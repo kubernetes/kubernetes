@@ -22,18 +22,12 @@ import (
 	// given binary target.
 
 	//Cloud providers
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/mesos"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/host_path"
+	"k8s.io/kubernetes/pkg/volume/nfs"
 )
 
 // ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.

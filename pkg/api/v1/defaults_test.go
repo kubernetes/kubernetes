@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	versioned "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -150,6 +150,64 @@ func TestSetDefaultReplicationController(t *testing.T) {
 				t.Errorf("expected: %v, got: %v", rc2.Spec.Template.Labels, rc2.Labels)
 			} else {
 				t.Errorf("unexpected equality: %v", rc.Labels)
+			}
+		}
+	}
+}
+
+func TestSetDefaultDaemon(t *testing.T) {
+	tests := []struct {
+		dc                 *versioned.Daemon
+		expectLabelsChange bool
+	}{
+		{
+			dc: &versioned.Daemon{
+				Spec: versioned.DaemonSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabelsChange: true,
+		},
+		{
+			dc: &versioned.Daemon{
+				ObjectMeta: versioned.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: versioned.DaemonSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabelsChange: false,
+		},
+	}
+
+	for _, test := range tests {
+		dc := test.dc
+		obj2 := roundTrip(t, runtime.Object(dc))
+		dc2, ok := obj2.(*versioned.Daemon)
+		if !ok {
+			t.Errorf("unexpected object: %v", dc2)
+			t.FailNow()
+		}
+		if test.expectLabelsChange != reflect.DeepEqual(dc2.Labels, dc2.Spec.Template.Labels) {
+			if test.expectLabelsChange {
+				t.Errorf("expected: %v, got: %v", dc2.Spec.Template.Labels, dc2.Labels)
+			} else {
+				t.Errorf("unexpected equality: %v", dc.Labels)
 			}
 		}
 	}
@@ -300,14 +358,14 @@ func TestSetDefaulServiceTargetPort(t *testing.T) {
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*versioned.Service)
 	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(1234) {
-		t.Errorf("Expected TargetPort to be defaulted, got %s", out.Spec.Ports[0].TargetPort)
+		t.Errorf("Expected TargetPort to be defaulted, got %v", out.Spec.Ports[0].TargetPort)
 	}
 
 	in = &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234, TargetPort: util.NewIntOrStringFromInt(5678)}}}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*versioned.Service)
 	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(5678) {
-		t.Errorf("Expected TargetPort to be unchanged, got %s", out.Spec.Ports[0].TargetPort)
+		t.Errorf("Expected TargetPort to be unchanged, got %v", out.Spec.Ports[0].TargetPort)
 	}
 }
 
@@ -324,13 +382,13 @@ func TestSetDefaultServicePort(t *testing.T) {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Spec.Ports[0].Protocol)
 	}
 	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromString("p") {
-		t.Errorf("Expected port %d, got %s", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
+		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Spec.Ports[1].Protocol)
 	}
 	if out.Spec.Ports[1].TargetPort != util.NewIntOrStringFromInt(309) {
-		t.Errorf("Expected port %d, got %s", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
+		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 
 	// Defaulted.
@@ -345,13 +403,13 @@ func TestSetDefaultServicePort(t *testing.T) {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
 	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(in.Spec.Ports[0].Port) {
-		t.Errorf("Expected port %d, got %d", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
+		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
 	if out.Spec.Ports[1].TargetPort != util.NewIntOrStringFromInt(in.Spec.Ports[1].Port) {
-		t.Errorf("Expected port %d, got %d", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
+		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }
 

@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -217,7 +217,7 @@ var _ = Describe("Networking", func() {
 				Logf("Attempt %v: service/pod still starting. (error: '%v')", i, err)
 				continue
 			}
-			// Finally, we pass/fail the test based on if the container's response body, as to wether or not it was able to find peers.
+			// Finally, we pass/fail the test based on if the container's response body, as to whether or not it was able to find peers.
 			switch {
 			case string(body) == "pass":
 				Logf("Passed on attempt %v. Cleaning up.", i)

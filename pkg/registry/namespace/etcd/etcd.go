@@ -20,16 +20,16 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/namespace"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // rest implements a RESTStorage for namespaces against etcd
@@ -48,8 +48,8 @@ type FinalizeREST struct {
 	store *etcdgeneric.Etcd
 }
 
-// NewStorage returns a RESTStorage object that will work against namespaces
-func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
+// NewREST returns a RESTStorage object that will work against namespaces.
+func NewREST(s storage.Interface) (*REST, *StatusREST, *FinalizeREST) {
 	prefix := "/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
@@ -67,11 +67,13 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
 			return namespace.MatchNamespace(label, field)
 		},
 		EndpointName: "namespaces",
-		Helper:       h,
+
+		CreateStrategy:      namespace.Strategy,
+		UpdateStrategy:      namespace.Strategy,
+		ReturnDeletedObject: true,
+
+		Storage: s,
 	}
-	store.CreateStrategy = namespace.Strategy
-	store.UpdateStrategy = namespace.Strategy
-	store.ReturnDeletedObject = true
 
 	statusStore := *store
 	statusStore.UpdateStrategy = namespace.StatusStrategy

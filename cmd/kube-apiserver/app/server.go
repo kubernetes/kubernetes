@@ -30,18 +30,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	forked "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/coreos/go-etcd/etcd"
 	systemd "github.com/coreos/go-systemd/daemon"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/capabilities"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
+	forked "k8s.io/kubernetes/third_party/forked/coreos/go-etcd/etcd"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -58,10 +62,10 @@ const (
 
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	InsecureBindAddress        util.IP
+	InsecureBindAddress        net.IP
 	InsecurePort               int
-	BindAddress                util.IP
-	AdvertiseAddress           util.IP
+	BindAddress                net.IP
+	AdvertiseAddress           net.IP
 	SecurePort                 int
 	ExternalHost               string
 	APIRate                    float32
@@ -70,26 +74,32 @@ type APIServer struct {
 	TLSPrivateKeyFile          string
 	CertDirectory              string
 	APIPrefix                  string
+	ExpAPIPrefix               string
 	StorageVersion             string
+	ExpStorageVersion          string
 	CloudProvider              string
 	CloudConfigFile            string
 	EventTTL                   time.Duration
 	BasicAuthFile              string
 	ClientCAFile               string
 	TokenAuthFile              string
+	OIDCIssuerURL              string
+	OIDCClientID               string
+	OIDCCAFile                 string
+	OIDCUsernameClaim          string
 	ServiceAccountKeyFile      string
 	ServiceAccountLookup       bool
+	KeystoneURL                string
 	AuthorizationMode          string
 	AuthorizationPolicyFile    string
 	AdmissionControl           string
 	AdmissionControlConfigFile string
-	EtcdServerList             util.StringList
+	EtcdServerList             []string
 	EtcdConfigFile             string
 	EtcdPathPrefix             string
-	OldEtcdPathPrefix          string
-	CorsAllowedOriginList      util.StringList
+	CorsAllowedOriginList      []string
 	AllowPrivileged            bool
-	ServiceClusterIPRange      util.IPNet // TODO: make this a list
+	ServiceClusterIPRange      net.IPNet // TODO: make this a list
 	ServiceNodePortRange       util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
@@ -102,18 +112,20 @@ type APIServer struct {
 	LongRunningRequestRE       string
 	SSHUser                    string
 	SSHKeyfile                 string
+	MaxConnectionBytesPerSec   int64
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
 		InsecurePort:           8080,
-		InsecureBindAddress:    util.IP(net.ParseIP("127.0.0.1")),
-		BindAddress:            util.IP(net.ParseIP("0.0.0.0")),
+		InsecureBindAddress:    net.ParseIP("127.0.0.1"),
+		BindAddress:            net.ParseIP("0.0.0.0"),
 		SecurePort:             6443,
 		APIRate:                10.0,
 		APIBurst:               200,
 		APIPrefix:              "/api",
+		ExpAPIPrefix:           "/experimental",
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
@@ -144,20 +156,23 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
-	fs.Var(&s.InsecureBindAddress, "insecure-bind-address", ""+
+	fs.MarkDeprecated("port", "see --insecure-port instead")
+	fs.IPVar(&s.InsecureBindAddress, "insecure-bind-address", s.InsecureBindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
 		"Defaults to localhost.")
-	fs.Var(&s.InsecureBindAddress, "address", "DEPRECATED: see --insecure-bind-address instead")
-	fs.Var(&s.BindAddress, "bind-address", ""+
+	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress, "DEPRECATED: see --insecure-bind-address instead")
+	fs.MarkDeprecated("address", "see --insecure-bind-address instread")
+	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		"clients. If blank, all interfaces will be used (0.0.0.0).")
-	fs.Var(&s.AdvertiseAddress, "advertise-address", ""+
+	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
 		"The IP address on which to advertise the apiserver to members of the cluster. This "+
 		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
-	fs.Var(&s.BindAddress, "public-address-override", "DEPRECATED: see --bind-address instead")
+	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress, "DEPRECATED: see --bind-address instead")
+	fs.MarkDeprecated("public-address-override", "see --bind-address instead")
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
@@ -171,6 +186,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
+	fs.StringVar(&s.ExpAPIPrefix, "experimental-prefix", s.ExpAPIPrefix, "The prefix for experimental API requests on the server. Default '/experimental'.")
 	fs.StringVar(&s.StorageVersion, "storage-version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
@@ -178,27 +194,32 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.")
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+	fs.StringVar(&s.OIDCIssuerURL, "oidc-issuer-url", s.OIDCIssuerURL, "The URL of the OpenID issuer, only HTTPS scheme will be accepted. If set, it will be used to verify the OIDC JSON Web Token (JWT)")
+	fs.StringVar(&s.OIDCClientID, "oidc-client-id", s.OIDCClientID, "The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set")
+	fs.StringVar(&s.OIDCCAFile, "oidc-ca-file", s.OIDCCAFile, "If set, the OpenID server's certificate will be verified by one of the authorities in the oidc-ca-file, otherwise the host's root CA set will be used")
+	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
+		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') is not "+
+		"guaranteed to be unique and immutable. This flag is experimental, please see the authentication documentation for further details.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, "File containing PEM-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup, "If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
+	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationPolicyFile, "authorization-policy-file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
 	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
 	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile, "File with admission control configuration.")
-	fs.Var(&s.EtcdServerList, "etcd-servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
+	fs.StringSliceVar(&s.EtcdServerList, "etcd-servers", s.EtcdServerList, "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
 	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd-servers.")
 	fs.StringVar(&s.EtcdPathPrefix, "etcd-prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
-	fs.StringVar(&s.OldEtcdPathPrefix, "old-etcd-prefix", s.OldEtcdPathPrefix, "The previous prefix for all resource paths in etcd, if any.")
-	fs.Var(&s.CorsAllowedOriginList, "cors-allowed-origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
+	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
-	fs.Var(&s.ServiceClusterIPRange, "service-cluster-ip-range", "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
-	fs.Var(&s.ServiceClusterIPRange, "portal-net", "Deprecated: see --service-cluster-ip-range instead.")
+	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange, "Deprecated: see --service-cluster-ip-range instead.")
 	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead.")
 	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", "A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.")
 	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "Deprecated: see --service-node-port-range instead.")
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/<version> key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
-	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ExternalHost, "external-hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
@@ -207,6 +228,14 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", defaultLongRunningRequestRE, "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
 	fs.StringVar(&s.SSHUser, "ssh-user", "", "If non-empty, use secure SSH proxy to the nodes, using this user name")
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", "", "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
+	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", 0, "If non-zero, throttle each user connection to this number of bytes/sec.  Currently only applies to long-running requests")
+	// Kubelet related flags:
+	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps, "Use https for kubelet connections")
+	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port, "Kubelet port")
+	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout, "Timeout for kubelet operations")
+	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile, "Path to a client key file for TLS.")
+	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile, "Path to a client key file for TLS.")
+	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile, "Path to a cert. file for the certificate authority.")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -214,14 +243,18 @@ func (s *APIServer) verifyClusterIPFlags() {
 	if s.ServiceClusterIPRange.IP == nil {
 		glog.Fatal("No --service-cluster-ip-range specified")
 	}
+	var ones, bits = s.ServiceClusterIPRange.Mask.Size()
+	if bits-ones > 20 {
+		glog.Fatal("Specified --service-cluster-ip-range is too large")
+	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (helper tools.EtcdHelper, err error) {
-	var client tools.EtcdGetSet
+func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, defaultVersion, storageVersion, pathPrefix string) (etcdStorage storage.Interface, err error) {
+	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 		if err != nil {
-			return helper, err
+			return nil, err
 		}
 	} else {
 		etcdClient := etcd.NewClient(etcdServerList)
@@ -236,7 +269,10 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 		client = etcdClient
 	}
 
-	return master.NewEtcdHelper(client, storageVersion, pathPrefix)
+	if storageVersion == "" {
+		storageVersion = defaultVersion
+	}
+	return master.NewEtcdStorage(client, interfacesFunc, storageVersion, pathPrefix)
 }
 
 // Run runs the specified APIServer.  This should never exit.
@@ -244,9 +280,10 @@ func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
 
 	// If advertise-address is not specified, use bind-address. If bind-address
-	// is also unset (or 0.0.0.0), setDefaults() in pkg/master/master.go will
-	// do the right thing and use the host's default interface.
-	if s.AdvertiseAddress == nil || net.IP(s.AdvertiseAddress).IsUnspecified() {
+	// is not usable (unset, 0.0.0.0, or loopback), setDefaults() in
+	// pkg/master/master.go will do the right thing and use the host's default
+	// interface.
+	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		s.AdvertiseAddress = s.BindAddress
 	}
 
@@ -257,10 +294,14 @@ func (s *APIServer) Run(_ []string) error {
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
-		HostNetworkSources: []string{},
+		HostNetworkSources:                     []string{},
+		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
 
 	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
 	if err != nil {
@@ -282,15 +323,15 @@ func (s *APIServer) Run(_ []string) error {
 	}
 	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
 
-	// v1beta3 is disabled by default. Users can enable it using "api/v1beta3=true"
-	enableV1beta3 := s.getRuntimeConfigValue("api/v1beta3", false)
-
 	// "api/v1={true|false} allows users to enable/disable v1 API.
 	// This takes preference over api/all and api/legacy, if specified.
 	disableV1 := disableAllAPIs
 	disableV1 = !s.getRuntimeConfigValue("api/v1", !disableV1)
 
-	// TODO: expose same flags as client.BindClientConfigFlags but for a server
+	// "experimental/v1={true|false} allows users to enable/disable the experimental API.
+	// This takes preference over api/all, if specified.
+	enableExp := s.getRuntimeConfigValue("experimental/v1", false)
+
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 		Version: s.StorageVersion,
@@ -300,20 +341,16 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.InterfacesFor, latest.Version, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
-
-	// TODO Is this the right place for migration to happen? Must *both* old and
-	// new etcd prefix params be supplied for this to be valid?
-	if s.OldEtcdPathPrefix != "" {
-		if err = helper.MigrateKeys(s.OldEtcdPathPrefix); err != nil {
-			glog.Fatalf("Migration of old etcd keys failed: %v", err)
-		}
+	expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, explatest.InterfacesFor, explatest.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
+	if err != nil {
+		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 	}
 
-	n := net.IPNet(s.ServiceClusterIPRange)
+	n := s.ServiceClusterIPRange
 
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
@@ -323,7 +360,20 @@ func (s *APIServer) Run(_ []string) error {
 			glog.Warning("no RSA key provided, service account token authentication disabled")
 		}
 	}
-	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, helper)
+	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
+		BasicAuthFile:         s.BasicAuthFile,
+		ClientCAFile:          s.ClientCAFile,
+		TokenAuthFile:         s.TokenAuthFile,
+		OIDCIssuerURL:         s.OIDCIssuerURL,
+		OIDCClientID:          s.OIDCClientID,
+		OIDCCAFile:            s.OIDCCAFile,
+		OIDCUsernameClaim:     s.OIDCUsernameClaim,
+		ServiceAccountKeyFile: s.ServiceAccountKeyFile,
+		ServiceAccountLookup:  s.ServiceAccountLookup,
+		Storage:               etcdStorage,
+		KeystoneURL:           s.KeystoneURL,
+	})
+
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
@@ -366,7 +416,9 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 	config := &master.Config{
-		EtcdHelper:             helper,
+		DatabaseStorage:    etcdStorage,
+		ExpDatabaseStorage: expEtcdStorage,
+
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
 		ServiceClusterIPRange:  &n,
@@ -377,15 +429,16 @@ func (s *APIServer) Run(_ []string) error {
 		EnableProfiling:        s.EnableProfiling,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
+		ExpAPIPrefix:           s.ExpAPIPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadWritePort:          s.SecurePort,
-		PublicAddress:          net.IP(s.AdvertiseAddress),
+		PublicAddress:          s.AdvertiseAddress,
 		Authenticator:          authenticator,
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
-		EnableV1Beta3:          enableV1beta3,
 		DisableV1:              disableV1,
+		EnableExp:              enableExp,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,
@@ -412,13 +465,19 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	longRunningRE := regexp.MustCompile(s.LongRunningRequestRE)
+	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
+		// TODO unify this with apiserver.MaxInFlightLimit
+		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
+			return nil, ""
+		}
+		return time.After(time.Minute), ""
+	}
 
 	if secureLocation != "" {
+		handler := apiserver.TimeoutHandler(m.Handler, longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
-			ReadTimeout:    ReadWriteTimeout,
-			WriteTimeout:   ReadWriteTimeout,
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
@@ -458,7 +517,7 @@ func (s *APIServer) Run(_ []string) error {
 				}
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon sucessful start message: %v\n", err)
+					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 				}
 				if err := secureServer.ListenAndServeTLS(s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
@@ -467,17 +526,16 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}()
 	}
+	handler := apiserver.TimeoutHandler(m.InsecureHandler, longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
-		ReadTimeout:    ReadWriteTimeout,
-		WriteTimeout:   ReadWriteTimeout,
+		Handler:        apiserver.RecoverPanics(handler),
 		MaxHeaderBytes: 1 << 20,
 	}
 	if secureLocation == "" {
 		// err == systemd.SdNotifyNoSocket when not running on a systemd system
 		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon sucessful start message: %v\n", err)
+			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 		}
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)

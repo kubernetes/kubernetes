@@ -53,7 +53,7 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Comma separated list of API Versions that should be tested.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,v1beta3"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1"}
 # Run tests with the standard (registry) and a custom etcd prefix
 # (kubernetes.io/registry).
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
@@ -204,8 +204,12 @@ runTests() {
 }
 
 reportCoverageToCoveralls() {
-  if [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
-    ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" || true
+  if [[ ${KUBE_COVER} =~ ^[yY]$ ]] && [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
+    kube::log::status "Reporting coverage results to Coveralls for service ${CI_NAME:-}"
+    ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" \
+    ${CI_NAME:+"-service=${CI_NAME}"} \
+    ${COVERALLS_REPO_TOKEN:+"-repotoken=${COVERALLS_REPO_TOKEN}"} \
+      || true
   fi
 }
 
@@ -218,7 +222,7 @@ for (( i=0, j=0; ; )); do
   apiVersion=${apiVersions[i]}
   etcdPrefix=${etcdPrefixes[j]}
   echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
-  KUBE_API_VERSION="${apiVersion}" KUBE_API_VERSIONS="v1,v1beta3" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  KUBE_API_VERSION="${apiVersion}" KUBE_API_VERSIONS="v1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then

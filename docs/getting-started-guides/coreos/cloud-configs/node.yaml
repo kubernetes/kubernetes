@@ -57,7 +57,7 @@ coreos:
         After=setup-network-environment.service
 
         [Service]
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-proxy -z /opt/bin/kube-proxy https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kube-proxy
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-proxy -z /opt/bin/kube-proxy https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kube-proxy
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
         # wait for kubernetes master to be up and ready
         ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
@@ -77,20 +77,20 @@ coreos:
 
         [Service]
         EnvironmentFile=/etc/network-environment
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kubelet -z /opt/bin/kubelet https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kubelet -z /opt/bin/kubelet https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kubelet
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
         # wait for kubernetes master to be up and ready
         ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
         ExecStart=/opt/bin/kubelet \
         --address=0.0.0.0 \
         --port=10250 \
-        --hostname_override=${DEFAULT_IPV4} \
-        --api_servers=<master-private-ip>:8080 \
-        --allow_privileged=true \
+        --hostname-override=${DEFAULT_IPV4} \
+        --api-servers=<master-private-ip>:8080 \
+        --allow-privileged=true \
         --logtostderr=true \
-        --cadvisor_port=4194 \
-        --healthz_bind_address=0.0.0.0 \
-        --healthz_port=10248
+        --cadvisor-port=4194 \
+        --healthz-bind-address=0.0.0.0 \
+        --healthz-port=10248
         Restart=always
         RestartSec=10
   update:

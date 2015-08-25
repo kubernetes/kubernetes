@@ -21,39 +21,53 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 const (
 	patch_long = `Update field(s) of a resource using strategic merge patch
 
-JSON and YAML formats are accepted.`
+JSON and YAML formats are accepted.
+
+Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.`
 	patch_example = `
-// Partially update a node using strategic merge patch
-kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'`
+# Partially update a node using strategic merge patch
+kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
+
+# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch
+kubectl patch -f node.json -p '{"spec":{"unschedulable":true}}'
+
+# Update a container's image; spec.containers[*].name is required because it's a merge key
+kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'`
 )
 
 func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "patch RESOURCE NAME -p PATCH",
+		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
 		Short:   "Update field(s) of a resource by stdin.",
 		Long:    patch_long,
 		Example: patch_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunPatch(f, out, cmd, args)
-			cmdutil.CheckCustomErr("Patch failed", err)
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+			err := RunPatch(f, out, cmd, args, shortOutput)
+			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringP("patch", "p", "", "The patch to be appied to the resource JSON file.")
+	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
+	cmdutil.AddOutputFlagsForMutation(cmd)
+
+	usage := "Filename, directory, or URL to a file identifying the resource to update"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
-func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	cmdNamespace, _, err := f.DefaultNamespace()
+func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -67,18 +81,11 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
 	err = r.Err()
-	if err != nil {
-		return err
-	}
-	mapping, err := r.ResourceMapping()
-	if err != nil {
-		return err
-	}
-	client, err := f.RESTClient(mapping)
 	if err != nil {
 		return err
 	}
@@ -87,13 +94,22 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	name, namespace := infos[0].Name, infos[0].Namespace
+	if len(infos) > 1 {
+		return fmt.Errorf("multiple resources provided")
+	}
+	info := infos[0]
+	name, namespace := info.Name, info.Namespace
+	mapping := info.ResourceMapping()
+	client, err := f.RESTClient(mapping)
+	if err != nil {
+		return err
+	}
 
 	helper := resource.NewHelper(client, mapping)
 	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "%s\n", name)
+	cmdutil.PrintSuccess(mapper, shortOutput, out, "", name, "patched")
 	return nil
 }

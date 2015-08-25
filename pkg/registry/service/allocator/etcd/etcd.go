@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	k8serr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/api"
+	k8serr "k8s.io/kubernetes/pkg/api/errors"
+	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 )
 
 var (
@@ -41,9 +42,9 @@ var (
 type Etcd struct {
 	lock sync.Mutex
 
-	alloc  allocator.Snapshottable
-	helper tools.EtcdHelper
-	last   string
+	alloc   allocator.Snapshottable
+	storage storage.Interface
+	last    string
 
 	baseKey string
 	kind    string
@@ -55,10 +56,10 @@ var _ service.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, helper tools.EtcdHelper) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, storage storage.Interface) *Etcd {
 	return &Etcd{
 		alloc:   alloc,
-		helper:  helper,
+		storage: storage,
 		baseKey: baseKey,
 		kind:    kind,
 	}
@@ -140,8 +141,8 @@ func (e *Etcd) Release(item int) error {
 
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
-	err := e.helper.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
-		tools.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
+	err := e.storage.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
+		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
 				return nil, fmt.Errorf("cannot allocate resources of type %s at this time", e.kind)
@@ -170,8 +171,8 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 	defer e.lock.Unlock()
 
 	existing := &api.RangeAllocation{}
-	if err := e.helper.ExtractObj(e.baseKey, existing, false); err != nil {
-		if tools.IsEtcdNotFound(err) {
+	if err := e.storage.Get(e.baseKey, existing, false); err != nil {
+		if etcdstorage.IsEtcdNotFound(err) {
 			return nil, nil
 		}
 		return nil, etcderr.InterpretGetError(err, e.kind, "")
@@ -184,7 +185,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.helper.ExtractObj(e.baseKey, existing, true); err != nil {
+	if err := e.storage.Get(e.baseKey, existing, true); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.kind, "")
 	}
 	return existing, nil
@@ -197,8 +198,8 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 	defer e.lock.Unlock()
 
 	last := ""
-	err := e.helper.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
-		tools.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
+	err := e.storage.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
+		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:

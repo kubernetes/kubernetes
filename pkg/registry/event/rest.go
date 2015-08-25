@@ -19,101 +19,58 @@ package event
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
-// REST adapts an event registry into apiserver's RESTStorage model.
-type REST struct {
-	registry generic.Registry
+type eventStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
 }
 
-// NewStorage returns a new REST. You must use a registry created by
-// NewEtcdRegistry unless you're testing.
-func NewStorage(registry generic.Registry) *REST {
-	return &REST{
-		registry: registry,
-	}
+// Strategy is the default logic that pplies when creating and updating
+// Event objects via the REST API.
+var Strategy = eventStrategy{api.Scheme, api.SimpleNameGenerator}
+
+func (eventStrategy) NamespaceScoped() bool {
+	return true
 }
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, errors.NewInternalError(fmt.Errorf("received object is not of type event: %#v", obj))
-	}
-	if api.NamespaceValue(ctx) != "" {
-		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
-			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
-		}
-	}
-	if errs := validation.ValidateEvent(event); len(errs) > 0 {
-		return nil, errors.NewInvalid("event", event.Name, errs)
-	}
-	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
-
-	err := rs.registry.CreateWithName(ctx, event.Name, event)
-	if err != nil {
-		return nil, err
-	}
-	return rs.registry.Get(ctx, event.Name)
+func (eventStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
-// Update replaces an existing Event instance in storage.registry, with the given instance.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, false, errors.NewInternalError(fmt.Errorf("received object is not of type event: %#v", obj))
-
-	}
-	if api.NamespaceValue(ctx) != "" {
-		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
-			return nil, false, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
-		}
-	}
-	if errs := validation.ValidateEvent(event); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("event", event.Name, errs)
-	}
-	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
-
-	err := rs.registry.UpdateWithName(ctx, event.Name, event)
-	if err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.Get(ctx, event.Name)
-	return out, false, err
+func (eventStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	_, ok := obj.(*api.Event)
-	if !ok {
-		return nil, errors.NewInternalError(fmt.Errorf("stored object %s is not of type event: %#v", name, obj))
-	}
-	return rs.registry.Delete(ctx, name, nil)
+func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+	event := obj.(*api.Event)
+	return validation.ValidateEvent(event)
 }
 
-func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, errors.NewInternalError(fmt.Errorf("stored object %s is not of type event: %#v", name, obj))
-	}
-	return event, err
+func (eventStrategy) AllowCreateOnUpdate() bool {
+	return true
 }
 
-func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
+func (eventStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	event := obj.(*api.Event)
+	return validation.ValidateEvent(event)
+}
+
+func (eventStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
+func MatchEvent(label labels.Selector, field fields.Selector) generic.Matcher {
+	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
+}
+
+func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
 	event, ok := obj.(*api.Event)
 	if !ok {
 		return nil, nil, errors.NewInternalError(fmt.Errorf("object is not of type event: %#v", obj))
@@ -134,23 +91,4 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fi
 		"reason":                         event.Reason,
 		"source":                         event.Source.Component,
 	}, nil
-}
-
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
-}
-
-// Watch returns Events events via a watch.Interface.
-// It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
-}
-
-// New returns a new api.Event
-func (*REST) New() runtime.Object {
-	return &api.Event{}
-}
-
-func (*REST) NewList() runtime.Object {
-	return &api.EventList{}
 }

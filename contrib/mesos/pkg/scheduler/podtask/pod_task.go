@@ -21,20 +21,18 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	annotation "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/gogo/protobuf/proto"
+	"github.com/pborman/uuid"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
+
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
-)
-
-const (
-	DefaultContainerCpus = 0.25 // initial CPU allocated for executor
-	DefaultContainerMem  = 64   // initial MB of memory allocated for executor
 )
 
 type StateType int
@@ -74,12 +72,13 @@ type T struct {
 }
 
 type Spec struct {
-	SlaveID string
-	CPU     float64
-	Memory  float64
-	PortMap []HostPortMapping
-	Ports   []uint64
-	Data    []byte
+	SlaveID       string
+	AssignedSlave string
+	CPU           mresource.CPUShares
+	Memory        mresource.MegaBytes
+	PortMap       []HostPortMapping
+	Ports         []uint64
+	Data          []byte
 }
 
 // mostly-clone this pod task. the clone will actually share the some fields:
@@ -141,8 +140,8 @@ func (t *T) BuildTaskInfo() *mesos.TaskInfo {
 		Executor: t.executor,
 		Data:     t.Spec.Data,
 		Resources: []*mesos.Resource{
-			mutil.NewScalarResource("cpus", t.Spec.CPU),
-			mutil.NewScalarResource("mem", t.Spec.Memory),
+			mutil.NewScalarResource("cpus", float64(t.Spec.CPU)),
+			mutil.NewScalarResource("mem", float64(t.Spec.Memory)),
 		},
 	}
 	if portsResource := rangeResource("ports", t.Spec.Ports); portsResource != nil {
@@ -151,23 +150,26 @@ func (t *T) BuildTaskInfo() *mesos.TaskInfo {
 	return info
 }
 
-// Fill the Spec in the T, should be called during k8s scheduling,
-// before binding.
-// TODO(jdef): remove hardcoded values and make use of actual pod resource settings
+// Fill the Spec in the T, should be called during k8s scheduling, before binding.
 func (t *T) FillFromDetails(details *mesos.Offer) error {
 	if details == nil {
 		//programming error
 		panic("offer details are nil")
 	}
 
-	log.V(3).Infof("Recording offer(s) %v against pod %v", details.Id, t.Pod.Name)
+	// compute used resources
+	cpu := mresource.PodCPULimit(&t.Pod)
+	mem := mresource.PodMemLimit(&t.Pod)
+	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", details.Id, t.Pod.Namespace, t.Pod.Name, cpu, mem)
 
 	t.Spec = Spec{
-		SlaveID: details.GetSlaveId().GetValue(),
-		CPU:     DefaultContainerCpus,
-		Memory:  DefaultContainerMem,
+		SlaveID:       details.GetSlaveId().GetValue(),
+		AssignedSlave: details.GetHostname(),
+		CPU:           cpu,
+		Memory:        mem,
 	}
 
+	// fill in port mapping
 	if mapping, err := t.mapper.Generate(t, details); err != nil {
 		t.Reset()
 		return err
@@ -213,35 +215,58 @@ func (t *T) AcceptOffer(offer *mesos.Offer) bool {
 	if offer == nil {
 		return false
 	}
-	var (
-		cpus float64 = 0
-		mem  float64 = 0
-	)
-	for _, resource := range offer.Resources {
-		if resource.GetName() == "cpus" {
-			cpus = *resource.GetScalar().Value
-		}
 
-		if resource.GetName() == "mem" {
-			mem = *resource.GetScalar().Value
+	// if the user has specified a target host, make sure this offer is for that host
+	if t.Pod.Spec.NodeName != "" && offer.GetHostname() != t.Pod.Spec.NodeName {
+		return false
+	}
+
+	// check the NodeSelector
+	if len(t.Pod.Spec.NodeSelector) > 0 {
+		slaveLabels := map[string]string{}
+		for _, a := range offer.Attributes {
+			if a.GetType() == mesos.Value_TEXT {
+				slaveLabels[a.GetName()] = a.GetText().GetValue()
+			}
+		}
+		selector := labels.SelectorFromSet(t.Pod.Spec.NodeSelector)
+		if !selector.Matches(labels.Set(slaveLabels)) {
+			return false
 		}
 	}
+
+	// check ports
 	if _, err := t.mapper.Generate(t, offer); err != nil {
 		log.V(3).Info(err)
 		return false
 	}
 
-	// for now hard-coded, constant values are used for cpus and mem. This is necessary
-	// until parent-cgroup integration is finished for mesos and k8sm. Then the k8sm
-	// executor can become the parent of pods and subsume their resource usage and
-	// therefore be compliant with expectations of mesos executors w/ respect to
-	// resource allocation and management.
-	//
-	// TODO(jdef): remove hardcoded values and make use of actual pod resource settings
-	if (cpus < DefaultContainerCpus) || (mem < DefaultContainerMem) {
-		log.V(3).Infof("not enough resources: cpus: %f mem: %f", cpus, mem)
+	// find offered cpu and mem
+	var (
+		offeredCpus mresource.CPUShares
+		offeredMem  mresource.MegaBytes
+	)
+	for _, resource := range offer.Resources {
+		if resource.GetName() == "cpus" {
+			offeredCpus = mresource.CPUShares(*resource.GetScalar().Value)
+		}
+
+		if resource.GetName() == "mem" {
+			offeredMem = mresource.MegaBytes(*resource.GetScalar().Value)
+		}
+	}
+
+	// calculate cpu and mem sum over all containers of the pod
+	// TODO (@sttts): also support pod.spec.resources.limit.request
+	// TODO (@sttts): take into account the executor resources
+	cpu := mresource.PodCPULimit(&t.Pod)
+	mem := mresource.PodMemLimit(&t.Pod)
+	log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
+	if (cpu > offeredCpus) || (mem > offeredMem) {
+		log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
 		return false
 	}
+
 	return true
 }
 
@@ -338,8 +363,7 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		bindTime:   now,
 	}
 	var (
-		offerId  string
-		hostname string
+		offerId string
 	)
 	for _, k := range []string{
 		annotation.BindingHostKey,
@@ -354,7 +378,7 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		}
 		switch k {
 		case annotation.BindingHostKey:
-			hostname = v
+			t.Spec.AssignedSlave = v
 		case annotation.SlaveIdKey:
 			t.Spec.SlaveID = v
 		case annotation.OfferIdKey:
@@ -367,7 +391,7 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 			t.executor = &mesos.ExecutorInfo{ExecutorId: mutil.NewExecutorID(v)}
 		}
 	}
-	t.Offer = offers.Expired(offerId, hostname, 0)
+	t.Offer = offers.Expired(offerId, t.Spec.AssignedSlave, 0)
 	t.Flags[Launched] = struct{}{}
 	t.Flags[Bound] = struct{}{}
 	return t, true, nil

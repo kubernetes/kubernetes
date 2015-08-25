@@ -12,6 +12,9 @@ GODEPS_PKG_DIR = Godeps/_workspace/pkg
 KUBE_GOFLAGS = $(GOFLAGS)
 export KUBE_GOFLAGS
 
+KUBE_GOLDFLAGS = $(GOLDFLAGS)
+export KUBE_GOLDFLAGS
+
 # Build code.
 #
 # Args:
@@ -19,6 +22,7 @@ export KUBE_GOFLAGS
 #     package, the build will produce executable files under $(OUT_DIR)/go/bin.
 #     If not specified, "everything" will be built.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
+#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make
@@ -35,6 +39,7 @@ all:
 #     directories will be run.  If not specified, "everything" will be tested.
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
+#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make check
@@ -78,6 +83,7 @@ clean:
 #     vetted.
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
+#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make vet

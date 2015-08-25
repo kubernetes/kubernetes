@@ -23,11 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 var testPod *api.Pod = &api.Pod{
@@ -52,14 +51,16 @@ func getRandomPodStatus() api.PodStatus {
 	}
 }
 
-func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []string) {
-	actions := kubeClient.(*testclient.Fake).Actions
+func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []testclient.Action) {
+	actions := kubeClient.(*testclient.Fake).Actions()
 	if len(actions) != len(expectedActions) {
 		t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
 		return
 	}
 	for i := 0; i < len(actions); i++ {
-		if actions[i].Action != expectedActions[i] {
+		e := expectedActions[i]
+		a := actions[i]
+		if !a.Matches(e.GetVerb(), e.GetResource()) || a.GetSubresource() != e.GetSubresource() {
 			t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
 		}
 	}
@@ -92,7 +93,7 @@ func TestNewStatus(t *testing.T) {
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 1)
 
-	status, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(testPod))
+	status, _ := syncer.GetPodStatus(testPod.UID)
 	if status.StartTime.IsZero() {
 		t.Errorf("SetPodStatus did not set a proper start time value")
 	}
@@ -113,7 +114,7 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	pod.Status.StartTime = &startTime
 	syncer.SetPodStatus(pod, getRandomPodStatus())
 
-	status, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(pod))
+	status, _ := syncer.GetPodStatus(pod.UID)
 	if !status.StartTime.Time.Equal(startTime.Time) {
 		t.Errorf("Unexpected start time, expected %v, actual %v", startTime, status.StartTime)
 	}
@@ -134,7 +135,7 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 	syncer.SetPodStatus(testPod, firstStatus)
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 2)
-	finalStatus, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(testPod))
+	finalStatus, _ := syncer.GetPodStatus(testPod.UID)
 	if finalStatus.StartTime.IsZero() {
 		t.Errorf("StartTime should not be zero")
 	}
@@ -151,14 +152,47 @@ func TestUnchangedStatus(t *testing.T) {
 	verifyUpdates(t, syncer, 1)
 }
 
-func TestSyncBatch(t *testing.T) {
+func TestSyncBatchIgnoresNotFound(t *testing.T) {
 	syncer := newTestStatusManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	err := syncer.syncBatch()
 	if err != nil {
 		t.Errorf("unexpected syncing error: %v", err)
 	}
-	verifyActions(t, syncer.kubeClient, []string{"get-pod", "update-status-pod"})
+	verifyActions(t, syncer.kubeClient, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+	})
+}
+
+func TestSyncBatch(t *testing.T) {
+	syncer := newTestStatusManager()
+	syncer.kubeClient = testclient.NewSimpleFake(testPod)
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
+	err := syncer.syncBatch()
+	if err != nil {
+		t.Errorf("unexpected syncing error: %v", err)
+	}
+	verifyActions(t, syncer.kubeClient, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
+	},
+	)
+}
+
+func TestSyncBatchChecksMismatchedUID(t *testing.T) {
+	syncer := newTestStatusManager()
+	testPod.UID = "first"
+	differentPod := *testPod
+	differentPod.UID = "second"
+	syncer.kubeClient = testclient.NewSimpleFake(testPod)
+	syncer.SetPodStatus(&differentPod, getRandomPodStatus())
+	err := syncer.syncBatch()
+	if err != nil {
+		t.Errorf("unexpected syncing error: %v", err)
+	}
+	verifyActions(t, syncer.kubeClient, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+	})
 }
 
 // shuffle returns a new shuffled list of container statuses.

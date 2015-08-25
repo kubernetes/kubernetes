@@ -25,29 +25,30 @@ import (
 	"sync"
 	"time"
 
-	execcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/messages"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	offerMetrics "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/proc"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/uid"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	offerMetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type Slave struct {
@@ -101,7 +102,7 @@ func (self *slaveStorage) getSlave(slaveId string) (*Slave, bool) {
 type PluginInterface interface {
 	// the apiserver may have a different state for the pod than we do
 	// so reconcile our records, but only for this one pod
-	reconcilePod(api.Pod)
+	reconcileTask(*podtask.T)
 
 	// execute the Scheduling plugin, should start a go routine and return immediately
 	Run(<-chan struct{})
@@ -120,14 +121,16 @@ type KubernetesScheduler struct {
 
 	// Config related, write-once
 
-	schedcfg          *schedcfg.Config
-	executor          *mesos.ExecutorInfo
-	executorGroup     uint64
-	scheduleFunc      PodScheduleFunc
-	client            *client.Client
-	etcdClient        tools.EtcdGetSet
-	failoverTimeout   float64 // in seconds
-	reconcileInterval int64
+	schedcfg                 *schedcfg.Config
+	executor                 *mesos.ExecutorInfo
+	executorGroup            uint64
+	scheduleFunc             PodScheduleFunc
+	client                   *client.Client
+	etcdClient               tools.EtcdClient
+	failoverTimeout          float64 // in seconds
+	reconcileInterval        int64
+	defaultContainerCPULimit mresource.CPUShares
+	defaultContainerMemLimit mresource.MegaBytes
 
 	// Mesos context.
 
@@ -154,29 +157,33 @@ type KubernetesScheduler struct {
 }
 
 type Config struct {
-	Schedcfg          schedcfg.Config
-	Executor          *mesos.ExecutorInfo
-	ScheduleFunc      PodScheduleFunc
-	Client            *client.Client
-	EtcdClient        tools.EtcdGetSet
-	FailoverTimeout   float64
-	ReconcileInterval int64
-	ReconcileCooldown time.Duration
+	Schedcfg                 schedcfg.Config
+	Executor                 *mesos.ExecutorInfo
+	ScheduleFunc             PodScheduleFunc
+	Client                   *client.Client
+	EtcdClient               tools.EtcdClient
+	FailoverTimeout          float64
+	ReconcileInterval        int64
+	ReconcileCooldown        time.Duration
+	DefaultContainerCPULimit mresource.CPUShares
+	DefaultContainerMemLimit mresource.MegaBytes
 }
 
 // New creates a new KubernetesScheduler
 func New(config Config) *KubernetesScheduler {
 	var k *KubernetesScheduler
 	k = &KubernetesScheduler{
-		schedcfg:          &config.Schedcfg,
-		RWMutex:           new(sync.RWMutex),
-		executor:          config.Executor,
-		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
-		scheduleFunc:      config.ScheduleFunc,
-		client:            config.Client,
-		etcdClient:        config.EtcdClient,
-		failoverTimeout:   config.FailoverTimeout,
-		reconcileInterval: config.ReconcileInterval,
+		schedcfg:                 &config.Schedcfg,
+		RWMutex:                  new(sync.RWMutex),
+		executor:                 config.Executor,
+		executorGroup:            uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
+		scheduleFunc:             config.ScheduleFunc,
+		client:                   config.Client,
+		etcdClient:               config.EtcdClient,
+		failoverTimeout:          config.FailoverTimeout,
+		reconcileInterval:        config.ReconcileInterval,
+		defaultContainerCPULimit: config.DefaultContainerCPULimit,
+		defaultContainerMemLimit: config.DefaultContainerMemLimit,
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				// filter the offers: the executor IDs must not identify a kubelet-
@@ -393,14 +400,21 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 	taskState := taskStatus.GetState()
 	metrics.StatusUpdates.WithLabelValues(source, reason, taskState.String()).Inc()
 
+	message := "none"
+	if taskStatus.Message != nil {
+		message = *taskStatus.Message
+	}
+
 	log.Infof(
-		"task status update %q from %q for task %q on slave %q executor %q for reason %q",
+		"task status update %q from %q for task %q on slave %q executor %q for reason %q with message %q",
 		taskState.String(),
 		source,
 		taskStatus.TaskId.GetValue(),
 		taskStatus.SlaveId.GetValue(),
 		taskStatus.ExecutorId.GetValue(),
-		reason)
+		reason,
+		message,
+	)
 
 	switch taskState {
 	case mesos.TaskState_TASK_RUNNING, mesos.TaskState_TASK_FINISHED, mesos.TaskState_TASK_STARTING, mesos.TaskState_TASK_STAGING:
@@ -422,10 +436,10 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 			log.Errorf("Ignore status %+v because the slave does not exist", taskStatus)
 			return
 		}
-	case mesos.TaskState_TASK_FAILED:
+	case mesos.TaskState_TASK_FAILED, mesos.TaskState_TASK_ERROR:
 		if task, _ := k.taskRegistry.UpdateStatus(taskStatus); task != nil {
 			if task.Has(podtask.Launched) && !task.Has(podtask.Bound) {
-				go k.plugin.reconcilePod(task.Pod)
+				go k.plugin.reconcileTask(task)
 				return
 			}
 		} else {
@@ -436,13 +450,24 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 		fallthrough
 	case mesos.TaskState_TASK_LOST, mesos.TaskState_TASK_KILLED:
 		k.reconcileTerminalTask(driver, taskStatus)
+	default:
+		log.Errorf(
+			"unknown task status %q from %q for task %q on slave %q executor %q for reason %q with message %q",
+			taskState.String(),
+			source,
+			taskStatus.TaskId.GetValue(),
+			taskStatus.SlaveId.GetValue(),
+			taskStatus.ExecutorId.GetValue(),
+			reason,
+			message,
+		)
 	}
 }
 
 func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
 	task, state := k.taskRegistry.UpdateStatus(taskStatus)
 
-	if (state == podtask.StateRunning || state == podtask.StatePending) && taskStatus.SlaveId != nil &&
+	if (state == podtask.StateRunning || state == podtask.StatePending) &&
 		((taskStatus.GetSource() == mesos.TaskStatus_SOURCE_MASTER && taskStatus.GetReason() == mesos.TaskStatus_REASON_RECONCILIATION) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED)) {

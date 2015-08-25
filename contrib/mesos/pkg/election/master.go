@@ -19,8 +19,8 @@ package election
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -46,14 +46,14 @@ type Service interface {
 }
 
 type notifier struct {
-	lock sync.Mutex
-	cond *sync.Cond
+	changed chan struct{} // to notify the service loop about changed state
 
 	// desired is updated with every change, current is updated after
 	// Start()/Stop() finishes. 'cond' is used to signal that a change
 	// might be needed. This handles the case where mastership flops
 	// around without calling Start()/Stop() excessively.
 	desired, current Master
+	lock             sync.Mutex // to protect the desired variable
 
 	// for comparison, to see if we are master.
 	id Master
@@ -65,7 +65,7 @@ type notifier struct {
 // elected master starts/stops matching 'id'. Never returns.
 func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) {
 	n := &notifier{id: Master(id), service: s}
-	n.cond = sync.NewCond(&n.lock)
+	n.changed = make(chan struct{})
 	finished := runtime.After(func() {
 		runtime.Until(func() {
 			for {
@@ -86,14 +86,16 @@ func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) 
 							glog.Errorf("Unexpected object from election channel: %v", event.Object)
 							break
 						}
-						func() {
-							n.lock.Lock()
-							defer n.lock.Unlock()
-							n.desired = electedMaster
-							if n.desired != n.current {
-								n.cond.Signal()
-							}
-						}()
+
+						n.lock.Lock()
+						n.desired = electedMaster
+						n.lock.Unlock()
+
+						// notify serviceLoop, but don't block. If a change
+						// is queued already it will see the new n.desired.
+						select {
+						case n.changed <- struct{}{}:
+						}
 					}
 				}
 			}
@@ -104,31 +106,22 @@ func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) 
 
 // serviceLoop waits for changes, and calls Start()/Stop() as needed.
 func (n *notifier) serviceLoop(abort <-chan struct{}) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
 	for {
 		select {
 		case <-abort:
 			return
-		default:
-			for n.desired == n.current {
-				ch := runtime.After(n.cond.Wait)
-				select {
-				case <-abort:
-					n.cond.Signal() // ensure that Wait() returns
-					<-ch
-					return
-				case <-ch:
-					// we were notified and have the lock, proceed..
-				}
-			}
-			if n.current != n.id && n.desired == n.id {
-				n.service.Validate(n.desired, n.current)
+		case <-n.changed:
+			n.lock.Lock()
+			newDesired := n.desired // copy value to avoid race below
+			n.lock.Unlock()
+
+			if n.current != n.id && newDesired == n.id {
+				n.service.Validate(newDesired, n.current)
 				n.service.Start()
-			} else if n.current == n.id && n.desired != n.id {
+			} else if n.current == n.id && newDesired != n.id {
 				n.service.Stop()
 			}
-			n.current = n.desired
+			n.current = newDesired
 		}
 	}
 }

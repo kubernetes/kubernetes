@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # The api version in which objects are currently stored in etcd.
-KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1beta3"}
+KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1"}
 # The api version in which our etcd objects should be converted to.
 # The new api version
 KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1"}
@@ -41,18 +41,18 @@ KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 UPDATE_ETCD_OBJECTS_SCRIPT="${KUBE_ROOT}/cluster/update-storage-objects.sh"
 
 function startApiServer() {
-  kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS} and runtime_config: ${RUNTIME_CONFIG}"
+  kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS} and runtime-config: ${RUNTIME_CONFIG}"
 
   KUBE_API_VERSIONS="${KUBE_API_VERSIONS}" \
     "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --address="127.0.0.1" \
-    --public_address_override="127.0.0.1" \
+    --public-address-override="127.0.0.1" \
     --port="${API_PORT}" \
-    --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-    --public_address_override="127.0.0.1" \
-    --kubelet_port=${KUBELET_PORT} \
-    --runtime_config="${RUNTIME_CONFIG}" \
-    --cert_dir="${TMPDIR:-/tmp/}" \
+    --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+    --public-address-override="127.0.0.1" \
+    --kubelet-port=${KUBELET_PORT} \
+    --runtime-config="${RUNTIME_CONFIG}" \
+    --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
   APISERVER_PID=$!
 
@@ -93,7 +93,7 @@ startApiServer
 
 # Create a pod
 kube::log::status "Creating a pod"
-${KUBECTL} create -f examples/pod.yaml
+${KUBECTL} create -f docs/user-guide/pod.yaml
 
 killApiServer
 

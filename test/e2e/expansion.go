@@ -17,35 +17,14 @@ limitations under the License.
 package e2e
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Variable Expansion", func() {
-	var c *client.Client
-	var ns string
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("var-expansion", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		// Clean up the namespace if a non-default one was used
-		if ns != api.NamespaceDefault {
-			By("Cleaning up the namespace")
-			err := c.Namespaces().Delete(ns)
-			expectNoError(err)
-		}
-	})
+	framework := NewFramework("var-expansion")
 
 	It("should allow composing env vars into new env vars", func() {
 		podName := "var-expansion-" + string(util.NewUUID())
@@ -80,11 +59,11 @@ var _ = Describe("Variable Expansion", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("env composition", c, pod, 0, []string{
+		framework.TestContainerOutput("env composition", pod, 0, []string{
 			"FOO=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
-		}, ns)
+		})
 	})
 
 	It("should allow substituting values in a container's command", func() {
@@ -112,9 +91,9 @@ var _ = Describe("Variable Expansion", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("substitution in container's command", c, pod, 0, []string{
+		framework.TestContainerOutput("substitution in container's command", pod, 0, []string{
 			"test-value",
-		}, ns)
+		})
 	})
 
 	It("should allow substituting values in a container's args", func() {
@@ -143,8 +122,8 @@ var _ = Describe("Variable Expansion", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("substitution in container's args", c, pod, 0, []string{
+		framework.TestContainerOutput("substitution in container's args", pod, 0, []string{
 			"test-value",
-		}, ns)
+		})
 	})
 })

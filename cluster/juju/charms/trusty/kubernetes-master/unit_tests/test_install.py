@@ -39,7 +39,7 @@ class TestInstallHook():
         pmock.return_value.write_lines.assert_called_with(['line1', 'line2',
                                                            'test1', 'test2'])
 
-    def test_update_rc_files_with_nonexistant_path(self):
+    def test_update_rc_files_with_nonexistent_path(self):
         """
         Test an unhappy path if the bashrc/users do not exist.
         """
@@ -80,7 +80,7 @@ class TestInstallHook():
          call is consistent. If we change this, we want to know we've broken it.
         """
         install.clone_repository()
-        repo = 'https://github.com/GoogleCloudPlatform/kubernetes.git'
+        repo = 'https://github.com/kubernetes/kubernetes.git'
         direct = '/opt/kubernetes'
         spmock.check_output.assert_called_with(['git', 'clone', repo, direct])
 

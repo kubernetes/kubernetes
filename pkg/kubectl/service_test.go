@@ -20,17 +20,19 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestGenerateService(t *testing.T) {
 	tests := []struct {
-		params   map[string]string
-		expected api.Service
+		generator Generator
+		params    map[string]interface{}
+		expected  api.Service
 	}{
 		{
-			params: map[string]string{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -48,7 +50,6 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "TCP",
 							TargetPort: util.NewIntOrStringFromInt(1234),
@@ -58,7 +59,9 @@ func TestGenerateService(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -76,7 +79,6 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: util.NewIntOrStringFromString("foobar"),
@@ -86,7 +88,8 @@ func TestGenerateService(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"labels":         "key1=value1,key2=value2",
 				"name":           "test",
@@ -109,7 +112,6 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "TCP",
 							TargetPort: util.NewIntOrStringFromInt(1234),
@@ -119,13 +121,14 @@ func TestGenerateService(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"public-ip":      "1.2.3.4",
+				"external-ip":    "1.2.3.4",
 			},
 			expected: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -138,24 +141,24 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					DeprecatedPublicIPs: []string{"1.2.3.4"},
+					ExternalIPs: []string{"1.2.3.4"},
 				},
 			},
 		},
 		{
-			params: map[string]string{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":                      "foo=bar,baz=blah",
 				"name":                          "test",
 				"port":                          "80",
 				"protocol":                      "UDP",
 				"container-port":                "foobar",
-				"public-ip":                     "1.2.3.4",
+				"external-ip":                   "1.2.3.4",
 				"create-external-load-balancer": "true",
 			},
 			expected: api.Service{
@@ -169,19 +172,19 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					Type:                api.ServiceTypeLoadBalancer,
-					DeprecatedPublicIPs: []string{"1.2.3.4"},
+					Type:        api.ServiceTypeLoadBalancer,
+					ExternalIPs: []string{"1.2.3.4"},
 				},
 			},
 		},
 		{
-			params: map[string]string{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -200,7 +203,6 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: util.NewIntOrStringFromString("foobar"),
@@ -211,7 +213,8 @@ func TestGenerateService(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
 				"selector":                      "foo=bar,baz=blah",
 				"name":                          "test",
 				"port":                          "80",
@@ -231,7 +234,6 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []api.ServicePort{
 						{
-							Name:       "default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: util.NewIntOrStringFromString("foobar"),
@@ -241,10 +243,69 @@ func TestGenerateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			generator: ServiceGeneratorV1{},
+			params: map[string]interface{}{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "TCP",
+				"container-port": "1234",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "TCP",
+							TargetPort: util.NewIntOrStringFromInt(1234),
+						},
+					},
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV1{},
+			params: map[string]interface{}{
+				"selector":         "foo=bar,baz=blah",
+				"name":             "test",
+				"port":             "80",
+				"protocol":         "TCP",
+				"container-port":   "1234",
+				"session-affinity": "ClientIP",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "TCP",
+							TargetPort: util.NewIntOrStringFromInt(1234),
+						},
+					},
+					SessionAffinity: api.ServiceAffinityClientIP,
+				},
+			},
+		},
 	}
-	generator := ServiceGenerator{}
 	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
+		obj, err := test.generator.Generate(test.params)
 		if !reflect.DeepEqual(obj, &test.expected) {
 			t.Errorf("expected:\n%#v\ngot\n%#v\n", &test.expected, obj)
 		}

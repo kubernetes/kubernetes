@@ -14,20 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +build integration
-
 package framework
 
 import (
 	"fmt"
 	"math/rand"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 // If you need to start an etcd instance by hand, you also need to insert a key
@@ -41,8 +40,8 @@ func NewEtcdClient() *etcd.Client {
 	return etcd.NewClient([]string{})
 }
 
-func NewHelper() (tools.EtcdHelper, error) {
-	return master.NewEtcdHelper(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+func NewEtcdStorage() (storage.Interface, error) {
+	return master.NewEtcdStorage(NewEtcdClient(), latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
 }
 
 func RequireEtcd() {

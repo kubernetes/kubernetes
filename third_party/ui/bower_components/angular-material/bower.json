@@ -1,1 +1,0 @@
-{ "name": "angular-material", "version": "0.8.1", "dependencies": { "angular": "1.3.x", "angular-animate": "1.3.x", "angular-aria": "1.3.x" }, "main": [ "angular-material.js", "angular-material.css" ] }

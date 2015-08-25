@@ -24,43 +24,38 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
 	registry         Registry
-	machines         minion.Registry
 	endpoints        endpoint.Registry
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
-	clusterName      string
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface, clusterName string) *REST {
+func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
+	serviceNodePorts portallocator.Interface) *REST {
 	return &REST{
 		registry:         registry,
-		machines:         machines,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
-		clusterName:      clusterName,
 	}
 }
 
@@ -149,6 +144,13 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		return nil, err
 	}
 
+	// TODO: can leave dangling endpoints, and potentially return incorrect
+	// endpoints if a new service is created with the same name
+	err = rs.endpoints.DeleteEndpoints(ctx, id)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
 	if api.IsServiceIPSet(service) {
 		rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
 	}
@@ -165,26 +167,11 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	service, err := rs.registry.GetService(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return service, err
+	return rs.registry.GetService(ctx, id)
 }
 
 func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	list, err := rs.registry.ListServices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var filtered []api.Service
-	for _, service := range list.Items {
-		if label.Matches(labels.Set(service.Labels)) {
-			filtered = append(filtered, service)
-		}
-	}
-	list.Items = filtered
-	return list, err
+	return rs.registry.ListServices(ctx, label, field)
 }
 
 // Watch returns Services events via a watch.Interface.
@@ -300,7 +287,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		return nil, nil, err
 	}
 	if len(eps.Subsets) == 0 {
-		return nil, nil, fmt.Errorf("no endpoints available for %q", svcName)
+		return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svcName))
 	}
 	// Pick a random Subset to start searching from.
 	ssSeed := rand.Intn(len(eps.Subsets))
@@ -320,7 +307,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 			}
 		}
 	}
-	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
+	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
 // This is O(N), but we expect haystack to be small;

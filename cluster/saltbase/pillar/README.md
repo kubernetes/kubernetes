@@ -1,6 +1,6 @@
 The
 [SaltStack pillar](http://docs.saltstack.com/en/latest/topics/pillar/)
-data is partially statically dervied from the contents of this
+data is partially statically derived from the contents of this
 directory. The bulk of the pillars are hard to perceive from browsing
 this directory, though, because they are written into
 [cluster-params.sls](cluster-params.sls) at cluster inception.

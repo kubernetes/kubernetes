@@ -1,5 +1,0 @@
----
-dependencies:
-    - { role: common }
-    - { role: docker }
-    - { role: kubernetes }

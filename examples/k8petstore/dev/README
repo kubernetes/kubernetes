@@ -6,13 +6,13 @@
 
 Now start a local redis instance 
 
-```
+```sh
 redis-server
 ```
 
 And run the app 
 
-```
+```sh
 export GOPATH=~/Development/k8hacking/k8petstore/web-server/
 cd $GOPATH/src/main/
 ## Now, you're in the local dir to run the app.  Go get its depenedencies.
@@ -20,7 +20,7 @@ go get
 go run PetStoreBook.go
 ```
 
-Once the app works the way you want it to, test it in the vagrant recipe below.  This will gaurantee that you're local environment isn't doing something that breaks the containers at the  versioning level.
+Once the app works the way you want it to, test it in the vagrant recipe below.  This will guarantee that you're local environment isn't doing something that breaks the containers at the  versioning level.
 
 ### Testing 
 

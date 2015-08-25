@@ -81,6 +81,42 @@ addon-dir-create:
     - makedirs: True
 {% endif %}
 
+{% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
+/etc/kubernetes/addons/registry/registry-svc.yaml:
+  file.managed:
+    - source: salt://kube-addons/registry/registry-svc.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+
+/etc/kubernetes/addons/registry/registry-rc.yaml:
+  file.managed:
+    - source: salt://kube-addons/registry/registry-rc.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+
+/etc/kubernetes/addons/registry/registry-pv.yaml:
+  file.managed:
+    - source: salt://kube-addons/registry/registry-pv.yaml.in
+    - template: jinja
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+
+/etc/kubernetes/addons/registry/registry-pvc.yaml:
+  file.managed:
+    - source: salt://kube-addons/registry/registry-pvc.yaml.in
+    - template: jinja
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+{% endif %}
+
 {% if pillar.get('enable_node_logging', '').lower() == 'true'
    and pillar.get('logging_destination').lower() == 'elasticsearch'
    and pillar.get('enable_cluster_logging', '').lower() == 'true' %}
@@ -94,7 +130,7 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
-{% if pillar.get('enable_cluster_ui', 'true').lower() == 'true' %}
+{% if pillar.get('enable_cluster_ui', '').lower() == 'true' %}
 /etc/kubernetes/addons/kube-ui:
   file.recurse:
     - source: salt://kube-addons/kube-ui

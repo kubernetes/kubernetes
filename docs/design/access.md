@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/access.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # K8s Identity and Access Management Sketch
 
 This document suggests a direction for identity and access management in the Kubernetes system.
@@ -11,6 +44,7 @@ High level goals are:
    - Ease integration with existing enterprise and hosted scenarios.
 
 ### Actors
+
 Each of these can act as normal users or attackers.
    - External Users: People who are accessing applications running on K8s (e.g. a web site served by webserver running in a container on K8s), but who do not have K8s API access.
    - K8s Users : People who access the K8s API (e.g. create K8s API objects like Pods)
@@ -19,6 +53,7 @@ Each of these can act as normal users or attackers.
    - K8s Admin means K8s Cluster Admins and K8s Project Admins taken together.
 
 ### Threats
+
 Both intentional attacks and accidental use of privilege are concerns.
 
 For both cases it may be useful to think about these categories differently:
@@ -49,6 +84,7 @@ K8s Cluster assets:
 This document is primarily about protecting K8s User assets and K8s cluster assets from other K8s Users and K8s Project and Cluster Admins.
 
 ### Usage environments
+
 Cluster in Small organization:
    - K8s Admins may be the same people as K8s Users.
    - few K8s Admins.
@@ -80,9 +116,10 @@ Pods configs should be largely portable between Org-run and hosted configuration
 
 
 # Design
+
 Related discussion:
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/442
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/443
+- http://issue.k8s.io/442
+- http://issue.k8s.io/443
 
 This doc describes two security profiles:
   - Simple profile:  like single-user mode.  Make it easy to evaluate K8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
@@ -93,7 +130,9 @@ K8s distribution should include templates of config, and documentation, for simp
 Features in this doc are divided into "Initial Feature", and "Improvements".   Initial features would be candidates for version 1.00.
 
 ## Identity
-###userAccount
+
+### userAccount
+
 K8s will have a `userAccount` API object.
 - `userAccount` has a UID which is immutable.  This is used to associate users with objects and to record actions in audit logs.
 - `userAccount` has a name which is a string and human readable and unique among userAccounts.  It is used to refer to users in Policies, to ensure that the Policies are human readable.  It can be changed only when there are no Policy objects or other objects which refer to that name.  An email address is a suggested format for this field.
@@ -126,7 +165,8 @@ Enterprise Profile:
    - each service using the API has own `userAccount` too. (e.g. `scheduler`, `repcontroller`)
    - automated jobs to denormalize the ldap group info into the local system list of users into the K8s userAccount file.
 
-###Unix accounts
+### Unix accounts
+
 A `userAccount` is not a Unix user account.  The fact that a pod is started by a `userAccount` does not mean that the processes in that pod's containers run as a Unix user with a corresponding name or identity.
 
 Initially:
@@ -136,9 +176,10 @@ Initially:
 Improvements:
 - Kubelet allocates disjoint blocks of root-namespace uids for each container.  This may provide some defense-in-depth against container escapes. (https://github.com/docker/docker/pull/4572)
 - requires docker to integrate user namespace support, and deciding what getpwnam() does for these uids.
-- any features that help users avoid use of privileged containers (https://github.com/GoogleCloudPlatform/kubernetes/issues/391)
+- any features that help users avoid use of privileged containers (http://issue.k8s.io/391)
 
-###Namespaces
+### Namespaces
+
 K8s will have a have a `namespace` API object.  It is similar to a Google Compute Engine `project`.  It provides a namespace for objects created by a group of people co-operating together, preventing name collisions with non-cooperating groups.  It also serves as a reference point for authorization policies.
 
 Namespaces are described in [namespaces.md](namespaces.md).
@@ -151,7 +192,7 @@ In the Simple Profile:
 
 Namespaces versus userAccount vs Labels:
 - `userAccount`s are intended for audit logging (both name and UID should be logged), and to define who has access to `namespace`s.
-- `labels` (see [docs/labels.md](../../docs/labels.md)) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.
+- `labels` (see [docs/user-guide/labels.md](../../docs/user-guide/labels.md)) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.
 - `namespace`s prevent name collisions between uncoordinated groups of people, and provide a place to attach common policies for co-operating groups of people.
 
 
@@ -159,7 +200,7 @@ Namespaces versus userAccount vs Labels:
 
 Goals for K8s authentication:
 - Include a built-in authentication system with no configuration required to use in single-user mode, and little configuration required to add several user accounts, and no https proxy required.
-- Allow for authentication to be handled by a system external to Kubernetes, to allow integration with existing to enterprise authorization systems.  The kubernetes namespace itself should avoid taking contributions of multiple authorization schemes.  Instead, a trusted proxy in front of the apiserver can be used to authenticate users.
+- Allow for authentication to be handled by a system external to Kubernetes, to allow integration with existing to enterprise authorization systems.  The Kubernetes namespace itself should avoid taking contributions of multiple authorization schemes.  Instead, a trusted proxy in front of the apiserver can be used to authenticate users.
   - For organizations whose security requirements only allow FIPS compliant implementations (e.g. apache) for authentication.
   - So the proxy can terminate SSL, and isolate the CA-signed certificate from less trusted, higher-touch APIserver.
   - For organizations that already have existing SaaS web services (e.g. storage, VMs) and want a common authentication portal.
@@ -212,7 +253,7 @@ Policy objects may be applicable only to a single namespace or to all namespaces
 
 ## Accounting
 
-The API should have a `quota` concept (see https://github.com/GoogleCloudPlatform/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
+The API should have a `quota` concept (see http://issue.k8s.io/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
 
 Initially:
 - a `quota` object is immutable.
@@ -248,4 +289,6 @@ Improvements:
 - Policies to drop logging for high rate trusted API calls, or by users performing audit or other sensitive functions.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/access.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

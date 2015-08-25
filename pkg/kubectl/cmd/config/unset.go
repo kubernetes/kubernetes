@@ -75,7 +75,7 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
 

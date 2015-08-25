@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # The golang package that we are building.
-readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
+readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
 # Load contrib target functions
@@ -33,7 +33,7 @@ kube::golang::server_targets() {
     cmd/kube-controller-manager
     cmd/kubelet
     cmd/hyperkube
-    cmd/kubernetes
+    cmd/linkcheck
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -68,6 +68,7 @@ kube::golang::test_targets() {
     cmd/genbashcomp
     cmd/genconversion
     cmd/gendeepcopy
+    cmd/genswaggertypedocs
     examples/k8petstore/web-server
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
@@ -83,10 +84,9 @@ readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
-  contrib/for-tests/network-tester/rc.json
-  contrib/for-tests/network-tester/service.json
+  test/images/network-tester/rc.json
+  test/images/network-tester/service.json
   hack/e2e.go
-  hack/e2e-suite
   hack/e2e-internal
   hack/ginkgo-e2e.sh
   hack/lib
@@ -103,10 +103,16 @@ readonly KUBE_CLIENT_PLATFORMS=(
   windows/amd64
 )
 
-# Gigabytes desired for parallel platform builds. 8 is fairly
+# Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
-readonly KUBE_PARALLEL_BUILD_MEMORY=8
+#
+# If you are using boot2docker, the following seems to work (note 
+# that 12000 rounds to 11G):
+#   boot2docker down
+#   VBoxManage modifyvm boot2docker-vm --memory 12000
+#   boot2docker up
+readonly KUBE_PARALLEL_BUILD_MEMORY=11
 
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
@@ -119,7 +125,6 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
   kube-scheduler
-  hyperkube
 )
 
 kube::golang::is_statically_linked_library() {
@@ -364,7 +369,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
     done
@@ -372,7 +377,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
     done
@@ -381,12 +386,12 @@ kube::golang::build_binaries_for_platform() {
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       go install "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
       CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
     fi
   fi
@@ -400,7 +405,7 @@ kube::golang::build_binaries_for_platform() {
     pushd "$(dirname ${outfile})" >/dev/null
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
-      -ldflags "${version_ldflags}" \
+      -ldflags "${goldflags}" \
       "$(dirname ${test})"
     popd >/dev/null
   done
@@ -442,16 +447,13 @@ kube::golang::build_binaries() {
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
 
-    # Fetch the version.
-    local version_ldflags
-    version_ldflags=$(kube::version::ldflags)
-
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags
+    local goflags goldflags
     eval "goflags=(${KUBE_GOFLAGS:-})"
+    goldflags="${KUBE_GOLDFLAGS:-} $(kube::version::ldflags)"
 
     local use_go_build
     local -a targets=()
@@ -484,8 +486,8 @@ kube::golang::build_binaries() {
       local gigs
       gigs=$(kube::golang::get_physmem)
 
-      if [[ ${gigs} -gt ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
-        kube::log::status "Multiple platforms requested and available ${gigs}G > threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
+      if [[ ${gigs} -ge ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
+        kube::log::status "Multiple platforms requested and available ${gigs}G >= threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
         parallel=true
       else
         kube::log::status "Multiple platforms requested, but available ${gigs}G < threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in serial"

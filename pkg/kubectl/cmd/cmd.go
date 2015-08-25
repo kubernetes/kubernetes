@@ -19,10 +19,10 @@ package cmd
 import (
 	"io"
 
-	cmdconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/config"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/spf13/cobra"
 )
@@ -45,6 +45,11 @@ __kubectl_get_resource()
         return 1
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+}
+
+__kubectl_get_resource_pod()
+{
+    __kubectl_parse_get "pod"
 }
 
 # $1 is the name of the pod we want to get the list of containers inside
@@ -79,17 +84,34 @@ __kubectl_require_pod_and_container()
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop)
-	    __kubectl_get_resource
+            __kubectl_get_resource
             return
             ;;
-	kubectl_logs)
-	    __kubectl_require_pod_and_container
-	    return
-	    ;;
+        kubectl_logs)
+            __kubectl_require_pod_and_container
+            return
+            ;;
+        kubectl_exec)
+            __kubectl_get_resource_pod
+            return
+            ;;
         *)
             ;;
     esac
 }
+`
+	valid_resources = `Valid resource types include:
+   * pods (aka 'po')
+   * replicationcontrollers (aka 'rc')
+   * services (aka 'svc')
+   * events (aka 'ev')
+   * nodes (aka 'no')
+   * namespaces (aka 'ns')
+   * secrets
+   * persistentvolumes (aka 'pv')
+   * persistentvolumeclaims (aka 'pvc')
+   * limitranges (aka 'limits')
+   * resourcequotas (aka 'quota')
 `
 )
 
@@ -101,7 +123,7 @@ func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *co
 		Short: "kubectl controls the Kubernetes cluster manager",
 		Long: `kubectl controls the Kubernetes cluster manager.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
+Find more information at https://github.com/kubernetes/kubernetes.`,
 		Run: runHelp,
 		BashCompletionFunction: bash_completion_func,
 	}
@@ -123,15 +145,17 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdRollingUpdate(f, out))
 	cmds.AddCommand(NewCmdScale(f, out))
 
+	cmds.AddCommand(NewCmdAttach(f, in, out, err))
 	cmds.AddCommand(NewCmdExec(f, in, out, err))
 	cmds.AddCommand(NewCmdPortForward(f))
 	cmds.AddCommand(NewCmdProxy(f, out))
 
-	cmds.AddCommand(NewCmdRun(f, out))
+	cmds.AddCommand(NewCmdRun(f, in, out, err))
 	cmds.AddCommand(NewCmdStop(f, out))
 	cmds.AddCommand(NewCmdExposeService(f, out))
 
 	cmds.AddCommand(NewCmdLabel(f, out))
+	cmds.AddCommand(NewCmdAnnotate(f, out))
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(cmdconfig.NewDefaultPathOptions(), out))
 	cmds.AddCommand(NewCmdClusterInfo(f, out))

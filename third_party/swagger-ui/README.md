@@ -13,9 +13,9 @@ Instructions on how to use these:
 https://github.com/swagger-api/swagger-ui#how-to-use-it
 
 ## Local Modifications
-- Updated the url to "../../swaggerapi" as per instructions at:
+- Updated the url in index.html to "../../swaggerapi" as per instructions at:
 https://github.com/swagger-api/swagger-ui#how-to-use-it
-- Modified swagger-ui.js to list resources and operations in sorted order.
+- Modified swagger-ui.js to list resources and operations in sorted order: https://github.com/GoogleCloudPlatform/kubernetes/pull/3421
 - Set supportedSubmitMethods: [] in index.html to remove "Try it out" buttons.
 
 LICENSE file has been created for compliance purposes.

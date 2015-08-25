@@ -73,6 +73,9 @@ type ContainerSpec struct {
 	HasMemory bool       `json:"has_memory"`
 	Memory    MemorySpec `json:"memory,omitempty"`
 
+	HasCustomMetrics bool            `json:"has_custom_metrics"`
+	CustomMetrics    []v1.MetricSpec `json:"custom_metrics,omitempty"`
+
 	// Following resources have no associated spec, but are being isolated.
 	HasNetwork    bool `json:"has_network"`
 	HasFilesystem bool `json:"has_filesystem"`
@@ -100,6 +103,9 @@ type ContainerStats struct {
 	// Task load statistics
 	HasLoad bool         `json:"has_load"`
 	Load    v1.LoadStats `json:"load_stats,omitempty"`
+	// Custom Metrics
+	HasCustomMetrics bool                    `json:"has_custom_metrics"`
+	CustomMetrics    map[string]v1.MetricVal `json:"custom_metrics,omitempty"`
 }
 
 type Percentiles struct {
@@ -110,8 +116,12 @@ type Percentiles struct {
 	Mean uint64 `json:"mean"`
 	// Max seen over the collected sample.
 	Max uint64 `json:"max"`
+	// 50th percentile over the collected sample.
+	Fifty uint64 `json:"fifty"`
 	// 90th percentile over the collected sample.
 	Ninety uint64 `json:"ninety"`
+	// 95th percentile over the collected sample.
+	NinetyFive uint64 `json:"ninetyfive"`
 }
 
 type Usage struct {

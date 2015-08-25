@@ -19,40 +19,41 @@ package rbd
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&RBDPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&rbdPlugin{nil, exec.New()}}
 }
 
-type RBDPlugin struct {
+type rbdPlugin struct {
 	host volume.VolumeHost
 	exe  exec.Interface
 }
 
-var _ volume.VolumePlugin = &RBDPlugin{}
+var _ volume.VolumePlugin = &rbdPlugin{}
+var _ volume.PersistentVolumePlugin = &rbdPlugin{}
 
 const (
-	RBDPluginName = "kubernetes.io/rbd"
+	rbdPluginName = "kubernetes.io/rbd"
 )
 
-func (plugin *RBDPlugin) Init(host volume.VolumeHost) {
+func (plugin *rbdPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 
-func (plugin *RBDPlugin) Name() string {
-	return RBDPluginName
+func (plugin *rbdPlugin) Name() string {
+	return rbdPluginName
 }
 
-func (plugin *RBDPlugin) CanSupport(spec *volume.Spec) bool {
+func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.VolumeSource.RBD == nil && spec.PersistentVolumeSource.RBD == nil {
 		return false
 	}
@@ -65,16 +66,16 @@ func (plugin *RBDPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *RBDPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}
 }
 
-func (plugin *RBDPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	secret := ""
-	source := plugin.getRBDVolumeSource(spec)
+	source, _ := plugin.getRBDVolumeSource(spec)
 
 	if source.SecretRef != nil {
 		kubeClient := plugin.host.GetKubeClient()
@@ -97,16 +98,18 @@ func (plugin *RBDPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret)
 }
 
-func (plugin *RBDPlugin) getRBDVolumeSource(spec *volume.Spec) *api.RBDVolumeSource {
+func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
+	// rbd volumes used directly in a pod have a ReadOnly flag set by the pod author.
+	// rbd volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	if spec.VolumeSource.RBD != nil {
-		return spec.VolumeSource.RBD
+		return spec.VolumeSource.RBD, spec.VolumeSource.RBD.ReadOnly
 	} else {
-		return spec.PersistentVolumeSource.RBD
+		return spec.PersistentVolumeSource.RBD, spec.ReadOnly
 	}
 }
 
-func (plugin *RBDPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
-	source := plugin.getRBDVolumeSource(spec)
+func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
+	source, readOnly := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
 	if pool == "" {
 		pool = "rbd"
@@ -120,95 +123,119 @@ func (plugin *RBDPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 		keyring = "/etc/ceph/keyring"
 	}
 
-	return &rbd{
-		podUID:   podUID,
-		volName:  spec.Name,
-		mon:      source.CephMonitors,
-		image:    source.RBDImage,
-		pool:     pool,
-		id:       id,
-		keyring:  keyring,
-		secret:   secret,
-		fsType:   source.FSType,
-		readOnly: source.ReadOnly,
-		manager:  manager,
-		mounter:  mounter,
-		plugin:   plugin,
+	return &rbdBuilder{
+		rbd: &rbd{
+			podUID:   podUID,
+			volName:  spec.Name,
+			Image:    source.RBDImage,
+			Pool:     pool,
+			ReadOnly: readOnly,
+			manager:  manager,
+			mounter:  mounter,
+			plugin:   plugin,
+		},
+		Mon:     source.CephMonitors,
+		Id:      id,
+		Keyring: keyring,
+		Secret:  secret,
+		fsType:  source.FSType,
 	}, nil
 }
 
-func (plugin *RBDPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *rbdPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newCleanerInternal(volName, podUID, &RBDUtil{}, mounter)
 }
 
-func (plugin *RBDPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &rbd{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
-		mounter: mounter,
-		plugin:  plugin,
+func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
+	return &rbdCleaner{
+		rbdBuilder: &rbdBuilder{
+			rbd: &rbd{
+				podUID:  podUID,
+				volName: volName,
+				manager: manager,
+				mounter: mounter,
+				plugin:  plugin,
+			},
+			Mon: make([]string, 0),
+		},
 	}, nil
 }
 
 type rbd struct {
 	volName  string
 	podUID   types.UID
-	mon      []string
-	pool     string
-	id       string
-	image    string
-	keyring  string
-	secret   string
-	fsType   string
-	readOnly bool
-	plugin   *RBDPlugin
+	Pool     string
+	Image    string
+	ReadOnly bool
+	plugin   *rbdPlugin
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 }
 
 func (rbd *rbd) GetPath() string {
-	name := RBDPluginName
+	name := rbdPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
 	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, util.EscapeQualifiedNameForDisk(name), rbd.volName)
 }
 
-func (rbd *rbd) SetUp() error {
-	return rbd.SetUpAt(rbd.GetPath())
+type rbdBuilder struct {
+	*rbd
+	// capitalized so they can be exported in persistRBD()
+	Mon     []string
+	Id      string
+	Keyring string
+	Secret  string
+	fsType  string
 }
 
-func (rbd *rbd) SetUpAt(dir string) error {
+var _ volume.Builder = &rbdBuilder{}
+
+func (b *rbdBuilder) SetUp() error {
+	return b.SetUpAt(b.GetPath())
+}
+
+func (b *rbdBuilder) SetUpAt(dir string) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(rbd.manager, *rbd, dir, rbd.mounter)
+	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("rbd: failed to setup")
 		return err
 	}
-	globalPDPath := rbd.manager.MakeGlobalPDName(*rbd)
+	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
 	// make mountpoint rw/ro work as expected
 	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
 	mode := "rw"
-	if rbd.readOnly {
+	if b.ReadOnly {
 		mode = "ro"
 	}
-	rbd.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
+	b.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
 
 	return nil
 }
 
+type rbdCleaner struct {
+	*rbdBuilder
+}
+
+var _ volume.Cleaner = &rbdCleaner{}
+
+func (b *rbd) IsReadOnly() bool {
+	return b.ReadOnly
+}
+
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
-func (rbd *rbd) TearDown() error {
-	return rbd.TearDownAt(rbd.GetPath())
+func (c *rbdCleaner) TearDown() error {
+	return c.TearDownAt(c.GetPath())
 }
 
-func (rbd *rbd) TearDownAt(dir string) error {
-	return diskTearDown(rbd.manager, *rbd, dir, rbd.mounter)
+func (c *rbdCleaner) TearDownAt(dir string) error {
+	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 
-func (plugin *RBDPlugin) execCommand(command string, args []string) ([]byte, error) {
+func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
 }

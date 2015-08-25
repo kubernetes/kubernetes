@@ -22,16 +22,17 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/google/gofuzz"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 
+	"github.com/google/gofuzz"
 	"speter.net/go/exp/math/dec/inf"
 )
 
@@ -88,6 +89,15 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.LabelSelector, _ = labels.Parse("a=b")
 			j.FieldSelector, _ = fields.ParseSelector("a=b")
 		},
+		func(j *api.PodSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			// has a default value
+			ttl := int64(30)
+			if c.RandBool() {
+				ttl = int64(c.Uint32())
+			}
+			j.TerminationGracePeriodSeconds = &ttl
+		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
@@ -109,9 +119,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
-		func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
-			// only replicas round trips
-			j.Replicas = int(c.RandUint64())
+		func(j *api.DaemonSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
 		},
 		func(j *api.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
@@ -158,6 +167,22 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
 			q.Amount.SetUnscaled(c.Int63n(1000))
 		},
+		func(q *api.ResourceRequirements, c fuzz.Continue) {
+			randomQuantity := func() resource.Quantity {
+				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+			}
+			q.Limits = make(api.ResourceList)
+			q.Requests = make(api.ResourceList)
+			cpuLimit := randomQuantity()
+			q.Limits[api.ResourceCPU] = *cpuLimit.Copy()
+			q.Requests[api.ResourceCPU] = *cpuLimit.Copy()
+			memoryLimit := randomQuantity()
+			q.Limits[api.ResourceMemory] = *memoryLimit.Copy()
+			q.Requests[api.ResourceMemory] = *memoryLimit.Copy()
+			storageLimit := randomQuantity()
+			q.Limits[api.ResourceStorage] = *storageLimit.Copy()
+			q.Requests[api.ResourceStorage] = *storageLimit.Copy()
+		},
 		func(p *api.PullPolicy, c fuzz.Continue) {
 			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
 			*p = policies[c.Rand.Intn(len(policies))]
@@ -202,7 +227,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.ValueFrom = &api.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
-				versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+				versions := registered.RegisteredVersions
 
 				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()

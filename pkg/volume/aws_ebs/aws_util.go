@@ -22,26 +22,26 @@ import (
 	"os"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type AWSDiskUtil struct{}
 
 // Attaches a disk specified by a volume.AWSElasticBlockStore to the current kubelet.
 // Mounts the disk to it's global path.
-func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPath string) error {
-	volumes, err := pd.getVolumeProvider()
+func (util *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, globalPDPath string) error {
+	volumes, err := b.getVolumeProvider()
 	if err != nil {
 		return err
 	}
-	devicePath, err := volumes.AttachDisk("", pd.volumeID, pd.readOnly)
+	devicePath, err := volumes.AttachDisk("", b.volumeID, b.readOnly)
 	if err != nil {
 		return err
 	}
-	if pd.partition != "" {
-		devicePath = devicePath + pd.partition
+	if b.partition != "" {
+		devicePath = devicePath + b.partition
 	}
 	//TODO(jonesdl) There should probably be better method than busy-waiting here.
 	numTries := 0
@@ -61,23 +61,23 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 	}
 
 	// Only mount the PD globally once.
-	mountpoint, err := pd.mounter.IsMountPoint(globalPDPath)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 				return err
 			}
-			mountpoint = false
+			notMnt = true
 		} else {
 			return err
 		}
 	}
 	options := []string{}
-	if pd.readOnly {
+	if b.readOnly {
 		options = append(options, "ro")
 	}
-	if !mountpoint {
-		err = pd.diskMounter.Mount(devicePath, globalPDPath, pd.fsType, options)
+	if notMnt {
+		err = b.diskMounter.Mount(devicePath, globalPDPath, b.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)
 			return err
@@ -87,10 +87,10 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 }
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *AWSDiskUtil) DetachDisk(pd *awsElasticBlockStore) error {
+func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreCleaner) error {
 	// Unmount the global PD mount, which should be the only one.
-	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeID)
-	if err := pd.mounter.Unmount(globalPDPath); err != nil {
+	globalPDPath := makeGlobalPDPath(c.plugin.host, c.volumeID)
+	if err := c.mounter.Unmount(globalPDPath); err != nil {
 		glog.V(2).Info("Error unmount dir ", globalPDPath, ": ", err)
 		return err
 	}
@@ -99,13 +99,13 @@ func (util *AWSDiskUtil) DetachDisk(pd *awsElasticBlockStore) error {
 		return err
 	}
 	// Detach the disk
-	volumes, err := pd.getVolumeProvider()
+	volumes, err := c.getVolumeProvider()
 	if err != nil {
-		glog.V(2).Info("Error getting volume provider for volumeID ", pd.volumeID, ": ", err)
+		glog.V(2).Info("Error getting volume provider for volumeID ", c.volumeID, ": ", err)
 		return err
 	}
-	if err := volumes.DetachDisk("", pd.volumeID); err != nil {
-		glog.V(2).Info("Error detaching disk ", pd.volumeID, ": ", err)
+	if err := volumes.DetachDisk("", c.volumeID); err != nil {
+		glog.V(2).Info("Error detaching disk ", c.volumeID, ": ", err)
 		return err
 	}
 	return nil

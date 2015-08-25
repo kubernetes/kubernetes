@@ -17,30 +17,32 @@ limitations under the License.
 package controllermanager
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-controller-manager/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/mesos"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/routecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
-	kendpoint "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/serviceaccount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumeclaimbinder"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
+	kendpoint "k8s.io/kubernetes/pkg/controller/endpoint"
+	"k8s.io/kubernetes/pkg/controller/namespace"
+	"k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/controller/persistentvolume"
+	"k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/controller/resourcequota"
+	"k8s.io/kubernetes/pkg/controller/route"
+	"k8s.io/kubernetes/pkg/controller/service"
+	"k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/profile"
-	kmendpoint "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
+	kmendpoint "k8s.io/kubernetes/contrib/mesos/pkg/service"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -108,22 +110,25 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := s.createEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	controllerManager := controller.NewReplicationManager(kubeClient, controller.BurstReplicas)
+	controllerManager := replicationcontroller.NewReplicationManager(kubeClient, replicationcontroller.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
 	if s.CloudProvider != mesos.ProviderName {
 		glog.Fatalf("Only provider %v is supported, you specified %v", mesos.ProviderName, s.CloudProvider)
 	}
-	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
 
-	nodeController := nodecontroller.NewNodeController(cloud, kubeClient, s.RegisterRetryCount,
+	nodeController := nodecontroller.NewNodeController(cloud, kubeClient,
 		s.PodEvictionTimeout, nodecontroller.NewPodEvictor(util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst)),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
-	if err := serviceController.Run(s.NodeSyncPeriod); err != nil {
+	if err := serviceController.Run(s.ServiceSyncPeriod, s.NodeSyncPeriod); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
 
@@ -136,11 +141,11 @@ func (s *CMServer) Run(_ []string) error {
 		routeController.Run(s.NodeSyncPeriod)
 	}
 
-	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
-	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)
+	resourceQuotaController := resourcequotacontroller.NewResourceQuotaController(kubeClient)
+	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
-	namespaceManager := namespace.NewNamespaceManager(kubeClient, s.NamespaceSyncPeriod)
-	namespaceManager.Run()
+	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, s.NamespaceSyncPeriod)
+	namespaceController.Run()
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
 	pvclaimBinder.Run()
@@ -149,6 +154,20 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
 	}
 	pvRecycler.Run()
+
+	var rootCA []byte
+
+	if s.RootCAFile != "" {
+		rootCA, err = ioutil.ReadFile(s.RootCAFile)
+		if err != nil {
+			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
+		}
+		if _, err := util.CertsFromPEM(rootCA); err != nil {
+			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
+		}
+	} else {
+		rootCA = kubeconfig.CAData
+	}
 
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
@@ -159,7 +178,7 @@ func (s *CMServer) Run(_ []string) error {
 				kubeClient,
 				serviceaccount.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
-					RootCA:         kubeconfig.CAData,
+					RootCA:         rootCA,
 				},
 			).Run()
 		}

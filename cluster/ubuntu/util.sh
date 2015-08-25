@@ -35,8 +35,14 @@ function test-build-release {
   "${KUBE_ROOT}/build/release.sh"
 }
 
-# From user input set the necessary k8s and etcd configuration infomation
+# From user input set the necessary k8s and etcd configuration information
 function setClusterInfo() {
+  # Initialize MINION_IPS in setClusterInfo function
+  # MINION_IPS is defined as a global variable, and is concatenated with other nodeIP
+  # When setClusterInfo is called for many times, this could cause potential problems
+  # Such as, you will have MINION_IPS=192.168.0.2,192.168.0.3,192.168.0.2,192.168.0.3 which is obviously wrong
+  MINION_IPS=""
+  
   ii=0
   for i in $nodes
   do
@@ -139,7 +145,7 @@ function verify-cluster {
   echo
   echo "Kubernetes cluster is running.  The master is running at:"
   echo
-  echo "  http://${MASTER_IP}"
+  echo "  http://${MASTER_IP}:8080"
   echo
 
 }
@@ -183,16 +189,6 @@ function verify-minion(){
   printf "\n"
 }
 
-function genServiceAccountsKey() {
-    SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
-    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/tmp/kube-serviceaccount.key"}
-    # Generate ServiceAccount key if needed
-    if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
-      mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
-      openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
-    fi
-}
-
 function create-etcd-opts(){
   cat <<EOF > ~/kube/default/etcd
 ETCD_OPTS="-name $1 \
@@ -206,21 +202,24 @@ EOF
 
 function create-kube-apiserver-opts(){
   cat <<EOF > ~/kube/default/kube-apiserver
-KUBE_APISERVER_OPTS="--address=0.0.0.0 \
---port=8080 \
---etcd_servers=http://127.0.0.1:4001 \
+KUBE_APISERVER_OPTS="--insecure-bind-address=0.0.0.0 \
+--insecure-port=8080 \
+--etcd-servers=http://127.0.0.1:4001 \
 --logtostderr=true \
 --service-cluster-ip-range=${1} \
---admission_control=${2} \
---service_account_key_file=/tmp/kube-serviceaccount.key \
---service_account_lookup=false "
+--admission-control=${2} \
+--service-node-port-range=${3} \
+--client-ca-file=/srv/kubernetes/ca.crt \
+--tls-cert-file=/srv/kubernetes/server.cert \
+--tls-private-key-file=/srv/kubernetes/server.key"
 EOF
 }
 
 function create-kube-controller-manager-opts(){
   cat <<EOF > ~/kube/default/kube-controller-manager
 KUBE_CONTROLLER_MANAGER_OPTS="--master=127.0.0.1:8080 \
---service_account_private_key_file=/tmp/kube-serviceaccount.key \
+--root-ca-file=/srv/kubernetes/ca.crt \
+--service-account-private-key-file=/srv/kubernetes/server.key \
 --logtostderr=true"
 EOF
 
@@ -238,11 +237,11 @@ function create-kubelet-opts(){
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="--address=0.0.0.0 \
 --port=10250 \
---hostname_override=$1 \
---api_servers=http://$2:8080 \
+--hostname-override=$1 \
+--api-servers=http://$2:8080 \
 --logtostderr=true \
---cluster_dns=$3 \
---cluster_domain=$4"
+--cluster-dns=$3 \
+--cluster-domain=$4"
 EOF
 
 }
@@ -259,20 +258,6 @@ function create-flanneld-opts(){
   cat <<EOF > ~/kube/default/flanneld
 FLANNEL_OPTS=""
 EOF
-}
-
-# Ensure that we have a password created for validating to the master. Will
-# read from $HOME/.kubernetes_auth if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
 }
 
 # Detect the IP for the master
@@ -361,7 +346,7 @@ function kube-up() {
   source "${KUBE_ROOT}/cluster/common.sh"
 
   # set kubernetes user and password
-  get-password
+  gen-kube-basicauth
 
   create-kubeconfig
 }
@@ -371,19 +356,20 @@ function provision-master() {
   echo "Deploying master on machine ${MASTER_IP}"
   echo
   ssh $SSH_OPTS $MASTER "mkdir -p ~/kube/default"
-  scp -r $SSH_OPTS ubuntu/config-default.sh ubuntu/util.sh ubuntu/master/* ubuntu/binaries/master/ "${MASTER}:~/kube"
+  scp -r $SSH_OPTS saltbase/salt/generate-cert/make-ca-cert.sh ubuntu/config-default.sh ubuntu/util.sh ubuntu/master/* ubuntu/binaries/master/ "${MASTER}:~/kube"
 
   # remote login to MASTER and use sudo to configue k8s master
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
-                            genServiceAccountsKey; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}" "${SERVICE_NODE_PORT_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-flanneld-opts; \
-                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
-                            && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
+                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
+                            sudo groupadd -f -r kube-cert; \
+                            sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+                            sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
                             sudo service etcd start;"
 }
 
@@ -404,7 +390,7 @@ function provision-minion() {
                          sudo -p '[sudo] password to copy files and start minion: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                          && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin; \
                          sudo service etcd start; \
-                         sudo -b ~/kube/reconfDocker.sh"
+                         sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
 }
 
 function provision-masterandminion() {
@@ -412,23 +398,24 @@ function provision-masterandminion() {
   echo "Deploying master and minion on machine ${MASTER_IP}"
   echo
   ssh $SSH_OPTS $MASTER "mkdir -p ~/kube/default"
-  scp -r $SSH_OPTS ubuntu/config-default.sh ubuntu/util.sh ubuntu/master/* ubuntu/reconfDocker.sh ubuntu/minion/* ubuntu/binaries/master/ ubuntu/binaries/minion "${MASTER}:~/kube"
+  scp -r $SSH_OPTS saltbase/salt/generate-cert/make-ca-cert.sh ubuntu/config-default.sh ubuntu/util.sh ubuntu/master/* ubuntu/reconfDocker.sh ubuntu/minion/* ubuntu/binaries/master/ ubuntu/binaries/minion "${MASTER}:~/kube"
 
   # remote login to the node and use sudo to configue k8s
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
-                            genServiceAccountsKey; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}" "${SERVICE_NODE_PORT_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                             create-kube-proxy-opts "${MASTER_IP}";\
                             create-flanneld-opts; \
-                            sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
-                            && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
+                            sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
+                            sudo groupadd -f -r kube-cert; \
+                            sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+                            sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
                             sudo service etcd start; \
-                            sudo -b ~/kube/reconfDocker.sh"
+                            sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
 }
 
 # Delete a kubernetes cluster
@@ -440,6 +427,8 @@ function kube-down {
     {
       echo "Cleaning on node ${i#*@}"
       ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
+      # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
+      ssh -t $i 'sudo rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; sudo rm -rf ~/kube /var/lib/kubelet'
     }
   done
   wait

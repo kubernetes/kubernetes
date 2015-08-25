@@ -19,9 +19,10 @@ package portallocator
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"strconv"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestAllocate(t *testing.T) {
@@ -42,10 +43,10 @@ func TestAllocate(t *testing.T) {
 		}
 		count++
 		if !pr.Contains(p) {
-			t.Fatalf("allocated %s which is outside of %s", p, pr)
+			t.Fatalf("allocated %d which is outside of %v", p, pr)
 		}
 		if found.Has(strconv.Itoa(p)) {
-			t.Fatalf("allocated %s twice @ %d", p, count)
+			t.Fatalf("allocated %d twice @ %d", p, count)
 		}
 		found.Insert(strconv.Itoa(p))
 	}
@@ -65,7 +66,7 @@ func TestAllocate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if released != p {
-		t.Errorf("unexpected %s : %s", p, released)
+		t.Errorf("unexpected %d : %d", p, released)
 	}
 
 	if err := r.Release(released); err != nil {
@@ -139,7 +140,7 @@ func TestSnapshot(t *testing.T) {
 
 	for _, n := range ports {
 		if !other.Has(n) {
-			t.Errorf("restored range does not have %s", n)
+			t.Errorf("restored range does not have %d", n)
 		}
 	}
 	if other.Free() != r.Free() {

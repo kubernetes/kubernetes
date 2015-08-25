@@ -21,13 +21,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // VolumeOptions contains option information about a volume.
@@ -134,6 +134,7 @@ type Spec struct {
 	Name                   string
 	VolumeSource           api.VolumeSource
 	PersistentVolumeSource api.PersistentVolumeSource
+	ReadOnly               bool
 }
 
 // NewSpecFromVolume creates an Spec from an api.Volume
@@ -145,10 +146,11 @@ func NewSpecFromVolume(vs *api.Volume) *Spec {
 }
 
 // NewSpecFromPersistentVolume creates an Spec from an api.PersistentVolume
-func NewSpecFromPersistentVolume(pv *api.PersistentVolume) *Spec {
+func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec {
 	return &Spec{
 		Name: pv.Name,
 		PersistentVolumeSource: pv.Spec.PersistentVolumeSource,
+		ReadOnly:               readOnly,
 	}
 }
 
@@ -249,7 +251,7 @@ func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVo
 	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
 		return persistentVolumePlugin, nil
 	}
-	return nil, fmt.Errorf("no persistent volume plugin matched: %+v")
+	return nil, fmt.Errorf("no persistent volume plugin matched")
 }
 
 // FindRecyclablePluginByName fetches a persistent volume plugin by name.  If no plugin

@@ -1,4 +1,37 @@
-#Service Accounts
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/service_accounts.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
+# Service Accounts
 
 ## Motivation
 
@@ -18,9 +51,10 @@ They also may interact with services other than the Kubernetes API, such as:
   - accessing files in an NFS volume attached to the pod
 
 ## Design Overview
+
 A service account binds together several things:
   - a *name*, understood by users, and perhaps by peripheral systems, for an identity
-  - a *principal* that can be authenticated and [authorized](../authorization.md)
+  - a *principal* that can be authenticated and [authorized](../admin/authorization.md)
   - a [security context](security_context.md), which defines the Linux Capabilities, User IDs, Groups IDs, and other
     capabilities and controls on interaction with the file system and OS.
   - a set of [secrets](secrets.md), which a container may use to
@@ -29,6 +63,7 @@ A service account binds together several things:
 ## Design Discussion
 
 A new object Kind is added:
+
 ```go
 type ServiceAccount struct {
     TypeMeta   `json:",inline" yaml:",inline"`
@@ -41,7 +76,7 @@ type ServiceAccount struct {
 ```
 
 The name ServiceAccount is chosen because it is widely used already (e.g. by Kerberos and LDAP)
-to refer to this type of account.  Note that it has no relation to kubernetes Service objects.
+to refer to this type of account.  Note that it has no relation to Kubernetes Service objects.
 
 The ServiceAccount object does not include any information that could not be defined separately:
   - username can be defined however users are defined.
@@ -55,12 +90,12 @@ These features are explained later.
 
 ### Names
 
-From the standpoint of the Kubernetes API, a `user` is any principal which can authenticate to kubernetes API.
+From the standpoint of the Kubernetes API, a `user` is any principal which can authenticate to Kubernetes API.
 This includes a human running `kubectl` on her desktop and a container in a Pod on a Node making API calls.
 
-There is already a notion of a username in kubernetes, which is populated into a request context after authentication.
+There is already a notion of a username in Kubernetes, which is populated into a request context after authentication.
 However, there is no API object representing a user.  While this may evolve, it is expected that in mature installations,
-the canonical storage of user identifiers will be handled by a system external to kubernetes.
+the canonical storage of user identifiers will be handled by a system external to Kubernetes.
 
 Kubernetes does not dictate how to divide up the space of user identifier strings.  User names can be
 simple Unix-style short usernames, (e.g. `alice`), or may be qualified to allow for federated identity (
@@ -69,7 +104,7 @@ accounts (e.g. `alice@example.com` vs `build-service-account-a3b7f0@foo-namespac
 but Kubernetes does not require this.
 
 Kubernetes also does not require that there be a distinction between human and Pod users.  It will be possible
-to setup a cluster where Alice the human talks to the kubernetes API as username `alice` and starts pods that
+to setup a cluster where Alice the human talks to the Kubernetes API as username `alice` and starts pods that
 also talk to the API as user `alice` and write files to NFS as user `alice`.  But, this is not recommended.
 
 Instead, it is recommended that Pods and Humans have distinct identities, and reference implementations will
@@ -90,7 +125,7 @@ The distinction is useful for a number of reasons:
 Pod Object.
 
 The `secrets` field is a list of references to /secret objects that an process started as that service account should
-have access to to be able to assert that role.
+have access to be able to assert that role.
 
 The secrets are not inline with the serviceAccount object.  This way, most or all users can have permission to `GET /serviceAccounts` so they can remind themselves
 what serviceAccounts are available for use.
@@ -104,6 +139,7 @@ are added to the map of tokens used by the authentication process in the apiserv
 might have some types that do not do anything on apiserver but just get pushed to the kubelet.)
 
 ### Pods
+
 The `PodSpec` is extended to have a `Pods.Spec.ServiceAccountUsername` field.  If this is unset, then a
 default value is chosen.  If it is set, then the corresponding value of `Pods.Spec.SecurityContext` is set by the
 Service Account Finalizer (see below).
@@ -111,12 +147,13 @@ Service Account Finalizer (see below).
 TBD: how policy limits which users can make pods with which service accounts.
 
 ### Authorization
+
 Kubernetes API Authorization Policies refer to users.  Pods created with a `Pods.Spec.ServiceAccountUsername` typically
 get a `Secret` which allows them to authenticate to the Kubernetes APIserver as a particular user.  So any
 policy that is desired can be applied to them.
 
 A higher level workflow is needed to coordinate creation of serviceAccounts, secrets and relevant policy objects.
-Users are free to extend kubernetes to put this business logic wherever is convenient for them, though the
+Users are free to extend Kubernetes to put this business logic wherever is convenient for them, though the
 Service Account Finalizer is one place where this can happen (see below).
 
 ### Kubelet
@@ -150,7 +187,7 @@ then it copies in the referenced securityContext and secrets references for the 
 
 Second, if ServiceAccount definitions change, it may take some actions.
 **TODO**: decide what actions it takes when a serviceAccount definition changes.  Does it stop pods, or just
-allow someone to list ones that out out of spec?  In general, people may want to customize this?
+allow someone to list ones that are out of spec?  In general, people may want to customize this?
 
 Third, if a new namespace is created, it may create a new serviceAccount for that namespace.  This may include
 a new username (e.g. `NAMESPACE-default-service-account@serviceaccounts.$CLUSTERID.kubernetes.io`), a new
@@ -163,5 +200,6 @@ Finally, it may provide an interface to automate creation of new serviceAccounts
 to GET serviceAccounts to see what has been created.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/service_accounts.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

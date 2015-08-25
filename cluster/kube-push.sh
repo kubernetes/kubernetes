@@ -25,11 +25,11 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {
   echo "${0} [-m|-n <node id>] <version>"
-  echo "  Updates Kurnetes binaries. Can be done for all components (by default), master(-m) or specified node(-n)."
+  echo "  Updates Kubernetes binaries. Can be done for all components (by default), master(-m) or specified node(-n)."
   echo "  If the version is not specified will try to use local binaries."
   echo "  Warning: upgrading single node is experimental"
 }
@@ -70,7 +70,7 @@ if [[ "${push_to_master}" == "false" ]] && [[ "${push_to_node}" == "false" ]]; t
 fi
 
 if [[ "${push_to_master}" == "true" ]]; then
-  echo "Udating master to version ${KUBE_VERSION:-"dev"}"
+  echo "Updating master to version ${KUBE_VERSION:-"dev"}"
   prepare-push false
   push-master
 fi

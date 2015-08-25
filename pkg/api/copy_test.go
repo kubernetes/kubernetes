@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {
@@ -43,7 +43,7 @@ func TestDeepCopyApiObjects(t *testing.T) {
 				}
 
 				if !reflect.DeepEqual(item, itemCopy) {
-					t.Errorf("expected %#v\ngot %#v", item, itemCopy)
+					t.Errorf("\nexpected %#v\ngot      %#v", item, itemCopy)
 				}
 			}
 		}

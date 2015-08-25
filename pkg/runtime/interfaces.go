@@ -37,7 +37,9 @@ type ObjectCodec interface {
 // Decoder defines methods for deserializing API objects into a given type
 type Decoder interface {
 	Decode(data []byte) (Object, error)
+	DecodeToVersion(data []byte, version string) (Object, error)
 	DecodeInto(data []byte, obj Object) error
+	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
 }
 
 // Encoder defines methods for serializing API objects into bytes
@@ -128,7 +130,7 @@ type SelfLinker interface {
 }
 
 // All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
-// burden. Implement it with a pointer reciever; this will allow us to use the go compiler to check the
+// burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
 // one thing about our objects that it's capable of checking for us.
 type Object interface {
 	// This function is used only to enforce membership. It's never called.

@@ -21,15 +21,16 @@ import (
 	"path"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/runtime"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -69,7 +70,7 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.NewEtcdHelper(f, testapi.Codec(), etcdtest.PathPrefix())
+	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 	podPrefix := "/pods"
 	return f, &Etcd{
@@ -85,7 +86,7 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
-		Helper:         h,
+		Storage:        s,
 	}
 }
 
@@ -306,83 +307,6 @@ func TestEtcdCreate(t *testing.T) {
 	}
 }
 
-// DEPRECATED
-func TestEtcdCreateWithName(t *testing.T) {
-	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{NodeName: "machine"},
-	}
-	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{NodeName: "machine2"},
-	}
-
-	nodeWithPodA := tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
-		},
-		E: nil,
-	}
-
-	emptyNode := tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: tools.EtcdErrorNotFound,
-	}
-
-	key := "foo"
-
-	table := map[string]struct {
-		existing tools.EtcdResponseWithError
-		expect   tools.EtcdResponseWithError
-		toCreate runtime.Object
-		objOK    func(obj runtime.Object) bool
-		errOK    func(error) bool
-	}{
-		"normal": {
-			existing: emptyNode,
-			toCreate: podA,
-			objOK:    hasCreated(t, podA),
-			errOK:    func(err error) bool { return err == nil },
-		},
-		"preExisting": {
-			existing: nodeWithPodA,
-			expect:   nodeWithPodA,
-			toCreate: podB,
-			errOK:    errors.IsAlreadyExists,
-		},
-	}
-
-	for name, item := range table {
-		fakeClient, registry := NewTestGenericEtcdRegistry(t)
-		path := etcdtest.AddPrefix("pods/foo")
-		fakeClient.Data[path] = item.existing
-		err := registry.CreateWithName(api.NewDefaultContext(), key, item.toCreate)
-		if !item.errOK(err) {
-			t.Errorf("%v: unexpected error: %v", name, err)
-		}
-
-		actual := fakeClient.Data[path]
-		if item.objOK != nil {
-			obj, err := api.Scheme.Decode([]byte(actual.R.Node.Value))
-			if err != nil {
-				t.Errorf("unable to decode stored value for %#v", actual)
-				continue
-			}
-			if !item.objOK(obj) {
-				t.Errorf("%v: unexpected response: %v", name, actual)
-			}
-		} else {
-			if e, a := item.expect, actual; !api.Semantic.DeepDerivative(e, a) {
-				t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
-			}
-		}
-	}
-}
-
 func TestEtcdUpdate(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
@@ -515,82 +439,6 @@ func TestEtcdUpdate(t *testing.T) {
 			if e, a := item.expect, actual; !api.Semantic.DeepDerivative(e, a) {
 				t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 			}
-		}
-	}
-}
-
-// DEPRECATED
-func TestEtcdUpdateWithName(t *testing.T) {
-	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec:       api.PodSpec{NodeName: "machine"},
-	}
-	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec:       api.PodSpec{NodeName: "machine2"},
-	}
-
-	nodeWithPodA := tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
-		},
-		E: nil,
-	}
-
-	nodeWithPodB := tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podB),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
-		},
-		E: nil,
-	}
-
-	emptyNode := tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: tools.EtcdErrorNotFound,
-	}
-
-	key := "foo"
-
-	table := map[string]struct {
-		existing tools.EtcdResponseWithError
-		expect   tools.EtcdResponseWithError
-		toUpdate runtime.Object
-		errOK    func(error) bool
-	}{
-		"normal": {
-			existing: nodeWithPodA,
-			expect:   nodeWithPodB,
-			toUpdate: podB,
-			errOK:    func(err error) bool { return err == nil },
-		},
-		"notExisting": {
-			existing: emptyNode,
-			expect:   nodeWithPodA,
-			toUpdate: podA,
-			// TODO: Should updating a non-existing thing fail?
-			errOK: func(err error) bool { return err == nil },
-		},
-	}
-
-	for name, item := range table {
-		fakeClient, registry := NewTestGenericEtcdRegistry(t)
-		path := etcdtest.AddPrefix("pods/foo")
-		fakeClient.Data[path] = item.existing
-		err := registry.UpdateWithName(api.NewContext(), key, item.toUpdate)
-		if !item.errOK(err) {
-			t.Errorf("%v: unexpected error: %v", name, err)
-		}
-
-		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
-			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
 }

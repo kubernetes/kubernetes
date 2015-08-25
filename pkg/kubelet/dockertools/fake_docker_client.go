@@ -26,8 +26,8 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
@@ -288,13 +288,20 @@ func (f *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Ex
 	defer f.Unlock()
 	f.execCmd = opts.Cmd
 	f.called = append(f.called, "create_exec")
-	return &docker.Exec{"12345678"}, nil
+	return &docker.Exec{ID: "12345678"}, nil
 }
 
 func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start_exec")
+	return nil
+}
+
+func (f *FakeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "attach")
 	return nil
 }
 

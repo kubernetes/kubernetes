@@ -19,7 +19,7 @@ Execute a command in a container.
 .SH OPTIONS
 .PP
 \fB\-c\fP, \fB\-\-container\fP=""
-    Container name
+    Container name. If omitted, the first container in the pod will be chosen
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
@@ -128,10 +128,6 @@ Execute a command in a container.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -141,14 +137,14 @@ Execute a command in a container.
 .RS
 
 .nf
-// get output from running 'date' from pod 123456\-7890, using the first container by default
+# get output from running 'date' from pod 123456\-7890, using the first container by default
 $ kubectl exec 123456\-7890 date
 	
-// get output from running 'date' in ruby\-container from pod 123456\-7890
+# get output from running 'date' in ruby\-container from pod 123456\-7890
 $ kubectl exec 123456\-7890 \-c ruby\-container date
 
-// switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
-// and sends stdout/stderr from 'bash' back to the client
+# switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
+# and sends stdout/stderr from 'bash' back to the client
 $ kubectl exec 123456\-7890 \-c ruby\-container \-i \-t \-\- bash \-il
 
 .fi

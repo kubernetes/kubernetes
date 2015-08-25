@@ -128,10 +128,6 @@ Print the logs for a container in a pod. If the pod has only one container, the 
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -141,13 +137,13 @@ Print the logs for a container in a pod. If the pod has only one container, the 
 .RS
 
 .nf
-// Returns snapshot of ruby\-container logs from pod 123456\-7890.
+# Returns snapshot of ruby\-container logs from pod 123456\-7890.
 $ kubectl logs 123456\-7890 ruby\-container
 
-// Returns snapshot of previous terminated ruby\-container logs from pod 123456\-7890.
+# Returns snapshot of previous terminated ruby\-container logs from pod 123456\-7890.
 $ kubectl logs \-p 123456\-7890 ruby\-container
 
-// Starts streaming of ruby\-container logs from pod 123456\-7890.
+# Starts streaming of ruby\-container logs from pod 123456\-7890.
 $ kubectl logs \-f 123456\-7890 ruby\-container
 
 .fi

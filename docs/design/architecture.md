@@ -1,8 +1,41 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/architecture.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes architecture
 
-A running Kubernetes cluster contains node agents (kubelet) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making kubelet itself (all our components, really) run within containers, and making the scheduler 100% pluggable.
+A running Kubernetes cluster contains node agents (`kubelet`) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making `kubelet` itself (all our components, really) run within containers, and making the scheduler 100% pluggable.
 
-![Architecture Diagram](../architecture.png?raw=true "Architecture overview")
+![Architecture Diagram](architecture.png?raw=true "Architecture overview")
 
 ## The Kubernetes Node
 
@@ -12,20 +45,21 @@ The Kubernetes node has the services necessary to run application containers and
 
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
-### Kubelet
-The **Kubelet** manages [pods](../pods.md) and their containers, their images, their volumes, etc. 
+### `kubelet`
 
-### Kube-Proxy
+The `kubelet` manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc.
 
-Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
+### `kube-proxy`
 
-Service endpoints are currently found via [DNS](../dns.md) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes {FOO}_SERVICE_HOST and {FOO}_SERVICE_PORT variables are supported).  These variables resolve to ports managed by the service proxy.
+Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../user-guide/services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
+
+Service endpoints are currently found via [DNS](../admin/dns.md) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes `{FOO}_SERVICE_HOST` and `{FOO}_SERVICE_PORT` variables are supported).  These variables resolve to ports managed by the service proxy.
 
 ## The Kubernetes Control Plane
 
 The Kubernetes control plane is split into a set of components. Currently they all run on a single _master_ node, but that is expected to change soon in order to support high-availability clusters.  These components work together to provide a unified view of the cluster.
 
-### etcd
+### `etcd`
 
 All persistent master state is stored in an instance of `etcd`.  This provides a great way to store configuration data reliably.  With `watch` support, coordinating components can be notified very quickly of changes.
 
@@ -41,7 +75,9 @@ The scheduler binds unscheduled pods to nodes via the `/binding` API. The schedu
 
 All other cluster-level functions are currently performed by the Controller Manager. For instance, `Endpoints` objects are created and updated by the endpoints controller, and nodes are discovered, managed, and monitored by the node controller. These could eventually be split into separate components to make them independently pluggable.
 
-The [`replicationcontroller`](../replication-controller.md) is a mechanism that is layered on top of the simple [`pod`](../pods.md) API. We eventually plan to port it to a generic plug-in mechanism, once one is implemented.
+The [`replicationcontroller`](../user-guide/replication-controller.md) is a mechanism that is layered on top of the simple [`pod`](../user-guide/pods.md) API. We eventually plan to port it to a generic plug-in mechanism, once one is implemented.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/architecture.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

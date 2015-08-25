@@ -50,6 +50,20 @@ func TestCapturePanic(t *testing.T) {
 	}
 }
 
+func TestCapturePanicWithEncoded(t *testing.T) {
+	tearDown()
+	Add(newPanicingService())
+	DefaultContainer.EnableContentEncoding(true)
+	httpRequest, _ := http.NewRequest("GET", "http://here.com/fire", nil)
+	httpRequest.Header.Set("Accept", "*/*")
+	httpRequest.Header.Set("Accept-Encoding", "gzip")
+	httpWriter := httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if 500 != httpWriter.Code {
+		t.Error("500 expected on fire, got", httpWriter.Code)
+	}
+}
+
 func TestNotFound(t *testing.T) {
 	tearDown()
 	httpRequest, _ := http.NewRequest("GET", "http://here.com/missing", nil)

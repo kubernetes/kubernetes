@@ -68,6 +68,25 @@ func TestMeasureContentLengthWriteErrorString(t *testing.T) {
 	}
 }
 
+// go test -v -test.run TestStatusIsPassedToResponse ...restful
+func TestStatusIsPassedToResponse(t *testing.T) {
+	for _, each := range []struct {
+		write, read int
+	}{
+		{write: 204, read: 204},
+		{write: 304, read: 304},
+		{write: 200, read: 200},
+		{write: 400, read: 200},
+	} {
+		httpWriter := httptest.NewRecorder()
+		resp := Response{httpWriter, "*/*", []string{"*/*"}, 0, 0, true}
+		resp.WriteHeader(each.write)
+		if got, want := httpWriter.Code, each.read; got != want {
+			t.Error("got %v want %v", got, want)
+		}
+	}
+}
+
 // go test -v -test.run TestStatusCreatedAndContentTypeJson_Issue54 ...restful
 func TestStatusCreatedAndContentTypeJson_Issue54(t *testing.T) {
 	httpWriter := httptest.NewRecorder()

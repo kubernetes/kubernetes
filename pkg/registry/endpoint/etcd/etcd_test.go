@@ -19,30 +19,21 @@ package etcd
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
-}
-
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	fakeEtcdClient, h := newHelper(t)
-	storage := NewStorage(h)
-	return storage, fakeEtcdClient
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage, false), fakeClient
 }
 
 func validNewEndpoints() *api.Endpoints {
@@ -69,13 +60,19 @@ func validChangedEndpoints() *api.Endpoints {
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	endpoints := validNewEndpoints()
 	endpoints.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		endpoints,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.Endpoints{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
@@ -85,17 +82,17 @@ func TestCreate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 
 	endpoints := validChangedEndpoints()
 	key, _ := storage.KeyFunc(ctx, endpoints.Name)
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, endpoints),
+					Value:         runtime.EncodeOrDie(testapi.Codec(), endpoints),
 					ModifiedIndex: 1,
 				},
 			},
@@ -103,161 +100,46 @@ func TestDelete(t *testing.T) {
 		return endpoints
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
-}
-
-func TestEtcdListEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets: []api.EndpointSubset{{
-								Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-								Ports:     []api.EndpointPort{{Port: 8345, Protocol: "TCP"}},
-							}},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
-		},
-		E: nil,
-	}
-
-	endpointsObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	endpoints := endpointsObj.(*api.EndpointsList)
-
-	if len(endpoints.Items) != 2 || endpoints.Items[0].Name != "foo" || endpoints.Items[1].Name != "bar" {
-		t.Errorf("Unexpected endpoints list: %#v", endpoints)
-	}
+	test.TestDelete(createFn, gracefulSetFn)
 }
 
 func TestEtcdGetEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	endpoints := validNewEndpoints()
-	name := endpoints.Name
-	key, _ := storage.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, endpoints), 0)
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var endpointsOut api.Endpoints
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &endpointsOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	obj, err := storage.Get(ctx, name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := obj.(*api.Endpoints)
-
-	endpoints.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := endpoints, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected endpoints: %#v, expected %#v", e, a)
-	}
+	test.TestGet(endpoints)
 }
 
-func TestListEmptyEndpointsList(t *testing.T) {
-	ctx := api.NewDefaultContext()
+func TestEtcdListEndpoints(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-
-	endpoints, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(endpoints.(*api.EndpointsList).Items) != 0 {
-		t.Errorf("Unexpected non-zero pod list: %#v", endpoints)
-	}
-	if endpoints.(*api.EndpointsList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", endpoints)
-	}
-}
-
-func TestListEndpointsList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
+	test := resttest.New(t, storage, fakeClient.SetError)
+	endpoints := validNewEndpoints()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	test.TestList(
+		endpoints,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
-	}
-
-	endpointsObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	endpoints := endpointsObj.(*api.EndpointsList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(endpoints.Items) != 2 {
-		t.Errorf("Unexpected endpoints list: %#v", endpoints)
-	}
-	if endpoints.Items[0].Name != "foo" {
-		t.Errorf("Unexpected endpoints: %#v", endpoints.Items[0])
-	}
-	if endpoints.Items[1].Name != "bar" {
-		t.Errorf("Unexpected endpoints: %#v", endpoints.Items[1])
-	}
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
 }
 
 func TestEndpointsDecode(t *testing.T) {
 	storage, _ := newStorage(t)
 	expected := validNewEndpoints()
-	body, err := latest.Codec.Encode(expected)
+	body, err := testapi.Codec().Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := latest.Codec.DecodeInto(body, actual); err != nil {
+	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -273,7 +155,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewEndpoints()), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewEndpoints()), 0)
 
 	_, _, err := storage.Update(ctx, endpoints)
 	if err != nil {
@@ -285,7 +167,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var endpointsOut api.Endpoints
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &endpointsOut)
+	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &endpointsOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -307,7 +189,7 @@ func TestDeleteEndpoints(t *testing.T) {
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, endpoints),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), endpoints),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},

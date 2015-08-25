@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 
 	"speter.net/go/exp/math/dec/inf"
 )
@@ -54,8 +54,8 @@ func TestSemantic(t *testing.T) {
 		{resource.Quantity{}, resource.MustParse("0"), true},
 		{resource.Quantity{}, resource.MustParse("1m"), false},
 		{
-			resource.Quantity{inf.NewDec(5, 0), resource.BinarySI},
-			resource.Quantity{inf.NewDec(5, 0), resource.DecimalSI},
+			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.BinarySI},
+			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.DecimalSI},
 			true,
 		},
 		{resource.MustParse("2m"), resource.MustParse("1m"), false},
@@ -138,7 +138,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 	for i, tc := range testCases {
 		AddToNodeAddresses(&tc.existing, tc.toAdd...)
 		if !Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Error("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
+			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
 		}
 	}
 }

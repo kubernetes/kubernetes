@@ -19,7 +19,7 @@ package volume
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestSpecSourceConverters(t *testing.T) {
@@ -43,7 +43,7 @@ func TestSpecSourceConverters(t *testing.T) {
 		},
 	}
 
-	converted = NewSpecFromPersistentVolume(pv)
+	converted = NewSpecFromPersistentVolume(pv, false)
 	if converted.PersistentVolumeSource.AWSElasticBlockStore == nil {
 		t.Errorf("Unexpected nil AWSElasticBlockStore: %+v", converted)
 	}

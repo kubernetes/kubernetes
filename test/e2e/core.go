@@ -29,7 +29,7 @@ type command struct {
 	component string
 }
 
-func coreDump(dir string) {
+func CoreDump(dir string) {
 	c, err := loadClient()
 	if err != nil {
 		fmt.Printf("Error creating client: %v", err)
@@ -53,13 +53,14 @@ func coreDump(dir string) {
 	cmds := []command{
 		{"cat /var/log/kubelet.log", "kubelet"},
 		{"cat /var/log/kube-proxy.log", "kube-proxy"},
+		{"cat /var/log/monit.log", "monit"},
 	}
 	logCore(cmds, hosts, dir, provider)
 
 	// I wish there was a better way to get the master IP...
 	config, err := loadConfig()
 	if err != nil {
-		fmt.Printf("Error loading config: %v")
+		fmt.Printf("Error loading config: %v", err)
 	}
 	ix := strings.LastIndex(config.Host, "/")
 	master := net.JoinHostPort(config.Host[ix+1:], "22")
@@ -68,6 +69,7 @@ func coreDump(dir string) {
 		{"cat /var/log/kube-apiserver.log", "kube-apiserver"},
 		{"cat /var/log/kube-scheduler.log", "kube-scheduler"},
 		{"cat /var/log/kube-controller-manager.log", "kube-controller-manager"},
+		{"cat /var/log/monit.log", "monit"},
 	}
 	logCore(cmds, []string{master}, dir, provider)
 }

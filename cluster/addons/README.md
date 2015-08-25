@@ -6,13 +6,13 @@ Kubernetes clusters. The add-ons are visible through the API (they can be listed
 using ```kubectl```), but manipulation of these objects is discouraged because
 the system will bring them back to the original state, in particular:
 * if an add-on is stopped, it will be restarted automatically
-* if an add-on is rolling-updated (for Replication Controlers), the system will stop the new version and
+* if an add-on is rolling-updated (for Replication Controllers), the system will stop the new version and
   start the old one again (or perform rolling update to the old version, in the
   future).
 
 On the cluster, the add-ons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
 (json is not supported at the moment). A system daemon periodically checks if
-the contents of this directory is consistent with the add-one objects on the API
+the contents of this directory is consistent with the add-on objects on the API
 server. If any difference is spotted, the system updates the API objects
 accordingly. (Limitation: for now, the system compares only the names of objects
 in the directory and on the API server. So changes in parameters may not be
@@ -21,7 +21,7 @@ manifests on the master server. But still, users are discouraged to do it
 on their own - they should rather wait for a new release of
 Kubernetes that will also contain new versions of add-ons.
 
-Each add-on must specify the following label: ````kubernetes.io/cluster-service: true````.
+Each add-on must specify the following label: ```kubernetes.io/cluster-service: true```.
 Yaml files that do not define this label will be ignored.
 
 The naming convention for Replication Controllers is

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestSelectorParse(t *testing.T) {
@@ -230,7 +230,7 @@ func TestLexerSequence(t *testing.T) {
 		}
 		for i := 0; i < min(len(tokens), len(v.t)); i++ {
 			if tokens[i] != v.t[i] {
-				t.Errorf("Test '%s': Mismatching in token type found '%s' it should be '%s'", v.s, tokens[i], v.t[i])
+				t.Errorf("Test '%s': Mismatching in token type found '%v' it should be '%v'", v.s, tokens[i], v.t[i])
 			}
 		}
 	}
@@ -453,7 +453,7 @@ func TestSetSelectorParser(t *testing.T) {
 		} else if err == nil && !ssp.Valid {
 			t.Errorf("Parse(%s) => %+v expected error", ssp.In, sel)
 		} else if ssp.Match && !reflect.DeepEqual(sel, ssp.Out) {
-			t.Errorf("Parse(%s) => parse output '%t' doesn't match '%t' expected match", ssp.In, sel, ssp.Out)
+			t.Errorf("Parse(%s) => parse output '%v' doesn't match '%v' expected match", ssp.In, sel, ssp.Out)
 		}
 	}
 }
@@ -496,7 +496,7 @@ func TestAdd(t *testing.T) {
 	for _, ts := range testCases {
 		ts.sel = ts.sel.Add(ts.key, ts.operator, ts.values)
 		if !reflect.DeepEqual(ts.sel, ts.refSelector) {
-			t.Errorf("Expected %t found %t", ts.refSelector, ts.sel)
+			t.Errorf("Expected %v found %v", ts.refSelector, ts.sel)
 		}
 	}
 }

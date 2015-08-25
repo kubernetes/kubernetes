@@ -20,10 +20,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -47,8 +49,8 @@ type fakeDiskManager struct{}
 func (fake *fakeDiskManager) MakeGlobalPDName(disk rbd) string {
 	return "/tmp/fake_rbd_path"
 }
-func (fake *fakeDiskManager) AttachDisk(disk rbd) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) AttachDisk(b rbdBuilder) error {
+	globalPath := b.manager.MakeGlobalPDName(*b.rbd)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -56,8 +58,8 @@ func (fake *fakeDiskManager) AttachDisk(disk rbd) error {
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(disk rbd, mntPath string) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) DetachDisk(c rbdCleaner, mntPath string) error {
+	globalPath := c.manager.MakeGlobalPDName(*c.rbd)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -73,12 +75,12 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	builder, err := plug.(*RBDPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{}, "secrets")
+	builder, err := plug.(*rbdPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{}, "secrets")
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
 	if builder == nil {
-		t.Errorf("Got a nil Builder: %v")
+		t.Error("Got a nil Builder")
 	}
 
 	path := builder.GetPath()
@@ -104,12 +106,12 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		}
 	}
 
-	cleaner, err := plug.(*RBDPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
+	cleaner, err := plug.(*rbdPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
 	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner: %v")
+		t.Error("Got a nil Cleaner")
 	}
 
 	if err := cleaner.TearDown(); err != nil {
@@ -151,5 +153,56 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pvA",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				RBD: &api.RBDVolumeSource{
+					CephMonitors: []string{"a", "b"},
+					RBDImage:     "bar",
+					FSType:       "ext4",
+				},
+			},
+			ClaimRef: &api.ObjectReference{
+				Name: "claimA",
+			},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claimA",
+			Namespace: "nsA",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "pvA",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
+	o.Add(pv)
+	o.Add(claim)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plug, _ := plugMgr.FindPluginByName(rbdPluginName)
+
+	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	spec := volume.NewSpecFromPersistentVolume(pv, true)
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+
+	if !builder.IsReadOnly() {
+		t.Errorf("Expected true for builder.IsReadOnly")
+	}
 }

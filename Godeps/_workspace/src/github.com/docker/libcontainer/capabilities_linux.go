@@ -49,6 +49,7 @@ var capabilityList = map[string]capability.Cap{
 	"SETFCAP":          capability.CAP_SETFCAP,
 	"WAKE_ALARM":       capability.CAP_WAKE_ALARM,
 	"BLOCK_SUSPEND":    capability.CAP_BLOCK_SUSPEND,
+	"AUDIT_READ":       capability.CAP_AUDIT_READ,
 }
 
 func newCapWhitelist(caps []string) (*whitelist, error) {

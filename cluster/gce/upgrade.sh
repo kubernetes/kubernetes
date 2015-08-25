@@ -29,7 +29,7 @@ fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
@@ -178,11 +178,11 @@ function prepare-node-upgrade() {
   detect-minion-names
 
   # TODO(mbforbes): Refactor setting scope flags.
-  local -a scope_flags=()
-  if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
+  local scope_flags=
+  if [ -n "${MINION_SCOPES}" ]; then
+    scope_flags="--scopes ${MINION_SCOPES}"
   else
-    scope_flags=("--no-scopes")
+    scope_flags="--no-scopes"
   fi
 
   # Get required node env vars from exiting template.
@@ -212,8 +212,15 @@ function do-node-upgrade() {
   echo "== Upgrading nodes to ${KUBE_VERSION}. ==" >&2
   # Do the actual upgrade.
   # NOTE(mbforbes): If you are changing this gcloud command, update
-  #                 test/e2e/restart.go to match this EXACTLY.
-  gcloud preview rolling-updates \
+  #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
+  # TODO(mbforbes): Remove this hack on July 29, 2015, when the migration to
+  #                 `gcloud alpha compute rolling-updates` is complete.
+  local subgroup="preview"
+  local exists=$(gcloud ${subgroup} rolling-updates -h &>/dev/null; echo $?) || true
+  if [[ "${exists}" != "0" ]]; then
+    subgroup="alpha compute"
+  fi
+  gcloud ${subgroup} rolling-updates \
       --project="${PROJECT}" \
       --zone="${ZONE}" \
       start \

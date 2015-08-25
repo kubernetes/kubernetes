@@ -1,8 +1,42 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/clustering.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Clustering in Kubernetes
 
 
 ## Overview
-The term "clustering" refers to the process of having all members of the kubernetes cluster find and trust each other.  There are multiple different ways to achieve clustering with different security and usability profiles.  This document attempts to lay out the user experiences for clustering that Kubernetes aims to address.
+
+The term "clustering" refers to the process of having all members of the Kubernetes cluster find and trust each other.  There are multiple different ways to achieve clustering with different security and usability profiles.  This document attempts to lay out the user experiences for clustering that Kubernetes aims to address.
 
 Once a cluster is established, the following is true:
 
@@ -41,7 +75,7 @@ The building blocks of an easier solution:
 * **Move to TLS** We will move to using TLS for all intra-cluster communication.  We will explicitly identify the trust chain (the set of trusted CAs) as opposed to trusting the system CAs.  We will also use client certificates for all AuthN.
 * [optional] **API driven CA** Optionally, we will run a CA in the master that will mint certificates for the nodes/kubelets.  There will be pluggable policies that will automatically approve certificate requests here as appropriate.
   * **CA approval policy**  This is a pluggable policy object that can automatically approve CA signing requests.  Stock policies will include `always-reject`, `queue` and `insecure-always-approve`.  With `queue` there would be an API for evaluating and accepting/rejecting requests.  Cloud providers could implement a policy here that verifies other out of band information and automatically approves/rejects based on other external factors.
-* **Scoped Kubelet Accounts** These accounts are per-minion and (optionally) give a minion permission to register itself.
+* **Scoped Kubelet Accounts** These accounts are per-node and (optionally) give a node permission to register itself.
 	* To start with, we'd have the kubelets generate a cert/account in the form of `kubelet:<host>`.  To start we would then hard code policy such that we give that particular account appropriate permissions.  Over time, we can make the policy engine more generic.
 * [optional] **Bootstrap API endpoint** This is a helper service hosted outside of the Kubernetes cluster that helps with initial discovery of the master.
 
@@ -60,4 +94,6 @@ This flow has the admin manually approving the kubelet signing requests.  This i
 ![Dynamic Sequence Diagram](clustering/dynamic.png)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/clustering.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

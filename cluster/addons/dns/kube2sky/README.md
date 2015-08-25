@@ -26,7 +26,7 @@ mutation (insertion or removal of a dns entry) before giving up and crashing.
 
 `--etcd-server`: The etcd server that is being used by skydns.
 
-`--kube_master_url`: URL of kubernetes master. Reuired if `--kubecfg_file` is not set.
+`--kube_master_url`: URL of kubernetes master. Required if `--kubecfg_file` is not set.
 
 `--kubecfg_file`: Path to kubecfg file that contains the master URL and tokens to authenticate with the master.
 

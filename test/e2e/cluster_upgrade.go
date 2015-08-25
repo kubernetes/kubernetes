@@ -29,12 +29,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -302,19 +302,13 @@ var _ = Describe("Skipped", func() {
 						Logf("Node template %s is still in use; not cleaning up", tmplBefore)
 						return
 					}
-					// TODO(mbforbes): Distinguish between transient failures
-					// and "cannot delete--in use" errors and retry on the
-					// former.
-					// TODO(mbforbes): Call this with retryCmd().
 					Logf("Deleting node template %s", tmplBefore)
-					o, err := exec.Command("gcloud", "compute", "instance-templates",
+					if _, _, err := retryCmd("gcloud", "compute", "instance-templates",
 						fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 						"delete",
-						tmplBefore).CombinedOutput()
-					if err != nil {
-						Logf("gcloud compute instance-templates delete %s call failed with err: %v, output: %s",
-							tmplBefore, err, string(o))
-						Logf("May have leaked %s", tmplBefore)
+						tmplBefore); err != nil {
+						Logf("gcloud compute instance-templates delete %s call failed with err: %v", tmplBefore, err)
+						Logf("May have leaked instance template %q", tmplBefore)
 					}
 				}
 			})
@@ -522,20 +516,19 @@ func migTemplate() (string, error) {
 	var errLast error
 	var templ string
 	key := "instanceTemplate"
-	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mbforbes): make this hit the compute API directly instead of
 		// shelling out to gcloud.
-		o, err := exec.Command("gcloud", "preview", "managed-instance-groups",
+		// An `instance-groups managed describe` call outputs what we want to stdout.
+		output, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"describe",
-			testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+			testContext.CloudConfig.NodeInstanceGroup)
 		if err != nil {
-			errLast = fmt.Errorf("gcloud preview managed-instance-groups describe call failed with err: %v", err)
+			errLast = fmt.Errorf("gcloud compute instance-groups managed describe call failed with err: %v", err)
 			return false, nil
 		}
-		output := string(o)
 
 		// The 'describe' call probably succeeded; parse the output and try to
 		// find the line that looks like "instanceTemplate: url/to/<templ>" and
@@ -561,13 +554,14 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	var errLast error
 	var id string
 	prefix, suffix := "Started [", "]."
-	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mbforbes): make this hit the compute API directly instead of
 		//                 shelling out to gcloud.
 		// NOTE(mbforbes): If you are changing this gcloud command, update
 		//                 cluster/gce/upgrade.sh to match this EXACTLY.
-		o, err := exec.Command("gcloud", "preview", "rolling-updates",
+		// A `rolling-updates start` call outputs what we want to stderr.
+		_, output, err := retryCmd("gcloud", append(migUdpateCmdBase(),
+			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"start",
@@ -580,12 +574,11 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 			//       --max-num-concurrent-instances.
 			fmt.Sprintf("--max-num-concurrent-instances=%d", 1),
 			fmt.Sprintf("--max-num-failed-instances=%d", 0),
-			fmt.Sprintf("--min-instance-update-time=%ds", 0)).CombinedOutput()
+			fmt.Sprintf("--min-instance-update-time=%ds", 0))...)
 		if err != nil {
-			errLast = fmt.Errorf("gcloud preview rolling-updates call failed with err: %v", err)
+			errLast = fmt.Errorf("rolling-updates call failed with err: %v", err)
 			return false, nil
 		}
-		output := string(o)
 
 		// The 'start' call probably succeeded; parse the output and try to find
 		// the line that looks like "Started [url/to/<id>]." and return <id>.
@@ -609,6 +602,25 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	return id, nil
 }
 
+// migUpdateCmdBase gets the base of the MIG rolling update command--i.e., all
+// pieces of the gcloud command that come after "gcloud" but before
+// "rolling-updates". Examples of returned values are:
+//
+//   {preview"}
+//
+//   {"alpha", "compute"}
+//
+// TODO(mbforbes): Remove this hack on July 29, 2015 when the migration to
+//                 `gcloud alpha compute rolling-updates` is complete.
+func migUdpateCmdBase() []string {
+	b := []string{"preview"}
+	a := []string{"rolling-updates", "-h"}
+	if err := exec.Command("gcloud", append(b, a...)...).Run(); err != nil {
+		b = []string{"alpha", "compute"}
+	}
+	return b
+}
+
 // migRollingUpdatePoll (CKE/GKE-only) polls the progress of the MIG rolling
 // update with ID id until it is complete. It returns an error if this takes
 // longer than nt times the number of nodes.
@@ -618,19 +630,19 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	start, timeout := time.Now(), nt*time.Duration(testContext.CloudConfig.NumNodes)
 	var errLast error
 	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
-	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if wait.Poll(restartPoll, timeout, func() (bool, error) {
-		o, err := exec.Command("gcloud", "preview", "rolling-updates",
+		// A `rolling-updates describe` call outputs what we want to stdout.
+		output, _, err := retryCmd("gcloud", append(migUdpateCmdBase(),
+			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"describe",
-			id).CombinedOutput()
+			id)...)
 		if err != nil {
 			errLast = fmt.Errorf("Error calling rolling-updates describe %s: %v", id, err)
 			Logf("%v", errLast)
 			return false, nil
 		}
-		output := string(o)
 
 		// The 'describe' call probably succeeded; parse the output and try to
 		// find the line that looks like "status: <status>" and see whether it's

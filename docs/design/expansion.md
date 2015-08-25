@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/expansion.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Variable expansion in pod command, args, and env
 
 ## Abstract
@@ -54,14 +87,14 @@ available to subsequent expansions.
 
 ### Use Case: Variable expansion in command
 
-Users frequently need to pass the values of environment variables to a container's command.  
+Users frequently need to pass the values of environment variables to a container's command.
 Currently, Kubernetes does not perform any expansion of variables.  The workaround is to invoke a
 shell in the container's command and have the shell perform the substitution, or to write a wrapper
 script that sets up the environment and runs the command.  This has a number of drawbacks:
 
 1.  Solutions that require a shell are unfriendly to images that do not contain a shell
 2.  Wrapper scripts make it harder to use images as base images
-3.  Wrapper scripts increase coupling to kubernetes
+3.  Wrapper scripts increase coupling to Kubernetes
 
 Users should be able to do the 80% case of variable expansion in command without writing a wrapper
 script or adding a shell invocation to their containers' commands.
@@ -97,7 +130,7 @@ The exact syntax for variable expansion has a large impact on how users perceive
 feature.  We considered implementing a very restrictive subset of the shell `${var}` syntax.  This
 syntax is an attractive option on some level, because many people are familiar with it.  However,
 this syntax also has a large number of lesser known features such as the ability to provide
-default values for unset variables, perform inline substitution, etc.  
+default values for unset variables, perform inline substitution, etc.
 
 In the interest of preventing conflation of the expansion feature in Kubernetes with the shell
 feature, we chose a different syntax similar to the one in Makefiles, `$(var)`.  We also chose not
@@ -206,7 +239,7 @@ The necessary changes to implement this functionality are:
     `ObjectReference` and an `EventRecorder`
 2.  Introduce `third_party/golang/expansion` package that provides:
     1.  An `Expand(string, func(string) string) string` function
-    2.  A `MappingFuncFor(ObjectEventRecorder, ...map[string]string) string` function 
+    2.  A `MappingFuncFor(ObjectEventRecorder, ...map[string]string) string` function
 3.  Make the kubelet expand environment correctly
 4.  Make the kubelet expand command correctly
 
@@ -278,7 +311,7 @@ func Expand(input string, mapping func(string) string) string {
 
 #### Kubelet changes
 
-The Kubelet should be made to correctly expand variables references in a container's environment, 
+The Kubelet should be made to correctly expand variables references in a container's environment,
 command, and args.  Changes will need to be made to:
 
 1.  The `makeEnvironmentVariables` function in the kubelet; this is used by
@@ -385,4 +418,7 @@ spec:
   restartPolicy: Never
 ```
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/expansion.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -150,11 +150,20 @@ func writeServiceError(err ServiceError, req *Request, resp *Response) {
 
 // Dispatch the incoming Http Request to a matching WebService.
 func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
+	writer := httpWriter
+
+	// CompressingResponseWriter should be closed after all operations are done
+	defer func() {
+		if compressWriter, ok := writer.(*CompressingResponseWriter); ok {
+			compressWriter.Close()
+		}
+	}()
+
 	// Instal panic recovery unless told otherwise
 	if !c.doNotRecover { // catch all for 500 response
 		defer func() {
 			if r := recover(); r != nil {
-				c.recoverHandleFunc(r, httpWriter)
+				c.recoverHandleFunc(r, writer)
 				return
 			}
 		}()
@@ -168,7 +177,6 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 
 	// Detect if compression is needed
 	// assume without compression, test for override
-	writer := httpWriter
 	if c.contentEncodingEnabled {
 		doCompress, encoding := wantsCompressedResponse(httpRequest)
 		if doCompress {
@@ -179,9 +187,6 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 				httpWriter.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			defer func() {
-				writer.(*CompressingResponseWriter).Close()
-			}()
 		}
 	}
 	// Find best match Route ; err is non nil if no match was found

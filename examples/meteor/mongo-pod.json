@@ -25,11 +25,9 @@
         "ports": [
           {
             "name": "mongo",
-            "containerPort": 27017,
-            "protocol": "TCP"
+            "containerPort": 27017
           }
         ],
-        "resources": {},
         "volumeMounts": [
           {
             "name": "mongo-disk",

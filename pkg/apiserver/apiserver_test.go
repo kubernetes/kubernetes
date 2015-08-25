@@ -32,19 +32,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 
 	"github.com/emicklei/go-restful"
 )
@@ -88,16 +88,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper(
-		versions,
-		func(version string) (*meta.VersionInterfaces, bool) {
-			interfaces, err := interfacesFor(version)
-			if err != nil {
-				return nil, false
-			}
-			return interfaces, true
-		},
-	)
+	return meta.NewDefaultRESTMapper("testgroup", versions, interfacesFor)
 }
 
 func addTestTypes() {
@@ -110,6 +101,7 @@ func addTestTypes() {
 		ResourceVersion string `json:"resourceVersion,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(testVersion, &api.Pod{})
 }
 
 func addNewTestTypes() {
@@ -177,7 +169,7 @@ func handle(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(true, storage, admissionControl, selfLinker)
 }
 
-// uses the default settings for a v1beta3 compatible api
+// uses the default settings for a v1 compatible api
 func handleNew(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(false, storage, admissionControl, selfLinker)
 }
@@ -258,6 +250,13 @@ type SimpleGetOptions struct {
 	Param1       string `json:"param1"`
 	Param2       string `json:"param2"`
 	Path         string `json:"atAPath"`
+}
+
+func (SimpleGetOptions) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"param1": "description for param1",
+		"param2": "description for param2",
+	}
 }
 
 func (*SimpleGetOptions) IsAnAPIObject() {}
@@ -706,10 +705,12 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		response, err := client.Do(request)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
-			continue
 		}
 		defer response.Body.Close()
-		data, _ := ioutil.ReadAll(response.Body)
+		data, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if response.StatusCode != v.ErrCode {
 			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
 			continue
@@ -852,7 +853,11 @@ func TestList(t *testing.T) {
 		}
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d, Expected: %d, %#v", i, resp.StatusCode, http.StatusOK, resp)
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
 			t.Logf("%d: body: %s", i, string(body))
 			continue
 		}
@@ -916,7 +921,10 @@ func TestNonEmptyList(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		t.Logf("Data: %s", string(body))
 	}
 
@@ -964,7 +972,10 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		t.Logf("Data: %s", string(body))
 	}
 	var listOut SimpleList
@@ -1059,7 +1070,10 @@ func TestGetBinary(t *testing.T) {
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
 	defer server.Close()
 
-	req, _ := http.NewRequest("GET", server.URL+"/api/version/namespaces/default/simple/binary", nil)
+	req, err := http.NewRequest("GET", server.URL+"/api/version/namespaces/default/simple/binary", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	req.Header.Add("Accept", "text/other, */*")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1075,6 +1089,47 @@ func TestGetBinary(t *testing.T) {
 	if !stream.closed || stream.version != "version" || stream.accept != "text/other, */*" ||
 		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
 		t.Errorf("unexpected stream: %#v", stream)
+	}
+}
+
+func validateSimpleGetOptionsParams(t *testing.T, route *restful.Route) {
+	// Validate name and description
+	expectedParams := map[string]string{
+		"param1":  "description for param1",
+		"param2":  "description for param2",
+		"atAPath": "",
+	}
+	for _, p := range route.ParameterDocs {
+		data := p.Data()
+		if desc, exists := expectedParams[data.Name]; exists {
+			if desc != data.Description {
+				t.Errorf("unexpected description for parameter %s: %s\n", data.Name, data.Description)
+			}
+			delete(expectedParams, data.Name)
+		}
+	}
+	if len(expectedParams) > 0 {
+		t.Errorf("did not find all expected parameters: %#v", expectedParams)
+	}
+}
+
+func TestGetWithOptionsRouteParams(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := GetWithOptionsRESTStorage{
+		SimpleRESTStorage: &SimpleRESTStorage{},
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
+	if len(ws) == 0 {
+		t.Fatal("no web services registered")
+	}
+	routes := ws[0].Routes()
+	for i := range routes {
+		if routes[i].Method == "GET" && routes[i].Operation == "readNamespacedSimple" {
+			validateSimpleGetOptionsParams(t, &routes[i])
+			break
+		}
 	}
 }
 
@@ -1292,6 +1347,33 @@ func TestConnect(t *testing.T) {
 	}
 }
 
+func TestConnectWithOptionsRouteParams(t *testing.T) {
+	connectStorage := &ConnecterRESTStorage{
+		connectHandler:      &SimpleConnectHandler{},
+		emptyConnectOptions: &SimpleGetOptions{},
+	}
+	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
+	if len(ws) == 0 {
+		t.Fatal("no web services registered")
+	}
+	routes := ws[0].Routes()
+	for i := range routes {
+		switch routes[i].Operation {
+		case "connectGetNamespacedSimpleConnect":
+		case "connectPostNamespacedSimpleConnect":
+		case "connectPutNamespacedSimpleConnect":
+		case "connectDeleteNamespacedSimpleConnect":
+			validateSimpleGetOptionsParams(t, &routes[i])
+
+		}
+	}
+}
+
 func TestConnectWithOptions(t *testing.T) {
 	responseText := "Hello World"
 	itemID := "theID"
@@ -1436,7 +1518,10 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, _ := ioutil.ReadAll(res.Body)
+		s, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		t.Logf(string(s))
 	}
 	if simpleStorage.deleted != ID {
@@ -1865,7 +1950,7 @@ func TestCreateNotFound(t *testing.T) {
 	handler := handle(map[string]rest.Storage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
-			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
+			// See http://pr.k8s.io/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrs.NewNotFound("simple", "id")},
 		},
 	})
@@ -1874,7 +1959,10 @@ func TestCreateNotFound(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{Other: "foo"}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1897,7 +1985,10 @@ func TestCreateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1909,7 +2000,10 @@ func TestCreateChecksDecode(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	if b, _ := ioutil.ReadAll(response.Body); !strings.Contains(string(b), "must be of type Simple") {
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
 		t.Errorf("unexpected response: %s", string(b))
 	}
 }
@@ -2000,7 +2094,10 @@ func TestCreateWithName(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{Other: "foo"}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2024,7 +2121,10 @@ func TestUpdateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/bar", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2036,7 +2136,10 @@ func TestUpdateChecksDecode(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	if b, _ := ioutil.ReadAll(response.Body); !strings.Contains(string(b), "must be of type Simple") {
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
 		t.Errorf("unexpected response: %s", string(b))
 	}
 }
@@ -2094,7 +2197,10 @@ func TestCreate(t *testing.T) {
 	simple := &Simple{
 		Other: "bar",
 	}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2150,7 +2256,10 @@ func TestCreateInNamespace(t *testing.T) {
 	simple := &Simple{
 		Other: "bar",
 	}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2196,7 +2305,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "other",
-		expectedSet: "/api/version/foo/bar?namespace=other",
+		expectedSet: "/api/version/namespaces/other/foo/bar",
 	}
 	handler := handleInternal(true, map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
 	server := httptest.NewServer(handler)
@@ -2206,8 +2315,11 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	simple := &Simple{
 		Other: "bar",
 	}
-	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/foo?namespace=other", bytes.NewBuffer(data))
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2329,8 +2441,11 @@ func TestCreateTimeout(t *testing.T) {
 	defer server.Close()
 
 	simple := &Simple{Other: "foo"}
-	data, _ := codec.Encode(simple)
-	itemOut := expectApiStatus(t, "POST", server.URL+"/api/version/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	itemOut := expectApiStatus(t, "POST", server.URL+"/api/version/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
 	if itemOut.Status != api.StatusFailure || itemOut.Reason != api.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
@@ -2338,7 +2453,7 @@ func TestCreateTimeout(t *testing.T) {
 
 func TestCORSAllowedOrigins(t *testing.T) {
 	table := []struct {
-		allowedOrigins util.StringList
+		allowedOrigins []string
 		origin         string
 		allowed        bool
 	}{
@@ -2407,5 +2522,101 @@ func TestCORSAllowedOrigins(t *testing.T) {
 				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
 			}
 		}
+	}
+}
+
+func TestCreateChecksAPIVersion(t *testing.T) {
+	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{}
+	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
+	data, err := newCodec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/api/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "does not match the specified apiVersion") {
+		t.Errorf("unexpected response: %s", string(b))
+	}
+}
+
+func TestCreateDefaultsAPIVersion(t *testing.T) {
+	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{}
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	delete(m, "apiVersion")
+	data, err = json.Marshal(m)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	request, err := http.NewRequest("POST", server.URL+"/api/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusCreated {
+		t.Errorf("unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusCreated, response)
+	}
+}
+
+func TestUpdateChecksAPIVersion(t *testing.T) {
+	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	data, err := newCodec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("PUT", server.URL+"/api/"+testVersion+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "does not match the specified apiVersion") {
+		t.Errorf("unexpected response: %s", string(b))
 	}
 }

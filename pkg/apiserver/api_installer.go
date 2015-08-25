@@ -25,13 +25,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
+	watchjson "k8s.io/kubernetes/pkg/watch/json"
 
 	"github.com/emicklei/go-restful"
 )
@@ -50,6 +50,11 @@ type action struct {
 	Path   string               // The path of the action
 	Params []*restful.Parameter // List of parameters associated with the action.
 	Namer  ScopeNamer
+}
+
+// An interface to see if an object supports swagger documentation as a method
+type documentable interface {
+	SwaggerDoc() map[string]string
 }
 
 // errEmptyName is returned when API requests do not fill the name section of the path.
@@ -195,7 +200,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
 		isDeleter = true
 	case isDeleter:
-		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
+		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
 	}
 
 	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
@@ -204,10 +209,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
-		getOptions     runtime.Object
-		getOptionsKind string
-		getSubpath     bool
-		getSubpathKey  string
+		getOptions          runtime.Object
+		versionedGetOptions runtime.Object
+		getOptionsKind      string
+		getSubpath          bool
+		getSubpathKey       string
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
@@ -215,14 +221,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return err
 		}
+		versionedGetOptions, err = a.group.Creater.New(serverVersion, getOptionsKind)
+		if err != nil {
+			return err
+		}
 		isGetter = true
 	}
 
 	var (
-		connectOptions     runtime.Object
-		connectOptionsKind string
-		connectSubpath     bool
-		connectSubpathKey  string
+		connectOptions          runtime.Object
+		versionedConnectOptions runtime.Object
+		connectOptionsKind      string
+		connectSubpath          bool
+		connectSubpathKey       string
 	)
 	if isConnecter {
 		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
@@ -231,6 +242,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if err != nil {
 				return err
 			}
+			versionedConnectOptions, err = a.group.Creater.New(serverVersion, connectOptionsKind)
 		}
 	}
 
@@ -327,7 +339,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if !hasSubresource {
 			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
 			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
-			actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
 		}
 		break
@@ -366,6 +377,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
 		m := monitorFilter(action.Verb, resource)
+		namespaced := ""
+		if strings.Contains(action.Path, scope.ArgumentName()) {
+			namespaced = "Namespaced"
+		}
 		switch action.Verb {
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
@@ -382,12 +397,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("read"+kind+strings.Title(subresource)).
+				Operation("read"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
 			if isGetterWithOptions {
-				if err := addObjectParams(ws, route, getOptions); err != nil {
+				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
 					return err
 				}
 			}
@@ -402,7 +417,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("list"+kind+strings.Title(subresource)).
+				Operation("list"+namespaced+kind+strings.Title(subresource)).
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
@@ -434,7 +449,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("replace"+kind+strings.Title(subresource)).
+				Operation("replace"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(versionedObject).
@@ -451,7 +466,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
-				Operation("patch"+kind+strings.Title(subresource)).
+				Operation("patch"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(api.Patch{}).
@@ -473,7 +488,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("create"+kind+strings.Title(subresource)).
+				Operation("create"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(versionedObject).
@@ -489,7 +504,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("delete"+kind+strings.Title(subresource)).
+				Operation("delete"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
@@ -508,7 +523,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("watch"+kind+strings.Title(subresource)).
+				Operation("watch"+namespaced+kind+strings.Title(subresource)).
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
@@ -527,7 +542,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("watch"+kind+strings.Title(subresource)+"List").
+				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List").
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
@@ -537,13 +552,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
-			// Accept all methods as per https://github.com/GoogleCloudPlatform/kubernetes/issues/3996
-			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
-			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
-			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
-			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
-			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
-			addProxyRoute(ws, "OPTIONS", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			// Accept all methods as per http://issue.k8s.io/3996
+			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "OPTIONS", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params)
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				doc := "connect " + method + " requests to " + kind
@@ -554,12 +569,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
 					Filter(m).
 					Doc(doc).
-					Operation("connect" + strings.Title(strings.ToLower(method)) + kind + strings.Title(subresource)).
+					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource)).
 					Produces("*/*").
 					Consumes("*/*").
 					Writes("string")
-				if connectOptions != nil {
-					if err := addObjectParams(ws, route, connectOptions); err != nil {
+				if versionedConnectOptions != nil {
+					if err := addObjectParams(ws, route, versionedConnectOptions); err != nil {
 						return err
 					}
 				}
@@ -733,7 +748,7 @@ func routeFunction(handler http.Handler) restful.RouteFunction {
 	}
 }
 
-func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource, subresource string, hasSubresource bool, params []*restful.Parameter) {
+func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, namespaced, kind, resource, subresource string, hasSubresource bool, params []*restful.Parameter) {
 	doc := "proxy " + method + " requests to " + kind
 	if hasSubresource {
 		doc = "proxy " + method + " requests to " + subresource + " of " + kind
@@ -741,7 +756,7 @@ func addProxyRoute(ws *restful.WebService, method string, prefix string, path st
 	proxyRoute := ws.Method(method).Path(path).To(routeFunction(proxyHandler)).
 		Filter(monitorFilter("PROXY", resource)).
 		Doc(doc).
-		Operation("proxy" + strings.Title(method) + kind + strings.Title(subresource)).
+		Operation("proxy" + strings.Title(method) + namespaced + kind + strings.Title(subresource)).
 		Produces("*/*").
 		Consumes("*/*").
 		Writes("string")
@@ -786,7 +801,11 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				if len(jsonName) == 0 {
 					continue
 				}
-				desc := sf.Tag.Get("description")
+
+				var desc string
+				if docable, ok := obj.(documentable); ok {
+					desc = docable.SwaggerDoc()[jsonName]
+				}
 				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.Name())))
 			}
 		}

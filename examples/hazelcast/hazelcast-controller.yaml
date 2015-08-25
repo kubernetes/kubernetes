@@ -16,12 +16,16 @@ spec:
       containers: 
         - resources:
             limits:
-              cpu: 0.5
-          image: quay.io/pires/hazelcast-kubernetes:0.3.1
+              cpu: 0.1
+          image: quay.io/pires/hazelcast-kubernetes:0.5
           name: hazelcast
           env:
           - name: "DNS_DOMAIN"
             value: "cluster.local"
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           ports: 
             - containerPort: 5701
               name: hazelcast

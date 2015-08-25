@@ -17,15 +17,20 @@ limitations under the License.
 package container
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/volume"
 )
+
+// Container Terminated and Kubelet is backing off the restart
+var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
@@ -53,9 +58,9 @@ type Runtime interface {
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error
-	// KillPod kills all the containers of a pod.
-	KillPod(pod Pod) error
+	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
+	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+	KillPod(pod *api.Pod, runningPod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod. Clients of this interface assume the containers
 	// statuses in a pod always have a deterministic ordering (eg: sorted by name).
@@ -77,6 +82,12 @@ type Runtime interface {
 	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
 	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
 	ContainerCommandRunner
+	// ContainerAttach encapsulates the attaching to containers for testability
+	ContainerAttacher
+}
+
+type ContainerAttacher interface {
+	AttachContainer(id string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
 }
 
 // CommandRunner encapsulates the command runner interfaces for testability.
@@ -94,14 +105,11 @@ type ContainerCommandRunner interface {
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
-// Customizable hooks injected into container runtimes.
-type RuntimeHooks interface {
-	// Determines whether the runtime should pull the specified container's image.
-	ShouldPullImage(pod *api.Pod, container *api.Container, imagePresent bool) bool
-
-	// Runs after an image is pulled reporting its status. Error may be nil
-	// for a successful pull.
-	ReportImagePull(pod *api.Pod, container *api.Container, err error)
+// ImagePuller wraps Runtime.PullImage() to pull a container image.
+// It will check the presence of the image, and report the 'image pulling',
+// 'image pulled' events correspondingly.
+type ImagePuller interface {
+	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error
 }
 
 // Pod is a group of containers, with the status of the pod.
@@ -115,11 +123,6 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
-	// The status of the pod.
-	// TODO(yifan): Inspect and get the statuses for all pods can be expensive,
-	// maybe we want to get one pod's status at a time (e.g. GetPodStatus()
-	// for the particular pod after we GetPods()).
-	Status api.PodStatus
 }
 
 // ContainerID is a type that identifies a container.
@@ -291,7 +294,6 @@ func (p *Pod) ToAPIPod() *api.Pod {
 	pod.UID = p.ID
 	pod.Name = p.Name
 	pod.Namespace = p.Namespace
-	pod.Status = p.Status
 
 	for _, c := range p.Containers {
 		var container api.Container

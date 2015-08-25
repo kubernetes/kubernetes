@@ -19,10 +19,10 @@ package predicates
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
 	"github.com/golang/glog"
 )
@@ -82,7 +82,7 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
 // are already mounted. Some times of volumes are mounted onto node machines.  For now, these mounts
 // are exclusive so if there is already a volume mounted on that node, another pod can't schedule
-// there. This is GCE specific for now.
+// there. This is GCE and Amazon EBS specific for now.
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
@@ -105,17 +105,19 @@ type resourceRequest struct {
 	memory   int64
 }
 
+var FailedResourceType string
+
 func getResourceRequest(pod *api.Pod) resourceRequest {
 	result := resourceRequest{}
-	for ix := range pod.Spec.Containers {
-		limits := pod.Spec.Containers[ix].Resources.Limits
-		result.memory += limits.Memory().Value()
-		result.milliCPU += limits.Cpu().MilliValue()
+	for _, container := range pod.Spec.Containers {
+		requests := container.Resources.Requests
+		result.memory += requests.Memory().Value()
+		result.milliCPU += requests.Cpu().MilliValue()
 	}
 	return result
 }
 
-func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fitting []*api.Pod, notFitting []*api.Pod) {
+func CheckPodsExceedingFreeResources(pods []*api.Pod, capacity api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory []*api.Pod) {
 	totalMilliCPU := capacity.Cpu().MilliValue()
 	totalMemory := capacity.Memory().Value()
 	milliCPURequested := int64(0)
@@ -124,9 +126,14 @@ func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fit
 		podRequest := getResourceRequest(pod)
 		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
-		if !fitsCPU || !fitsMemory {
-			// the pod doesn't fit
-			notFitting = append(notFitting, pod)
+		if !fitsCPU {
+			// the pod doesn't fit due to CPU request
+			notFittingCPU = append(notFittingCPU, pod)
+			continue
+		}
+		if !fitsMemory {
+			// the pod doesn't fit due to Memory request
+			notFittingMemory = append(notFittingMemory, pod)
 			continue
 		}
 		// the pod fits
@@ -150,9 +157,20 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	pods := []*api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
-	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
-	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.Pods().Value() {
+	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, info.Status.Capacity)
+	if int64(len(pods)) > info.Status.Capacity.Pods().Value() {
 		glog.V(4).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
+		FailedResourceType = "PodExceedsMaxPodNumber"
+		return false, nil
+	}
+	if len(exceedingCPU) > 0 {
+		glog.V(4).Infof("Cannot schedule Pod %v, because Node does not have sufficient CPU", pod)
+		FailedResourceType = "PodExceedsFreeCPU"
+		return false, nil
+	}
+	if len(exceedingMemory) > 0 {
+		glog.V(4).Infof("Cannot schedule Pod %v, because Node does not have sufficient Memory", pod)
+		FailedResourceType = "PodExceedsFreeMemory"
 		return false, nil
 	}
 	glog.V(4).Infof("Schedule Pod %v on Node %v is allowed, Node is running only %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())

@@ -22,20 +22,20 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	libutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/api"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	libutil "k8s.io/kubernetes/pkg/util"
 )
 
 const (
-	log_example = `// Returns snapshot of ruby-container logs from pod 123456-7890.
+	log_example = `# Returns snapshot of ruby-container logs from pod 123456-7890.
 $ kubectl logs 123456-7890 ruby-container
 
-// Returns snapshot of previous terminated ruby-container logs from pod 123456-7890.
+# Returns snapshot of previous terminated ruby-container logs from pod 123456-7890.
 $ kubectl logs -p 123456-7890 ruby-container
 
-// Starts streaming of ruby-container logs from pod 123456-7890.
+# Starts streaming of ruby-container logs from pod 123456-7890.
 $ kubectl logs -f 123456-7890 ruby-container`
 )
 

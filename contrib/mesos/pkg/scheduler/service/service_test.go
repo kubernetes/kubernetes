@@ -1,3 +1,5 @@
+// +build unit_test
+
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
 
@@ -14,8 +16,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +build unit_test
-
 package service
 
 import (
@@ -27,7 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
+	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -115,6 +117,14 @@ func Test_awaitFailoverDoneFailover(t *testing.T) {
 	}
 }
 
+func Test_DefaultResourceLimits(t *testing.T) {
+	assert := assert.New(t)
+
+	s := NewSchedulerServer()
+	assert.Equal(s.DefaultContainerCPULimit, mresource.DefaultDefaultContainerCPULimit)
+	assert.Equal(s.DefaultContainerMemLimit, mresource.DefaultDefaultContainerMemLimit)
+}
+
 func Test_StaticPods(t *testing.T) {
 	assert := assert.New(t)
 
@@ -137,9 +147,9 @@ func Test_StaticPods(t *testing.T) {
 	assert.NoError(err)
 
 	// archive config files
-	data, fileNum, err := archive.ZipDir(staticPodsConfigPath)
+	data, paths, err := archive.ZipDir(staticPodsConfigPath)
 	assert.NoError(err)
-	assert.Equal(2, fileNum)
+	assert.Equal(2, len(paths))
 
 	// unarchive config files
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))

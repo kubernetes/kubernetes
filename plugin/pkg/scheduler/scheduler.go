@@ -22,11 +22,11 @@ package scheduler
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
 
 	"github.com/golang/glog"
 )
@@ -116,7 +116,7 @@ func (s *Scheduler) scheduleOne() {
 		s.config.BindPodsRateLimiter.Accept()
 	}
 
-	glog.V(3).Infof("Attempting to schedule: %v", pod)
+	glog.V(3).Infof("Attempting to schedule: %+v", pod)
 	start := time.Now()
 	defer func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
@@ -124,8 +124,8 @@ func (s *Scheduler) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule: %v", pod)
-		s.config.Recorder.Eventf(pod, "failedScheduling", "%v", err)
+		glog.V(1).Infof("Failed to schedule: %+v", pod)
+		s.config.Recorder.Eventf(pod, "FailedScheduling", "%v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -144,12 +144,12 @@ func (s *Scheduler) scheduleOne() {
 		err := s.config.Binder.Bind(b)
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		if err != nil {
-			glog.V(1).Infof("Failed to bind pod: %v", err)
-			s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
+			glog.V(1).Infof("Failed to bind pod: %+v", err)
+			s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
 			return
 		}
-		s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+		s.config.Recorder.Eventf(pod, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 		// tell the model to assume that this binding took effect.
 		assumed := *pod
 		assumed.Spec.NodeName = dest

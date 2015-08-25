@@ -18,14 +18,16 @@ package iptables
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	utilexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 type RulePosition string
@@ -49,6 +51,19 @@ type Interface interface {
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
+	// TODO: (BenTheElder) Unit-Test Save/SaveAll, Restore/RestoreAll
+	// Save calls `iptables-save` for table.
+	Save(table Table) ([]byte, error)
+	// SaveAll calls `iptables-save`.
+	SaveAll() ([]byte, error)
+	// Restore runs `iptables-restore` passing data through a temporary file.
+	// table is the Table to restore
+	// data should be formatted like the output of Save()
+	// flush sets the presence of the "--noflush" flag. see: FlushFlag
+	// counters sets the "--counters" flag. see: RestoreCountersFlag
+	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
+	// RestoreAll is the same as Restore except that no table is specified.
+	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
 }
 
 type Protocol byte
@@ -71,6 +86,29 @@ const (
 	ChainPrerouting  Chain = "PREROUTING"
 	ChainOutput      Chain = "OUTPUT"
 )
+
+const (
+	cmdIptablesSave    string = "iptables-save"
+	cmdIptablesRestore string = "iptables-restore"
+	cmdIptables        string = "iptables"
+	cmdIp6tables       string = "ip6tables"
+)
+
+// Option flag for Restore
+type RestoreCountersFlag bool
+
+const RestoreCounters RestoreCountersFlag = true
+const NoRestoreCounters RestoreCountersFlag = false
+
+// Option flag for Restore
+type FlushFlag bool
+
+const FlushTables FlushFlag = true
+const NoFlushTables FlushFlag = false
+
+// Versions of iptables less than this do not support the -C / --check flag
+// (test whether a rule exists).
+const MinCheckVersion = "1.4.11"
 
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
@@ -178,11 +216,83 @@ func (runner *runner) IsIpv6() bool {
 	return runner.protocol == ProtocolIpv6
 }
 
+// Save is part of Interface.
+func (runner *runner) Save(table Table) ([]byte, error) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// run and return
+	args := []string{"-t", string(table)}
+	return runner.exec.Command(cmdIptablesSave, args...).CombinedOutput()
+}
+
+// SaveAll is part of Interface.
+func (runner *runner) SaveAll() ([]byte, error) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// run and return
+	return runner.exec.Command(cmdIptablesSave, []string{}...).CombinedOutput()
+}
+
+// Restore is part of Interface.
+func (runner *runner) Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	// setup args
+	args := []string{"-T", string(table)}
+	return runner.restoreInternal(args, data, flush, counters)
+}
+
+// RestoreAll is part of Interface.
+func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	// setup args
+	args := make([]string, 0)
+	return runner.restoreInternal(args, data, flush, counters)
+}
+
+// restoreInternal is the shared part of Restore/RestoreAll
+func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	if !flush {
+		args = append(args, "--noflush")
+	}
+	if counters {
+		args = append(args, "--counters")
+	}
+	// create temp file through which to pass data
+	temp, err := ioutil.TempFile("", "kube-temp-iptables-restore-")
+	if err != nil {
+		return err
+	}
+	// make sure we delete the temp file
+	defer os.Remove(temp.Name())
+	// Put the filename at the end of args.
+	// NOTE: the filename must be at the end.
+	// See: https://git.netfilter.org/iptables/commit/iptables-restore.c?id=e6869a8f59d779ff4d5a0984c86d80db70784962
+	args = append(args, temp.Name())
+	if err != nil {
+		return err
+	}
+	// write data to the file
+	_, err = temp.Write(data)
+	temp.Close()
+	if err != nil {
+		return err
+	}
+	// run the command and return the output or an error including the output and error
+	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v (%s)", err, b)
+	}
+	return nil
+}
+
 func (runner *runner) iptablesCommand() string {
 	if runner.IsIpv6() {
-		return "ip6tables"
+		return cmdIp6tables
 	} else {
-		return "iptables"
+		return cmdIptables
 	}
 }
 
@@ -215,17 +325,20 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 // of hack and half-measures.  We should nix this ASAP.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
 	glog.V(1).Infof("running iptables-save -t %s", string(table))
-	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
+	out, err := runner.exec.Command(cmdIptablesSave, "-t", string(table)).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
 
-	// Sadly, iptables has inconsistent quoting rules for comments.
-	// Just unquote any arg that is wrapped in quotes.
-	argsCopy := make([]string, len(args))
-	copy(argsCopy, args)
-	for i := range argsCopy {
-		unquote(&argsCopy[i])
+	// Sadly, iptables has inconsistent quoting rules for comments. Just remove all quotes.
+	// Also, quoted multi-word comments (which are counted as a single arg)
+	// will be unpacked into multiple args,
+	// in order to compare against iptables-save output (which will be split at whitespace boundary)
+	// e.g. a single arg('"this must be before the NodePort rules"') will be unquoted and unpacked into 7 args.
+	var argsCopy []string
+	for i := range args {
+		tmpField := strings.Trim(args[i], "\"")
+		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
 	}
 	argset := util.NewStringSet(argsCopy...)
 
@@ -234,14 +347,14 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 
 		// Check that this is a rule for the correct chain, and that it has
 		// the correct number of argument (+2 for "-A <chain name>")
-		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(args)+2 {
+		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(argsCopy)+2 {
 			continue
 		}
 
 		// Sadly, iptables has inconsistent quoting rules for comments.
-		// Just unquote any arg that is wrapped in quotes.
+		// Just remove all quotes.
 		for i := range fields {
-			unquote(&fields[i])
+			fields[i] = strings.Trim(fields[i], "\"")
 		}
 
 		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
@@ -252,12 +365,6 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 	}
 
 	return false, nil
-}
-
-func unquote(strp *string) {
-	if len(*strp) >= 2 && (*strp)[0] == '"' && (*strp)[len(*strp)-1] == '"' {
-		*strp = strings.TrimPrefix(strings.TrimSuffix(*strp, `"`), `"`)
-	}
 }
 
 // Executes the rule check using the "-C" flag
@@ -293,76 +400,39 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 
 // Checks if iptables has the "-C" flag
 func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
-	vstring, err := getIptablesVersionString(exec)
+	minVersion, err := semver.NewVersion(MinCheckVersion)
 	if err != nil {
 		return false, err
 	}
-
-	v1, v2, v3, err := extractIptablesVersion(vstring)
+	// Returns "vX.Y.Z".
+	vstring, err := GetIptablesVersionString(exec)
 	if err != nil {
 		return false, err
 	}
-
-	return iptablesHasCheckCommand(v1, v2, v3), nil
+	// Make a semver of the part after the v in "vX.X.X".
+	version, err := semver.NewVersion(vstring[1:])
+	if err != nil {
+		return false, err
+	}
+	if version.LessThan(*minVersion) {
+		return false, nil
+	}
+	return true, nil
 }
 
-// getIptablesVersion returns the first three components of the iptables version.
-// e.g. "iptables v1.3.66" would return (1, 3, 66, nil)
-func extractIptablesVersion(str string) (int, int, int, error) {
-	versionMatcher := regexp.MustCompile("v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
-	result := versionMatcher.FindStringSubmatch(str)
-	if result == nil {
-		return 0, 0, 0, fmt.Errorf("no iptables version found in string: %s", str)
-	}
-
-	v1, err := strconv.Atoi(result[1])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	v2, err := strconv.Atoi(result[2])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	v3, err := strconv.Atoi(result[3])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	return v1, v2, v3, nil
-}
-
-// Runs "iptables --version" to get the version string
-func getIptablesVersionString(exec utilexec.Interface) (string, error) {
-	bytes, err := exec.Command("iptables", "--version").CombinedOutput()
+// GetIptablesVersionString runs "iptables --version" to get the version string,
+// then matches for vX.X.X e.g. if "iptables --version" outputs: "iptables v1.3.66"
+// then it would would return "v1.3.66", nil
+func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
+	// this doesn't access mutable state so we don't need to use the interface / runner
+	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
-
-	return string(bytes), nil
-}
-
-// GetIptablesVersion returns the major minor and patch version of iptables
-// which will all be zero in case of error, and any error encountered.
-func GetIptablesVersion(exec utilexec.Interface) (int, int, int, error) {
-	s, err := getIptablesVersionString(exec)
-	if err != nil {
-		return 0, 0, 0, err
+	versionMatcher := regexp.MustCompile("v[0-9]+\\.[0-9]+\\.[0-9]+")
+	match := versionMatcher.FindStringSubmatch(string(bytes))
+	if match == nil {
+		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
-	return extractIptablesVersion(s)
-}
-
-// Checks if an iptables version is after 1.4.11, when --check was added
-func iptablesHasCheckCommand(v1 int, v2 int, v3 int) bool {
-	if v1 > 1 {
-		return true
-	}
-	if v1 == 1 && v2 > 4 {
-		return true
-	}
-	if v1 == 1 && v2 == 4 && v3 >= 11 {
-		return true
-	}
-	return false
+	return match[0], nil
 }

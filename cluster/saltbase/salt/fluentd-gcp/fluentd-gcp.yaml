@@ -6,19 +6,20 @@ metadata:
 spec:
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.8
+    image: gcr.io/google_containers/fluentd-gcp:1.11
     resources:
       limits:
         cpu: 100m
         memory: 200Mi
     env:
-    - name: "FLUENTD_ARGS"
-      value: "-qq"
+    - name: FLUENTD_ARGS
+      value: -qq
     volumeMounts:
     - name: varlog
       mountPath: /varlog
     - name: containers
       mountPath: /var/lib/docker/containers
+  terminationGracePeriodSeconds: 30
   volumes:
   - name: varlog
     hostPath:

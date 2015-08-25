@@ -17,8 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 // Codec encodes internal objects to the v1 scheme

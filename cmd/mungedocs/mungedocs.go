@@ -17,11 +17,11 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -31,15 +31,38 @@ import (
 var (
 	verify  = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
 	rootDir = flag.String("root-dir", "", "Root directory containing documents to be processed.")
+	// "repo-root" seems like a dumb name, this is the relative path (from rootDir) to get to the repoRoot
+	relRoot = flag.String("repo-root", "..", `Appended to --root-dir to get the repository root.
+It's done this way so that generally you just have to set --root-dir.
+Examples:
+ * --root-dir=docs/ --repo-root=.. means the repository root is ./
+ * --root-dir=/usr/local/long/path/repo/docs/ --repo-root=.. means the repository root is /usr/local/long/path/repo/
+ * --root-dir=/usr/local/long/path/repo/docs/admin --repo-root=../.. means the repository root is /usr/local/long/path/repo/`)
+	skipMunges = flag.String("skip-munges", "", "Comma-separated list of munges to *not* run. Available munges are: "+availableMungeList)
+	repoRoot   string
 
 	ErrChangesNeeded = errors.New("mungedocs: changes required")
 
 	// All of the munge operations to perform.
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
 	allMunges = []munge{
+		{"remove-whitespace", updateWhitespace},
 		{"table-of-contents", updateTOC},
-		{"check-links", checkLinks},
+		{"unversioned-warning", updateUnversionedWarning},
+		{"md-links", updateLinks},
+		{"blank-lines-surround-preformatted", updatePreformatted},
+		{"header-lines", updateHeaderLines},
+		{"analytics", updateAnalytics},
+		{"kubectl-dash-f", updateKubectlFileTargets},
+		{"sync-examples", syncExamples},
 	}
+	availableMungeList = func() string {
+		names := []string{}
+		for _, m := range allMunges {
+			names = append(names, m.name)
+		}
+		return strings.Join(names, ",")
+	}()
 )
 
 // a munge processes a document, returning an updated document xor an error.
@@ -47,7 +70,7 @@ var (
 // data into a new byte array and return that.
 type munge struct {
 	name string
-	fn   func(filePath string, before []byte) (after []byte, err error)
+	fn   func(filePath string, mlines mungeLines) (after mungeLines, err error)
 }
 
 type fileProcessor struct {
@@ -69,12 +92,14 @@ func (f fileProcessor) visit(path string) error {
 		return err
 	}
 
+	mungeLines := getMungeLines(string(fileBytes))
+
 	modificationsMade := false
 	errFound := false
 	filePrinted := false
 	for _, munge := range f.munges {
-		after, err := munge.fn(path, fileBytes)
-		if err != nil || !bytes.Equal(after, fileBytes) {
+		after, err := munge.fn(path, mungeLines)
+		if err != nil || !after.Equal(mungeLines) {
 			if !filePrinted {
 				fmt.Printf("%s\n----\n", path)
 				filePrinted = true
@@ -89,7 +114,7 @@ func (f fileProcessor) visit(path string) error {
 			}
 			fmt.Println("")
 		}
-		fileBytes = after
+		mungeLines = after
 	}
 
 	// Write out new file with any changes.
@@ -98,7 +123,7 @@ func (f fileProcessor) visit(path string) error {
 			// We're not allowed to make changes.
 			return ErrChangesNeeded
 		}
-		ioutil.WriteFile(path, fileBytes, 0644)
+		ioutil.WriteFile(path, mungeLines.Bytes(), 0644)
 	}
 	if errFound {
 		return ErrChangesNeeded
@@ -119,7 +144,32 @@ func newWalkFunc(fp *fileProcessor, changesNeeded *bool) filepath.WalkFunc {
 	}
 }
 
+func wantedMunges() (filtered []munge) {
+	skipList := strings.Split(*skipMunges, ",")
+	skipped := map[string]bool{}
+	for _, m := range skipList {
+		if len(m) > 0 {
+			skipped[m] = true
+		}
+	}
+	for _, m := range allMunges {
+		if !skipped[m.name] {
+			filtered = append(filtered, m)
+		} else {
+			// Remove from the map so we can verify that everything
+			// requested was in fact valid.
+			delete(skipped, m.name)
+		}
+	}
+	if len(skipped) != 0 {
+		fmt.Fprintf(os.Stderr, "ERROR: requested to skip %v, but these are not valid munges. (valid: %v)\n", skipped, availableMungeList)
+		os.Exit(1)
+	}
+	return filtered
+}
+
 func main() {
+	var err error
 	flag.Parse()
 
 	if *rootDir == "" {
@@ -127,8 +177,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	repoRoot = path.Join(*rootDir, *relRoot)
+	repoRoot, err = filepath.Abs(repoRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+		os.Exit(2)
+	}
+
 	fp := fileProcessor{
-		munges:     allMunges,
+		munges:     wantedMunges(),
 		verifyOnly: *verify,
 	}
 
@@ -137,16 +194,20 @@ func main() {
 	// - If verify is true: exit 0 if no changes needed, exit 1 if changes
 	//   needed.
 	// - If verify is false: exit 0 if changes successfully made or no
-	//   changes needed.
+	//   changes needed, exit 1 if manual changes are needed.
 	var changesNeeded bool
 
-	err := filepath.Walk(*rootDir, newWalkFunc(&fp, &changesNeeded))
+	err = filepath.Walk(*rootDir, newWalkFunc(&fp, &changesNeeded))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)
 	}
-	if changesNeeded && *verify {
-		fmt.Fprintf(os.Stderr, "FAIL: changes needed but not made due to --verify\n")
+	if changesNeeded {
+		if *verify {
+			fmt.Fprintf(os.Stderr, "FAIL: changes needed but not made due to --verify\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: some manual changes are still required.\n")
+		}
 		os.Exit(1)
 	}
 }

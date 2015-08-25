@@ -17,9 +17,10 @@ limitations under the License.
 package meta
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type fakeCodec struct{}
@@ -32,7 +33,15 @@ func (fakeCodec) Decode([]byte) (runtime.Object, error) {
 	return nil, nil
 }
 
+func (fakeCodec) DecodeToVersion([]byte, string) (runtime.Object, error) {
+	return nil, nil
+}
+
 func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
+	return nil
+}
+
+func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, string, string) error {
 	return nil
 }
 
@@ -54,12 +63,14 @@ var validCodec = fakeCodec{}
 var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
-func fakeInterfaces(version string) (*VersionInterfaces, bool) {
-	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, true
+func fakeInterfaces(version string) (*VersionInterfaces, error) {
+	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
-func unmatchedVersionInterfaces(version string) (*VersionInterfaces, bool) {
-	return nil, false
+var unmatchedErr = errors.New("no version")
+
+func unmatchedVersionInterfaces(version string) (*VersionInterfaces, error) {
+	return nil, unmatchedErr
 }
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {
@@ -82,7 +93,7 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 		{Resource: "internalObjects", MixedCase: true, Kind: "InternalObject", APIVersion: "test"},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]string{"test"}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper("tgroup", []string{"test"}, fakeInterfaces)
 		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, testCase.MixedCase)
 		v, k, err := mapper.VersionAndKindForResource(testCase.Resource)
 		hasErr := err != nil
@@ -92,6 +103,33 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 		}
 		if v != testCase.APIVersion || k != testCase.Kind {
 			t.Errorf("%d: unexpected version and kind: %s %s", i, v, k)
+		}
+	}
+}
+
+func TestRESTMapperGroupForResource(t *testing.T) {
+	testCases := []struct {
+		Resource                string
+		Kind, APIVersion, Group string
+		Err                     bool
+	}{
+		{Resource: "myObject", Kind: "MyObject", APIVersion: "test", Group: "testapi"},
+		{Resource: "myobject", Kind: "MyObject", APIVersion: "test", Group: "testapi2"},
+		{Resource: "myObje", Err: true, Kind: "MyObject", APIVersion: "test", Group: "testapi"},
+		{Resource: "myobje", Err: true, Kind: "MyObject", APIVersion: "test", Group: "testapi"},
+	}
+	for i, testCase := range testCases {
+		mapper := NewDefaultRESTMapper(testCase.Group, []string{"test"}, fakeInterfaces)
+		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, false)
+		g, err := mapper.GroupForResource(testCase.Resource)
+		if testCase.Err {
+			if err == nil {
+				t.Errorf("%d: expected error", i)
+			}
+		} else if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+		} else if g != testCase.Group {
+			t.Errorf("%d: expected group %q, got %q", i, testCase.Group, g)
 		}
 	}
 }
@@ -108,7 +146,6 @@ func TestKindToResource(t *testing.T) {
 
 		{Kind: "ReplicationController", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
 		{Kind: "ReplicationController", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
-		// API convention changed with regard to capitalization for v1beta3
 		{Kind: "ReplicationController", MixedCase: false, Plural: "replicationcontrollers", Singular: "replicationcontroller"},
 
 		{Kind: "ImageRepository", MixedCase: true, Plural: "imageRepositories", Singular: "imageRepository"},
@@ -121,6 +158,40 @@ func TestKindToResource(t *testing.T) {
 		plural, singular := kindToResource(testCase.Kind, testCase.MixedCase)
 		if singular != testCase.Singular || plural != testCase.Plural {
 			t.Errorf("%d: unexpected plural and singular: %s %s", i, plural, singular)
+		}
+	}
+}
+
+func TestRESTMapperResourceSingularizer(t *testing.T) {
+	testCases := []struct {
+		Kind, APIVersion string
+		MixedCase        bool
+		Plural           string
+		Singular         string
+	}{
+		{Kind: "Pod", APIVersion: "test", MixedCase: true, Plural: "pods", Singular: "pod"},
+		{Kind: "Pod", APIVersion: "test", MixedCase: false, Plural: "pods", Singular: "pod"},
+
+		{Kind: "ReplicationController", APIVersion: "test", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
+		{Kind: "ReplicationController", APIVersion: "test", MixedCase: false, Plural: "replicationcontrollers", Singular: "replicationcontroller"},
+
+		{Kind: "ImageRepository", APIVersion: "test", MixedCase: true, Plural: "imageRepositories", Singular: "imageRepository"},
+		{Kind: "ImageRepository", APIVersion: "test", MixedCase: false, Plural: "imagerepositories", Singular: "imagerepository"},
+
+		{Kind: "Status", APIVersion: "test", MixedCase: true, Plural: "statuses", Singular: "status"},
+		{Kind: "Status", APIVersion: "test", MixedCase: false, Plural: "statuses", Singular: "status"},
+
+		{Kind: "lowercase", APIVersion: "test", MixedCase: false, Plural: "lowercases", Singular: "lowercase"},
+		// Don't add extra s if the original object is already plural
+		{Kind: "lowercases", APIVersion: "test", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
+	}
+	for i, testCase := range testCases {
+		mapper := NewDefaultRESTMapper("tgroup", []string{"test"}, fakeInterfaces)
+		// create singular/plural mapping
+		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, testCase.MixedCase)
+		singular, _ := mapper.ResourceSingularizer(testCase.Plural)
+		if singular != testCase.Singular {
+			t.Errorf("%d: mismatched singular: %s, should be %s", i, singular, testCase.Singular)
 		}
 	}
 }
@@ -154,7 +225,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		// TODO: add test for a resource that exists in one version but not another
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
+		mapper := NewDefaultRESTMapper("tgroup", testCase.DefaultVersions, fakeInterfaces)
 		mapper.Add(RESTScopeNamespace, "InternalObject", "test", testCase.MixedCase)
 		mapping, err := mapper.RESTMapping(testCase.Kind, testCase.APIVersions...)
 		hasErr := err != nil
@@ -181,7 +252,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 }
 
 func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
-	mapper := NewDefaultRESTMapper([]string{"test1", "test2"}, fakeInterfaces)
+	mapper := NewDefaultRESTMapper("tgroup", []string{"test1", "test2"}, fakeInterfaces)
 	mapper.Add(RESTScopeNamespace, "InternalObject", "test1", false)
 	mapper.Add(RESTScopeNamespace, "OtherObject", "test2", false)
 
@@ -234,7 +305,7 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 }
 
 func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
-	mapper := NewDefaultRESTMapper([]string{"test1", "test2"}, unmatchedVersionInterfaces)
+	mapper := NewDefaultRESTMapper("tgroup", []string{"test1", "test2"}, unmatchedVersionInterfaces)
 	mapper.Add(RESTScopeNamespace, "InternalObject", "test1", false)
 	_, err := mapper.RESTMapping("InternalObject", "test1")
 	if err == nil {

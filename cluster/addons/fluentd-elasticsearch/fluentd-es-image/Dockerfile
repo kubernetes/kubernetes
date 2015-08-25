@@ -24,7 +24,7 @@ RUN apt-get update && \
     apt-get clean
 
 # Install Fluentd.
-RUN /usr/bin/curl -L http://toolbelt.treasuredata.com/sh/install-ubuntu-trusty-td-agent2.sh | sh
+RUN /usr/bin/curl -L https://td-toolbelt.herokuapp.com/sh/install-ubuntu-trusty-td-agent2.sh | sh
 
 # Change the default user and group to root.
 # Needed to allow access to /var/log/docker/... files.

@@ -3,7 +3,6 @@ var fs = require('fs');
 var yaml = require('js-yaml');
 var colors = require('colors/safe');
 
-
 var write_cloud_config_from_object = function (data, output_file) {
   try {
     fs.writeFileSync(output_file, [
@@ -40,4 +39,20 @@ exports.process_template = function (input_file, output_file, processor) {
     console.log(colors.red(e));
   }
   return write_cloud_config_from_object(processor(_.clone(data)), output_file);
+};
+
+exports.write_files_from = function (local_dir, remote_dir) {
+  try {
+    return _.map(fs.readdirSync(local_dir), function (fn) {
+      return {
+        path: [remote_dir, fn].join('/'),
+        owner: 'root',
+        permissions: '0640',
+        encoding: 'base64',
+        content: fs.readFileSync([local_dir, fn].join('/')).toString('base64'),
+      };
+    });
+  } catch (e) {
+    console.log(colors.red(e));
+  }
 };

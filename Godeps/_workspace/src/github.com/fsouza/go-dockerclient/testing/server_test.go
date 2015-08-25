@@ -5,6 +5,7 @@
 package testing
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -180,7 +182,7 @@ func TestListRunningContainers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) == 0 {
+	if len(got) != 0 {
 		t.Errorf("ListRunningContainers: Want 0. Got %d.", len(got))
 	}
 }
@@ -190,8 +192,8 @@ func TestCreateContainer(t *testing.T) {
 	server.imgIDs = map[string]string{"base": "a1234"}
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
-	body := `{"Hostname":"", "User":"", "Memory":0, "MemorySwap":0, "AttachStdin":false, "AttachStdout":true, "AttachStderr":true,
-"PortSpecs":null, "Tty":false, "OpenStdin":false, "StdinOnce":false, "Env":null, "Cmd":["date"], "Image":"base", "Volumes":{}, "VolumesFrom":""}`
+	body := `{"Hostname":"", "User":"ubuntu", "Memory":0, "MemorySwap":0, "AttachStdin":false, "AttachStdout":true, "AttachStderr":true,
+"PortSpecs":null, "Tty":false, "OpenStdin":false, "StdinOnce":false, "Env":null, "Cmd":["date"], "Image":"base", "Volumes":{}, "VolumesFrom":"","HostConfig":{"Binds":["/var/run/docker.sock:/var/run/docker.sock:rw"]}}`
 	request, _ := http.NewRequest("POST", "/containers/create", strings.NewReader(body))
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusCreated {
@@ -208,6 +210,16 @@ func TestCreateContainer(t *testing.T) {
 	}
 	if stored.State.Running {
 		t.Errorf("CreateContainer should not set container to running state.")
+	}
+	if stored.Config.User != "ubuntu" {
+		t.Errorf("CreateContainer: wrong config. Expected: %q. Returned: %q.", "ubuntu", stored.Config.User)
+	}
+	if stored.Config.Hostname != returned.ID[:12] {
+		t.Errorf("CreateContainer: wrong hostname. Expected: %q. Returned: %q.", returned.ID[:12], stored.Config.Hostname)
+	}
+	expectedBind := []string{"/var/run/docker.sock:/var/run/docker.sock:rw"}
+	if !reflect.DeepEqual(stored.HostConfig.Binds, expectedBind) {
+		t.Errorf("CreateContainer: wrong host config. Expected: %v. Returned %v.", expectedBind, stored.HostConfig.Binds)
 	}
 }
 
@@ -238,6 +250,57 @@ func TestCreateContainerInvalidBody(t *testing.T) {
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusBadRequest {
 		t.Errorf("CreateContainer: wrong status. Want %d. Got %d.", http.StatusBadRequest, recorder.Code)
+	}
+}
+
+func TestCreateContainerDuplicateName(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	server.imgIDs = map[string]string{"base": "a1234"}
+	addContainers(&server, 1)
+	server.containers[0].Name = "mycontainer"
+	recorder := httptest.NewRecorder()
+	body := `{"Hostname":"", "User":"ubuntu", "Memory":0, "MemorySwap":0, "AttachStdin":false, "AttachStdout":true, "AttachStderr":true,
+"PortSpecs":null, "Tty":false, "OpenStdin":false, "StdinOnce":false, "Env":null, "Cmd":["date"], "Image":"base", "Volumes":{}, "VolumesFrom":"","HostConfig":{"Binds":["/var/run/docker.sock:/var/run/docker.sock:rw"]}}`
+	request, _ := http.NewRequest("POST", "/containers/create?name=mycontainer", strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusConflict {
+		t.Errorf("CreateContainer: wrong status. Want %d. Got %d.", http.StatusConflict, recorder.Code)
+	}
+}
+
+func TestCreateMultipleContainersEmptyName(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	server.imgIDs = map[string]string{"base": "a1234"}
+	addContainers(&server, 1)
+	server.containers[0].Name = ""
+	recorder := httptest.NewRecorder()
+	body := `{"Hostname":"", "User":"ubuntu", "Memory":0, "MemorySwap":0, "AttachStdin":false, "AttachStdout":true, "AttachStderr":true,
+"PortSpecs":null, "Tty":false, "OpenStdin":false, "StdinOnce":false, "Env":null, "Cmd":["date"], "Image":"base", "Volumes":{}, "VolumesFrom":"","HostConfig":{"Binds":["/var/run/docker.sock:/var/run/docker.sock:rw"]}}`
+	request, _ := http.NewRequest("POST", "/containers/create", strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusCreated {
+		t.Errorf("CreateContainer: wrong status. Want %d. Got %d.", http.StatusCreated, recorder.Code)
+	}
+	var returned docker.Container
+	err := json.NewDecoder(recorder.Body).Decode(&returned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := server.containers[1]
+	if returned.ID != stored.ID {
+		t.Errorf("CreateContainer: ID mismatch. Stored: %q. Returned: %q.", stored.ID, returned.ID)
+	}
+	if stored.State.Running {
+		t.Errorf("CreateContainer should not set container to running state.")
+	}
+	if stored.Config.User != "ubuntu" {
+		t.Errorf("CreateContainer: wrong config. Expected: %q. Returned: %q.", "ubuntu", stored.Config.User)
+	}
+	expectedBind := []string{"/var/run/docker.sock:/var/run/docker.sock:rw"}
+	if !reflect.DeepEqual(stored.HostConfig.Binds, expectedBind) {
+		t.Errorf("CreateContainer: wrong host config. Expected: %v. Returned %v.", expectedBind, stored.HostConfig.Binds)
 	}
 }
 
@@ -500,15 +563,24 @@ func TestStartContainer(t *testing.T) {
 	server := DockerServer{}
 	addContainers(&server, 1)
 	server.buildMuxer()
+	memory := int64(536870912)
+	hostConfig := docker.HostConfig{Memory: memory}
+	configBytes, err := json.Marshal(hostConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 	recorder := httptest.NewRecorder()
 	path := fmt.Sprintf("/containers/%s/start", server.containers[0].ID)
-	request, _ := http.NewRequest("POST", path, nil)
+	request, _ := http.NewRequest("POST", path, bytes.NewBuffer(configBytes))
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusOK, recorder.Code)
 	}
 	if !server.containers[0].State.Running {
 		t.Error("StartContainer: did not set the container to running state")
+	}
+	if gotMemory := server.containers[0].HostConfig.Memory; gotMemory != memory {
+		t.Errorf("StartContainer: wrong HostConfig. Wants %d of memory. Got %d", memory, gotMemory)
 	}
 }
 
@@ -521,7 +593,7 @@ func TestStartContainerWithNotifyChannel(t *testing.T) {
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
 	path := fmt.Sprintf("/containers/%s/start", server.containers[1].ID)
-	request, _ := http.NewRequest("POST", path, nil)
+	request, _ := http.NewRequest("POST", path, bytes.NewBuffer([]byte("{}")))
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusOK, recorder.Code)
@@ -536,7 +608,7 @@ func TestStartContainerNotFound(t *testing.T) {
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
 	path := "/containers/abc123/start"
-	request, _ := http.NewRequest("POST", path, nil)
+	request, _ := http.NewRequest("POST", path, bytes.NewBuffer([]byte("null")))
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusNotFound, recorder.Code)
@@ -550,7 +622,7 @@ func TestStartContainerAlreadyRunning(t *testing.T) {
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
 	path := fmt.Sprintf("/containers/%s/start", server.containers[0].ID)
-	request, _ := http.NewRequest("POST", path, nil)
+	request, _ := http.NewRequest("POST", path, bytes.NewBuffer([]byte("null")))
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusBadRequest {
 		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusBadRequest, recorder.Code)
@@ -811,6 +883,22 @@ func TestRemoveContainer(t *testing.T) {
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
 	path := fmt.Sprintf("/containers/%s", server.containers[0].ID)
+	request, _ := http.NewRequest("DELETE", path, nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Errorf("RemoveContainer: wrong status. Want %d. Got %d.", http.StatusNoContent, recorder.Code)
+	}
+	if len(server.containers) > 0 {
+		t.Error("RemoveContainer: did not remove the container.")
+	}
+}
+
+func TestRemoveContainerByName(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 1)
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	path := fmt.Sprintf("/containers/%s", server.containers[0].Name)
 	request, _ := http.NewRequest("DELETE", path, nil)
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusNoContent {
@@ -1506,4 +1594,191 @@ func waitExec(url, execID string, running bool, maxTry int) (*docker.ExecInspect
 		exec, err = client.InspectExec(exec.ID)
 	}
 	return exec, err
+}
+
+func TestStatsContainer(t *testing.T) {
+	server, err := NewServer("127.0.0.1:0", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Stop()
+	addContainers(server, 2)
+	server.buildMuxer()
+	expected := docker.Stats{}
+	expected.CPUStats.CPUUsage.TotalUsage = 20
+	server.PrepareStats(server.containers[0].ID, func(id string) docker.Stats {
+		return expected
+	})
+	recorder := httptest.NewRecorder()
+	path := fmt.Sprintf("/containers/%s/stats?stream=false", server.containers[0].ID)
+	request, _ := http.NewRequest("GET", path, nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Errorf("StatsContainer: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	body := recorder.Body.Bytes()
+	var got docker.Stats
+	err = json.Unmarshal(body, &got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got.Read = time.Time{}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("StatsContainer: wrong value. Want %#v. Got %#v.", expected, got)
+	}
+}
+
+type safeWriter struct {
+	sync.Mutex
+	*httptest.ResponseRecorder
+}
+
+func (w *safeWriter) Write(buf []byte) (int, error) {
+	w.Lock()
+	defer w.Unlock()
+	return w.ResponseRecorder.Write(buf)
+}
+
+func TestStatsContainerStream(t *testing.T) {
+	server, err := NewServer("127.0.0.1:0", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Stop()
+	addContainers(server, 2)
+	server.buildMuxer()
+	expected := docker.Stats{}
+	expected.CPUStats.CPUUsage.TotalUsage = 20
+	server.PrepareStats(server.containers[0].ID, func(id string) docker.Stats {
+		time.Sleep(50 * time.Millisecond)
+		return expected
+	})
+	recorder := &safeWriter{
+		ResponseRecorder: httptest.NewRecorder(),
+	}
+	path := fmt.Sprintf("/containers/%s/stats?stream=true", server.containers[0].ID)
+	request, _ := http.NewRequest("GET", path, nil)
+	go func() {
+		server.ServeHTTP(recorder, request)
+	}()
+	time.Sleep(200 * time.Millisecond)
+	recorder.Lock()
+	defer recorder.Unlock()
+	body := recorder.Body.Bytes()
+	parts := bytes.Split(body, []byte("\n"))
+	if len(parts) < 2 {
+		t.Errorf("StatsContainer: wrong number of parts. Want at least 2. Got %#v.", len(parts))
+	}
+	var got docker.Stats
+	err = json.Unmarshal(parts[0], &got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got.Read = time.Time{}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("StatsContainer: wrong value. Want %#v. Got %#v.", expected, got)
+	}
+}
+
+func addNetworks(server *DockerServer, n int) {
+	server.netMut.Lock()
+	defer server.netMut.Unlock()
+	for i := 0; i < n; i++ {
+		netid := fmt.Sprintf("%x", rand.Int()%10000)
+		network := docker.Network{
+			Name: netid,
+			ID:   fmt.Sprintf("%x", rand.Int()%10000),
+			Type: "bridge",
+			Endpoints: []*docker.Endpoint{
+				&docker.Endpoint{
+					Name:    "blah",
+					ID:      fmt.Sprintf("%x", rand.Int()%10000),
+					Network: netid,
+				},
+			},
+		}
+		server.networks = append(server.networks, &network)
+	}
+}
+
+func TestListNetworks(t *testing.T) {
+	server := DockerServer{}
+	addNetworks(&server, 2)
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	request, _ := http.NewRequest("GET", "/networks", nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Errorf("ListNetworks: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	expected := make([]docker.Network, 2)
+	for i, network := range server.networks {
+		expected[i] = docker.Network{
+			ID:        network.ID,
+			Name:      network.Name,
+			Type:      network.Type,
+			Endpoints: network.Endpoints,
+		}
+	}
+	var got []docker.Network
+	err := json.NewDecoder(recorder.Body).Decode(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("ListNetworks. Want %#v. Got %#v.", expected, got)
+	}
+}
+
+type createNetworkResponse struct {
+	ID string `json:"ID"`
+}
+
+func TestCreateNetwork(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	netid := fmt.Sprintf("%x", rand.Int()%10000)
+	netname := fmt.Sprintf("%x", rand.Int()%10000)
+	body := fmt.Sprintf(`{"ID": "%s", "Name": "%s", "Type": "bridge" }`, netid, netname)
+	request, _ := http.NewRequest("POST", "/networks", strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusCreated {
+		t.Errorf("CreateNetwork: wrong status. Want %d. Got %d.", http.StatusCreated, recorder.Code)
+	}
+
+	var returned createNetworkResponse
+	err := json.NewDecoder(recorder.Body).Decode(&returned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := server.networks[0]
+	if returned.ID != stored.ID {
+		t.Errorf("CreateNetwork: ID mismatch. Stored: %q. Returned: %q.", stored.ID, returned)
+	}
+}
+
+func TestCreateNetworkInvalidBody(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	request, _ := http.NewRequest("POST", "/networks", strings.NewReader("whaaaaaat---"))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Errorf("CreateNetwork: wrong status. Want %d. Got %d.", http.StatusBadRequest, recorder.Code)
+	}
+}
+
+func TestCreateNetworkDuplicateName(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	addNetworks(&server, 1)
+	server.networks[0].Name = "mynetwork"
+	recorder := httptest.NewRecorder()
+	body := fmt.Sprintf(`{"ID": "%s", "Name": "mynetwork", "Type": "bridge" }`, fmt.Sprintf("%x", rand.Int()%10000))
+	request, _ := http.NewRequest("POST", "/networks", strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusForbidden {
+		t.Errorf("CreateNetwork: wrong status. Want %d. Got %d.", http.StatusForbidden, recorder.Code)
+	}
 }

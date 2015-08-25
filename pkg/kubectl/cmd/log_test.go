@@ -22,8 +22,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func TestSelectContainer(t *testing.T) {
@@ -150,18 +150,10 @@ func TestSelectContainer(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-
 	tests := []struct {
 		name, version, podPath, logPath, container string
 		pod                                        *api.Pod
 	}{
-		{
-			name:    "v1beta3 - pod log",
-			version: "v1beta3",
-			podPath: "/api/v1beta3/namespaces/test/pods/foo",
-			logPath: "/api/v1beta3/namespaces/test/pods/foo/log",
-			pod:     testPod(),
-		},
 		{
 			name:    "v1 - pod log",
 			version: "v1",

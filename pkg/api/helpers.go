@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -53,7 +53,7 @@ var Semantic = conversion.EqualitiesOrDie(
 		// TODO: if we decide it's important, after we drop v1beta1/2, we
 		// could start comparing format.
 		//
-		// Uninitialized quantities are equivilent to 0 quantities.
+		// Uninitialized quantities are equivalent to 0 quantities.
 		if a.Amount == nil && b.MilliValue() == 0 {
 			return true
 		}
@@ -83,6 +83,7 @@ var standardResources = util.NewStringSet(
 	string(ResourceQuotas),
 	string(ResourceServices),
 	string(ResourceReplicationControllers),
+	string(ResourceDaemon),
 	string(ResourceSecrets),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage))

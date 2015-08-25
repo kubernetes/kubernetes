@@ -20,9 +20,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
 type ErrorReplicationControllers struct {
@@ -73,14 +73,15 @@ func TestReplicationControllerScale(t *testing.T) {
 	name := "foo"
 	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
-	if len(fake.Actions) != 2 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+	actions := fake.Actions()
+	if len(actions) != 2 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
-	if fake.Actions[1].Action != "update-replicationController" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
-		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", fake.Actions[1], count)
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetObject().(*api.ReplicationController).Spec.Replicas != int(count) {
+		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", actions[1], count)
 	}
 }
 
@@ -96,11 +97,12 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	name := "foo"
 	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
-	if len(fake.Actions) != 1 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+	actions := fake.Actions()
+	if len(actions) != 1 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
 }
 

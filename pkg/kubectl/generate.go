@@ -18,10 +18,12 @@ package kubectl
 
 import (
 	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GeneratorParam is a parameter for a generator
@@ -34,17 +36,24 @@ type GeneratorParam struct {
 // Generator is an interface for things that can generate API objects from input parameters.
 type Generator interface {
 	// Generate creates an API object given a set of parameters
-	Generate(params map[string]string) (runtime.Object, error)
+	Generate(params map[string]interface{}) (runtime.Object, error)
 	// ParamNames returns the list of parameters that this generator uses
 	ParamNames() []GeneratorParam
 }
 
+func IsZero(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	return reflect.DeepEqual(i, reflect.Zero(reflect.TypeOf(i)).Interface())
+}
+
 // ValidateParams ensures that all required params are present in the params map
-func ValidateParams(paramSpec []GeneratorParam, params map[string]string) error {
+func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) error {
 	for ix := range paramSpec {
 		if paramSpec[ix].Required {
 			value, found := params[paramSpec[ix].Name]
-			if !found || len(value) == 0 {
+			if !found || IsZero(value) {
 				return fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name)
 			}
 		}
@@ -53,8 +62,8 @@ func ValidateParams(paramSpec []GeneratorParam, params map[string]string) error 
 }
 
 // MakeParams is a utility that creates generator parameters from a command line
-func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]string {
-	result := map[string]string{}
+func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]interface{} {
+	result := map[string]interface{}{}
 	for ix := range params {
 		f := cmd.Flags().Lookup(params[ix].Name)
 		if f != nil {
@@ -73,7 +82,11 @@ func MakeLabels(labels map[string]string) string {
 }
 
 // ParseLabels turns a string representation of a label set into a map[string]string
-func ParseLabels(labelString string) (map[string]string, error) {
+func ParseLabels(labelSpec interface{}) (map[string]string, error) {
+	labelString, isString := labelSpec.(string)
+	if !isString {
+		return nil, fmt.Errorf("expected string, found %v", labelSpec)
+	}
 	if len(labelString) == 0 {
 		return nil, fmt.Errorf("no label spec passed")
 	}
@@ -87,4 +100,12 @@ func ParseLabels(labelString string) (map[string]string, error) {
 		labels[labelSpec[0]] = labelSpec[1]
 	}
 	return labels, nil
+}
+
+func GetBool(params map[string]string, key string, defValue bool) (bool, error) {
+	if val, found := params[key]; !found {
+		return defValue, nil
+	} else {
+		return strconv.ParseBool(val)
+	}
 }

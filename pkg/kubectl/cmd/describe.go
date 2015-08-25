@@ -23,12 +23,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -37,27 +38,38 @@ const (
 This command joins many API calls together to form a detailed description of a
 given resource or group of resources.
 
-$ kubectl describe RESOURCE NAME_PREFIX
+$ kubectl describe TYPE NAME_PREFIX
 
-will first check for an exact match on RESOURCE and NAME_PREFIX. If no such resource
-exists, it will output details for every resource that has a name prefixed with NAME_PREFIX`
-	describe_example = `// Describe a node
+will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
+exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
+
+Possible resource types include (case insensitive): pods (po), services (svc),
+replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
+persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota),
+namespaces (ns) or secrets.`
+	describe_example = `# Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
-// Describe a pod
+# Describe a pod
 $ kubectl describe pods/nginx
 
-// Describe pods by label name=myLabel
+# Describe a pod identified by type and name in "pod.json"
+$ kubectl describe -f pod.json
+
+# Describe all pods
+$ kubectl describe pods
+
+# Describe pods by label name=myLabel
 $ kubectl describe po -l name=myLabel
 
-// Describe all pods managed by the 'frontend' replication controller (rc-created pods
-// get the name of the rc as a prefix in the pod the name).
+# Describe all pods managed by the 'frontend' replication controller (rc-created pods
+# get the name of the rc as a prefix in the pod the name).
 $ kubectl describe pods frontend`
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "describe (RESOURCE NAME_PREFIX | RESOURCE/NAME)",
+		Use:     "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		Short:   "Show details of a specific resource or group of resources",
 		Long:    describe_long,
 		Example: describe_example,
@@ -67,64 +79,80 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		ValidArgs: kubectl.DescribableResources(),
 	}
+	usage := "Filename, directory, or URL to a file containing the resource to describe"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }
 
 func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
+	if len(args) == 0 && len(filenames) == 0 {
+		fmt.Fprint(out, "You must specify the type of resource to describe. ", valid_resources)
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(selector).
-		ResourceTypeOrNameArgs(false, args...).
+		ResourceTypeOrNameArgs(true, args...).
 		Flatten().
 		Do()
 	err = r.Err()
 	if err != nil {
 		return err
 	}
-	mapping, err := r.ResourceMapping()
-	if err != nil {
-		return err
-	}
 
-	describer, err := f.Describer(mapping)
-	if err != nil {
-		return err
-	}
+	allErrs := []error{}
 	infos, err := r.Infos()
 	if err != nil {
-		if errors.IsNotFound(err) && len(args) == 2 {
-			return DescribeMatchingResources(mapper, typer, describer, f, cmdNamespace, args[0], args[1], out)
+		if apierrors.IsNotFound(err) && len(args) == 2 {
+			return DescribeMatchingResources(mapper, typer, f, cmdNamespace, args[0], args[1], out, err)
 		}
-		return err
+		allErrs = append(allErrs, err)
 	}
 
 	for _, info := range infos {
+		mapping := info.ResourceMapping()
+		describer, err := f.Describer(mapping)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
 		s, err := describer.Describe(info.Namespace, info.Name)
 		if err != nil {
-			return err
+			allErrs = append(allErrs, err)
+			continue
 		}
 		fmt.Fprintf(out, "%s\n\n", s)
 	}
 
-	return nil
+	return errors.NewAggregate(allErrs)
 }
 
-func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, describer kubectl.Describer, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer) error {
+func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer, originalError error) error {
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, rsrc).
 		SingleResourceType().
 		Flatten().
 		Do()
+	mapping, err := r.ResourceMapping()
+	if err != nil {
+		return err
+	}
+	describer, err := f.Describer(mapping)
+	if err != nil {
+		return err
+	}
 	infos, err := r.Infos()
 	if err != nil {
 		return err
@@ -142,7 +170,7 @@ func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper
 		}
 	}
 	if !isFound {
-		return fmt.Errorf("%v %q not found", rsrc, prefix)
+		return originalError
 	}
 	return nil
 }

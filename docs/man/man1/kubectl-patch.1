@@ -18,15 +18,27 @@ Update field(s) of a resource using strategic merge patch
 .PP
 JSON and YAML formats are accepted.
 
+.PP
+Please refer to the models in 
+\[la]https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html\[ra] to find if a field is mutable.
+
 
 .SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to update
+
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for patch
 
 .PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output mode. Use "\-o name" for shorter output (resource/name).
+
+.PP
 \fB\-p\fP, \fB\-\-patch\fP=""
-    The patch to be appied to the resource JSON file.
+    The patch to be applied to the resource JSON file.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -119,10 +131,6 @@ JSON and YAML formats are accepted.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -133,8 +141,14 @@ JSON and YAML formats are accepted.
 
 .nf
 
-// Partially update a node using strategic merge patch
-kubectl patch node k8s\-node\-1 \-p '\{"spec":\{"unschedulable":true\}\}'
+# Partially update a node using strategic merge patch
+kubectl patch node k8s\-node\-1 \-p '{"spec":{"unschedulable":true}}'
+
+# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch
+kubectl patch \-f node.json \-p '{"spec":{"unschedulable":true}}'
+
+# Update a container's image; spec.containers[*].name is required because it's a merge key
+kubectl patch pod valid\-pod \-p '{"spec":{"containers":[{"name":"kubernetes\-serve\-hostname","image":"new image"}]}}'
 
 .fi
 .RE

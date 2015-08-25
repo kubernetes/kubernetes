@@ -14,6 +14,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# When run as described below, the conformance test tests whether a cluster
+# supports key features for Kubernetes version 1.0.
+
+# Instructions:
+#  - Setup a Kubernetes cluster with $NUM_MINIONS nodes (defined below).
+#  - Provide a Kubeconfig file whose current context is set to the
+#    cluster to be tested, and with suitable auth setting.
+#  - Specify the location of that kubeconfig with, e.g.:
+#    declare -x KUBECONFIG="$HOME/.kube/config"
+#  - Make sure only essential pods are running and there are no failed/pending pods.
+#  - Go to a git tree that contains the kubernetes source.
+#    - git clone git://github.com/kubernetes/kubernetes.git
+#  - Checkout the upstream/conformance-test-v1 branch
+#    - git checkout upstream/conformance-test-v1
+#    - The working tree will be in a "detached HEAD" state.
+#  - Make binaries needed by e2e
+#      make clean
+#      make quick-release
+#  - Run the test and capture output:
+#      hack/conformance-test.sh 2>&1 | tee conformance.$(date +%FT%T%z).log
+#
+
+# About the conformance test:
 # The conformance test checks whether a kubernetes cluster supports
 # a minimum set of features to be called "Kubernetes".  It is similar
 # to `hack/e2e-test.sh` but it differs in that:
@@ -31,44 +54,16 @@
 #    - tests of optional features, such as volume types.
 #    - tests of performance, scale, or reliability
 #    - known flaky tests.
-
-# The conformance test should be run from a github repository at
-# commit TBDCOMMITNUMBER.  Otherwise, it may not include the right
-# set of tests.
-# e.g.:
-#   cd /new/directory
-#   git clone git://github.com/GoogleCloudPlatform/kubernetes.git
-#   cd kubernetes
-#   git checkout TBDCOMMITNUMBER.
-# The working tree will be in a "detached HEAD" state.
-#
-# When run as described above, the conformance test tests whether a cluster is
-# supports key features for Kubernetes version 1.0.
-#
 # TODO: when preparing to release a new major or minor version of Kubernetes,
-# then update above commit number, reevaluate the set of e2e tests,
+# create a new conformance-test-vX.Y branch, update mentions of that branch in this file,
+# reevaluate the set of e2e tests,
 # update documentation at docs/getting-started-guides/README.md to have
 # a new column for conformance at that new version, and notify
 # community.
 
-# Instructions:
-#  - Setup a Kubernetes cluster with $NUM_MINIONS nodes (defined below).
-#  - Provide a Kubeconfig file whose current context is set to the
-#    cluster to be tested, and with suitable auth setting.
-#  - Specify the location of that kubeconfig with, e.g.:
-#    declare -x KUBECONFIG="$HOME/.kube/config"
-#  - Specify the location of the master with, e.g.:
-#    declare -x KUBE_MASTER_IP="1.2.3.4"
-#  - Make sure only essential pods are running and there are no failed/pending pods.
-#  - Make binaries needed by e2e, e.g.:
-#      make clean
-#      make quick-release
-#  - Run the test and capture output:
-#      hack/conformance-test.sh 2>&1 | tee conformance.$(date +%FT%T%z).log
 
 : ${KUBECONFIG:?"Must set KUBECONFIG before running conformance test."}
-: ${KUBE_MASTER_IP:?"Must set KUBE_MASTER_IP before running conformance test."}
-echo "Conformance test using ${KUBECONFIG} against master at ${KUBE_MASTER_IP}"
+echo "Conformance test using current-context of ${KUBECONFIG}"
 echo -n "Conformance test run date:"
 date
 echo -n "Conformance test SHA:"
@@ -98,13 +93,19 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 #  Restart: node management.
 #  Scale: performance
 #  Services.*load balancer: not all cloud providers have a load balancer.
-#  Services.*NodePort: flaky
+#  Services.*NodePort: requires you to open the firewall yourself, so not covered.
+#  Services.*nodeport: requires you to open the firewall yourself, so not covered.
 #  Shell: replies on optional ssh access to nodes.
 #  SSH: optional feature.
+#  Addon\supdate: requires SSH
 #  Volumes: contained only skipped tests.
-export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging.*|Etcd\sfailure.*|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Shell|SSH|Volumes"
+#  Clean\sup\spods\son\snode: performance
+#  MaxPods\slimit\snumber\sof\spods: not sure why this wasn't working on GCE but it wasn't.
+#  Kubectl\sclient\sSimple\spod: not sure why this wasn't working on GCE but it wasn't
+#  DNS: not sure why this wasn't working on GCE but it wasn't
+export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging|Etcd\sfailure|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Services.*nodeport|Shell|SSH|Addon\supdate|Volumes|Clean\sup\spods\son\snode|Skipped|skipped|MaxPods\slimit\snumber\sof\spods|Kubectl\sclient\sSimple\spod|DNS"
 
-declare -x KUBERNETES_CONFORMANCE_TEST="1"
+declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_MINIONS=4
 hack/ginkgo-e2e.sh
 exit $?

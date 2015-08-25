@@ -19,16 +19,16 @@ package iptables
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 func getIptablesCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv4 {
-		return "iptables"
+		return cmdIptables
 	}
 	if protocol == ProtocolIpv6 {
-		return "ip6tables"
+		return cmdIp6tables
 	}
 	panic("Unknown protocol")
 }
@@ -39,9 +39,9 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Exists.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 			// Failure.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{2} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -96,7 +96,7 @@ func TestFlushChain(t *testing.T) {
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -130,7 +130,7 @@ func TestDeleteChain(t *testing.T) {
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -197,7 +197,7 @@ func TestEnsureRuleNew(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 			// Success on the second call.
 			func() ([]byte, error) { return []byte{}, nil },
 		},
@@ -233,7 +233,7 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 2 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{2} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -260,9 +260,9 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -290,7 +290,7 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -353,7 +353,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 2 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{2} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -382,7 +382,7 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 			// Success on the first call.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -438,72 +438,13 @@ func TestGetIptablesHasCheckCommand(t *testing.T) {
 	}
 }
 
-func TestExtractIptablesVersion(t *testing.T) {
-	testCases := []struct {
-		Version string
-		V1      int
-		V2      int
-		V3      int
-		Err     bool
-	}{
-		{"iptables v1.4.7", 1, 4, 7, false},
-		{"iptables v1.4.11", 1, 4, 11, false},
-		{"iptables v0.2.5", 0, 2, 5, false},
-		{"iptables v1.2.3.4.5.6", 1, 2, 3, false},
-		{"iptables v1.4", 0, 0, 0, true},
-		{"iptables v12345.12345.12345.12344", 12345, 12345, 12345, false},
-		{"total junk", 0, 0, 0, true},
-	}
-
-	for _, testCase := range testCases {
-		v1, v2, v3, err := extractIptablesVersion(testCase.Version)
-		if (err != nil) != testCase.Err {
-			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
-		}
-		if err == nil {
-			if v1 != testCase.V1 {
-				t.Errorf("First version number incorrect for string \"%s\", got %d, expected %d", testCase.Version, v1, testCase.V1)
-			}
-			if v2 != testCase.V2 {
-				t.Errorf("Second version number incorrect for string \"%s\", got %d, expected %d", testCase.Version, v2, testCase.V2)
-			}
-			if v3 != testCase.V3 {
-				t.Errorf("Third version number incorrect for string \"%s\", got %d, expected %d", testCase.Version, v3, testCase.V3)
-			}
-		}
-	}
-}
-
-func TestIptablesHasCheckCommand(t *testing.T) {
-	testCases := []struct {
-		V1     int
-		V2     int
-		V3     int
-		Result bool
-	}{
-		{0, 55, 55, false},
-		{1, 0, 55, false},
-		{1, 4, 10, false},
-		{1, 4, 11, true},
-		{1, 4, 19, true},
-		{1, 5, 0, true},
-		{2, 0, 0, true},
-	}
-
-	for _, testCase := range testCases {
-		if result := iptablesHasCheckCommand(testCase.V1, testCase.V2, testCase.V3); result != testCase.Result {
-			t.Errorf("For %d.%d.%d expected %v got %v", testCase.V1, testCase.V2, testCase.V3, testCase.Result, result)
-		}
-	}
-}
-
 func TestCheckRuleWithoutCheckPresent(t *testing.T) {
 	iptables_save_output := `# Generated by iptables-save v1.4.7 on Wed Oct 29 14:56:01 2014
 *nat
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER 
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
@@ -541,7 +482,7 @@ func TestCheckRuleWithoutCheckAbsent(t *testing.T) {
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER 
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 

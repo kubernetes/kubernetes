@@ -19,7 +19,7 @@
 # they are written using the latest API version.
 #
 # Steps to use this script to upgrade the cluster to a new version:
-# https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
+# https://github.com/kubernetes/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
 
 set -o errexit
 set -o nounset
@@ -32,7 +32,7 @@ KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 
 # List of resources to be updated.
 # TODO: Get this list of resources from server once
-# https://github.com/GoogleCloudPlatform/kubernetes/issues/2057 is fixed.
+# http://issue.k8s.io/2057 is fixed.
 declare -a resources=(
     "endpoints"
     "events"

@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Version is the string that represents the current external default version.
@@ -64,6 +63,8 @@ var RESTMapper meta.RESTMapper
 // userResources is a group of resources mostly used by a kubectl user
 var userResources = []string{"rc", "svc", "pods", "pvc"}
 
+const importPrefix = "k8s.io/kubernetes/pkg/api"
+
 func init() {
 	// Use the first API version in the list of registered versions as the latest.
 	Version = registered.RegisteredVersions[0]
@@ -76,28 +77,14 @@ func init() {
 		Versions = append(Versions, versions[i])
 	}
 
-	mapper := meta.NewDefaultRESTMapper(
-		versions,
-		func(version string) (*meta.VersionInterfaces, bool) {
-			interfaces, err := InterfacesFor(version)
-			if err != nil {
-				return nil, false
-			}
-			return interfaces, true
-		},
-	)
-
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	kindToRootScope := map[string]bool{
-		"Node":             true,
-		"Minion":           true,
-		"Namespace":        true,
-		"PersistentVolume": true,
-	}
-
-	// setup aliases for groups of resources
-	mapper.AddResourceAlias("all", userResources...)
+	rootScoped := util.NewStringSet(
+		"Node",
+		"Minion",
+		"Namespace",
+		"PersistentVolume",
+	)
 
 	// these kinds should be excluded from the list of resources
 	ignoredKinds := util.NewStringSet(
@@ -106,34 +93,24 @@ func init() {
 		"Status",
 		"PodLogOptions",
 		"PodExecOptions",
-		"PodProxyOptions")
+		"PodAttachOptions",
+		"PodProxyOptions",
+		"Daemon",
+		"ThirdPartyResource",
+		"ThirdPartyResourceData",
+		"ThirdPartyResourceList")
 
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
-	for _, version := range versions {
-		for kind := range api.Scheme.KnownTypes(version) {
-			if ignoredKinds.Has(kind) {
-				continue
-			}
-			scope := meta.RESTScopeNamespace
-			if kindToRootScope[kind] {
-				scope = meta.RESTScopeRoot
-			}
-			mapper.Add(scope, kind, version, false)
-		}
-	}
+	mapper := api.NewDefaultRESTMapper("api", versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
+	// setup aliases for groups of resources
+	mapper.AddResourceAlias("all", userResources...)
 	RESTMapper = mapper
+	api.RegisterRESTMapper(RESTMapper)
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
 func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "v1beta3":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta3.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
 	case "v1":
 		return &meta.VersionInterfaces{
 			Codec:            v1.Codec,

@@ -21,24 +21,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
 
 type NamespaceInfo struct {
 	Namespace string
-}
-
-// TODO Move to labels package.
-func formatLabels(labelMap map[string]string) string {
-	l := labels.Set(labelMap).String()
-	if l == "" {
-		l = "<none>"
-	}
-	return l
 }
 
 func listOfImages(spec *api.PodSpec) []string {
@@ -106,16 +96,15 @@ func expandResourceShortcut(resource string) string {
 		"cs":     "componentstatuses",
 		"ev":     "events",
 		"ep":     "endpoints",
-		"limits": "limitRanges",
+		"limits": "limitranges",
 		"no":     "nodes",
+		"ns":     "namespaces",
 		"po":     "pods",
-		"pv":     "persistentVolumes",
-		"pvc":    "persistentVolumeClaims",
-		"quota":  "resourceQuotas",
+		"pv":     "persistentvolumes",
+		"pvc":    "persistentvolumeclaims",
+		"quota":  "resourcequotas",
 		"rc":     "replicationcontrollers",
-		// DEPRECATED: will be removed before 1.0
-		"se":  "services",
-		"svc": "services",
+		"svc":    "services",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded

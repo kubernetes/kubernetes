@@ -19,8 +19,8 @@ package dockertools
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	docker "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 type instrumentedDockerInterface struct {
@@ -39,7 +39,7 @@ func recordOperation(operation string, start time.Time) {
 	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 
-// Record error for metric if an error occured.
+// Record error for metric if an error occurred.
 func recordError(operation string, err error) {
 	if err != nil {
 		metrics.DockerErrors.WithLabelValues(operation).Inc()
@@ -188,4 +188,13 @@ func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspec
 	out, err := in.client.InspectExec(id)
 	recordError(operation, err)
 	return out, err
+}
+
+func (in instrumentedDockerInterface) AttachToContainer(opts docker.AttachToContainerOptions) error {
+	const operation = "attach"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.AttachToContainer(opts)
+	recordError(operation, err)
+	return err
 }

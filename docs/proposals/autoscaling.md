@@ -1,6 +1,40 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/proposals/autoscaling.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Abstract
+
 Auto-scaling is a data-driven feature that allows users to increase or decrease capacity as needed by controlling the
-number of pods deployed within the system automatically.  
+number of pods deployed within the system automatically.
 
 ## Motivation
 
@@ -12,18 +46,18 @@ done automatically based on statistical analysis and thresholds.
 
 * Provide a concrete proposal for implementing auto-scaling pods within Kubernetes
 * Implementation proposal should be in line with current discussions in existing issues:
-    * Scale verb - [1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)
+    * Scale verb - [1629](http://issue.k8s.io/1629)
     * Config conflicts - [Config](https://github.com/GoogleCloudPlatform/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.md#automated-re-configuration-processes)
-    * Rolling updates - [1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
-    * Multiple scalable types - [1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)  
+    * Rolling updates - [1353](http://issue.k8s.io/1353)
+    * Multiple scalable types - [1624](http://issue.k8s.io/1624)
 
 ## Constraints and Assumptions
 
-* This proposal is for horizontal scaling only.  Vertical scaling will be handled in [issue 2072](https://github.com/GoogleCloudPlatform/kubernetes/issues/2072)
+* This proposal is for horizontal scaling only.  Vertical scaling will be handled in [issue 2072](http://issue.k8s.io/2072)
 * `ReplicationControllers` will not know about the auto-scaler, they are the target of the auto-scaler.  The `ReplicationController` responsibilities are
-constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](../replication-controller.md#responsibilities-of-the-replication-controller)
+constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](../user-guide/replication-controller.md#responsibilities-of-the-replication-controller)
 * Auto-scalers will be loosely coupled with data gathering components in order to allow a wide variety of input sources
-* Auto-scalable resources will support a scale verb ([1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629))
+* Auto-scalable resources will support a scale verb ([1629](http://issue.k8s.io/1629))
 such that the auto-scaler does not directly manipulate the underlying resource.
 * Initially, most thresholds will be set by application administrators. It should be possible for an autoscaler to be
 written later that sets thresholds automatically based on past behavior (CPU used vs incoming requests).
@@ -42,8 +76,8 @@ applications will expose one or more network endpoints for clients to connect to
 balanced or situated behind a proxy - the data from those proxies and load balancers can be used to estimate client to
 server traffic for applications. This is the primary, but not sole, source of data for making decisions.
 
-Within Kubernetes a [kube proxy](../services.md#ips-and-vips)
-running on each node directs service requests to the underlying implementation.  
+Within Kubernetes a [kube proxy](../user-guide/services.md#ips-and-vips)
+running on each node directs service requests to the underlying implementation.
 
 While the proxy provides internal inter-pod connections, there will be L3 and L7 proxies and load balancers that manage
 traffic to backends. OpenShift, for instance, adds a "route" resource for defining external to internal traffic flow.
@@ -53,7 +87,7 @@ data source for the number of backends.
 ### Scaling based on predictive analysis
 
 Scaling may also occur based on predictions of system state like anticipated load, historical data, etc.  Hand in hand
-with scaling based on traffic, predictive analysis may be used to determine anticipated system load and scale the application automatically.  
+with scaling based on traffic, predictive analysis may be used to determine anticipated system load and scale the application automatically.
 
 ### Scaling based on arbitrary data
 
@@ -79,14 +113,14 @@ use a client/cache implementation to receive watch data from the data aggregator
 scaling the application.  Auto-scalers are created and defined like other resources via REST endpoints and belong to the
 namespace just as a `ReplicationController` or `Service`.
 
-Since an auto-scaler is a durable object it is best represented as a resource.  
+Since an auto-scaler is a durable object it is best represented as a resource.
 
 ```go
     //The auto scaler interface
     type AutoScalerInterface interface {
         //ScaleApplication adjusts a resource's replica count.  Calls scale endpoint.  
         //Args to this are based on what the endpoint
-        //can support.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/1629
+        //can support.  See http://issue.k8s.io/1629
         ScaleApplication(num int) error
     }
 
@@ -198,6 +232,7 @@ Since an auto-scaler is a durable object it is best represented as a resource.
 ```
 
 #### Boundary Definitions
+
 The `AutoScaleThreshold` definitions provide the boundaries for the auto-scaler.  By defining comparisons that form a range
 along with positive and negative increments you may define bi-directional scaling.  For example the upper bound may be
 specified as "when requests per second rise above 50 for 30 seconds scale the application up by 1" and a lower bound may
@@ -206,9 +241,9 @@ be specified as "when requests per second fall below 25 for 30 seconds scale the
 ### Data Aggregator
 
 This section has intentionally been left empty.  I will defer to folks who have more experience gathering and analyzing
-time series statistics.  
+time series statistics.
 
-Data aggregation is opaque to the the auto-scaler resource.  The auto-scaler is configured to use `AutoScaleThresholds`
+Data aggregation is opaque to the auto-scaler resource.  The auto-scaler is configured to use `AutoScaleThresholds`
 that know how to work with the underlying data in order to know if an application must be scaled up or down.   Data aggregation
 must feed a common data structure to ease the development of `AutoScaleThreshold`s but it does not matter to the
 auto-scaler whether this occurs in a push or pull implementation, whether or not the data is stored at a granular level,
@@ -219,23 +254,24 @@ Of note: If the statistics gathering mechanisms can be initialized with a regist
 potentially piggyback on this registry.
 
 ### Multi-target Scaling Policy
+
 If multiple scalable targets satisfy the `TargetSelector` criteria the auto-scaler should be configurable as to which
 target(s) are scaled.  To begin with, if multiple targets are found the auto-scaler will scale the largest target up
-or down as appropriate.  In the future this may be more configurable.  
+or down as appropriate.  In the future this may be more configurable.
 
 ### Interactions with a deployment
 
-In a deployment it is likely that multiple replication controllers must be monitored.  For instance, in a [rolling deployment](../replication-controller.md#rolling-updates)
+In a deployment it is likely that multiple replication controllers must be monitored.  For instance, in a [rolling deployment](../user-guide/replication-controller.md#rolling-updates)
 there will be multiple replication controllers, with one scaling up and another scaling down.  This means that an
 auto-scaler must be aware of the entire set of capacity that backs a service so it does not fight with the deployer.  `AutoScalerSpec.MonitorSelector`
 is what provides this ability.  By using a selector that spans the entire service the auto-scaler can monitor capacity
 of multiple replication controllers and check that capacity against the `AutoScalerSpec.MaxAutoScaleCount` and
-`AutoScalerSpec.MinAutoScaleCount` while still only targeting a specific set of `ReplicationController`s with `TargetSelector`.  
+`AutoScalerSpec.MinAutoScaleCount` while still only targeting a specific set of `ReplicationController`s with `TargetSelector`.
 
 In the course of a deployment it is up to the deployment orchestration to decide how to manage the labels
 on the replication controllers if it needs to ensure that only specific replication controllers are targeted by
 the auto-scaler.  By default, the auto-scaler will scale the largest replication controller that meets the target label
-selector criteria.  
+selector criteria.
 
 During deployment orchestration the auto-scaler may be making decisions to scale its target up or down.  In order to prevent
 the scaler from fighting with a deployment process that is scaling one replication controller up and scaling another one
@@ -253,5 +289,6 @@ temporarily disable negative decrement thresholds until the deployment process i
 an auto-scaler to be able to grow capacity during a deployment than to shrink the number of instances precisely.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/autoscaling.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

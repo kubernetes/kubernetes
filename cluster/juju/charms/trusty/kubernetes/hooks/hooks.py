@@ -204,8 +204,9 @@ def register_machine(apiserver, retry=False):
         mem = info.strip().split(':')[1].strip().split()[0]
     cpus = os.sysconf('SC_NPROCESSORS_ONLN')
 
+    # https://github.com/kubernetes/kubernetes/blob/master/docs/admin/node.md
     registration_request = Registrator()
-    registration_request.data['Kind'] = 'Minion'
+    registration_request.data['kind'] = 'Node'
     registration_request.data['id'] = private_address
     registration_request.data['name'] = private_address
     registration_request.data['metadata']['name'] = private_address

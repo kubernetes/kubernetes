@@ -24,10 +24,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Specified a policy for garbage collecting containers.
@@ -138,7 +138,7 @@ func (cgc *realContainerGC) GarbageCollect() error {
 	// Remove unidentified containers.
 	for _, container := range unidentifiedContainers {
 		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
-		err = cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: container.id})
+		err = cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: container.id, RemoveVolumes: true})
 		if err != nil {
 			glog.Warningf("Failed to remove unidentified dead container %q: %v", container.name, err)
 		}
@@ -201,13 +201,13 @@ func (cgc *realContainerGC) removeOldestN(containers []containerGCInfo, toRemove
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := numToKeep; i < len(containers); i++ {
-		err := cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id})
+		err := cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id, RemoveVolumes: true})
 		if err != nil {
 			glog.Warningf("Failed to remove dead container %q: %v", containers[i].name, err)
 		}
 		symlinkPath := dockertools.LogSymlink(cgc.containerLogsDir, containers[i].podNameWithNamespace, containers[i].containerName, containers[i].id)
 		err = os.Remove(symlinkPath)
-		if !os.IsNotExist(err) {
+		if err != nil && !os.IsNotExist(err) {
 			glog.Warningf("Failed to remove container %q log symlink %q: %v", containers[i].name, symlinkPath, err)
 		}
 	}

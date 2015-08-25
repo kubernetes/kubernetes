@@ -39,6 +39,7 @@ const (
 	attributesApi    = "attributes"
 	versionApi       = "version"
 	psApi            = "ps"
+	customMetricsApi = "appmetrics"
 )
 
 // Interface for a cAdvisor API version
@@ -305,7 +306,7 @@ func (self *version2_0) Version() string {
 }
 
 func (self *version2_0) SupportedRequestTypes() []string {
-	return []string{versionApi, attributesApi, eventsApi, machineApi, summaryApi, statsApi, specApi, storageApi, psApi}
+	return []string{versionApi, attributesApi, eventsApi, machineApi, summaryApi, statsApi, specApi, storageApi, psApi, customMetricsApi}
 }
 
 func (self *version2_0) HandleRequest(requestType string, request []string, m manager.Manager, w http.ResponseWriter, r *http.Request) error {
@@ -364,6 +365,32 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 			contStats[name] = convertStats(cont)
 		}
 		return writeResult(contStats, w)
+	case customMetricsApi:
+		containerName := getContainerName(request)
+		glog.V(4).Infof("Api - Custom Metrics: Looking for metrics for container %q, options %+v", containerName, opt)
+		conts, err := m.GetRequestedContainersInfo(containerName, opt)
+		if err != nil {
+			return err
+		}
+		specs, err := m.GetContainerSpec(containerName, opt)
+		if err != nil {
+			return err
+		}
+		contMetrics := make(map[string]map[string][]info.MetricVal, 0)
+		for _, cont := range conts {
+			metrics := map[string][]info.MetricVal{}
+			contStats := convertStats(cont)
+			spec := specs[cont.Name]
+			for _, contStat := range contStats {
+				for _, ms := range spec.CustomMetrics {
+					if contStat.HasCustomMetrics && !contStat.CustomMetrics[ms.Name].Timestamp.IsZero() {
+						metrics[ms.Name] = append(metrics[ms.Name], contStat.CustomMetrics[ms.Name])
+					}
+				}
+			}
+			contMetrics[containerName] = metrics
+		}
+		return writeResult(contMetrics, w)
 	case specApi:
 		containerName := getContainerName(request)
 		glog.V(4).Infof("Api - Spec for container %q, options %+v", containerName, opt)
@@ -412,12 +439,13 @@ func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
 	stats := []v2.ContainerStats{}
 	for _, val := range cont.Stats {
 		stat := v2.ContainerStats{
-			Timestamp:     val.Timestamp,
-			HasCpu:        cont.Spec.HasCpu,
-			HasMemory:     cont.Spec.HasMemory,
-			HasNetwork:    cont.Spec.HasNetwork,
-			HasFilesystem: cont.Spec.HasFilesystem,
-			HasDiskIo:     cont.Spec.HasDiskIo,
+			Timestamp:        val.Timestamp,
+			HasCpu:           cont.Spec.HasCpu,
+			HasMemory:        cont.Spec.HasMemory,
+			HasNetwork:       cont.Spec.HasNetwork,
+			HasFilesystem:    cont.Spec.HasFilesystem,
+			HasDiskIo:        cont.Spec.HasDiskIo,
+			HasCustomMetrics: cont.Spec.HasCustomMetrics,
 		}
 		if stat.HasCpu {
 			stat.Cpu = val.Cpu
@@ -433,6 +461,9 @@ func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
 		}
 		if stat.HasDiskIo {
 			stat.DiskIo = val.DiskIo
+		}
+		if stat.HasCustomMetrics {
+			stat.CustomMetrics = val.CustomMetrics
 		}
 		// TODO(rjnagal): Handle load stats.
 		stats = append(stats, stat)

@@ -22,75 +22,120 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type stringCodec struct{}
-
-type fakeAPIObject string
-
-func (*fakeAPIObject) IsAnAPIObject() {}
-
-func (c stringCodec) Encode(obj runtime.Object) ([]byte, error) {
-	return []byte(*obj.(*fakeAPIObject)), nil
-}
-
-func (c stringCodec) Decode(data []byte) (runtime.Object, error) {
-	o := fakeAPIObject(data)
-	return &o, nil
-}
-
-func (c stringCodec) DecodeInto(data []byte, obj runtime.Object) error {
-	o := obj.(*fakeAPIObject)
-	*o = fakeAPIObject(data)
-	return nil
-}
-
-func TestSetObj(t *testing.T) {
+func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
-		fakeObject := fakeAPIObject("object")
-		if err := helper.SetObj(key, &fakeObject, nil, 0); err != nil {
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := client.Get(key, false, false)
 		if err != nil || resp.Node == nil {
 			t.Fatalf("unexpected error: %v %v", err, resp)
 		}
-		if resp.Node.Value != "object" {
-			t.Errorf("unexpected response: %#v", resp.Node)
+		decoded, err := testapi.Codec().Decode([]byte(resp.Node.Value))
+		if err != nil {
+			t.Fatalf("unexpected response: %#v", resp.Node)
+		}
+		result := *decoded.(*api.ServiceAccount)
+		if !api.Semantic.DeepEqual(testObject, result) {
+			t.Errorf("expected: %#v got: %#v", testObject, result)
 		}
 	})
 }
 
-func TestExtractObj(t *testing.T) {
+func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
-		_, err := client.Set(key, "object", 0)
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		coded, err := testapi.Codec().Encode(&testObject)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		s := fakeAPIObject("")
-		if err := helper.ExtractObj(key, &s, false); err != nil {
+		_, err = client.Set(key, string(coded), 0)
+		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if s != "object" {
-			t.Errorf("unexpected response: %#v", s)
+		result := api.ServiceAccount{}
+		if err := etcdStorage.Get(key, &result, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Propagate ResourceVersion (it is set automatically).
+		testObject.ObjectMeta.ResourceVersion = result.ObjectMeta.ResourceVersion
+		if !api.Semantic.DeepEqual(testObject, result) {
+			t.Errorf("expected: %#v got: %#v", testObject, result)
+		}
+	})
+}
+
+func TestWriteTTL(t *testing.T) {
+	client := framework.NewEtcdClient()
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
+	framework.WithEtcdKey(func(key string) {
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		result := &api.ServiceAccount{}
+		err := etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "foo" {
+				t.Fatalf("unexpected existing object: %v", obj)
+			}
+			if res.TTL != 0 {
+				t.Fatalf("unexpected TTL: %#v", res)
+			}
+			ttl := uint64(10)
+			out := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "out"}}
+			return out, &ttl, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Name != "out" {
+			t.Errorf("unexpected response: %#v", result)
+		}
+		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL != 10 {
+			t.Fatalf("unexpected get: %v %#v", err, res)
+		}
+
+		result = &api.ServiceAccount{}
+		err = etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "out" {
+				t.Fatalf("unexpected existing object: %v", obj)
+			}
+			if res.TTL <= 1 {
+				t.Fatalf("unexpected TTL: %#v", res)
+			}
+			out := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "out2"}}
+			return out, nil, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Name != "out2" {
+			t.Errorf("unexpected response: %#v", result)
+		}
+		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL <= 1 {
+			t.Fatalf("unexpected get: %v %#v", err, res)
 		}
 	})
 }
 
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.NewEtcdHelper(client, testapi.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
 		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
@@ -100,7 +145,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := helper.Watch(key, 0, tools.Everything)
+		w, err := etcdStorage.Watch(key, 0, storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -139,50 +184,6 @@ func TestWatch(t *testing.T) {
 		pod = event.Object.(*api.Pod)
 		if pod.ResourceVersion != strconv.FormatUint(expectedVersion, 10) {
 			t.Errorf("expected version %d, got %#v", expectedVersion, pod)
-		}
-	})
-}
-
-func TestMigrateKeys(t *testing.T) {
-	withEtcdKey(func(oldPrefix string) {
-		client := newEtcdClient()
-		helper := tools.NewEtcdHelper(client, testapi.Codec(), oldPrefix)
-
-		key1 := oldPrefix + "/obj1"
-		key2 := oldPrefix + "/foo/obj2"
-		key3 := oldPrefix + "/foo/bar/obj3"
-
-		// Create a new entres - these are the 'existing' entries with old prefix
-		_, _ = helper.Client.Create(key1, "foo", 0)
-		_, _ = helper.Client.Create(key2, "foo", 0)
-		_, _ = helper.Client.Create(key3, "foo", 0)
-
-		// Change the helper to a new prefix
-		newPrefix := "/kubernetes.io"
-		helper = tools.NewEtcdHelper(client, testapi.Codec(), newPrefix)
-
-		// Migrate the keys
-		err := helper.MigrateKeys(oldPrefix)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		// Check the resources are at the correct new location
-		newNames := []string{
-			newPrefix + "/obj1",
-			newPrefix + "/foo/obj2",
-			newPrefix + "/foo/bar/obj3",
-		}
-		for _, name := range newNames {
-			_, err := helper.Client.Get(name, false, false)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-		}
-
-		// Check the old locations are removed
-		if _, err := helper.Client.Get(oldPrefix, false, false); err == nil {
-			t.Fatalf("Old directory still exists.")
 		}
 	})
 }

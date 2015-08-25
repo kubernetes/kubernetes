@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "spark-master",
-        "image": "gcr.io/google_containers/spark-master",
+        "image": "gcr.io/google_containers/spark-master:1.4.0_v1",
         "ports": [
           {
             "containerPort": 7077

@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestExtraArgsFail(t *testing.T) {
@@ -59,10 +59,11 @@ func TestCreateObject(t *testing.T) {
 
 	cmd := NewCmdCreate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
+	if buf.String() != "replicationcontroller/redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -92,10 +93,11 @@ func TestCreateMultipleObject(t *testing.T) {
 	cmd := NewCmdCreate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
 	// Names should come from the REST response, NOT the files
-	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -125,9 +127,10 @@ func TestCreateDirectory(t *testing.T) {
 
 	cmd := NewCmdCreate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/name\nservices/baz\nreplicationcontrollers/name\nservices/baz\nreplicationcontrollers/name\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/name\nservice/baz\nreplicationcontroller/name\nservice/baz\nreplicationcontroller/name\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -147,7 +150,7 @@ func TestPrintObjectSpecificMessage(t *testing.T) {
 		},
 		{
 			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer}},
-			expectOutput: true,
+			expectOutput: false,
 		},
 		{
 			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort}},

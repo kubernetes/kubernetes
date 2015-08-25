@@ -17,15 +17,16 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewHyperkubeServer creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubeletExecutor() *Server {
-	s := service.NewHyperKubeletExecutorServer()
+	s := service.NewKubeletExecutorServer()
 	hks := Server{
-		SimpleUsage: "executor",
+		SimpleUsage: hyperkube.CommandExecutor,
 		Long: `The kubelet-executor binary is responsible for maintaining a set of containers
 on a particular node. It syncs data from a specialized Mesos source that tracks
 task launches and kills. It then queries Docker to see what is currently
@@ -35,6 +36,6 @@ containers by starting or stopping Docker containers.`,
 			return s.Run(hks, args)
 		},
 	}
-	s.AddHyperkubeFlags(hks.Flags())
+	s.AddFlags(hks.Flags())
 	return &hks
 }

@@ -1,7 +1,6 @@
 {
    "kind":"ReplicationController",
    "apiVersion":"v1",
-   "id":"redis-master",
    "metadata":{
       "name":"redis-master",
       "labels":{

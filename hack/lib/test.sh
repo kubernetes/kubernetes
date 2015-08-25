@@ -23,7 +23,7 @@ readonly   red=$(tput setaf 1)
 readonly green=$(tput setaf 2)
 
 kube::test::clear_all() {
-  kubectl delete "${kube_flags[@]}" rc,pods --all
+  kubectl delete "${kube_flags[@]}" rc,pods --all --grace-period=0
 }
 
 kube::test::get_object_assert() {
@@ -32,6 +32,31 @@ kube::test::get_object_assert() {
   local expected=$3
 
   res=$(eval kubectl get "${kube_flags[@]}" $object -o template -t \"$request\")
+
+  if [[ "$res" =~ ^$expected$ ]]; then
+      echo -n ${green}
+      echo "Successful get $object $request: $res"
+      echo -n ${reset}
+      return 0
+  else
+      echo ${bold}${red}
+      echo "FAIL!"
+      echo "Get $object $request"
+      echo "  Expected: $expected"
+      echo "  Got:      $res"
+      echo ${reset}${red}
+      caller
+      echo ${reset}
+      return 1
+  fi
+}
+
+kube::test::get_object_jsonpath_assert() {
+  local object=$1
+  local request=$2
+  local expected=$3
+
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath -t \"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -75,6 +100,34 @@ kube::test::describe_object_assert() {
 
   echo -n ${green}
   echo "Successful describe $resource $object:"
+  echo "$result"
+  echo -n ${reset}
+  return 0
+}
+
+kube::test::describe_resource_assert() {
+  local resource=$1
+  local matches=${@:2}
+
+  result=$(eval kubectl describe "${kube_flags[@]}" $resource)
+
+  for match in ${matches}; do
+    if [[ ! $(echo "$result" | grep ${match}) ]]; then
+      echo ${bold}${red}
+      echo "FAIL!"
+      echo "Describe $resource"
+      echo "  Expected Match: $match"
+      echo "  Not found in:"
+      echo "$result"
+      echo ${reset}${red}
+      caller
+      echo ${reset}
+      return 1
+    fi
+  done
+
+  echo -n ${green}
+  echo "Successful describe $resource:"
   echo "$result"
   echo -n ${reset}
   return 0

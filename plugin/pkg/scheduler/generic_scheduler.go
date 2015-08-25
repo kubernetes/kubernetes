@@ -23,11 +23,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 type FailedPredicateMap map[string]util.StringSet
@@ -116,6 +116,7 @@ func findNodesThatFit(pod *api.Pod, podLister algorithm.PodLister, predicateFunc
 	for _, node := range nodes.Items {
 		fits := true
 		for name, predicate := range predicateFuncs {
+			predicates.FailedResourceType = ""
 			fit, err := predicate(pod, machineToPods[node.Name], node.Name)
 			if err != nil {
 				return api.NodeList{}, FailedPredicateMap{}, err
@@ -124,6 +125,10 @@ func findNodesThatFit(pod *api.Pod, podLister algorithm.PodLister, predicateFunc
 				fits = false
 				if _, found := failedPredicateMap[node.Name]; !found {
 					failedPredicateMap[node.Name] = util.StringSet{}
+				}
+				if predicates.FailedResourceType != "" {
+					failedPredicateMap[node.Name].Insert(predicates.FailedResourceType)
+					break
 				}
 				failedPredicateMap[node.Name].Insert(name)
 				break
@@ -190,7 +195,7 @@ func getBestHosts(list algorithm.HostPriorityList) []string {
 func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
-		fmt.Errorf("failed to list nodes: %v", err)
+		glog.Errorf("failed to list nodes: %v", err)
 		return []algorithm.HostPriority{}, err
 	}
 

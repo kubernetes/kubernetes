@@ -1,3 +1,35 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/devel/pull-requests.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Pull Request Process
 ====================
 
@@ -15,17 +47,21 @@ We want to limit the total number of PRs in flight to:
 * Remove old PRs that would be difficult to rebase as the underlying code has changed over time
 * Encourage code velocity
 
-RC to v1.0 Pull Requests
-------------------------
+Life of a Pull Request
+----------------------
 
-Between the first RC build (~6/22) and v1.0, we will adopt a higher bar for PR merges.  For v1.0 to be a stable release, we need to ensure that any fixes going in are very well tested and have a low risk of breaking anything.  Refactors and complex changes will be rejected in favor of more strategic and smaller workarounds.
+Unless in the last few weeks of a milestone when we need to reduce churn and stabilize, we aim to be always accepting pull requests.
 
-These PRs require:
-* A risk assessment by the code author in the PR.  This should outline which parts of the code are being touched, the risk of regression, and complexity of the code.
-* Two LGTMs from experienced reviewers.
+Either the [on call](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Kubernetes-on-call-rotation) manually or the [submit queue](https://github.com/contrib/tree/master/submit-queue) automatically will manage merging PRs.
 
-Once those requirements are met, they will be labeled [ok-to-merge](https://github.com/GoogleCloudPlatform/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Aopen+is%3Apr+label%3Aok-to-merge) and can be merged.
+There are several requirements for the submit queue to work:
+* Author must have signed CLA ("cla: yes" label added to PR)
+* No changes can be made since last lgtm label was applied
+* k8s-bot must have reported the GCE E2E build and test steps passed (Travis, Shippable and Jenkins build)
 
-These restrictions will be relaxed after v1.0 is released.
+Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/contrib/tree/master/submit-queue/whitelist.txt).
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

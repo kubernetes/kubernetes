@@ -18,6 +18,12 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
+# this mimics the behavior of linux realpath which is not shipped by default with
+# mac OS X 
+kube::util::realpath() {
+  [[ $1 = /* ]] && echo "$1" | sed 's/\/$//' || echo "$PWD/${1#./}"  | sed 's/\/$//'
+}
+
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
@@ -48,7 +54,7 @@ kube::util::wait_for_url() {
 #   KUBE_TEMP
 kube::util::ensure-temp-dir() {
   if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    KUBE_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t kubernetes.XXXXXX)
   fi
 }
 
@@ -123,8 +129,10 @@ kube::util::wait-for-jobs() {
 # that match $3, copy is skipped.
 kube::util::gen-doc() {
   local cmd="$1"
-  local dest="$2"
-  local skipprefix="${3:-}"
+  local base_dest="$(kube::util::realpath $2)"
+  local relative_doc_dest="$(echo $3 | sed 's/\/$//')"
+  local dest="${base_dest}/${relative_doc_dest}"
+  local skipprefix="${4:-}"
 
   # We do this in a tmpdir in case the dest has other non-autogenned files
   # We don't want to include them in the list of gen'd files
@@ -136,19 +144,24 @@ kube::util::gen-doc() {
   ls "${tmpdir}" | LC_ALL=C sort > "${tmpdir}/.files_generated"
 
   while read file; do
-    # Add analytics link to generated .md files
-    if [[ "${file}" == *.md ]]; then
-      local link path
-      path=$(basename "$dest")/${file}
-      link=$(kube::util::analytics-link "${path}")
-      echo -e "\n${link}" >> "${tmpdir}/${file}"
-    fi
-    # remove all old generated files from the destination
-    if [[ -e "${tmpdir}/${file}" && -n "${skipprefix}" ]]; then
+    # Don't add analytics link to generated .md files -- that is done (and
+    # checked) by mungedocs.
+
+    # Remove all old generated files from the destination
+    if [[ -e "${tmpdir}/${file}" ]]; then
       local original generated
-      original=$(grep -v "^${skipprefix}" "${dest}/${file}") || :
-      generated=$(grep -v "^${skipprefix}" "${tmpdir}/${file}") || :
-      if [[ "${original}" == "${generated}" ]]; then
+      # Filter all munges from original content.
+      original=$(cat "${dest}/${file}" | sed '/^<!-- BEGIN MUNGE:.*/,/^<!-- END MUNGE:.*/d')
+      generated=$(cat "${tmpdir}/${file}")
+      # If this function was asked to filter lines with a prefix, do so.
+      if [[ -n "${skipprefix}" ]]; then
+        original=$(echo "${original}" | grep -v "^${skipprefix}" || :)
+        generated=$(echo "${generated}" | grep -v "^${skipprefix}" || :)
+      fi
+      # By now, the contents should be normalized and stripped of any
+      # auto-managed content.  We also ignore whitespace here because of
+      # markdown strictness fixups later in the pipeline.
+      if diff -Bw <(echo "${original}") <(echo "${generated}") > /dev/null; then
         # actual contents same, overwrite generated with original.
         mv "${dest}/${file}" "${tmpdir}/${file}"
       fi
@@ -158,7 +171,11 @@ kube::util::gen-doc() {
   done <"${dest}/.files_generated"
 
   # put the new generated file into the destination
-  find "${tmpdir}" -exec rsync -pt {} "${dest}" \; >/dev/null
+  # the shopt is so that we get .files_generated from the glob.
+  shopt -s dotglob
+  cp -af "${tmpdir}"/* "${dest}"
+  shopt -u dotglob
+
   #cleanup
   rm -rf "${tmpdir}"
 }
@@ -184,7 +201,7 @@ kube::util::gen-analytics() {
               -not -path "${path}/Godeps/*" \
               -not -path "${path}/third_party/*" \
               -not -path "${path}/_output/*" \
-              -not -path "${path}/docs/kubectl*" ))
+              -not -path "${path}/docs/user-guide/kubectl/kubectl*" ))
   for f in "${mdfiles[@]}"; do
     link=$(kube::util::analytics-link "${f#${path}/}")
     if grep -q -F -x "${link}" "${f}"; then

@@ -18,12 +18,12 @@ limitations under the License.
 package defaults
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 )
 
 func init() {
@@ -32,6 +32,20 @@ func init() {
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
 	factory.RegisterPriorityFunction("EqualPriority", scheduler.EqualPriority, 1)
+
+	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
+	// the number of pods (belonging to the same service) on the same node.
+	// Register the factory so that it's available, but do not include it as part of the default priorities
+	// Largely replaced by "SelectorSpreadPriority", but registered for backward compatibility with 1.0
+	factory.RegisterPriorityConfigFactory(
+		"ServiceSpreadingPriority",
+		factory.PriorityConfigFactory{
+			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{})
+			},
+			Weight: 1,
+		},
+	)
 }
 
 func defaultPredicates() util.StringSet {
@@ -65,12 +79,12 @@ func defaultPriorities() util.StringSet {
 		factory.RegisterPriorityFunction("LeastRequestedPriority", priorities.LeastRequestedPriority, 1),
 		// Prioritizes nodes to help achieve balanced resource usage
 		factory.RegisterPriorityFunction("BalancedResourceAllocation", priorities.BalancedResourceAllocation, 1),
-		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
+		// spreads pods by minimizing the number of pods (belonging to the same service or replication controller) on the same node.
 		factory.RegisterPriorityConfigFactory(
-			"ServiceSpreadingPriority",
+			"SelectorSpreadPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewServiceSpreadPriority(args.ServiceLister)
+					return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister)
 				},
 				Weight: 1,
 			},

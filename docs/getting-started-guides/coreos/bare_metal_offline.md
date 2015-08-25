@@ -1,3 +1,35 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/coreos/bare_metal_offline.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Bare Metal CoreOS with Kubernetes (OFFLINE)
 ------------------------------------------
 Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
@@ -21,20 +53,23 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 
 ## Prerequisites
+
 1. Installed *CentOS 6* for PXE server
 2. At least two bare metal nodes to work with
 
 ## High Level Design
-1. Manage the tftp directory 
+
+1. Manage the tftp directory
   * /tftpboot/(coreos)(centos)(RHEL)
   * /tftpboot/pxelinux.0/(MAC) -> linked to Linux image config file
 2. Update per install the link for pxelinux
 3. Update the DHCP config to reflect the host needing deployment
-4. Setup nodes to deploy CoreOS creating a etcd cluster. 
-5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
+4. Setup nodes to deploy CoreOS creating a etcd cluster.
+5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/).
 6. Installing the CoreOS slaves to become Kubernetes nodes.
 
 ## This Guides variables
+
 | Node Description              | MAC               | IP          |
 | :---------------------------- | :---------------: | :---------: |
 | CoreOS/etcd/Kubernetes Master | d0:00:67:13:0d:00 | 10.20.30.40 |
@@ -43,13 +78,14 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 
 ## Setup PXELINUX CentOS
+
 To setup CentOS PXELINUX environment there is a complete [guide here](http://docs.fedoraproject.org/en-US/Fedora/7/html/Installation_Guide/ap-pxe-server.html). This section is the abbreviated version.
 
 1. Install packages needed on CentOS
 
         sudo yum install tftp-server dhcp syslinux
 
-2. ```vi /etc/xinetd.d/tftp``` to enable tftp service and change disable to 'no'
+2. `vi /etc/xinetd.d/tftp` to enable tftp service and change disable to 'no'
         disable = no
 
 3. Copy over the syslinux images we will need.
@@ -72,14 +108,14 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
         mkdir /tftpboot/pxelinux.cfg
         touch /tftpboot/pxelinux.cfg/default
 
-5. Edit the menu ```vi /tftpboot/pxelinux.cfg/default```
+5. Edit the menu `vi /tftpboot/pxelinux.cfg/default`
 
         default menu.c32
         prompt 0
         timeout 15
         ONTIMEOUT local
         display boot.msg
-        
+
         MENU TITLE Main Menu
 
         LABEL local
@@ -89,10 +125,11 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
 Now you should have a working PXELINUX setup to image CoreOS nodes. You can verify the services by using VirtualBox locally or with bare metal servers.
 
 ## Adding CoreOS to PXE
-This section describes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment. 
+
+This section describes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment.
 
 1. Find or create the TFTP root directory that everything will be based off of.
-    * For this document we will assume ```/tftpboot/``` is our root directory.
+    * For this document we will assume `/tftpboot/` is our root directory.
 2. Once we know and have our tftp root directory we will create a new directory structure for our CoreOS images.
 3. Download the CoreOS PXE files provided by the CoreOS team.
 
@@ -106,7 +143,7 @@ This section describes how to setup the CoreOS images to live alongside a pre-ex
         gpg --verify coreos_production_pxe.vmlinuz.sig
         gpg --verify coreos_production_pxe_image.cpio.gz.sig
 
-4. Edit the menu ```vi /tftpboot/pxelinux.cfg/default``` again
+4. Edit the menu `vi /tftpboot/pxelinux.cfg/default` again
 
         default menu.c32
         prompt 0
@@ -133,12 +170,13 @@ This section describes how to setup the CoreOS images to live alongside a pre-ex
                 APPEND initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<xxx.xxx.xxx.xxx>/pxe-cloud-config-slave.yml
         MENU END
 
-This configuration file will now boot from local drive but have the option to PXE image CoreOS. 
+This configuration file will now boot from local drive but have the option to PXE image CoreOS.
 
-## DHCP configuration 
+## DHCP configuration
+
 This section covers configuring the DHCP server to hand out our new images. In this case we are assuming that there are other servers that will boot alongside other images.
 
-1. Add the ```filename``` to the _host_ or _subnet_ sections.
+1. Add the `filename` to the _host_ or _subnet_ sections.
 
         filename "/tftpboot/pxelinux.0";
 
@@ -148,7 +186,7 @@ This section covers configuring the DHCP server to hand out our new images. In t
                 next-server 10.20.30.242;
                 option broadcast-address 10.20.30.255;
                 filename "<other default image>";
-        
+
                 ...
                 # http://www.syslinux.org/wiki/index.php/PXELINUX
                 host core_os_master {
@@ -156,7 +194,7 @@ This section covers configuring the DHCP server to hand out our new images. In t
                         option routers 10.20.30.1;
                         fixed-address 10.20.30.40;
                         option domain-name-servers 10.20.30.242;
-                        filename "/pxelinux.0";        
+                        filename "/pxelinux.0";
                 }
                 host core_os_slave {
                         hardware ethernet d0:00:67:13:0d:01;
@@ -178,17 +216,18 @@ This section covers configuring the DHCP server to hand out our new images. In t
 We will be specifying the node configuration later in the guide.
 
 ## Kubernetes
-To deploy our configuration we need to create an ```etcd``` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
+
+To deploy our configuration we need to create an `etcd` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here.
 1. Is to template the cloud config file and programmatically create new static configs for different cluster setups.
 2. Have a service discovery protocol running in our stack to do auto discovery.
 
-This demo we just make a static single ```etcd``` server to host our Kubernetes and ```etcd``` master servers.
+This demo we just make a static single `etcd` server to host our Kubernetes and `etcd` master servers.
 
 Since we are OFFLINE here most of the helping processes in CoreOS and Kubernetes are then limited. To do our setup we will then have to download and serve up our binaries for Kubernetes in our local environment.
 
 An easy solution is to host a small web server on the DHCP/TFTP host for all our binaries to make them available to the local CoreOS PXE machines.
 
-To get this up and running we are going to setup a simple ```apache``` server to serve our binaries needed to bootstrap Kubernetes.
+To get this up and running we are going to setup a simple `apache` server to serve our binaries needed to bootstrap Kubernetes.
 
 This is on the PXE server from the previous section:
 
@@ -211,6 +250,7 @@ This sets up our binaries we need to run Kubernetes. This would need to be enhan
 Now for the good stuff!
 
 ## Cloud Configs
+
 The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
 
 These are based on the work found here: [master.yml](cloud-configs/master.yaml), [node.yml](cloud-configs/node.yaml)
@@ -218,13 +258,14 @@ These are based on the work found here: [master.yml](cloud-configs/master.yaml),
 To make the setup work, you need to replace a few placeholders:
 
  - Replace `<PXE_SERVER_IP>` with your PXE server ip address (e.g. 10.20.30.242)
- - Replace `<MASTER_SERVER_IP>` with the kubernetes master ip address (e.g. 10.20.30.40)
+ - Replace `<MASTER_SERVER_IP>` with the Kubernetes master ip address (e.g. 10.20.30.40)
  - If you run a private docker registry, replace `rdocker.example.com` with your docker registry dns name.
  - If you use a proxy, replace `rproxy.example.com` with your proxy server (and port)
  - Add your own SSH public key(s) to the cloud config at the end
 
 ### master.yml
-On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-master.yml```.
+
+On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cloud-config-master.yml`.
 
 
     #cloud-config
@@ -382,11 +423,11 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             --address=0.0.0.0 \
             --port=8080 \
             --service-cluster-ip-range=10.100.0.0/16 \
-            --etcd_servers=http://127.0.0.1:4001 \
+            --etcd-servers=http://127.0.0.1:4001 \
             --logtostderr=true
             Restart=always
             RestartSec=10
-        - name: kube-controller-manager.service 
+        - name: kube-controller-manager.service
           command: start
           content: |
             [Unit]
@@ -444,7 +485,8 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
 
 
 ### node.yml
-On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-slave.yml```.
+
+On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cloud-config-slave.yml`.
 
     #cloud-config
     ---
@@ -493,7 +535,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
           command: start
           content: |
             [Unit]
-            After=network-online.target 
+            After=network-online.target
             Wants=network-online.target
             Description=flannel is an etcd backed overlay network for containers
             [Service]
@@ -544,7 +586,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-proxy
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
             ExecStart=/opt/bin/kube-proxy \
-            --etcd_servers=http://<MASTER_SERVER_IP>:4001 \
+            --etcd-servers=http://<MASTER_SERVER_IP>:4001 \
             --logtostderr=true
             Restart=always
             RestartSec=10
@@ -563,10 +605,10 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             ExecStart=/opt/bin/kubelet \
             --address=0.0.0.0 \
             --port=10250 \
-            --hostname_override=${DEFAULT_IPV4} \
-            --api_servers=<MASTER_SERVER_IP>:8080 \
-            --healthz_bind_address=0.0.0.0 \
-            --healthz_port=10248 \
+            --hostname-override=${DEFAULT_IPV4} \
+            --api-servers=<MASTER_SERVER_IP>:8080 \
+            --healthz-bind-address=0.0.0.0 \
+            --healthz-port=10248 \
             --logtostderr=true
             Restart=always
             RestartSec=10
@@ -578,7 +620,8 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
 
 
 ## New pxelinux.cfg file
-Create a pxelinux target file for a _slave_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-slave```
+
+Create a pxelinux target file for a _slave_ node: `vi /tftpboot/pxelinux.cfg/coreos-node-slave`
 
     default coreos
     prompt 1
@@ -591,7 +634,7 @@ Create a pxelinux target file for a _slave_ node: ```vi /tftpboot/pxelinux.cfg/c
       kernel images/coreos/coreos_production_pxe.vmlinuz
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-slave.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
-And one for the _master_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-master```
+And one for the _master_ node: `vi /tftpboot/pxelinux.cfg/coreos-node-master`
 
     default coreos
     prompt 1
@@ -605,6 +648,7 @@ And one for the _master_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-master``
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-master.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
 ## Specify the pxelinux targets
+
 Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets. We will do this by using the pxelinux mechanism of setting a specific MAC addresses to a specific pxelinux.cfg file.
 
 Refer to the MAC address table in the beginning of this guide. Documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
@@ -618,9 +662,10 @@ Refer to the MAC address table in the beginning of this guide. Documentation for
 Reboot these servers to get the images PXEd and ready for running containers!
 
 ## Creating test pod
+
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
@@ -634,14 +679,14 @@ List fleet machines
 
     fleetctl list-machines
 
-Check system status of services on master node:
+Check system status of services on master:
 
     systemctl status kube-apiserver
     systemctl status kube-controller-manager
     systemctl status kube-scheduler
     systemctl status kube-register
 
-Check system status of services on a minion node:
+Check system status of services on a node:
 
     systemctl status kube-kubelet
     systemctl status docker.service
@@ -657,4 +702,6 @@ Kill all pods:
     for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_offline.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

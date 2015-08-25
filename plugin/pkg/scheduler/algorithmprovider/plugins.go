@@ -18,5 +18,5 @@ limitations under the License.
 package algorithmprovider
 
 import (
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults"
+	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults"
 )

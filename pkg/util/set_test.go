@@ -129,3 +129,57 @@ func TestStringSetHasAny(t *testing.T) {
 		t.Errorf("expected false, got true")
 	}
 }
+
+func TestStringSetEquals(t *testing.T) {
+	// Simple case (order doesn't matter)
+	a := NewStringSet("1", "2")
+	b := NewStringSet("2", "1")
+	if !a.Equal(b) {
+		t.Errorf("Expected to be equal: %v vs %v", a, b)
+	}
+
+	// It is a set; duplicates are ignored
+	b = NewStringSet("2", "2", "1")
+	if !a.Equal(b) {
+		t.Errorf("Expected to be equal: %v vs %v", a, b)
+	}
+
+	// Edge cases around empty sets / empty strings
+	a = NewStringSet()
+	b = NewStringSet()
+	if !a.Equal(b) {
+		t.Errorf("Expected to be equal: %v vs %v", a, b)
+	}
+
+	b = NewStringSet("1", "2", "3")
+	if a.Equal(b) {
+		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
+	}
+
+	b = NewStringSet("1", "2", "")
+	if a.Equal(b) {
+		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
+	}
+
+	// Check for equality after mutation
+	a = NewStringSet()
+	a.Insert("1")
+	if a.Equal(b) {
+		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
+	}
+
+	a.Insert("2")
+	if a.Equal(b) {
+		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
+	}
+
+	a.Insert("")
+	if !a.Equal(b) {
+		t.Errorf("Expected to be equal: %v vs %v", a, b)
+	}
+
+	a.Delete("")
+	if a.Equal(b) {
+		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
+	}
+}

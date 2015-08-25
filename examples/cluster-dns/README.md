@@ -1,28 +1,61 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/examples/cluster-dns/README.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Kubernetes DNS example
 
 This is a toy example demonstrating how to use kubernetes DNS.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns).
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](../../cluster/addons/dns/).
 
-```shell
+```sh
 $ cd kubernetes
 $ hack/dev-build-and-up.sh
 ```
 
 ### Step One: Create two namespaces
 
-We'll see how cluster DNS works across multiple [namespaces](../../docs/namespaces.md), first we need to create two namespaces:
+We'll see how cluster DNS works across multiple [namespaces](../../docs/user-guide/namespaces.md), first we need to create two namespaces:
 
-```shell
+```sh
 $ kubectl create -f examples/cluster-dns/namespace-dev.yaml
 $ kubectl create -f examples/cluster-dns/namespace-prod.yaml
 ```
 
 Now list all namespaces:
 
-```shell
+```sh
 $ kubectl get namespaces
 NAME          LABELS             STATUS
 default       <none>             Active
@@ -32,7 +65,7 @@ production    name=production    Active
 
 For kubectl client to work with each namespace, we define two contexts:
 
-```shell
+```sh
 $ kubectl config set-context dev --namespace=development --cluster=${CLUSTER_NAME} --user=${USER_NAME}
 $ kubectl config set-context prod --namespace=production --cluster=${CLUSTER_NAME} --user=${USER_NAME}
 ```
@@ -41,16 +74,16 @@ You can view your cluster name and user name in kubernetes config at ~/.kube/con
 
 ### Step Two: Create backend replication controller in each namespace
 
-Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](../../docs/replication-controller.md) in each namespace.
+Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](../../docs/user-guide/replication-controller.md) in each namespace.
 
-```shell
+```sh
 $ kubectl config use-context dev
 $ kubectl create -f examples/cluster-dns/dns-backend-rc.yaml
 ```
 
 Once that's up you can list the pod in the cluster:
 
-```shell
+```sh
 $ kubectl get rc
 CONTROLLER    CONTAINER(S)   IMAGE(S)              SELECTOR           REPLICAS
 dns-backend   dns-backend    ddysher/dns-backend   name=dns-backend   1
@@ -58,7 +91,7 @@ dns-backend   dns-backend    ddysher/dns-backend   name=dns-backend   1
 
 Now repeat the above commands to create a replication controller in prod namespace:
 
-```shell
+```sh
 $ kubectl config use-context prod
 $ kubectl create -f examples/cluster-dns/dns-backend-rc.yaml
 $ kubectl get rc
@@ -69,43 +102,43 @@ dns-backend   dns-backend    ddysher/dns-backend   name=dns-backend   1
 ### Step Three: Create backend service
 
 Use the file [`examples/cluster-dns/dns-backend-service.yaml`](dns-backend-service.yaml) to create
-a [service](../../docs/services.md) for the backend server.
+a [service](../../docs/user-guide/services.md) for the backend server.
 
-```shell
+```sh
 $ kubectl config use-context dev
 $ kubectl create -f examples/cluster-dns/dns-backend-service.yaml
 ```
 
 Once that's up you can list the service in the cluster:
 
-```shell
+```sh
 $ kubectl get service dns-backend
-NAME          LABELS    SELECTOR           IP(S)          PORT(S)
-dns-backend   <none>    name=dns-backend   10.0.236.129   8000/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR          AGE
+dns-backend  10.0.2.3         <none>            8000/TCP               name=dns-backend  1d
 ```
 
 Again, repeat the same process for prod namespace:
 
-```shell
+```sh
 $ kubectl config use-context prod
 $ kubectl create -f examples/cluster-dns/dns-backend-service.yaml
 $ kubectl get service dns-backend
-NAME          LABELS    SELECTOR           IP(S)         PORT(S)
-dns-backend   <none>    name=dns-backend   10.0.35.246   8000/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR          AGE
+dns-backend  10.0.2.4         <none>            8000/TCP               name=dns-backend  1d
 ```
 
 ### Step Four: Create client pod in one namespace
 
-Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
+Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/user-guide/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
 
-```shell
+```sh
 $ kubectl config use-context dev
 $ kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
 ```
 
 Once that's up you can list the pod in the cluster:
 
-```shell
+```sh
 $ kubectl get pods dns-frontend
 NAME           READY     STATUS       RESTARTS   AGE
 dns-frontend   0/1       ExitCode:0   0          1m
@@ -113,7 +146,7 @@ dns-frontend   0/1       ExitCode:0   0          1m
 
 Wait until the pod succeeds, then we can see the output from the client pod:
 
-```shell
+```sh
 $ kubectl logs dns-frontend
 2015-05-07T20:13:54.147664936Z 10.0.236.129
 2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.cluster.local:8000
@@ -121,11 +154,11 @@ $ kubectl logs dns-frontend
 2015-05-07T20:13:54.147738295Z Hello World!
 ```
 
-Please refer to the [source code](./images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
+Please refer to the [source code](images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
 
 If we switch to prod namespace with the same pod config, we'll see the same result, i.e. dns will resolve across namespace.
 
-```shell
+```sh
 $ kubectl config use-context prod
 $ kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
 $ kubectl logs dns-frontend
@@ -138,10 +171,11 @@ $ kubectl logs dns-frontend
 
 #### Note about default namespace
 
-If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.cluster.local:8000`, or shorthand version `http://dns-backend:8000`
+If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.svc.cluster.local:8000`, or shorthand version `http://dns-backend:8000`
 
 
 ### tl; dr;
+
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial. Remember to set first `$CLUSTER_NAME` and `$USER_NAME` to the values found in `~/.kube/config`.
 
 ```sh
@@ -176,4 +210,6 @@ kubectl logs dns-frontend
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cluster-dns/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

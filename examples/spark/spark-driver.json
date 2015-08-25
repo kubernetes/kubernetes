@@ -1,0 +1,23 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "spark-driver",
+    "labels": {
+      "name": "spark-driver"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "spark-driver",
+        "image": "gcr.io/google_containers/spark-driver:1.4.0_v1",
+        "resources": {
+          "limits": {
+            "cpu": "100m"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
-	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 )
 
 type fakeEtcdClient struct {
@@ -94,11 +94,7 @@ func newKube2Sky(ec etcdClient) *kube2sky {
 	}
 }
 
-func getEtcdOldStylePath(name, namespace string) string {
-	return path.Join(basePath, namespace, name)
-}
-
-func getEtcdNewStylePath(name, namespace string) string {
+func getEtcdPathForA(name, namespace string) string {
 	return path.Join(basePath, serviceSubDomain, namespace, name)
 }
 
@@ -125,18 +121,11 @@ func getHostPortFromString(data string) (*hostPort, error) {
 }
 
 func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *hostPort) {
-	oldStyleKey := getEtcdOldStylePath(serviceName, namespace)
-	values := ec.Get(oldStyleKey)
-	require.True(t, len(values) > 0, fmt.Sprintf("oldStyleKey '%s'  not found.", oldStyleKey))
-	actualHostPort, err := getHostPortFromString(values[0])
-	require.NoError(t, err)
-	assert.Equal(t, expectedHostPort.Host, actualHostPort.Host)
-
-	newStyleKey := getEtcdNewStylePath(serviceName, namespace)
-	values = ec.Get(newStyleKey)
+	key := getEtcdPathForA(serviceName, namespace)
+	values := ec.Get(key)
 	//require.True(t, exists)
-	require.True(t, len(values) > 0, "newStyleKey entry not found.")
-	actualHostPort, err = getHostPortFromString(values[0])
+	require.True(t, len(values) > 0, "entry not found.")
+	actualHostPort, err := getHostPortFromString(values[0])
 	require.NoError(t, err)
 	assert.Equal(t, expectedHostPort.Host, actualHostPort.Host)
 }
@@ -230,9 +219,8 @@ func TestHeadlessService(t *testing.T) {
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("", 8080, "10.0.0.3", "10.0.0.4"))
 
-	// We expect 4 records with "svc" subdomain and 4 records without
-	// "svc" subdomain.
-	expectedDNSRecords := 8
+	// We expect 4 records.
+	expectedDNSRecords := 4
 	assert.NoError(t, k2s.endpointsStore.Add(&endpoints))
 	k2s.newService(&service)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
@@ -251,9 +239,8 @@ func TestHeadlessServiceWithNamedPorts(t *testing.T) {
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithTwoPorts("http1", 80, "http2", 81, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("https", 443, "10.0.0.3", "10.0.0.4"))
 
-	// We expect 14 records. 6 SRV records. 4 POD entries with old style, 4 POD entries with new style
-	// "svc" subdomain.
-	expectedDNSRecords := 14
+	// We expect 10 records. 6 SRV records. 4 POD records.
+	expectedDNSRecords := 10
 	assert.NoError(t, k2s.endpointsStore.Add(&endpoints))
 	k2s.newService(&service)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
@@ -263,8 +250,8 @@ func TestHeadlessServiceWithNamedPorts(t *testing.T) {
 
 	endpoints.Subsets = endpoints.Subsets[:1]
 	k2s.handleEndpointAdd(&endpoints)
-	// We expect 8 records. 4 SRV records. 2 POD entries with old style, 2 POD entries with new style
-	expectedDNSRecords = 8
+	// We expect 6 records. 4 SRV records. 2 POD records.
+	expectedDNSRecords = 6
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
 	assertSRVEntryInEtcd(t, ec, "http1", "tcp", testService, testNamespace, 80, 2)
 	assertSRVEntryInEtcd(t, ec, "http2", "tcp", testService, testNamespace, 81, 2)
@@ -284,14 +271,14 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"))
 
-	expectedDNSRecords := 4
+	expectedDNSRecords := 2
 	assert.NoError(t, k2s.endpointsStore.Add(&endpoints))
 	k2s.newService(&service)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
 	endpoints.Subsets = append(endpoints.Subsets,
 		newSubsetWithOnePort("", 8080, "10.0.0.3", "10.0.0.4"),
 	)
-	expectedDNSRecords = 8
+	expectedDNSRecords = 4
 	k2s.handleEndpointAdd(&endpoints)
 
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
@@ -315,9 +302,8 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 
 	// Add an endpoints object for the service.
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("", 8080, "10.0.0.3", "10.0.0.4"))
-	// We expect 4 records with "svc" subdomain and 4 records without
-	// "svc" subdomain.
-	expectedDNSRecords := 8
+	// We expect 4 records.
+	expectedDNSRecords := 4
 	k2s.handleEndpointAdd(&endpoints)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
 }
@@ -347,7 +333,7 @@ func TestUpdateSinglePortService(t *testing.T) {
 	k2s := newKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
 	k2s.newService(&service)
-	assert.Len(t, ec.writes, 2)
+	assert.Len(t, ec.writes, 1)
 	newService := service
 	newService.Spec.ClusterIP = "0.0.0.0"
 	k2s.updateService(&service, &newService)
@@ -365,9 +351,7 @@ func TestDeleteSinglePortService(t *testing.T) {
 	service := newService(testNamespace, testService, "1.2.3.4", "", 80)
 	// Add the service
 	k2s.newService(&service)
-	// two entries should get created, one with the svc subdomain (new-style)
-	// , and one without the svc subdomain (old-style)
-	assert.Len(t, ec.writes, 2)
+	assert.Len(t, ec.writes, 1)
 	// Delete the service
 	k2s.removeService(&service)
 	assert.Empty(t, ec.writes)
@@ -387,7 +371,7 @@ func TestServiceWithNamePort(t *testing.T) {
 	expectedValue := getHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 	assertSRVEntryInEtcd(t, ec, "http1", "tcp", testService, testNamespace, 80, 1)
-	assert.Len(t, ec.writes, 3)
+	assert.Len(t, ec.writes, 2)
 
 	// update service
 	newService := service
@@ -396,7 +380,7 @@ func TestServiceWithNamePort(t *testing.T) {
 	expectedValue = getHostPort(&newService)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 	assertSRVEntryInEtcd(t, ec, "http2", "tcp", testService, testNamespace, 80, 1)
-	assert.Len(t, ec.writes, 3)
+	assert.Len(t, ec.writes, 2)
 
 	// Delete the service
 	k2s.removeService(&service)

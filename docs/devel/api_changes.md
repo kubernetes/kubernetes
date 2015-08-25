@@ -1,4 +1,44 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/devel/api_changes.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # So you want to change the API?
+
+Before attempting a change to the API, you should familiarize yourself
+with a number of existing API types and with the [API
+conventions](api-conventions.md).  If creating a new API
+type/resource, we also recommend that you first send a PR containing
+just a proposal for the new API types, and that you initially target
+the experimental API (pkg/expapi).
 
 The Kubernetes API has two major components - the internal structures and
 the versioned APIs.  The versioned APIs are intended to be stable, while the
@@ -59,9 +99,12 @@ backward-compatibly.
 Before talking about how to make API changes, it is worthwhile to clarify what
 we mean by API compatibility.  An API change is considered backward-compatible
 if it:
-   * adds new functionality that is not required for correct behavior
-   * does not change existing semantics
-   * does not change existing defaults
+   * adds new functionality that is not required for correct behavior (e.g.,
+     does not add a new required field)
+   * does not change existing semantics, including:
+     * default values and behavior
+     * interpretation of existing API types, fields, and values
+     * which fields are required and which are not
 
 Put another way:
 
@@ -71,11 +114,11 @@ Put another way:
    degrade behavior) when issued against servers that do not include your change.
 3. It must be possible to round-trip your change (convert to different API
    versions and back) with no loss of information.
+4. Existing clients need not be aware of your change in order for them to continue
+   to function as they did previously, even when your change is utilized
 
 If your change does not meet these criteria, it is not considered strictly
-compatible.  There are times when this might be OK, but mostly we want changes
-that meet this definition.  If you think you need to break compatibility, you
-should talk to the Kubernetes team first.
+compatible.
 
 Let's consider some examples.  In a hypothetical API (assume we're at version
 v6), the `Frobber` struct looks something like this:
@@ -146,14 +189,43 @@ API call might POST an object in API v7beta1 format, which uses the cleaner
 form (since v7beta1 is "beta").  When the user reads the object back in the
 v7beta1 API it would be unacceptable to have lost all but `Params[0]`.  This
 means that, even though it is ugly, a compatible change must be made to the v6
-API.
+API. However, this is very challenging to do correctly. It generally requires
+multiple representations of the same information in the same API resource, which
+need to be kept in sync in the event that either is changed. However, if
+the new representation is more expressive than the old, this breaks
+backward compatibility, since clients that only understood the old representation
+would not be aware of the new representation nor its semantics. Examples of
+proposals that have run into this challenge include [generalized label
+selectors](http://issues.k8s.io/341) and [pod-level security
+context](http://prs.k8s.io/12823).
 
 As another interesting example, enumerated values provide a unique challenge.
 Adding a new value to an enumerated set is *not* a compatible change.  Clients
 which assume they know how to handle all possible values of a given field will
 not be able to handle the new values.  However, removing value from an
 enumerated set *can* be a compatible change, if handled properly (treat the
-removed value as deprecated but allowed).
+removed value as deprecated but allowed). This is actually a special case of
+a new representation, discussed above.
+
+## Incompatible API changes
+
+There are times when this might be OK, but mostly we want changes that
+meet this definition.  If you think you need to break compatibility,
+you should talk to the Kubernetes team first.
+
+Breaking compatibility of a beta or stable API version, such as v1, is unacceptable.
+Compatibility for experimental or alpha APIs is not strictly required, but
+breaking compatibility should not be done lightly, as it disrupts all users of the
+feature. Experimental APIs may be removed. Alpha and beta API versions may be deprecated
+and eventually removed wholesale, as described in the [versioning document](../design/versioning.md).
+Document incompatible changes across API versions under the [conversion tips](../api.md).
+
+If your change is going to be backward incompatible or might be a breaking change for API
+consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
+the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
+the release notes for the next release by labeling the PR with the "release-note" github label.
+
+If you found that your change accidentally broke clients, it should be reverted.
 
 ## Changing versioned APIs
 
@@ -166,9 +238,12 @@ before starting "all the rest".
 ### Edit types.go
 
 The struct definitions for each API are in `pkg/api/<version>/types.go`.  Edit
-those files to reflect the change you want to make.  Note that all non-online
-fields in versioned APIs must have description tags - these are used to generate
+those files to reflect the change you want to make.  Note that all types and non-inline
+fields in versioned APIs must be preceded by descriptive comments - these are used to generate
 documentation.
+
+Optional fields should have the `,omitempty` json tag; fields are interpreted as being
+required otherwise.
 
 ### Edit defaults.go
 
@@ -177,7 +252,7 @@ need to add cases to `pkg/api/<version>/defaults.go`.  Of course, since you
 have added code, you have to add a test: `pkg/api/<version>/defaults_test.go`.
 
 Do use pointers to scalars when you need to distinguish between an unset value
-and an an automatic zero value.  For example,
+and an automatic zero value.  For example,
 `PodSpec.TerminationGracePeriodSeconds` is defined as `*int64` the go type
 definition.  A zero value means 0 seconds, and a nil value asks the system to
 pick a default.
@@ -194,6 +269,12 @@ should jump to that topic below.  In the very rare case that you are making an
 incompatible change you might or might not want to do this now, but you will
 have to do more later.  The files you want are
 `pkg/api/<version>/conversion.go` and `pkg/api/<version>/conversion_test.go`.
+
+Note that the conversion machinery doesn't generically handle conversion of values,
+such as various kinds of field references and API constants. [The client
+library](../../pkg/client/unversioned/request.go) has custom conversion code for
+field references. You also need to add a call to api.Scheme.AddFieldLabelConversionFunc
+with a mapping function that understands supported translations.
 
 ## Changing the internal structures
 
@@ -250,8 +331,9 @@ conversion functions when writing your conversion functions.
 Once all the necessary manually written conversions are added, you need to
 regenerate auto-generated ones. To regenerate them:
    - run
-```
-   $ hack/update-generated-conversions.sh
+
+```sh
+hack/update-generated-conversions.sh
 ```
 
 If running the above script is impossible due to compile errors, the easiest
@@ -275,7 +357,7 @@ a panic from the `serialization_test`.  If so, look at the diff it produces (or
 the backtrace in case of a panic) and figure out what you forgot.  Encode that
 into the fuzzer's custom fuzz functions.  Hint: if you added defaults for a field,
 that field will need to have a custom fuzz function that ensures that the field is
-fuzzed to a non-empty value. 
+fuzzed to a non-empty value.
 
 The fuzzer can be found in `pkg/api/testing/fuzzer.go`.
 
@@ -325,21 +407,17 @@ an example to illustrate your change.
 
 Make sure you update the swagger API spec by running:
 
-```shell
-$ hack/update-swagger-spec.sh
+```sh
+hack/update-swagger-spec.sh
 ```
 
 The API spec changes should be in a commit separate from your other changes.
-
-## Incompatible API changes
-If your change is going to be backward incompatible or might be a breaking change for API
-consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
-the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
-`CHANGELOG.md` for the next release.
 
 ## Adding new REST objects
 
 TODO(smarterclayton): write this.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

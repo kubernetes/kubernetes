@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 )
 
 type slowService struct {
@@ -69,7 +69,23 @@ func Test(t *testing.T) {
 	changes := make(chan bool, 1500)
 	done := make(chan struct{})
 	s := &slowService{t: t, changes: changes, done: done}
+
+	// change master to "notme" such that the initial m.Elect call inside Notify
+	// will trigger an obversable event. We will wait for it to make sure the
+	// Notify loop will see those master changes triggered by the go routine below.
+	m.ChangeMaster(Master("me"))
+	temporaryWatch := m.mux.Watch()
+	ch := temporaryWatch.ResultChan()
+
 	notifyDone := runtime.After(func() { Notify(m, "", "me", s, done) })
+
+	// wait for the event triggered by the initial m.Elect of Notify. Then drain
+	// the channel to not block anything.
+	<-ch
+	temporaryWatch.Stop()
+	for i := 0; i < len(ch); i += 1 { // go 1.3 and 1.4 compatible loop
+		<-ch
+	}
 
 	go func() {
 		defer close(done)
@@ -83,16 +99,8 @@ func Test(t *testing.T) {
 	<-notifyDone
 	close(changes)
 
-	changeList := []bool{}
-	for {
-		change, ok := <-changes
-		if !ok {
-			break
-		}
-		changeList = append(changeList, change)
-	}
-
-	if len(changeList) > 1000 {
-		t.Errorf("unexpected number of changes: %v", len(changeList))
+	changesNum := len(changes)
+	if changesNum > 1000 || changesNum == 0 {
+		t.Errorf("unexpected number of changes: %v", changesNum)
 	}
 }

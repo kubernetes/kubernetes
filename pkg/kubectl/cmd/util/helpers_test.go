@@ -22,17 +22,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
 func TestMerge(t *testing.T) {
+	grace := int64(30)
 	tests := []struct {
 		obj       runtime.Object
 		fragment  string
@@ -53,8 +55,9 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -121,8 +124,9 @@ func TestMerge(t *testing.T) {
 							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -273,11 +277,11 @@ func TestCheckInvalidErr(t *testing.T) {
 	}{
 		{
 			errors.NewInvalid("Invalid1", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single': details`,
+			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single', Details: details`,
 		},
 		{
 			errors.NewInvalid("Invalid2", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "multi1", "details"), fielderrors.NewFieldInvalid("Cause", "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1': details, Cause: invalid value 'multi2': details]`,
+			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1', Details: details, Cause: invalid value 'multi2', Details: details]`,
 		},
 		{
 			errors.NewInvalid("Invalid3", "invalidation", fielderrors.ValidationErrorList{}),
@@ -296,5 +300,27 @@ func TestCheckInvalidErr(t *testing.T) {
 		if errReturned != test.expected {
 			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
 		}
+	}
+}
+
+func TestDumpReaderToFile(t *testing.T) {
+	testString := "TEST STRING"
+	tempFile, err := ioutil.TempFile("", "hlpers_test_dump_")
+	if err != nil {
+		t.Errorf("unexpected error setting up a temporary file %v", err)
+	}
+	defer syscall.Unlink(tempFile.Name())
+	defer tempFile.Close()
+	err = DumpReaderToFile(strings.NewReader(testString), tempFile.Name())
+	if err != nil {
+		t.Errorf("error in DumpReaderToFile: %v", err)
+	}
+	data, err := ioutil.ReadFile(tempFile.Name())
+	if err != nil {
+		t.Errorf("error when reading %s: %v", tempFile.Name(), err)
+	}
+	stringData := string(data)
+	if stringData != testString {
+		t.Fatalf("Wrong file content %s != %s", testString, stringData)
 	}
 }

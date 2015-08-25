@@ -17,28 +17,27 @@ limitations under the License.
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+const tocMungeTag = "GENERATED_TOC"
+
+var r = regexp.MustCompile("[^A-Za-z0-9-]")
 
 // inserts/updates a table of contents in markdown file.
 //
 // First, builds a ToC.
-// Then, finds <!-- BEGIN GENERATED TOC --> and <!-- END GENERATED TOC -->, and replaces anything between those with
+// Then, finds the magic macro block tags and replaces anything between those with
 // the ToC, thereby updating any previously inserted ToC.
 //
 // TODO(erictune): put this in own package with tests
-func updateTOC(filePath string, markdown []byte) ([]byte, error) {
-	toc, err := buildTOC(markdown)
+func updateTOC(filePath string, mlines mungeLines) (mungeLines, error) {
+	toc := buildTOC(mlines)
+	updatedMarkdown, err := updateMacroBlock(mlines, tocMungeTag, toc)
 	if err != nil {
-		return nil, err
-	}
-	lines := splitLines(markdown)
-	updatedMarkdown, err := updateMacroBlock(lines, "<!-- BEGIN GENERATED TOC -->", "<!-- END GENERATED TOC -->", string(toc))
-	if err != nil {
-		return nil, err
+		return mlines, err
 	}
 	return updatedMarkdown, nil
 }
@@ -49,24 +48,35 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 // and builds a table of contents from those.  Assumes bookmarks for those will be
 // like #each-word-in-heading-in-lowercases-with-dashes-instead-of-spaces.
 // builds the ToC.
-func buildTOC(markdown []byte) ([]byte, error) {
-	var buffer bytes.Buffer
-	scanner := bufio.NewScanner(bytes.NewReader(markdown))
-	for scanner.Scan() {
-		line := scanner.Text()
+
+func buildTOC(mlines mungeLines) mungeLines {
+	var out mungeLines
+
+	for _, mline := range mlines {
+		if mline.preformatted || !mline.header {
+			continue
+		}
+		// Add a blank line after the munge start tag
+		if len(out) == 0 {
+			out = append(out, blankMungeLine)
+		}
+		line := mline.data
 		noSharps := strings.TrimLeft(line, "#")
 		numSharps := len(line) - len(noSharps)
 		heading := strings.Trim(noSharps, " \n")
 		if numSharps > 0 {
 			indent := strings.Repeat("  ", numSharps-1)
 			bookmark := strings.Replace(strings.ToLower(heading), " ", "-", -1)
-			tocLine := fmt.Sprintf("%s- [%s](#%s)\n", indent, heading, bookmark)
-			buffer.WriteString(tocLine)
+			// remove symbols (except for -) in bookmarks
+			bookmark = r.ReplaceAllString(bookmark, "")
+			tocLine := fmt.Sprintf("%s- [%s](#%s)", indent, heading, bookmark)
+			out = append(out, newMungeLine(tocLine))
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return []byte{}, err
-	}
 
-	return buffer.Bytes(), nil
+	}
+	// Add a blank line before the munge end tag
+	if len(out) != 0 {
+		out = append(out, blankMungeLine)
+	}
+	return out
 }

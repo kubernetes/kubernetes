@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/security.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Security in Kubernetes
 
 Kubernetes should define a reasonable set of security best practices that allows processes to be isolated from each other, from the cluster infrastructure, and which preserves important boundaries between those who manage the cluster, and those who use the cluster.
@@ -18,21 +51,21 @@ While Kubernetes today is not primarily a multi-tenant system, the long term evo
 
 ## Use cases
 
-### Roles:
+### Roles
 
 We define "user" as a unique identity accessing the Kubernetes API server, which may be a human or an automated process.  Human users fall into the following categories:
 
-1. k8s admin - administers a kubernetes cluster and has access to the underlying components of the system
+1. k8s admin - administers a Kubernetes cluster and has access to the underlying components of the system
 2. k8s project administrator - administrates the security of a small subset of the cluster
-3. k8s developer - launches pods on a kubernetes cluster and consumes cluster resources
+3. k8s developer - launches pods on a Kubernetes cluster and consumes cluster resources
 
 Automated process users fall into the following categories:
 
 1. k8s container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources independent of the human users attached to a project
-2. k8s infrastructure user - the user that kubernetes infrastructure components use to perform cluster functions with clearly defined roles
+2. k8s infrastructure user - the user that Kubernetes infrastructure components use to perform cluster functions with clearly defined roles
 
 
-### Description of roles:
+### Description of roles
 
 * Developers:
   * write pod specs.
@@ -78,7 +111,7 @@ A pod runs in a *security context* under a *service account* that is defined by 
    5.  Developers should be able to run their own images or images from the community and expect those images to run correctly
    6.  Developers may need to ensure their images work within higher security requirements specified by administrators
    7.  When available, Linux kernel user namespaces can be used to ensure 5.2 and 5.4 are met.
-   8.  When application developers want to share filesytem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
+   8.  When application developers want to share filesystem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
 6. Developers should be able to define [secrets](secrets.md) that are automatically added to the containers when pods are run
    1.  Secrets are files injected into the container whose values should not be displayed within a pod. Examples:
        1. An SSH private key for git cloning remote data
@@ -94,11 +127,11 @@ A pod runs in a *security context* under a *service account* that is defined by 
 ### Related design discussion
 
 * [Authorization and authentication](access.md)
-* [Secret distribution via files](https://github.com/GoogleCloudPlatform/kubernetes/pull/2030)
+* [Secret distribution via files](http://pr.k8s.io/2030)
 * [Docker secrets](https://github.com/docker/docker/pull/6697)
 * [Docker vault](https://github.com/docker/docker/issues/10310)
 * [Service Accounts:](service_accounts.md)
-* [Secret volumes](https://github.com/GoogleCloudPlatform/kubernetes/pull/4126)
+* [Secret volumes](http://pr.k8s.io/4126)
 
 ## Specific Design Points
 
@@ -117,4 +150,6 @@ The controller manager for Replication Controllers and other future controllers 
 The Kubernetes pod scheduler is responsible for reading data from the pod to fit it onto a node in the cluster.  At a minimum, it needs access to view the ID of a pod (to craft the binding), its current state, any resource information necessary to identify placement, and other data relevant to concerns like anti-affinity, zone or region preference, or custom logic.  It does not need the ability to modify pods or see other resources, only to create bindings.  It should not need the ability to delete bindings unless the scheduler takes control of relocating components on failed hosts (which could be implemented by a separate component that can delete bindings but not create them).  The scheduler may need read access to user or project-container information to determine preferential location (underspecified at this time).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/security.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

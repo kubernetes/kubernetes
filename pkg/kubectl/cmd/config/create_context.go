@@ -23,9 +23,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type createContextOptions struct {
@@ -39,7 +39,7 @@ type createContextOptions struct {
 const (
 	create_context_long = `Sets a context entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values for those fields.`
-	create_context_example = `// Set the user field on the gce context entry without touching other values
+	create_context_example = `# Set the user field on the gce context entry without touching other values
 $ kubectl config set-context gce --user=cluster-admin`
 )
 
@@ -81,10 +81,14 @@ func (o createContextOptions) run() error {
 		return err
 	}
 
-	context := o.modifyContext(config.Contexts[o.name])
-	config.Contexts[o.name] = context
+	startingStanza, exists := config.Contexts[o.name]
+	if !exists {
+		startingStanza = clientcmdapi.NewContext()
+	}
+	context := o.modifyContext(*startingStanza)
+	config.Contexts[o.name] = &context
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 

@@ -20,11 +20,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -91,7 +91,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubelet.PodUpdate, expected ...kube
 	for i := range expected {
 		update := <-ch
 		sort.Sort(sortedPods(update.Pods))
-		// Clear the annotation field before the comparision.
+		// Clear the annotation field before the comparison.
 		// TODO: consider mock out recordFirstSeen in config.go
 		for _, pod := range update.Pods {
 			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)

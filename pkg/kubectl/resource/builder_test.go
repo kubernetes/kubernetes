@@ -28,16 +28,16 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/watch"
+	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -83,6 +83,7 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 }
 
 func testData() (*api.PodList, *api.ServiceList) {
+	grace := int64(30)
 	pods := &api.PodList{
 		ListMeta: api.ListMeta{
 			ResourceVersion: "15",
@@ -91,15 +92,17 @@ func testData() (*api.PodList, *api.ServiceList) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -111,6 +114,10 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					Type:            "ClusterIP",
+					SessionAffinity: "None",
+				},
 			},
 		},
 	}
@@ -162,7 +169,10 @@ type testVisitor struct {
 	Infos     []*Info
 }
 
-func (v *testVisitor) Handle(info *Info) error {
+func (v *testVisitor) Handle(info *Info, err error) error {
+	if err != nil {
+		return err
+	}
 	v.Infos = append(v.Infos, info)
 	return v.InjectErr
 }
@@ -228,7 +238,7 @@ func TestNodeBuilder(t *testing.T) {
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
-		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, "../../../examples/pod").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -239,8 +249,12 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
-	info := test.Infos[1]
-	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
+	info := test.Infos[0]
+	if _, ok := info.Object.(*api.ReplicationController); !ok || info.Name != "redis-master" || info.Namespace != "test" {
+		t.Errorf("unexpected info: %#v", info)
+	}
+	info = test.Infos[1]
+	if _, ok := info.Object.(*api.Pod); !ok || info.Name != "nginx" || info.Namespace != "test" {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -364,7 +378,7 @@ func TestResourceByName(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
-		t.Errorf("unexpected object: %#v", test.Objects())
+		t.Errorf("unexpected object: %#v", test.Objects()[0])
 	}
 
 	mapping, err := b.Do().ResourceMapping()
@@ -373,6 +387,66 @@ func TestResourceByName(t *testing.T) {
 	}
 	if mapping.Resource != "pods" {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
+	}
+}
+
+func TestMultipleResourceByTheSameName(t *testing.T) {
+	pods, svcs := testData()
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/pods/baz":     runtime.EncodeOrDie(latest.Codec, &pods.Items[1]),
+		"/namespaces/test/services/foo": runtime.EncodeOrDie(latest.Codec, &svcs.Items[0]),
+		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, &svcs.Items[0]),
+	})).
+		NamespaceParam("test")
+
+	test := &testVisitor{}
+	singular := false
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceTypeOrNameArgs(true, "pods,services", "foo", "baz")
+
+	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
+	if err != nil || singular || len(test.Infos) != 4 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	}
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svcs.Items[0], &svcs.Items[0]}, test.Objects()) {
+		t.Errorf("unexpected visited objects: %#v", test.Objects())
+	}
+
+	if _, err := b.Do().ResourceMapping(); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestResourceNames(t *testing.T) {
+	pods, svc := testData()
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, &svc.Items[0]),
+	})).
+		NamespaceParam("test")
+
+	test := &testVisitor{}
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceNames("pods", "foo", "services/baz")
+
+	err := b.Do().Visit(test.Handle)
+	if err != nil || len(test.Infos) != 2 {
+		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+	}
+	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
+		t.Errorf("unexpected object: \n%#v, expected: \n%#v", test.Objects()[0], &pods.Items[0])
+	}
+	if !reflect.DeepEqual(&svc.Items[0], test.Objects()[1]) {
+		t.Errorf("unexpected object: \n%#v, expected: \n%#v", test.Objects()[1], &svc.Items[0])
 	}
 }
 
@@ -645,7 +719,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 		Do()
 	count := 0
 	testErr := fmt.Errorf("test error")
-	err := req.Visit(func(_ *Info) error {
+	err := req.Visit(func(_ *Info, _ error) error {
 		count++
 		if count > 1 {
 			return testErr
@@ -684,6 +758,26 @@ func TestSingularObject(t *testing.T) {
 	}
 	if rc.Name != "redis-master" || rc.Namespace != "test" {
 		t.Errorf("unexpected controller: %#v", rc)
+	}
+}
+
+func TestSingularObjectNoExtension(t *testing.T) {
+	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").DefaultNamespace().
+		FilenameParam(false, "../../../examples/pod").
+		Flatten().
+		Do().Object()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	if pod.Name != "nginx" || pod.Namespace != "test" {
+		t.Errorf("unexpected pod: %#v", pod)
 	}
 }
 
@@ -848,40 +942,6 @@ func TestLatest(t *testing.T) {
 	}
 }
 
-func TestIgnoreStreamErrors(t *testing.T) {
-	pods, svc := testData()
-
-	r, w := io.Pipe()
-	go func() {
-		defer w.Close()
-		w.Write([]byte(`{}`))
-		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, &pods.Items[0])))
-	}()
-
-	r2, w2 := io.Pipe()
-	go func() {
-		defer w2.Close()
-		w2.Write([]byte(`{}`))
-		w2.Write([]byte(runtime.EncodeOrDie(latest.Codec, &svc.Items[0])))
-	}()
-
-	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		ContinueOnError(). // TODO: order seems bad, but allows clients to determine what they want...
-		Stream(r, "1").Stream(r2, "2")
-
-	test := &testVisitor{}
-	singular := false
-
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) != 2 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
-	}
-
-	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &svc.Items[0]}, test.Objects()) {
-		t.Errorf("unexpected visited objects: %#v", test.Objects())
-	}
-}
-
 func TestReceiveMultipleErrors(t *testing.T) {
 	pods, svc := testData()
 
@@ -907,7 +967,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 	singular := false
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err == nil || singular || len(test.Infos) != 0 {
+	if err == nil || singular || len(test.Infos) != 2 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
@@ -923,32 +983,32 @@ func TestReceiveMultipleErrors(t *testing.T) {
 func TestReplaceAliases(t *testing.T) {
 	tests := []struct {
 		name     string
-		args     []string
-		expected []string
+		arg      string
+		expected string
 	}{
 		{
 			name:     "no-replacement",
-			args:     []string{"service", "pods", "rc"},
-			expected: []string{"service", "pods", "rc"},
+			arg:      "service",
+			expected: "service",
 		},
 		{
 			name:     "all-replacement",
-			args:     []string{"all"},
-			expected: []string{"rc,svc,pods,pvc"},
+			arg:      "all",
+			expected: "rc,svc,pods,pvc",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "rc,svc,pods,pvc,secrets",
 		},
 	}
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient())
 
 	for _, test := range tests {
-		replaced := b.replaceAliases(test.args)
-		if len(replaced) != len(test.expected) {
-			t.Errorf("%s: unexpected args length: expected %d, got %d", test.name, len(test.expected), len(replaced))
-		}
-		for i, arg := range test.expected {
-			if arg != replaced[i] {
-				t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, arg, replaced[i])
-			}
+		replaced := b.replaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

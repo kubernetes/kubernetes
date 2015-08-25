@@ -28,12 +28,23 @@ cd "${KUBE_ROOT}"
 declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
 declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
 
-if [[ "$#" -ne 2 ]]; then
-  echo "${0} <pr-number> <remote branch>: cherry pick <pr> onto <remote branch> and leave instructions for proposing pull request"
+if [[ -z ${GITHUB_USER:-} ]]; then
+  echo "Please export GITHUB_USER=<your-user>"
+  exit 1
+fi
+
+if ! which hub > /dev/null; then
+  echo "Can't find 'hub' tool in PATH, please install from https://github.com/github/hub"
+  exit 1
+fi
+
+if [[ "$#" -lt 2 ]]; then
+  echo "${0} <remote branch> <pr-number>...: cherry pick one or more <pr> onto <remote branch> and leave instructions for proposing pull request"
   echo ""
-  echo "  Checks out <remote branch> and handles the cherry-pick of <pr> for you."
-  echo "  Example:"
-  echo "    $0 12345 upstream/release-3.14"
+  echo "  Checks out <remote branch> and handles the cherry-pick of <pr> (possibly multiple) for you."
+  echo "  Examples:"
+  echo "    $0 upstream/release-3.14 12345        # Cherry-picks PR 12345 onto upstream/release-3.14 and proposes that as a PR."
+  echo "    $0 upstream/release-3.14 12345 56789  # Cherry-picks PR 12345, then 56789 and proposes the combination as a single PR."
   exit 2
 fi
 
@@ -47,8 +58,14 @@ if [[ -e "${REBASEMAGIC}" ]]; then
   exit 1
 fi
 
-declare -r PULL="${1}"
-declare -r BRANCH="${2}"
+declare -r BRANCH="$1"
+shift 1
+declare -r PULLS=( "$@" )
+
+function join { local IFS="$1"; shift; echo "$*"; }
+declare -r PULLDASH=$(join - "${PULLS[@]/#/#}") # Generates something like "#12345-#56789"
+declare -r PULLSUBJ=$(join " " "${PULLS[@]/#/#}") # Generates something like "#12345 #56789"
+
 echo "+++ Updating remotes..."
 git remote update
 
@@ -58,11 +75,8 @@ if ! git log -n1 --format=%H "${BRANCH}" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "+++ Downloading patch to /tmp/${PULL}.patch (in case you need to do this again)"
-
-curl -o "/tmp/${PULL}.patch" -sSL "https://github.com/GoogleCloudPlatform/kubernetes/pull/${PULL}.patch"
-
-declare -r NEWBRANCH="$(echo automated-cherry-pick-of-#${PULL}-on-${BRANCH} | sed 's/\//-/g')"
+declare -r NEWBRANCHREQ="automated-cherry-pick-of-${PULLDASH}" # "Required" portion for tools.
+declare -r NEWBRANCH="$(echo ${NEWBRANCHREQ}-${BRANCH} | sed 's/\//-/g')"
 declare -r NEWBRANCHUNIQ="${NEWBRANCH}-$(date +%s)"
 echo "+++ Creating local branch ${NEWBRANCHUNIQ}"
 
@@ -84,46 +98,62 @@ trap return_to_kansas EXIT
 git checkout -b "${NEWBRANCHUNIQ}" "${BRANCH}"
 cleanbranch="${NEWBRANCHUNIQ}"
 
-echo
-echo "+++ About to attempt cherry pick of PR. To reattempt:"
-echo "  $ git am -3 /tmp/${PULL}.patch"
-echo
 gitamcleanup=true
-git am -3 "/tmp/${PULL}.patch" || {
-  conflicts=false
-  while unmerged=$(git status --porcelain | grep ^U) && [[ -n ${unmerged} ]] \
-    || [[ -e "${REBASEMAGIC}" ]]; do
-    conflicts=true # <-- We should have detected conflicts once
-    echo
-    echo "+++ Conflicts detected:"
-    echo
-    (git status --porcelain | grep ^U) || echo "!!! None. Did you git am --continue?"
-    echo
-    echo "+++ Please resolve the conflicts in another window (and remember to 'git add / git am --continue')"
-    read -p "+++ Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " -r
-    echo
-    if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
-      echo "Aborting." >&2
+for pull in "${PULLS[@]}"; do
+  echo "+++ Downloading patch to /tmp/${pull}.patch (in case you need to do this again)"
+  curl -o "/tmp/${pull}.patch" -sSL "http://pr.k8s.io/${pull}.patch"
+  echo
+  echo "+++ About to attempt cherry pick of PR. To reattempt:"
+  echo "  $ git am -3 /tmp/${pull}.patch"
+  echo
+  git am -3 "/tmp/${pull}.patch" || {
+    conflicts=false
+    while unmerged=$(git status --porcelain | grep ^U) && [[ -n ${unmerged} ]] \
+      || [[ -e "${REBASEMAGIC}" ]]; do
+      conflicts=true # <-- We should have detected conflicts once
+      echo
+      echo "+++ Conflicts detected:"
+      echo
+      (git status --porcelain | grep ^U) || echo "!!! None. Did you git am --continue?"
+      echo
+      echo "+++ Please resolve the conflicts in another window (and remember to 'git add / git am --continue')"
+      read -p "+++ Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " -r
+      echo
+      if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
+        echo "Aborting." >&2
+        exit 1
+      fi
+    done
+
+    if [[ "${conflicts}" != "true" ]]; then
+      echo "!!! git am failed, likely because of an in-progress 'git am' or 'git rebase'"
       exit 1
     fi
-  done
-
-  if [[ "${conflicts}" != "true" ]]; then
-    echo "!!! git am failed, likely because of an in-progress 'git am' or 'git rebase'"
-    exit 1
-  fi
-}
+  }
+done
 gitamcleanup=false
 
-if git remote -v | grep ^origin | grep GoogleCloudPlatform/kubernetes.git; then
-  echo "!!! You have 'origin' configured as your GoogleCloudPlatform/kubernetes.git"
+function make-a-pr() {
+  local rel=$(basename ${BRANCH})
+  echo "+++ Creating a pull request on github"
+  hub pull-request -F- -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}" <<EOF
+Automated cherry pick of ${PULLSUBJ}
+
+Cherry pick of ${PULLSUBJ} on ${rel}.
+EOF
+}
+
+if git remote -v | grep ^origin | grep kubernetes/kubernetes.git; then
+  echo "!!! You have 'origin' configured as your kubernetes/kubernetes.git"
   echo "This isn't normal. Leaving you with push instructions:"
+  echo
+  echo "+++ First manually push the branch this script created:"
   echo
   echo "  git push REMOTE ${NEWBRANCHUNIQ}:${NEWBRANCH}"
   echo
   echo "where REMOTE is your personal fork (maybe 'upstream'? Consider swapping those.)."
-  echo "Then propose ${NEWBRANCH} as a pull against ${BRANCH} (NOT MASTER)."
-  echo "Use this exact subject: 'Automated cherry pick of #${PULL}' and include a justification."
+  echo
+  make-a-pr
   cleanbranch=""
   exit 0
 fi
@@ -140,8 +170,4 @@ if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
 fi
 
 git push origin -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
-
-echo
-echo "+++ Now you must propose ${NEWBRANCH} as a pull against ${BRANCH} (NOT MASTER)."
-echo "    You must use this exact subject: 'Automated cherry pick of #${PULL}' and include a justification."
-echo
+make-a-pr

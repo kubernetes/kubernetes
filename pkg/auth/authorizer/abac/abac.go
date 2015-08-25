@@ -25,7 +25,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
 // TODO: make this into a real API object.  Note that when that happens, it

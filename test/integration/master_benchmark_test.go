@@ -25,14 +25,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
-	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // Command line flag globals, parsed in init and used by the benchmarks:
@@ -179,7 +179,7 @@ func BenchmarkPodListEtcd(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: listing pods took %v", id, time.Since(now))
 			}()
-			if response, err := m.EtcdHelper.Client.Get(key, true, true); err != nil {
+			if response, err := m.EtcdStorage.Client.Get(key, true, true); err != nil {
 				return err
 			} else if len(response.Node.Nodes) < podsPerNode {
 				glog.Fatalf("List retrieved %d pods, which is less than %d", len(response.Node.Nodes), podsPerNode)

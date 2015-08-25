@@ -19,14 +19,14 @@ package endpoint
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	endptspkg "github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/api"
+	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
 // endpointsStrategy implements behavior for Endpoints
@@ -79,7 +79,7 @@ func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.
 func MatchEndpoints(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{label, field, EndpointsAttributes}
+	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: EndpointsAttributes}
 }
 
 // EndpointsAttributes returns the attributes of an endpoint such that a

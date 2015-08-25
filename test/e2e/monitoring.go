@@ -22,11 +22,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	influxdb "github.com/influxdb/influxdb/client"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -92,6 +92,9 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				return nil, err
 			}
 			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				expectedPods = append(expectedPods, string(pod.UID))
 			}
 		}

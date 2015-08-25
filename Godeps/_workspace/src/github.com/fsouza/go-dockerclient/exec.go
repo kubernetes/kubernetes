@@ -25,6 +25,7 @@ type CreateExecOptions struct {
 	Tty          bool     `json:"Tty,omitempty" yaml:"Tty,omitempty"`
 	Cmd          []string `json:"Cmd,omitempty" yaml:"Cmd,omitempty"`
 	Container    string   `json:"Container,omitempty" yaml:"Container,omitempty"`
+	User         string   `json:"User,omitempty" yaml:"User,omitempty"`
 }
 
 // StartExecOptions specify parameters to the StartExecContainer function.

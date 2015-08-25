@@ -19,7 +19,7 @@ package config
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type Merger interface {
@@ -74,7 +74,7 @@ func (m *Mux) Channel(source string) chan interface{} {
 	}
 	newChannel := make(chan interface{})
 	m.sources[source] = newChannel
-	go util.Forever(func() { m.listen(source, newChannel) }, 0)
+	go util.Until(func() { m.listen(source, newChannel) }, 0, util.NeverStop)
 	return newChannel
 }
 

@@ -20,13 +20,14 @@ import (
 
 // APIImages represent an image returned in the ListImages call.
 type APIImages struct {
-	ID          string   `json:"Id" yaml:"Id"`
-	RepoTags    []string `json:"RepoTags,omitempty" yaml:"RepoTags,omitempty"`
-	Created     int64    `json:"Created,omitempty" yaml:"Created,omitempty"`
-	Size        int64    `json:"Size,omitempty" yaml:"Size,omitempty"`
-	VirtualSize int64    `json:"VirtualSize,omitempty" yaml:"VirtualSize,omitempty"`
-	ParentID    string   `json:"ParentId,omitempty" yaml:"ParentId,omitempty"`
-	RepoDigests []string `json:"RepoDigests,omitempty" yaml:"RepoDigests,omitempty"`
+	ID          string            `json:"Id" yaml:"Id"`
+	RepoTags    []string          `json:"RepoTags,omitempty" yaml:"RepoTags,omitempty"`
+	Created     int64             `json:"Created,omitempty" yaml:"Created,omitempty"`
+	Size        int64             `json:"Size,omitempty" yaml:"Size,omitempty"`
+	VirtualSize int64             `json:"VirtualSize,omitempty" yaml:"VirtualSize,omitempty"`
+	ParentID    string            `json:"ParentId,omitempty" yaml:"ParentId,omitempty"`
+	RepoDigests []string          `json:"RepoDigests,omitempty" yaml:"RepoDigests,omitempty"`
+	Labels      map[string]string `json:"Labels,omitempty" yaml:"Labels,omitempty"`
 }
 
 // Image is the type representing a docker image and its various properties
@@ -42,6 +43,7 @@ type Image struct {
 	Config          *Config   `json:"Config,omitempty" yaml:"Config,omitempty"`
 	Architecture    string    `json:"Architecture,omitempty" yaml:"Architecture,omitempty"`
 	Size            int64     `json:"Size,omitempty" yaml:"Size,omitempty"`
+	VirtualSize     int64     `json:"VirtualSize,omitempty" yaml:"VirtualSize,omitempty"`
 }
 
 // ImageHistory represent a layer in an image's history returned by the
@@ -357,8 +359,9 @@ type ImportImageOptions struct {
 	Source     string `qs:"fromSrc"`
 	Tag        string `qs:"tag"`
 
-	InputStream  io.Reader `qs:"-"`
-	OutputStream io.Writer `qs:"-"`
+	InputStream   io.Reader `qs:"-"`
+	OutputStream  io.Writer `qs:"-"`
+	RawJSONStream bool      `qs:"-"`
 }
 
 // ImportImage imports an image from a url, a file or stdin
@@ -380,7 +383,7 @@ func (c *Client) ImportImage(opts ImportImageOptions) error {
 		opts.InputStream = bytes.NewBuffer(b)
 		opts.Source = "-"
 	}
-	return c.createImage(queryString(&opts), nil, opts.InputStream, opts.OutputStream, false)
+	return c.createImage(queryString(&opts), nil, opts.InputStream, opts.OutputStream, opts.RawJSONStream)
 }
 
 // BuildImageOptions present the set of informations available for building an

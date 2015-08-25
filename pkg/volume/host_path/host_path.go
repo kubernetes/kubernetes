@@ -19,11 +19,11 @@ package host_path
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -71,14 +71,20 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 
 func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	if spec.VolumeSource.HostPath != nil {
-		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
+		return &hostPathBuilder{
+			hostPath: &hostPath{path: spec.VolumeSource.HostPath.Path},
+			readOnly: false,
+		}, nil
 	} else {
-		return &hostPath{spec.PersistentVolumeSource.HostPath.Path}, nil
+		return &hostPathBuilder{
+			hostPath: &hostPath{path: spec.PersistentVolumeSource.HostPath.Path},
+			readOnly: spec.ReadOnly,
+		}, nil
 	}
 }
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
-	return &hostPath{""}, nil
+	return &hostPathCleaner{&hostPath{""}}, nil
 }
 
 func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
@@ -86,11 +92,10 @@ func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, e
 }
 
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
-	if spec.VolumeSource.HostPath != nil {
-		return &hostPathRecycler{spec.Name, spec.VolumeSource.HostPath.Path, host}, nil
-	} else {
-		return &hostPathRecycler{spec.Name, spec.PersistentVolumeSource.HostPath.Path, host}, nil
+	if spec.PersistentVolumeSource.HostPath == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
+	return &hostPathRecycler{spec.Name, spec.PersistentVolumeSource.HostPath.Path, host}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -99,27 +104,48 @@ type hostPath struct {
 	path string
 }
 
-// SetUp does nothing.
-func (hp *hostPath) SetUp() error {
-	return nil
-}
-
-// SetUpAt does not make sense for host paths - probably programmer error.
-func (hp *hostPath) SetUpAt(dir string) error {
-	return fmt.Errorf("SetUpAt() does not make sense for host paths")
-}
-
 func (hp *hostPath) GetPath() string {
 	return hp.path
 }
 
+type hostPathBuilder struct {
+	*hostPath
+	readOnly bool
+}
+
+var _ volume.Builder = &hostPathBuilder{}
+
+// SetUp does nothing.
+func (b *hostPathBuilder) SetUp() error {
+	return nil
+}
+
+// SetUpAt does not make sense for host paths - probably programmer error.
+func (b *hostPathBuilder) SetUpAt(dir string) error {
+	return fmt.Errorf("SetUpAt() does not make sense for host paths")
+}
+
+func (b *hostPathBuilder) IsReadOnly() bool {
+	return b.readOnly
+}
+
+func (b *hostPathBuilder) GetPath() string {
+	return b.path
+}
+
+type hostPathCleaner struct {
+	*hostPath
+}
+
+var _ volume.Cleaner = &hostPathCleaner{}
+
 // TearDown does nothing.
-func (hp *hostPath) TearDown() error {
+func (c *hostPathCleaner) TearDown() error {
 	return nil
 }
 
 // TearDownAt does not make sense for host paths - probably programmer error.
-func (hp *hostPath) TearDownAt(dir string) error {
+func (c *hostPathCleaner) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 
@@ -154,7 +180,7 @@ func (r *hostPathRecycler) Recycle() error {
 				{
 					Name: "vol",
 					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{r.path},
+						HostPath: &api.HostPathVolumeSource{Path: r.path},
 					},
 				},
 			},

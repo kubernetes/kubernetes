@@ -19,8 +19,8 @@ package algorithm
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 // MinionLister interface represents anything that can list minions for a scheduler.
@@ -66,7 +66,7 @@ type ServiceLister interface {
 // FakeServiceLister implements ServiceLister on []api.Service for test purposes.
 type FakeServiceLister []api.Service
 
-// FakeServiceLister returns api.ServiceList, the list of all services.
+// List returns api.ServiceList, the list of all services.
 func (f FakeServiceLister) List() (api.ServiceList, error) {
 	return api.ServiceList{Items: f}, nil
 }
@@ -87,6 +87,55 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 	}
 	if len(services) == 0 {
 		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+
+	return
+}
+
+// ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
+type ControllerLister interface {
+	// Lists all the replication controllers
+	List() ([]api.ReplicationController, error)
+	// Gets the services for the given pod
+	GetPodControllers(*api.Pod) ([]api.ReplicationController, error)
+}
+
+// EmptyControllerLister implements ControllerLister on []api.ReplicationController returning empty data
+type EmptyControllerLister struct{}
+
+// List returns nil
+func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
+	return nil, nil
+}
+
+// GetPodControllers returns nil
+func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	return nil, nil
+}
+
+// FakeControllerLister implements ControllerLister on []api.ReplicationController for test purposes.
+type FakeControllerLister []api.ReplicationController
+
+// List returns []api.ReplicationController, the list of all ReplicationControllers.
+func (f FakeControllerLister) List() ([]api.ReplicationController, error) {
+	return f, nil
+}
+
+// GetPodControllers gets the ReplicationControllers that have the selector that match the labels on the given pod
+func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	var selector labels.Selector
+
+	for _, controller := range f {
+		if controller.Namespace != pod.Namespace {
+			continue
+		}
+		selector = labels.Set(controller.Spec.Selector).AsSelector()
+		if selector.Matches(labels.Set(pod.Labels)) {
+			controllers = append(controllers, controller)
+		}
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("Could not find Replication Controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
 	return

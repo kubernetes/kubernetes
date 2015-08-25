@@ -31,19 +31,19 @@ import (
 	"testing"
 	"time"
 
-	assertext "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/assert"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/messages"
-	kmruntime "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	kmruntime "k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/kubelet"
+	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
@@ -263,7 +263,7 @@ func TestExecutorRegister(t *testing.T) {
 }
 
 // TestExecutorDisconnect ensures that the executor thinks that it is not
-// connected after a call to Disconnected has occured.
+// connected after a call to Disconnected has occurred.
 func TestExecutorDisconnect(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	executor := NewTestKubernetesExecutor()
@@ -346,7 +346,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	select {
 	case <-updates:
 	case <-time.After(time.Second):
-		t.Fatalf("Executor should send an intial update on Registration")
+		t.Fatalf("Executor should send an initial update on Registration")
 	}
 
 	pod := NewTestPod(1)

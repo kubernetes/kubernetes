@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/examples/spark/README.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Spark example
 
 Following this example, you will create a functional [Apache
@@ -19,32 +52,32 @@ The Docker images are heavily based on https://github.com/mattf/docker-spark
 This example assumes you have a Kubernetes cluster installed and
 running, and that you have installed the ```kubectl``` command line
 tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides) for installation
+started](../../docs/getting-started-guides/) for installation
 instructions for your platform.
 
 ## Step One: Start your Master service
 
-The Master [service](../../docs/services.md) is the master (or head) service for a Spark
+The Master [service](../../docs/user-guide/services.md) is the master (or head) service for a Spark
 cluster.
 
-Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/pods.md) running
+Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.md) running
 the Master service.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-master.json
 ```
 
-Then, use the [`examples/spark/spark-master-service.json`](spar-master-service.json) file to
+Then, use the [`examples/spark/spark-master-service.json`](spark-master-service.json) file to
 create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-master-service.json
 ```
 
 ### Check to see if Master is running and accessible
 
-```shell
+```sh
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 [...]
@@ -54,7 +87,7 @@ spark-master                                   1/1       Running   0          25
 
 Check logs to see the status of the master.
 
-```shell
+```sh
 $ kubectl logs spark-master
 
 starting org.apache.spark.deploy.master.Master, logging to /opt/spark-1.4.0-bin-hadoop2.6/sbin/../logs/spark--org.apache.spark.deploy.master.Master-1-spark-master.out
@@ -87,15 +120,15 @@ program.
 The Spark workers need the Master service to be running.
 
 Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
-[replication controller](../../docs/replication-controller.md) that manages the worker pods.
+[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-worker-controller.json
 ```
 
 ### Check to see if the workers are running
 
-```shell
+```sh
 $ kubectl get pods
 NAME                                            READY     STATUS    RESTARTS   AGE
 [...]
@@ -110,45 +143,37 @@ $ kubectl logs spark-master
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.1.15:44839 with 1 cores, 2.6 GB RAM
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.0.19:60970 with 1 cores, 2.6 GB RAM
 ```
-## Step Three: Do something with the cluster
 
-Get the address and port of the Master service.
+## Step Three: Start your Spark driver to launch jobs on your Spark cluster
+
+The Spark driver is used to launch jobs into Spark cluster. You can read more about it in
+[Spark architecture](http://spark.apache.org/docs/latest/cluster-overview.html).
 
 ```shell
-$ kubectl get service spark-master
-NAME           LABELS              SELECTOR            IP(S)          PORT(S)
-spark-master   name=spark-master   name=spark-master   10.0.204.187   7077/TCP
+$ kubectl create -f examples/spark/spark-driver.json
 ```
 
-SSH to one of your cluster nodes. On GCE/GKE you can either use [Developers Console](https://console.developers.google.com)
-(more details [here](https://cloud.google.com/compute/docs/ssh-in-browser))
-or run  `gcloud compute ssh <name>` where the name can be taken from `kubectl get nodes`
-(more details [here](https://cloud.google.com/compute/docs/gcloud-compute/#connecting)).
+The Spark driver needs the Master service to be running.
 
-```
-$ kubectl get nodes
-NAME                     LABELS                                          STATUS
-kubernetes-minion-5jvu   kubernetes.io/hostname=kubernetes-minion-5jvu   Ready
-kubernetes-minion-6fbi   kubernetes.io/hostname=kubernetes-minion-6fbi   Ready
-kubernetes-minion-8y2v   kubernetes.io/hostname=kubernetes-minion-8y2v   Ready
-kubernetes-minion-h0tr   kubernetes.io/hostname=kubernetes-minion-h0tr   Ready
+### Check to see if the driver is running
 
-$ gcloud compute ssh kubernetes-minion-5jvu --zone=us-central1-b
-Linux kubernetes-minion-5jvu 3.16.0-0.bpo.4-amd64 #1 SMP Debian 3.16.7-ckt9-3~deb8u1~bpo70+1 (2015-04-27) x86_64
-
-=== GCE Kubernetes node setup complete ===
-
-me@kubernetes-minion-5jvu:~$
+```shell
+$ kubectl get pods
+NAME                                           READY     REASON    RESTARTS   AGE
+[...]
+spark-master                                    1/1       Running   0          14m
+spark-driver                                    1/1       Running   0          10m
 ```
 
-Once logged in run spark-base image. Inside of the image there is a script
-that sets up the environment based on the provided IP and port of the Master.
+## Step Four: Do something with the cluster
+
+Use the kubectl exec to connect to Spark driver
 
 ```
-cluster-node $ sudo docker run -it gcr.io/google_containers/spark-base
-root@f12a6fec45ce:/# . /setup_client.sh 10.0.204.187 7077
-root@f12a6fec45ce:/# pyspark
-Python 2.7.9 (default, Mar  1 2015, 12:57:24) 
+$ kubectl exec spark-driver -it bash
+root@spark-driver:/#
+root@spark-driver:/# pyspark
+Python 2.7.9 (default, Mar  1 2015, 12:57:24)
 [GCC 4.9.2] on linux2
 Type "help", "copyright", "credits" or "license" for more information.
 15/06/26 14:25:28 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
@@ -164,11 +189,12 @@ SparkContext available as sc, HiveContext available as sqlContext.
 >>> sc.parallelize(range(1000)).map(lambda x:socket.gethostname()).distinct().collect()
 ['spark-worker-controller-u40r2', 'spark-worker-controller-hifwi', 'spark-worker-controller-vpgyg']
 ```
+
 ## Result
 
-You now have services, replication controllers, and pods for the Spark master and Spark workers.
-You can take this example to the next step and start using the Apache Spark cluster 
-you just created, see [Spark documentation](https://spark.apache.org/documentation.html) 
+You now have services, replication controllers, and pods for the Spark master , Spark driver and Spark workers.
+You can take this example to the next step and start using the Apache Spark cluster
+you just created, see [Spark documentation](https://spark.apache.org/documentation.html)
 for more information.
 
 ## tl;dr
@@ -181,4 +207,9 @@ Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 ```kubectl create -f spark-worker-controller.json```
 
+```kubectl create -f spark-driver.json```
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

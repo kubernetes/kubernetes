@@ -19,11 +19,13 @@ package master
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 func TestGetServersToValidate(t *testing.T) {
@@ -31,8 +33,8 @@ func TestGetServersToValidate(t *testing.T) {
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	config.EtcdHelper = tools.NewEtcdHelper(fakeClient, latest.Codec, etcdtest.PathPrefix())
-	config.EtcdHelper.Versioner = nil
+	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.Codec, etcdtest.PathPrefix())
+	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
 
 	master.nodeRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -45,5 +47,29 @@ func TestGetServersToValidate(t *testing.T) {
 		if _, ok := servers[server]; !ok {
 			t.Errorf("server list missing: %s", server)
 		}
+	}
+}
+
+func TestFindExternalAddress(t *testing.T) {
+	expectedIP := "172.0.0.1"
+
+	nodes := []*api.Node{new(api.Node), new(api.Node), new(api.Node)}
+	nodes[0].Status.Addresses = []api.NodeAddress{{"ExternalIP", expectedIP}}
+	nodes[1].Status.Addresses = []api.NodeAddress{{"LegacyHostIP", expectedIP}}
+	nodes[2].Status.Addresses = []api.NodeAddress{{"ExternalIP", expectedIP}, {"LegacyHostIP", "172.0.0.2"}}
+
+	for _, node := range nodes {
+		ip, err := findExternalAddress(node)
+		if err != nil {
+			t.Errorf("error getting node external address: %s", err)
+		}
+		if ip != expectedIP {
+			t.Errorf("expected ip to be %s, but was %s", expectedIP, ip)
+		}
+	}
+
+	_, err := findExternalAddress(new(api.Node))
+	if err == nil {
+		t.Errorf("expected findExternalAddress to fail on a node with missing ip information")
 	}
 }

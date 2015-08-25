@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 type FakeNodeInfo api.Node
@@ -59,7 +59,7 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 	for _, req := range usage {
 		containers = append(containers, api.Container{
 			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
+				Requests: api.ResourceList{
 					api.ResourceCPU:    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
 					api.ResourceMemory: *resource.NewQuantity(req.memory, resource.BinarySI),
 				},

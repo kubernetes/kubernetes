@@ -24,39 +24,56 @@ import (
 
 func Test_buildTOC(t *testing.T) {
 	var cases = []struct {
-		in  string
-		out string
+		in       string
+		expected string
 	}{
 		{"", ""},
 		{"Lorem ipsum\ndolor sit amet\n", ""},
-		{"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n",
-			"- [Title](#title)\n  - [Section Heading](#section-heading)\n"},
+		{
+			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n",
+			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n",
+		},
+		{
+			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n```bash\n#!/bin/sh\n```",
+			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n",
+		},
+		{
+			"# Title\nLorem ipsum \n## Section Heading\n### Ok, why doesn't this work? ...add 4 *more* `symbols`!\ndolor sit amet\n",
+			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n    - [Ok, why doesn't this work? ...add 4 *more* `symbols`!](#ok-why-doesnt-this-work-add-4-more-symbols)\n\n",
+		},
 	}
-	for _, c := range cases {
-		actual, err := buildTOC([]byte(c.in))
-		assert.NoError(t, err)
-		if c.out != string(actual) {
-			t.Errorf("Expected TOC '%v' but got '%v'", c.out, string(actual))
+	for i, c := range cases {
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.expected)
+		actual := buildTOC(in)
+		if !expected.Equal(actual) {
+			t.Errorf("Case[%d] Expected TOC '%v' but got '%v'", i, expected.String(), actual.String())
 		}
 	}
 }
 
 func Test_updateTOC(t *testing.T) {
 	var cases = []struct {
-		in  string
-		out string
+		in       string
+		expected string
 	}{
 		{"", ""},
-		{"Lorem ipsum\ndolor sit amet\n",
-			"Lorem ipsum\ndolor sit amet\n"},
-		{"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN GENERATED TOC -->\nold cruft\n<!-- END GENERATED TOC -->\n## Section Heading\ndolor sit amet\n",
-			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN GENERATED TOC -->\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END GENERATED TOC -->\n## Section Heading\ndolor sit amet\n"},
+		{
+			"Lorem ipsum\ndolor sit amet\n",
+			"Lorem ipsum\ndolor sit amet\n",
+		},
+		{
+			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\nold cruft\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
+			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\n\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
+		},
 	}
 	for _, c := range cases {
-		actual, err := updateTOC("filename.md", []byte(c.in))
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.expected)
+		actual, err := updateTOC("filename.md", in)
 		assert.NoError(t, err)
-		if c.out != string(actual) {
-			t.Errorf("Expected TOC '%v' but got '%v'", c.out, string(actual))
+		if !expected.Equal(actual) {
+			t.Errorf("Expected TOC '%v' but got '%v'", expected.String(), actual.String())
 		}
 	}
 }

@@ -15,7 +15,7 @@
 
 .PHONY:	kbuild kpush
 
-TAG = 1.8
+TAG = 1.11
 
 # Rules for building the test image for deployment to Dockerhub with user kubernetes.
 

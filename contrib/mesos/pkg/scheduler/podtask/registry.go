@@ -23,10 +23,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 const (
@@ -188,6 +188,8 @@ func (k *inMemoryRegistry) UpdateStatus(status *mesos.TaskStatus) (*T, StateType
 		k.handleTaskFinished(task, state, status)
 	case mesos.TaskState_TASK_FAILED:
 		k.handleTaskFailed(task, state, status)
+	case mesos.TaskState_TASK_ERROR:
+		k.handleTaskError(task, state, status)
 	case mesos.TaskState_TASK_KILLED:
 		k.handleTaskKilled(task, state, status)
 	case mesos.TaskState_TASK_LOST:
@@ -300,10 +302,15 @@ func (k *inMemoryRegistry) recordFinishedTask(taskId string) *ring.Ring {
 
 func (k *inMemoryRegistry) handleTaskFailed(task *T, state StateType, status *mesos.TaskStatus) {
 	switch state {
-	case StatePending:
+	case StatePending, StateRunning:
 		delete(k.taskRegistry, task.ID)
 		delete(k.podToTask, task.podKey)
-	case StateRunning:
+	}
+}
+
+func (k *inMemoryRegistry) handleTaskError(task *T, state StateType, status *mesos.TaskStatus) {
+	switch state {
+	case StatePending, StateRunning:
 		delete(k.taskRegistry, task.ID)
 		delete(k.podToTask, task.podKey)
 	}

@@ -114,7 +114,7 @@ type Manager interface {
 }
 
 // New takes a memory storage and returns a new manager.
-func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs) (Manager, error) {
+func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool) (Manager, error) {
 	if memoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
@@ -139,13 +139,15 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs) (Manager, error) 
 		inHostNamespace = true
 	}
 	newManager := &manager{
-		containers:        make(map[namespacedContainerName]*containerData),
-		quitChannels:      make([]chan error, 0, 2),
-		memoryCache:       memoryCache,
-		fsInfo:            fsInfo,
-		cadvisorContainer: selfContainer,
-		inHostNamespace:   inHostNamespace,
-		startupTime:       time.Now(),
+		containers:               make(map[namespacedContainerName]*containerData),
+		quitChannels:             make([]chan error, 0, 2),
+		memoryCache:              memoryCache,
+		fsInfo:                   fsInfo,
+		cadvisorContainer:        selfContainer,
+		inHostNamespace:          inHostNamespace,
+		startupTime:              time.Now(),
+		maxHousekeepingInterval:  maxHousekeepingInterval,
+		allowDynamicHousekeeping: allowDynamicHousekeeping,
 	}
 
 	machineInfo, err := getMachineInfo(sysfs, fsInfo)
@@ -176,19 +178,21 @@ type namespacedContainerName struct {
 }
 
 type manager struct {
-	containers             map[namespacedContainerName]*containerData
-	containersLock         sync.RWMutex
-	memoryCache            *memory.InMemoryCache
-	fsInfo                 fs.FsInfo
-	machineInfo            info.MachineInfo
-	versionInfo            info.VersionInfo
-	quitChannels           []chan error
-	cadvisorContainer      string
-	inHostNamespace        bool
-	dockerContainersRegexp *regexp.Regexp
-	loadReader             cpuload.CpuLoadReader
-	eventHandler           events.EventManager
-	startupTime            time.Time
+	containers               map[namespacedContainerName]*containerData
+	containersLock           sync.RWMutex
+	memoryCache              *memory.InMemoryCache
+	fsInfo                   fs.FsInfo
+	machineInfo              info.MachineInfo
+	versionInfo              info.VersionInfo
+	quitChannels             []chan error
+	cadvisorContainer        string
+	inHostNamespace          bool
+	dockerContainersRegexp   *regexp.Regexp
+	loadReader               cpuload.CpuLoadReader
+	eventHandler             events.EventManager
+	startupTime              time.Time
+	maxHousekeepingInterval  time.Duration
+	allowDynamicHousekeeping bool
 }
 
 // Start the container manager.
@@ -371,12 +375,13 @@ func (self *manager) GetContainerSpec(containerName string, options v2.RequestOp
 func (self *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
 	specV1 := self.getAdjustedSpec(cinfo)
 	specV2 := v2.ContainerSpec{
-		CreationTime:  specV1.CreationTime,
-		HasCpu:        specV1.HasCpu,
-		HasMemory:     specV1.HasMemory,
-		HasFilesystem: specV1.HasFilesystem,
-		HasNetwork:    specV1.HasNetwork,
-		HasDiskIo:     specV1.HasDiskIo,
+		CreationTime:     specV1.CreationTime,
+		HasCpu:           specV1.HasCpu,
+		HasMemory:        specV1.HasMemory,
+		HasFilesystem:    specV1.HasFilesystem,
+		HasNetwork:       specV1.HasNetwork,
+		HasDiskIo:        specV1.HasDiskIo,
+		HasCustomMetrics: specV1.HasCustomMetrics,
 	}
 	if specV1.HasCpu {
 		specV2.Cpu.Limit = specV1.Cpu.Limit
@@ -387,6 +392,9 @@ func (self *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
 		specV2.Memory.Limit = specV1.Memory.Limit
 		specV2.Memory.Reservation = specV1.Memory.Reservation
 		specV2.Memory.SwapLimit = specV1.Memory.SwapLimit
+	}
+	if specV1.HasCustomMetrics {
+		specV2.CustomMetrics = specV1.CustomMetrics
 	}
 	specV2.Aliases = cinfo.Aliases
 	specV2.Namespace = cinfo.Namespace
@@ -689,6 +697,28 @@ func (m *manager) GetProcessList(containerName string, options v2.RequestOptions
 	return ps, nil
 }
 
+func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *containerData) error {
+	for k, v := range collectorConfigs {
+		configFile, err := cont.ReadFile(v, m.inHostNamespace)
+		if err != nil {
+			return fmt.Errorf("failed to read config file %q for config %q, container %q: %v", k, v, cont.info.Name, err)
+		}
+		glog.V(3).Infof("Got config from %q: %q", v, configFile)
+
+		newCollector, err := collector.NewCollector(k, configFile)
+		if err != nil {
+			glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
+			return err
+		}
+		err = cont.collectorManager.RegisterCollector(newCollector)
+		if err != nil {
+			glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
+			return err
+		}
+	}
+	return nil
+}
+
 // Create a container.
 func (m *manager) createContainer(containerName string) error {
 	handler, accept, err := container.NewContainerHandler(containerName)
@@ -700,14 +730,23 @@ func (m *manager) createContainer(containerName string) error {
 		glog.V(4).Infof("ignoring container %q", containerName)
 		return nil
 	}
-	// TODO(vmarmol): Register collectors.
 	collectorManager, err := collector.NewCollectorManager()
 	if err != nil {
 		return err
 	}
+
 	logUsage := *logCadvisorUsage && containerName == m.cadvisorContainer
-	cont, err := newContainerData(containerName, m.memoryCache, handler, m.loadReader, logUsage, collectorManager)
+	cont, err := newContainerData(containerName, m.memoryCache, handler, m.loadReader, logUsage, collectorManager, m.maxHousekeepingInterval, m.allowDynamicHousekeeping)
 	if err != nil {
+		return err
+	}
+
+	// Add collectors
+	labels := handler.GetContainerLabels()
+	collectorConfigs := collector.GetCollectorConfigs(labels)
+	err = m.registerCollectors(collectorConfigs, cont)
+	if err != nil {
+		glog.Infof("failed to register collectors for %q: %v", containerName, err)
 		return err
 	}
 

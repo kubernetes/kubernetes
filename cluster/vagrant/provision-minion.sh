@@ -78,7 +78,8 @@ rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
 
 # Disable network interface being managed by Network Manager (needed for Fedora 21+)
 NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-sed -i 's/^NM_CONTROLLED=no/#NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+grep -q ^NM_CONTROLLED= ${NETWORK_CONF_PATH}ifcfg-eth1 || echo 'NM_CONTROLLED=no' >> ${NETWORK_CONF_PATH}ifcfg-eth1
+sed -i 's/^#NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
 systemctl restart network
 
 # Setup hosts file to support ping by hostname to master

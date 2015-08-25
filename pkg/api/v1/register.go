@@ -17,9 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Codec encodes internal objects to the v1 scheme
@@ -47,6 +47,8 @@ func addKnownTypes() {
 		&PodTemplateList{},
 		&ReplicationController{},
 		&ReplicationControllerList{},
+		&DaemonList{},
+		&Daemon{},
 		&Service{},
 		&ServiceList{},
 		&Endpoints{},
@@ -74,6 +76,7 @@ func addKnownTypes() {
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
 		&ListOptions{},
+		&PodAttachOptions{},
 		&PodLogOptions{},
 		&PodExecOptions{},
 		&PodProxyOptions{},
@@ -81,6 +84,9 @@ func addKnownTypes() {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
+		&ThirdPartyResource{},
+		&ThirdPartyResourceList{},
+		&ThirdPartyResourceData{},
 	)
 	// Legacy names are supported
 	api.Scheme.AddKnownTypeWithName("v1", "Minion", &Node{})
@@ -94,6 +100,8 @@ func (*PodTemplate) IsAnAPIObject()               {}
 func (*PodTemplateList) IsAnAPIObject()           {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
+func (*Daemon) IsAnAPIObject()                    {}
+func (*DaemonList) IsAnAPIObject()                {}
 func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}
@@ -121,6 +129,7 @@ func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
 func (*DeleteOptions) IsAnAPIObject()             {}
 func (*ListOptions) IsAnAPIObject()               {}
+func (*PodAttachOptions) IsAnAPIObject()          {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
@@ -128,3 +137,6 @@ func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
 func (*SerializedReference) IsAnAPIObject()       {}
 func (*RangeAllocation) IsAnAPIObject()           {}
+func (*ThirdPartyResource) IsAnAPIObject()        {}
+func (*ThirdPartyResourceList) IsAnAPIObject()    {}
+func (*ThirdPartyResourceData) IsAnAPIObject()    {}

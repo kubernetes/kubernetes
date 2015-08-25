@@ -27,12 +27,13 @@ rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
 
 # Disable network interface being managed by Network Manager (needed for Fedora 21+)
 NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-sed -i 's/^NM_CONTROLLED=no/#NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+grep -q ^NM_CONTROLLED= ${NETWORK_CONF_PATH}ifcfg-eth1 || echo 'NM_CONTROLLED=no' >> ${NETWORK_CONF_PATH}ifcfg-eth1
+sed -i 's/^#NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
 systemctl restart network
 
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
-  echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
+  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
   echo "Note that this requires having Docker installed.  If you are running " >&2
   echo "from a release tarball, something is wrong.  Look at " >&2
   echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
@@ -116,8 +117,10 @@ EOF
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+  cert_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
   enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
+  enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
   enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
   logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
   elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
@@ -180,20 +183,20 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   cat > "${kubelet_kubeconfig_file}" << EOF
 apiVersion: v1
 kind: Config
-users:
-- name: kubelet
-  user:
-    token: ${KUBELET_TOKEN}
 clusters:
-- name: local
-  cluster:
+- cluster:
     insecure-skip-tls-verify: true
+  name: local
 contexts:
-  - context:
+- context:
     cluster: local
     user: kubelet
   name: service-account-context
 current-context: service-account-context
+users:
+- name: kubelet
+  user:
+    token: ${KUBELET_TOKEN}
 EOF
 )
 
@@ -207,20 +210,20 @@ EOF
   cat > "${kube_proxy_kubeconfig_file}" << EOF
 apiVersion: v1
 kind: Config
-users:
-- name: kube-proxy
-  user:
-    token: ${KUBE_PROXY_TOKEN}
 clusters:
-- name: local
-  cluster:
-     insecure-skip-tls-verify: true
+- cluster:
+    insecure-skip-tls-verify: true
+  name: local
 contexts:
 - context:
     cluster: local
     user: kube-proxy
   name: service-account-context
 current-context: service-account-context
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
 EOF
 )
 

@@ -27,6 +27,9 @@ type Capabilities struct {
 
 	// List of pod sources for which using host network is allowed.
 	HostNetworkSources []string
+
+	// PerConnectionBandwidthLimitBytesPerSec limits the throughput of each connection (currently only used for proxy, exec, attach)
+	PerConnectionBandwidthLimitBytesPerSec int64
 }
 
 // TODO: Clean these up into a singleton
@@ -43,10 +46,11 @@ func Initialize(c Capabilities) {
 }
 
 // Setup the capability set.  It wraps Initialize for improving usibility.
-func Setup(allowPrivileged bool, hostNetworkSources []string) {
+func Setup(allowPrivileged bool, hostNetworkSources []string, perConnectionBytesPerSec int64) {
 	Initialize(Capabilities{
-		AllowPrivileged:    allowPrivileged,
-		HostNetworkSources: hostNetworkSources,
+		AllowPrivileged:                        allowPrivileged,
+		HostNetworkSources:                     hostNetworkSources,
+		PerConnectionBandwidthLimitBytesPerSec: perConnectionBytesPerSec,
 	})
 }
 

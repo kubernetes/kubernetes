@@ -18,7 +18,8 @@ limitations under the License.
 package main
 
 import (
-	kubeproxy "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
+	kubeproxy "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewKubeProxy creates a new hyperkube Server object that includes the
@@ -27,7 +28,7 @@ func NewKubeProxy() *Server {
 	s := kubeproxy.NewProxyServer()
 
 	hks := Server{
-		SimpleUsage: "proxy",
+		SimpleUsage: hyperkube.CommandProxy,
 		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
 		services and forwarding it to the appropriate pods.  It generally runs on
 		nodes next to the Kubelet and proxies traffic from local pods to remote pods.

@@ -17,8 +17,8 @@ limitations under the License.
 package prober
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 var _ Prober = &FakeProber{}

@@ -25,22 +25,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/messages"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -437,25 +437,6 @@ func (k *KubernetesExecutor) attemptSuicide(driver bindings.ExecutorDriver, abor
 
 // async continuation of LaunchTask
 func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId string, pod *api.Pod) {
-
-	//HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/scheduler.go
-	binding := &api.Binding{
-		ObjectMeta: api.ObjectMeta{
-			Namespace:   pod.Namespace,
-			Name:        pod.Name,
-			Annotations: make(map[string]string),
-		},
-		Target: api.ObjectReference{
-			Kind: "Node",
-			Name: pod.Annotations[meta.BindingHostKey],
-		},
-	}
-
-	// forward the annotations that the scheduler wants to apply
-	for k, v := range pod.Annotations {
-		binding.Annotations[k] = v
-	}
-
 	deleteTask := func() {
 		k.lock.Lock()
 		defer k.lock.Unlock()
@@ -463,17 +444,57 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 		k.resetSuicideWatch(driver)
 	}
 
-	log.Infof("Binding '%v/%v' to '%v' with annotations %+v...", pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
-	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
 	// TODO(k8s): use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
-	err := k.client.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
-	if err != nil {
-		deleteTask()
-		k.sendStatus(driver, newStatus(mutil.NewTaskID(taskId), mesos.TaskState_TASK_FAILED,
-			messages.CreateBindingFailure))
-		return
+	if pod.Spec.NodeName == "" {
+		//HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/scheduler.go
+		binding := &api.Binding{
+			ObjectMeta: api.ObjectMeta{
+				Namespace:   pod.Namespace,
+				Name:        pod.Name,
+				Annotations: make(map[string]string),
+			},
+			Target: api.ObjectReference{
+				Kind: "Node",
+				Name: pod.Annotations[meta.BindingHostKey],
+			},
+		}
+
+		// forward the annotations that the scheduler wants to apply
+		for k, v := range pod.Annotations {
+			binding.Annotations[k] = v
+		}
+
+		// create binding on apiserver
+		log.Infof("Binding '%v/%v' to '%v' with annotations %+v...", pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
+		ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
+		err := k.client.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+		if err != nil {
+			deleteTask()
+			k.sendStatus(driver, newStatus(mutil.NewTaskID(taskId), mesos.TaskState_TASK_FAILED,
+				messages.CreateBindingFailure))
+			return
+		}
+	} else {
+		// post annotations update to apiserver
+		patch := struct {
+			Metadata struct {
+				Annotations map[string]string `json:"annotations"`
+			} `json:"metadata"`
+		}{}
+		patch.Metadata.Annotations = pod.Annotations
+		patchJson, _ := json.Marshal(patch)
+		log.V(4).Infof("Patching annotations %v of pod %v/%v: %v", pod.Annotations, pod.Namespace, pod.Name, string(patchJson))
+		err := k.client.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
+		if err != nil {
+			log.Errorf("Error updating annotations of ready-to-launch pod %v/%v: %v", pod.Namespace, pod.Name, err)
+			deleteTask()
+			k.sendStatus(driver, newStatus(mutil.NewTaskID(taskId), mesos.TaskState_TASK_FAILED,
+				messages.AnnotationUpdateFailure))
+			return
+		}
 	}
+
 	podFullName := container.GetPodFullName(pod)
 
 	// allow a recently failed-over scheduler the chance to recover the task/pod binding:

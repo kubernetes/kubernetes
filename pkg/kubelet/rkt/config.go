@@ -21,6 +21,8 @@ import "fmt"
 // Config stores the global configuration for the rkt runtime.
 // Run 'rkt' for more details.
 type Config struct {
+	// The absolute path to the binary, or leave empty to find it in $PATH.
+	Path string
 	// The debug flag for rkt.
 	Debug bool
 	// The rkt data directory.

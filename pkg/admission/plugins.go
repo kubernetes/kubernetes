@@ -21,8 +21,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // Factory is a function that returns an Interface for admission decisions.

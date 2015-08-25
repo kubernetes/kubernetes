@@ -41,10 +41,6 @@ function build-local() {
     cp -v $OUTPUT_DIR/* cluster/juju/charms/trusty/kubernetes-master/files/output
 }
 
-function get-password() {
-    echo "TODO: Assign username/password security"
-}
-
 function kube-up() {
     build-local
     if [[ -d "~/.juju/current-env" ]]; then
@@ -135,7 +131,7 @@ function sleep-status() {
 
     # sleep because we cannot get the status back of where the minions are in the deploy phase
     # thanks to a generic "started" state and our service not actually coming online until the
-    # minions have recieved the binary from the master distribution hub during relations
+    # minions have received the binary from the master distribution hub during relations
     echo "Sleeping an additional minute to allow the cluster to settle"
     sleep 60
 }

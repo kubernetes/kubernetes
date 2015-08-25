@@ -23,21 +23,35 @@ package version
 // version for ad-hoc builds (e.g. `go build`) that cannot get the version
 // information from git.
 //
-// The "-dev" suffix in the version info indicates that fact, and it means the
-// current build is from a version greater that version. For example, v0.7-dev
-// means version > 0.7 and < 0.8. (There's exceptions to this rule, see
-// docs/releasing.md for more details.)
+// If you are looking at these fields in the git tree, they look
+// strange. They are modified on the fly by the build process. The
+// in-tree values are dummy values used for "git archive", which also
+// works for GitHub tar downloads.
 //
-// When releasing a new Kubernetes version, this file should be updated to
-// reflect the new version, and then a git annotated tag (using format vX.Y
-// where X == Major version and Y == Minor version) should be created to point
-// to the commit that updates pkg/version/base.go
-
+// When releasing a new Kubernetes version, this file is updated by
+// build/mark_new_version.sh to reflect the new version, and then a
+// git annotated tag (using format vX.Y where X == Major version and Y
+// == Minor version) is created to point to the commit that updates
+// pkg/version/base.go
 var (
-	// TODO: Deprecate gitMajor and gitMinor, use only gitVersion instead.
-	gitMajor     string = "1"              // major version, always numeric
-	gitMinor     string = "0.0"            // minor version, numeric possibly followed by "+"
-	gitVersion   string = "v1.0.0"         // version from git, output of $(git describe)
-	gitCommit    string = ""               // sha1 from git, output of $(git rev-parse HEAD)
+	// TODO: Deprecate gitMajor and gitMinor, use only gitVersion
+	// instead. First step in deprecation, keep the fields but make
+	// them irrelevant. (Next we'll take it out, which may muck with
+	// scripts consuming the kubectl version output - but most of
+	// these should be looking at gitVersion already anyways.)
+	gitMajor string = "" // major version, always numeric
+	gitMinor string = "" // minor version, numeric possibly followed by "+"
+
+	// semantic version, dervied by build scripts (see
+	// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/versioning.md
+	// for a detailed discussion of this field)
+	//
+	// TODO: This field is still called "gitVersion" for legacy
+	// reasons. For prerelease versions, the build metadata on the
+	// semantic version is a git hash, but the version itself is no
+	// longer the direct output of "git describe", but a slight
+	// translation to be semver compliant.
+	gitVersion   string = "v0.0.0-master+$Format:%h$"
+	gitCommit    string = "$Format:%H$"    // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = "not a git tree" // state of git tree, either "clean" or "dirty"
 )

@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl delete \- Delete a resource by filename, stdin, resource and name, or by resources and label selector.
+kubectl delete \- Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 
 .SH SYNOPSIS
@@ -13,14 +13,13 @@ kubectl delete \- Delete a resource by filename, stdin, resource and name, or by
 
 .SH DESCRIPTION
 .PP
-Delete a resource by filename, stdin, resource and name, or by resources and label selector.
+Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 .PP
 JSON and YAML formats are accepted.
 
 .PP
-If both a filename and command line arguments are passed, the command line
-arguments are used and the filename is ignored.
+Only one type of the arguments may be specified: filenames, resources and names, or resources and label selector
 
 .PP
 Note that the delete command does NOT do resource version checks, so if someone
@@ -51,7 +50,11 @@ will be lost along with the rest of the resource.
 
 .PP
 \fB\-\-ignore\-not\-found\fP=false
-    Treat "resource not found" as a successful delete.
+    Treat "resource not found" as a successful delete. Defaults to "true" when \-\-all is specified.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
 \fB\-l\fP, \fB\-\-selector\fP=""
@@ -152,10 +155,6 @@ will be lost along with the rest of the resource.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -165,19 +164,22 @@ will be lost along with the rest of the resource.
 .RS
 
 .nf
-// Delete a pod using the type and name specified in pod.json.
-$ kubectl delete \-f pod.json
+# Delete a pod using the type and name specified in pod.json.
+$ kubectl delete \-f ./pod.json
 
-// Delete a pod based on the type and name in the JSON passed into stdin.
+# Delete a pod based on the type and name in the JSON passed into stdin.
 $ cat pod.json | kubectl delete \-f \-
 
-// Delete pods and services with label name=myLabel.
+# Delete pods and services with same names "baz" and "foo"
+$ kubectl delete pod,service baz foo
+
+# Delete pods and services with label name=myLabel.
 $ kubectl delete pods,services \-l name=myLabel
 
-// Delete a pod with UID 1234\-56\-7890\-234234\-456456.
+# Delete a pod with UID 1234\-56\-7890\-234234\-456456.
 $ kubectl delete pod 1234\-56\-7890\-234234\-456456
 
-// Delete all pods
+# Delete all pods
 $ kubectl delete pods \-\-all
 
 .fi

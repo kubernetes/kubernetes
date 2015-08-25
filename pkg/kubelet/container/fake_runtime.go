@@ -23,8 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // FakeRuntime is a fake container runtime for testing.
@@ -151,7 +152,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secret) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secret, backOff *util.Backoff) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -163,13 +164,13 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secr
 	return f.Err
 }
 
-func (f *FakeRuntime) KillPod(pod Pod) error {
+func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "KillPod")
-	f.KilledPods = append(f.KilledPods, string(pod.ID))
-	for _, c := range pod.Containers {
+	f.KilledPods = append(f.KilledPods, string(runningPod.ID))
+	for _, c := range runningPod.Containers {
 		f.KilledContainers = append(f.KilledContainers, c.Name)
 	}
 	return f.Err
@@ -231,6 +232,14 @@ func (f *FakeRuntime) ExecInContainer(containerID string, cmd []string, stdin io
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ExecInContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) AttachContainer(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "AttachContainer")
 	return f.Err
 }
 

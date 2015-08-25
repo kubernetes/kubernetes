@@ -1,5 +1,5 @@
 cd examples
-	ls *.go | xargs -I {} go build {}
+	ls *.go | xargs -I {} go build -o /tmp/ignore {}
 	cd ..
 go fmt ...swagger && \
 go test -test.v ...swagger && \

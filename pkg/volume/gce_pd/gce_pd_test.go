@@ -20,10 +20,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -74,8 +76,8 @@ type fakePDManager struct {
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+func (fake *fakePDManager) AttachAndMountDisk(b *gcePersistentDiskBuilder, globalPDPath string) error {
+	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -83,12 +85,12 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPat
 	fake.attachCalled = true
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	pd.mounter.Mount(globalPath, globalPath, pd.fsType, nil)
+	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
+	globalPath := makeGlobalPDName(c.plugin.host, c.pdName)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -170,35 +172,51 @@ func TestPlugin(t *testing.T) {
 	if !fakeManager.detachCalled {
 		t.Errorf("Detach watch not called")
 	}
-
 }
 
-func TestPluginLegacy(t *testing.T) {
+func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pvA",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			},
+			ClaimRef: &api.ObjectReference{
+				Name: "claimA",
+			},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claimA",
+			Namespace: "nsA",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "pvA",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
+	o.Add(pv)
+	o.Add(claim)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 
-	plug, err := plugMgr.FindPluginByName("gce-pd")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
-	if plug.Name() != "gce-pd" {
-		t.Errorf("Wrong name: %s", plug.Name())
-	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
-		t.Errorf("Expected false")
-	}
-
-	spec := &api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}
+	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, nil); err == nil {
-		t.Errorf("Expected failiure")
-	}
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), nil)
-	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
-	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
+	if !builder.IsReadOnly() {
+		t.Errorf("Expected true for builder.IsReadOnly")
 	}
 }

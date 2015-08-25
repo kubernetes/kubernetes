@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -64,7 +64,7 @@ var _ = Describe("Restart", func() {
 		SkipUnlessProviderIs("gce", "gke")
 		skipped = false
 
-		ps = newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.Everything())
+		ps = newPodStore(c, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -89,7 +89,7 @@ var _ = Describe("Restart", func() {
 		for i, p := range pods {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
-		ns := api.NamespaceDefault
+		ns := api.NamespaceSystem
 		if !checkPodsRunningReady(c, ns, podNamesBefore, podReadyBeforeTimeout) {
 			Failf("At least one pod wasn't running and ready at test start.")
 		}
@@ -232,13 +232,13 @@ func restartNodes(provider string, nt time.Duration) error {
 //   done
 //
 //   # Step 2: Start the recreate.
-//   output=$(gcloud preview managed-instance-groups --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
+//   output=$(gcloud compute instance-groups managed --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
 //   op=${output##*:}
 //
 //   # Step 3: Wait until it's complete.
 //   status=""
 //   while [[ "${status}" != "DONE" ]]; do
-// 	  output=$(gcloud preview managed-instance-groups --zone="${ZONE}" get-operation ${op} | grep status)
+// 	  output=$(gcloud compute instance-groups managed --zone="${ZONE}" get-operation ${op} | grep status)
 // 	  status=${output##*:}
 //   done
 func migRollingUpdateSelf(nt time.Duration) error {

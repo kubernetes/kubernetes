@@ -19,7 +19,7 @@ package election
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Fake allows for testing of anything consuming a MasterElector.

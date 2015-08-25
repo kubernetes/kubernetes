@@ -63,8 +63,11 @@ def clone_repository():
     of kubernetes. Subsequently used during upgrades.
     """
 
-    repository = 'https://github.com/GoogleCloudPlatform/kubernetes.git'
-    kubernetes_directory = '/opt/kubernetes'
+    repository = 'https://github.com/kubernetes/kubernetes.git'
+    kubernetes_directory = path('/opt/kubernetes')
+    # Since we can not clone twice, check for the directory and remove it.
+    if kubernetes_directory.isdir():
+        kubernetes_directory.rmtree_p()
 
     command = ['git', 'clone', repository, kubernetes_directory]
     print(command)
@@ -75,8 +78,8 @@ def clone_repository():
 
 def install_packages():
     """
-     Install required packages to build the k8s source, and syndicate between
-     minion nodes. In addition, fetch pip to handle python dependencies
+    Install required packages to build the k8s source, and syndicate between
+    minion nodes. In addition, fetch pip to handle python dependencies
     """
     hookenv.log('Installing Debian packages')
     # Create the list of packages to install.
@@ -87,8 +90,8 @@ def install_packages():
 
 def update_rc_files(strings):
     """
-     Preseed the bash environment for ubuntu and root with K8's env vars to
-     make interfacing with the api easier. (see: kubectrl docs)
+    Preseed the bash environment for ubuntu and root with K8's env vars to
+    make interfacing with the api easier. (see: kubectrl docs)
     """
     rc_files = [path('/home/ubuntu/.bashrc'), path('/root/.bashrc')]
     for rc_file in rc_files:

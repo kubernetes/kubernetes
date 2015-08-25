@@ -33,8 +33,8 @@ package e2e
 
 import (
 	"fmt"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -52,6 +52,9 @@ type VolumeTestConfig struct {
 	serverImage string
 	// Ports to export from the server pod. TCP only.
 	serverPorts []int
+	// Volumes needed to be mounted to the server container from the host
+	// map <host (source) path> -> <container (dst.) path>
+	volumes map[string]string
 }
 
 // Starts a container specified by config.serverImage and exports all
@@ -71,6 +74,25 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 			ContainerPort: config.serverPorts[i],
 			Protocol:      api.ProtocolTCP,
 		}
+	}
+
+	volumeCount := len(config.volumes)
+	volumes := make([]api.Volume, volumeCount)
+	mounts := make([]api.VolumeMount, volumeCount)
+
+	i := 0
+	for src, dst := range config.volumes {
+		mountName := fmt.Sprintf("path%d", i)
+		volumes[i].Name = mountName
+		volumes[i].VolumeSource.HostPath = &api.HostPathVolumeSource{
+			Path: src,
+		}
+
+		mounts[i].Name = mountName
+		mounts[i].ReadOnly = false
+		mounts[i].MountPath = dst
+
+		i++
 	}
 
 	By(fmt.Sprint("creating ", config.prefix, " server pod"))
@@ -96,9 +118,11 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 					SecurityContext: &api.SecurityContext{
 						Privileged: privileged,
 					},
-					Ports: serverPodPorts,
+					Ports:        serverPodPorts,
+					VolumeMounts: mounts,
 				},
 			},
+			Volumes: volumes,
 		},
 	}
 	_, err := podClient.Create(serverPod)
@@ -210,7 +234,7 @@ var _ = Describe("Volumes", func() {
 
 	AfterEach(func() {
 		if clean {
-			if err := c.Namespaces().Delete(namespace.Name); err != nil {
+			if err := deleteNS(c, namespace.Name); err != nil {
 				Failf("Couldn't delete ns %s", err)
 			}
 		}
@@ -248,7 +272,7 @@ var _ = Describe("Volumes", func() {
 					ReadOnly: true,
 				},
 			}
-			// Must match content of contrib/for-tests/volumes-tester/nfs/index.html
+			// Must match content of test/images/volumes-tester/nfs/index.html
 			testVolumeClient(c, config, volume, "Hello from NFS!")
 		})
 	})
@@ -320,13 +344,139 @@ var _ = Describe("Volumes", func() {
 			volume := api.VolumeSource{
 				Glusterfs: &api.GlusterfsVolumeSource{
 					EndpointsName: config.prefix + "-server",
-					// 'test_vol' comes from contrib/for-tests/volumes-tester/gluster/run_gluster.sh
+					// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 					Path:     "test_vol",
 					ReadOnly: true,
 				},
 			}
-			// Must match content of contrib/for-tests/volumes-tester/gluster/index.html
+			// Must match content of test/images/volumes-tester/gluster/index.html
 			testVolumeClient(c, config, volume, "Hello from GlusterFS!")
 		})
 	})
+
+	////////////////////////////////////////////////////////////////////////
+	// iSCSI
+	////////////////////////////////////////////////////////////////////////
+
+	// Marked with [Skipped] to skip the test by default (see driver.go),
+	// the test needs privileged containers, which are disabled by default.
+	// Also, make sure that iscsiadm utility and iscsi target kernel modules
+	// are installed on all nodes!
+	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
+
+	Describe("[Skipped] iSCSI", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "iscsi",
+				serverImage: "gcr.io/google_containers/volume-iscsi",
+				serverPorts: []int{3260},
+				volumes: map[string]string{
+					// iSCSI container needs to insert modules from the host
+					"/lib/modules": "/lib/modules",
+				},
+			}
+
+			defer func() {
+				if clean {
+					volumeTestCleanup(c, config)
+				}
+			}()
+			pod := startVolumeServer(c, config)
+			serverIP := pod.Status.PodIP
+			Logf("iSCSI server IP address: %v", serverIP)
+
+			volume := api.VolumeSource{
+				ISCSI: &api.ISCSIVolumeSource{
+					TargetPortal: serverIP + ":3260",
+					// from test/images/volumes-tester/iscsi/initiatorname.iscsi
+					IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
+					Lun:      0,
+					FSType:   "ext2",
+					ReadOnly: true,
+				},
+			}
+			// Must match content of test/images/volumes-tester/iscsi/block.tar.gz
+			testVolumeClient(c, config, volume, "Hello from iSCSI")
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// Ceph RBD
+	////////////////////////////////////////////////////////////////////////
+
+	// Marked with [Skipped] to skip the test by default (see driver.go),
+	// the test needs privileged containers, which are disabled by default.
+	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=RBD"
+
+	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
+	Describe("[Skipped] Ceph RBD", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "rbd",
+				serverImage: "gcr.io/google_containers/volume-rbd",
+				serverPorts: []int{6789},
+				volumes: map[string]string{
+					// iSCSI container needs to insert modules from the host
+					"/lib/modules": "/lib/modules",
+					"/sys":         "/sys",
+				},
+			}
+
+			defer func() {
+				if clean {
+					volumeTestCleanup(c, config)
+				}
+			}()
+			pod := startVolumeServer(c, config)
+			serverIP := pod.Status.PodIP
+			Logf("Ceph server IP address: %v", serverIP)
+
+			// create secrets for the server
+			secret := api.Secret{
+				TypeMeta: api.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name: config.prefix + "-secret",
+				},
+				Data: map[string][]byte{
+					// from test/images/volumes-tester/rbd/keyring
+					"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
+				},
+			}
+
+			secClient := c.Secrets(config.namespace)
+
+			defer func() {
+				if clean {
+					secClient.Delete(config.prefix + "-secret")
+				}
+			}()
+
+			if _, err := secClient.Create(&secret); err != nil {
+				Failf("Failed to create secrets for Ceph RBD: %v", err)
+			}
+
+			volume := api.VolumeSource{
+				RBD: &api.RBDVolumeSource{
+					CephMonitors: []string{serverIP},
+					RBDPool:      "rbd",
+					RBDImage:     "foo",
+					RadosUser:    "admin",
+					SecretRef: &api.LocalObjectReference{
+						Name: config.prefix + "-secret",
+					},
+					FSType:   "ext2",
+					ReadOnly: true,
+				},
+			}
+			// Must match content of test/images/volumes-tester/gluster/index.html
+			testVolumeClient(c, config, volume, "Hello from RBD")
+
+		})
+	})
+
 })

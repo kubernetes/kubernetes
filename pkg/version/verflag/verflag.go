@@ -23,8 +23,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	flag "github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type versionValue int
@@ -66,7 +66,7 @@ func (v *versionValue) String() string {
 	return fmt.Sprintf("%v", bool(*v == VersionTrue))
 }
 
-// The type of the flag as requred by the pflag.Value interface
+// The type of the flag as required by the pflag.Value interface
 func (v *versionValue) Type() string {
 	return "version"
 }

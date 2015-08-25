@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type describeClient struct {
@@ -172,6 +172,29 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato", "Started", "Finished", "Exit Code", "2"},
 		},
+		// Last Terminated
+		{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
+				Name: "test",
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{
+						StartedAt: util.NewTime(time.Now()),
+					},
+				},
+				LastTerminationState: api.ContainerState{
+					Terminated: &api.ContainerStateTerminated{
+						StartedAt:  util.NewTime(time.Now().Add(time.Second * 3)),
+						FinishedAt: util.NewTime(time.Now()),
+						Reason:     "crashing",
+						ExitCode:   3,
+					},
+				},
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Started", "Finished", "Exit Code", "2", "crashing", "3"},
+		},
 		// No state defaults to waiting.
 		{
 			container: api.Container{Name: "test", Image: "image"},
@@ -181,6 +204,16 @@ func TestDescribeContainers(t *testing.T) {
 				RestartCount: 7,
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image"},
+		},
+		//env
+		{
+			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz"},
 		},
 		// Using limits.
 		{
@@ -301,5 +334,80 @@ func TestDefaultDescribers(t *testing.T) {
 	}
 	if !strings.Contains(out, "foo") {
 		t.Errorf("unexpected output: %s", out)
+	}
+}
+
+func TestGetPodsTotalRequests(t *testing.T) {
+	testCases := []struct {
+		pods         []*api.Pod
+		expectedReqs map[api.ResourceName]resource.Quantity
+	}{
+		{
+			pods: []*api.Pod{
+				{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("1"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("300Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+									},
+								},
+							},
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("90m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("120Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("200M"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("60m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("43Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("500M"),
+									},
+								},
+							},
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("34m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("83Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("700M"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedReqs: map[api.ResourceName]resource.Quantity{
+				api.ResourceName(api.ResourceCPU):     resource.MustParse("1.184"),
+				api.ResourceName(api.ResourceMemory):  resource.MustParse("546Mi"),
+				api.ResourceName(api.ResourceStorage): resource.MustParse("2.4G"),
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		reqs, err := getPodsTotalRequests(testCase.pods)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if !reflect.DeepEqual(reqs, testCase.expectedReqs) {
+			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
+		}
 	}
 }

@@ -20,10 +20,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -72,22 +74,22 @@ type fakeDiskManager struct {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
 	return "/tmp/fake_iscsi_path"
 }
-func (fake *fakeDiskManager) AttachDisk(disk iscsiDisk) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) AttachDisk(b iscsiDiskBuilder) error {
+	globalPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	disk.mounter.Mount(globalPath, globalPath, disk.fsType, nil)
+	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 
 	fake.attachCalled = true
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(disk iscsiDisk, mntPath string) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
+	globalPath := c.manager.MakeGlobalPDName(*c.iscsiDisk)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -106,12 +108,12 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	fakeManager := &fakeDiskManager{}
 	fakeMounter := &mount.FakeMounter{}
-	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	builder, err := plug.(*iscsiPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
 	if builder == nil {
-		t.Errorf("Got a nil Builder: %v")
+		t.Error("Got a nil Builder")
 	}
 
 	path := builder.GetPath()
@@ -141,12 +143,12 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	fakeManager = &fakeDiskManager{}
-	cleaner, err := plug.(*ISCSIPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
+	cleaner, err := plug.(*iscsiPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
 	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner: %v")
+		t.Error("Got a nil Cleaner")
 	}
 
 	if err := cleaner.TearDown(); err != nil {
@@ -193,5 +195,57 @@ func TestPluginPersistentVolume(t *testing.T) {
 			},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pvA",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ISCSI: &api.ISCSIVolumeSource{
+					TargetPortal: "127.0.0.1:3260",
+					IQN:          "iqn.2014-12.server:storage.target01",
+					FSType:       "ext4",
+					Lun:          0,
+				},
+			},
+			ClaimRef: &api.ObjectReference{
+				Name: "claimA",
+			},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claimA",
+			Namespace: "nsA",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "pvA",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
+	o.Add(pv)
+	o.Add(claim)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plug, _ := plugMgr.FindPluginByName(iscsiPluginName)
+
+	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	spec := volume.NewSpecFromPersistentVolume(pv, true)
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+
+	if !builder.IsReadOnly() {
+		t.Errorf("Expected true for builder.IsReadOnly")
+	}
 }

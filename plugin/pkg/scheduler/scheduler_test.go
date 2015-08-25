@@ -23,13 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 type fakeBinder struct {
@@ -85,13 +85,13 @@ func TestScheduler(t *testing.T) {
 			algo:             mockScheduler{"machine1", nil},
 			expectBind:       &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			expectAssumedPod: podWithID("foo", "machine1"),
-			eventReason:      "scheduled",
+			eventReason:      "Scheduled",
 		}, {
 			sendPod:        podWithID("foo", ""),
 			algo:           mockScheduler{"machine1", errS},
 			expectError:    errS,
 			expectErrorPod: podWithID("foo", ""),
-			eventReason:    "failedScheduling",
+			eventReason:    "FailedScheduling",
 		}, {
 			sendPod:         podWithID("foo", ""),
 			algo:            mockScheduler{"machine1", nil},
@@ -99,7 +99,7 @@ func TestScheduler(t *testing.T) {
 			injectBindError: errB,
 			expectError:     errB,
 			expectErrorPod:  podWithID("foo", ""),
-			eventReason:     "failedScheduling",
+			eventReason:     "FailedScheduling",
 		},
 	}
 
@@ -164,10 +164,10 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// Setup modeler so we control the contents of all 3 stores: assumed,
 	// scheduled and queued
 	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	scheduledPodLister := &cache.StoreToPodLister{scheduledPodStore}
+	scheduledPodLister := &cache.StoreToPodLister{Store: scheduledPodStore}
 
 	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
+	queuedPodLister := &cache.StoreToPodLister{Store: queuedPodStore}
 
 	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
 
@@ -176,11 +176,11 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// all entries inserted with fakeTime will expire.
 	ttl := 30 * time.Second
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{fakeTime}
-	ttlPolicy := &cache.TTLPolicy{ttl, fakeClock}
+	fakeClock := &util.FakeClock{Time: fakeTime}
+	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	assumedPodsStore := cache.NewFakeExpirationStore(
 		cache.MetaNamespaceKeyFunc, nil, ttlPolicy, fakeClock)
-	modeler.assumedPods = &cache.StoreToPodLister{assumedPodsStore}
+	modeler.assumedPods = &cache.StoreToPodLister{Store: assumedPodsStore}
 
 	// Port is the easiest way to cause a fit predicate failure
 	podPort := 8080
@@ -218,7 +218,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	s := New(c)
 	called := make(chan struct{})
 	events := eventBroadcaster.StartEventWatcher(func(e *api.Event) {
-		if e, a := "scheduled", e.Reason; e != a {
+		if e, a := "Scheduled", e.Reason; e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 		close(called)
@@ -277,7 +277,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 	called = make(chan struct{})
 	events = eventBroadcaster.StartEventWatcher(func(e *api.Event) {
-		if e, a := "scheduled", e.Reason; e != a {
+		if e, a := "Scheduled", e.Reason; e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 		close(called)
@@ -314,9 +314,9 @@ func (fr *FakeRateLimiter) Accept() {
 
 func TestSchedulerRateLimitsBinding(t *testing.T) {
 	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	scheduledPodLister := &cache.StoreToPodLister{scheduledPodStore}
+	scheduledPodLister := &cache.StoreToPodLister{Store: scheduledPodStore}
 	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
+	queuedPodLister := &cache.StoreToPodLister{Store: queuedPodStore}
 	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
 
 	algo := NewGenericScheduler(

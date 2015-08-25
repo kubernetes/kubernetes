@@ -23,9 +23,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -35,46 +36,59 @@ Scale also allows users to specify one or more preconditions for the scale actio
 If --current-replicas or --resource-version is specified, it is validated before the
 scale is attempted, and it is guaranteed that the precondition holds true when the
 scale is sent to the server.`
-	scale_example = `// Scale replication controller named 'foo' to 3.
+	scale_example = `# Scale replication controller named 'foo' to 3.
 $ kubectl scale --replicas=3 replicationcontrollers foo
 
-// If the replication controller named foo's current size is 2, scale foo to 3.
-$ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo`
+# Scale a replication controller identified by type and name specified in "foo-controller.yaml" to 3.
+$ kubectl scale --replicas=3 -f foo-controller.yaml
+
+# If the replication controller named foo's current size is 2, scale foo to 3.
+$ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo
+
+# Scale multiple replication controllers.
+$ kubectl scale --replicas=5 rc/foo rc/bar`
 )
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
 func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE NAME",
+		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
 		Short:   "Set a new size for a Replication Controller.",
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunScale(f, out, cmd, args)
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+			err := RunScale(f, out, cmd, args, shortOutput)
 			cmdutil.CheckErr(err)
 		},
 	}
 	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to scale.")
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the replication controller match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
+	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait.")
 	cmd.MarkFlagRequired("replicas")
+	cmdutil.AddOutputFlagsForMutation(cmd)
+
+	usage := "Filename, directory, or URL to a file identifying the replication controller to set a new size"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
 // RunScale executes the scaling
-func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "resize" {
+func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
+	if len(os.Args) > 1 && os.Args[1] == "resize" {
 		printDeprecationWarning("scale", "resize")
 	}
 
 	count := cmdutil.GetFlagInt(cmd, "replicas")
 	if count < 0 {
-		return cmdutil.UsageError(cmd, "--replicas=COUNT RESOURCE NAME")
+		return cmdutil.UsageError(cmd, "--replicas=COUNT TYPE NAME")
 	}
 
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -83,14 +97,11 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
 	err = r.Err()
-	if err != nil {
-		return err
-	}
-	mapping, err := r.ResourceMapping()
 	if err != nil {
 		return err
 	}
@@ -99,24 +110,36 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	if len(infos) > 1 {
-		return fmt.Errorf("multiple resources provided: %v", args)
-	}
 	info := infos[0]
-
+	mapping := info.ResourceMapping()
 	scaler, err := f.Scaler(mapping)
 	if err != nil {
 		return err
 	}
 
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
-	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
-	precondition := &kubectl.ScalePrecondition{currentSize, resourceVersion}
-	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
-	waitForReplicas := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
-	if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
-		return err
+	if len(resourceVersion) != 0 && len(infos) > 1 {
+		return fmt.Errorf("cannot use --resource-version with multiple controllers")
 	}
-	fmt.Fprint(out, "scaled\n")
-	return nil
+	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
+	if currentSize != -1 && len(infos) > 1 {
+		return fmt.Errorf("cannot use --current-replicas with multiple controllers")
+	}
+	precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: resourceVersion}
+	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+	var waitForReplicas *kubectl.RetryParams
+	if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {
+		waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
+	}
+
+	errs := []error{}
+	for _, info := range infos {
+		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "scaled")
+	}
+
+	return errors.NewAggregate(errs)
 }

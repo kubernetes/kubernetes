@@ -23,13 +23,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/genutils"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/cpuguy83/go-md2man/mangen"
-	"github.com/russross/blackfriday"
+	mangen "github.com/cpuguy83/go-md2man/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/cmd/genutils"
+	"k8s.io/kubernetes/pkg/kubectl/cmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func main() {
@@ -144,17 +143,7 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
 `)
 
-	renderer := mangen.ManRenderer(0)
-	extensions := 0
-	extensions |= blackfriday.EXTENSION_NO_INTRA_EMPHASIS
-	extensions |= blackfriday.EXTENSION_TABLES
-	extensions |= blackfriday.EXTENSION_FENCED_CODE
-	extensions |= blackfriday.EXTENSION_AUTOLINK
-	extensions |= blackfriday.EXTENSION_SPACE_HEADERS
-	extensions |= blackfriday.EXTENSION_FOOTNOTES
-	extensions |= blackfriday.EXTENSION_TITLEBLOCK
-
-	final := blackfriday.Markdown(out.Bytes(), renderer, extensions)
+	final := mangen.Render(out.Bytes())
 
 	filename := docsDir + dname + ".1"
 	outFile, err := os.Create(filename)

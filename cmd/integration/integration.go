@@ -33,34 +33,34 @@ import (
 	"sync"
 	"time"
 
-	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
-	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
-	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 	docker "github.com/fsouza/go-dockerclient"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/apiserver"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/controller/endpoint"
+	"k8s.io/kubernetes/pkg/controller/node"
+	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/scheduler"
+	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/test/e2e"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -79,10 +79,6 @@ type fakeKubeletClient struct{}
 
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
-}
-
-func (fakeKubeletClient) HealthCheck(host string) (probe.Result, string, error) {
-	return probe.Success, "", nil
 }
 
 type delegateHandler struct {
@@ -132,9 +128,13 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
 
-	helper, err := master.NewEtcdHelper(etcdClient, "", etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
 	if err != nil {
-		glog.Fatalf("Unable to get etcd helper: %v", err)
+		glog.Fatalf("Unable to get etcd storage: %v", err)
+	}
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+	if err != nil {
+		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
 
 	// Master
@@ -152,17 +152,16 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		glog.Fatalf("no public address for %s", host)
 	}
 
-	// Enable v1beta3 in master only if we are starting the components for that api version.
-	enableV1Beta3 := apiVersion == "v1beta3"
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
+		ExpDatabaseStorage:    expEtcdStorage,
 		KubeletClient:         fakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
-		EnableV1Beta3:         enableV1Beta3,
+		ExpAPIPrefix:          "/experimental",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
@@ -172,7 +171,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	handler.delegate = m.Handler
 
 	// Scheduler
-	schedulerConfigFactory := factory.NewConfigFactory(cl)
+	schedulerConfigFactory := factory.NewConfigFactory(cl, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		glog.Fatalf("Couldn't create scheduler config: %v", err)
@@ -183,7 +182,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 
-	endpoints := service.NewEndpointController(cl)
+	endpoints := endpointcontroller.NewEndpointController(cl)
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpoints.Run(3, util.NeverStop)
 
@@ -192,7 +191,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 10, 5*time.Minute, nodecontroller.NewPodEvictor(util.NewFakeRateLimiter()),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, nodecontroller.NewPodEvictor(util.NewFakeRateLimiter()),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
@@ -332,7 +331,7 @@ containers:
 			desc: "static-pod-from-spec",
 			fileContents: `{
 				"kind": "Pod",
-				"apiVersion": "v1beta3",
+				"apiVersion": "v1",
 				"metadata": {
 					"name": "static-pod-from-spec"
 				},
@@ -611,23 +610,6 @@ func runPatchTest(c *client.Client) {
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
-		"v1beta3": {
-			api.JSONPatchType: {
-				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
-			},
-			api.MergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":null}}`),
-			},
-			api.StrategicMergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
-			},
-		},
 		"v1": {
 			api.JSONPatchType: {
 				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
@@ -885,7 +867,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 
 	// Delete a pod to free up room.
 	glog.Infof("Deleting pod %v", bar.Name)
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, nil)
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, api.NewDeleteOptions(0))
 	if err != nil {
 		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
 	}
@@ -896,7 +878,11 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
 	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
-		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+		if pod, perr := client.Pods(api.NamespaceDefault).Get("phantom.bar"); perr == nil {
+			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v", pod)
+		} else {
+			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+		}
 	}
 
 	glog.Info("Scheduler doesn't make phantom pods: test passed.")
@@ -1027,7 +1013,7 @@ func ServeCachedManifestFile(contents string) (servingAddress string) {
 const (
 	testPodSpecFile = `{
 		"kind": "Pod",
-		"apiVersion": "v1beta3",
+		"apiVersion": "v1",
 		"metadata": {
 			"name": "container-vm-guestbook-pod-spec"
 		},

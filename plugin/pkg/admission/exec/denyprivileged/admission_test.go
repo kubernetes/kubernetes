@@ -19,11 +19,11 @@ package denyprivileged
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // TestAdmission verifies a namespace is created on create requests for namespace managed resources
@@ -37,8 +37,8 @@ func TestAdmissionDeny(t *testing.T) {
 
 func testAdmission(t *testing.T, pod *api.Pod, shouldAccept bool) {
 	mockClient := &testclient.Fake{
-		ReactFn: func(action testclient.FakeAction) (runtime.Object, error) {
-			if action.Action == "get-pod" && action.Value.(string) == pod.Name {
+		ReactFn: func(action testclient.Action) (runtime.Object, error) {
+			if action.Matches("get", "pods") && action.(testclient.GetAction).GetName() == pod.Name {
 				return pod, nil
 			}
 			t.Errorf("Unexpected API call: %#v", action)

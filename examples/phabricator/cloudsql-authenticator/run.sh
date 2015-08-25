@@ -18,7 +18,7 @@
 #       should only send updates if something changes. We should be able to do
 #       this by comparing pod creation time with the last scan time.
 while true; do
-  hostport="https://kubernetes.default.cluster.local"
+  hostport="https://kubernetes.default.svc.cluster.local"
   token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
   path="api/v1/pods"
   query="labels=$SELECTOR"

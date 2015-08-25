@@ -22,20 +22,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	kservice "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/workqueue"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/endpoints"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	kservice "k8s.io/kubernetes/pkg/controller/endpoint"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/workqueue"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -243,6 +243,7 @@ func (e *endpointController) worker() {
 	}
 }
 
+// HACK(sttts): add annotations to the endpoint about the respective container ports
 func (e *endpointController) syncService(key string) {
 	startTime := time.Now()
 	defer func() {
@@ -287,6 +288,7 @@ func (e *endpointController) syncService(key string) {
 	}
 
 	subsets := []api.EndpointSubset{}
+	containerPortAnnotations := map[string]string{} // by <HostIP>:<Port>
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 
@@ -295,7 +297,7 @@ func (e *endpointController) syncService(key string) {
 
 			portName := servicePort.Name
 			portProto := servicePort.Protocol
-			portNum, err := findPort(pod, servicePort)
+			portNum, containerPort, err := findPort(pod, servicePort)
 			if err != nil {
 				glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
@@ -320,6 +322,7 @@ func (e *endpointController) syncService(key string) {
 				ResourceVersion: pod.ObjectMeta.ResourceVersion,
 			}}
 			subsets = append(subsets, api.EndpointSubset{Addresses: []api.EndpointAddress{epa}, Ports: []api.EndpointPort{epp}})
+			containerPortAnnotations[fmt.Sprintf(meta.ContainerPortKeyFormat, portProto, pod.Status.HostIP, portNum)] = strconv.Itoa(containerPort)
 		}
 	}
 	subsets = endpoints.RepackSubsets(subsets)
@@ -347,6 +350,13 @@ func (e *endpointController) syncService(key string) {
 	newEndpoints := currentEndpoints
 	newEndpoints.Subsets = subsets
 	newEndpoints.Labels = service.Labels
+
+	if newEndpoints.Annotations == nil {
+		newEndpoints.Annotations = map[string]string{}
+	}
+	for hostIpPort, containerPort := range containerPortAnnotations {
+		newEndpoints.Annotations[hostIpPort] = containerPort
+	}
 
 	if len(currentEndpoints.ResourceVersion) == 0 {
 		// No previous endpoints, create them
@@ -389,8 +399,8 @@ func (e *endpointController) checkLeftoverEndpoints() {
 // string up in all named ports in all containers in the target pod.  If no
 // match is found, fail.
 //
-// HACK(jdef): return the HostPort instead of the ContainerPort for generic mesos compat.
-func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
+// HACK(jdef): return the HostPort in addition to the ContainerPort for generic mesos compatibility
+func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 	portName := svcPort.TargetPort
 	switch portName.Kind {
 	case util.IntstrString:
@@ -398,7 +408,8 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.Name == name && port.Protocol == svcPort.Protocol {
-					return findMappedPortName(pod, port.Protocol, name)
+					hostPort, err := findMappedPortName(pod, port.Protocol, name)
+					return hostPort, port.ContainerPort, err
 				}
 			}
 		}
@@ -412,12 +423,13 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {
-					return findMappedPort(pod, port.Protocol, p)
+					hostPort, err := findMappedPort(pod, port.Protocol, p)
+					return hostPort, port.ContainerPort, err
 				}
 			}
 		}
 	}
-	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
+	return 0, 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }
 
 func findMappedPort(pod *api.Pod, protocol api.Protocol, port int) (int, error) {

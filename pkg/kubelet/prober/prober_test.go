@@ -19,10 +19,10 @@ package prober
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 func TestFormatURL(t *testing.T) {
@@ -48,12 +48,12 @@ func TestFindPortByName(t *testing.T) {
 	container := api.Container{
 		Ports: []api.ContainerPort{
 			{
-				Name:     "foo",
-				HostPort: 8080,
+				Name:          "foo",
+				ContainerPort: 8080,
 			},
 			{
-				Name:     "bar",
-				HostPort: 9000,
+				Name:          "bar",
+				ContainerPort: 9000,
 			},
 		},
 	}
@@ -85,7 +85,7 @@ func TestGetURLParts(t *testing.T) {
 	for _, test := range testCases {
 		state := api.PodStatus{PodIP: "127.0.0.1"}
 		container := api.Container{
-			Ports: []api.ContainerPort{{Name: "found", HostPort: 93}},
+			Ports: []api.ContainerPort{{Name: "found", ContainerPort: 93}},
 			LivenessProbe: &api.Probe{
 				Handler: api.Handler{
 					HTTPGet: test.probe,
@@ -138,7 +138,7 @@ func TestGetTCPAddrParts(t *testing.T) {
 	for _, test := range testCases {
 		host := "1.2.3.4"
 		container := api.Container{
-			Ports: []api.ContainerPort{{Name: "found", HostPort: 93}},
+			Ports: []api.ContainerPort{{Name: "found", ContainerPort: 93}},
 			LivenessProbe: &api.Probe{
 				Handler: api.Handler{
 					TCPSocket: test.probe,

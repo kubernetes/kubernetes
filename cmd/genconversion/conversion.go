@@ -17,22 +17,31 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"os"
+	"path"
 	"runtime"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/expapi"
+	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/tools/imports"
 )
+
+const pkgBase = "k8s.io/kubernetes/pkg"
 
 var (
 	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
-	version      = flag.StringP("version", "v", "v1beta3", "Version for conversion.")
+	groupVersion = flag.StringP("version", "v", "api/v1", "groupPath/version for conversion.")
 )
 
 func main() {
@@ -51,18 +60,46 @@ func main() {
 		funcOut = file
 	}
 
-	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw())
+	data := new(bytes.Buffer)
+
+	group, version := path.Split(*groupVersion)
+	group = strings.TrimRight(group, "/")
+
+	_, err := data.WriteString(fmt.Sprintf("package %v\n", version))
+	if err != nil {
+		glog.Fatalf("error writing package line: %v", err)
+	}
+
+	versionPath := path.Join(pkgBase, group, version)
+	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
+	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
+	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
-	generator.OverwritePackage(*version, "")
-	for _, knownType := range api.Scheme.KnownTypes(*version) {
-		if err := generator.GenerateConversionsForType(*version, knownType); err != nil {
+	generator.OverwritePackage(version, "")
+	for _, knownType := range api.Scheme.KnownTypes(version) {
+		if !strings.HasPrefix(knownType.PkgPath(), versionPath) {
+			continue
+		}
+		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}
-	if err := generator.WriteConversionFunctions(funcOut); err != nil {
+	generator.RepackImports(util.NewStringSet())
+	if err := generator.WriteImports(data); err != nil {
+		glog.Fatalf("error while writing imports: %v", err)
+	}
+	if err := generator.WriteConversionFunctions(data); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
-	if err := generator.RegisterConversionFunctions(funcOut); err != nil {
+	if err := generator.RegisterConversionFunctions(data, fmt.Sprintf("%s.Scheme", apiShort)); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
+	}
+
+	b, err := imports.Process("", data.Bytes(), nil)
+	if err != nil {
+		glog.Fatalf("error while update imports: %v", err)
+	}
+	if _, err := funcOut.Write(b); err != nil {
+		glog.Fatalf("error while writing out the resulting file: %v", err)
 	}
 }

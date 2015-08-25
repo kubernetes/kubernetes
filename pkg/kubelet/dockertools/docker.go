@@ -20,23 +20,22 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
-	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/leaky"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -71,6 +70,7 @@ type DockerInterface interface {
 	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
 	StartExec(string, docker.StartExecOptions) error
 	InspectExec(id string) (*docker.ExecInspect, error)
+	AttachToContainer(opts docker.AttachToContainerOptions) error
 }
 
 // KubeletContainerName encapsulates a pod name and a Kubernetes container name.
@@ -233,14 +233,15 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both full pod name and container name.
-func BuildDockerName(dockerName KubeletContainerName, container *api.Container) string {
+func BuildDockerName(dockerName KubeletContainerName, container *api.Container) (string, string) {
 	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	return fmt.Sprintf("%s_%s_%s_%s_%08x",
+	stableName := fmt.Sprintf("%s_%s_%s_%s",
 		containerNamePrefix,
 		containerName,
 		dockerName.PodFullName,
-		dockerName.PodUID,
-		rand.Uint32())
+		dockerName.PodUID)
+
+	return stableName, fmt.Sprintf("%s_%08x", stableName, rand.Uint32())
 }
 
 // Unpacks a container name, returning the pod full name and container name we would have used to
@@ -282,19 +283,14 @@ func LogSymlink(containerLogsDir, podFullName, containerName, dockerId string) s
 	return path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s.%s", podFullName, containerName, dockerId, LogSuffix))
 }
 
-// Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
-func getDockerEndpoint(dockerEndpoint string) string {
-	var endpoint string
+// Get a *docker.Client, either using the endpoint passed in, or using
+// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
+func getDockerClient(dockerEndpoint string) (*docker.Client, error) {
 	if len(dockerEndpoint) > 0 {
-		endpoint = dockerEndpoint
-	} else if len(os.Getenv("DOCKER_HOST")) > 0 {
-		endpoint = os.Getenv("DOCKER_HOST")
-	} else {
-		endpoint = "unix:///var/run/docker.sock"
+		glog.Infof("Connecting to docker on %s", dockerEndpoint)
+		return docker.NewClient(dockerEndpoint)
 	}
-	glog.Infof("Connecting to docker on %s", endpoint)
-
-	return endpoint
+	return docker.NewClientFromEnv()
 }
 
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
@@ -303,7 +299,7 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 			VersionInfo: docker.Env{"ApiVersion=1.18"},
 		}
 	}
-	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))
+	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}

@@ -17,13 +17,15 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -84,6 +86,8 @@ func (f *Framework) afterEach() {
 		// Note that we don't wait for any cleanup to propagate, which means
 		// that if you delete a bunch of pods right before ending your test,
 		// you may or may not see the killing/deletion/cleanup events.
+
+		dumpAllPodInfo(f.Client)
 	}
 
 	// Check whether all nodes are ready after the test.
@@ -92,7 +96,8 @@ func (f *Framework) afterEach() {
 	}
 
 	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
-	if err := f.Client.Namespaces().Delete(f.Namespace.Name); err != nil {
+
+	if err := deleteNS(f.Client, f.Namespace.Name); err != nil {
 		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
 	}
 	// Paranoia-- prevent reuse!
@@ -154,4 +159,51 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 	}
+}
+
+// Write a file using kubectl exec echo <contents> > <path> via specified container
+// Because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
+func (f *Framework) WriteFileViaContainer(podName, containerName string, path string, contents string) error {
+	By("writing a file in the container")
+	allowedCharacters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	for _, c := range contents {
+		if !strings.ContainsRune(allowedCharacters, c) {
+			return fmt.Errorf("Unsupported character in string to write: %v", c)
+		}
+	}
+	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
+	stdout, stderr, err := kubectlExec(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
+	if err != nil {
+		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return err
+}
+
+// Read a file using kubectl exec cat <path>
+func (f *Framework) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
+	By("reading a file in the container")
+
+	stdout, stderr, err := kubectlExec(f.Namespace.Name, podName, containerName, "--", "cat", path)
+	if err != nil {
+		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return string(stdout), err
+}
+
+func kubectlExec(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
+	var stdout, stderr bytes.Buffer
+	cmdArgs := []string{
+		"exec",
+		fmt.Sprintf("--namespace=%v", namespace),
+		podName,
+		fmt.Sprintf("-c=%v", containerName),
+	}
+	cmdArgs = append(cmdArgs, args...)
+
+	cmd := kubectlCmd(cmdArgs...)
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	err := cmd.Run()
+	return stdout.Bytes(), stderr.Bytes(), err
 }

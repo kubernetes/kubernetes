@@ -1,6 +1,40 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/networking.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Networking
 
 There are 4 distinct networking problems to solve:
+
 1. Highly-coupled container-to-container communications
 2. Pod-to-Pod communications
 3. Pod-to-Service communications
@@ -53,7 +87,7 @@ whereas, in general, they don't control what pods land together on a host.
 ## Pod to pod
 
 Because every pod gets a "real" (not machine-private) IP address, pods can
-communicate without proxies or translations.  The can use well-known port
+communicate without proxies or translations.  The pod can use well-known port
 numbers and can avoid the use of higher-level service discovery systems like
 DNS-SD, Consul, or Etcd.
 
@@ -97,7 +131,7 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 
 Example of GCE's advanced routing rules:
 
-```
+```sh
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
   --destination-range "${MINION_IP_RANGES[$i]}" \
@@ -114,7 +148,7 @@ a pod tries to egress beyond GCE's project the packets must be SNAT'ed
 
 With the primary aim of providing IP-per-pod-model, other implementations exist
 to serve the purpose outside of GCE.
-  - [OpenVSwitch with GRE/VxLAN](../ovs-networking.md)
+  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.md)
   - [Flannel](https://github.com/coreos/flannel#flannel)
   - [L2 networks](http://blog.oddbit.com/2014/08/11/four-ways-to-connect-a-docker/)
     ("With Linux Bridge devices" section)
@@ -125,9 +159,9 @@ to serve the purpose outside of GCE.
 
 ## Pod to service
 
-The [service](../services.md) abstraction provides a way to group pods under a
+The [service](../user-guide/services.md) abstraction provides a way to group pods under a
 common access policy (e.g. load-balanced).  The implementation of this creates a
-virtual IP which clients can access and which is transparantly proxied to the
+virtual IP which clients can access and which is transparently proxied to the
 pods in a Service.  Each node runs a kube-proxy process which programs
 `iptables` rules to trap access to service IPs and redirect them to the correct
 backends.  This provides a highly-available load-balancing solution with low
@@ -175,4 +209,6 @@ External IP assignment would also simplify DNS support (see below).
 IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/networking.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

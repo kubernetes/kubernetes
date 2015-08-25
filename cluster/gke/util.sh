@@ -29,7 +29,7 @@ source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
 # Assumed vars:
 #   GCLOUD
 function prepare-e2e() {
-  echo "... in prepare-e2e()" >&2
+  echo "... in gke:prepare-e2e()" >&2
 
   # Ensure GCLOUD is set to some gcloud binary.
   if [[ -z "${GCLOUD:-}" ]]; then
@@ -48,28 +48,28 @@ function prepare-e2e() {
 # Vars set:
 #   PROJECT
 function detect-project() {
-  echo "... in detect-project()" >&2
+  echo "... in gke:detect-project()" >&2
   if [[ -z "${PROJECT:-}" ]]; then
     export PROJECT=$("${GCLOUD}" config list project | tail -n 1 | cut -f 3 -d ' ')
+    echo "... Using project: ${PROJECT}" >&2
   fi
-
   if [[ -z "${PROJECT:-}" ]]; then
     echo "Could not detect Google Cloud Platform project. Set the default project using " >&2
     echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
-  echo "Project: ${PROJECT}" >&2
 }
 
 # Execute prior to running tests to build a release if required for env.
 function test-build-release() {
-  echo "... in test-build-release()" >&2
+  echo "... in gke:test-build-release()" >&2
   # We currently use the Kubernetes version that GKE supports (not testing
   # bleeding-edge builds).
 }
 
 # Verify needed binaries exist.
 function verify-prereqs() {
+  echo "... in gke:verify-prereqs()" >&2
   if ! which gcloud >/dev/null; then
     local resp
     if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
@@ -112,8 +112,10 @@ function verify-prereqs() {
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
+#   MINION_SCOPES
+#   MACHINE_TYPE
 function kube-up() {
-  echo "... in kube-up()" >&2
+  echo "... in gke:kube-up()" >&2
   detect-project >&2
 
   # Make the specified network if we need to.
@@ -121,7 +123,7 @@ function kube-up() {
     echo "Creating new network: ${NETWORK}" >&2
     "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
   else
-    echo "Using network: ${NETWORK}" >&2
+    echo "... Using network: ${NETWORK}" >&2
   fi
 
   # Allow SSH on all nodes in the network. This doesn't actually check whether
@@ -134,7 +136,7 @@ function kube-up() {
       --project="${PROJECT}" \
       --source-ranges="0.0.0.0/0"
   else
-    echo "Using firewall-rule: ${FIREWALL_SSH}" >&2
+    echo "... Using firewall-rule: ${FIREWALL_SSH}" >&2
   fi
 
   local create_args=(
@@ -142,12 +144,10 @@ function kube-up() {
     "--project=${PROJECT}"
     "--num-nodes=${NUM_MINIONS}"
     "--network=${NETWORK}"
+    "--scopes=${MINION_SCOPES}"
+    "--cluster-version=${CLUSTER_API_VERSION}"
+    "--machine-type=${MACHINE_TYPE}"
   )
-  if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
-    create_args+=("--cluster-version=${CLUSTER_API_VERSION:-}")
-  else
-    create_args+=("--cluster-api-version=${CLUSTER_API_VERSION:-}")
-  fi
 
   # Bring up the cluster.
   "${GCLOUD}" "${CMD_GROUP}" container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
@@ -164,7 +164,7 @@ function kube-up() {
 # Vars set:
 #   MINION_TAG
 function test-setup() {
-  echo "... in test-setup()" >&2
+  echo "... in gke:test-setup()" >&2
   # Detect the project into $PROJECT if it isn't set
   detect-project >&2
   detect-minions >&2
@@ -189,37 +189,17 @@ function test-setup() {
     --network="${NETWORK}"
 }
 
-# Ensure that we have a password created for validating to the master.
-#
-# Assumed vars:
-#  ZONE
-#  CLUSTER_NAME
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password() {
-  echo "... in get-password()" >&2
-  detect-project >&2
-  KUBE_USER=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep password | cut -f 4 -d ' ')
-}
-
-# Detect the instance name and IP for the master
+# Detect the IP for the master. Note that on GKE, we don't know the name of the
+# master, so KUBE_MASTER is not set.
 #
 # Assumed vars:
 #   ZONE
 #   CLUSTER_NAME
 # Vars set:
-#   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master() {
-  echo "... in detect-master()" >&2
+  echo "... in gke:detect-master()" >&2
   detect-project >&2
-  KUBE_MASTER="k8s-${CLUSTER_NAME}-master"
   KUBE_MASTER_IP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
@@ -230,7 +210,7 @@ function detect-master() {
 # Vars set:
 #   MINION_NAMES
 function detect-minions() {
-  echo "... in detect-minions()" >&2
+  echo "... in gke:detect-minions()" >&2
   detect-minion-names
 }
 
@@ -241,11 +221,13 @@ function detect-minions() {
 # Vars set:
 #   MINION_NAMES
 function detect-minion-names {
+  echo "... in gke:detect-minion-names()" >&2
   detect-project
   detect-node-instance-group
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_GROUP}" list \
-    | cut -d'/' -f11))
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
+    --format=yaml | grep instance: | cut -d ' ' -f 2))
+
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
 
@@ -259,6 +241,7 @@ function detect-minion-names {
 # Vars set:
 #   NODE_INSTANCE_GROUP
 function detect-node-instance-group {
+  echo "... in gke:detect-node-instance-group()" >&2
   NODE_INSTANCE_GROUP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep instanceGroupManagers | cut -d '/' -f 11)
@@ -270,7 +253,7 @@ function detect-node-instance-group {
 #   GCLOUD
 #   ZONE
 function ssh-to-node() {
-  echo "... in ssh-to-node()" >&2
+  echo "... in gke:ssh-to-node()" >&2
   detect-project >&2
 
   local node="$1"
@@ -288,13 +271,13 @@ function ssh-to-node() {
 
 # Restart the kube-proxy on a node ($1)
 function restart-kube-proxy() {
-  echo "... in restart-kube-proxy()"  >&2
+  echo "... in gke:restart-kube-proxy()"  >&2
   ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
 # Restart the kube-proxy on master ($1)
 function restart-apiserver() {
-  echo "... in restart-kube-apiserver()"  >&2
+  echo "... in gke:restart-apiserver()"  >&2
   ssh-to-node "$1" "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 }
 
@@ -308,7 +291,7 @@ function restart-apiserver() {
 #   KUBE_ROOT
 #   ZONE
 function test-teardown() {
-  echo "... in test-teardown()" >&2
+  echo "... in gke:test-teardown()" >&2
 
   detect-project >&2
   detect-minions >&2
@@ -333,7 +316,7 @@ function test-teardown() {
 #  ZONE
 #  CLUSTER_NAME
 function kube-down() {
-  echo "... in kube-down()" >&2
+  echo "... in gke:kube-down()" >&2
   detect-project >&2
   "${GCLOUD}" "${CMD_GROUP}" container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
