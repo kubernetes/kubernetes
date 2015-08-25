@@ -411,3 +411,71 @@ func TestGetPodsTotalRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestPersistentVolumeDescriber(t *testing.T) {
+	tests := map[string]*api.PersistentVolume{
+
+		"hostpath": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{},
+				},
+			},
+		},
+		"gce": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+			},
+		},
+		"ebs": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+				},
+			},
+		},
+		"nfs": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					NFS: &api.NFSVolumeSource{},
+				},
+			},
+		},
+		"iscsi": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{},
+				},
+			},
+		},
+		"gluster": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Glusterfs: &api.GlusterfsVolumeSource{},
+				},
+			},
+		},
+		"rbd": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					RBD: &api.RBDVolumeSource{},
+				},
+			},
+		},
+	}
+
+	for name, pv := range tests {
+		fake := testclient.NewSimpleFake(pv)
+		c := PersistentVolumeDescriber{fake}
+		str, err := c.Describe("foo", "bar")
+		if err != nil {
+			t.Errorf("Unexpected error for test %s: %v", name, err)
+		}
+		if str == "" {
+			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", name)
+		}
+
+	}
+}
