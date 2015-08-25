@@ -264,3 +264,98 @@ type DeploymentStatus struct {
 	// Total number of new ready pods with the desired template spec.
 	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
 }
+
+// Job represents the configuration of a single job.
+type Job struct {
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is a structure defining the expected behavior of a job.
+	Spec JobSpec `json:"spec,omitempty" description:"definition of the expected behavior of a job"`
+
+	// Status is a structure describing current status of a job.
+	Status JobStatus `json:"status,omitempty" description:"description of a current job status"`
+}
+
+// JobList is a collection of jobs.
+type JobList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty"`
+
+	Items []Job `json:"items" description:"list of jobs"`
+}
+
+// JobSpec describes how the job execution will look like.
+type JobSpec struct {
+
+	// Parallelism specifies the maximum desired number of pods the job should
+	// run at any given time. The actual number of pods running in steady state will
+	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
+	// i.e. when the work left to do is less than max parallelism.
+	Parallelism *int `json:"parallelism,omitempty" description:"maximum number of pods the job should run"`
+
+	// Completions specifies the desired number of successfully finished pods the
+	// job should be run with. Defaults to 1.
+	Completions *int `json:"completions,omitempty" descrption:"desired number of pods"`
+
+	// Selector is a label query over pods that should match the pod count.
+	Selector map[string]string `json:"selector" description:"selector for pods running a job"`
+
+	// Template is the object that describes the pod that will be created when
+	// executing a job.
+	Template *api.PodTemplateSpec `json:"template" description:"job execution's pod definition"`
+}
+
+// JobStatus represents the current state of a Job.
+type JobStatus struct {
+
+	// Conditions represent the latest available observations of an object's current state
+	Conditions []JobCondition `json:"conditions,omitempty" description:"latest observations of an object's state"`
+
+	// CreationTime represents time when the job was created
+	CreationTime util.Time `json:"creationTime,omitempty" description:"time when job was created"`
+
+	// StartTime represents time when the job was started
+	StartTime util.Time `json:"startTime,omitempty" description:"time when job was started"`
+
+	// CompletionTime represents time when the job was completed
+	CompletionTime util.Time `json:"completionTime,omitempty" description:"time when job was completed"`
+
+	// Active is the number of actively running pods.
+	Active int `json:"active,omitempty" description:"number of actively running pods"`
+
+	// Successful is the number of pods successfully completed their job.
+	Successful int `json:"successful,omitempty" description:"number of successfully completed pods"`
+
+	// Unsuccessful is the number of pods failures, this applies only to jobs
+	// created with RestartPolicyNever, otherwise this value will always be 0.
+	Unsuccessful int `json:"unsuccessful,omitempty" description:"number of pod failures"`
+}
+
+// JobStatusResult is a wrapper for JobStatus returned by kubelet that can be encode/decoded
+type JobStatusResult struct {
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Status represents the current information about a job. This data may not be up
+	// to date.
+	Status JobStatus `json:"status,omitempty" description:"current information about a job"`
+}
+
+type JobConditionType string
+
+// These are valid conditions of a job.
+const (
+	// JobComplete means the job has completed its execution.
+	JobComplete JobConditionType = "Complete"
+)
+
+// JobCondition describes current state of a job.
+type JobCondition struct {
+	Type               JobConditionType    `json:"type"`
+	Status             api.ConditionStatus `json:"status"`
+	LastHeartbeatTime  util.Time           `json:"lastHeartbeatTime,omitempty"`
+	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty"`
+	Reason             string              `json:"reason,omitempty"`
+	Message            string              `json:"message,omitempty"`
+}
