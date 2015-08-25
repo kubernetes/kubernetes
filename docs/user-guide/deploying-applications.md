@@ -53,7 +53,7 @@ Kubernetes creates and manages sets of replicated containers (actually, replicat
 
 A replication controller simply ensures that a specified number of pod "replicas" are running at any one time. If there are too many, it will kill some. If there are too few, it will start more. It’s analogous to Google Compute Engine’s [Instance Group Manager](https://cloud.google.com/compute/docs/instance-groups/manager/) or AWS’s [Auto-scaling Group](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html) (with no scaling policies).
 
-The replication controller created to run nginx by `kubctl run` in the [Quick start](quick-start.md) could be specified using YAML as follows:
+The replication controller created to run nginx by `kubectl run` in the [Quick start](quick-start.md) could be specified using YAML as follows:
 
 ```yaml
 apiVersion: v1
