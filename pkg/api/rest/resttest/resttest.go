@@ -36,9 +36,10 @@ import (
 
 type Tester struct {
 	*testing.T
-	storage      rest.Storage
-	storageError injectErrorFunc
-	clusterScope bool
+	storage       rest.Storage
+	storageError  injectErrorFunc
+	clusterScope  bool
+	generatesName bool
 }
 
 type injectErrorFunc func(err error)
@@ -59,6 +60,11 @@ func (t *Tester) withStorageError(err error, fn func()) {
 
 func (t *Tester) ClusterScope() *Tester {
 	t.clusterScope = true
+	return t
+}
+
+func (t *Tester) GeneratesName() *Tester {
+	t.generatesName = true
 	return t
 }
 
@@ -96,14 +102,20 @@ func copyOrDie(obj runtime.Object) runtime.Object {
 	return out
 }
 
-type AssignFunc func(objs []runtime.Object) []runtime.Object
-type SetRVFunc func(resourceVersion uint64)
+type AssignFunc func([]runtime.Object) []runtime.Object
+type GetFunc func(api.Context, runtime.Object) (runtime.Object, error)
+type SetFunc func(api.Context, runtime.Object) error
+type SetRVFunc func(uint64)
 
 // Test creating an object.
-func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
+func (t *Tester) TestCreate(valid runtime.Object, setFn SetFunc, getFn GetFunc, invalid ...runtime.Object) {
 	t.testCreateHasMetadata(copyOrDie(valid))
-	t.testCreateGeneratesName(copyOrDie(valid))
-	t.testCreateGeneratesNameReturnsServerTimeout(copyOrDie(valid))
+	if !t.generatesName {
+		t.testCreateGeneratesName(copyOrDie(valid))
+		t.testCreateGeneratesNameReturnsServerTimeout(copyOrDie(valid))
+	}
+	t.testCreateEquals(copyOrDie(valid), getFn)
+	t.testCreateAlreadyExisting(copyOrDie(valid), setFn)
 	if t.clusterScope {
 		t.testCreateDiscardsObjectNamespace(copyOrDie(valid))
 		t.testCreateIgnoresContextNamespace(copyOrDie(valid))
@@ -160,6 +172,53 @@ func (t *Tester) TestList(obj runtime.Object, assignFn AssignFunc, setRVFn SetRV
 
 // =============================================================================
 // Creation tests.
+
+func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, setFn SetFunc) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	fooMeta := t.getObjectMetaOrFail(foo)
+	fooMeta.Name = "foo1"
+	fooMeta.Namespace = api.NamespaceValue(ctx)
+	fooMeta.GenerateName = ""
+	if err := setFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	_, err := t.storage.(rest.Creater).Create(ctx, foo)
+	if !errors.IsAlreadyExists(err) {
+		t.Errorf("expected already exists err, got %v", err)
+	}
+}
+
+func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	fooMeta := t.getObjectMetaOrFail(foo)
+	fooMeta.Name = "foo2"
+	fooMeta.Namespace = api.NamespaceValue(ctx)
+	fooMeta.GenerateName = ""
+
+	created, err := t.storage.(rest.Creater).Create(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	got, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Set resource version which might be unset in created object.
+	createdMeta := t.getObjectMetaOrFail(created)
+	gotMeta := t.getObjectMetaOrFail(got)
+	createdMeta.ResourceVersion = gotMeta.ResourceVersion
+
+	if e, a := created, got; !api.Semantic.DeepEqual(e, a) {
+		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
+	}
+}
 
 func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)

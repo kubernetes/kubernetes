@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
@@ -66,6 +67,12 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		pod,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.PodTemplate{
 			Template: api.PodTemplateSpec{},
