@@ -76,6 +76,7 @@ func TestRunOnce(t *testing.T) {
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 
 	podManager, _ := newFakePodManager()
+	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 
 	kb := &Kubelet{
 		rootDirectory:       "/tmp/kubelet",
@@ -88,6 +89,7 @@ func TestRunOnce(t *testing.T) {
 		podManager:          podManager,
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
+		diskSpaceManager:    diskSpaceManager,
 	}
 	kb.containerManager, _ = newContainerManager(cadvisor, "", "", "")
 
