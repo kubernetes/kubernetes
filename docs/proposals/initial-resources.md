@@ -77,7 +77,7 @@ If there is still no data the default value will be set by LimitRanger. Same par
 
 #### Example
 
-For example, if we have at least 60 samples from image:tag over the past 7 days, we will use the 90th percentile of all of the samples of image:tag over the past 7 days.
+If we have at least 60 samples from image:tag over the past 7 days, we will use the 90th percentile of all of the samples of image:tag over the past 7 days.
 Otherwise, if we have at least 60 samples from image:tag over the past 30 days, we will use the 90th percentile of all of the samples over of image:tag the past 30 days.
 Otherwise, if we have at least 1 sample from image over the past 30 days, we will use that the 90th percentile of all of the samples of image over the past 30 days.
 Otherwise we will use default value.
@@ -99,6 +99,7 @@ The first version will be quite simple so there is a lot of possible improvement
 and should be introduced shortly after the first version is done:
 
 * observe OOM and then react to it by increasing estimation
+* add possibility to specify if estimation should be made, possibly as ```InitialResourcesPolicy``` with options: *always*, *if-not-set*, *never*
 * add other features to the model like *namespace*
 * remember predefined values for the most popular images like *mysql*, *nginx*, *redis*, etc.
 * dry mode, which allows to ask system for resource recommendation for a container without running it
