@@ -221,7 +221,7 @@ func restartNodes(provider string, nt time.Duration) error {
 	}
 }
 
-// TODO(mbforbes): Switch this to MIG recreate-instances. This can be done
+// TODO(marekbiskup): Switch this to MIG recreate-instances. This can be done
 // with the following bash, but needs to be written in Go:
 //
 //   # Step 1: Get instance names.
