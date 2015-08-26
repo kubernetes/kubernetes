@@ -1585,7 +1585,7 @@ func NodeSSHHosts(c *client.Client) ([]string, error) {
 		for _, addr := range n.Status.Addresses {
 			// Use the first external IP address we find on the node, and
 			// use at most one per node.
-			// TODO(mbforbes): Use the "preferred" address for the node, once
+			// TODO(roberthbailey): Use the "preferred" address for the node, once
 			// such a thing is defined (#2462).
 			if addr.Type == api.NodeExternalIP {
 				hosts = append(hosts, addr.Address+":22")
@@ -1680,7 +1680,7 @@ func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeo
 	}
 	// Wait for them all to finish.
 	success := true
-	// TODO(mbforbes): Change to `for range` syntax and remove logging once we
+	// TODO(a-robinson): Change to `for range` syntax and remove logging once we
 	// support only Go >= 1.4.
 	for _, podName := range podNames {
 		if !<-result {

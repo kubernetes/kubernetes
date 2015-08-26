@@ -1533,7 +1533,7 @@ func (t *WebserverTest) Cleanup() []error {
 		if _, err := t.Client.ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}
-		// TODO(mbforbes): Wait.
+		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
 		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {

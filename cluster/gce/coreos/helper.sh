@@ -139,8 +139,8 @@ function create-master-instance {
 
 # TODO(dawnchen): Check $CONTAINER_RUNTIME to decide which
 # cloud_config yaml file should be passed
-# TODO(mbforbes): Make $1 required.
-# TODO(mbforbes): Document required vars (for this and call chain).
+# TODO(zmerlynn): Make $1 required.
+# TODO(zmerlynn): Document required vars (for this and call chain).
 # $1 version
 function create-node-instance-template {
   local suffix=""
