@@ -94,10 +94,6 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
-		return err
-	}
 	infos, err := r.Infos()
 	if err != nil {
 		return err
@@ -109,11 +105,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	mapping := info.ResourceMapping()
 
 	// Get the input object
-	client, err := f.RESTClient(mapping)
-	if err != nil {
-		return err
-	}
-	inputObject, err := resource.NewHelper(client, mapping).Get(info.Namespace, info.Name)
+	inputObject, err := r.Object()
 	if err != nil {
 		return err
 	}
