@@ -354,7 +354,7 @@ function create-node-template {
   detect-project
 
   # First, ensure the template doesn't exist.
-  # TODO(mbforbes): To make this really robust, we need to parse the output and
+  # TODO(zmerlynn): To make this really robust, we need to parse the output and
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
   if gcloud compute instance-templates describe "$1" --project "${PROJECT}" &>/dev/null; then
@@ -653,7 +653,7 @@ function kube-up {
 
   echo "Creating minions."
 
-  # TODO(mbforbes): Refactor setting scope flags.
+  # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
   if [ -n "${MINION_SCOPES}" ]; then
     scope_flags="--scopes ${MINION_SCOPES}"
@@ -1015,7 +1015,7 @@ function prepare-push() {
   if [[ "${1-}" == "true" ]]; then
     write-node-env
 
-    # TODO(mbforbes): Refactor setting scope flags.
+    # TODO(zmerlynn): Refactor setting scope flags.
     local scope_flags=
     if [ -n "${MINION_SCOPES}" ]; then
       scope_flags="--scopes ${MINION_SCOPES}"

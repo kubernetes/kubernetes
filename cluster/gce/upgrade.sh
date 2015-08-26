@@ -119,7 +119,7 @@ function prepare-upgrade() {
 #   PROJECT
 #   ZONE
 function get-node-env() {
-  # TODO(mbforbes): Make this more reliable with retries.
+  # TODO(zmerlynn): Make this more reliable with retries.
   gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${MINION_NAMES[0]} --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
@@ -177,7 +177,7 @@ function prepare-node-upgrade() {
 
   detect-minion-names
 
-  # TODO(mbforbes): Refactor setting scope flags.
+  # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
   if [ -n "${MINION_SCOPES}" ]; then
     scope_flags="--scopes ${MINION_SCOPES}"
@@ -194,11 +194,11 @@ function prepare-node-upgrade() {
   KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${node_env}" "KUBELET_KEY")
 
-  # TODO(mbforbes): How do we ensure kube-env is written in a ${version}-
+  # TODO(zmerlynn): How do we ensure kube-env is written in a ${version}-
   #                 compatible way?
   write-node-env
 
-  # TODO(mbforbes): Get configure-vm script from ${version}. (Must plumb this
+  # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
   #                 through all create-node-instance-template implementations).
   create-node-instance-template ${SANITIZED_VERSION}
   # The following is echo'd so that callers can get the template name.
@@ -211,9 +211,9 @@ function prepare-node-upgrade() {
 function do-node-upgrade() {
   echo "== Upgrading nodes to ${KUBE_VERSION}. ==" >&2
   # Do the actual upgrade.
-  # NOTE(mbforbes): If you are changing this gcloud command, update
+  # NOTE(zmerlynn): If you are changing this gcloud command, update
   #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
-  # TODO(mbforbes): Remove this hack on July 29, 2015, when the migration to
+  # TODO(zmerlynn): Remove this hack on July 29, 2015, when the migration to
   #                 `gcloud alpha compute rolling-updates` is complete.
   local subgroup="preview"
   local exists=$(gcloud ${subgroup} rolling-updates -h &>/dev/null; echo $?) || true
@@ -231,7 +231,7 @@ function do-node-upgrade() {
       --max-num-failed-instances=0 \
       --min-instance-update-time=0s
 
-  # TODO(mbforbes): Wait for the rolling-update to finish.
+  # TODO(zmerlynn): Wait for the rolling-update to finish.
 
   echo "== Finished upgrading nodes to ${KUBE_VERSION}. ==" >&2
 }

@@ -152,8 +152,8 @@ function create-master-instance {
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
 
-# TODO(mbforbes): Make $1 required.
-# TODO(mbforbes): Document required vars (for this and call chain).
+# TODO(zmerlynn): Make $1 required.
+# TODO(zmerlynn): Document required vars (for this and call chain).
 # $1 version
 function create-node-instance-template {
   local suffix=""

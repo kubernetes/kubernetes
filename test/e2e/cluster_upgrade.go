@@ -133,7 +133,7 @@ func masterUpgradeGKE(v string) error {
 }
 
 var masterPush = func(_ string) error {
-	// TODO(mbforbes): Make master push use the provided version.
+	// TODO(mikedanese): Make master push use the provided version.
 	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-push.sh"), "-m")
 	return err
 }
@@ -233,7 +233,7 @@ var _ = Describe("Skipped", func() {
 			}
 			testLoadBalancerReachable(ingress, 80)
 
-			// TODO(mbforbes): Add setup, validate, and teardown for:
+			// TODO(mikedanese): Add setup, validate, and teardown for:
 			//  - secrets
 			//  - volumes
 			//  - persistent volumes
@@ -485,7 +485,7 @@ func validate(f Framework, svcNameWant, rcNameWant string, ingress api.LoadBalan
 	if svcNameWant != svc.Name {
 		return fmt.Errorf("wanted service name %q, got %q", svcNameWant, svc.Name)
 	}
-	// TODO(mbforbes): Make testLoadBalancerReachable return an error.
+	// TODO(mikedanese): Make testLoadBalancerReachable return an error.
 	testLoadBalancerReachable(ingress, 80)
 
 	Logf("Cluster validation succeeded")
@@ -517,7 +517,7 @@ func migTemplate() (string, error) {
 	var templ string
 	key := "instanceTemplate"
 	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
-		// TODO(mbforbes): make this hit the compute API directly instead of
+		// TODO(mikedanese): make this hit the compute API directly instead of
 		// shelling out to gcloud.
 		// An `instance-groups managed describe` call outputs what we want to stdout.
 		output, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
@@ -555,9 +555,9 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	var id string
 	prefix, suffix := "Started [", "]."
 	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
-		// TODO(mbforbes): make this hit the compute API directly instead of
+		// TODO(mikedanese): make this hit the compute API directly instead of
 		//                 shelling out to gcloud.
-		// NOTE(mbforbes): If you are changing this gcloud command, update
+		// NOTE(mikedanese): If you are changing this gcloud command, update
 		//                 cluster/gce/upgrade.sh to match this EXACTLY.
 		// A `rolling-updates start` call outputs what we want to stderr.
 		_, output, err := retryCmd("gcloud", append(migUdpateCmdBase(),
@@ -610,7 +610,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 //
 //   {"alpha", "compute"}
 //
-// TODO(mbforbes): Remove this hack on July 29, 2015 when the migration to
+// TODO(mikedanese): Remove this hack on July 29, 2015 when the migration to
 //                 `gcloud alpha compute rolling-updates` is complete.
 func migUdpateCmdBase() []string {
 	b := []string{"preview"}
