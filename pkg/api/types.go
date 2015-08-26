@@ -1618,6 +1618,7 @@ type PodExecOptions struct {
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call
+// TODO: this should be named ProxyOptions, not PodProxyOptions
 type PodProxyOptions struct {
 	TypeMeta
 
