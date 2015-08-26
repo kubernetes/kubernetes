@@ -396,3 +396,33 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []experimental.Job, er
 	}
 	return
 }
+
+// StoreToNetworksLister makes a Store that lists networks
+type StoreToNetworksLister struct {
+	Store
+}
+
+// List lists all networks in the store
+func (s *StoreToNetworksLister) List() (networks api.NetworkList, err error) {
+	for _, m := range s.Store.List() {
+		networks.Items = append(networks.Items, *(m.(*api.Network)))
+	}
+	return networks, nil
+}
+
+// GetNamespaceNetwork returns the network of a namespace
+func (s *StoreToNetworksLister) GetNamespaceNetwork(ns *api.Namespace) *api.Network {
+	var net *api.Network
+
+	if ns.Spec.Network != "" {
+		for _, m := range s.Store.List() {
+			n := m.(*api.Network)
+			if ns.Spec.Network == n.Name {
+				net = n
+				break
+			}
+		}
+	}
+
+	return net
+}

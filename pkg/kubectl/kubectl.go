@@ -93,7 +93,7 @@ func expandResourceShortcut(resource string) string {
 		"ep":     "endpoints",
 		"hpa":    "horizontalpodautoscalers",
 		"limits": "limitranges",
-		"net":	  "networks",
+		"net":    "networks",
 		"no":     "nodes",
 		"ns":     "namespaces",
 		"po":     "pods",

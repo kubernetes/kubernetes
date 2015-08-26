@@ -900,9 +900,8 @@ func deepCopy_api_NamespaceSpec(in NamespaceSpec, out *NamespaceSpec, c *convers
 	} else {
 		out.Finalizers = nil
 	}
-	if err := deepCopy_api_Network(in.Network, &out.Network, c); err != nil {
-		return err
-	}
+
+	out.Network = in.Network
 	return nil
 }
 
@@ -949,16 +948,19 @@ func deepCopy_api_NetworkList(in NetworkList, out *NetworkList, c *conversion.Cl
 
 func deepCopy_api_NetworkSpec(in NetworkSpec, out *NetworkSpec, c *conversion.Cloner) error {
 	if in.Subnets != nil {
-		out.Subnets = make([]Subnet, len(in.Subnets))
-		for i := range in.Subnets {
-			if err := deepCopy_api_Subnet(in.Subnets[i], &out.Subnets[i], c); err != nil {
+		out.Subnets = make(map[string]Subnet)
+		for key, val := range in.Subnets {
+			newVal := new(Subnet)
+			if err := deepCopy_api_Subnet(val, newVal, c); err != nil {
 				return err
 			}
+			out.Subnets[key] = *newVal
 		}
 	} else {
 		out.Subnets = nil
 	}
 	out.ProviderNetworkID = in.ProviderNetworkID
+	out.TenantID = in.TenantID
 	return nil
 }
 

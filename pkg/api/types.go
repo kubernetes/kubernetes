@@ -1158,6 +1158,10 @@ const (
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+
+	// ServiceTypeNetworkProvider means a service and its clusterIP will be created
+	// by networkprovider,
+	ServiceTypeNetworkProvider ServiceType = "NetworkProvider"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1513,7 +1517,7 @@ type NamespaceSpec struct {
 	Finalizers []FinalizerName
 
 	// Network descibes a network segment
-	Network Network
+	Network string `json:"network,omitempty"`
 }
 
 type FinalizerName string
@@ -1535,6 +1539,8 @@ type NamespacePhase string
 const (
 	// NamespaceActive means the namespace is available for use in the system
 	NamespaceActive NamespacePhase = "Active"
+	// NamespaceFailed means the namespace is not available since provider network is not found
+	NamespaceFailed NamespacePhase = "Failed"
 	// NamespaceTerminating means the namespace is undergoing graceful termination
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
@@ -1571,33 +1577,36 @@ type NetworkPhase string
 // These are the valid phases of a network.
 const (
 	// NetworkInitializing means the network is just accepted by system
-	NetworkInitializing NetworkPhase	= "Initializing"
+	NetworkInitializing NetworkPhase = "Initializing"
 	// NetworkActive means the network is available for use in the system
-	NetworkActive NetworkPhase 	= "Active"
+	NetworkActive NetworkPhase = "Active"
 	// NetworkPending means the network is accepted by system, but it is still
 	// processing by network provider
-	NetworkPending NetworkPhase	= "Pending"
+	NetworkPending NetworkPhase = "Pending"
 	// NetworkFailed means the network is not available
-	NetworkFailed NetworkPhase 	= "Failed"
+	NetworkFailed NetworkPhase = "Failed"
 	// NetworkTerminating means the network is undergoing graceful termination
-	NetworkTerminating NetworkPhase	= "Terminating"
+	NetworkTerminating NetworkPhase = "Terminating"
 )
 
 // Subnet is a description of a subnet
 type Subnet struct {
-	CIDR 	string	`json:"cidr"`
-	Gateway string	`json:"gateway"`
+	CIDR    string `json:"cidr"`
+	Gateway string `json:"gateway"`
 }
 
 // NetworkSpec is a description of a network
 type NetworkSpec struct {
 	// There must be at least one subnet in a network
 	// Subnets and ProviderNetworkID must not be provided together
-	Subnets []Subnet `json:"subnets"`
+	Subnets map[string]Subnet `json:"subnets,omitempty"`
 
 	// Network's ID of provider network
 	// ProviderNetworkID and Subnets must not be provided together
-	ProviderNetworkID	string	`json:"providerNetworkID"`
+	ProviderNetworkID string `json:"providerNetworkID,omitempty"`
+
+	// TenantID is the tenant ID of network provider
+	TenantID string `json:"tenantID"`
 }
 
 // Network describes a network

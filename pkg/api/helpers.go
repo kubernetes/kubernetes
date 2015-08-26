@@ -110,6 +110,11 @@ func IsServiceIPSet(service *Service) bool {
 
 // this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *Service) bool {
+	// For NetworkProvider typed service, cluster ip is omitted
+	if service.Spec.Type == ServiceTypeNetworkProvider {
+		return false
+	}
+
 	return service.Spec.ClusterIP == ""
 }
 

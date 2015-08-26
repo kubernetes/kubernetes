@@ -44,13 +44,13 @@ func validNewNetwork() *api.Network {
 			Name: "foo",
 		},
 		Spec: api.NetworkSpec{
-			Subnets: []api.Subnet {
-				api.Subnet{
-					CIDR: "192.168.0.0/24",
+			Subnets: map[string]api.Subnet{
+				"subnet1": {
+					CIDR:    "192.168.0.0/24",
 					Gateway: "192.168.0.1",
 				},
 			},
-		} ,
+		},
 	}
 }
 
@@ -76,6 +76,12 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		Network,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.Network{
 			ObjectMeta: api.ObjectMeta{Name: "bad value"},

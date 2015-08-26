@@ -79,7 +79,7 @@ func describerMap(c *client.Client) map[string]Describer {
 		"PersistentVolume":      &PersistentVolumeDescriber{c},
 		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
 		"Namespace":             &NamespaceDescriber{c},
-		"Network":				 &NetworkDescriber{c},
+		"Network":               &NetworkDescriber{c},
 	}
 	return m
 }
@@ -161,9 +161,10 @@ func describeNetwork(network *api.Network) (string, error) {
 	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", network.Name)
+		fmt.Fprintf(out, "TenantID:\t%s\n", network.Spec.TenantID)
 		fmt.Fprintf(out, "Subnets:\t%s\n", strings.Join(subnets, ";"))
 		fmt.Fprintf(out, "ProviderNetworkID:\t%s\n", network.Spec.ProviderNetworkID)
-		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(network.Labels))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(network.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(network.Status.Phase))
 		return nil
 	})
@@ -194,6 +195,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
 func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.ResourceQuotaList, limitRangeList *api.LimitRangeList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", namespace.Name)
+		fmt.Fprintf(out, "Network:\t%s\n", namespace.Spec.Network)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(namespace.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(namespace.Status.Phase))
 		if resourceQuotaList != nil {

@@ -60,10 +60,10 @@ func (c *networks) Create(network *api.Network) (*api.Network, error) {
 func (c *networks) List(label labels.Selector, field fields.Selector) (*api.NetworkList, error) {
 	result := &api.NetworkList{}
 	err := c.r.Get().
-	Resource("networks").
-	LabelsSelectorParam(label).
-	FieldsSelectorParam(field).
-	Do().Into(result)
+		Resource("networks").
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
+		Do().Into(result)
 	return result, err
 }
 
@@ -104,10 +104,10 @@ func (c *networks) Delete(name string) error {
 // Watch returns a watch.Interface that watches the requested networks.
 func (c *networks) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
-	Prefix("watch").
-	Resource("networks").
-	Param("resourceVersion", resourceVersion).
-	LabelsSelectorParam(label).
-	FieldsSelectorParam(field).
-	Watch()
+		Prefix("watch").
+		Resource("networks").
+		Param("resourceVersion", resourceVersion).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
+		Watch()
 }

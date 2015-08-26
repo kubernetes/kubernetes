@@ -1177,7 +1177,7 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 
 var supportedSessionAffinityType = sets.NewString(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
 var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
-	string(api.ServiceTypeLoadBalancer))
+	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypeNetworkProvider))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1766,6 +1766,7 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName).Prefix("metadata")...)
+
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]))...)
 	}
@@ -1805,8 +1806,8 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) er
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta).Prefix("metadata")...)
 	newNamespace.Spec = oldNamespace.Spec
 	if newNamespace.DeletionTimestamp.IsZero() {
-		if newNamespace.Status.Phase != api.NamespaceActive {
-			allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNamespace.Status.Phase, "A namespace may only be in active status if it does not have a deletion timestamp."))
+		if newNamespace.Status.Phase != api.NamespaceActive && newNamespace.Status.Phase != api.NamespaceFailed {
+			allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNamespace.Status.Phase, "A namespace may only be in active/failed status if it does not have a deletion timestamp."))
 		}
 	} else {
 		if newNamespace.Status.Phase != api.NamespaceTerminating {
@@ -1851,7 +1852,11 @@ func ValidateNetwork(network *api.Network) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&network.ObjectMeta, false, ValidateNetworkName).Prefix("metadata")...)
 
-	if network.Spec.ProviderNetworkID != "" {
+	if network.Spec.TenantID == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("tenantID"))
+	}
+
+	if network.Spec.ProviderNetworkID == "" {
 		for _, subnet := range network.Spec.Subnets {
 			if validated, errMsg := ValidateSubnet(subnet.Gateway, subnet.CIDR); !validated {
 				allErrs = append(allErrs, errs.NewFieldInvalid("subnets", subnet.CIDR, errMsg))
@@ -1875,14 +1880,8 @@ func ValidateNetworkStatusUpdate(newNetwork, oldNetwork *api.Network) errs.Valid
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newNetwork.ObjectMeta, &oldNetwork.ObjectMeta).Prefix("metadata")...)
 	newNetwork.Spec = oldNetwork.Spec
-	if newNetwork.DeletionTimestamp.IsZero() {
-		if newNetwork.Status.Phase != api.NetworkActive {
-			allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNetwork.Status.Phase, "A network may only be in active status if it does not have a deletion timestamp."))
-		}
-	} else {
-		if newNetwork.Status.Phase != api.NetworkTerminating {
-			allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNetwork.Status.Phase, "A network may only be in terminating status if it has a deletion timestamp."))
-		}
+	if !newNetwork.DeletionTimestamp.IsZero() && newNetwork.Status.Phase != api.NetworkTerminating {
+		allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNetwork.Status.Phase, "A network may only be in terminating status if it has a deletion timestamp."))
 	}
 	return allErrs
 }

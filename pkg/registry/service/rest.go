@@ -253,9 +253,9 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		nodePortOp.ReleaseDeferred(oldNodePort)
 	}
 
-	// Remove any LoadBalancerStatus now if Type != LoadBalancer;
+	// Remove any LoadBalancerStatus now if Type != LoadBalancer and != NetworkProvider;
 	// although loadbalancer delete is actually asynchronous, we don't need to expose the user to that complexity.
-	if service.Spec.Type != api.ServiceTypeLoadBalancer {
+	if service.Spec.Type != api.ServiceTypeLoadBalancer && service.Spec.Type != api.ServiceTypeNetworkProvider {
 		service.Status.LoadBalancer = api.LoadBalancerStatus{}
 	}
 
@@ -343,6 +343,8 @@ func shouldAssignNodePorts(service *api.Service) bool {
 	case api.ServiceTypeNodePort:
 		return true
 	case api.ServiceTypeClusterIP:
+		return false
+	case api.ServiceTypeNetworkProvider:
 		return false
 	default:
 		glog.Errorf("Unknown service type: %v", service.Spec.Type)

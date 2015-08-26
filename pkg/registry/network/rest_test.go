@@ -31,7 +31,9 @@ func TestNetworkStrategy(t *testing.T) {
 	network := &api.Network{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Status:     api.NetworkStatus{Phase: api.NetworkTerminating},
-		Spec:       api.NetworkSpec{Subnets: []api.Subnet{{CIDR: "192.168.0.0/24", Gateway: "192.168.0.1"}}},
+		Spec: api.NetworkSpec{
+			TenantID: "12345",
+			Subnets:  map[string]api.Subnet{"s1": {CIDR: "192.168.0.0/24", Gateway: "192.168.0.1"}}},
 	}
 	Strategy.PrepareForCreate(network)
 	if network.Status.Phase != api.NetworkInitializing {
@@ -43,7 +45,7 @@ func TestNetworkStrategy(t *testing.T) {
 	}
 	invalidNetwork := &api.Network{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-		Spec:       api.NetworkSpec{Subnets: []api.Subnet{{CIDR: "10.10.10.0/24", Gateway: "192.168.0.1"}}},
+		Spec:       api.NetworkSpec{Subnets: map[string]api.Subnet{"s1": {CIDR: "10.10.10.0/24", Gateway: "192.168.0.1"}}},
 	}
 	errs = Strategy.ValidateUpdate(ctx, invalidNetwork, network)
 	if len(errs) == 0 {
@@ -62,13 +64,17 @@ func TestNetworkStatusStrategy(t *testing.T) {
 	now := util.Now()
 	oldNetwork := &api.Network{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
-		Spec:       api.NetworkSpec{Subnets: []api.Subnet{{CIDR: "192.168.0.0/24", Gateway: "192.168.0.1"}}},
-		Status:     api.NetworkStatus{Phase: api.NetworkActive},
+		Spec: api.NetworkSpec{
+			TenantID: "12345",
+			Subnets:  map[string]api.Subnet{"s1": {CIDR: "192.168.0.0/24", Gateway: "192.168.0.1"}}},
+		Status: api.NetworkStatus{Phase: api.NetworkActive},
 	}
 	network := &api.Network{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now},
-		Spec:       api.NetworkSpec{Subnets: []api.Subnet{{CIDR: "192.168.0.0/24", Gateway: "192.168.0.1"}}},
-		Status:     api.NetworkStatus{Phase: api.NetworkTerminating},
+		Spec: api.NetworkSpec{
+			TenantID: "12345",
+			Subnets:  map[string]api.Subnet{"s1": {CIDR: "192.168.0.0/24", Gateway: "192.168.0.1"}}},
+		Status: api.NetworkStatus{Phase: api.NetworkTerminating},
 	}
 	StatusStrategy.PrepareForUpdate(network, oldNetwork)
 	if network.Status.Phase != api.NetworkTerminating {
