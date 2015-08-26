@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -487,5 +488,47 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion
 	if apiVersion != "v1" {
 		t.Errorf("Expected default APIVersion v1, got: %v", apiVersion)
+	}
+}
+
+func TestSetDefaultLimitRangeItem(t *testing.T) {
+	limitRange := &versioned.LimitRange{
+		ObjectMeta: versioned.ObjectMeta{
+			Name: "test-defaults",
+		},
+		Spec: versioned.LimitRangeSpec{
+			Limits: []versioned.LimitRangeItem{{
+				Type: versioned.LimitTypeContainer,
+				Max: versioned.ResourceList{
+					versioned.ResourceCPU: resource.MustParse("100m"),
+				},
+				Min: versioned.ResourceList{
+					versioned.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Default:        versioned.ResourceList{},
+				DefaultRequest: versioned.ResourceList{},
+			}},
+		},
+	}
+
+	output := roundTrip(t, runtime.Object(limitRange))
+	limitRange2 := output.(*versioned.LimitRange)
+	defaultLimit := limitRange2.Spec.Limits[0].Default
+	defaultRequest := limitRange2.Spec.Limits[0].DefaultRequest
+
+	// verify that default cpu was set to the max
+	defaultValue := defaultLimit[versioned.ResourceCPU]
+	if defaultValue.String() != "100m" {
+		t.Errorf("Expected default cpu: %s, got: %s", "100m", defaultValue.String())
+	}
+	// verify that default request was set to the limit
+	requestValue := defaultRequest[versioned.ResourceCPU]
+	if requestValue.String() != "100m" {
+		t.Errorf("Expected request cpu: %s, got: %s", "100m", requestValue.String())
+	}
+	// verify that if a min is provided, it will be the default if no limit is specified
+	requestMinValue := defaultRequest[versioned.ResourceMemory]
+	if requestMinValue.String() != "100Mi" {
+		t.Errorf("Expected request memory: %s, got: %s", "100Mi", requestMinValue.String())
 	}
 }
