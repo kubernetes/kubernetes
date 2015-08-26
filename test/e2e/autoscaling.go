@@ -53,7 +53,7 @@ var _ = Describe("Autoscaling", func() {
 		cleanUpAutoscaler()
 	})
 
-	It("[Autoscaling] should scale cluster size based on cpu utilization", func() {
+	It("[Skipped][Autoscaling Suite] should scale cluster size based on cpu utilization", func() {
 		setUpAutoscaler("cpu/node_utilization", 0.7, nodeCount, nodeCount+1)
 
 		ConsumeCpu(f, "cpu-utilization", nodeCount*coresPerNode)
@@ -73,7 +73,7 @@ var _ = Describe("Autoscaling", func() {
 		expectNoError(waitForClusterSize(f.Client, 1, 20*time.Minute))
 	})
 
-	It("[Autoscaling] should scale cluster size based on memory utilization", func() {
+	It("[Skipped][Autoscaling Suite] should scale cluster size based on memory utilization", func() {
 		setUpAutoscaler("memory/node_utilization", 0.5, nodeCount, nodeCount+1)
 
 		// Consume 60% of total memory capacity in 256MB chunks.
