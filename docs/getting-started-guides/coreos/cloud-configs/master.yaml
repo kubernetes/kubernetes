@@ -22,6 +22,8 @@ coreos:
   etcd2:
     name: master
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    # VMware does not support $private_ipv4 and public_ipv4, please replace this variable with local ip (can be fixed by a DHCP static entry)
+    # https://coreos.com/os/docs/latest/booting-on-vmware.html#cloud-config
     advertise-client-urls: http://$private_ipv4:2379,http://$private_ipv4:4001
     initial-cluster-token: k8s_etcd
     listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
