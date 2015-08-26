@@ -12,7 +12,7 @@ spec:
         cpu: 100m
     env:
     - name: "FLUENTD_ARGS"
-      value: "-qq"
+      value: "-q"
     volumeMounts:
     - name: varlog
       mountPath: /varlog
