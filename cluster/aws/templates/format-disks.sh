@@ -75,7 +75,7 @@ else
       echo "Found multiple ephemeral block devices, formatting with btrfs as RAID-0"
       mkfs.btrfs -f --data raid0 ${block_devices[@]}
     fi
-    echo "${block_devices[0]}  /mnt/ephemeral  btrfs  noatime  0 0" >> /etc/fstab
+    echo "${block_devices[0]}  /mnt/ephemeral  btrfs  noatime,nobootwait  0 0" >> /etc/fstab
     mkdir -p /mnt/ephemeral
     mount /mnt/ephemeral
 
@@ -89,7 +89,7 @@ else
     fi
 
     mkfs -t ext4 ${block_devices[0]}
-    echo "${block_devices[0]}  /mnt/ephemeral  ext4     noatime  0 0" >> /etc/fstab
+    echo "${block_devices[0]}  /mnt/ephemeral  ext4     noatime,nobootwait  0 0" >> /etc/fstab
     mkdir -p /mnt/ephemeral
     mount /mnt/ephemeral
 
@@ -154,7 +154,7 @@ else
 
       mkfs -t ext4 /dev/vg-ephemeral/ephemeral
       mkdir -p /mnt/ephemeral
-      echo "/dev/vg-ephemeral/ephemeral  /mnt/ephemeral  ext4  noatime  0 0" >> /etc/fstab
+      echo "/dev/vg-ephemeral/ephemeral  /mnt/ephemeral  ext4  noatime,nobootwait  0 0" >> /etc/fstab
       mount /mnt/ephemeral
 
       mkdir -p /mnt/ephemeral/kubernetes
@@ -205,4 +205,3 @@ if [[ -n "${move_kubelet}" ]]; then
   ln -s ${move_kubelet}/kubelet /var/lib/kubelet
   KUBELET_ROOT="${move_kubelet}/kubelet"
 fi
-
