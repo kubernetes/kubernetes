@@ -404,13 +404,11 @@ func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// Returns "vX.Y.Z".
 	vstring, err := GetIptablesVersionString(exec)
 	if err != nil {
 		return false, err
 	}
-	// Make a semver of the part after the v in "vX.X.X".
-	version, err := semver.NewVersion(vstring[1:])
+	version, err := semver.NewVersion(vstring)
 	if err != nil {
 		return false, err
 	}
@@ -420,19 +418,18 @@ func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
 	return true, nil
 }
 
-// GetIptablesVersionString runs "iptables --version" to get the version string,
-// then matches for vX.X.X e.g. if "iptables --version" outputs: "iptables v1.3.66"
-// then it would would return "v1.3.66", nil
+// GetIptablesVersionString runs "iptables --version" to get the version string
+// in the form "X.X.X"
 func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
 	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
-	versionMatcher := regexp.MustCompile("v[0-9]+\\.[0-9]+\\.[0-9]+")
+	versionMatcher := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9]+)")
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
-	return match[0], nil
+	return match[1], nil
 }

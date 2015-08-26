@@ -74,13 +74,12 @@ func ShouldUseIptablesProxier() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// returns "vX.X.X", err
+	// returns "X.X.X", err
 	versionString, err := utiliptables.GetIptablesVersionString(exec)
 	if err != nil {
 		return false, err
 	}
-	// make a semver of the part after the v in "vX.X.X"
-	version, err := semver.NewVersion(versionString[1:])
+	version, err := semver.NewVersion(versionString)
 	if err != nil {
 		return false, err
 	}
