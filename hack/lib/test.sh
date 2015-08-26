@@ -132,3 +132,21 @@ kube::test::describe_resource_assert() {
   echo -n ${reset}
   return 0
 }
+
+kube::test::if_has_string() {
+  local message=$1
+  local match=$2
+
+  if [[ $(echo "$message" | grep "$match") ]]; then
+    echo "Successful"
+    echo "message:$message"
+    echo "has:$match"
+    return 0
+  else
+    echo "FAIL!"
+    echo "message:$message"
+    echo "has not:$match"
+    caller
+    return 1
+  fi
+}
