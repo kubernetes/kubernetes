@@ -94,7 +94,7 @@ type HorizontalPodAutoscalerStatus struct {
 	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
 	// try to maintain by adjusting the desired number of pods.
 	// Two types of resources are supported: "cpu" and "memory".
-	CurrentConsumption ResourceConsumption `json:"currentConsumption" description:"current resource consumption"`
+	CurrentConsumption *ResourceConsumption `json:"currentConsumption" description:"current resource consumption"`
 
 	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
 	// This is used by the autoscaler to controll how often the number of pods is changed.
@@ -110,7 +110,7 @@ type HorizontalPodAutoscaler struct {
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the autoscaler; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
 
 	// Status represents the current information about the autoscaler.
-	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
+	Status *HorizontalPodAutoscalerStatus `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscaler is a collection of pod autoscalers.

@@ -113,15 +113,24 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	expClients := NewExperimentalClientCache(clientConfig)
 
 	noClientErr := errors.New("could not get client")
-	getBothClients := func(group string, version string) (client *client.Client, expClient *client.ExperimentalClient, err error) {
-		err = noClientErr
+	getBothClients := func(group string, version string) (*client.Client, *client.ExperimentalClient, error) {
 		switch group {
 		case "api":
-			client, err = clients.ClientForVersion(version)
+			client, err := clients.ClientForVersion(version)
+			return client, nil, err
+
 		case "experimental":
-			expClient, err = expClients.Client()
+			client, err := clients.ClientForVersion(version)
+			if err != nil {
+				return nil, nil, err
+			}
+			expClient, err := expClients.Client()
+			if err != nil {
+				return nil, nil, err
+			}
+			return client, expClient, err
 		}
-		return
+		return nil, nil, noClientErr
 	}
 	return &Factory{
 		clients:    clients,

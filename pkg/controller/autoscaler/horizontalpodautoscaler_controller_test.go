@@ -165,6 +165,10 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 			LatestTimestamp: timestamp,
 		}}}
 
+	status := expapi.HorizontalPodAutoscalerStatus{
+		CurrentReplicas: 1,
+		DesiredReplicas: 3,
+	}
 	updateHpaResponse := serverResponse{http.StatusOK, &expapi.HorizontalPodAutoscaler{
 
 		ObjectMeta: api.ObjectMeta{
@@ -182,10 +186,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 			MaxCount: 5,
 			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.3")},
 		},
-		Status: expapi.HorizontalPodAutoscalerStatus{
-			CurrentReplicas: 1,
-			DesiredReplicas: 3,
-		},
+		Status: &status,
 	}}
 
 	heapsterRawResponse, _ := json.Marshal(&metrics)
