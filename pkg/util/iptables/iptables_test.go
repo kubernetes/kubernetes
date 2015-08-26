@@ -36,6 +36,8 @@ func getIptablesCommand(protocol Protocol) string {
 func testEnsureChain(t *testing.T, protocol Protocol) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Exists.
@@ -46,6 +48,7 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	}
 	fexec := exec.FakeExec{
 		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -60,12 +63,12 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	cmd := getIptablesCommand(protocol)
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Exists.
 	exists, err = runner.EnsureChain(TableNAT, Chain("FOOBAR"))
@@ -93,6 +96,8 @@ func TestEnsureChainIpv6(t *testing.T) {
 func TestFlushChain(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
@@ -103,6 +108,7 @@ func TestFlushChain(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
 	runner := New(&fexec, ProtocolIpv4)
@@ -111,11 +117,11 @@ func TestFlushChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Failure.
 	err = runner.FlushChain(TableNAT, Chain("FOOBAR"))
@@ -127,6 +133,8 @@ func TestFlushChain(t *testing.T) {
 func TestDeleteChain(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
@@ -137,6 +145,7 @@ func TestDeleteChain(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
 	runner := New(&fexec, ProtocolIpv4)
@@ -145,11 +154,11 @@ func TestDeleteChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Failure.
 	err = runner.DeleteChain(TableNAT, Chain("FOOBAR"))
@@ -428,12 +437,15 @@ func TestGetIptablesHasCheckCommand(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		check, err := getIptablesHasCheckCommand(&fexec)
+		version, err := GetIptablesVersionString(&fexec)
 		if (err != nil) != testCase.Err {
 			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
 		}
-		if err == nil && testCase.Expected != check {
-			t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
+		if err == nil {
+			check := getIptablesHasCheckCommand(version)
+			if testCase.Expected != check {
+				t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
+			}
 		}
 	}
 }
