@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"strings"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -44,33 +42,6 @@ func addDefaultingFuncs() {
 				*obj.Spec.Replicas = 1
 			}
 		},
-		func(obj *Volume) {
-			if util.AllPtrFieldsNil(&obj.VolumeSource) {
-				obj.VolumeSource = VolumeSource{
-					EmptyDir: &EmptyDirVolumeSource{},
-				}
-			}
-		},
-		func(obj *ContainerPort) {
-			if obj.Protocol == "" {
-				obj.Protocol = ProtocolTCP
-			}
-		},
-		func(obj *Container) {
-			if obj.ImagePullPolicy == "" {
-				// TODO(dchen1107): Move ParseImageName code to pkg/util
-				parts := strings.Split(obj.Image, ":")
-				// Check image tag
-				if parts[len(parts)-1] == "latest" {
-					obj.ImagePullPolicy = PullAlways
-				} else {
-					obj.ImagePullPolicy = PullIfNotPresent
-				}
-			}
-			if obj.TerminationMessagePath == "" {
-				obj.TerminationMessagePath = TerminationMessagePathDefault
-			}
-		},
 		func(obj *ServiceSpec) {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = ServiceAffinityNone
@@ -86,21 +57,6 @@ func addDefaultingFuncs() {
 				if sp.TargetPort == util.NewIntOrStringFromInt(0) || sp.TargetPort == util.NewIntOrStringFromString("") {
 					sp.TargetPort = util.NewIntOrStringFromInt(sp.Port)
 				}
-			}
-		},
-		func(obj *PodSpec) {
-			if obj.DNSPolicy == "" {
-				obj.DNSPolicy = DNSClusterFirst
-			}
-			if obj.RestartPolicy == "" {
-				obj.RestartPolicy = RestartPolicyAlways
-			}
-			if obj.HostNetwork {
-				defaultHostNetworkPorts(&obj.Containers)
-			}
-			if obj.TerminationGracePeriodSeconds == nil {
-				period := int64(DefaultTerminationGracePeriodSeconds)
-				obj.TerminationGracePeriodSeconds = &period
 			}
 		},
 		func(obj *Probe) {
@@ -124,17 +80,6 @@ func addDefaultingFuncs() {
 		func(obj *PersistentVolumeClaim) {
 			if obj.Status.Phase == "" {
 				obj.Status.Phase = ClaimPending
-			}
-		},
-		func(obj *Endpoints) {
-			for i := range obj.Subsets {
-				ss := &obj.Subsets[i]
-				for i := range ss.Ports {
-					ep := &ss.Ports[i]
-					if ep.Protocol == "" {
-						ep.Protocol = ProtocolTCP
-					}
-				}
 			}
 		},
 		func(obj *HTTPGetAction) {
@@ -205,15 +150,4 @@ func addDefaultingFuncs() {
 			}
 		},
 	)
-}
-
-// With host networking default all container ports to host ports.
-func defaultHostNetworkPorts(containers *[]Container) {
-	for i := range *containers {
-		for j := range (*containers)[i].Ports {
-			if (*containers)[i].Ports[j].HostPort == 0 {
-				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
-			}
-		}
-	}
 }

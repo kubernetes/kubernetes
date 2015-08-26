@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -280,6 +282,12 @@ type VolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
+}
+
+func (volsrc *VolumeSource) ApplyDefaults() {
+	if util.AllPtrFieldsNil(volsrc) {
+		volsrc.EmptyDir = &EmptyDirVolumeSource{}
+	}
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -736,6 +744,12 @@ type ContainerPort struct {
 	HostIP string `json:"hostIP,omitempty"`
 }
 
+func (cp *ContainerPort) ApplyDefaults() {
+	if cp.Protocol == "" {
+		cp.Protocol = ProtocolTCP
+	}
+}
+
 // VolumeMount describes a mounting of a Volume within a container.
 type VolumeMount struct {
 	// This must match the Name of a Volume.
@@ -960,6 +974,22 @@ type Container struct {
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty"`
+}
+
+func (ctr *Container) ApplyDefaults() {
+	if ctr.ImagePullPolicy == "" {
+		// TODO(dchen1107): Move ParseImageName code to pkg/util
+		parts := strings.Split(ctr.Image, ":")
+		// Check image tag
+		if parts[len(parts)-1] == "latest" {
+			ctr.ImagePullPolicy = PullAlways
+		} else {
+			ctr.ImagePullPolicy = PullIfNotPresent
+		}
+	}
+	if ctr.TerminationMessagePath == "" {
+		ctr.TerminationMessagePath = TerminationMessagePathDefault
+	}
 }
 
 // Handler defines a specific action that should be taken
@@ -1206,6 +1236,31 @@ type PodSpec struct {
 	// in the case of docker, only DockerConfig type secrets are honored.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+func (spec *PodSpec) ApplyDefaults() {
+	if spec.DNSPolicy == "" {
+		spec.DNSPolicy = DNSClusterFirst
+	}
+	if spec.RestartPolicy == "" {
+		spec.RestartPolicy = RestartPolicyAlways
+	}
+	if spec.HostNetwork {
+		// With host networking all container ports are host ports.
+		for i := range spec.Containers {
+			ctr := &spec.Containers[i]
+			for i := range ctr.Ports {
+				port := &ctr.Ports[i]
+				if port.HostPort == 0 {
+					port.HostPort = port.ContainerPort
+				}
+			}
+		}
+	}
+	if spec.TerminationGracePeriodSeconds == nil {
+		period := int64(DefaultTerminationGracePeriodSeconds)
+		spec.TerminationGracePeriodSeconds = &period
+	}
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -1651,6 +1706,12 @@ type EndpointPort struct {
 	// Must be UDP or TCP.
 	// Default is TCP.
 	Protocol Protocol `json:"protocol,omitempty"`
+}
+
+func (ep *EndpointPort) ApplyDefaults() {
+	if ep.Protocol == "" {
+		ep.Protocol = ProtocolTCP
+	}
 }
 
 // EndpointsList is a list of endpoints.
