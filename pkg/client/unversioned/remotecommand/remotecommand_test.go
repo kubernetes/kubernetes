@@ -63,6 +63,7 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 		for {
 			select {
 			case stream := <-streamCh:
+
 				streamType := stream.Headers().Get(api.StreamType)
 				switch streamType {
 				case api.StreamTypeError:
@@ -70,7 +71,6 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 					receivedStreams++
 				case api.StreamTypeStdin:
 					stdinStream = stream
-					stdinStream.Close()
 					receivedStreams++
 				case api.StreamTypeStdout:
 					stdoutStream = stream
@@ -83,6 +83,7 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 				}
 
 				defer stream.Reset()
+				defer stream.Close()
 
 				if receivedStreams == expectedStreams {
 					break WaitForStreams
