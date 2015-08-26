@@ -1,7 +1,7 @@
 # This Dockerfile will build an image that is configured
 # to run Fluentd with an Elasticsearch plug-in and the
 # provided configuration file.
-# TODO(satnam6502): Use a lighter base image, e.g. some form of busybox.
+# TODO(a-robinson): Use a lighter base image, e.g. some form of busybox.
 # The image acts as an executable for the binary /usr/sbin/td-agent.
 # Note that fluentd is run with root permssion to allow access to
 # log files with root only access under /var/lib/docker/containers/*
@@ -9,7 +9,7 @@
 # information about installing fluentd using deb package.
 
 FROM ubuntu:14.04
-MAINTAINER Satnam Singh "satnam@google.com"
+MAINTAINER Alex Robinson "arob@google.com"
 
 # Ensure there are enough file descriptors for running Fluentd.
 RUN ulimit -n 65536
