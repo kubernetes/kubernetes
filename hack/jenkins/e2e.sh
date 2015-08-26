@@ -100,6 +100,7 @@ GCE_DEFAULT_SKIP_TESTS=(
 GCE_FLAKY_TESTS=(
     "DaemonRestart"
     "ResourceUsage"
+    "monotonically\sincreasing\srestart\scount"
     )
 
 # Tests which are not able to be run in parallel.
