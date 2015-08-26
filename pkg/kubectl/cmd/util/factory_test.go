@@ -165,6 +165,33 @@ func TestLabelsForObject(t *testing.T) {
 	}
 }
 
+func TestCanBeExposed(t *testing.T) {
+	factory := NewFactory(nil)
+	tests := []struct {
+		kind      string
+		expectErr bool
+	}{
+		{
+			kind:      "ReplicationController",
+			expectErr: false,
+		},
+		{
+			kind:      "Node",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		err := factory.CanBeExposed(test.kind)
+		if test.expectErr && err == nil {
+			t.Error("unexpected non-error")
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+}
+
 func TestFlagUnderscoreRenaming(t *testing.T) {
 	factory := NewFactory(nil)
 

@@ -34,9 +34,9 @@ type ExposeOptions struct {
 }
 
 const (
-	expose_long = `Take a replicated application and expose it as Kubernetes Service.
+	expose_long = `Take a replication controller, service or pod and expose it as a new Kubernetes Service.
 
-Looks up a replication controller or service by name and uses the selector for that resource as the
+Looks up a replication controller, service or pod by name and uses the selector for that resource as the
 selector for a new Service on the specified port. If no labels are specified, the new service will
 re-use the labels from the resource it exposes.`
 
@@ -45,6 +45,9 @@ $ kubectl expose rc nginx --port=80 --target-port=8000
 
 # Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
+
+# Create a service for a pod valid-pod, which serves on port 444 with the name "frontend"
+$ kubectl expose pod valid-pod --port=444 --name=frontend
 
 # Create a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
 $ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
@@ -58,7 +61,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]",
-		Short:   "Take a replicated application and expose it as Kubernetes Service",
+		Short:   "Take a replication controller, service or pod and expose it as a new Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -113,7 +116,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-
+	if err := f.CanBeExposed(mapping.Kind); err != nil {
+		return err
+	}
 	// Get the input object
 	inputObject, err := r.Object()
 	if err != nil {
