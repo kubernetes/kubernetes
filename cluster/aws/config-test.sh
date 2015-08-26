@@ -35,6 +35,12 @@ LOG="/dev/null"
 
 MASTER_DISK_TYPE="${MASTER_DISK_TYPE:-gp2}"
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20}
+# The master root EBS volume size (typically does not need to be very large)
+MASTER_ROOT_DISK_TYPE="${MASTER_ROOT_DISK_TYPE:-gp2}"
+MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-8}
+# The minions root EBS volume size (used to house Docker images)
+MINION_ROOT_DISK_TYPE="${MINION_ROOT_DISK_TYPE:-gp2}"
+MINION_ROOT_DISK_SIZE=${MINION_ROOT_DISK_SIZE:-32}
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
