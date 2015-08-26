@@ -259,8 +259,9 @@ func podReady(pod *api.Pod) bool {
 // logPodStates logs basic info of provided pods for debugging.
 func logPodStates(pods []api.Pod) {
 	// Find maximum widths for pod, node, and phase strings for column printing.
-	maxPodW, maxNodeW, maxPhaseW := len("POD"), len("NODE"), len("PHASE")
-	for _, pod := range pods {
+	maxPodW, maxNodeW, maxPhaseW, maxGraceW := len("POD"), len("NODE"), len("PHASE"), len("GRACE")
+	for i := range pods {
+		pod := &pods[i]
 		if len(pod.ObjectMeta.Name) > maxPodW {
 			maxPodW = len(pod.ObjectMeta.Name)
 		}
@@ -275,13 +276,18 @@ func logPodStates(pods []api.Pod) {
 	maxPodW++
 	maxNodeW++
 	maxPhaseW++
+	maxGraceW++
 
 	// Log pod info. * does space padding, - makes them left-aligned.
-	Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
-		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", "CONDITIONS")
+	Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s",
+		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", maxGraceW, "GRACE", "CONDITIONS")
 	for _, pod := range pods {
-		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
-			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
+		grace := ""
+		if pod.DeletionGracePeriodSeconds != nil {
+			grace = fmt.Sprintf("%ds", *pod.DeletionGracePeriodSeconds)
+		}
+		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s %[8]s",
+			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, grace, pod.Status.Conditions)
 	}
 	Logf("") // Final empty line helps for readability.
 }
@@ -1350,9 +1356,7 @@ func dumpAllPodInfo(c *client.Client) {
 	if err != nil {
 		Logf("unable to fetch pod debug info: %v", err)
 	}
-	for _, pod := range pods.Items {
-		Logf("Pod %s %s node=%s, deletionTimestamp=%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-	}
+	logPodStates(pods.Items)
 }
 
 func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
