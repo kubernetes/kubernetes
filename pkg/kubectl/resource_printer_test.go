@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -118,6 +119,7 @@ func TestPrinter(t *testing.T) {
 		{"test template", "template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}",
 			podTest, "foo"},
 		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
+		{"test name", "name", "", podTest, "/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
 	for _, test := range printerTests {
@@ -272,6 +274,52 @@ func TestTemplatePanic(t *testing.T) {
 	}
 }
 
+func TestNamePrinter(t *testing.T) {
+	tests := map[string]struct {
+		obj    runtime.Object
+		expect string
+	}{
+		"singleObject": {
+			&api.Pod{
+				TypeMeta: api.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			"pod/foo\n"},
+		"List": {
+			&v1.List{
+				TypeMeta: v1.TypeMeta{
+					Kind: "List",
+				},
+				Items: []runtime.RawExtension{
+					{
+						RawJSON: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
+					},
+					{
+						RawJSON: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
+					},
+				},
+			},
+			"pod/foo\npod/bar\n"},
+	}
+	printer, _, _ := GetPrinter("name", "")
+	for name, item := range tests {
+		buff := &bytes.Buffer{}
+		err := printer.PrintObj(item.obj, buff)
+		if err != nil {
+			t.Errorf("%v: unexpected err: %v", name, err)
+			continue
+		}
+		got := buff.String()
+		if item.expect != got {
+			t.Errorf("%v: expected %v, got %v", name, item.expect, got)
+		}
+	}
+}
+
 func TestTemplateStrings(t *testing.T) {
 	// This unit tests the "exists" function as well as the template from update.sh
 	table := map[string]struct {
@@ -413,6 +461,7 @@ func TestPrinters(t *testing.T) {
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
 		"jsonpath":             jsonpathPrinter,
+		"name":                 &NamePrinter{},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
