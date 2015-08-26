@@ -106,7 +106,7 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
-		diskMounter: &awsSafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
