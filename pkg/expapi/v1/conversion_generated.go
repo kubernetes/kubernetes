@@ -1513,8 +1513,13 @@ func convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *ex
 	if err := convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(&in.Status, &out.Status, s); err != nil {
-		return err
+	if in.Status != nil {
+		out.Status = new(HorizontalPodAutoscalerStatus)
+		if err := convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in.Status, out.Status, s); err != nil {
+			return err
+		}
+	} else {
+		out.Status = nil
 	}
 	return nil
 }
@@ -1568,8 +1573,13 @@ func convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerS
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if err := convert_expapi_ResourceConsumption_To_v1_ResourceConsumption(&in.CurrentConsumption, &out.CurrentConsumption, s); err != nil {
-		return err
+	if in.CurrentConsumption != nil {
+		out.CurrentConsumption = new(ResourceConsumption)
+		if err := convert_expapi_ResourceConsumption_To_v1_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
+			return err
+		}
+	} else {
+		out.CurrentConsumption = nil
 	}
 	if in.LastScaleTimestamp != nil {
 		if err := s.Convert(&in.LastScaleTimestamp, &out.LastScaleTimestamp, 0); err != nil {
@@ -1845,8 +1855,13 @@ func convert_v1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler(in *Ho
 	if err := convert_v1_HorizontalPodAutoscalerSpec_To_expapi_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := convert_v1_HorizontalPodAutoscalerStatus_To_expapi_HorizontalPodAutoscalerStatus(&in.Status, &out.Status, s); err != nil {
-		return err
+	if in.Status != nil {
+		out.Status = new(expapi.HorizontalPodAutoscalerStatus)
+		if err := convert_v1_HorizontalPodAutoscalerStatus_To_expapi_HorizontalPodAutoscalerStatus(in.Status, out.Status, s); err != nil {
+			return err
+		}
+	} else {
+		out.Status = nil
 	}
 	return nil
 }
@@ -1900,8 +1915,13 @@ func convert_v1_HorizontalPodAutoscalerStatus_To_expapi_HorizontalPodAutoscalerS
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if err := convert_v1_ResourceConsumption_To_expapi_ResourceConsumption(&in.CurrentConsumption, &out.CurrentConsumption, s); err != nil {
-		return err
+	if in.CurrentConsumption != nil {
+		out.CurrentConsumption = new(expapi.ResourceConsumption)
+		if err := convert_v1_ResourceConsumption_To_expapi_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
+			return err
+		}
+	} else {
+		out.CurrentConsumption = nil
 	}
 	if in.LastScaleTimestamp != nil {
 		if err := s.Convert(&in.LastScaleTimestamp, &out.LastScaleTimestamp, 0); err != nil {

@@ -82,8 +82,13 @@ func describerMap(c *client.Client) map[string]Describer {
 	return m
 }
 
-func expDescriberMap(c *client.ExperimentalClient) map[string]Describer {
-	return map[string]Describer{}
+func expDescriberMap(c *client.Client, exp *client.ExperimentalClient) map[string]Describer {
+	return map[string]Describer{
+		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{
+			client:       c,
+			experimental: exp,
+		},
+	}
 }
 
 // List of all resource types we can describe
@@ -102,10 +107,12 @@ func DescribableResources() []string {
 func DescriberFor(kind string, c *client.Client, ec *client.ExperimentalClient) (Describer, bool) {
 	var f Describer
 	var ok bool
+
 	if c != nil {
 		f, ok = describerMap(c)[kind]
-	} else if ec != nil {
-		f, ok = expDescriberMap(ec)[kind]
+	}
+	if !ok && c != nil && ec != nil {
+		f, ok = expDescriberMap(c, ec)[kind]
 	}
 	return f, ok
 }
@@ -1099,6 +1106,56 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 		fmt.Fprintf(out, "  Memory(bytes):\t\t%d (%d%% of total)\n", totalMemory, int64(fractionTotalMemory))
 		if events != nil {
 			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+// HorizontalPodAutoscalerDescriber generates information about a horizontal pod autoscaler.
+type HorizontalPodAutoscalerDescriber struct {
+	client       *client.Client
+	experimental *client.ExperimentalClient
+}
+
+func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (string, error) {
+	hpa, err := d.experimental.HorizontalPodAutoscalers(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", hpa.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", hpa.Namespace)
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(hpa.Labels))
+		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
+		fmt.Fprintf(out, "Reference:\t%s/%s/%s/%s\n",
+			hpa.Spec.ScaleRef.Kind,
+			hpa.Spec.ScaleRef.Namespace,
+			hpa.Spec.ScaleRef.Name,
+			hpa.Spec.ScaleRef.Subresource)
+		fmt.Fprintf(out, "Target resource consumption:\t%s %s\n",
+			hpa.Spec.Target.Quantity.String(),
+			hpa.Spec.Target.Resource)
+		fmt.Fprintf(out, "Current resource consumption:\t")
+
+		if hpa.Status != nil && hpa.Status.CurrentConsumption != nil {
+			fmt.Fprintf(out, "%s %s\n",
+				hpa.Status.CurrentConsumption.Quantity.String(),
+				hpa.Status.CurrentConsumption.Resource)
+		} else {
+			fmt.Fprintf(out, "<not available>\n")
+		}
+		fmt.Fprintf(out, "Min pods:\t%d\n", hpa.Spec.MinCount)
+		fmt.Fprintf(out, "Max pods:\t%d\n", hpa.Spec.MaxCount)
+
+		// TODO: switch to scale subresource once the required code is submitted.
+		if strings.ToLower(hpa.Spec.ScaleRef.Kind) == "replicationcontroller" {
+			fmt.Fprintf(out, "ReplicationController pods:\t")
+			rc, err := d.client.ReplicationControllers(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Name)
+			if err == nil {
+				fmt.Fprintf(out, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
+			} else {
+				fmt.Fprintf(out, "failed to check Replication Controller\n")
+			}
 		}
 		return nil
 	})
