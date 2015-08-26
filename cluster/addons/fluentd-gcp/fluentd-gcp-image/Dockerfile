@@ -17,11 +17,14 @@ RUN apt-get -q update && \
     apt-get clean && \
     curl -s https://storage.googleapis.com/signals-agents/logging/google-fluentd-install.sh | sudo bash
 
-# Copy the Fluentd configuration file for logging Docker container logs.
-COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
-
 # Install the record reformer plugin.
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer
 
+# Remove the misleading log file that gets generated when the agent is installed
+RUN rm -rf /var/log/google-fluentd
+
+# Copy the Fluentd configuration file for logging Docker container logs.
+COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
+
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS" > /var/log/google-fluentd.log
+CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS"
