@@ -115,11 +115,21 @@ type runner struct {
 	mu       sync.Mutex
 	exec     utilexec.Interface
 	protocol Protocol
+	hasCheck bool
 }
 
 // New returns a new Interface which will exec iptables.
 func New(exec utilexec.Interface, protocol Protocol) Interface {
-	return &runner{exec: exec, protocol: protocol}
+	vstring, err := GetIptablesVersionString(exec)
+	if err != nil {
+		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
+		vstring = MinCheckVersion
+	}
+	return &runner{
+		exec:     exec,
+		protocol: protocol,
+		hasCheck: getIptablesHasCheckCommand(vstring),
+	}
 }
 
 // EnsureChain is part of Interface.
@@ -308,12 +318,7 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
-	checkPresent, err := getIptablesHasCheckCommand(runner.exec)
-	if err != nil {
-		glog.Warningf("Error checking iptables version, assuming version at least 1.4.11: %v", err)
-		checkPresent = true
-	}
-	if checkPresent {
+	if runner.hasCheck {
 		return runner.checkRuleUsingCheck(makeFullArgs(table, chain, args...))
 	} else {
 		return runner.checkRuleWithoutCheck(table, chain, args...)
@@ -399,23 +404,21 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 }
 
 // Checks if iptables has the "-C" flag
-func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
+func getIptablesHasCheckCommand(vstring string) bool {
 	minVersion, err := semver.NewVersion(MinCheckVersion)
 	if err != nil {
-		return false, err
-	}
-	vstring, err := GetIptablesVersionString(exec)
-	if err != nil {
-		return false, err
+		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinCheckVersion, err)
+		return true
 	}
 	version, err := semver.NewVersion(vstring)
 	if err != nil {
-		return false, err
+		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		return true
 	}
 	if version.LessThan(*minVersion) {
-		return false, nil
+		return false
 	}
-	return true, nil
+	return true
 }
 
 // GetIptablesVersionString runs "iptables --version" to get the version string
