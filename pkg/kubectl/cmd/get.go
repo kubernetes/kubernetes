@@ -43,6 +43,9 @@ $ kubectl get pods
 # List all pods in ps output format with more information (such as node name).
 $ kubectl get pods -o wide
 
+# List all pods in resource/name format (such as pod/nginx).
+$ kubectl get pods -o name
+
 # List a single replication controller with specified NAME in ps output format.
 $ kubectl get replicationcontroller web
 
