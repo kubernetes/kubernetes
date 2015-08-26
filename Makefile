@@ -32,6 +32,23 @@ all:
 	hack/build-go.sh $(WHAT)
 .PHONY: all
 
+# Runs all the presubmission verifications.
+#
+# Example:
+#   make verify
+verify:
+	hack/verify-gofmt.sh
+	hack/verify-boilerplate.sh
+	hack/verify-description.sh
+	hack/verify-generated-conversions.sh
+	hack/verify-generated-deep-copies.sh
+	hack/verify-generated-docs.sh
+	hack/verify-swagger-spec.sh
+	hack/verify-linkcheck.sh
+	hack/verify-flags-underscore.py
+	hack/verify-godeps.sh
+.PHONY: verify
+
 # Build and run tests.
 #
 # Args:
