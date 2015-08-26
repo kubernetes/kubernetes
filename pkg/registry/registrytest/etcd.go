@@ -30,17 +30,17 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-func NewEtcdStorage(t *testing.T) (storage.Interface, *tools.FakeEtcdClient) {
+func NewEtcdStorage(t *testing.T, group ...string) (storage.Interface, *tools.FakeEtcdClient) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Codec(group...), etcdtest.PathPrefix())
 	return etcdStorage, fakeClient
 }
 
 type keyFunc func(api.Context, string) (string, error)
 type newFunc func() runtime.Object
 
-func GetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, newFn newFunc, ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func GetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, newFn newFunc, ctx api.Context, obj runtime.Object, group ...string) (runtime.Object, error) {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return nil, err
@@ -55,13 +55,13 @@ func GetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, newFn newFunc, c
 		return nil, err
 	}
 	result := newFn()
-	if err := testapi.Codec().DecodeInto([]byte(resp.Node.Value), result); err != nil {
+	if err := testapi.Codec(group...).DecodeInto([]byte(resp.Node.Value), result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func SetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, ctx api.Context, obj runtime.Object) error {
+func SetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, ctx api.Context, obj runtime.Object, group ...string) error {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return err
@@ -71,17 +71,17 @@ func SetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, ctx api.Context,
 		return err
 	}
 	key = etcdtest.AddPrefix(key)
-	_, err = fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), obj), 0)
+	_, err = fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(group...), obj), 0)
 	return err
 }
 
-func SetObjectsForKey(fakeClient *tools.FakeEtcdClient, key string, objects []runtime.Object) []runtime.Object {
+func SetObjectsForKey(fakeClient *tools.FakeEtcdClient, key string, objects []runtime.Object, group ...string) []runtime.Object {
 	result := make([]runtime.Object, len(objects))
 	if len(objects) > 0 {
 		nodes := make([]*etcd.Node, len(objects))
 		for i, obj := range objects {
-			encoded := runtime.EncodeOrDie(testapi.Codec(), obj)
-			decoded, _ := testapi.Codec().Decode([]byte(encoded))
+			encoded := runtime.EncodeOrDie(testapi.Codec(group...), obj)
+			decoded, _ := testapi.Codec(group...).Decode([]byte(encoded))
 			nodes[i] = &etcd.Node{Value: encoded}
 			result[i] = decoded
 		}

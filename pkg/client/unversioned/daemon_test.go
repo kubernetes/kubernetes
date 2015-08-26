@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/testapi"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -34,7 +34,7 @@ func TestListDaemons(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getDCResourceName(), ns, ""),
+			Path:   testapi.ResourcePath(getDCResourceName(), ns, "", "experimental"),
 		},
 		Response: Response{StatusCode: 200,
 			Body: &expapi.DaemonList{
@@ -53,6 +53,7 @@ func TestListDaemons(t *testing.T) {
 					},
 				},
 			},
+			BodyGroup: "experimental",
 		},
 	}
 	receivedControllerList, err := c.Setup().Daemons(ns).List(labels.Everything())
@@ -63,7 +64,7 @@ func TestListDaemons(t *testing.T) {
 func TestGetDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "GET", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo", "experimental"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &expapi.Daemon{
@@ -78,6 +79,7 @@ func TestGetDaemon(t *testing.T) {
 					Template: &api.PodTemplateSpec{},
 				},
 			},
+			BodyGroup: "experimental",
 		},
 	}
 	receivedController, err := c.Setup().Daemons(ns).Get("foo")
@@ -101,7 +103,7 @@ func TestUpdateDaemon(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "PUT", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "PUT", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo", "experimental"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &expapi.Daemon{
@@ -116,6 +118,7 @@ func TestUpdateDaemon(t *testing.T) {
 					Template: &api.PodTemplateSpec{},
 				},
 			},
+			BodyGroup: "experimental",
 		},
 	}
 	receivedController, err := c.Setup().Daemons(ns).Update(requestController)
@@ -125,7 +128,7 @@ func TestUpdateDaemon(t *testing.T) {
 func TestDeleteDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo", "experimental"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().Daemons(ns).Delete("foo")
@@ -138,7 +141,7 @@ func TestCreateDaemon(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: testapi.ResourcePath(getDCResourceName(), ns, ""), Body: requestController, Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "POST", Path: testapi.ResourcePath(getDCResourceName(), ns, "", "experimental"), Body: requestController, BodyGroup: "experimental", Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &expapi.Daemon{
@@ -153,6 +156,7 @@ func TestCreateDaemon(t *testing.T) {
 					Template: &api.PodTemplateSpec{},
 				},
 			},
+			BodyGroup: "experimental",
 		},
 	}
 	receivedController, err := c.Setup().Daemons(ns).Create(requestController)

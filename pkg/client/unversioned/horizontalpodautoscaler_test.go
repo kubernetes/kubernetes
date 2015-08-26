@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -41,12 +41,13 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 	}
 	c := &testClient{
 		Request: testRequest{
-			Method: "POST",
-			Path:   testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
-			Body:   &horizontalPodAutoscaler,
+			Method:    "POST",
+			Path:      testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "", "experimental"),
+			Query:     buildQueryValues(nil),
+			Body:      &horizontalPodAutoscaler,
+			BodyGroup: "experimental",
 		},
-		Response: Response{StatusCode: 200, Body: &horizontalPodAutoscaler},
+		Response: Response{StatusCode: 200, Body: &horizontalPodAutoscaler, BodyGroup: "experimental"},
 	}
 
 	response, err := c.Setup().HorizontalPodAutoscalers(ns).Create(&horizontalPodAutoscaler)
@@ -67,11 +68,11 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"),
+			Path:   testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc", "experimental"),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
+		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler, BodyGroup: "experimental"},
 	}
 
 	response, err := c.Setup().HorizontalPodAutoscalers(ns).Get("abc")
@@ -93,11 +94,11 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, ""),
+			Path:   testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "", "experimental"),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: horizontalPodAutoscalerList},
+		Response: Response{StatusCode: 200, Body: horizontalPodAutoscalerList, BodyGroup: "experimental"},
 	}
 	response, err := c.Setup().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
@@ -113,8 +114,8 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc", "experimental"), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler, BodyGroup: "experimental"},
 	}
 	response, err := c.Setup().HorizontalPodAutoscalers(ns).Update(horizontalPodAutoscaler)
 	c.Validate(t, response, err)
@@ -123,7 +124,7 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 func TestHorizontalPodAutoscalerDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "foo", "experimental"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().HorizontalPodAutoscalers(ns).Delete("foo", nil)
@@ -134,7 +135,7 @@ func TestHorizontalPodAutoscalerWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePathWithPrefix("watch", getHorizontalPodAutoscalersResoureName(), "", ""),
+			Path:   testapi.ResourcePathWithPrefix("watch", getHorizontalPodAutoscalersResoureName(), "", "", "experimental"),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
