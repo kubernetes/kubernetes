@@ -30,6 +30,7 @@ type ScaleNamespacer interface {
 // ScaleInterface has methods to work with Scale (sub)resources.
 type ScaleInterface interface {
 	Get(string, string) (*expapi.Scale, error)
+	Update(string, *expapi.Scale) (*expapi.Scale, error)
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
@@ -52,6 +53,25 @@ func (c *scales) Get(kind string, name string) (result *expapi.Scale, err error)
 	if strings.ToLower(kind) == "replicationcontroller" {
 		kind = "replicationControllers"
 		err = c.client.Get().Namespace(c.ns).Resource(kind).Name(name).SubResource("scale").Do().Into(result)
+		return
+	}
+	err = fmt.Errorf("Kind not supported: %s", kind)
+	return
+}
+
+func (c *scales) Update(kind string, scale *expapi.Scale) (result *expapi.Scale, err error) {
+	result = &expapi.Scale{}
+	if strings.ToLower(kind) == "replicationcontroller" {
+		kind = "replicationControllers"
+
+		err = c.client.Put().
+			Namespace(scale.Namespace).
+			Resource(kind).
+			Name(scale.Name).
+			SubResource("scale").
+			Body(scale).
+			Do().
+			Into(result)
 		return
 	}
 	err = fmt.Errorf("Kind not supported: %s", kind)
