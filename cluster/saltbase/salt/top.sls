@@ -72,6 +72,7 @@ base:
     - docker
     - kubelet
 {% endif %}
+    - kube-proxy
 
   'roles:kubernetes-pool-vsphere':
     - match: grain
