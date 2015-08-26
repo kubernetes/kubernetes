@@ -171,13 +171,13 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 
 		if desiredReplicas != count {
 			// Going down
-			if desiredReplicas < count && (hpa.Status.LastScaleTimestamp == nil ||
+			if desiredReplicas < count && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
 				rescale = true
 			}
 
 			// Going up
-			if desiredReplicas > count && (hpa.Status.LastScaleTimestamp == nil ||
+			if desiredReplicas > count && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
 				rescale = true
 			}
@@ -192,11 +192,12 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 			}
 		}
 
-		hpa.Status = expapi.HorizontalPodAutoscalerStatus{
+		status := expapi.HorizontalPodAutoscalerStatus{
 			CurrentReplicas:    count,
 			DesiredReplicas:    desiredReplicas,
-			CurrentConsumption: currentConsumption,
+			CurrentConsumption: &currentConsumption,
 		}
+		hpa.Status = &status
 		if rescale {
 			now := util.NewTime(now)
 			hpa.Status.LastScaleTimestamp = &now

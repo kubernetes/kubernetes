@@ -789,8 +789,13 @@ func deepCopy_v1_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *Horizo
 	if err := deepCopy_v1_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_v1_HorizontalPodAutoscalerStatus(in.Status, &out.Status, c); err != nil {
-		return err
+	if in.Status != nil {
+		out.Status = new(HorizontalPodAutoscalerStatus)
+		if err := deepCopy_v1_HorizontalPodAutoscalerStatus(*in.Status, out.Status, c); err != nil {
+			return err
+		}
+	} else {
+		out.Status = nil
 	}
 	return nil
 }
@@ -835,8 +840,13 @@ func deepCopy_v1_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out
 func deepCopy_v1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if err := deepCopy_v1_ResourceConsumption(in.CurrentConsumption, &out.CurrentConsumption, c); err != nil {
-		return err
+	if in.CurrentConsumption != nil {
+		out.CurrentConsumption = new(ResourceConsumption)
+		if err := deepCopy_v1_ResourceConsumption(*in.CurrentConsumption, out.CurrentConsumption, c); err != nil {
+			return err
+		}
+	} else {
+		out.CurrentConsumption = nil
 	}
 	if in.LastScaleTimestamp != nil {
 		out.LastScaleTimestamp = new(util.Time)
