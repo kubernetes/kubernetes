@@ -1773,7 +1773,7 @@ func findSecurityGroupForInstance(instance *ec2.Instance) *string {
 
 		if securityGroupId != nil {
 			// We create instances with one SG
-			glog.Warning("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceID), *securityGroupId)
+			glog.Warningf("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceID), *securityGroupId)
 			continue
 		} else {
 			securityGroupId = securityGroup.GroupID
