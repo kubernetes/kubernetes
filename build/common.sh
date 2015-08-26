@@ -23,6 +23,7 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
+DOCKER_MACHINE_VM=${DOCKER_MACHINE_VM:-"k8s-build"}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -136,21 +137,34 @@ function kube::build::verify_prereqs() {
 
     if kube::build::is_osx; then
       if [[ -z "$DOCKER_NATIVE" ]];then
-        if [[ -z "$(which boot2docker)" ]]; then
-          echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
+        if [[ -z "$(which boot2docker)" ]] && [[ -z "$(which docker-machine)" ]]; then
+          echo "It looks like you are running on Mac OS X and boot2docker/docker-machine can't be found." >&2
           echo "See: https://docs.docker.com/installation/mac/" >&2
           exit 1
         fi
-        if [[ $(boot2docker status) != "running" ]]; then
-          echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
-          exit 1
-        else
-          # Reach over and set the clock. After sleep/resume the clock will skew.
-          kube::log::status "Setting boot2docker clock"
-          boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
-          if [[ -z "$DOCKER_HOST" ]]; then
-            kube::log::status "Setting boot2docker env variables"
-            $(boot2docker shellinit)
+        if [[ -n "$(which boot2docker)" ]]; then
+          if [[ $(boot2docker status) != "running" ]]; then
+            echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
+            exit 1
+          else
+            # Reach over and set the clock. After sleep/resume the clock will skew.
+            kube::log::status "Setting boot2docker clock"
+            boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+            if [[ -z "$DOCKER_HOST" ]]; then
+              kube::log::status "Setting boot2docker env variables"
+              $(boot2docker shellinit)
+            fi
+          fi
+        elif [[ -n "$(which docker-machine)" ]]; then
+          if [[ $(docker-machine status ${DOCKER_MACHINE_VM}) != "Running" ]]; then
+            echo "docker-machine vm isn't started. Please run 'docker-machine create -d virtualbox ${DOCKER_MACHINE_VM} || docker-machine start ${DOCKER_MACHINE_VM}'"
+            exit 1
+          else
+            # Reach over and set the clock. After sleep/resume the clock will skew.
+            kube::log::status "Setting docker-machine clock"
+            docker-machine ssh ${DOCKER_MACHINE_VM} sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+            kube::log::status "Setting docker-machine env variables"
+            eval "$(docker-machine env ${DOCKER_MACHINE_VM})"
           fi
         fi
       fi
@@ -161,9 +175,10 @@ function kube::build::verify_prereqs() {
         echo "Can't connect to 'docker' daemon.  please fix and retry."
         echo
         echo "Possible causes:"
-        echo "  - On Mac OS X, boot2docker VM isn't installed or started"
+        echo "  - On Mac OS X, boot2docker/docker-machine VM isn't installed or started"
         echo "  - On Mac OS X, docker env variable isn't set appropriately. Run:"
-        echo "      \$(boot2docker shellinit)"
+        echo "      \$(boot2docker shellinit) OR"
+        echo "      eval \$(docker-machine env ${DOCKER_MACHINE_VM})"
         echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
         echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
         echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
@@ -171,20 +186,6 @@ function kube::build::verify_prereqs() {
       } >&2
       exit 1
     fi
-  else
-
-    # On OS X, set boot2docker env vars for the 'clean' target if boot2docker is running
-    if kube::build::is_osx && kube::build::has_docker ; then
-      if [[ ! -z "$(which boot2docker)" ]]; then
-        if [[ $(boot2docker status) == "running" ]]; then
-          if [[ -z "$DOCKER_HOST" ]]; then
-            kube::log::status "Setting boot2docker env variables"
-            $(boot2docker shellinit)
-          fi
-        fi
-      fi
-    fi
-
   fi
 
   KUBE_ROOT_HASH=$(kube::build::short_hash "$KUBE_ROOT")
