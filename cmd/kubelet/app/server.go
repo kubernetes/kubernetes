@@ -692,7 +692,7 @@ func startKubelet(k KubeletBootstrap, podCfg *config.PodConfig, kc *KubeletConfi
 
 func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 	// source of all configuration
-	cfg := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates, kc.Recorder)
+	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kc.Recorder)
 
 	// define file config source
 	if kc.ConfigFile != "" {
