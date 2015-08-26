@@ -38,17 +38,19 @@ import (
 const nameRequiredError = "resource name may not be empty"
 
 type testRequest struct {
-	Method  string
-	Path    string
-	Header  string
-	Query   url.Values
-	Body    runtime.Object
-	RawBody *string
+	Method    string
+	Path      string
+	Header    string
+	Query     url.Values
+	Body      runtime.Object
+	BodyGroup string
+	RawBody   *string
 }
 
 type Response struct {
 	StatusCode int
 	Body       runtime.Object
+	BodyGroup  string
 	RawBody    *string
 }
 
@@ -73,7 +75,7 @@ func (c *testClient) Setup() *testClient {
 	c.handler = &util.FakeHandler{
 		StatusCode: c.Response.StatusCode,
 	}
-	if responseBody := body(c.Response.Body, c.Response.RawBody); responseBody != nil {
+	if responseBody := body(c.Response.Body, c.Response.RawBody, c.Response.BodyGroup); responseBody != nil {
 		c.handler.ResponseBody = *responseBody
 	}
 	c.server = httptest.NewServer(c.handler)
@@ -90,7 +92,7 @@ func (c *testClient) Setup() *testClient {
 	if c.ExperimentalClient == nil {
 		version := c.Version
 		if len(version) == 0 {
-			version = testapi.Version()
+			version = testapi.GroupAndVersion("experimental")
 		}
 		c.ExperimentalClient = NewExperimentalOrDie(&Config{
 			Host:    c.server.URL,
@@ -135,7 +137,7 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 		return
 	}
 
-	requestBody := body(c.Request.Body, c.Request.RawBody)
+	requestBody := body(c.Request.Body, c.Request.RawBody, c.Request.BodyGroup)
 	actualQuery := c.handler.RequestReceived.URL.Query()
 	t.Logf("got query: %v", actualQuery)
 	t.Logf("path: %v", c.Request.Path)
@@ -211,9 +213,9 @@ func validateFields(a, b string) bool {
 	return sA.String() == sB.String()
 }
 
-func body(obj runtime.Object, raw *string) *string {
+func body(obj runtime.Object, raw *string, group string) *string {
 	if obj != nil {
-		bs, _ := testapi.Codec().Encode(obj)
+		bs, _ := testapi.Codec(group).Encode(obj)
 		body := string(bs)
 		return &body
 	}

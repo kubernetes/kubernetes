@@ -86,14 +86,22 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 }
 
 // roundTripSame verifies the same source object is tested in all API versions.
-func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
+func roundTripSame(t *testing.T, item runtime.Object, kind string, except ...string) {
 	set := util.NewStringSet(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
+
 	version := testapi.Version()
+	codec := testapi.Codec()
+	//TODO: we should deduct if a kind belongs to "experimental" group once we
+	//divide the scheme for internal objects.
+	if api.Scheme.Recognizes(testapi.GroupAndVersion("experimental"), kind) {
+		version = testapi.Version("experimental")
+		codec = testapi.Codec("experimental")
+	}
 	if !set.Has(version) {
 		fuzzInternalObject(t, version, item, seed)
-		roundTrip(t, testapi.Codec(), item)
+		roundTrip(t, codec, item)
 	}
 }
 
@@ -108,7 +116,7 @@ func TestSpecificKind(t *testing.T) {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
 	}
-	roundTripSame(t, item)
+	roundTripSame(t, item, kind)
 }
 
 func TestList(t *testing.T) {
@@ -121,7 +129,7 @@ func TestList(t *testing.T) {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
 	}
-	roundTripSame(t, item)
+	roundTripSame(t, item, kind)
 }
 
 var nonRoundTrippableTypes = util.NewStringSet()
@@ -145,7 +153,7 @@ func TestRoundTripTypes(t *testing.T) {
 			if _, err := meta.TypeAccessor(item); err != nil {
 				t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
 			}
-			roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
+			roundTripSame(t, item, kind, nonRoundTrippableTypesByVersion[kind]...)
 			if !nonInternalRoundTrippableTypes.Has(kind) {
 				roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
 			}
