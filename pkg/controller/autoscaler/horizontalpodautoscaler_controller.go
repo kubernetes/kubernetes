@@ -40,7 +40,7 @@ const (
 )
 
 type HorizontalPodAutoscalerController struct {
-	client    *client.Client
+	client    client.Interface
 	expClient client.ExperimentalInterface
 }
 
@@ -71,8 +71,7 @@ var heapsterQueryStart, _ = time.ParseDuration("-5m")
 var downscaleForbiddenWindow, _ = time.ParseDuration("20m")
 var upscaleForbiddenWindow, _ = time.ParseDuration("3m")
 
-func New(client *client.Client, expClient client.ExperimentalInterface) *HorizontalPodAutoscalerController {
-	//TODO: switch to client.Interface
+func New(client client.Interface, expClient client.ExperimentalInterface) *HorizontalPodAutoscalerController {
 	return &HorizontalPodAutoscalerController{
 		client:    client,
 		expClient: expClient,
@@ -126,16 +125,9 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 			strings.Join(podNames, ","),
 			metricSpec.name)
 
-		resultRaw, err := a.client.
-			Get().
-			Prefix("proxy").
-			Resource("services").
-			Namespace(heapsterNamespace).
-			Name(heapsterService).
-			Suffix(metricPath).
-			Param("start", startTime.Format(time.RFC3339)).
-			Do().
-			Raw()
+		resultRaw, err := a.client.Services(heapsterNamespace).
+			ProxyGet(heapsterService, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
+			DoRaw()
 
 		if err != nil {
 			glog.Warningf("Failed to get pods metrics for %s: %v", reference, err)

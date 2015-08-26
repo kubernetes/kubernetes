@@ -36,15 +36,16 @@ type ServiceInterface interface {
 	Update(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	ProxyGet(name, path string, params map[string]string) ResponseWrapper
 }
 
-// services implements PodsNamespacer interface
+// services implements ServicesNamespacer interface
 type services struct {
 	r  *Client
 	ns string
 }
 
-// newServices returns a PodsClient
+// newServices returns a services
 func newServices(c *Client, namespace string) *services {
 	return &services{c, namespace}
 }
@@ -97,4 +98,18 @@ func (c *services) Watch(label labels.Selector, field fields.Selector, resourceV
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()
+}
+
+// ProxyGet returns a response of the service by calling it through the proxy.
+func (c *services) ProxyGet(name, path string, params map[string]string) ResponseWrapper {
+	request := c.r.Get().
+		Prefix("proxy").
+		Namespace(c.ns).
+		Resource("services").
+		Name(name).
+		Suffix(path)
+	for k, v := range params {
+		request = request.Param(k, v)
+	}
+	return request
 }
