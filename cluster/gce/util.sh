@@ -176,7 +176,7 @@ function copy-if-not-staged() {
   local -r hash=$4
 
   if already-staged "${tar}" "${hash}"; then
-    echo "+++ $(basename ${tar}) already staged ('rm ${tar}.sha1' to force)"
+    echo "+++ $(basename ${tar}) already staged ('rm ${tar}.uploaded.sha1' to force)"
   else
     echo "${hash}" > "${tar}.sha1"
     gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
