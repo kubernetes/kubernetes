@@ -133,15 +133,18 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			continue
 		}
 		glog.V(3).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
-		outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
-		if err != nil {
-			glog.Errorf("Failed to connect to balancer: %v", err)
-			inConn.Close()
-			continue
-		}
-		// Spin up an async copy loop.
-		go proxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		go connecBalancer(service, inConn, proxier)
 	}
+}
+
+func connecBalancer(service proxy.ServicePortName, inConn net.Conn, proxier *Proxier) {
+	outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
+	if err != nil {
+		glog.Errorf("Failed to connect to balancer: %v", err)
+		inConn.Close()
+	}
+	// Spin up an async copy loop.
+	go proxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 }
 
 // proxyTCP proxies data bi-directionally between in and out.
