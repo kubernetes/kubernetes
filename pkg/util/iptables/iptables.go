@@ -310,7 +310,7 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
 	checkPresent, err := getIptablesHasCheckCommand(runner.exec)
 	if err != nil {
-		glog.Warning("Error checking iptables version, assuming version at least 1.4.11: %v", err)
+		glog.Warningf("Error checking iptables version, assuming version at least 1.4.11: %v", err)
 		checkPresent = true
 	}
 	if checkPresent {
