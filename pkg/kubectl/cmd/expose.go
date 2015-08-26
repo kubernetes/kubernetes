@@ -191,21 +191,28 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 	}
 
+	resourceMapper := &resource.Mapper{ObjectTyper: typer, RESTMapper: mapper, ClientMapper: f.ClientMapperForCommand()}
+	info, err = resourceMapper.InfoForObject(object)
+	if err != nil {
+		return err
+	}
 	// TODO: extract this flag to a central location, when such a location exists.
-	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		resourceMapper := &resource.Mapper{ObjectTyper: typer, RESTMapper: mapper, ClientMapper: f.ClientMapperForCommand()}
-		info, err := resourceMapper.InfoForObject(object)
-		if err != nil {
-			return err
-		}
+	if cmdutil.GetFlagBool(cmd, "dry-run") {
+		fmt.Fprintln(out, "running in dry-run mode...")
+	} else {
 		data, err := info.Mapping.Codec.Encode(object)
 		if err != nil {
 			return err
 		}
-		_, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, data)
+		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, data)
 		if err != nil {
 			return err
 		}
 	}
-	return f.PrintObject(cmd, object, out)
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	if outputFormat != "" {
+		return f.PrintObject(cmd, object, out)
+	}
+	cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "exposed")
+	return nil
 }
