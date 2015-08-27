@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -148,6 +149,15 @@ func testDaemonSets(f *Framework) {
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		Logf("Check that reaper kills all daemon pods for %s", simpleDSName)
+		dsReaper, err := kubectl.ReaperFor("DaemonSet", c)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = dsReaper.Stop(ns, simpleDSName, 0, nil)
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to be reaped")
+	}()
 
 	By("Check that daemon pods launch on every node of the cluster.")
 	Expect(err).NotTo(HaveOccurred())
@@ -218,4 +228,7 @@ func testDaemonSets(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, complexLabel))).
 		NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
+
+	By("We should now be able to delete the daemon set.")
+	Expect(c.DaemonSets(ns).Delete(complexDSName)).NotTo(HaveOccurred())
 }
