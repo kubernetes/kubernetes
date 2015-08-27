@@ -371,7 +371,7 @@ func (dsc *DaemonSetsController) manage(ds *experimental.DaemonSet) {
 
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v", ds.Name, nodesNeedingDaemonPods)
 	for i := range nodesNeedingDaemonPods {
-		if err := dsc.podControl.CreateReplicaOnNode(ds.Namespace, ds, nodesNeedingDaemonPods[i]); err != nil {
+		if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[i], ds.Namespace, ds.Spec.Template, ds); err != nil {
 			glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 			dsc.expectations.CreationObserved(dsKey)
 			util.HandleError(err)

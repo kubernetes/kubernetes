@@ -75,5 +75,15 @@ func addDefaultingFuncs() {
 				*obj.Spec.UniqueLabelKey = "deployment.kubernetes.io/podTemplateHash"
 			}
 		},
+		func(obj *Job) {
+			if obj.Spec.Completions == nil {
+				completions := 1
+				obj.Spec.Completions = &completions
+			}
+			if obj.Spec.Parallelism == nil {
+				parallelism := 2
+				obj.Spec.Parallelism = &parallelism
+			}
+		},
 	)
 }

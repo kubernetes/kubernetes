@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -42,7 +41,7 @@ import (
 )
 
 type FakePodControl struct {
-	controllerSpec []api.ReplicationController
+	controllerSpec []api.PodTemplateSpec
 	deletePodName  []string
 	lock           sync.Mutex
 	err            error
@@ -60,7 +59,7 @@ func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
-func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationController) error {
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.err != nil {
@@ -70,7 +69,7 @@ func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationCo
 	return nil
 }
 
-func (f *FakePodControl) CreateReplicaOnNode(namespace string, daemon *experimental.DaemonSet, nodeName string) error {
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
 	return nil
 }
 
@@ -87,7 +86,7 @@ func (f *FakePodControl) clear() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.deletePodName = []string{}
-	f.controllerSpec = []api.ReplicationController{}
+	f.controllerSpec = []api.PodTemplateSpec{}
 }
 
 func getKey(rc *api.ReplicationController, t *testing.T) string {

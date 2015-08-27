@@ -344,3 +344,55 @@ func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.E
 	err = fmt.Errorf("Could not find endpoints for service: %v", svc.Name)
 	return
 }
+
+// StoreToJobLister gives a store List and Exists methods. The store must contain only Jobs.
+type StoreToJobLister struct {
+	Store
+}
+
+// Exists checks if the given job exists in the store.
+func (s *StoreToJobLister) Exists(job *experimental.Job) (bool, error) {
+	_, exists, err := s.Store.Get(job)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToJobLister lists all jobs in the store.
+func (s *StoreToJobLister) List() (jobs []experimental.Job, err error) {
+	for _, c := range s.Store.List() {
+		jobs = append(jobs, *(c.(*experimental.Job)))
+	}
+	return jobs, nil
+}
+
+// GetPodControllers returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
+func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []experimental.Job, err error) {
+	var selector labels.Selector
+	var job experimental.Job
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("No jobs found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		job = *m.(*experimental.Job)
+		if job.Namespace != pod.Namespace {
+			continue
+		}
+		labelSet := labels.Set(job.Spec.Selector)
+		selector = labels.Set(job.Spec.Selector).AsSelector()
+
+		// Job with a nil or empty selector match nothing
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		jobs = append(jobs, job)
+	}
+	if len(jobs) == 0 {
+		err = fmt.Errorf("Could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
