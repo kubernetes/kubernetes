@@ -535,6 +535,7 @@ You will need to run one or more instances of etcd.
 availability.
 
 To run an etcd instance:
+
 1. copy `cluster/saltbase/salt/etcd/etcd.manifest`
 1. make any modifications needed
 1. start the pod by putting it into the kubelet manifest directory
