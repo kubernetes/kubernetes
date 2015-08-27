@@ -189,6 +189,43 @@ func TestSetDefaultDeployment(t *testing.T) {
 	}
 }
 
+func TestSetDefaultJob(t *testing.T) {
+	expected := &Job{
+		Spec: JobSpec{
+			Completions: newInt(1),
+			Parallelism: newInt(2),
+		},
+	}
+	tests := []*Job{
+		{},
+		{
+			Spec: JobSpec{
+				Completions: newInt(1),
+			},
+		},
+		{
+			Spec: JobSpec{
+				Parallelism: newInt(2),
+			},
+		},
+	}
+
+	for _, original := range tests {
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*Job)
+		if !ok {
+			t.Errorf("unexpected object: %v", got)
+			t.FailNow()
+		}
+		if *got.Spec.Completions != *expected.Spec.Completions {
+			t.Errorf("got different completions than expected: %d %d", *got.Spec.Completions, *expected.Spec.Completions)
+		}
+		if *got.Spec.Parallelism != *expected.Spec.Parallelism {
+			t.Errorf("got different parallelism than expected: %d %d", *got.Spec.Parallelism, *expected.Spec.Parallelism)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := v1.Codec.Encode(obj)
 	if err != nil {

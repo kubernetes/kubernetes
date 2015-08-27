@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
+	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/controller/persistentvolume"
@@ -66,6 +67,7 @@ type CMServer struct {
 	ConcurrentEndpointSyncs           int
 	ConcurrentRCSyncs                 int
 	ConcurrentDSCSyncs                int
+	ConcurrentJobSyncs                int
 	ServiceSyncPeriod                 time.Duration
 	NodeSyncPeriod                    time.Duration
 	ResourceQuotaSyncPeriod           time.Duration
@@ -104,6 +106,7 @@ func NewCMServer() *CMServer {
 		ConcurrentEndpointSyncs:           5,
 		ConcurrentRCSyncs:                 5,
 		ConcurrentDSCSyncs:                2,
+		ConcurrentJobSyncs:                5,
 		ServiceSyncPeriod:                 5 * time.Minute,
 		NodeSyncPeriod:                    10 * time.Second,
 		ResourceQuotaSyncPeriod:           10 * time.Second,
@@ -237,6 +240,9 @@ func (s *CMServer) Run(_ []string) error {
 
 	go daemon.NewDaemonSetsController(kubeClient).
 		Run(s.ConcurrentDSCSyncs, util.NeverStop)
+
+	go job.NewJobManager(kubeClient).
+		Run(s.ConcurrentJobSyncs, util.NeverStop)
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {

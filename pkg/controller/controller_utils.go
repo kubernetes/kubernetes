@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -213,10 +212,10 @@ func NewControllerExpectations() *ControllerExpectations {
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
-	// CreateReplica creates new replicated pods according to the spec.
-	CreateReplica(namespace string, controller *api.ReplicationController) error
-	// CreateReplicaOnNode creates a new pod according to the spec on the specified node.
-	CreateReplicaOnNode(namespace string, ds *experimental.DaemonSet, nodeName string) error
+	// CreatePods creates new pods according to the spec.
+	CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error
+	// CreatePodsOnNode creates a new pod accorting to the spec on the specified node.
+	CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string) error
 }
@@ -227,7 +226,7 @@ type RealPodControl struct {
 	Recorder   record.EventRecorder
 }
 
-func getReplicaLabelSet(template *api.PodTemplateSpec) labels.Set {
+func getPodsLabelSet(template *api.PodTemplateSpec) labels.Set {
 	desiredLabels := make(labels.Set)
 	for k, v := range template.Labels {
 		desiredLabels[k] = v
@@ -235,7 +234,7 @@ func getReplicaLabelSet(template *api.PodTemplateSpec) labels.Set {
 	return desiredLabels
 }
 
-func getReplicaAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
+func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
 	desiredAnnotations := make(labels.Set)
 	for k, v := range template.Annotations {
 		desiredAnnotations[k] = v
@@ -254,7 +253,7 @@ func getReplicaAnnotationSet(template *api.PodTemplateSpec, object runtime.Objec
 	return desiredAnnotations, nil
 }
 
-func getReplicaPrefix(controllerName string) string {
+func getPodsPrefix(controllerName string) string {
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controllerName)
 	if ok, _ := validation.ValidatePodName(prefix, true); !ok {
@@ -263,44 +262,25 @@ func getReplicaPrefix(controllerName string) string {
 	return prefix
 }
 
-func (r RealPodControl) CreateReplica(namespace string, controller *api.ReplicationController) error {
-	desiredLabels := getReplicaLabelSet(controller.Spec.Template)
-	desiredAnnotations, err := getReplicaAnnotationSet(controller.Spec.Template, controller)
-	if err != nil {
-		return err
-	}
-	prefix := getReplicaPrefix(controller.Name)
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Labels:       desiredLabels,
-			Annotations:  desiredAnnotations,
-			GenerateName: prefix,
-		},
-	}
-	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.Spec); err != nil {
-		return fmt.Errorf("unable to convert pod template: %v", err)
-	}
-	if labels.Set(pod.Labels).AsSelector().Empty() {
-		return fmt.Errorf("unable to create pod replica, no labels")
-	}
-	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(controller, "FailedCreate", "Error creating: %v", err)
-		return fmt.Errorf("unable to create pod replica: %v", err)
-	} else {
-		glog.V(4).Infof("Controller %v created pod %v", controller.Name, newPod.Name)
-		r.Recorder.Eventf(controller, "SuccessfulCreate", "Created pod: %v", newPod.Name)
-	}
-	return nil
+func (r RealPodControl) CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	return r.createPods("", namespace, template, object)
 }
 
-func (r RealPodControl) CreateReplicaOnNode(namespace string, ds *experimental.DaemonSet, nodeName string) error {
-	desiredLabels := getReplicaLabelSet(ds.Spec.Template)
-	desiredAnnotations, err := getReplicaAnnotationSet(ds.Spec.Template, ds)
+func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	return r.createPods(nodeName, namespace, template, object)
+}
+
+func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	desiredLabels := getPodsLabelSet(template)
+	desiredAnnotations, err := getPodsAnnotationSet(template, object)
 	if err != nil {
 		return err
 	}
-	prefix := getReplicaPrefix(ds.Name)
+	meta, err := api.ObjectMetaFor(object)
+	if err != nil {
+		return fmt.Errorf("object does not have ObjectMeta, %v", err)
+	}
+	prefix := getPodsPrefix(meta.Name)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -309,22 +289,22 @@ func (r RealPodControl) CreateReplicaOnNode(namespace string, ds *experimental.D
 			GenerateName: prefix,
 		},
 	}
-	if err := api.Scheme.Convert(&ds.Spec.Template.Spec, &pod.Spec); err != nil {
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
+	}
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
 		return fmt.Errorf("unable to convert pod template: %v", err)
 	}
-	// if a pod does not have labels then it cannot be controlled by any controller
 	if labels.Set(pod.Labels).AsSelector().Empty() {
-		return fmt.Errorf("unable to create pod replica, no labels")
+		return fmt.Errorf("unable to create pods, no labels")
 	}
-	pod.Spec.NodeName = nodeName
 	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(ds, "FailedCreate", "Error creating: %v", err)
-		return fmt.Errorf("unable to create pod replica: %v", err)
+		r.Recorder.Eventf(object, "FailedCreate", "Error creating: %v", err)
+		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
-		glog.V(4).Infof("Controller %v created pod %v", ds.Name, newPod.Name)
-		r.Recorder.Eventf(ds, "SuccessfulCreate", "Created pod: %v", newPod.Name)
+		glog.V(4).Infof("Controller %v created pod %v", meta.Name, newPod.Name)
+		r.Recorder.Eventf(object, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
-
 	return nil
 }
 
