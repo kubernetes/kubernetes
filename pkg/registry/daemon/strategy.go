@@ -21,7 +21,8 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/expapi/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -45,16 +46,16 @@ func (daemonStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a daemon before creation.
 func (daemonStrategy) PrepareForCreate(obj runtime.Object) {
-	daemon := obj.(*api.Daemon)
-	daemon.Status = api.DaemonStatus{}
+	daemon := obj.(*expapi.Daemon)
+	daemon.Status = expapi.DaemonStatus{}
 
 	daemon.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (daemonStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newDaemon := obj.(*api.Daemon)
-	oldDaemon := old.(*api.Daemon)
+	newDaemon := obj.(*expapi.Daemon)
+	oldDaemon := old.(*expapi.Daemon)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -74,7 +75,7 @@ func (daemonStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // Validate validates a new daemon.
 func (daemonStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	daemon := obj.(*api.Daemon)
+	daemon := obj.(*expapi.Daemon)
 	return validation.ValidateDaemon(daemon)
 }
 
@@ -86,8 +87,8 @@ func (daemonStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (daemonStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateDaemon(obj.(*api.Daemon))
-	updateErrorList := validation.ValidateDaemonUpdate(old.(*api.Daemon), obj.(*api.Daemon))
+	validationErrorList := validation.ValidateDaemon(obj.(*expapi.Daemon))
+	updateErrorList := validation.ValidateDaemonUpdate(old.(*expapi.Daemon), obj.(*expapi.Daemon))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -97,7 +98,7 @@ func (daemonStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // DaemonToSelectableFields returns a field set that represents the object.
-func DaemonToSelectableFields(daemon *api.Daemon) fields.Set {
+func DaemonToSelectableFields(daemon *expapi.Daemon) fields.Set {
 	return fields.Set{
 		"metadata.name": daemon.Name,
 	}
@@ -111,7 +112,7 @@ func MatchDaemon(label labels.Selector, field fields.Selector) generic.Matcher {
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			daemon, ok := obj.(*api.Daemon)
+			daemon, ok := obj.(*expapi.Daemon)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not a daemon.")
 			}

@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -231,7 +232,7 @@ type StoreToDaemonLister struct {
 }
 
 // Exists checks if the given dc exists in the store.
-func (s *StoreToDaemonLister) Exists(daemon *api.Daemon) (bool, error) {
+func (s *StoreToDaemonLister) Exists(daemon *expapi.Daemon) (bool, error) {
 	_, exists, err := s.Store.Get(daemon)
 	if err != nil {
 		return false, err
@@ -241,17 +242,17 @@ func (s *StoreToDaemonLister) Exists(daemon *api.Daemon) (bool, error) {
 
 // StoreToDaemonLister lists all daemons in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToDaemonLister) List() (daemons []api.Daemon, err error) {
+func (s *StoreToDaemonLister) List() (daemons []expapi.Daemon, err error) {
 	for _, c := range s.Store.List() {
-		daemons = append(daemons, *(c.(*api.Daemon)))
+		daemons = append(daemons, *(c.(*expapi.Daemon)))
 	}
 	return daemons, nil
 }
 
 // GetPodDaemons returns a list of daemons managing a pod. Returns an error iff no matching daemons are found.
-func (s *StoreToDaemonLister) GetPodDaemons(pod *api.Pod) (daemons []api.Daemon, err error) {
+func (s *StoreToDaemonLister) GetPodDaemons(pod *api.Pod) (daemons []expapi.Daemon, err error) {
 	var selector labels.Selector
-	var daemonController api.Daemon
+	var daemonController expapi.Daemon
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("No daemons found for pod %v because it has no labels", pod.Name)
@@ -259,7 +260,7 @@ func (s *StoreToDaemonLister) GetPodDaemons(pod *api.Pod) (daemons []api.Daemon,
 	}
 
 	for _, m := range s.Store.List() {
-		daemonController = *m.(*api.Daemon)
+		daemonController = *m.(*expapi.Daemon)
 		if daemonController.Namespace != pod.Namespace {
 			continue
 		}

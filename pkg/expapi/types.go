@@ -271,3 +271,51 @@ type DeploymentList struct {
 
 	Items []Deployment `json:"items"`
 }
+
+// DaemonSpec is the specification of a daemon.
+type DaemonSpec struct {
+	// Selector is a label query over pods that are managed by the daemon.
+	Selector map[string]string `json:"selector"`
+
+	// Template is the object that describes the pod that will be created.
+	// The Daemon will create exactly one copy of this pod on every node
+	// that matches the template's node selector (or on every node if no node
+	// selector is specified).
+	Template *api.PodTemplateSpec `json:"template,omitempty"`
+}
+
+// DaemonStatus represents the current status of a daemon.
+type DaemonStatus struct {
+	// CurrentNumberScheduled is the number of nodes that are running exactly 1 copy of the
+	// daemon and are supposed to run the daemon.
+	CurrentNumberScheduled int `json:"currentNumberScheduled"`
+
+	// NumberMisscheduled is the number of nodes that are running the daemon, but are
+	// not supposed to run the daemon.
+	NumberMisscheduled int `json:"numberMisscheduled"`
+
+	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
+	// (including nodes correctly running the daemon).
+	DesiredNumberScheduled int `json:"desiredNumberScheduled"`
+}
+
+// Daemon represents the configuration of a daemon.
+type Daemon struct {
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this daemon.
+	Spec DaemonSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this daemon. This data may be
+	// out of date by some window of time.
+	Status DaemonStatus `json:"status,omitempty"`
+}
+
+// DaemonList is a collection of daemon.
+type DaemonList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty"`
+
+	Items []Daemon `json:"items"`
+}
