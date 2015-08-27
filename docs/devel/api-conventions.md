@@ -713,6 +713,13 @@ Annotations have very different intended usage from labels. We expect them to be
 
 In fact, experimental API fields, including to represent fields of newer alpha/beta API versions in the older, stable storage version, may be represented as annotations with the prefix `experimental.kubernetes.io/`.
 
+Other advice regarding use of labels, annotations, and other generic map keys by Kubernetes components and tools:
+  - Key names should be all lowercase, with words separated by dashes, such as `desired-replicas`
+  - Prefix the key with `kubernetes.io/` or `foo.kubernetes.io/`, preferably the latter if the label/annotation is specific to `foo`
+    - For instance, prefer `service-account.kubernetes.io/name` over `kubernetes.io/service-account.name`
+  - Use annotations to store API extensions that the controller responsible for the resource doesn't need to know about, experimental fields that aren't intended to be generally used API fields, etc. Beware that annotations aren't automatically handled by the API conversion machinery.
+
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api-conventions.md?pixel)]()

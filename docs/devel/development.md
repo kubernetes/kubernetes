@@ -112,6 +112,8 @@ fixups (e.g. automated doc formatting), use one or more commits for the
 changes to tooling and a final commit to apply the fixup en masse.  This makes
 reviews much easier.
 
+See [Faster Reviews](faster_reviews.md) for more details.
+
 ## godep and dependency management
 
 Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.

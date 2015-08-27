@@ -189,17 +189,82 @@ API call might POST an object in API v7beta1 format, which uses the cleaner
 form (since v7beta1 is "beta").  When the user reads the object back in the
 v7beta1 API it would be unacceptable to have lost all but `Params[0]`.  This
 means that, even though it is ugly, a compatible change must be made to the v6
-API. However, this is very challenging to do correctly. It generally requires
+API.
+
+However, this is very challenging to do correctly. It often requires
 multiple representations of the same information in the same API resource, which
-need to be kept in sync in the event that either is changed. However, if
-the new representation is more expressive than the old, this breaks
-backward compatibility, since clients that only understood the old representation
+need to be kept in sync in the event that either is changed. For example,
+let's say you decide to rename a field within the same API version. In this case,
+you add units to `height` and `width`. You implement this by adding duplicate
+fields:
+
+```go
+type Frobber struct {
+	Height         *int          `json:"height"`
+	Width          *int          `json:"width"`
+	HeightInInches *int          `json:"heightInInches"`
+	WidthInInches  *int          `json:"widthInInches"`
+}
+```
+
+You convert all of the fields to pointers in order to distinguish between unset and
+set to 0, and then set each corresponding field from the other in the defaulting
+pass (e.g., `heightInInches` from `height`, and vice versa), which runs just prior
+to conversion. That works fine when the user creates a resource from a hand-written
+configuration -- clients can write either field and read either field, but what about
+creation or update from the output of GET, or update via PATCH (see
+[In-place updates](../user-guide/managing-deployments.md#in-place-updates-of-resources))?
+In this case, the two fields will conflict, because only one field would be updated
+in the case of an old client that was only aware of the old field (e.g., `height`).
+
+Say the client creates:
+
+```json
+{
+  "height": 10,
+  "width": 5
+}
+```
+
+and GETs:
+
+```json
+{
+  "height": 10,
+  "heightInInches": 10,
+  "width": 5,
+  "widthInInches": 5
+}
+```
+
+then PUTs back:
+
+```json
+{
+  "height": 13,
+  "heightInInches": 10,
+  "width": 5,
+  "widthInInches": 5
+}
+```
+
+The update should not fail, because it would have worked before `heightInInches` was added.
+
+Therefore, when there are duplicate fields, the old field MUST take precedence
+over the new, and the new field should be set to match by the server upon write.
+A new client would be aware of the old field as well as the new, and so can ensure
+that the old field is either unset or is set consistently with the new field. However,
+older clients would be unaware of the new field. Please avoid introducing duplicate
+fields due to the complexity they incur in the API.
+
+A new representation, even in a new API version, that is more expressive than an old one
+breaks backward compatibility, since clients that only understood the old representation
 would not be aware of the new representation nor its semantics. Examples of
 proposals that have run into this challenge include [generalized label
 selectors](http://issues.k8s.io/341) and [pod-level security
 context](http://prs.k8s.io/12823).
 
-As another interesting example, enumerated values provide a unique challenge.
+As another interesting example, enumerated values cause similar challenges.
 Adding a new value to an enumerated set is *not* a compatible change.  Clients
 which assume they know how to handle all possible values of a given field will
 not be able to handle the new values.  However, removing value from an
@@ -226,6 +291,21 @@ the change gets in. If you are unsure, ask. Also make sure that the change gets 
 the release notes for the next release by labeling the PR with the "release-note" github label.
 
 If you found that your change accidentally broke clients, it should be reverted.
+
+In short, the expected API evolution is as follows:
+* `experimental/v1alpha1` ->
+* `newapigroup/v1alpha1` -> ... -> `newapigroup/v1alphaN` ->
+* `newapigroup/v1beta1` -> ... -> `newapigroup/v1betaN` ->
+* `newapigroup/v1` ->
+* `newapigroup/v2alpha1` -> ...
+
+While in experimental we have no obligation to move forward with the API at all and may delete or break it at any time.
+
+While in alpha we expect to move forward with it, but may break it.
+
+Once in beta we will preserve forward compatibility, but may introduce new versions and delete old ones.
+
+v1 must be backward-compatible for an extended length of time.
 
 ## Changing versioned APIs
 
