@@ -676,7 +676,7 @@ Some cloud providers require a config file. If so, you need to put config file i
 - `--cloud-config=` set if cloud provider requires a config file.
 - Used by `aws`, `gce`, `mesos`, `openshift`, `ovirt` and `rackspace`.
 - You must put config file into apiserver image or mount through hostPath.
-- Cloud config file syntax is [Gcfg](https://code.google.com/p/gcfg/).
+- Cloud config file syntax is [Gcfg](https://gopkg.in/gcfg.v1).
 - AWS format defined by type [AWSCloudConfig](../../pkg/cloudprovider/providers/aws/aws.go)
 - There is a similar type in the corresponding file for other cloud providers.
 - GCE example: search for `gce.conf` in [this file](../../cluster/gce/configure-vm.sh)
