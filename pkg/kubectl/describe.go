@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
@@ -69,6 +70,7 @@ func describerMap(c *client.Client) map[string]Describer {
 	m := map[string]Describer{
 		"Pod": &PodDescriber{c},
 		"ReplicationController": &ReplicationControllerDescriber{c},
+		"Daemon":                &DaemonDescriber{c},
 		"Secret":                &SecretDescriber{c},
 		"Service":               &ServiceDescriber{c},
 		"ServiceAccount":        &ServiceAccountDescriber{c},
@@ -128,6 +130,7 @@ func init() {
 		describePod,
 		describeService,
 		describeReplicationController,
+		describeDaemon,
 		describeNode,
 		describeNamespace,
 	)
@@ -423,6 +426,7 @@ type PodDescriber struct {
 
 func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 	rc := d.ReplicationControllers(namespace)
+	dc := d.Daemons(namespace)
 	pc := d.Pods(namespace)
 
 	pod, err := pc.Get(name)
@@ -453,11 +457,15 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	daemons, err := getDaemonsForLabels(dc, labels.Set(pod.Labels))
+	if err != nil {
+		return "", err
+	}
 
-	return describePod(pod, rcs, events)
+	return describePod(pod, rcs, daemons, events)
 }
 
-func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.EventList) (string, error) {
+func describePod(pod *api.Pod, rcs []api.ReplicationController, daemons []expapi.Daemon, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
@@ -477,6 +485,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		fmt.Fprintf(out, "Message:\t%s\n", pod.Status.Message)
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
+		fmt.Fprintf(out, "Daemons:\t%s\n", printDaemonsByLabels(daemons))
 		fmt.Fprintf(out, "Containers:\n")
 		describeContainers(pod, out)
 		if len(pod.Status.Conditions) > 0 {
@@ -823,7 +832,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForReplicationController(pc, controller)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, controller.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -889,6 +898,52 @@ func describeJob(job *experimental.Job, events *api.EventList) (string, error) {
 		if job.Spec.Template != nil {
 			describeVolumes(job.Spec.Template.Spec.Volumes, out)
 		}
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+// DaemonDescriber generates information about a daemon and the pods it has created.
+type DaemonDescriber struct {
+	client.Interface
+}
+
+func (d *DaemonDescriber) Describe(namespace, name string) (string, error) {
+	dc := d.Daemons(namespace)
+	pc := d.Pods(namespace)
+
+	daemon, err := dc.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, daemon.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
+
+	events, _ := d.Events(namespace).Search(daemon)
+
+	return describeDaemon(daemon, events, running, waiting, succeeded, failed)
+}
+
+func describeDaemon(daemon *expapi.Daemon, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
+		if daemon.Spec.Template != nil {
+			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
+		} else {
+			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
+		}
+		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Selector))
+		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(daemon.Labels))
+		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
+		fmt.Fprintf(out, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
+		fmt.Fprintf(out, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
+		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1347,6 +1402,30 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 	}
 }
 
+// Get all daemons whose selectors would match a given set of labels.
+// TODO: Move this to pkg/client and ideally implement it server-side (instead
+// of getting all RC's and searching through them manually).
+// TODO: write an interface for controllers and fuse getReplicationControllersForLabels
+// and getDaemonsForLabels.
+func getDaemonsForLabels(c client.DaemonInterface, labelsToMatch labels.Labels) ([]expapi.Daemon, error) {
+	// Get all daemon controllers.
+	// TODO this needs a namespace scope as argument
+	daemons, err := c.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error getting daemons: %v", err)
+	}
+
+	// Find the ones that match labelsToMatch.
+	var matchingDaemons []expapi.Daemon
+	for _, daemon := range daemons.Items {
+		selector := labels.SelectorFromSet(daemon.Spec.Selector)
+		if selector.Matches(labelsToMatch) {
+			matchingDaemons = append(matchingDaemons, daemon)
+		}
+	}
+	return matchingDaemons, nil
+}
+
 // Get all replication controllers whose selectors would match a given set of
 // labels.
 // TODO Move this to pkg/client and ideally implement it server-side (instead
@@ -1370,6 +1449,20 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 	return matchingRCs, nil
 }
 
+func printDaemonsByLabels(matchingDaemons []expapi.Daemon) string {
+	// Format the matching RC's into strings.
+	var daemonStrings []string
+	for _, daemon := range matchingDaemons {
+		daemonStrings = append(daemonStrings, fmt.Sprintf("%s (%d desired, %d nodes scheduled, %d nodes misscheduled)", daemon.Name, daemon.Status.DesiredNumberScheduled, daemon.Status.CurrentNumberScheduled, daemon.Status.NumberMisscheduled))
+	}
+
+	list := strings.Join(daemonStrings, ", ")
+	if list == "" {
+		return "<none>"
+	}
+	return list
+}
+
 func printReplicationControllersByLabels(matchingRCs []api.ReplicationController) string {
 	// Format the matching RC's into strings.
 	var rcStrings []string
@@ -1384,8 +1477,8 @@ func printReplicationControllersByLabels(matchingRCs []api.ReplicationController
 	return list
 }
 
-func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, succeeded, failed int, err error) {
-	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector), fields.Everything())
+func getPodStatusForController(c client.PodInterface, selector map[string]string) (running, waiting, succeeded, failed int, err error) {
+	rcPods, err := c.List(labels.SelectorFromSet(selector), fields.Everything())
 	if err != nil {
 		return
 	}
