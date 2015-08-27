@@ -220,4 +220,17 @@ kube::util::analytics-link() {
   echo "[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/${path}?pixel)]()"
 }
 
+# Checks that the specified Go tool (full package path $1) is installed in
+# $PATH.
+kube::util::check-tool-installed() {
+  local -r package="$1"
+  local binary_name
+  binary_name=$(basename "${package}")
+  if ! command -v "${binary_name}" >/dev/null 2>&1; then
+    kube::log::error "${binary_name} not found; please install with " \
+      "go get -u ${package}"
+    return 1
+  fi
+}
+
 # ex: ts=2 sw=2 et filetype=sh
