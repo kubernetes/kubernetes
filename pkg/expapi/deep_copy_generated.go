@@ -687,6 +687,69 @@ func deepCopy_expapi_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cl
 	return nil
 }
 
+func deepCopy_expapi_Daemon(in Daemon, out *Daemon, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_DaemonSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_DaemonStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_expapi_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Daemon, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_expapi_Daemon(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_DaemonSpec(in DaemonSpec, out *DaemonSpec, c *conversion.Cloner) error {
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := deepCopy_api_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_DaemonStatus(in DaemonStatus, out *DaemonStatus, c *conversion.Cloner) error {
+	out.CurrentNumberScheduled = in.CurrentNumberScheduled
+	out.NumberMisscheduled = in.NumberMisscheduled
+	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	return nil
+}
+
 func deepCopy_expapi_Deployment(in Deployment, out *Deployment, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1022,6 +1085,10 @@ func init() {
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
 		deepCopy_expapi_APIVersion,
+		deepCopy_expapi_Daemon,
+		deepCopy_expapi_DaemonList,
+		deepCopy_expapi_DaemonSpec,
+		deepCopy_expapi_DaemonStatus,
 		deepCopy_expapi_Deployment,
 		deepCopy_expapi_DeploymentList,
 		deepCopy_expapi_DeploymentSpec,
