@@ -76,7 +76,10 @@ If you have what looks like a bug, or you would like to make a feature request, 
 
 Before you file an issue, please search existing issues to see if your issue is already covered.
 
-If filing a bug, please include detailed information about how to reproduce the problem.
+If filing a bug, please include detailed information about how to reproduce the problem, such as:
+* Kubernetes version: `kubectl version`
+* Cloud provider, OS distro, network configuration, and Docker version
+* Steps to reproduce the problem
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/troubleshooting.md?pixel)]()
