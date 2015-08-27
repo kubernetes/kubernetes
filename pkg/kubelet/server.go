@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
+	expv1 "k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -149,7 +149,7 @@ func (s *Server) InstallDefaultHandlers() {
 
 	ws = new(restful.WebService)
 	ws.
-		Path("/nodeStats").
+		Path("/experimental/v1/nodeStats").
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getNodeStats).
@@ -157,7 +157,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Param(ws.QueryParameter("numstats", "max number of stats to return").DataType("int")).
 		Param(ws.QueryParameter("start", "start time of the query").DataType("time.Time")).
 		Param(ws.QueryParameter("end", "end time of the query").DataType("time.Time")).
-		Writes(v1.NodeStats{}))
+		Writes(expv1.NodeStats{}))
 	s.restfulCont.Add(ws)
 
 	ws = new(restful.WebService)
@@ -872,14 +872,14 @@ func binaryQuantityFromUint(u uint64) *resource.Quantity {
 	return resource.NewQuantity(int64(u), resource.BinarySI)
 }
 
-func convertContainerStats(stats *cadvisorApi.ContainerStats) *v1.StatsPoint {
-	point := &v1.StatsPoint{
+func convertContainerStats(stats *cadvisorApi.ContainerStats) *expv1.StatsPoint {
+	point := &expv1.StatsPoint{
 		Time: stats.Timestamp,
-		Cpu: v1.CpuStats{
+		Cpu: expv1.CpuStats{
 			// TODO: CpuInst https://github.com/google/cadvisor/pull/861
 			Usage: *binaryQuantityFromUint(stats.Cpu.Usage.Total),
 		},
-		Memory: v1.MemoryStats{
+		Memory: expv1.MemoryStats{
 			Usage:      *binaryQuantityFromUint(stats.Memory.Usage),
 			WorkingSet: *binaryQuantityFromUint(stats.Memory.WorkingSet),
 		},
@@ -919,20 +919,20 @@ func (s *Server) getNodeStats(request *restful.Request, response *restful.Respon
 		return
 	}
 
-	contStats := make([]v1.ContainerStats, len(statsMap))
+	contStats := make([]expv1.ContainerStats, len(statsMap))
 
 	for name, info := range statsMap {
-		points := make([]*v1.StatsPoint, 0, len(info.Stats))
+		points := make([]*expv1.StatsPoint, 0, len(info.Stats))
 		for _, sp := range info.Stats {
 			points = append(points, convertContainerStats(sp))
 		}
-		contStats = append(contStats, v1.ContainerStats{
+		contStats = append(contStats, expv1.ContainerStats{
 			Name:  name,
 			Stats: points,
 		})
 	}
 
-	nodeStats := v1.NodeStats{
+	nodeStats := expv1.NodeStats{
 		Containers: contStats,
 	}
 	response.WriteEntity(&nodeStats)

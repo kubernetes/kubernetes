@@ -20,12 +20,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type NodeStats struct {
-	TypeMeta
-	ObjectMeta // should have node name
-	Containers []ContainerStats
+	v1.TypeMeta
+	v1.ObjectMeta // should have node name
+	Containers    []ContainerStats
 }
 
 type ContainerStats struct {
