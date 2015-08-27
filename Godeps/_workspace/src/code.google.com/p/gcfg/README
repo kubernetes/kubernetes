@@ -1,7 +1,0 @@
-Gcfg reads INI-style configuration files into Go structs;
-supports user-defined types and subsections.
-
-Project page: https://code.google.com/p/gcfg
-Package docs: http://godoc.org/code.google.com/p/gcfg
-
-My other projects: https://speter.net

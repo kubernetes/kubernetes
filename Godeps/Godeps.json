@@ -15,10 +15,6 @@
 			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
-			"ImportPath": "code.google.com/p/gcfg",
-			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
-		},
-		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -605,6 +601,10 @@
 		{
 			"ImportPath": "google.golang.org/cloud/internal",
 			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+		},
+		{
+			"ImportPath": "gopkg.in/gcfg.v1",
+			"Rev": "5866678811acbcbc248097f2c524cbc4d13abd8b"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",

@@ -9,8 +9,8 @@ import (
 )
 
 import (
-	"code.google.com/p/gcfg/scanner"
-	"code.google.com/p/gcfg/token"
+	"gopkg.in/gcfg.v1/scanner"
+	"gopkg.in/gcfg.v1/token"
 )
 
 var unescape = map[rune]rune{'\\': '\\', '"': '"', 'n': '\n', 't': '\t'}
