@@ -42,27 +42,30 @@ func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 // validates that errors are returned only when proper.
 func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 	// Unknown modes should return errors
-	if _, err := NewAuthorizerFromAuthorizationConfig("DoesNotExist", ""); err == nil {
+	if _, err := NewAuthorizerFromAuthorizationConfig([]string{"DoesNotExist"}, ""); err == nil {
 		t.Errorf("NewAuthorizerFromAuthorizationConfig using a fake mode should have returned an error")
 	}
 
 	// ModeAlwaysAllow and ModeAlwaysDeny should return without authorizationPolicyFile
 	// but error if one is given
-	for _, config := range []string{ModeAlwaysAllow, ModeAlwaysDeny} {
-		if _, err := NewAuthorizerFromAuthorizationConfig(config, ""); err != nil {
-			t.Errorf("NewAuthorizerFromAuthorizationConfig with %s returned an error: %s", err, config)
-		}
-		if _, err := NewAuthorizerFromAuthorizationConfig(config, "shoulderror"); err == nil {
-			t.Errorf("NewAuthorizerFromAuthorizationConfig with %s should have returned an error", config)
-		}
+	if _, err := NewAuthorizerFromAuthorizationConfig([]string{ModeAlwaysAllow, ModeAlwaysDeny}, ""); err != nil {
+		t.Errorf("NewAuthorizerFromAuthorizationConfig returned an error: %s", err)
 	}
 
 	// ModeABAC requires a policy file
-	if _, err := NewAuthorizerFromAuthorizationConfig(ModeABAC, ""); err == nil {
+	if _, err := NewAuthorizerFromAuthorizationConfig([]string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}, ""); err == nil {
 		t.Errorf("NewAuthorizerFromAuthorizationConfig using a fake mode should have returned an error")
 	}
 	// ModeABAC should not error if a valid policy path is provided
-	if _, err := NewAuthorizerFromAuthorizationConfig(ModeABAC, "../auth/authorizer/abac/example_policy_file.jsonl"); err != nil {
+	if _, err := NewAuthorizerFromAuthorizationConfig([]string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}, "../auth/authorizer/abac/example_policy_file.jsonl"); err != nil {
 		t.Errorf("NewAuthorizerFromAuthorizationConfig errored while using a valid policy file: %s", err)
+	}
+	// Authorization Policy file cannot be used without ModeABAC
+	if _, err := NewAuthorizerFromAuthorizationConfig([]string{ModeAlwaysAllow, ModeAlwaysDeny}, "../auth/authorizer/abac/example_policy_file.jsonl"); err == nil {
+		t.Errorf("NewAuthorizerFromAuthorizationConfig should have errored when Authorization Policy File is used without ModeABAC")
+	}
+	// Atleast one authorizationMode is necessary
+	if _, err := NewAuthorizerFromAuthorizationConfig([]string{}, "../auth/authorizer/abac/example_policy_file.jsonl"); err == nil {
+		t.Errorf("NewAuthorizerFromAuthorizationConfig should have errored when no authorization modes are passed")
 	}
 }
