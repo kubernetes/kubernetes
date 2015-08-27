@@ -24,5 +24,21 @@ func addDefaultingFuncs() {
 			if len(obj.APIGroup) == 0 {
 				obj.APIGroup = "experimental"
 			}
-		})
+		},
+		func(obj *Daemon) {
+			var labels map[string]string
+			if obj.Spec.Template != nil {
+				labels = obj.Spec.Template.Labels
+			}
+			// TODO: support templates defined elsewhere when we support them in the API
+			if labels != nil {
+				if len(obj.Spec.Selector) == 0 {
+					obj.Spec.Selector = labels
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
+		},
+	)
 }

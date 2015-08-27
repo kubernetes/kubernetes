@@ -17,7 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -29,50 +29,50 @@ type DaemonsNamespacer interface {
 }
 
 type DaemonInterface interface {
-	List(selector labels.Selector) (*api.DaemonList, error)
-	Get(name string) (*api.Daemon, error)
-	Create(ctrl *api.Daemon) (*api.Daemon, error)
-	Update(ctrl *api.Daemon) (*api.Daemon, error)
+	List(selector labels.Selector) (*expapi.DaemonList, error)
+	Get(name string) (*expapi.Daemon, error)
+	Create(ctrl *expapi.Daemon) (*expapi.Daemon, error)
+	Update(ctrl *expapi.Daemon) (*expapi.Daemon, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // daemons implements DaemonsNamespacer interface
 type daemons struct {
-	r  *Client
+	r  *ExperimentalClient
 	ns string
 }
 
-func newDaemons(c *Client, namespace string) *daemons {
+func newDaemons(c *ExperimentalClient, namespace string) *daemons {
 	return &daemons{c, namespace}
 }
 
 // Ensure statically that daemons implements DaemonInterface.
 var _ DaemonInterface = &daemons{}
 
-func (c *daemons) List(selector labels.Selector) (result *api.DaemonList, err error) {
-	result = &api.DaemonList{}
+func (c *daemons) List(selector labels.Selector) (result *expapi.DaemonList, err error) {
+	result = &expapi.DaemonList{}
 	err = c.r.Get().Namespace(c.ns).Resource("daemons").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular daemon.
-func (c *daemons) Get(name string) (result *api.Daemon, err error) {
-	result = &api.Daemon{}
+func (c *daemons) Get(name string) (result *expapi.Daemon, err error) {
+	result = &expapi.Daemon{}
 	err = c.r.Get().Namespace(c.ns).Resource("daemons").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new daemon.
-func (c *daemons) Create(daemon *api.Daemon) (result *api.Daemon, err error) {
-	result = &api.Daemon{}
+func (c *daemons) Create(daemon *expapi.Daemon) (result *expapi.Daemon, err error) {
+	result = &expapi.Daemon{}
 	err = c.r.Post().Namespace(c.ns).Resource("daemons").Body(daemon).Do().Into(result)
 	return
 }
 
 // Update updates an existing daemon.
-func (c *daemons) Update(daemon *api.Daemon) (result *api.Daemon, err error) {
-	result = &api.Daemon{}
+func (c *daemons) Update(daemon *expapi.Daemon) (result *expapi.Daemon, err error) {
+	result = &expapi.Daemon{}
 	err = c.r.Put().Namespace(c.ns).Resource("daemons").Name(daemon.Name).Body(daemon).Do().Into(result)
 	return
 }

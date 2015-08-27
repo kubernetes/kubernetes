@@ -83,7 +83,6 @@ var standardResources = util.NewStringSet(
 	string(ResourceQuotas),
 	string(ResourceServices),
 	string(ResourceReplicationControllers),
-	string(ResourceDaemon),
 	string(ResourceSecrets),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage))
