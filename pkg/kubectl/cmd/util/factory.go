@@ -345,15 +345,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
 	}
 	// First try stable api, if we can't validate using that, try experimental.
-	// If experimental fails, return error from stable api.
+	// If experimental fails, return last error.
 	// TODO: Figure out which group to try once multiple group support is merged
 	//       instead of trying everything.
 	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version)
 	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version)
-		if errExp == nil {
-			return nil
-		}
+		err = getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version)
 	}
 	return err
 }
