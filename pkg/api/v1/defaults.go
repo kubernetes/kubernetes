@@ -188,37 +188,6 @@ func addDefaultingFuncs() {
 				}
 			}
 		},
-		func(obj *LimitRangeItem) {
-			// for container limits, we apply default values
-			if obj.Type == LimitTypeContainer {
-
-				if obj.Default == nil {
-					obj.Default = make(ResourceList)
-				}
-				if obj.DefaultRequest == nil {
-					obj.DefaultRequest = make(ResourceList)
-				}
-
-				// If a default limit is unspecified, but the max is specified, default the limit to the max
-				for key, value := range obj.Max {
-					if _, exists := obj.Default[key]; !exists {
-						obj.Default[key] = *(value.Copy())
-					}
-				}
-				// If a default limit is specified, but the default request is not, default request to limit
-				for key, value := range obj.Default {
-					if _, exists := obj.DefaultRequest[key]; !exists {
-						obj.DefaultRequest[key] = *(value.Copy())
-					}
-				}
-				// If a default request is not specified, but the min is provided, default request to the min
-				for key, value := range obj.Min {
-					if _, exists := obj.DefaultRequest[key]; !exists {
-						obj.DefaultRequest[key] = *(value.Copy())
-					}
-				}
-			}
-		},
 	)
 }
 

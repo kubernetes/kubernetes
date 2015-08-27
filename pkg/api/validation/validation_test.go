@@ -3226,19 +3226,12 @@ func TestValidateLimitRange(t *testing.T) {
 					api.ResourceMemory: resource.MustParse("10000"),
 				},
 				Min: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("5"),
+					api.ResourceCPU:    resource.MustParse("0"),
 					api.ResourceMemory: resource.MustParse("100"),
 				},
 				Default: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("50"),
 					api.ResourceMemory: resource.MustParse("500"),
-				},
-				DefaultRequest: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("10"),
-					api.ResourceMemory: resource.MustParse("200"),
-				},
-				MaxLimitRequestRatio: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("20"),
 				},
 			},
 		},
@@ -3298,43 +3291,6 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 	}
 
-	invalidSpecRangeDefaultRequestOutsideRange := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("1000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("100"),
-				},
-				DefaultRequest: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("2000"),
-				},
-			},
-		},
-	}
-
-	invalidSpecRangeRequestMoreThanDefaultRange := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("1000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("100"),
-				},
-				Default: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("500"),
-				},
-				DefaultRequest: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("800"),
-				},
-			},
-		},
-	}
-
 	successCases := []api.LimitRange{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -3382,14 +3338,6 @@ func TestValidateLimitRange(t *testing.T) {
 		"invalid spec default outside range": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultOutsideRange},
 			"default value 2k is greater than max value 1k",
-		},
-		"invalid spec defaultrequest outside range": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultRequestOutsideRange},
-			"default request value 2k is greater than max value 1k",
-		},
-		"invalid spec defaultrequest more than default": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeRequestMoreThanDefaultRange},
-			"default request value 800 is greater than default limit value 500",
 		},
 	}
 	for k, v := range errorCases {
