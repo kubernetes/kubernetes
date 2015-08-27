@@ -533,7 +533,7 @@ var _ = Describe("Pods", func() {
 		}, 1)
 	})
 
-	It("should have monotonically increasing restart count", func() {
+	PIt("should have monotonically increasing restart count", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
