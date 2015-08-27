@@ -95,8 +95,14 @@ func (p *Parameter) DataType(typeName string) *Parameter {
 	return p
 }
 
-// DefaultValue sets the default value field and returnw the receiver
+// DefaultValue sets the default value field and returns the receiver
 func (p *Parameter) DefaultValue(stringRepresentation string) *Parameter {
 	p.data.DefaultValue = stringRepresentation
+	return p
+}
+
+// Description sets the description value field and returns the receiver
+func (p *Parameter) Description(doc string) *Parameter {
+	p.data.Description = doc
 	return p
 }
