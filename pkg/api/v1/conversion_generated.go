@@ -805,30 +805,6 @@ func convert_api_LimitRangeItem_To_v1_LimitRangeItem(in *api.LimitRangeItem, out
 	} else {
 		out.Default = nil
 	}
-	if in.DefaultRequest != nil {
-		out.DefaultRequest = make(ResourceList)
-		for key, val := range in.DefaultRequest {
-			newVal := resource.Quantity{}
-			if err := s.Convert(&val, &newVal, 0); err != nil {
-				return err
-			}
-			out.DefaultRequest[ResourceName(key)] = newVal
-		}
-	} else {
-		out.DefaultRequest = nil
-	}
-	if in.MaxLimitRequestRatio != nil {
-		out.MaxLimitRequestRatio = make(ResourceList)
-		for key, val := range in.MaxLimitRequestRatio {
-			newVal := resource.Quantity{}
-			if err := s.Convert(&val, &newVal, 0); err != nil {
-				return err
-			}
-			out.MaxLimitRequestRatio[ResourceName(key)] = newVal
-		}
-	} else {
-		out.MaxLimitRequestRatio = nil
-	}
 	return nil
 }
 
@@ -3193,30 +3169,6 @@ func convert_v1_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, out *ap
 		}
 	} else {
 		out.Default = nil
-	}
-	if in.DefaultRequest != nil {
-		out.DefaultRequest = make(api.ResourceList)
-		for key, val := range in.DefaultRequest {
-			newVal := resource.Quantity{}
-			if err := s.Convert(&val, &newVal, 0); err != nil {
-				return err
-			}
-			out.DefaultRequest[api.ResourceName(key)] = newVal
-		}
-	} else {
-		out.DefaultRequest = nil
-	}
-	if in.MaxLimitRequestRatio != nil {
-		out.MaxLimitRequestRatio = make(api.ResourceList)
-		for key, val := range in.MaxLimitRequestRatio {
-			newVal := resource.Quantity{}
-			if err := s.Convert(&val, &newVal, 0); err != nil {
-				return err
-			}
-			out.MaxLimitRequestRatio[api.ResourceName(key)] = newVal
-		}
-	} else {
-		out.MaxLimitRequestRatio = nil
 	}
 	return nil
 }
