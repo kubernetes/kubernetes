@@ -31,6 +31,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -66,6 +67,10 @@ func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationCo
 		return f.err
 	}
 	f.controllerSpec = append(f.controllerSpec, *spec)
+	return nil
+}
+
+func (f *FakePodControl) CreateReplicaOnNode(namespace string, daemon *expapi.DaemonSet, nodeName string) error {
 	return nil
 }
 
