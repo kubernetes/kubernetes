@@ -1,37 +1,37 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Kubernetes 0.19.3 on EC2 powered by CoreOS 681.2.0 (stable)",
+  "Description": "Kubernetes 1.0.3 on EC2 powered by CoreOS 723.3.0 (stable)",
   "Mappings": {
       "RegionMap": {
           "eu-central-1" : {
-              "AMI" : "ami-eae5ddf7"
+              "AMI" : "ami-bececaa3"
           },
           "ap-northeast-1" : {
-              "AMI" : "ami-1a6fca1a"
+              "AMI" : "ami-f2338ff2"
           },
           "us-gov-west-1" : {
-              "AMI" : "ami-e99fffca"
+              "AMI" : "ami-c75033e4"
           },
           "sa-east-1" : {
-              "AMI" : "ami-b1cb49ac"
+              "AMI" : "ami-11e9600c"
           },
           "ap-southeast-2" : {
-              "AMI" : "ami-23641e19"
+              "AMI" : "ami-8f88c8b5"
           },
           "ap-southeast-1" : {
-              "AMI" : "ami-da030788"
+              "AMI" : "ami-b6d8d4e4"
           },
           "us-east-1" : {
-              "AMI" : "ami-93ea17f8"
+              "AMI" : "ami-3d73d356"
           },
           "us-west-2" : {
-              "AMI" : "ami-5d4d486d"
+              "AMI" : "ami-85ada4b5"
           },
           "us-west-1" : {
-              "AMI" : "ami-c967938d"
+              "AMI" : "ami-1db04f59"
           },
           "eu-west-1" : {
-              "AMI" : "ami-5f2f5528"
+              "AMI" : "ami-0e104179"
           }
       }
   },
@@ -90,12 +90,12 @@
       "Type": "AWS::EC2::VPC::Id"
     },
     "SubnetId": {
-      "Description": "The ID of the subnet to launch into (that must be within the supplied VPC)",
-      "Type": "AWS::EC2::Subnet::Id"
+      "Description": "List of IDs of the subnets to launch into (that must be within the supplied VPC)",
+      "Type": "List<AWS::EC2::Subnet::Id>"
     },
     "SubnetAZ": {
-      "Description": "The availability zone of the subnet supplied (for example eu-west-1a)",
-      "Type": "String"
+      "Description": "List of availability zones of the subnet supplied (for example eu-west-1a, eu-west-1b)",
+      "Type": "List<AWS::EC2::AvailabilityZone::Name>"
     }
   },
   "Conditions": {
@@ -114,6 +114,10 @@
             "ToPort": "22",
             "CidrIp": {"Ref": "AllowSSHFrom"}
           }
+        ],
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-sg" ] ]}},
+          {"Key" : "KubernetesCluster", "Value" : {"Ref" : "AWS::StackName"}}
         ]
       }
     },
@@ -149,14 +153,20 @@
           "AssociatePublicIpAddress" : "true",
           "DeviceIndex"              : "0",
           "DeleteOnTermination"      : "true",
-          "SubnetId"                 : {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]}
+          "SubnetId"                 : {"Fn::If": [
+            "UseEC2Classic",
+            {"Ref": "AWS::NoValue"},
+            {"Fn::Select": [0, {"Ref": "SubnetId"}]}
+          ]}
         }],
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI"]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
+        "IamInstanceProfile": {"Ref" : "KubernetesMasterInstanceProfile" },
         "Tags" : [
           {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-master" ] ]}},
-          {"Key" : "KubernetesRole", "Value" : "node"}
+          {"Key" : "KubernetesRole", "Value" : "node"},
+          {"Key" : "KubernetesCluster", "Value" : {"Ref" : "AWS::StackName"}}
         ],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
@@ -261,7 +271,8 @@
           "        ExecStart=/opt/bin/kube-apiserver \\\n",
           "        --insecure-bind-address=0.0.0.0 \\\n",
           "        --service-cluster-ip-range=10.100.0.0/16 \\\n",
-          "        --etcd-servers=http://localhost:2379\n",
+          "        --etcd-servers=http://localhost:2379 \\\n",
+          "        --cloud-provider=aws\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
           "    - name: kube-controller-manager.service\n",
@@ -276,7 +287,8 @@
           "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kube-controller-manager\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager\n",
           "        ExecStart=/opt/bin/kube-controller-manager \\\n",
-          "        --master=127.0.0.1:8080\n",
+          "        --master=127.0.0.1:8080 \\\n",
+          "        --cloud-provider=aws\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
           "    - name: kube-scheduler.service\n",
@@ -288,7 +300,7 @@
           "        Requires=kube-apiserver.service\n",
           "        After=kube-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kube-scheduler\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kube-scheduler\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler\n",
           "        ExecStart=/opt/bin/kube-scheduler \\\n",
           "        --master=127.0.0.1:8080\n",
@@ -312,7 +324,7 @@
           "        Restart=always\n",
           "        RestartSec=10\n",
           "  update:\n",
-          "    group: alpha\n",
+          "    group: stable\n",
           "    reboot-strategy: off\n"
           ]]}
         }
@@ -324,6 +336,7 @@
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
+        "IamInstanceProfile": {"Ref" : "KubernetesNodeInstanceProfile" },
         "AssociatePublicIpAddress" : "true",
         "SecurityGroups": [{"Fn::If": [
           "UseEC2Classic",
@@ -358,20 +371,32 @@
           "          content: |\n",
           "            [Service]\n",
           "            Environment=DOCKER_OPTS='--registry-mirror=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":5000'\n",
+          "    - name: hostname-override.service\n",
+          "      command: start\n",
+          "      content: |\n",
+          "        [Unit]\n",
+          "        Description=Kubelet Hostname Override\n",
+          "        Requires=network-online.target\n",
+          "        After=network-online.target\n\n",
+          "        [Service]\n",
+          "        Type=oneshot\n",
+          "        RemainAfterExit=yes\n",
+          "        EnvironmentFile=/etc/kube-env\n",
+          "        ExecStart=/run/setup-hostname-override.sh\n",
           "    - name: kubelet.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
           "        Description=Kubernetes Kubelet\n",
           "        Documentation=https://github.com/GoogleCloudPlatform/kubernetes\n",
-          "        Requires=network-online.target\n",
-          "        After=network-online.target\n\n",
+          "        Requires=hostname-override.service\n",
+          "        After=hostname-override.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kubelet\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet\n",
           "        ExecStart=/opt/bin/kubelet \\\n",
           "        --api-servers=", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080 \\\n",
-          "        --hostname-override=$private_ipv4\n",
+          "        --hostname-override=${HOSTNAME_OVERRIDE}\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
           "    - name: kube-proxy.service\n",
@@ -383,7 +408,7 @@
           "        Requires=network-online.target\n",
           "        After=network-online.target\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kube-proxy\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kube-proxy\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy\n",
           "        ExecStart=/opt/bin/kube-proxy \\\n",
           "        --master=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080\n",
@@ -391,7 +416,25 @@
           "        RestartSec=10\n",
           "  update:\n",
           "    group: alpha\n",
-          "    reboot-strategy: off\n"
+          "    reboot-strategy: off\n",
+          "write_files:\n",
+          "  - path: /run/setup-hostname-override.sh\n",
+          "    permissions: \"0755\"\n",
+          "    content: |\n",
+          "      #!/bin/bash\n",
+          "      set -x\n",
+          "      source /etc/kube-env\n",
+          "      if [[ -z \"${HOSTNAME_OVERRIDE}\" ]]; then\n",
+          "        HOSTNAME_OVERRIDE=`curl --silent http://169.254.169.254/2007-01-19/meta-data/local-hostname`\n",
+          "      fi\n",
+          "      if [[ -z \"${HOSTNAME_OVERRIDE}\" ]]; then\n",
+          "        HOSTNAME_OVERRIDE=`hostname -f`\n",
+          "      fi\n",
+          "      echo \"HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE}\" > /etc/hostname-override\n",
+          "  - path: /etc/kube-env\n",
+          "    permissions: 0644\n",
+          "    owner: root\n",
+          "    content: |\n"
           ]]}
         }
       }
@@ -399,16 +442,126 @@
     "KubernetesAutoScalingGroup": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
-        "AvailabilityZones": {"Fn::If": ["UseEC2Classic", {"Fn::GetAZs": ""}, [{"Ref": "SubnetAZ"}]]},
-        "VPCZoneIdentifier": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, [{"Ref": "SubnetId"}]]},
+        "AvailabilityZones": {"Fn::If": [
+          "UseEC2Classic",
+          {"Fn::GetAZs": ""},
+          {"Ref": "SubnetAZ"}
+        ]},
+        "VPCZoneIdentifier": {"Fn::If": [
+          "UseEC2Classic",
+          {"Ref": "AWS::NoValue"},
+          {"Ref": "SubnetId"}
+        ]},
         "LaunchConfigurationName": {"Ref": "KubernetesNodeLaunchConfig"},
         "MinSize": "2",
         "MaxSize": "12",
         "DesiredCapacity": {"Ref": "ClusterSize"},
         "Tags" : [
           {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-node" ] ]}, "PropagateAtLaunch" : true},
-          {"Key" : "KubernetesRole", "Value" : "node", "PropagateAtLaunch" : true}
+          {"Key" : "KubernetesRole", "Value" : "node", "PropagateAtLaunch" : true},
+          {"Key" : "KubernetesCluster", "Value" : {"Ref" : "AWS::StackName"}, "PropagateAtLaunch" : true}
         ]
+      }
+    },
+    "KubernetesMasterRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version" : "2012-10-17",
+          "Statement": [ {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": [ "ec2.amazonaws.com" ]
+            },
+            "Action": [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Path": "/",
+        "Policies": [ {
+          "PolicyName": "kubernetes-master",
+          "PolicyDocument": {
+            "Version" : "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["ec2:*"],
+                "Resource": ["*"]
+              },
+              {
+                "Effect": "Allow",
+                "Action": ["elasticloadbalancing:*"],
+                "Resource": ["*"]
+              },
+              {
+                "Effect": "Allow",
+                "Action": "s3:*",
+                "Resource": [
+                  "arn:aws:s3:::kubernetes-*"
+                ]
+              }
+            ]
+          }
+        } ]
+      }
+    },
+    "KubernetesMasterInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [ { "Ref": "KubernetesMasterRole" } ]
+      }
+    },
+    "KubernetesNodeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version" : "2012-10-17",
+          "Statement": [ {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": [ "ec2.amazonaws.com" ]
+            },
+            "Action": [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Path": "/",
+        "Policies": [ {
+          "PolicyName": "kubernetes-minion",
+          "PolicyDocument": {
+            "Version" : "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:*",
+                "Resource": [
+                  "arn:aws:s3:::kubernetes-*"
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": "ec2:Describe*",
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": "ec2:AttachVolume",
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": "ec2:DetachVolume",
+                "Resource": "*"
+              }
+            ]
+          }
+        } ]
+      }
+    },
+    "KubernetesNodeInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [ { "Ref": "KubernetesNodeRole" } ]
       }
     }
   },

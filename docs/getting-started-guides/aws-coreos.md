@@ -63,8 +63,8 @@ aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
 --parameters ParameterKey=KeyPair,ParameterValue=<keypair> \
              ParameterKey=ClusterSize,ParameterValue=<cluster_size> \
              ParameterKey=VpcId,ParameterValue=<vpc_id> \
-             ParameterKey=SubnetId,ParameterValue=<subnet_id> \
-             ParameterKey=SubnetAZ,ParameterValue=<subnet_az>
+             ParameterKey=SubnetId,ParameterValue=<Comma delimited list of subnets_ids> \
+             ParameterKey=SubnetAZ,ParameterValue=<Comma delimited list of subnets_azs>
 ```
 
 It will take a few minutes for the entire stack to come up. You can monitor the stack progress with the following command:
