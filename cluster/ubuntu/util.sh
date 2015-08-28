@@ -441,6 +441,22 @@ function kube-down {
     {
       echo "Cleaning on node ${i#*@}"
       ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
+      
+      #umount the pods' volume
+      loop=1
+      MOUNT_NUM=`mount | wc -l`
+      while [ $loop -le $MOUNT_NUM ]
+      do
+        MOUNT_PATH=`mount | sed -n "$loop"p | awk '{print $3}'`
+        if [[ $MOUNT_PATH == /var/lib/kubelet/pods* ]]
+        then
+          umount $MOUNT_PATH
+          loop=`expr $loop + 1`
+        else
+          loop=`expr $loop + 1` 
+        fi
+      done
+      
       # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
       ssh -t $i 'rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; rm -rf ~/kube /var/lib/kubelet'
     }
