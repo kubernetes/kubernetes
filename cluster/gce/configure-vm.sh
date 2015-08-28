@@ -539,6 +539,7 @@ grains:
   roles:
     - kubernetes-master
   cloud: gce
+  api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
   if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
     cat <<EOF >/etc/gce.conf
@@ -633,8 +634,8 @@ if [[ -z "${is_push}" ]]; then
     create-salt-master-kubelet-auth
   else
     create-salt-kubelet-auth
-    create-salt-kubeproxy-auth
   fi
+  create-salt-kubeproxy-auth
   download-release
   configure-salt
   remove-docker-artifacts
