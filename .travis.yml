@@ -13,16 +13,7 @@ install:
   - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
 
 script:
-  - ./hack/verify-gofmt.sh
-  - ./hack/verify-boilerplate.sh
-  - ./hack/verify-description.sh
-  - ./hack/verify-generated-conversions.sh
-  - ./hack/verify-generated-deep-copies.sh
-  - ./hack/verify-generated-docs.sh
-  - ./hack/verify-swagger-spec.sh
-  - ./hack/verify-linkcheck.sh
-  - ./hack/verify-flags-underscore.py
-  - ./hack/verify-godeps.sh $TRAVIS_BRANCH
+  - make verify BRANCH=$TRAVIS_BRANCH
 
 notifications:
   irc: "chat.freenode.net#kubernetes-dev"
