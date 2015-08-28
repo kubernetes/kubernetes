@@ -626,6 +626,30 @@ func deepCopy_api_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conv
 	} else {
 		out.Default = nil
 	}
+	if in.DefaultRequest != nil {
+		out.DefaultRequest = make(ResourceList)
+		for key, val := range in.DefaultRequest {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.DefaultRequest[key] = *newVal
+		}
+	} else {
+		out.DefaultRequest = nil
+	}
+	if in.MaxLimitRequestRatio != nil {
+		out.MaxLimitRequestRatio = make(ResourceList)
+		for key, val := range in.MaxLimitRequestRatio {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.MaxLimitRequestRatio[key] = *newVal
+		}
+	} else {
+		out.MaxLimitRequestRatio = nil
+	}
 	return nil
 }
 
