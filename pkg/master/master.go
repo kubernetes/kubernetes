@@ -112,6 +112,7 @@ type Config struct {
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
+	EnableWatchCache      bool
 	APIPrefix             string
 	ExpAPIPrefix          string
 	CorsAllowedOriginList []string
@@ -189,6 +190,7 @@ type Master struct {
 	enableUISupport       bool
 	enableSwaggerSupport  bool
 	enableProfiling       bool
+	enableWatchCache      bool
 	apiPrefix             string
 	expAPIPrefix          string
 	corsAllowedOriginList []string
@@ -344,6 +346,7 @@ func New(c *Config) *Master {
 		enableUISupport:       c.EnableUISupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
 		enableProfiling:       c.EnableProfiling,
+		enableWatchCache:      c.EnableWatchCache,
 		apiPrefix:             c.APIPrefix,
 		expAPIPrefix:          c.ExpAPIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
@@ -430,10 +433,9 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	enableCacher := true
 	healthzChecks := []healthz.HealthzChecker{}
 	m.clock = util.RealClock{}
-	podStorage := podetcd.NewStorage(c.DatabaseStorage, enableCacher, c.KubeletClient)
+	podStorage := podetcd.NewStorage(c.DatabaseStorage, c.EnableWatchCache, c.KubeletClient)
 
 	podTemplateStorage := podtemplateetcd.NewREST(c.DatabaseStorage)
 
@@ -449,10 +451,10 @@ func (m *Master) init(c *Config) {
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(c.DatabaseStorage, enableCacher)
+	endpointsStorage := endpointsetcd.NewREST(c.DatabaseStorage, c.EnableWatchCache)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, enableCacher, c.KubeletClient)
+	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, c.EnableWatchCache, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	serviceStorage := serviceetcd.NewREST(c.DatabaseStorage)

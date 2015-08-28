@@ -107,6 +107,7 @@ type APIServer struct {
 	KubeletConfig              client.KubeletConfig
 	ClusterName                string
 	EnableProfiling            bool
+	EnableWatchCache           bool
 	MaxRequestsInFlight        int
 	MinRequestTimeout          int
 	LongRunningRequestRE       string
@@ -222,6 +223,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/<version> key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	// TODO: enable cache in integration tests.
+	fs.BoolVar(&s.EnableWatchCache, "watch-cache", true, "Enable watch caching in the apiserver")
 	fs.StringVar(&s.ExternalHost, "external-hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", 400, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", 1800, "An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load.")
@@ -429,6 +432,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableUISupport:        true,
 		EnableSwaggerSupport:   true,
 		EnableProfiling:        s.EnableProfiling,
+		EnableWatchCache:       s.EnableWatchCache,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
 		ExpAPIPrefix:           s.ExpAPIPrefix,
