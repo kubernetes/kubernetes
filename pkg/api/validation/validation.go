@@ -362,6 +362,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateRBD(source.RBD).Prefix("rbd")...)
 	}
+	if source.Cinder != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateCinderVolumeSource(source.Cinder).Prefix("cinder")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -485,6 +489,17 @@ func validateRBD(rbd *api.RBDVolumeSource) errs.ValidationErrorList {
 	return allErrs
 }
 
+func validateCinderVolumeSource(cd *api.CinderVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if cd.VolumeID == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("volumeID"))
+	}
+	if cd.FSType == "" || (cd.FSType != "ext3" && cd.FSType != "ext4") {
+		allErrs = append(allErrs, errs.NewFieldRequired("fsType required and should be of type ext3 or ext4"))
+	}
+	return allErrs
+}
+
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
@@ -543,6 +558,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.ISCSI != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateISCSIVolumeSource(pv.Spec.ISCSI).Prefix("iscsi")...)
+	}
+	if pv.Spec.Cinder != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateCinderVolumeSource(pv.Spec.Cinder).Prefix("cinder")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
