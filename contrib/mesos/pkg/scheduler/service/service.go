@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
@@ -63,9 +64,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -77,6 +80,8 @@ const (
 
 	executorCPUs = mresource.CPUShares(0.25) // initial CPU allocated for executor
 	executorMem  = mresource.MegaBytes(64.0) // initial memory allocated for executor
+
+	ComponentType = "k8sm-scheduler"
 )
 
 type SchedulerServer struct {
@@ -140,7 +145,7 @@ type SchedulerServer struct {
 	StaticPodsConfigPath          string
 
 	executable  string // path to the binary running this service
-	client      *client.Client
+	client      client.Interface
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -283,17 +288,25 @@ func (s *SchedulerServer) serveFrameworkArtifact(path string) (string, string) {
 	}
 	serveFile("/"+base, path)
 
-	hostURI := ""
-	if s.AdvertisedAddress != "" {
-		hostURI = fmt.Sprintf("http://%s/%s", s.AdvertisedAddress, base)
-	} else if s.HA && s.HADomain != "" {
-		hostURI = fmt.Sprintf("http://%s.%s:%d/%s", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort, base)
-	} else {
-		hostURI = fmt.Sprintf("http://%s:%d/%s", s.Address.String(), s.Port, base)
-	}
+	hostURI := s.URI(base)
 	log.V(2).Infof("Hosting artifact '%s' at '%s'", path, hostURI)
 
 	return hostURI, base
+}
+
+func (s *SchedulerServer) URI(path string) string {
+	var hostURI string
+	if s.AdvertisedAddress != "" {
+		hostURI = fmt.Sprintf("http://%s", s.AdvertisedAddress)
+	} else if s.HA && s.HADomain != "" {
+		hostURI = fmt.Sprintf("http://%s.%s:%d", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort)
+	} else {
+		hostURI = fmt.Sprintf("http://%s:%d", s.Address.String(), s.Port)
+	}
+	if path != "" {
+		hostURI = fmt.Sprintf("%s/%s", hostURI, path)
+	}
+	return hostURI
 }
 
 func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, *uid.UID, error) {
@@ -602,6 +615,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 	s.FrameworkWebURI = strings.TrimSpace(s.FrameworkWebURI)
 
+	healthz.InstallHandler(s.mux)
+
 	metrics.Register()
 	runtime.Register()
 	s.mux.Handle("/metrics", prometheus.Handler())
@@ -619,6 +634,28 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("Unable to make apiserver client: %v", err)
 	}
 	s.client = client
+
+	// Register component
+	_, err = client.ComponentsClient().Create(&api.Component{
+		Spec: s.spec(),
+		Status: api.ComponentStatus{
+			Conditions: []api.ComponentCondition{
+				{
+					Type:   api.ComponentAlive,
+					Status: api.ConditionTrue,
+				},
+				{
+					Type:    api.ComponentReady,
+					Status:  api.ConditionFalse,
+					Reason:  "starting",
+					Message: "Starting",
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to register component: %v", err)
+	}
 
 	if s.ReconcileCooldown < defaultReconcileCooldown {
 		s.ReconcileCooldown = defaultReconcileCooldown
@@ -833,4 +870,58 @@ func (s *SchedulerServer) getUsername() (username string, err error) {
 		}
 	}
 	return
+}
+
+func (s *SchedulerServer) spec() api.ComponentSpec {
+	// extract scheme/host/port from URL (which is compiled from multiple flags)
+	urlStr := s.URI("")
+	urlObj, err := url.Parse(urlStr)
+	if err != nil {
+		log.Fatalf("Unable to parse component url %q: %v", urlStr, err)
+	}
+	host := urlObj.Host
+	port := util.IntOrString{}
+	if strings.Contains(host, ":") {
+		var portStr string
+		host, portStr, err = net.SplitHostPort(host)
+		if err != nil {
+			log.Fatalf("Unable to parse component host port %q: %v", host, err)
+		}
+		portInt, err := strconv.Atoi(portStr)
+		if err != nil {
+			log.Fatalf("Unable to parse component host port %q: %v", portStr, err)
+		}
+		port = util.NewIntOrStringFromInt(portInt)
+	}
+
+	scheme := api.URISchemeHTTP
+	if urlObj.Scheme == "https" {
+		scheme = api.URISchemeHTTPS
+	}
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: scheme,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }

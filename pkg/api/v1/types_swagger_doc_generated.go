@@ -69,7 +69,72 @@ func (Capabilities) SwaggerDoc() map[string]string {
 	return map_Capabilities
 }
 
+var map_Component = map[string]string{
+	"":         "Component describes an instance of a specific micro-service, along with its definition and last known status",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec defines the behavior of a component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Status defines the component's last known state. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (Component) SwaggerDoc() map[string]string {
+	return map_Component
+}
+
 var map_ComponentCondition = map[string]string{
+	"":        "ComponentCondition describes one aspect of the state of a component",
+	"type":    "Type of condition: Pending, Running, or Terminated",
+	"status":  "Status of the condition: True, False, or Unknown",
+	"reason":  "Reason for the transition to the current status (machine-readable)",
+	"message": "Message that describes the current status (human-readable)",
+}
+
+func (ComponentCondition) SwaggerDoc() map[string]string {
+	return map_ComponentCondition
+}
+
+var map_ComponentList = map[string]string{
+	"":         "ComponentList describes a list of components",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"items":    "Items is a list of component objects.",
+}
+
+func (ComponentList) SwaggerDoc() map[string]string {
+	return map_ComponentList
+}
+
+var map_ComponentSpec = map[string]string{
+	"":               "ComponentSpec defines a component and how to verify its status",
+	"type":           "Type of the component",
+	"livenessProbe":  "Periodic probe of component liveness.",
+	"readinessProbe": "Periodic probe of component readiness.",
+}
+
+func (ComponentSpec) SwaggerDoc() map[string]string {
+	return map_ComponentSpec
+}
+
+var map_ComponentStatus = map[string]string{
+	"":                   "ComponentStatus describes the status of a component",
+	"conditions":         "Conditions of the component",
+	"lastUpdateTime":     "LastUpdateTime of the component status, regardless of previous status.",
+	"lastTransitionTime": "LastTransitionTime of the component status, from a different phase and/or condition",
+}
+
+func (ComponentStatus) SwaggerDoc() map[string]string {
+	return map_ComponentStatus
+}
+
+var map_ComponentStatuses = map[string]string{
+	"":           "ComponentStatuses describes the set of conditions of a single component instance",
+	"metadata":   "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"conditions": "List of component statuses conditions observed",
+}
+
+func (ComponentStatuses) SwaggerDoc() map[string]string {
+	return map_ComponentStatuses
+}
+
+var map_ComponentStatusesCondition = map[string]string{
 	"":        "Information about the condition of a component.",
 	"type":    "Type of condition for a component. Valid value: \"Healthy\"",
 	"status":  "Status of the condition for a component. Valid values for \"Healthy\": \"True\", \"False\", or \"Unknown\".",
@@ -77,28 +142,18 @@ var map_ComponentCondition = map[string]string{
 	"error":   "Condition error code for a component. For example, a health check error code.",
 }
 
-func (ComponentCondition) SwaggerDoc() map[string]string {
-	return map_ComponentCondition
+func (ComponentStatusesCondition) SwaggerDoc() map[string]string {
+	return map_ComponentStatusesCondition
 }
 
-var map_ComponentStatus = map[string]string{
-	"":           "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
-	"metadata":   "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"conditions": "List of component conditions observed",
-}
-
-func (ComponentStatus) SwaggerDoc() map[string]string {
-	return map_ComponentStatus
-}
-
-var map_ComponentStatusList = map[string]string{
-	"":         "Status of all the conditions for the component as a list of ComponentStatus objects.",
+var map_ComponentStatusesList = map[string]string{
+	"":         "Status of all the conditions for the component as a list of ComponentStatuses objects.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-	"items":    "List of ComponentStatus objects.",
+	"items":    "List of ComponentStatuses objects.",
 }
 
-func (ComponentStatusList) SwaggerDoc() map[string]string {
-	return map_ComponentStatusList
+func (ComponentStatusesList) SwaggerDoc() map[string]string {
+	return map_ComponentStatusesList
 }
 
 var map_Container = map[string]string{
@@ -970,9 +1025,9 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_Probe = map[string]string{
-	"": "Probe describes a liveness probe to be examined to the container.",
-	"initialDelaySeconds": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
-	"timeoutSeconds":      "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
+	"": "Probe describes a method by which status can be retrieved.",
+	"initialDelaySeconds": "Number of seconds after creation before probes are expected to succeed. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
+	"timeoutSeconds":      "Number of seconds after which an individual probe attempt times out. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 }
 
 func (Probe) SwaggerDoc() map[string]string {
@@ -1279,6 +1334,7 @@ func (StatusDetails) SwaggerDoc() map[string]string {
 
 var map_TCPSocketAction = map[string]string{
 	"":     "TCPSocketAction describes an action based on opening a socket",
+	"host": "Host name to connect to, defaults to the pod IP.",
 	"port": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
 }
 

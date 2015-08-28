@@ -169,6 +169,13 @@ func ValidateEndpointsName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateServiceName can be used to check whether the given component name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateComponentName(name string, prefix bool) (bool, string) {
+	return NameIsDNSSubdomain(name, prefix)
+}
+
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -1782,4 +1789,90 @@ func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErro
 
 func ValidateSchemaUpdate(oldResource, newResource *api.ThirdPartyResource) errs.ValidationErrorList {
 	return errs.ValidationErrorList{fmt.Errorf("Schema update is not supported.")}
+}
+
+// ValidateComponentCreate tests if required fields in the component are set for create.
+func ValidateComponentCreate(component *api.Component) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&component.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
+
+	//TODO(karlkfi): validate probes
+
+	if component.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", component.Name))
+	}
+	// name is auto-generated before validation?
+	//	if component.Name != "" {
+	//		allErrs = append(allErrs, errs.NewFieldForbidden("metadata.name", component.Name))
+	//	}
+
+	if component.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	}
+
+	return allErrs
+}
+
+// ValidateComponentUpdate tests if required fields in the component are set for update.
+func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&new.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
+
+	//TODO(karlkfi): validate probes
+
+	if new.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", new.Name))
+	}
+
+	if new.Name != old.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.name", new.Name, fmt.Sprintf("expected: %s", old.Name)))
+	}
+
+	//TODO(karlkfi): validate name is valid format
+
+	// only updaters with both the name and uid may update the resource
+	if new.UID != old.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.uid", new.UID, "uid must match existing uid"))
+	}
+
+	if new.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	}
+
+	if new.Spec.Type != old.Spec.Type {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.type", new.Spec.Type, fmt.Sprintf("expected: %s", old.Spec.Type)))
+	}
+
+	return allErrs
+}
+
+// ValidateComponentStatusUpdate tests if required fields in the component status are set for update.
+func ValidateComponentStatusUpdate(old, new *api.Component) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&new.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
+
+	if new.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", new.Name))
+	}
+
+	if new.Name != old.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.name", new.Name, fmt.Sprintf("expected: %s", old.Name)))
+	}
+
+	//TODO(karlkfi): validate name is valid format
+
+	// only updaters with both the name and uid may update the resource
+	if new.UID != old.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.uid", new.UID, "uid must match existing uid"))
+	}
+
+	if new.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	}
+
+	if new.Spec.Type != old.Spec.Type {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.type", new.Spec.Type, fmt.Sprintf("expected: %s", old.Spec.Type)))
+	}
+
+	return allErrs
 }

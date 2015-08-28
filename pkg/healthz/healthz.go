@@ -23,6 +23,10 @@ import (
 	"sync"
 )
 
+const (
+	Path = "/healthz"
+)
+
 // HealthzChecker is a named healthz check.
 type HealthzChecker interface {
 	Name() string
@@ -63,9 +67,9 @@ func InstallHandler(mux mux, checks ...HealthzChecker) {
 	if len(checks) == 0 {
 		checks = []HealthzChecker{PingHealthz}
 	}
-	mux.Handle("/healthz", handleRootHealthz(checks...))
+	mux.Handle(Path, handleRootHealthz(checks...))
 	for _, check := range checks {
-		mux.Handle(fmt.Sprintf("/healthz/%v", check.Name()), adaptCheckToHandler(check.Check))
+		mux.Handle(fmt.Sprintf("%s/%v", Path, check.Name()), adaptCheckToHandler(check.Check))
 	}
 }
 

@@ -31,10 +31,12 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller/component"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -56,29 +58,35 @@ import (
 	// "k8s.io/kubernetes/pkg/controller/autoscaler"
 )
 
+const (
+	ComponentType = "kube-controller-manager"
+)
+
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
-	Port                    int
-	Address                 net.IP
-	CloudProvider           string
-	CloudConfigFile         string
-	ConcurrentEndpointSyncs int
-	ConcurrentRCSyncs       int
-	ServiceSyncPeriod       time.Duration
-	NodeSyncPeriod          time.Duration
-	ResourceQuotaSyncPeriod time.Duration
-	NamespaceSyncPeriod     time.Duration
-	PVClaimBinderSyncPeriod time.Duration
-	RegisterRetryCount      int
-	NodeMonitorGracePeriod  time.Duration
-	NodeStartupGracePeriod  time.Duration
-	NodeMonitorPeriod       time.Duration
-	NodeStatusUpdateRetry   int
-	PodEvictionTimeout      time.Duration
-	DeletingPodsQps         float32
-	DeletingPodsBurst       int
-	ServiceAccountKeyFile   string
-	RootCAFile              string
+	Port                      int
+	Address                   net.IP
+	CloudProvider             string
+	CloudConfigFile           string
+	ConcurrentComponentProbes int
+	ComponentProbePeriod      int
+	ConcurrentEndpointSyncs   int
+	ConcurrentRCSyncs         int
+	ServiceSyncPeriod         time.Duration
+	NodeSyncPeriod            time.Duration
+	ResourceQuotaSyncPeriod   time.Duration
+	NamespaceSyncPeriod       time.Duration
+	PVClaimBinderSyncPeriod   time.Duration
+	RegisterRetryCount        int
+	NodeMonitorGracePeriod    time.Duration
+	NodeStartupGracePeriod    time.Duration
+	NodeMonitorPeriod         time.Duration
+	NodeStatusUpdateRetry     int
+	PodEvictionTimeout        time.Duration
+	DeletingPodsQps           float32
+	DeletingPodsBurst         int
+	ServiceAccountKeyFile     string
+	RootCAFile                string
 
 	ClusterName       string
 	ClusterCIDR       net.IPNet
@@ -92,18 +100,19 @@ type CMServer struct {
 // NewCMServer creates a new CMServer with a default config.
 func NewCMServer() *CMServer {
 	s := CMServer{
-		Port:                    ports.ControllerManagerPort,
-		Address:                 net.ParseIP("127.0.0.1"),
-		ConcurrentEndpointSyncs: 5,
-		ConcurrentRCSyncs:       5,
-		ServiceSyncPeriod:       5 * time.Minute,
-		NodeSyncPeriod:          10 * time.Second,
-		ResourceQuotaSyncPeriod: 10 * time.Second,
-		NamespaceSyncPeriod:     5 * time.Minute,
-		PVClaimBinderSyncPeriod: 10 * time.Second,
-		RegisterRetryCount:      10,
-		PodEvictionTimeout:      5 * time.Minute,
-		ClusterName:             "kubernetes",
+		Port:                      ports.ControllerManagerPort,
+		Address:                   net.ParseIP("127.0.0.1"),
+		ConcurrentComponentProbes: 5,
+		ConcurrentEndpointSyncs:   5,
+		ConcurrentRCSyncs:         5,
+		ServiceSyncPeriod:         5 * time.Minute,
+		NodeSyncPeriod:            10 * time.Second,
+		ResourceQuotaSyncPeriod:   10 * time.Second,
+		NamespaceSyncPeriod:       5 * time.Minute,
+		PVClaimBinderSyncPeriod:   10 * time.Second,
+		RegisterRetryCount:        10,
+		PodEvictionTimeout:        5 * time.Minute,
+		ClusterName:               "kubernetes",
 	}
 	return &s
 }
@@ -170,6 +179,28 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
+	// Register component
+	_, err = kubeClient.ComponentsClient().Create(&api.Component{
+		Spec: s.spec(),
+		Status: api.ComponentStatus{
+			Conditions: []api.ComponentCondition{
+				{
+					Type:   api.ComponentAlive,
+					Status: api.ConditionTrue,
+				},
+				{
+					Type:    api.ComponentReady,
+					Status:  api.ConditionFalse,
+					Reason:  "starting",
+					Message: "Starting",
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to register component: %v", err)
+	}
+
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -186,6 +217,9 @@ func (s *CMServer) Run(_ []string) error {
 		}
 		glog.Fatal(server.ListenAndServe())
 	}()
+
+	components := componentcontroller.NewComponentController(kubeClient)
+	go components.Run(s.ConcurrentComponentProbes, util.NeverStop)
 
 	endpoints := endpointcontroller.NewEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
@@ -276,4 +310,36 @@ func (s *CMServer) Run(_ []string) error {
 	// horizontalPodAutoscalerController.Run(s.NodeSyncPeriod)
 
 	select {}
+}
+
+func (s *CMServer) spec() api.ComponentSpec {
+	host := s.Address.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.Port)
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: api.URISchemeHTTP,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }

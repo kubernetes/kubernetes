@@ -338,7 +338,8 @@ var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
-var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
+var componentColumns = []string{"NAME", "TYPE", "STATUS"}
+var componentStatusesColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
@@ -372,8 +373,10 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
-	h.Handler(componentStatusColumns, printComponentStatus)
-	h.Handler(componentStatusColumns, printComponentStatusList)
+	h.Handler(componentColumns, printComponent)
+	h.Handler(componentColumns, printComponentList)
+	h.Handler(componentStatusesColumns, printComponentStatuses)
+	h.Handler(componentStatusesColumns, printComponentStatusesList)
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResource)
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
 }
@@ -1036,15 +1039,62 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, withNamesp
 	return nil
 }
 
-func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printComponent(item *api.Component, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	if withNamespace {
-		return fmt.Errorf("componentStatus is not namespaced")
+		return fmt.Errorf("component is not namespaced")
+	}
+
+	// TODO(kalrkfi): order without filtering unknown types
+	validConditionTypes := []api.ComponentConditionType{
+		api.ComponentAlive,
+		api.ComponentReady,
+	}
+
+	conditionMap := make(map[api.ComponentConditionType]*api.ComponentCondition)
+	for i := range item.Status.Conditions {
+		cond := item.Status.Conditions[i]
+		conditionMap[cond.Type] = &cond
+	}
+	var status []string
+	for _, validCondition := range validConditionTypes {
+		if condition, found := conditionMap[validCondition]; found {
+			if condition.Status == api.ConditionTrue {
+				status = append(status, string(condition.Type))
+			} else {
+				status = append(status, "Not"+string(condition.Type))
+			}
+		}
+	}
+	if len(status) == 0 {
+		status = append(status, "Unknown")
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", item.Name, item.Spec.Type, strings.Join(status, ",")); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
+	return err
+}
+
+func printComponentList(list *api.ComponentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printComponent(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func printComponentStatuses(item *api.ComponentStatuses, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("componentStatuses is not namespaced")
 	}
 	status := "Unknown"
 	message := ""
 	error := ""
 	for _, condition := range item.Conditions {
-		if condition.Type == api.ComponentHealthy {
+		if condition.Type == api.ComponentStatusesHealthy {
 			if condition.Status == api.ConditionTrue {
 				status = "Healthy"
 			} else {
@@ -1063,9 +1113,9 @@ func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace 
 	return err
 }
 
-func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printComponentStatusesList(list *api.ComponentStatusesList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printComponentStatus(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+		if err := printComponentStatuses(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

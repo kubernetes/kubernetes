@@ -21,6 +21,7 @@ package app
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -40,8 +41,11 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
+	componentregistry "k8s.io/kubernetes/pkg/registry/component"
+	componentetcd "k8s.io/kubernetes/pkg/registry/component/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -58,6 +62,8 @@ const (
 	ReadWriteTimeout = time.Minute * 60
 	//TODO: This can be tightened up. It still matches objects named watch or proxy.
 	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs|portforward|exec)/?$)"
+
+	ComponentType = "kube-apiserver"
 )
 
 // APIServer runs a kubernetes api server.
@@ -352,6 +358,32 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 	}
 
+	//TODO(karlkfi): use componentStorage/componentStatusStorage from Master? This is a duplicate.
+	componentStorage, componentStatusStorage := componentetcd.NewStorage(etcdStorage)
+	componentsClient := componentregistry.NewClient(componentStorage, componentStatusStorage)
+
+	// Register component
+	_, err = componentsClient.Create(&api.Component{
+		Spec: s.spec(),
+		Status: api.ComponentStatus{
+			Conditions: []api.ComponentCondition{
+				{
+					Type:   api.ComponentAlive,
+					Status: api.ConditionTrue,
+				},
+				{
+					Type:    api.ComponentReady,
+					Status:  api.ConditionFalse,
+					Reason:  "starting",
+					Message: "Starting",
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to register component: %v", err)
+	}
+
 	n := s.ServiceClusterIPRange
 
 	// Default to the private server key for service account token signing
@@ -558,4 +590,36 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		return boolValue
 	}
 	return defaultValue
+}
+
+func (s *APIServer) spec() api.ComponentSpec {
+	host := s.InsecureBindAddress.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.InsecurePort)
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: api.URISchemeHTTP,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }

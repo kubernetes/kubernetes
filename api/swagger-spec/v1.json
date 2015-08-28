@@ -56,13 +56,439 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/componentstatuses",
+    "path": "/api/v1/components",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
-      "type": "v1.ComponentStatusList",
+      "type": "v1.ComponentList",
       "method": "GET",
-      "summary": "list objects of kind ComponentStatus",
+      "summary": "list or watch objects of kind Component",
+      "nickname": "listNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ComponentList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "POST",
+      "summary": "create a Component",
+      "nickname": "createNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Component",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/components",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of Component",
+      "nickname": "watchNamespacedComponentList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/components/{name}",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.Component",
+      "method": "GET",
+      "summary": "read the specified Component",
+      "nickname": "readNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "PUT",
+      "summary": "replace the specified Component",
+      "nickname": "replaceNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Component",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "PATCH",
+      "summary": "partially update the specified Component",
+      "nickname": "patchNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete a Component",
+      "nickname": "deleteNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/components/{name}",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind Component",
+      "nickname": "watchNamespacedComponent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/components/{name}/status",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.ComponentList",
+      "method": "GET",
+      "summary": "list or watch status of objects of kind Component",
       "nickname": "listNamespacedComponentStatus",
       "parameters": [
        {
@@ -108,6 +534,444 @@
        {
         "type": "string",
         "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ComponentList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "POST",
+      "summary": "create status of a Component",
+      "nickname": "createNamespacedComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Component",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "GET",
+      "summary": "read status of the specified Component",
+      "nickname": "readNamespacedComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "PUT",
+      "summary": "replace status of the specified Component",
+      "nickname": "replaceNamespacedComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Component",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Component",
+      "method": "PATCH",
+      "summary": "partially update status of the specified Component",
+      "nickname": "patchNamespacedComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Component"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete status of a Component",
+      "nickname": "deleteNamespacedComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/components/{name}/status",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of status of Component",
+      "nickname": "watchNamespacedComponentStatusList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to status of an object of kind Component",
+      "nickname": "watchNamespacedComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Component",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespace}/componentstatuses",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.ComponentStatusesList",
+      "method": "GET",
+      "summary": "list objects of kind ComponentStatuses",
+      "nickname": "listNamespacedComponentStatuses",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
@@ -118,7 +982,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ComponentStatusList"
+        "responseModel": "v1.ComponentStatusesList"
        }
       ],
       "produces": [
@@ -135,10 +999,10 @@
     "description": "API at /api/v1 version v1",
     "operations": [
      {
-      "type": "v1.ComponentStatus",
+      "type": "v1.ComponentStatuses",
       "method": "GET",
-      "summary": "read the specified ComponentStatus",
-      "nickname": "readNamespacedComponentStatus",
+      "summary": "read the specified ComponentStatuses",
+      "nickname": "readNamespacedComponentStatuses",
       "parameters": [
        {
         "type": "string",
@@ -160,7 +1024,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the ComponentStatus",
+        "description": "name of the ComponentStatuses",
         "required": true,
         "allowMultiple": false
        }
@@ -169,7 +1033,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ComponentStatus"
+        "responseModel": "v1.ComponentStatuses"
        }
       ],
       "produces": [
@@ -186,10 +1050,10 @@
     "description": "API at /api/v1 version v1",
     "operations": [
      {
-      "type": "v1.ComponentStatusList",
+      "type": "v1.ComponentStatusesList",
       "method": "GET",
-      "summary": "list objects of kind ComponentStatus",
-      "nickname": "listComponentStatus",
+      "summary": "list objects of kind ComponentStatuses",
+      "nickname": "listComponentStatuses",
       "parameters": [
        {
         "type": "string",
@@ -236,7 +1100,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ComponentStatusList"
+        "responseModel": "v1.ComponentStatusesList"
        }
       ],
       "produces": [
@@ -11068,9 +11932,9 @@
      }
     }
    },
-   "v1.ComponentStatusList": {
-    "id": "v1.ComponentStatusList",
-    "description": "Status of all the conditions for the component as a list of ComponentStatus objects.",
+   "v1.ComponentList": {
+    "id": "v1.ComponentList",
+    "description": "ComponentList describes a list of components",
     "required": [
      "items"
     ],
@@ -11090,9 +11954,9 @@
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1.ComponentStatus"
+       "$ref": "v1.Component"
       },
-      "description": "List of ComponentStatus objects."
+      "description": "Items is a list of component objects."
      }
     }
    },
@@ -11110,9 +11974,340 @@
      }
     }
    },
+   "v1.Component": {
+    "id": "v1.Component",
+    "description": "Component describes an instance of a specific micro-service, along with its definition and last known status",
+    "required": [
+     "spec",
+     "status"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1.ComponentSpec",
+      "description": "Spec defines the behavior of a component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "v1.ComponentStatus",
+      "description": "Status defines the component's last known state. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "v1.ComponentSpec": {
+    "id": "v1.ComponentSpec",
+    "description": "ComponentSpec defines a component and how to verify its status",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of the component"
+     },
+     "livenessProbe": {
+      "$ref": "v1.Probe",
+      "description": "Periodic probe of component liveness."
+     },
+     "readinessProbe": {
+      "$ref": "v1.Probe",
+      "description": "Periodic probe of component readiness."
+     }
+    }
+   },
+   "v1.Probe": {
+    "id": "v1.Probe",
+    "description": "Probe describes a method by which status can be retrieved.",
+    "properties": {
+     "exec": {
+      "$ref": "v1.ExecAction",
+      "description": "One and only one of the following should be specified. Exec specifies the action to take."
+     },
+     "httpGet": {
+      "$ref": "v1.HTTPGetAction",
+      "description": "HTTPGet specifies the http request to perform."
+     },
+     "tcpSocket": {
+      "$ref": "v1.TCPSocketAction",
+      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
+     },
+     "initialDelaySeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of seconds after creation before probes are expected to succeed. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+     },
+     "timeoutSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of seconds after which an individual probe attempt times out. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+     }
+    }
+   },
+   "v1.ExecAction": {
+    "id": "v1.ExecAction",
+    "description": "ExecAction describes a \"run in container\" action.",
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy."
+     }
+    }
+   },
+   "v1.HTTPGetAction": {
+    "id": "v1.HTTPGetAction",
+    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path to access on the HTTP server."
+     },
+     "port": {
+      "type": "string",
+      "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+     },
+     "host": {
+      "type": "string",
+      "description": "Host name to connect to, defaults to the pod IP."
+     },
+     "scheme": {
+      "type": "string",
+      "description": "Scheme to use for connecting to the host. Defaults to HTTP."
+     }
+    }
+   },
+   "v1.TCPSocketAction": {
+    "id": "v1.TCPSocketAction",
+    "description": "TCPSocketAction describes an action based on opening a socket",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "host": {
+      "type": "string",
+      "description": "Host name to connect to, defaults to the pod IP."
+     },
+     "port": {
+      "type": "string",
+      "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+     }
+    }
+   },
    "v1.ComponentStatus": {
     "id": "v1.ComponentStatus",
-    "description": "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
+    "description": "ComponentStatus describes the status of a component",
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ComponentCondition"
+      },
+      "description": "Conditions of the component"
+     },
+     "lastUpdateTime": {
+      "type": "string",
+      "description": "LastUpdateTime of the component status, regardless of previous status."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "LastTransitionTime of the component status, from a different phase and/or condition"
+     }
+    }
+   },
+   "v1.ComponentCondition": {
+    "id": "v1.ComponentCondition",
+    "description": "ComponentCondition describes one aspect of the state of a component",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of condition: Pending, Running, or Terminated"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition: True, False, or Unknown"
+     },
+     "reason": {
+      "type": "string",
+      "description": "Reason for the transition to the current status (machine-readable)"
+     },
+     "message": {
+      "type": "string",
+      "description": "Message that describes the current status (human-readable)"
+     }
+    }
+   },
+   "json.WatchEvent": {
+    "id": "json.WatchEvent",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
+     },
+     "object": {
+      "type": "string",
+      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
+     }
+    }
+   },
+   "api.Patch": {
+    "id": "api.Patch",
+    "properties": {}
+   },
+   "v1.Status": {
+    "id": "v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "v1.StatusDetails": {
+    "id": "v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "v1.StatusCause": {
+    "id": "v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error. This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed. Fields may appear more than once in an array of causes due to fields having multiple errors.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "v1.DeleteOptions": {
+    "id": "v1.DeleteOptions",
+    "description": "DeleteOptions may be provided when deleting an API object",
+    "required": [
+     "gracePeriodSeconds"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "gracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately."
+     }
+    }
+   },
+   "v1.ComponentStatusesList": {
+    "id": "v1.ComponentStatusesList",
+    "description": "Status of all the conditions for the component as a list of ComponentStatuses objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ComponentStatuses"
+      },
+      "description": "List of ComponentStatuses objects."
+     }
+    }
+   },
+   "v1.ComponentStatuses": {
+    "id": "v1.ComponentStatuses",
+    "description": "ComponentStatuses describes the set of conditions of a single component instance",
     "properties": {
      "kind": {
       "type": "string",
@@ -11129,14 +12324,14 @@
      "conditions": {
       "type": "array",
       "items": {
-       "$ref": "v1.ComponentCondition"
+       "$ref": "v1.ComponentStatusesCondition"
       },
-      "description": "List of component conditions observed"
+      "description": "List of component statuses conditions observed"
      }
     }
    },
-   "v1.ComponentCondition": {
-    "id": "v1.ComponentCondition",
+   "v1.ComponentStatusesCondition": {
+    "id": "v1.ComponentStatusesCondition",
     "description": "Information about the condition of a component.",
     "required": [
      "type",
@@ -11273,128 +12468,6 @@
      "protocol": {
       "type": "string",
       "description": "The IP protocol for this port. Must be UDP or TCP. Default is TCP."
-     }
-    }
-   },
-   "json.WatchEvent": {
-    "id": "json.WatchEvent",
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
-     },
-     "object": {
-      "type": "string",
-      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
-     }
-    }
-   },
-   "api.Patch": {
-    "id": "api.Patch",
-    "properties": {}
-   },
-   "v1.Status": {
-    "id": "v1.Status",
-    "description": "Status is a return value for calls that don't return other objects.",
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "metadata": {
-      "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "status": {
-      "type": "string",
-      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
-     },
-     "message": {
-      "type": "string",
-      "description": "A human-readable description of the status of this operation."
-     },
-     "reason": {
-      "type": "string",
-      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
-     },
-     "details": {
-      "$ref": "v1.StatusDetails",
-      "description": "Extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
-     },
-     "code": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Suggested HTTP return code for this status, 0 if not set."
-     }
-    }
-   },
-   "v1.StatusDetails": {
-    "id": "v1.StatusDetails",
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
-     },
-     "kind": {
-      "type": "string",
-      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "causes": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.StatusCause"
-      },
-      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
-     },
-     "retryAfterSeconds": {
-      "type": "integer",
-      "format": "int32",
-      "description": "If specified, the time in seconds before the operation should be retried."
-     }
-    }
-   },
-   "v1.StatusCause": {
-    "id": "v1.StatusCause",
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
-    "properties": {
-     "reason": {
-      "type": "string",
-      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
-     },
-     "message": {
-      "type": "string",
-      "description": "A human-readable description of the cause of the error. This field may be presented as-is to a reader."
-     },
-     "field": {
-      "type": "string",
-      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed. Fields may appear more than once in an array of causes due to fields having multiple errors.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
-     }
-    }
-   },
-   "v1.DeleteOptions": {
-    "id": "v1.DeleteOptions",
-    "description": "DeleteOptions may be provided when deleting an API object",
-    "required": [
-     "gracePeriodSeconds"
-    ],
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "gracePeriodSeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately."
      }
     }
    },
@@ -12734,85 +13807,6 @@
      "mountPath": {
       "type": "string",
       "description": "Path within the container at which the volume should be mounted."
-     }
-    }
-   },
-   "v1.Probe": {
-    "id": "v1.Probe",
-    "description": "Probe describes a liveness probe to be examined to the container.",
-    "properties": {
-     "exec": {
-      "$ref": "v1.ExecAction",
-      "description": "One and only one of the following should be specified. Exec specifies the action to take."
-     },
-     "httpGet": {
-      "$ref": "v1.HTTPGetAction",
-      "description": "HTTPGet specifies the http request to perform."
-     },
-     "tcpSocket": {
-      "$ref": "v1.TCPSocketAction",
-      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
-     },
-     "initialDelaySeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
-     },
-     "timeoutSeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
-     }
-    }
-   },
-   "v1.ExecAction": {
-    "id": "v1.ExecAction",
-    "description": "ExecAction describes a \"run in container\" action.",
-    "properties": {
-     "command": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy."
-     }
-    }
-   },
-   "v1.HTTPGetAction": {
-    "id": "v1.HTTPGetAction",
-    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
-    "required": [
-     "port"
-    ],
-    "properties": {
-     "path": {
-      "type": "string",
-      "description": "Path to access on the HTTP server."
-     },
-     "port": {
-      "type": "string",
-      "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
-     },
-     "host": {
-      "type": "string",
-      "description": "Host name to connect to, defaults to the pod IP."
-     },
-     "scheme": {
-      "type": "string",
-      "description": "Scheme to use for connecting to the host. Defaults to HTTP."
-     }
-    }
-   },
-   "v1.TCPSocketAction": {
-    "id": "v1.TCPSocketAction",
-    "description": "TCPSocketAction describes an action based on opening a socket",
-    "required": [
-     "port"
-    ],
-    "properties": {
-     "port": {
-      "type": "string",
-      "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
      }
     }
    },

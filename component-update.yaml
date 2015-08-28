@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Component
+metadata:
+  name: scheduler-3vcjt
+spec:
+  type: scheduler
+  address: http://172.17.0.215:10251
+status:
+  phase: Running

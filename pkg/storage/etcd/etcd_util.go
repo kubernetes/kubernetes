@@ -120,3 +120,13 @@ func EtcdHealthCheck(data []byte) error {
 	}
 	return nil
 }
+
+var EtcdHealthValidator = etcdHealthValidator{}
+
+type etcdHealthValidator struct{}
+
+// Validate returns an error if the response body is unhealthy.
+// Satisfies the probe/http.BodyValidator
+func (hv etcdHealthValidator) Validate(body []byte) error {
+	return EtcdHealthCheck(body)
+}

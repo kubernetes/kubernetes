@@ -81,17 +81,18 @@ func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string,
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
+	dataStr := string(data)
 	if err != nil {
-		return probe.Unknown, string(data), err
+		return probe.Unknown, dataStr, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return probe.Failure, string(data),
+		return probe.Failure, dataStr,
 			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
 	}
 	if server.Validate != nil {
 		if err := server.Validate(data); err != nil {
-			return probe.Failure, string(data), err
+			return probe.Failure, dataStr, err
 		}
 	}
-	return probe.Success, string(data), nil
+	return probe.Success, dataStr, nil
 }

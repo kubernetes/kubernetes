@@ -23,3 +23,21 @@ const (
 	Failure Result = "failure"
 	Unknown Result = "unknown"
 )
+
+func (s Result) String() string {
+	switch s {
+	case Success:
+		return "success"
+	case Failure:
+		return "failure"
+	default:
+		return "unknown"
+	}
+}
+
+type Prober interface {
+	// Probe executes a health probe and returns the result.
+	// If the execution fails, an error is returned.
+	// If the probe results in failure, a message may be returned instead of an error.
+	Probe() (result Result, msg string, err error)
+}

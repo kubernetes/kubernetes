@@ -22,14 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-type ComponentStatusesInterface interface {
-	ComponentStatuses() ComponentStatusInterface
+type ComponentStatusesClientSupplier interface {
+	ComponentStatuses() ComponentStatusesClient
 }
 
 // ComponentStatusInterface contains methods to retrieve ComponentStatus
-type ComponentStatusInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.ComponentStatusList, error)
-	Get(name string) (*api.ComponentStatus, error)
+type ComponentStatusesClient interface {
+	List(label labels.Selector, field fields.Selector) (*api.ComponentStatusesList, error)
+	Get(name string) (*api.ComponentStatuses, error)
 
 	// TODO: It'd be nice to have watch support at some point
 	//Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -44,8 +44,8 @@ func newComponentStatuses(c *Client) *componentStatuses {
 	return &componentStatuses{c}
 }
 
-func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
-	result = &api.ComponentStatusList{}
+func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusesList, err error) {
+	result = &api.ComponentStatusesList{}
 	err = c.client.Get().
 		Resource("componentStatuses").
 		LabelsSelectorParam(label).
@@ -56,8 +56,8 @@ func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (
 	return result, err
 }
 
-func (c *componentStatuses) Get(name string) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
+func (c *componentStatuses) Get(name string) (result *api.ComponentStatuses, err error) {
+	result = &api.ComponentStatuses{}
 	err = c.client.Get().Resource("componentStatuses").Name(name).Do().Into(result)
 	return
 }

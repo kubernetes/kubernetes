@@ -784,6 +784,8 @@ const (
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
+	// Host name to connect to, defaults to the pod IP.
+	Host string `json:"host,omitempty"`
 	// Number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
@@ -800,14 +802,14 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// Probe describes a liveness probe to be examined to the container.
+// Probe describes a method by which status can be retrieved.
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
-	// Number of seconds after the container has started before liveness probes are initiated.
+	// Number of seconds after creation before probes are expected to succeed.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
-	// Number of seconds after which liveness probes timeout.
+	// Number of seconds after which an individual probe attempt times out.
 	// Defaults to 1 second.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
 	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
@@ -2429,19 +2431,88 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
-// Type and constants for component health validation.
+// ComponentType is the name of a group of one or more component instances
+type ComponentType string
+
+// ComponentSpec defines a component and how to verify its status
+type ComponentSpec struct {
+	// Type of the component
+	Type ComponentType `json:"type"`
+	// Periodic probe of component liveness.
+	LivenessProbe *Probe `json:"livenessProbe,omitempty"`
+	// Periodic probe of component readiness.
+	ReadinessProbe *Probe `json:"readinessProbe,omitempty"`
+}
+
+// ComponentConditionType describes a type of component condition
 type ComponentConditionType string
 
-// These are the valid conditions for the component.
 const (
-	ComponentHealthy ComponentConditionType = "Healthy"
+	// ComponentAlive indicates that a component is running
+	ComponentAlive ComponentConditionType = "Alive"
+	// ComponentReady indicates that a component is ready for use
+	ComponentReady ComponentConditionType = "Ready"
+)
+
+// ComponentCondition describes one aspect of the state of a component
+type ComponentCondition struct {
+	// Type of condition: Pending, Running, or Terminated
+	Type ComponentConditionType `json:"type"`
+	// Status of the condition: True, False, or Unknown
+	Status ConditionStatus `json:"status"`
+	// Reason for the transition to the current status (machine-readable)
+	Reason string `json:"reason,omitempty"`
+	// Message that describes the current status (human-readable)
+	Message string `json:"message,omitempty"`
+}
+
+// ComponentStatus describes the status of a component
+type ComponentStatus struct {
+	// Conditions of the component
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
+	// LastUpdateTime of the component status, regardless of previous status.
+	LastUpdateTime util.Time `json:"lastUpdateTime,omitempty"`
+	// LastTransitionTime of the component status, from a different phase and/or condition
+	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
+}
+
+// Component describes an instance of a specific micro-service, along with its definition and last known status
+type Component struct {
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
+	// Spec defines the behavior of a component and how to verify its status.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec ComponentSpec `json:"spec"`
+	// Status defines the component's last known state.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status ComponentStatus `json:"status"`
+}
+
+// ComponentList describes a list of components
+type ComponentList struct {
+	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	ListMeta `json:"metadata,omitempty"`
+	// Items is a list of component objects.
+	Items []Component `json:"items"`
+}
+
+// ComponentStatusesConditionType describes a type of component statuses condition
+type ComponentStatusesConditionType string
+
+const (
+	// ComponentStatusesHealthy describes a component that is ready to use
+	ComponentStatusesHealthy ComponentStatusesConditionType = "Healthy"
 )
 
 // Information about the condition of a component.
-type ComponentCondition struct {
+type ComponentStatusesCondition struct {
 	// Type of condition for a component.
 	// Valid value: "Healthy"
-	Type ComponentConditionType `json:"type"`
+	Type ComponentStatusesConditionType `json:"type"`
 	// Status of the condition for a component.
 	// Valid values for "Healthy": "True", "False", or "Unknown".
 	Status ConditionStatus `json:"status"`
@@ -2453,26 +2524,26 @@ type ComponentCondition struct {
 	Error string `json:"error,omitempty"`
 }
 
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-type ComponentStatus struct {
+// ComponentStatuses describes the set of conditions of a single component instance
+type ComponentStatuses struct {
 	TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// List of component conditions observed
-	Conditions []ComponentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// List of component statuses conditions observed
+	Conditions []ComponentStatusesCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
-// Status of all the conditions for the component as a list of ComponentStatus objects.
-type ComponentStatusList struct {
+// Status of all the conditions for the component as a list of ComponentStatuses objects.
+type ComponentStatusesList struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	ListMeta `json:"metadata,omitempty"`
 
-	// List of ComponentStatus objects.
-	Items []ComponentStatus `json:"items"`
+	// List of ComponentStatuses objects.
+	Items []ComponentStatuses `json:"items"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.

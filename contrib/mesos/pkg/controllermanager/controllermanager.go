@@ -24,11 +24,13 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
+	"k8s.io/kubernetes/pkg/controller/component"
 	kendpoint "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -47,6 +49,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
+)
+
+const (
+	ComponentType = "k8sm-controller-manager"
 )
 
 // CMServer is the main context object for the controller manager.
@@ -93,6 +99,28 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
+	// Register component
+	_, err = kubeClient.ComponentsClient().Create(&api.Component{
+		Spec: s.spec(),
+		Status: api.ComponentStatus{
+			Conditions: []api.ComponentCondition{
+				{
+					Type:   api.ComponentAlive,
+					Status: api.ConditionTrue,
+				},
+				{
+					Type:    api.ComponentReady,
+					Status:  api.ConditionFalse,
+					Reason:  "starting",
+					Message: "Starting",
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to register component: %v", err)
+	}
+
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -107,8 +135,8 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	endpoints := s.createEndpointController(kubeClient)
-	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+	components := componentcontroller.NewComponentController(kubeClient)
+	go components.Run(s.ConcurrentComponentProbes, util.NeverStop)
 
 	controllerManager := replicationcontroller.NewReplicationManager(kubeClient, replicationcontroller.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
@@ -200,4 +228,36 @@ func (s *CMServer) createEndpointController(client *client.Client) kmendpoint.En
 	glog.V(2).Infof("Creating podIP:containerPort endpoint controller")
 	stockEndpointController := kendpoint.NewEndpointController(client)
 	return stockEndpointController
+}
+
+func (s *CMServer) spec() api.ComponentSpec {
+	host := s.Address.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.Port)
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: api.URISchemeHTTP,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }
