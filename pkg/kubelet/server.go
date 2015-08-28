@@ -37,6 +37,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/resource"
+	expv1 "k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -144,6 +146,19 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Add(ws)
 
 	s.restfulCont.Handle("/stats/", &httpHandler{f: s.handleStats})
+
+	ws = new(restful.WebService)
+	ws.
+		Path("/experimental/v1/nodeStats").
+		Produces(restful.MIME_JSON)
+	ws.Route(ws.GET("").
+		To(s.getNodeStats).
+		Operation("getNodeStats").
+		Param(ws.QueryParameter("numstats", "max number of stats to return").DataType("int")).
+		Param(ws.QueryParameter("start", "start time of the query").DataType("time.Time")).
+		Param(ws.QueryParameter("end", "end time of the query").DataType("time.Time")).
+		Writes(expv1.NodeStats{}))
+	s.restfulCont.Add(ws)
 
 	ws = new(restful.WebService)
 	ws.
@@ -256,6 +271,43 @@ func (s *Server) InstallDebuggingHandlers() {
 	s.restfulCont.Add(ws)
 }
 
+func boolQueryParameter(req *restful.Request, param string, defValue bool) (bool, error) {
+	s := req.QueryParameter(param)
+	if s == "" {
+		return defValue, nil
+	}
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return false, fmt.Errorf("invalid bool query parameter: %s", s)
+	}
+	return b, nil
+}
+
+func intQueryParameter(req *restful.Request, param string, defValue int) (int, error) {
+	s := req.QueryParameter(param)
+	if s == "" {
+		return defValue, nil
+	}
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid int query parameter: %s", s)
+	}
+	return i, nil
+}
+
+func timeQueryParameter(req *restful.Request, param string, defValue time.Time) (time.Time, error) {
+	s := req.QueryParameter(param)
+	if s == "" {
+		return defValue, nil
+	}
+	// RFC3339 since it's simple and doesn't contain any spaces
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid time query parameter: %s", s)
+	}
+	return t, nil
+}
+
 type httpHandler struct {
 	f func(w http.ResponseWriter, r *http.Request)
 }
@@ -342,8 +394,16 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 
-	follow, _ := strconv.ParseBool(request.QueryParameter("follow"))
-	previous, _ := strconv.ParseBool(request.QueryParameter("previous"))
+	follow, err := boolQueryParameter(request, "follow", false)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	previous, err := boolQueryParameter(request, "previous", false)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
 	tail := request.QueryParameter("tail")
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
@@ -370,7 +430,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	fw := flushwriter.Wrap(response)
 	response.Header().Set("Transfer-Encoding", "chunked")
 	response.WriteHeader(http.StatusOK)
-	err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, previous, fw, fw)
+	err = s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, previous, fw, fw)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
@@ -806,4 +866,75 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
+}
+
+func binaryQuantityFromUint(u uint64) *resource.Quantity {
+	return resource.NewQuantity(int64(u), resource.BinarySI)
+}
+
+func convertContainerStats(stats *cadvisorApi.ContainerStats) *expv1.StatsPoint {
+	point := &expv1.StatsPoint{
+		Time: stats.Timestamp,
+		Cpu: expv1.CpuStats{
+			// TODO: CpuInst https://github.com/google/cadvisor/pull/861
+			Usage: *binaryQuantityFromUint(stats.Cpu.Usage.Total),
+		},
+		Memory: expv1.MemoryStats{
+			Usage:      *binaryQuantityFromUint(stats.Memory.Usage),
+			WorkingSet: *binaryQuantityFromUint(stats.Memory.WorkingSet),
+		},
+	}
+	return point
+}
+
+func (s *Server) getNodeStats(request *restful.Request, response *restful.Response) {
+	numstats, err := intQueryParameter(request, "numstats", 60)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	start, err := timeQueryParameter(request, "start", time.Time{})
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	end, err := timeQueryParameter(request, "end", time.Now())
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	subcontainers, err := boolQueryParameter(request, "subcontainers", false)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	cadvisorRequest := &cadvisorApi.ContainerInfoRequest{
+		NumStats: numstats,
+		Start:    start,
+		End:      end,
+	}
+	statsMap, err := s.host.GetRawContainerInfo("/", cadvisorRequest, subcontainers)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	contStats := make([]expv1.ContainerStats, len(statsMap))
+
+	for name, info := range statsMap {
+		points := make([]*expv1.StatsPoint, 0, len(info.Stats))
+		for _, sp := range info.Stats {
+			points = append(points, convertContainerStats(sp))
+		}
+		contStats = append(contStats, expv1.ContainerStats{
+			Name:  name,
+			Stats: points,
+		})
+	}
+
+	nodeStats := expv1.NodeStats{
+		Containers: contStats,
+	}
+	response.WriteEntity(&nodeStats)
+	return
 }
