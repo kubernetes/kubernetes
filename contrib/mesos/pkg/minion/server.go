@@ -21,15 +21,15 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
+	"os/signal"
 	"path"
 	"strings"
-	"time"
+	"syscall"
 
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
-	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
@@ -37,6 +37,11 @@ import (
 	"github.com/kardianos/osext"
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
+)
+
+const (
+	proxyLogFilename    = "proxy.log"
+	executorLogFilename = "executor.log"
 )
 
 type MinionServer struct {
@@ -48,8 +53,7 @@ type MinionServer struct {
 	hks            hyperkube.Interface
 	clientConfig   *client.Config
 	kmBinary       string
-	done           chan struct{} // closed when shutting down
-	exit           chan error    // to signal fatal errors
+	tasks          []*tasks.Task
 
 	pathOverride string // the PATH environment for the sub-processes
 	cgroupPrefix string // e.g. mesos
@@ -69,15 +73,11 @@ func NewMinionServer() *MinionServer {
 	s := &MinionServer{
 		KubeletExecutorServer: exservice.NewKubeletExecutorServer(),
 		privateMountNS:        false, // disabled until Docker supports customization of the parent mount namespace
-		done:                  make(chan struct{}),
-		exit:                  make(chan error),
-
-		cgroupPrefix:    config.DefaultCgroupPrefix,
-		logMaxSize:      config.DefaultLogMaxSize(),
-		logMaxBackups:   config.DefaultLogMaxBackups,
-		logMaxAgeInDays: config.DefaultLogMaxAgeInDays,
-
-		runProxy: true,
+		cgroupPrefix:          config.DefaultCgroupPrefix,
+		logMaxSize:            config.DefaultLogMaxSize(),
+		logMaxBackups:         config.DefaultLogMaxBackups,
+		logMaxAgeInDays:       config.DefaultLogMaxAgeInDays,
+		runProxy:              true,
 	}
 
 	// cache this for later use
@@ -141,10 +141,13 @@ func (ms *MinionServer) launchProxyServer() {
 		args = append(args, fmt.Sprintf("--hostname-override=%s", ms.KubeletExecutorServer.HostnameOverride))
 	}
 
-	ms.launchHyperkubeServer(hyperkube.CommandProxy, &args, "proxy.log")
+	ms.launchHyperkubeServer(hyperkube.CommandProxy, args, proxyLogFilename, nil)
 }
 
-func (ms *MinionServer) launchExecutorServer() {
+// launchExecutorServer returns a chan that closes upon kubelet-executor death. since the kubelet-
+// executor doesn't support failover right now, the right thing to do is to fail completely since all
+// pods will be lost upon restart and we want mesos to recover the resources from them.
+func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 	allArgs := os.Args[1:]
 
 	// filter out minion flags, leaving those for the executor
@@ -159,111 +162,65 @@ func (ms *MinionServer) launchExecutorServer() {
 	}
 
 	// run executor and quit minion server when this exits cleanly
-	err := ms.launchHyperkubeServer(hyperkube.CommandExecutor, &executorArgs, "executor.log")
-	if err != nil {
-		// just return, executor will be restarted on error
-		log.Error(err)
-		return
+	execDied := make(chan struct{})
+	decorator := func(t *tasks.Task) *tasks.Task {
+		t.Finished = func(_ bool) bool {
+			// this func implements the task.finished spec, so when the executor exits
+			// we return false to indicate that it should not be restarted. we also
+			// close execDied to signal interested listeners.
+			close(execDied)
+			return false
+		}
+		// since we only expect to die once, and there is no restart; don't delay any longer than needed
+		t.RestartDelay = 0
+		return t
 	}
-
-	log.Info("Executor exited cleanly, stopping the minion")
-	ms.exit <- nil
+	ms.launchHyperkubeServer(hyperkube.CommandExecutor, executorArgs, executorLogFilename, decorator)
+	return execDied
 }
 
-func (ms *MinionServer) launchHyperkubeServer(server string, args *[]string, logFileName string) error {
+func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logFileName string, decorator func(*tasks.Task) *tasks.Task) {
 	log.V(2).Infof("Spawning hyperkube %v with args '%+v'", server, args)
 
-	// prepare parameters
-	kmArgs := []string{server}
-	for _, arg := range *args {
-		kmArgs = append(kmArgs, arg)
-	}
-
-	// create command
-	cmd := exec.Command(ms.kmBinary, kmArgs...)
-	if _, err := cmd.StdoutPipe(); err != nil {
-		// fatal error => terminate minion
-		err = fmt.Errorf("error getting stdout of %v: %v", server, err)
-		ms.exit <- err
-		return err
-	}
-	stderrLogs, err := cmd.StderrPipe()
-	if err != nil {
-		// fatal error => terminate minion
-		err = fmt.Errorf("error getting stderr of %v: %v", server, err)
-		ms.exit <- err
-		return err
-	}
-
-	ch := make(chan struct{})
-	go func() {
-		defer func() {
-			select {
-			case <-ch:
-				log.Infof("killing %v process...", server)
-				if err = cmd.Process.Kill(); err != nil {
-					log.Errorf("failed to kill %v process: %v", server, err)
-				}
-			default:
-			}
-		}()
-
-		maxSize := ms.logMaxSize.Value()
-		if maxSize > 0 {
-			// convert to MB
-			maxSize = maxSize / 1024 / 1024
-			if maxSize == 0 {
-				log.Warning("maximal log file size is rounded to 1 MB")
-				maxSize = 1
-			}
+	kmArgs := append([]string{server}, args...)
+	maxSize := ms.logMaxSize.Value()
+	if maxSize > 0 {
+		// convert to MB
+		maxSize = maxSize / 1024 / 1024
+		if maxSize == 0 {
+			log.Warning("maximal log file size is rounded to 1 MB")
+			maxSize = 1
 		}
-		writer := &lumberjack.Logger{
+	}
+
+	writerFunc := func() io.WriteCloser {
+		return &lumberjack.Logger{
 			Filename:   logFileName,
 			MaxSize:    int(maxSize),
 			MaxBackups: ms.logMaxBackups,
 			MaxAge:     ms.logMaxAgeInDays,
 		}
-		defer writer.Close()
-
-		log.V(2).Infof("Starting logging for %v: max log file size %d MB, keeping %d backups, for %d days", server, maxSize, ms.logMaxBackups, ms.logMaxAgeInDays)
-
-		<-ch
-		written, err := io.Copy(writer, stderrLogs)
-		if err != nil {
-			log.Errorf("error writing data to %v: %v", logFileName, err)
-		}
-
-		log.Infof("wrote %d bytes to %v", written, logFileName)
-	}()
+	}
 
 	// use given environment, but add /usr/sbin to the path for the iptables binary used in kube-proxy
+	var kmEnv []string
 	if ms.pathOverride != "" {
 		env := os.Environ()
-		cmd.Env = make([]string, 0, len(env))
+		kmEnv = make([]string, 0, len(env))
 		for _, e := range env {
 			if !strings.HasPrefix(e, "PATH=") {
-				cmd.Env = append(cmd.Env, e)
+				kmEnv = append(kmEnv, e)
 			}
 		}
-		cmd.Env = append(cmd.Env, "PATH="+ms.pathOverride)
+		kmEnv = append(kmEnv, "PATH="+ms.pathOverride)
 	}
 
-	// if the server fails to start then we exit the executor, otherwise
-	// wait for the proxy process to end (and release resources after).
-	if err := cmd.Start(); err != nil {
-		// fatal error => terminate minion
-		err = fmt.Errorf("error starting %v: %v", server, err)
-		ms.exit <- err
-		return err
+	t := tasks.New(server, ms.kmBinary, kmArgs, kmEnv, writerFunc)
+	if decorator != nil {
+		t = decorator(t)
 	}
-	close(ch)
-	if err := cmd.Wait(); err != nil {
-		log.Errorf("%v exited with error: %v", server, err)
-		err = fmt.Errorf("%v exited with error: %v", server, err)
-		return err
-	}
-
-	return nil
+	go t.Start()
+	ms.tasks = append(ms.tasks, t)
 }
 
 // runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
@@ -295,15 +252,52 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	cgroupLogger("using cgroup-root %q", ms.cgroupRoot)
 
 	// run subprocesses until ms.done is closed on return of this function
-	defer close(ms.done)
 	if ms.runProxy {
-		go runtime.Until(ms.launchProxyServer, 5*time.Second, ms.done)
+		ms.launchProxyServer()
 	}
-	go runtime.Until(ms.launchExecutorServer, 5*time.Second, ms.done)
 
-	// wait until minion exit is requested
-	// don't close ms.exit here to avoid panics of go routines writing an error to it
-	return <-ms.exit
+	// abort closes when the kubelet-executor dies
+	abort := ms.launchExecutorServer()
+	shouldQuit := termSignalListener(abort)
+	te := tasks.MergeOutput(ms.tasks, shouldQuit)
+
+	// TODO(jdef) do something fun here, such as reporting task completion to the apiserver
+
+	<-te.Close().Done() // we don't listen for any specific events yet; wait for all tasks to finish
+	return nil
+}
+
+// termSignalListener returns a signal chan that closes when either (a) the process receives a termination
+// signal: SIGTERM, SIGINT, or SIGHUP; or (b) the abort chan closes.
+func termSignalListener(abort <-chan struct{}) <-chan struct{} {
+	shouldQuit := make(chan struct{})
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh)
+
+	go func() {
+		defer close(shouldQuit)
+		for {
+			select {
+			case <-abort:
+				log.Infof("executor died, aborting")
+				return
+			case s, ok := <-sigCh:
+				if !ok {
+					return
+				}
+				switch s {
+				case os.Interrupt, os.Signal(syscall.SIGTERM), os.Signal(syscall.SIGINT), os.Signal(syscall.SIGHUP):
+					log.Infof("received signal %q, aborting", s)
+					return
+				case os.Signal(syscall.SIGCHLD): // who cares?
+				default:
+					log.Errorf("unexpected signal: %T %#v", s, s)
+				}
+
+			}
+		}
+	}()
+	return shouldQuit
 }
 
 func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
