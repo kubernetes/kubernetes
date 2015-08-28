@@ -55,7 +55,7 @@ $ sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
 You also need to ensure it's executable:
 
 ```console
-$ sudo chmod +X /usr/local/bin/kubectl
+$ sudo chmod +x /usr/local/bin/kubectl
 ```
 
 If you prefer not to copy kubectl, you need to ensure the tool is in your path:
