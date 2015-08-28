@@ -394,6 +394,10 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.I
 		PortRange:  fmt.Sprintf("%d-%d", minPort, maxPort),
 		Target:     gce.targetPoolURL(name, region),
 	}
+	if externalIP != nil {
+		req.IPAddress = externalIP.String()
+	}
+
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return nil, err
