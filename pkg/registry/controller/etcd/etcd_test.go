@@ -17,13 +17,11 @@ limitations under the License.
 package etcd
 
 import (
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
@@ -57,125 +55,104 @@ func createController(storage *REST, rc api.ReplicationController, t *testing.T)
 	return *newRc, nil
 }
 
-var validPodTemplate = api.PodTemplate{
-	Template: api.PodTemplateSpec{
+func validNewController() *api.ReplicationController {
+	return &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Labels: map[string]string{"a": "b"},
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:            "test",
-					Image:           "test_image",
-					ImagePullPolicy: api.PullIfNotPresent,
+		Spec: api.ReplicationControllerSpec{
+			Selector: map[string]string{"a": "b"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "test",
+							Image:           "test_image",
+							ImagePullPolicy: api.PullIfNotPresent,
+						},
+					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
 		},
-	},
+	}
 }
 
-var validControllerSpec = api.ReplicationControllerSpec{
-	Selector: validPodTemplate.Template.Labels,
-	Template: &validPodTemplate.Template,
-}
-
-var validController = api.ReplicationController{
-	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "default"},
-	Spec:       validControllerSpec,
-}
+var validController = *validNewController()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
+	controller := validNewController()
+	controller.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		&api.ReplicationController{
-			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
-				Selector: map[string]string{"a": "b"},
-				Template: &validPodTemplate.Template,
-			},
-		},
+		controller,
 		func(ctx api.Context, obj runtime.Object) error {
 			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
 		},
 		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
 		},
-		// invalid
+		// invalid (invalid selector)
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
 				Selector: map[string]string{},
-				Template: &validPodTemplate.Template,
+				Template: validController.Spec.Template,
 			},
 		},
 	)
 }
 
-func TestEtcdControllerValidatesUpdate(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, _ := newStorage(t)
-
-	updateController, err := createController(storage, validController, t)
-	if err != nil {
-		t.Errorf("Failed to create controller, cannot proceed with test.")
-	}
-
-	updaters := []func(rc api.ReplicationController) (runtime.Object, bool, error){
-		func(rc api.ReplicationController) (runtime.Object, bool, error) {
-			rc.UID = "newUID"
-			return storage.Update(ctx, &rc)
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestUpdate(
+		// valid
+		validNewController(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
 		},
-		func(rc api.ReplicationController) (runtime.Object, bool, error) {
-			rc.Name = ""
-			return storage.Update(ctx, &rc)
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
 		},
-		func(rc api.ReplicationController) (runtime.Object, bool, error) {
-			rc.Spec.Selector = map[string]string{}
-			return storage.Update(ctx, &rc)
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
 		},
-	}
-	for _, u := range updaters {
-		c, updated, err := u(updateController)
-		if c != nil || updated {
-			t.Errorf("Expected nil object and not created")
-		}
-		if !errors.IsInvalid(err) && !errors.IsBadRequest(err) {
-			t.Errorf("Expected invalid or bad request error, got %v of type %T", err, err)
-		}
-	}
-}
-
-func TestEtcdControllerValidatesNamespaceOnUpdate(t *testing.T) {
-	storage, _ := newStorage(t)
-	ns := "newnamespace"
-
-	// The update should fail if the namespace on the controller is set to something
-	// other than the namespace on the given context, even if the namespace on the
-	// controller is valid.
-	updateController, err := createController(storage, validController, t)
-
-	newNamespaceController := validController
-	newNamespaceController.Namespace = ns
-	_, err = createController(storage, newNamespaceController, t)
-
-	c, updated, err := storage.Update(api.WithNamespace(api.NewContext(), ns), &updateController)
-	if c != nil || updated {
-		t.Errorf("Expected nil object and not created")
-	}
-	// TODO: Be more paranoid about the type of error and make sure it has the substring
-	// "namespace" in it, once #5684 is fixed. Ideally this would be a NewBadRequest.
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	}
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.ReplicationController)
+			object.Spec.Replicas = object.Spec.Replicas + 1
+			return object
+		},
+		// invalid updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.ReplicationController)
+			object.UID = "newUID"
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.ReplicationController)
+			object.Name = ""
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.ReplicationController)
+			object.Spec.Selector = map[string]string{}
+			return object
+		},
+	)
 }
 
 func TestGenerationNumber(t *testing.T) {
 	storage, _ := newStorage(t)
-	modifiedSno := validController
+	modifiedSno := *validNewController()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
 	ctx := api.NewDefaultContext()
@@ -225,17 +202,15 @@ func TestGenerationNumber(t *testing.T) {
 func TestEtcdGetController(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
-	copy := validController
-	test.TestGet(&copy)
+	test.TestGet(validNewController())
 }
 
 func TestEtcdListControllers(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
 	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	copy := validController
 	test.TestList(
-		&copy,
+		validNewController(),
 		func(objects []runtime.Object) []runtime.Object {
 			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
@@ -244,38 +219,13 @@ func TestEtcdListControllers(t *testing.T) {
 		})
 }
 
-func TestEtcdUpdateController(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	key, _ := storage.KeyFunc(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-
-	// set a key, then retrieve the current resource version and try updating it
-	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0)
-	update := validController
-	update.ResourceVersion = strconv.FormatUint(resp.Node.ModifiedIndex, 10)
-	update.Spec.Replicas = validController.Spec.Replicas + 1
-	_, created, err := storage.Update(ctx, &update)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if created {
-		t.Errorf("expected an update but created flag was returned")
-	}
-	ctrl, err := storage.Get(ctx, validController.Name)
-	updatedController, _ := ctrl.(*api.ReplicationController)
-	if updatedController.Spec.Replicas != validController.Spec.Replicas+1 {
-		t.Errorf("Unexpected controller: %#v", ctrl)
-	}
-}
-
 func TestEtcdDeleteController(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, _ := storage.KeyFunc(ctx, validController.Name)
 	key = etcdtest.AddPrefix(key)
 
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewController()), 0)
 	obj, err := storage.Delete(ctx, validController.Name, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -491,7 +441,7 @@ func TestDelete(t *testing.T) {
 	key = etcdtest.AddPrefix(key)
 
 	createFn := func() runtime.Object {
-		rc := validController
+		rc := *validNewController()
 		rc.ResourceVersion = "1"
 		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{

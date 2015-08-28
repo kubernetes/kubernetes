@@ -86,3 +86,36 @@ func TestCreate(t *testing.T) {
 		},
 	)
 }
+
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test.TestUpdate(
+		// valid
+		validService(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.Service)
+			object.Spec = api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz2"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
+				}},
+			}
+			return object
+		},
+	)
+}

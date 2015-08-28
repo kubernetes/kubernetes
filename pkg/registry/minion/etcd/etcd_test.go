@@ -95,6 +95,30 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test.TestUpdate(
+		// valid
+		validNewNode(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.Node)
+			object.Spec.Unschedulable = !object.Spec.Unschedulable
+			return object
+		},
+	)
+}
+
 func TestDelete(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
@@ -143,36 +167,6 @@ func TestEtcdListNodes(t *testing.T) {
 		func(resourceVersion uint64) {
 			registrytest.SetResourceVersion(fakeClient, resourceVersion)
 		})
-}
-
-func TestEtcdUpdateEndpoints(t *testing.T) {
-	ctx := api.NewContext()
-	storage, fakeClient := newStorage(t)
-	node := validChangedNode()
-
-	key, _ := storage.KeyFunc(ctx, node.Name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewNode()), 0)
-
-	_, _, err := storage.Update(ctx, node)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var nodeOut api.Node
-	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &nodeOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	node.ObjectMeta.ResourceVersion = nodeOut.ObjectMeta.ResourceVersion
-	if !api.Semantic.DeepEqual(node, &nodeOut) {
-		t.Errorf("Unexpected node: %#v, expected %#v", &nodeOut, node)
-	}
 }
 
 func TestEtcdDeleteNode(t *testing.T) {

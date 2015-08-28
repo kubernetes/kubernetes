@@ -112,6 +112,30 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestUpdate(t *testing.T) {
+	storage, _, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestUpdate(
+		// valid
+		validNewPod(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.Pod)
+			object.Labels = map[string]string{"a": "b"}
+			return object
+		},
+	)
+}
+
 func TestDelete(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
@@ -196,37 +220,6 @@ func TestPodDecode(t *testing.T) {
 
 	if !api.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
-}
-
-func TestUpdateWithConflictingNamespace(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "default"},
-					Spec:       api.PodSpec{NodeName: "machine"},
-				}),
-				ModifiedIndex: 1,
-			},
-		},
-	}
-
-	pod := validChangedPod()
-	pod.Namespace = "not-default"
-
-	obj, created, err := storage.Update(api.NewDefaultContext(), pod)
-	if obj != nil || created {
-		t.Error("Expected a nil channel, but we got a value or created")
-	}
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "the namespace of the provided object does not match the namespace sent on the request") == -1 {
-		t.Errorf("Expected 'Pod.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
 
@@ -688,33 +681,6 @@ func TestEtcdCreateBinding(t *testing.T) {
 				t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, test.binding.Target.Name)
 			}
 		}
-	}
-}
-
-func TestEtcdUpdateNotFound(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	fakeClient.TestIndex = true
-
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: tools.EtcdErrorNotFound,
-	}
-
-	podIn := api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:            "foo",
-			ResourceVersion: "1",
-			Labels: map[string]string{
-				"foo": "bar",
-			},
-		},
-	}
-	_, _, err := storage.Update(ctx, &podIn)
-	if err == nil {
-		t.Errorf("unexpected non-error")
 	}
 }
 

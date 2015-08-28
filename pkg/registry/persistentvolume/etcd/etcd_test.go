@@ -89,6 +89,32 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestUpdate(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test.TestUpdate(
+		// valid
+		validNewPersistentVolume("foo"),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.PersistentVolume)
+			object.Spec.Capacity = api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+			}
+			return object
+		},
+	)
+}
+
 func TestDelete(t *testing.T) {
 	ctx := api.NewContext()
 	storage, _, fakeClient := newStorage(t)
@@ -154,36 +180,6 @@ func TestPersistentVolumesDecode(t *testing.T) {
 
 	if !api.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
-}
-
-func TestEtcdUpdatePersistentVolumes(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient := newStorage(t)
-	persistentVolume := validChangedPersistentVolume()
-
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewPersistentVolume("foo")), 0)
-
-	_, _, err := storage.Update(ctx, persistentVolume)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var persistentVolumeOut api.PersistentVolume
-	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &persistentVolumeOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	persistentVolume.ObjectMeta.ResourceVersion = persistentVolumeOut.ObjectMeta.ResourceVersion
-	if !api.Semantic.DeepEqual(persistentVolume, &persistentVolumeOut) {
-		t.Errorf("Unexpected persistentVolume: %#v, expected %#v", &persistentVolumeOut, persistentVolume)
 	}
 }
 
