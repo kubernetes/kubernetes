@@ -1,37 +1,37 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Kubernetes 1.0.3 on EC2 powered by CoreOS 713.3.0 (stable)",
+  "Description": "Kubernetes 1.0.3 on EC2 powered by CoreOS 723.3.0 (stable)",
   "Mappings": {
       "RegionMap": {
           "eu-central-1" : {
-              "AMI" : "ami-02211b1f"
+              "AMI" : "ami-bececaa3"
           },
           "ap-northeast-1" : {
-              "AMI" : "ami-22d27b22"
+              "AMI" : "ami-f2338ff2"
           },
           "us-gov-west-1" : {
-              "AMI" : "ami-e53a59c6"
+              "AMI" : "ami-c75033e4"
           },
           "sa-east-1" : {
-              "AMI" : "ami-45a62a58"
+              "AMI" : "ami-11e9600c"
           },
           "ap-southeast-2" : {
-              "AMI" : "ami-2b2e6911"
+              "AMI" : "ami-8f88c8b5"
           },
           "ap-southeast-1" : {
-              "AMI" : "ami-0ef1f15c"
+              "AMI" : "ami-b6d8d4e4"
           },
           "us-east-1" : {
-              "AMI" : "ami-6b1cd400"
+              "AMI" : "ami-3d73d356"
           },
           "us-west-2" : {
-              "AMI" : "ami-f5a5a5c5"
+              "AMI" : "ami-85ada4b5"
           },
           "us-west-1" : {
-              "AMI" : "ami-bf8477fb"
+              "AMI" : "ami-1db04f59"
           },
           "eu-west-1" : {
-              "AMI" : "ami-50f4b927"
+              "AMI" : "ami-0e104179"
           }
       }
   },
