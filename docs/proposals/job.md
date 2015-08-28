@@ -154,8 +154,8 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
-    // JobSucceeded means the job has successfully completed its execution.
-    JobSucceeded JobConditionType = "Complete"
+    // JobComplete means the job has completed its execution.
+    JobComplete JobConditionType = "Complete"
 )
 
 // JobCondition describes current state of a job.
