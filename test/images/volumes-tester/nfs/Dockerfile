@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:14.04
+FROM centos
 MAINTAINER Jan Safranek, jsafrane@redhat.com
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update -qq && apt-get install -y nfs-kernel-server -qq
+RUN yum -y install /usr/bin/ps nfs-utils && yum clean all
 RUN mkdir -p /exports
 ADD run_nfs.sh /usr/local/bin/
 ADD index.html /exports/index.html

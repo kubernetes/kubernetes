@@ -31,7 +31,8 @@ function start()
     /usr/sbin/rpc.mountd -N 2 -N 3 -V 4 -V 4.1
 
     /usr/sbin/exportfs -r
-    /usr/sbin/rpc.nfsd -N 2 -N 3 -V 4 -V 4.1 2
+    # -G 10 to reduce grace time to 10 seconds (the lowest allowed)
+    /usr/sbin/rpc.nfsd -G 10 -N 2 -N 3 -V 4 -V 4.1 2
 
     echo "NFS started"
 }
