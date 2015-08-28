@@ -213,6 +213,8 @@ func NewControllerExpectations() *ControllerExpectations {
 type PodControlInterface interface {
 	// CreateReplica creates new replicated pods according to the spec.
 	CreateReplica(namespace string, controller *api.ReplicationController) error
+	// CreateReplicaOnNodes creates a new pod according to the spec, on a specified list of nodes.
+	CreateReplicaOnNode(namespace string, controller *api.Daemon, nodeNames string) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string) error
 }
@@ -287,6 +289,39 @@ func (r RealPodControl) CreateReplica(namespace string, controller *api.Replicat
 		glog.V(4).Infof("Controller %v created pod %v", controller.Name, newPod.Name)
 		r.Recorder.Eventf(controller, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
+	return nil
+}
+
+func (r RealPodControl) CreateReplicaOnNode(namespace string, controller *api.Daemon, nodeName string) error {
+	desiredLabels := getReplicaLabelSet(controller.Spec.Template)
+	desiredAnnotations, err := getReplicaAnnotationSet(controller.Spec.Template, controller)
+	if err != nil {
+		return err
+	}
+	prefix := getReplicaPrefix(controller.Name)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels:       desiredLabels,
+			Annotations:  desiredAnnotations,
+			GenerateName: prefix,
+		},
+	}
+	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.Spec); err != nil {
+		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	if labels.Set(pod.Labels).AsSelector().Empty() {
+		return fmt.Errorf("unable to create pod replica, no labels")
+	}
+	pod.Spec.NodeName = nodeName
+	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
+		r.Recorder.Eventf(controller, "failedCreate", "Error creating: %v", err)
+		return fmt.Errorf("unable to create pod replica: %v", err)
+	} else {
+		glog.V(4).Infof("Controller %v created pod %v", controller.Name, newPod.Name)
+		r.Recorder.Eventf(controller, "successfulCreate", "Created pod: %v", newPod.Name)
+	}
+
 	return nil
 }
 

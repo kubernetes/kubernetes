@@ -68,6 +68,10 @@ func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationCo
 	return nil
 }
 
+func (f *FakePodControl) CreateReplicaOnNode(namespace string, daemon *api.Daemon, nodeName string) error {
+	return nil
+}
+
 func (f *FakePodControl) DeletePod(namespace string, podName string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
