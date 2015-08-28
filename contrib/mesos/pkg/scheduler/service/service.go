@@ -107,6 +107,7 @@ type SchedulerServer struct {
 	ProxyBindall bool
 	ProxyLogV    int
 
+	MinionPathOverride    string
 	MinionLogMaxSize      resource.Quantity
 	MinionLogMaxBackups   int
 	MinionLogMaxAgeInDays int
@@ -237,6 +238,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RunProxy, "run-proxy", s.RunProxy, "Run the kube-proxy as a side process of the executor.")
 	fs.IntVar(&s.ProxyLogV, "proxy-logv", s.ProxyLogV, "Logging verbosity of spawned minion proxy processes.")
 
+	fs.StringVar(&s.MinionPathOverride, "minion-path-override", s.MinionPathOverride, "Override the PATH in the environment of the minion sub-processes.")
 	fs.Var(resource.NewQuantityFlagValue(&s.MinionLogMaxSize), "minion-max-log-size", "Maximum log file size for the executor and proxy before rotation")
 	fs.IntVar(&s.MinionLogMaxAgeInDays, "minion-max-log-age", s.MinionLogMaxAgeInDays, "Maximum log file age of the executor and proxy in days")
 	fs.IntVar(&s.MinionLogMaxBackups, "minion-max-log-backups", s.MinionLogMaxBackups, "Maximum log file backups of the executor and proxy to keep after rotation")
@@ -327,6 +329,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.ProxyBindall))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-logv=%d", s.ProxyLogV))
 
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--path-override=%s", s.MinionPathOverride))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-size=%v", s.MinionLogMaxSize.String()))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-backups=%d", s.MinionLogMaxBackups))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-age=%d", s.MinionLogMaxAgeInDays))
