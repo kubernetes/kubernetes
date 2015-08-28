@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -379,8 +378,7 @@ func (c *Client) ImportImage(opts ImportImageOptions) error {
 		if err != nil {
 			return err
 		}
-		b, err := ioutil.ReadAll(f)
-		opts.InputStream = bytes.NewBuffer(b)
+		opts.InputStream = f
 		opts.Source = "-"
 	}
 	return c.createImage(queryString(&opts), nil, opts.InputStream, opts.OutputStream, opts.RawJSONStream)

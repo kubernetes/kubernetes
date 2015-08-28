@@ -45,15 +45,16 @@ type APIPort struct {
 //
 // See http://goo.gl/QeFH7U for more details.
 type APIContainers struct {
-	ID         string    `json:"Id" yaml:"Id"`
-	Image      string    `json:"Image,omitempty" yaml:"Image,omitempty"`
-	Command    string    `json:"Command,omitempty" yaml:"Command,omitempty"`
-	Created    int64     `json:"Created,omitempty" yaml:"Created,omitempty"`
-	Status     string    `json:"Status,omitempty" yaml:"Status,omitempty"`
-	Ports      []APIPort `json:"Ports,omitempty" yaml:"Ports,omitempty"`
-	SizeRw     int64     `json:"SizeRw,omitempty" yaml:"SizeRw,omitempty"`
-	SizeRootFs int64     `json:"SizeRootFs,omitempty" yaml:"SizeRootFs,omitempty"`
-	Names      []string  `json:"Names,omitempty" yaml:"Names,omitempty"`
+	ID         string            `json:"Id" yaml:"Id"`
+	Image      string            `json:"Image,omitempty" yaml:"Image,omitempty"`
+	Command    string            `json:"Command,omitempty" yaml:"Command,omitempty"`
+	Created    int64             `json:"Created,omitempty" yaml:"Created,omitempty"`
+	Status     string            `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Ports      []APIPort         `json:"Ports,omitempty" yaml:"Ports,omitempty"`
+	SizeRw     int64             `json:"SizeRw,omitempty" yaml:"SizeRw,omitempty"`
+	SizeRootFs int64             `json:"SizeRootFs,omitempty" yaml:"SizeRootFs,omitempty"`
+	Names      []string          `json:"Names,omitempty" yaml:"Names,omitempty"`
+	Labels     map[string]string `json:"Labels,omitempty" yaml:"Labels, omitempty"`
 }
 
 // ListContainers returns a slice of containers matching the given criteria.
@@ -213,7 +214,19 @@ type Config struct {
 	NetworkDisabled bool                `json:"NetworkDisabled,omitempty" yaml:"NetworkDisabled,omitempty"`
 	SecurityOpts    []string            `json:"SecurityOpts,omitempty" yaml:"SecurityOpts,omitempty"`
 	OnBuild         []string            `json:"OnBuild,omitempty" yaml:"OnBuild,omitempty"`
+	Mounts          []Mount             `json:"Mounts,omitempty" yaml:"Mounts,omitempty"`
 	Labels          map[string]string   `json:"Labels,omitempty" yaml:"Labels,omitempty"`
+}
+
+// Mount represents a mount point in the container.
+//
+// It has been added in the version 1.20 of the Docker API, available since
+// Docker 1.8.
+type Mount struct {
+	Source      string
+	Destination string
+	Mode        string
+	RW          bool
 }
 
 // LogConfig defines the log driver type and the configuration for it.

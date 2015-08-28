@@ -624,8 +624,8 @@ func TestStartContainerAlreadyRunning(t *testing.T) {
 	path := fmt.Sprintf("/containers/%s/start", server.containers[0].ID)
 	request, _ := http.NewRequest("POST", path, bytes.NewBuffer([]byte("null")))
 	server.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest {
-		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusBadRequest, recorder.Code)
+	if recorder.Code != http.StatusNotModified {
+		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusNotModified, recorder.Code)
 	}
 }
 
@@ -1690,7 +1690,7 @@ func addNetworks(server *DockerServer, n int) {
 			ID:   fmt.Sprintf("%x", rand.Int()%10000),
 			Type: "bridge",
 			Endpoints: []*docker.Endpoint{
-				&docker.Endpoint{
+				{
 					Name:    "blah",
 					ID:      fmt.Sprintf("%x", rand.Int()%10000),
 					Network: netid,
