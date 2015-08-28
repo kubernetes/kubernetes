@@ -1395,6 +1395,81 @@ func convert_expapi_APIVersion_To_v1_APIVersion(in *expapi.APIVersion, out *APIV
 	return nil
 }
 
+func convert_expapi_Daemon_To_v1_Daemon(in *expapi.Daemon, out *Daemon, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.Daemon))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_DaemonSpec_To_v1_DaemonSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_DaemonStatus_To_v1_DaemonStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_expapi_DaemonList_To_v1_DaemonList(in *expapi.DaemonList, out *DaemonList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.DaemonList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Daemon, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_Daemon_To_v1_Daemon(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_expapi_DaemonSpec_To_v1_DaemonSpec(in *expapi.DaemonSpec, out *DaemonSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.DaemonSpec))(in)
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(v1.PodTemplateSpec)
+		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_expapi_DaemonStatus_To_v1_DaemonStatus(in *expapi.DaemonStatus, out *DaemonStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.DaemonStatus))(in)
+	}
+	out.CurrentNumberScheduled = in.CurrentNumberScheduled
+	out.NumberMisscheduled = in.NumberMisscheduled
+	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	return nil
+}
+
 func convert_expapi_Deployment_To_v1_Deployment(in *expapi.Deployment, out *Deployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.Deployment))(in)
@@ -1734,6 +1809,81 @@ func convert_v1_APIVersion_To_expapi_APIVersion(in *APIVersion, out *expapi.APIV
 	}
 	out.Name = in.Name
 	out.APIGroup = in.APIGroup
+	return nil
+}
+
+func convert_v1_Daemon_To_expapi_Daemon(in *Daemon, out *expapi.Daemon, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Daemon))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_DaemonSpec_To_expapi_DaemonSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_DaemonStatus_To_expapi_DaemonStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_DaemonList_To_expapi_DaemonList(in *DaemonList, out *expapi.DaemonList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.Daemon, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Daemon_To_expapi_Daemon(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_DaemonSpec_To_expapi_DaemonSpec(in *DaemonSpec, out *expapi.DaemonSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonSpec))(in)
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_v1_DaemonStatus_To_expapi_DaemonStatus(in *DaemonStatus, out *expapi.DaemonStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonStatus))(in)
+	}
+	out.CurrentNumberScheduled = in.CurrentNumberScheduled
+	out.NumberMisscheduled = in.NumberMisscheduled
+	out.DesiredNumberScheduled = in.DesiredNumberScheduled
 	return nil
 }
 
@@ -2107,6 +2257,10 @@ func init() {
 		convert_api_VolumeSource_To_v1_VolumeSource,
 		convert_api_Volume_To_v1_Volume,
 		convert_expapi_APIVersion_To_v1_APIVersion,
+		convert_expapi_DaemonList_To_v1_DaemonList,
+		convert_expapi_DaemonSpec_To_v1_DaemonSpec,
+		convert_expapi_DaemonStatus_To_v1_DaemonStatus,
+		convert_expapi_Daemon_To_v1_Daemon,
 		convert_expapi_DeploymentList_To_v1_DeploymentList,
 		convert_expapi_DeploymentSpec_To_v1_DeploymentSpec,
 		convert_expapi_DeploymentStatus_To_v1_DeploymentStatus,
@@ -2130,6 +2284,10 @@ func init() {
 		convert_v1_Capabilities_To_api_Capabilities,
 		convert_v1_ContainerPort_To_api_ContainerPort,
 		convert_v1_Container_To_api_Container,
+		convert_v1_DaemonList_To_expapi_DaemonList,
+		convert_v1_DaemonSpec_To_expapi_DaemonSpec,
+		convert_v1_DaemonStatus_To_expapi_DaemonStatus,
+		convert_v1_Daemon_To_expapi_Daemon,
 		convert_v1_DeploymentList_To_expapi_DeploymentList,
 		convert_v1_DeploymentSpec_To_expapi_DeploymentSpec,
 		convert_v1_DeploymentStatus_To_expapi_DeploymentStatus,

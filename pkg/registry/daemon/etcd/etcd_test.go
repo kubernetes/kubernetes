@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
@@ -46,13 +47,13 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 }
 
 // createController is a helper function that returns a controller with the updated resource version.
-func createController(storage *REST, dc api.Daemon, t *testing.T) (api.Daemon, error) {
+func createController(storage *REST, dc expapi.Daemon, t *testing.T) (expapi.Daemon, error) {
 	ctx := api.WithNamespace(api.NewContext(), dc.Namespace)
 	obj, err := storage.Create(ctx, &dc)
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
 	}
-	newDc := obj.(*api.Daemon)
+	newDc := obj.(*expapi.Daemon)
 	return *newDc, nil
 }
 
@@ -75,12 +76,12 @@ var validPodTemplate = api.PodTemplate{
 	},
 }
 
-var validControllerSpec = api.DaemonSpec{
+var validControllerSpec = expapi.DaemonSpec{
 	Selector: validPodTemplate.Template.Labels,
 	Template: &validPodTemplate.Template,
 }
 
-var validController = api.Daemon{
+var validController = expapi.Daemon{
 	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "default"},
 	Spec:       validControllerSpec,
 }
@@ -90,8 +91,8 @@ func TestCreate(t *testing.T) {
 	test := resttest.New(t, storage, fakeClient.SetError)
 	test.TestCreate(
 		// valid
-		&api.Daemon{
-			Spec: api.DaemonSpec{
+		&expapi.Daemon{
+			Spec: expapi.DaemonSpec{
 				Selector: map[string]string{"a": "b"},
 				Template: &validPodTemplate.Template,
 			},
@@ -103,8 +104,8 @@ func TestCreate(t *testing.T) {
 			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
 		},
 		// invalid
-		&api.Daemon{
-			Spec: api.DaemonSpec{
+		&expapi.Daemon{
+			Spec: expapi.DaemonSpec{
 				Selector: map[string]string{},
 				Template: &validPodTemplate.Template,
 			},
@@ -133,7 +134,7 @@ func TestEtcdGetController(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	controller, ok := ctrl.(*api.Daemon)
+	controller, ok := ctrl.(*expapi.Daemon)
 	if !ok {
 		t.Errorf("Expected a controller, got %#v", ctrl)
 	}
@@ -151,20 +152,20 @@ func TestEtcdControllerValidatesUpdate(t *testing.T) {
 		t.Errorf("Failed to create controller, cannot proceed with test.")
 	}
 
-	updaters := []func(dc api.Daemon) (runtime.Object, bool, error){
-		func(dc api.Daemon) (runtime.Object, bool, error) {
+	updaters := []func(dc expapi.Daemon) (runtime.Object, bool, error){
+		func(dc expapi.Daemon) (runtime.Object, bool, error) {
 			dc.UID = "newUID"
 			return storage.Update(ctx, &dc)
 		},
-		func(dc api.Daemon) (runtime.Object, bool, error) {
+		func(dc expapi.Daemon) (runtime.Object, bool, error) {
 			dc.Name = ""
 			return storage.Update(ctx, &dc)
 		},
-		func(dc api.Daemon) (runtime.Object, bool, error) {
+		func(dc expapi.Daemon) (runtime.Object, bool, error) {
 			dc.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
 			return storage.Update(ctx, &dc)
 		},
-		func(dc api.Daemon) (runtime.Object, bool, error) {
+		func(dc expapi.Daemon) (runtime.Object, bool, error) {
 			dc.Spec.Selector = map[string]string{}
 			return storage.Update(ctx, &dc)
 		},
@@ -224,7 +225,7 @@ func TestEtcdGetControllerDifferentNamespace(t *testing.T) {
 	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &otherNsController), 0)
 
 	obj, err := storage.Get(ctx1, validController.Name)
-	ctrl1, _ := obj.(*api.Daemon)
+	ctrl1, _ := obj.(*expapi.Daemon)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -236,7 +237,7 @@ func TestEtcdGetControllerDifferentNamespace(t *testing.T) {
 	}
 
 	obj, err = storage.Get(ctx2, validController.Name)
-	ctrl2, _ := obj.(*api.Daemon)
+	ctrl2, _ := obj.(*expapi.Daemon)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -320,7 +321,7 @@ func TestEtcdListControllers(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	controllers, _ := objList.(*api.DaemonList)
+	controllers, _ := objList.(*expapi.DaemonList)
 	if len(controllers.Items) != 2 || controllers.Items[0].Name != validController.Name || controllers.Items[1].Name != controller.Name {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
@@ -340,7 +341,7 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	controllers, _ := objList.(*api.DaemonList)
+	controllers, _ := objList.(*expapi.DaemonList)
 	if len(controllers.Items) != 0 {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
@@ -376,7 +377,7 @@ func TestEtcdListControllersLabelsMatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	controllers, _ := objList.(*api.DaemonList)
+	controllers, _ := objList.(*expapi.DaemonList)
 	if len(controllers.Items) != 1 || controllers.Items[0].Name != controller.Name ||
 		!testLabels.Matches(labels.Set(controllers.Items[0].Labels)) {
 		t.Errorf("Unexpected controller list: %#v for query with labels %#v",
@@ -430,7 +431,7 @@ func TestEtcdWatchControllersMatch(t *testing.T) {
 	// The watcher above is waiting for these Labels, on receiving them it should
 	// apply the ControllerStatus decorator, which lists pods, causing a query against
 	// the /registry/pods endpoint of the etcd client.
-	controller := &api.Daemon{
+	controller := &expapi.Daemon{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Labels:    validController.Spec.Selector,
@@ -476,13 +477,13 @@ func TestEtcdWatchControllersFields(t *testing.T) {
 		etcdstorage.EtcdCAS,
 		etcdstorage.EtcdDelete}
 
-	controller := &api.Daemon{
+	controller := &expapi.Daemon{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Labels:    validController.Spec.Selector,
 			Namespace: "default",
 		},
-		Status: api.DaemonStatus{
+		Status: expapi.DaemonStatus{
 			CurrentNumberScheduled: 2,
 			NumberMisscheduled:     1,
 			DesiredNumberScheduled: 4,
@@ -549,7 +550,7 @@ func TestEtcdWatchControllersNotMatch(t *testing.T) {
 	}
 	fakeClient.WaitForWatchCompletion()
 
-	controller := &api.Daemon{
+	controller := &expapi.Daemon{
 		ObjectMeta: api.ObjectMeta{
 			Name: "bar",
 			Labels: map[string]string{

@@ -199,48 +199,6 @@ func (ContainerStatus) SwaggerDoc() map[string]string {
 	return map_ContainerStatus
 }
 
-var map_Daemon = map[string]string{
-	"":         "Daemon represents the configuration of a daemon.",
-	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec defines the specification of the desired behavior of this daemon. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is the current status of this daemon. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-}
-
-func (Daemon) SwaggerDoc() map[string]string {
-	return map_Daemon
-}
-
-var map_DaemonList = map[string]string{
-	"":         "DaemonList is a collection of daemon.",
-	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is a list of daemons.",
-}
-
-func (DaemonList) SwaggerDoc() map[string]string {
-	return map_DaemonList
-}
-
-var map_DaemonSpec = map[string]string{
-	"":         "DaemonSpec is the specification of a daemon.",
-	"selector": "Selector is a label query over pods that are managed by the daemon. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
-	"template": "Template is the object that describes the pod that will be created. The Daemon will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template",
-}
-
-func (DaemonSpec) SwaggerDoc() map[string]string {
-	return map_DaemonSpec
-}
-
-var map_DaemonStatus = map[string]string{
-	"": "DaemonStatus represents the current status of a daemon.",
-	"currentNumberScheduled": "CurrentNumberScheduled is the number of nodes that are running exactly 1 copy of the daemon and are supposed to run the daemon.",
-	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon, but are not supposed to run the daemon.",
-	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon (including nodes correctly running the daemon).",
-}
-
-func (DaemonStatus) SwaggerDoc() map[string]string {
-	return map_DaemonStatus
-}
-
 var map_DeleteOptions = map[string]string{
 	"":                   "DeleteOptions may be provided when deleting an API object",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",

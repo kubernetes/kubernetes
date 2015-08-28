@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/expapi/testapi"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -36,8 +37,8 @@ func TestListDaemons(t *testing.T) {
 			Path:   testapi.ResourcePath(getDCResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
-			Body: &api.DaemonList{
-				Items: []api.Daemon{
+			Body: &expapi.DaemonList{
+				Items: []expapi.Daemon{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -46,7 +47,7 @@ func TestListDaemons(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Spec: api.DaemonSpec{
+						Spec: expapi.DaemonSpec{
 							Template: &api.PodTemplateSpec{},
 						},
 					},
@@ -65,7 +66,7 @@ func TestGetDaemon(t *testing.T) {
 		Request: testRequest{Method: "GET", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.Daemon{
+			Body: &expapi.Daemon{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -73,7 +74,7 @@ func TestGetDaemon(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: api.DaemonSpec{
+				Spec: expapi.DaemonSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -96,14 +97,14 @@ func TestGetDaemonWithNoName(t *testing.T) {
 
 func TestUpdateDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestController := &api.Daemon{
+	requestController := &expapi.Daemon{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.Daemon{
+			Body: &expapi.Daemon{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -111,7 +112,7 @@ func TestUpdateDaemon(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: api.DaemonSpec{
+				Spec: expapi.DaemonSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -133,14 +134,14 @@ func TestDeleteDaemon(t *testing.T) {
 
 func TestCreateDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestController := &api.Daemon{
+	requestController := &expapi.Daemon{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: testapi.ResourcePath(getDCResourceName(), ns, ""), Body: requestController, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.Daemon{
+			Body: &expapi.Daemon{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -148,7 +149,7 @@ func TestCreateDaemon(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: api.DaemonSpec{
+				Spec: expapi.DaemonSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
