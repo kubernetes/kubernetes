@@ -20,19 +20,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // PersistentVolumeRecycler is a controller that watches for PersistentVolumes that are released from their claims.
@@ -228,8 +228,4 @@ func (f *PersistentVolumeRecycler) NewWrapperBuilder(spec *volume.Spec, pod *api
 
 func (f *PersistentVolumeRecycler) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("NewWrapperCleaner not supported by PVClaimBinder's VolumeHost implementation")
-}
-
-func (f *PersistentVolumeRecycler) GetCloudProvider() cloudprovider.Interface {
-	return nil
 }

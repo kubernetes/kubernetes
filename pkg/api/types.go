@@ -224,8 +224,6 @@ type VolumeSource struct {
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
-	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -250,8 +248,6 @@ type PersistentVolumeSource struct {
 	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
-	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -557,21 +553,6 @@ type RBDVolumeSource struct {
 	Keyring string `json:"keyring"`
 	// Optional: SecretRef is name of the authentication secret for RBDUser, default is empty.
 	SecretRef *LocalObjectReference `json:"secretRef"`
-	// Optional: Defaults to false (read/write). ReadOnly here will force
-	// the ReadOnly setting in VolumeMounts.
-	ReadOnly bool `json:"readOnly,omitempty"`
-}
-
-// CinderVolumeSource represents a cinder volume resource in Openstack.
-// A Cinder volume must exist and be formatted before mounting to a container.
-// The volume must also be in the same region as the kubelet.
-type CinderVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
-	VolumeID string `json:"volumeID"`
-	// Required: Filesystem type to mount.
-	// Must be a filesystem type supported by the host operating system.
-	// Only ext3 and ext4 are allowed
-	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
