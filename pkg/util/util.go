@@ -44,12 +44,16 @@ var ReallyCrash bool
 var PanicHandlers = []func(interface{}){logPanic}
 
 // HandleCrash simply catches a crash and logs an error. Meant to be called via defer.
-func HandleCrash() {
+// Additional context-specific handlers can be provided, and will be called in case of panic
+func HandleCrash(additionalHandlers ...func(interface{})) {
 	if ReallyCrash {
 		return
 	}
 	if r := recover(); r != nil {
 		for _, fn := range PanicHandlers {
+			fn(r)
+		}
+		for _, fn := range additionalHandlers {
 			fn(r)
 		}
 	}
