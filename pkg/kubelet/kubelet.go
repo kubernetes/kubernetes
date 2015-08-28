@@ -1350,12 +1350,20 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, runningPods []*kubeco
 		return err
 	}
 	errlist := []error{}
-	for i := range found {
-		if !active.Has(string(found[i])) {
-			glog.V(3).Infof("Orphaned pod %q found, removing", found[i])
-			if err := os.RemoveAll(kl.getPodDir(found[i])); err != nil {
-				errlist = append(errlist, err)
-			}
+	for _, uid := range found {
+		if active.Has(string(uid)) {
+			continue
+		}
+		if err := os.Remove(kl.getPodVolumesDir(uid)); err != nil {
+			// If we cannot remove the volumes directory, it implies that the
+			// the directory is not empty. We should wait for the volume
+			// cleanup to complete before attempting to delete the directory.
+			glog.V(3).Infof("Orphaned pod %q found, but unable to remove the volume directory", uid)
+			continue
+		}
+		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
+		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
+			errlist = append(errlist, err)
 		}
 	}
 	return utilErrors.NewAggregate(errlist)
