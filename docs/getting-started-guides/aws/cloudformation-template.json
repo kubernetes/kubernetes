@@ -114,6 +114,10 @@
             "ToPort": "22",
             "CidrIp": {"Ref": "AllowSSHFrom"}
           }
+        ],
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-sg" ] ]}},
+          {"Key" : "KubernetesCluster", "Value" : {"Ref" : "AWS::StackName"}}
         ]
       }
     },
@@ -161,7 +165,8 @@
         "IamInstanceProfile": {"Ref" : "KubernetesMasterInstanceProfile" },
         "Tags" : [
           {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-master" ] ]}},
-          {"Key" : "KubernetesRole", "Value" : "node"}
+          {"Key" : "KubernetesRole", "Value" : "node"},
+          {"Key" : "KubernetesCluster", "Value" : {"Ref" : "AWS::StackName"}}
         ],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
@@ -453,7 +458,8 @@
         "DesiredCapacity": {"Ref": "ClusterSize"},
         "Tags" : [
           {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-node" ] ]}, "PropagateAtLaunch" : true},
-          {"Key" : "KubernetesRole", "Value" : "node", "PropagateAtLaunch" : true}
+          {"Key" : "KubernetesRole", "Value" : "node", "PropagateAtLaunch" : true},
+          {"Key" : "KubernetesCluster", "Value" : {"Ref" : "AWS::StackName"}, "PropagateAtLaunch" : true}
         ]
       }
     },
