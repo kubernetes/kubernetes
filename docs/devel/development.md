@@ -145,6 +145,8 @@ Here's a quick walkthrough of one way to use godeps to add or update a Kubernete
 
 1) Devote a directory to this endeavor:
 
+_Devoting a separate directory is not required, but it is helpful to separate dependency updates from other changes._
+
 ```sh
 export KPATH=$HOME/code/kubernetes
 mkdir -p $KPATH/src/k8s.io/kubernetes
@@ -183,10 +185,17 @@ godep save ./...
 cd $KPATH/src/k8s.io/kubernetes
 go get -u path/to/dependency
 # Change code in Kubernetes accordingly if necessary.
-godep update path/to/dependency
+godep update path/to/dependency/...
 ```
 
-5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: `godep restore`
+_If `go get -u path/to/dependency` fails with compilation errors, instead try `go get -d -u path/to/dependency`
+to fetch the dependencies without compiling them.  This can happen when updating the cadvisor dependency._
+
+
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running hack/verify-godeps.sh
+
+_If hack/verify-godeps.sh fails after a `godep update`, it is possible that a transitive dependency was added or removed but not
+updated by godeps.  It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
