@@ -56,7 +56,5 @@ trap stop TERM
 
 start "$@"
 
-# Ugly hack to do nothing and wait for SIGTERM
-while true; do
-    read
-done
+tail -f /dev/null &
+wait
