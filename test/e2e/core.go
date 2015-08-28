@@ -53,7 +53,7 @@ func CoreDump(dir string) {
 	cmds := []command{
 		{"cat /var/log/kubelet.log", "kubelet"},
 		{"cat /var/log/kube-proxy.log", "kube-proxy"},
-		{"cat /var/log/monit.log", "monit"},
+		{"cat /var/log/supervisor/supervisord.log", "supervisord"},
 	}
 	logCore(cmds, hosts, dir, provider)
 
@@ -69,7 +69,7 @@ func CoreDump(dir string) {
 		{"cat /var/log/kube-apiserver.log", "kube-apiserver"},
 		{"cat /var/log/kube-scheduler.log", "kube-scheduler"},
 		{"cat /var/log/kube-controller-manager.log", "kube-controller-manager"},
-		{"cat /var/log/monit.log", "monit"},
+		{"cat /var/log/supervisor/supervisord.log", "supervisord"},
 	}
 	logCore(cmds, []string{master}, dir, provider)
 }
