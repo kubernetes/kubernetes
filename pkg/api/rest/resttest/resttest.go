@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
@@ -120,7 +121,10 @@ func copyOrDie(obj runtime.Object) runtime.Object {
 }
 
 type AssignFunc func([]runtime.Object) []runtime.Object
+type EmitFunc func(runtime.Object, string) error
 type GetFunc func(api.Context, runtime.Object) (runtime.Object, error)
+type InitWatchFunc func()
+type InjectErrFunc func(err error)
 type SetFunc func(api.Context, runtime.Object) error
 type SetRVFunc func(uint64)
 type UpdateFunc func(runtime.Object) runtime.Object
@@ -185,12 +189,21 @@ func (t *Tester) TestGet(obj runtime.Object) {
 	}
 }
 
-// Test listing object.
+// Test listing objects.
 func (t *Tester) TestList(obj runtime.Object, assignFn AssignFunc, setRVFn SetRVFunc) {
 	t.testListError()
 	t.testListFound(obj, assignFn)
 	t.testListNotFound(assignFn, setRVFn)
 	t.testListMatchLabels(obj, assignFn)
+}
+
+// Test watching objects.
+func (t *Tester) TestWatch(
+	obj runtime.Object, initWatchFn InitWatchFunc, injectErrFn InjectErrFunc, emitFn EmitFunc,
+	labelsPass, labelsFail []labels.Set, fieldsPass, fieldsFail []fields.Set, actions []string) {
+	t.testWatch(initWatchFn, injectErrFn)
+	t.testWatchLabels(copyOrDie(obj), initWatchFn, emitFn, labelsPass, labelsFail, actions)
+	t.testWatchFields(copyOrDie(obj), initWatchFn, emitFn, fieldsPass, fieldsFail, actions)
 }
 
 // =============================================================================
@@ -912,5 +925,127 @@ func (t *Tester) testListNotFound(assignFn AssignFunc, setRVFn SetRVFunc) {
 	}
 	if meta.ResourceVersion != "123" {
 		t.Errorf("unexpected resource version: %d", meta.ResourceVersion)
+	}
+}
+
+// =============================================================================
+// Watching tests.
+
+func (t *Tester) testWatch(initWatchFn InitWatchFunc, injectErrFn InjectErrFunc) {
+	ctx := t.TestContext()
+	watcher, err := t.storage.(rest.Watcher).Watch(ctx, labels.Everything(), fields.Everything(), "1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	initWatchFn()
+
+	select {
+	case _, ok := <-watcher.ResultChan():
+		if !ok {
+			t.Errorf("watch channel should be open")
+		}
+	default:
+	}
+
+	injectErrFn(nil)
+	if _, ok := <-watcher.ResultChan(); ok {
+		t.Errorf("watch channel should be closed")
+	}
+	watcher.Stop()
+}
+
+func (t *Tester) testWatchFields(obj runtime.Object, initWatchFn InitWatchFunc, emitFn EmitFunc, fieldsPass, fieldsFail []fields.Set, actions []string) {
+	ctx := t.TestContext()
+
+	for _, field := range fieldsPass {
+		for _, action := range actions {
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, labels.Everything(), field.AsSelector(), "1")
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			initWatchFn()
+			if err := emitFn(obj, action); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			select {
+			case _, ok := <-watcher.ResultChan():
+				if !ok {
+					t.Errorf("watch channel should be open")
+				}
+			case <-time.After(time.Millisecond * 100):
+				t.Errorf("unexpected timeout from result channel")
+			}
+			watcher.Stop()
+		}
+	}
+
+	for _, field := range fieldsFail {
+		for _, action := range actions {
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, labels.Everything(), field.AsSelector(), "1")
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			initWatchFn()
+			if err := emitFn(obj, action); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			select {
+			case <-watcher.ResultChan():
+				t.Errorf("unexpected result from result channel")
+			case <-time.After(time.Millisecond * 100):
+				// expected case
+			}
+			watcher.Stop()
+		}
+	}
+}
+
+func (t *Tester) testWatchLabels(obj runtime.Object, initWatchFn InitWatchFunc, emitFn EmitFunc, labelsPass, labelsFail []labels.Set, actions []string) {
+	ctx := t.TestContext()
+
+	for _, label := range labelsPass {
+		for _, action := range actions {
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, label.AsSelector(), fields.Everything(), "1")
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			initWatchFn()
+			if err := emitFn(obj, action); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			select {
+			case _, ok := <-watcher.ResultChan():
+				if !ok {
+					t.Errorf("watch channel should be open")
+				}
+			case <-time.After(time.Millisecond * 100):
+				t.Errorf("unexpected timeout from result channel")
+			}
+			watcher.Stop()
+		}
+	}
+
+	for _, label := range labelsFail {
+		for _, action := range actions {
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, label.AsSelector(), fields.Everything(), "1")
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			initWatchFn()
+			if err := emitFn(obj, action); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			select {
+			case <-watcher.ResultChan():
+				t.Errorf("unexpected result from result channel")
+			case <-time.After(time.Millisecond * 100):
+				// expected case
+			}
+			watcher.Stop()
+		}
 	}
 }
