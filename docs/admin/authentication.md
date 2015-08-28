@@ -118,13 +118,14 @@ Finally, add these parameters
 into apiserver start parameters.
 
 **easyrsa** can be used to manually generate certificates for your cluster.
+
 1.  Download, unpack, and initialize the patched version of easyrsa3.
     `curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz`
     `tar xzf easy-rsa.tar.gz`
     `cd easy-rsa-master/easyrsa3`
     `./easyrsa init-pki`
 1.  Generate a CA. (--batch set automatic mode. --req-cn default CN to use.)
-    `./easyrsa --batch "--req-cn=${MASTER_IP}@date +%s" build-ca nopass`
+    ``./easyrsa --batch "--req-cn=${MASTER_IP}@`date +%s`" build-ca nopass``
 1.  Generate server certificate and key.
     (build-server-full [filename]: Generate a keypair and sign locally for a client or server)
     `./easyrsa --subject-alt-name="${MASTER_IP}" build-server-full kubernetes-master nopass`
@@ -137,6 +138,7 @@ into apiserver start parameters.
     and add these into apiserver start parameters.
 
 **openssl** can also be use to manually generate certificates for your cluster.
+
 1.  Generate a ca.key with 2048bit
     `openssl genrsa -out ca.key 2048`
 1.  According to the ca.key generate a ca.crt.  (-days set the certificate effective time).
