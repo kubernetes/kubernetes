@@ -345,6 +345,22 @@ generator to create it from scratch.
 Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
 
+## Edit deep copy files
+
+At this point you have both the versioned API changes and the internal
+structure changes done.  You now need to generate code to handle deep copy
+of your versioned api objects.
+
+The deep copy code resides with each versioned API:
+   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
+
+To regenerate them:
+   - run
+
+```sh
+hack/update-generated-deep-copies.sh
+```
+
 ## Update the fuzzer
 
 Part of our testing regimen for APIs is to "fuzz" (fill with random values) API
