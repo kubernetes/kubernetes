@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 )
@@ -88,4 +89,70 @@ func ValidateThirdPartyResource(obj *expapi.ThirdPartyResource) errs.ValidationE
 		versions.Insert(version.Name)
 	}
 	return allErrs
+}
+
+// ValidateDaemon tests if required fields in the daemon are set.
+func ValidateDaemon(controller *expapi.Daemon) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateDaemonSpec(&controller.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+// ValidateDaemonUpdate tests if required fields in the daemon are set.
+func ValidateDaemonUpdate(oldController, controller *expapi.Daemon) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateDaemonSpec(&controller.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, ValidateDaemonTemplateUpdate(oldController.Spec.Template, controller.Spec.Template).Prefix("spec.template")...)
+	return allErrs
+}
+
+// ValidateDaemonTemplateUpdate tests that certain fields in the daemon's pod template are not updated.
+func ValidateDaemonTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplateSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	podSpec := podTemplate.Spec
+	// podTemplate.Spec is not a pointer, so we can modify NodeSelector and NodeName directly.
+	podSpec.NodeSelector = oldPodTemplate.Spec.NodeSelector
+	podSpec.NodeName = oldPodTemplate.Spec.NodeName
+	// In particular, we do not allow updates to container images at this point.
+	if !api.Semantic.DeepEqual(oldPodTemplate.Spec, podSpec) {
+		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec", "content of spec is not printed out, please refer to the \"details\"", "may not update fields other than spec.nodeSelector"))
+	}
+	return allErrs
+}
+
+// ValidateDaemonSpec tests if required fields in the daemon spec are set.
+func ValidateDaemonSpec(spec *expapi.DaemonSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	selector := labels.Set(spec.Selector).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
+	}
+
+	if spec.Template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("template"))
+	} else {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+		}
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+		// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
+		allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
+		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
+		if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		}
+	}
+	return allErrs
+}
+
+// ValidateDaemonName can be used to check whether the given daemon name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateDaemonName(name string, prefix bool) (bool, string) {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
