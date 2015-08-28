@@ -11,6 +11,7 @@ spec:
   selector:
     k8s-app: kube-dns
   clusterIP:  {{ pillar['dns_server'] }}
+  deprecatedPublicIPs: [{{ pillar['dns_server_public'] }}]
   ports:
   - name: dns
     port: 53

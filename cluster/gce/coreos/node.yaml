@@ -146,7 +146,7 @@ coreos:
         --config=/etc/kubernetes/manifests \
         --allow_privileged=False \
         --v=2 \
-        --cluster_dns=10.0.0.10 \
+        --cluster_dns=10.1.4.53 \
         --cluster_domain=cluster.local \
         --logtostderr=true \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}

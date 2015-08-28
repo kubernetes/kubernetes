@@ -71,7 +71,8 @@ function detect-vivid-image () {
         ;;
 
       us-west-2)
-        AWS_IMAGE=ami-33566d03
+        AWS_IMAGE=ami-3b14370b # Ubuntu 14.04
+#       AWS_IMAGE=ami-33566d03 # Ubuntu 15.04
         ;;
 
       *)

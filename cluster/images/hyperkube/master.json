@@ -22,7 +22,7 @@
               "/hyperkube",
               "apiserver",
               "--portal-net=10.0.0.1/24",
-              "--address=127.0.0.1",
+              "--address=0.0.0.0",
               "--etcd_servers=http://127.0.0.1:4001",
               "--cluster_name=kubernetes",
               "--v=2"

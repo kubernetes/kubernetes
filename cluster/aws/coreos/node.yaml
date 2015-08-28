@@ -69,7 +69,7 @@ coreos:
         --config=/etc/kubernetes/manifests \
         --allow_privileged=False \
         --v=2 \
-        --cluster_dns=10.0.0.10 \
+        --cluster_dns=10.1.4.53 \
         --cluster_domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --hostname-override=${HOSTNAME_OVERRIDE} \

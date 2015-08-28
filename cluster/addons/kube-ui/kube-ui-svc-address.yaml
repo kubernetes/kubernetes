@@ -1,13 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: kube-ui
+  name: kube-ui-public
   namespace: kube-system
   labels:
     k8s-app: kube-ui
-    kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "KubeUI"
 spec:
+  selector:
+    k8s-app: kube-ui
+  deprecatedPublicIPs: [ {{ pillar['kube_ui_public'] }} ]
   ports:
   - port: 80
     targetPort: 8080
