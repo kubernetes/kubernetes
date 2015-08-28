@@ -145,8 +145,8 @@ func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.fcDisk)
-	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
-	if mountpoint {
+	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	if !noMnt {
 		glog.Infof("fc: %s already mounted", globalPDPath)
 		return nil
 	}

@@ -750,17 +750,17 @@ type ISCSIVolumeSource struct {
 // A Fibre Channel Disk can only be mounted as read/write once.
 type FCVolumeSource struct {
 	// Required: FC target world wide names (WWNs)
-	TargetWWNs []string `json:"targetWWNs" description:"FC target wwns"`
+	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
-	Lun int `json:"lun" description:"FC target lun number"`
+	Lun int `json:"lun"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	FSType string `json:"fsType" description:"file system type to mount, such as ext4, xfs, ntfs"`
+	FSType string `json:"fsType"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
-	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container.

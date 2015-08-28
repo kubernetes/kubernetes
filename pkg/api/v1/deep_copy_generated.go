@@ -1245,7 +1245,6 @@ func deepCopy_v1_PersistentVolumeSource(in PersistentVolumeSource, out *Persiste
 	} else {
 		out.ISCSI = nil
 	}
-<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := deepCopy_v1_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
@@ -1261,7 +1260,7 @@ func deepCopy_v1_PersistentVolumeSource(in PersistentVolumeSource, out *Persiste
 		}
 	} else {
 		out.CephFS = nil
-=======
+	}
 	if in.FC != nil {
 		out.FC = new(FCVolumeSource)
 		if err := deepCopy_v1_FCVolumeSource(*in.FC, out.FC, c); err != nil {
@@ -1269,7 +1268,6 @@ func deepCopy_v1_PersistentVolumeSource(in PersistentVolumeSource, out *Persiste
 		}
 	} else {
 		out.FC = nil
->>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -2192,7 +2190,6 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 	} else {
 		out.RBD = nil
 	}
-<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := deepCopy_v1_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
@@ -2216,7 +2213,7 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 		}
 	} else {
 		out.DownwardAPI = nil
-=======
+	}
 	if in.FC != nil {
 		out.FC = new(FCVolumeSource)
 		if err := deepCopy_v1_FCVolumeSource(*in.FC, out.FC, c); err != nil {
@@ -2224,7 +2221,6 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 		}
 	} else {
 		out.FC = nil
->>>>>>> support fibre channel volume
 	}
 	return nil
 }
