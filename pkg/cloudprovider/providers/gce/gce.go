@@ -352,7 +352,11 @@ func makeFirewallName(name string) string {
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
 func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(2).Info("Checking if load balancer already exists: %s", name)
+	if len(hosts) == 0 {
+		return nil, fmt.Errorf("Cannot EnsureTCPLoadBalancer() with no hosts")
+	}
+
+	glog.V(2).Infof("Checking if load balancer already exists: %s", name)
 	_, exists, err := gce.GetTCPLoadBalancer(name, region)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if GCE load balancer already exists: %v", err)
