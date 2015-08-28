@@ -248,6 +248,7 @@ update-period
 upgrade-target
 use-kubernetes-cluster-service
 user-whitelist
+watch-cache
 watch-only
 whitelist-override-label
 www-prefix
