@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -51,11 +52,8 @@ type lifecycle struct {
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 
 	// prevent deletion of immortal namespaces
-	if a.GetOperation() == admission.Delete {
-		if a.GetKind() == "Namespace" && l.immortalNamespaces.Has(a.GetName()) {
-			return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("namespace can never be deleted"))
-		}
-		return nil
+	if a.GetOperation() == admission.Delete && a.GetKind() == "Namespace" && l.immortalNamespaces.Has(a.GetName()) {
+		return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("namespace can never be deleted"))
 	}
 
 	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
@@ -78,15 +76,27 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
+
+	// refuse to operate on non-existent namespaces
 	if !exists {
-		return nil
-	}
-	namespace := namespaceObj.(*api.Namespace)
-	if namespace.Status.Phase != api.NamespaceTerminating {
-		return nil
+		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
+		namespaceObj, err = l.client.Namespaces().Get(a.GetNamespace())
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+		}
 	}
 
-	return admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
+	// ensure that we're not trying to create objects in terminating namespaces
+	if a.GetOperation() == admission.Create {
+		namespace := namespaceObj.(*api.Namespace)
+		if namespace.Status.Phase != api.NamespaceTerminating {
+			return nil
+		}
+
+		return admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
+	}
+
+	return nil
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
@@ -103,11 +113,11 @@ func NewLifecycle(c client.Interface) admission.Interface {
 		},
 		&api.Namespace{},
 		store,
-		0,
+		5*time.Minute,
 	)
 	reflector.Run()
 	return &lifecycle{
-		Handler:            admission.NewHandler(admission.Create, admission.Delete),
+		Handler:            admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		client:             c,
 		store:              store,
 		immortalNamespaces: util.NewStringSet(api.NamespaceDefault),
