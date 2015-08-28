@@ -22,6 +22,7 @@ DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
+RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
 
@@ -45,17 +46,17 @@ GO_OUT=""
 while getopts "o:" OPTION
 do
     case $OPTION in
-        o) 
+        o)
             echo "skipping build"
             echo "using source $OPTARG"
             GO_OUT="$OPTARG"
             if [ $GO_OUT == "" ]; then
                 echo "You provided an invalid value for the build output directory."
-                exit 
+                exit
             fi
             ;;
         ?)
-            usage    
+            usage
             exit
             ;;
     esac
@@ -141,7 +142,7 @@ function detect_binary {
 
 cleanup_dockerized_kubelet()
 {
-  if [[ -e $KUBELET_CIDFILE ]]; then 
+  if [[ -e $KUBELET_CIDFILE ]]; then
     docker kill $(<$KUBELET_CIDFILE) > /dev/null
     rm -f $KUBELET_CIDFILE
   fi
@@ -209,16 +210,20 @@ function start_apiserver {
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
+    runtime_config=""
+    if [[ -n "${RUNTIME_CONFIG}" ]]; then
+      runtime_config="--runtime-config=\"${RUNTIME_CONFIG}\""
+    fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg}\
+    sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg} ${runtime_config}\
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
-      --address="${API_HOST}" \
-      --port="${API_PORT}" \
+      --insecure-bind-address="${API_HOST}" \
+      --insecure-port="${API_PORT}" \
       --etcd-servers="http://127.0.0.1:4001" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
@@ -310,7 +315,7 @@ test_docker
 test_apiserver_off
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
-if [ "$GO_OUT" == "" ]; then 
+if [ "$GO_OUT" == "" ]; then
     detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
