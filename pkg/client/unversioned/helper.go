@@ -479,7 +479,7 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 			return nil, err
 		}
 		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, fmt.Errorf("host must be a URL or a host:port pair: %s", base)
+			return nil, fmt.Errorf("host must be a URL or a host:port pair: %q", base)
 		}
 	}
 
