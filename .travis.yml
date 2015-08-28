@@ -26,3 +26,4 @@ script:
 
 notifications:
   irc: "chat.freenode.net#kubernetes-dev"
+  slack: kubernetes:PHPPkljtEsHXED6xl9IfOvKe
