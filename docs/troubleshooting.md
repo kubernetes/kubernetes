@@ -52,15 +52,15 @@ We also have a number of FAQ pages:
    * [Debugging FAQ](https://github.com/kubernetes/kubernetes/wiki/Debugging-FAQ)
    * [Services FAQ](https://github.com/kubernetes/kubernetes/wiki/Services-FAQ)
 
-You may also find the StackOverflow topics relevant:
+You may also find the Stack Overflow topics relevant:
    * [Kubernetes](http://stackoverflow.com/questions/tagged/kubernetes)
    * [Google Container Engine - GKE](http://stackoverflow.com/questions/tagged/google-container-engine)
 
 # Help! My question isn't covered!  I need help now!
 
-## Stackoverflow
+## Stack Overflow
 
-Someone else from the community may have already asked a similar question or may be able to help with your problem. The Kubernetes team will also monitor posts tagged kubernetes.
+Someone else from the community may have already asked a similar question or may be able to help with your problem. The Kubernetes team will also monitor [posts tagged kubernetes](http://stackoverflow.com/questions/tagged/kubernetes). If there aren't any existing questions that help, please [ask a new one](http://stackoverflow.com/questions/ask?tags=kubernetes)!
 
 ## IRC
 
