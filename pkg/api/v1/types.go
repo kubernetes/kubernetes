@@ -277,9 +277,6 @@ type VolumeSource struct {
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
-	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
-	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -325,9 +322,6 @@ type PersistentVolumeSource struct {
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
-	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
-	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -573,24 +567,6 @@ type RBDVolumeSource struct {
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
-	ReadOnly bool `json:"readOnly,omitempty"`
-}
-
-// CinderVolumeSource represents a cinder volume resource in Openstack.
-// A Cinder volume must exist before mounting to a container.
-// The volume must also be in the same region as the kubelet.
-type CinderVolumeSource struct {
-	// volume id used to identify the volume in cinder
-	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
-	VolumeID string `json:"volumeID"`
-	// Required: Filesystem type to mount.
-	// Must be a filesystem type supported by the host operating system.
-	// Only ext3 and ext4 are allowed
-	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
-	FSType string `json:"fsType,omitempty"`
-	// Optional: Defaults to false (read/write). ReadOnly here will force
-	// the ReadOnly setting in VolumeMounts.
-	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 

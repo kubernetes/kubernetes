@@ -76,16 +76,6 @@ func convert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *Capa
 	return nil
 }
 
-func convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderVolumeSource, out *CinderVolumeSource, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.CinderVolumeSource))(in)
-	}
-	out.VolumeID = in.VolumeID
-	out.FSType = in.FSType
-	out.ReadOnly = in.ReadOnly
-	return nil
-}
-
 func convert_api_ComponentCondition_To_v1_ComponentCondition(in *api.ComponentCondition, out *ComponentCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ComponentCondition))(in)
@@ -1341,14 +1331,6 @@ func convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.Per
 	} else {
 		out.ISCSI = nil
 	}
-	if in.Cinder != nil {
-		out.Cinder = new(CinderVolumeSource)
-		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
-			return err
-		}
-	} else {
-		out.Cinder = nil
-	}
 	return nil
 }
 
@@ -2331,14 +2313,6 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	} else {
 		out.RBD = nil
 	}
-	if in.Cinder != nil {
-		out.Cinder = new(CinderVolumeSource)
-		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
-			return err
-		}
-	} else {
-		out.Cinder = nil
-	}
 	return nil
 }
 
@@ -2389,16 +2363,6 @@ func convert_v1_Capabilities_To_api_Capabilities(in *Capabilities, out *api.Capa
 	} else {
 		out.Drop = nil
 	}
-	return nil
-}
-
-func convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in *CinderVolumeSource, out *api.CinderVolumeSource, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*CinderVolumeSource))(in)
-	}
-	out.VolumeID = in.VolumeID
-	out.FSType = in.FSType
-	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -3657,14 +3621,6 @@ func convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Persist
 	} else {
 		out.ISCSI = nil
 	}
-	if in.Cinder != nil {
-		out.Cinder = new(api.CinderVolumeSource)
-		if err := convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
-			return err
-		}
-	} else {
-		out.Cinder = nil
-	}
 	return nil
 }
 
@@ -4647,14 +4603,6 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 	} else {
 		out.RBD = nil
 	}
-	if in.Cinder != nil {
-		out.Cinder = new(api.CinderVolumeSource)
-		if err := convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
-			return err
-		}
-	} else {
-		out.Cinder = nil
-	}
 	return nil
 }
 
@@ -4663,7 +4611,6 @@ func init() {
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		convert_api_Binding_To_v1_Binding,
 		convert_api_Capabilities_To_v1_Capabilities,
-		convert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
 		convert_api_ComponentCondition_To_v1_ComponentCondition,
 		convert_api_ComponentStatusList_To_v1_ComponentStatusList,
 		convert_api_ComponentStatus_To_v1_ComponentStatus,
@@ -4778,7 +4725,6 @@ func init() {
 		convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		convert_v1_Binding_To_api_Binding,
 		convert_v1_Capabilities_To_api_Capabilities,
-		convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		convert_v1_ComponentCondition_To_api_ComponentCondition,
 		convert_v1_ComponentStatusList_To_api_ComponentStatusList,
 		convert_v1_ComponentStatus_To_api_ComponentStatus,
