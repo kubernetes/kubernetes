@@ -201,21 +201,25 @@ kubectl is modified to support the **ResourceQuota** resource.
 For example,
 
 ```console
-$ kubectl namespace myspace
-$ kubectl create -f docs/user-guide/resourcequota/quota.yaml
-$ kubectl get quota
-NAME
-quota
-$ kubectl describe quota quota
-Name:                   quota
-Resource                Used    Hard
---------                ----    ----
-cpu                     0m      20
-memory                  0       1Gi
-pods                    5       10
-replicationcontrollers  5       20
-resourcequotas          1       1
-services                3       5
+$ kubectl create -f docs/user-guide/resourcequota/namespace.yaml
+namespace "quota-example" created
+$ kubectl create -f docs/user-guide/resourcequota/quota.yaml --namespace=quota-example
+resourcequota "quota" created
+$ kubectl describe quota quota --namespace=quota-example
+Name:                    quota
+Namespace:               quota-example
+Resource                 Used      Hard
+--------                 ----      ----
+cpu                      0         20
+memory                   0         1Gi
+persistentvolumeclaims   0         10
+pods                     0         10
+replicationcontrollers   0         20
+resourcequotas           1         1
+secrets                  1         10
+services                 0         5
+
+
 ```
 
 ## More information
