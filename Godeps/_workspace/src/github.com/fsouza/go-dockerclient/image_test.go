@@ -21,11 +21,13 @@ import (
 func newTestClient(rt *FakeRoundTripper) Client {
 	endpoint := "http://localhost:4243"
 	u, _ := parseEndpoint("http://localhost:4243", false)
+	testAPIVersion, _ := NewAPIVersion("1.17")
 	client := Client{
 		HTTPClient:             &http.Client{Transport: rt},
 		endpoint:               endpoint,
 		endpointURL:            u,
 		SkipServerVersionCheck: true,
+		serverAPIVersion:       testAPIVersion,
 	}
 	return client
 }
