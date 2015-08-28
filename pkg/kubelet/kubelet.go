@@ -164,7 +164,8 @@ func NewMainKubelet(
 	podCIDR string,
 	pods int,
 	dockerExecHandler dockertools.ExecHandler,
-	resolverConfig string) (*Kubelet, error) {
+	resolverConfig string,
+	nodeLabelPluginDir string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -281,7 +282,11 @@ func NewMainKubelet(
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
+		nodeLabels:                     NewNodeLabelMap(hostname, nodeLabelPluginDir),
 	}
+
+	// Start polling for node labels
+	klet.nodeLabels.Run()
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
@@ -556,6 +561,9 @@ type Kubelet struct {
 
 	// Optionally shape the bandwidth of a pod
 	shaper bandwidth.BandwidthShaper
+
+	// The plugin directory containing labels to apply to this node
+	nodeLabels *NodeLabelMap
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -785,6 +793,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			Labels: map[string]string{"kubernetes.io/hostname": kl.hostname},
 		},
 	}
+
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
 		if !ok {
@@ -2206,6 +2215,8 @@ func (kl *Kubelet) syncNetworkStatus() {
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
+	node.ObjectMeta.Labels = kl.nodeLabels.GetNodeLabels()
+
 	// Set addresses for the node.
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()

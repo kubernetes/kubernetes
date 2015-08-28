@@ -262,6 +262,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
 		ResolverConfig:            s.ResolverConfig,
+		NodeLabelPluginDir	   s.NodeLabelPluginDir,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
@@ -364,6 +365,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.MaxPods,
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
+		kc.NodeLabelPluginDir,
 	)
 	if err != nil {
 		return nil, nil, err

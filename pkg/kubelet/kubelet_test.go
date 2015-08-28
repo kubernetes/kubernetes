@@ -89,6 +89,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.os = kubecontainer.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
+	kubelet.nodeLabels = NewNodeLabelMap(testKubeletHostname, "")
 	kubelet.nodeName = testKubeletHostname
 	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
@@ -2353,8 +2354,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{"kubernetes.io/hostname": "127.0.0.1"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -2457,8 +2461,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{"kubernetes.io/hostname": "127.0.0.1"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -2551,8 +2558,11 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{"kubernetes.io/hostname": "127.0.0.1"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
