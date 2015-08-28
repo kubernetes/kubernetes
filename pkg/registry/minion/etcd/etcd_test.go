@@ -19,7 +19,6 @@ package etcd
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -169,6 +168,41 @@ func TestEtcdListNodes(t *testing.T) {
 		})
 }
 
+func TestWatchNodes(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test.TestWatch(
+		validNewNode(),
+		func() {
+			fakeClient.WaitForWatchCompletion()
+		},
+		func(err error) {
+			fakeClient.WatchInjectError <- err
+		},
+		func(obj runtime.Object, action string) error {
+			return registrytest.EmitObject(fakeClient, obj, action)
+		},
+		// matching labels
+		[]labels.Set{
+			{"name": "foo"},
+		},
+		// not matching labels
+		[]labels.Set{
+			{"name": "bar"},
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matchin fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+		},
+		registrytest.WatchActions,
+	)
+}
+
 func TestEtcdDeleteNode(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
@@ -186,96 +220,5 @@ func TestEtcdDeleteNode(t *testing.T) {
 	}
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-}
-
-func TestEtcdWatchNode(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	watching, err := storage.Watch(ctx,
-		labels.Everything(),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchNodesMatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	node := validNewNode()
-
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": node.Name}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	nodeBytes, _ := testapi.Codec().Encode(node)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(nodeBytes),
-		},
-	}
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Error("unexpected timeout from result channel")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchNodesNotMatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	node := validNewNode()
-
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "bar"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	nodeBytes, _ := testapi.Codec().Encode(node)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(nodeBytes),
-		},
-	}
-
-	select {
-	case <-watching.ResultChan():
-		t.Error("unexpected result from result channel")
-	case <-time.After(time.Millisecond * 100):
-		// expected case
 	}
 }
