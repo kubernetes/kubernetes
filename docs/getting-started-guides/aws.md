@@ -98,8 +98,8 @@ NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS
 
 ### Alternatives
 
-A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
-AWS CloudFormation or EC2 with user data (cloud-config).
+A contributed [example](coreos/coreos_multinode_cluster.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), using
+EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
 

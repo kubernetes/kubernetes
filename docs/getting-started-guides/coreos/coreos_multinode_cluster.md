@@ -161,7 +161,7 @@ nova list
 
 #### Get a Suitable CoreOS Image
 
-You'll need a [suitable version of CoreOS image for OpenStack] (https://coreos.com/os/docs/latest/booting-on-openstack.html)
+You'll need a [suitable version of CoreOS image for OpenStack](https://coreos.com/os/docs/latest/booting-on-openstack.html)
 Once you download that, upload it to glance.  An example is shown below:
 
 ```sh
@@ -228,39 +228,6 @@ minion01
 ```
 
 This is basically the same as the master nodes but with the node.yaml post-boot script instead of the master.
-
-### VMware Fusion
-
-#### Create the master config-drive
-
-```sh
-mkdir -p /tmp/new-drive/openstack/latest/
-cp master.yaml /tmp/new-drive/openstack/latest/user_data
-hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o master.iso /tmp/new-drive
-```
-
-#### Provision the Master
-
-Boot the [vmware image](https://coreos.com/docs/running-coreos/platforms/vmware) using `master.iso` as a config drive.
-
-#### Capture the master private IP address
-
-#### Edit node.yaml
-
-Edit `node.yaml` and replace all instances of `<master-private-ip>` with the private IP address of the master node.
-
-#### Create the node config-drive
-
-```sh
-mkdir -p /tmp/new-drive/openstack/latest/
-cp node.yaml /tmp/new-drive/openstack/latest/user_data
-hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o node.iso /tmp/new-drive
-```
-
-#### Provision worker nodes
-
-Boot one or more the [vmware image](https://coreos.com/docs/running-coreos/platforms/vmware) using `node.iso` as a config drive.
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/coreos_multinode_cluster.md?pixel)]()
