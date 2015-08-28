@@ -130,7 +130,6 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("docker", s.dockerHealthCheck),
-		healthz.NamedCheck("hostname", s.hostnameHealthCheck),
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
 	var ws *restful.WebService
@@ -283,25 +282,6 @@ func (s *Server) dockerHealthCheck(req *http.Request) error {
 	}
 	if result < 0 {
 		return fmt.Errorf("Docker version is too old: %q", version.String())
-	}
-	return nil
-}
-
-func (s *Server) hostnameHealthCheck(req *http.Request) error {
-	masterHostname, _, err := net.SplitHostPort(req.Host)
-	if err != nil {
-		if !strings.Contains(req.Host, ":") {
-			masterHostname = req.Host
-		} else {
-			return fmt.Errorf("Could not parse hostname from http request: %v", err)
-		}
-	}
-
-	// Check that the hostname known by the master matches the hostname
-	// the kubelet knows
-	hostname := s.host.GetHostname()
-	if masterHostname != hostname && masterHostname != "127.0.0.1" && masterHostname != "localhost" {
-		return fmt.Errorf("Kubelet hostname \"%v\" does not match the hostname expected by the master \"%v\"", hostname, masterHostname)
 	}
 	return nil
 }
