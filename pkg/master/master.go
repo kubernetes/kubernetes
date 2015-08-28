@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -26,7 +25,6 @@ import (
 	"net/http/pprof"
 	"net/url"
 	"os"
-	rt "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -410,22 +408,8 @@ func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWr
 func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
 	container := restful.NewContainer()
 	container.ServeMux = mux
-	container.RecoverHandler(logStackOnRecover)
+	apiserver.InstallRecoverHandler(container)
 	return container
-}
-
-//TODO: Unify with RecoverPanics?
-func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) {
-	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
-	for i := 2; ; i += 1 {
-		_, file, line, ok := rt.Caller(i)
-		if !ok {
-			break
-		}
-		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
-	}
-	glog.Errorln(buffer.String())
 }
 
 // init initializes master.
