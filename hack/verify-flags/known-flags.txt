@@ -110,6 +110,11 @@ insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
 iptables-sync-period
+ir-data-source
+ir-dbname
+ir-influxdb-host
+ir-password
+ir-user
 jenkins-host
 jenkins-jobs
 km-path
