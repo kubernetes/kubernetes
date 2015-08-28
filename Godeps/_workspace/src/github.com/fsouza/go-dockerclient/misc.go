@@ -11,7 +11,7 @@ import (
 
 // Version returns version information about the docker server.
 //
-// See http://goo.gl/BOZrF5 for more details.
+// See https://goo.gl/ND9R8L for more details.
 func (c *Client) Version() (*Env, error) {
 	body, _, err := c.do("GET", "/version", doOptions{})
 	if err != nil {
@@ -26,7 +26,7 @@ func (c *Client) Version() (*Env, error) {
 
 // Info returns system-wide information about the Docker server.
 //
-// See http://goo.gl/wmqZsW for more details.
+// See https://goo.gl/ElTHi2 for more details.
 func (c *Client) Info() (*Env, error) {
 	body, _, err := c.do("GET", "/info", doOptions{})
 	if err != nil {
