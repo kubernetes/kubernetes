@@ -219,7 +219,7 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo "Possible causes:"
       echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
       echo "    - Create and start your VM using docker-machine or boot2docker: "
-      echo "      - docker-machine create -f <provider> kube-dev"
+      echo "      - docker-machine create -d <driver> kube-dev"
       echo "      - boot2docker init && boot2docker start"
       echo "    - Set your environment variables using: "
       echo "      - eval \$(docker-machine env kube-dev)"
