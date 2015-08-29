@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: es
-        image: kubernetes/elasticsearch:1.1
+        image: kubernetes/elasticsearch:1.2
         env:
           - name: "CLUSTER_NAME"
             value: "mytunes-db"
