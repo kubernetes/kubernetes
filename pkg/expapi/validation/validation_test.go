@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
@@ -537,6 +538,123 @@ func TestValidateDaemon(t *testing.T) {
 				field != "metadata.labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
+		}
+	}
+}
+
+func validDeployment() *expapi.Deployment {
+	return &expapi.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "abc",
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: expapi.DeploymentSpec{
+			Selector: map[string]string{
+				"name": "abc",
+			},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "abc",
+					Namespace: api.NamespaceDefault,
+					Labels: map[string]string{
+						"name": "abc",
+					},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:            "nginx",
+							Image:           "image",
+							ImagePullPolicy: api.PullNever,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestValidateDeployment(t *testing.T) {
+	successCases := []*expapi.Deployment{
+		validDeployment(),
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateDeployment(successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]*expapi.Deployment{}
+	errorCases["metadata.name: required value"] = &expapi.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: api.NamespaceDefault,
+		},
+	}
+	// selector should match the labels in pod template.
+	invalidSelectorDeployment := validDeployment()
+	invalidSelectorDeployment.Spec.Selector = map[string]string{
+		"name": "def",
+	}
+	errorCases["selector does not match labels"] = invalidSelectorDeployment
+
+	// RestartPolicy should be always.
+	invalidRestartPolicyDeployment := validDeployment()
+	invalidRestartPolicyDeployment.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
+	errorCases["unsupported value 'Never'"] = invalidRestartPolicyDeployment
+
+	// invalid unique label key.
+	invalidUniqueLabelDeployment := validDeployment()
+	invalidUniqueLabel := "abc/def/ghi"
+	invalidUniqueLabelDeployment.Spec.UniqueLabelKey = &invalidUniqueLabel
+	errorCases["spec.uniqueLabel: invalid value"] = invalidUniqueLabelDeployment
+
+	// rollingUpdate should be nil for recreate.
+	invalidRecreateDeployment := validDeployment()
+	invalidRecreateDeployment.Spec.Strategy = expapi.DeploymentStrategy{
+		Type:          expapi.DeploymentRecreate,
+		RollingUpdate: &expapi.RollingUpdateDeployment{},
+	}
+	errorCases["rollingUpdate should be nil when strategy type is Recreate"] = invalidRecreateDeployment
+
+	// MaxSurge should be in the form of 20%.
+	invalidMaxSurgeDeployment := validDeployment()
+	invalidMaxSurgeDeployment.Spec.Strategy = expapi.DeploymentStrategy{
+		Type: expapi.DeploymentRollingUpdate,
+		RollingUpdate: &expapi.RollingUpdateDeployment{
+			MaxSurge: util.NewIntOrStringFromString("20Percent"),
+		},
+	}
+	errorCases["value should be int(5) or percentage(5%)"] = invalidMaxSurgeDeployment
+
+	// MaxSurge and MaxUnavailable cannot both be zero.
+	invalidRollingUpdateDeployment := validDeployment()
+	invalidRollingUpdateDeployment.Spec.Strategy = expapi.DeploymentStrategy{
+		Type: expapi.DeploymentRollingUpdate,
+		RollingUpdate: &expapi.RollingUpdateDeployment{
+			MaxSurge:       util.NewIntOrStringFromString("0%"),
+			MaxUnavailable: util.NewIntOrStringFromInt(0),
+		},
+	}
+	errorCases["cannot be 0 when maxSurge is 0 as well"] = invalidRollingUpdateDeployment
+
+	// MaxUnavailable should not be more than 100%.
+	invalidMaxUnavailableDeployment := validDeployment()
+	invalidMaxUnavailableDeployment.Spec.Strategy = expapi.DeploymentStrategy{
+		Type: expapi.DeploymentRollingUpdate,
+		RollingUpdate: &expapi.RollingUpdateDeployment{
+			MaxUnavailable: util.NewIntOrStringFromString("110%"),
+		},
+	}
+	errorCases["should not be more than 100%"] = invalidMaxUnavailableDeployment
+
+	for k, v := range errorCases {
+		errs := ValidateDeployment(v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else if !strings.Contains(errs[0].Error(), k) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
 		}
 	}
 }
