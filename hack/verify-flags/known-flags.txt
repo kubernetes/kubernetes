@@ -65,6 +65,7 @@ dry-run
 duration-sec
 e2e-output-dir
 enable-debugging-handlers
+enable-horizontal-pod-autoscaler
 enable-server
 etcd-config
 etcd-prefix
@@ -96,6 +97,7 @@ grace-period
 ha-domain
 healthz-bind-address
 healthz-port
+horizontal-pod-autoscaler-sync-period
 hostname-override
 host-network-sources
 http-check-frequency
