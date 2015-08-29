@@ -218,11 +218,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if outputFormat == "" {
 			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "labeled")
 		} else {
-			printer, err := f.PrinterForMapping(cmd, info.Mapping, false)
-			if err != nil {
-				return err
-			}
-			return printer.PrintObj(obj, out)
+			f.PrintObject(cmd, obj, out)
 		}
 		return nil
 	})
