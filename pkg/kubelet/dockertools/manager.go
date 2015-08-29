@@ -372,10 +372,14 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 
 	oldStatuses := make(map[string]api.ContainerStatus, len(pod.Spec.Containers))
 	lastObservedTime := make(map[string]util.Time, len(pod.Spec.Containers))
+	// Record the last time we observed a container termination.
 	for _, status := range pod.Status.ContainerStatuses {
 		oldStatuses[status.Name] = status
 		if status.LastTerminationState.Terminated != nil {
-			lastObservedTime[status.Name] = status.LastTerminationState.Terminated.FinishedAt
+			timestamp, ok := lastObservedTime[status.Name]
+			if !ok || timestamp.Before(status.LastTerminationState.Terminated.FinishedAt) {
+				lastObservedTime[status.Name] = status.LastTerminationState.Terminated.FinishedAt
+			}
 		}
 	}
 
@@ -435,20 +439,19 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 				// Populate the last termination state.
 				containerStatus.LastTerminationState = *terminationState
 			}
-			count := true
-			// Only count dead containers terminated after last time we observed,
-			if lastObservedTime, ok := lastObservedTime[dockerContainerName]; ok {
-				if terminationState != nil && terminationState.Terminated.FinishedAt.After(lastObservedTime.Time) {
-					count = false
-				} else {
-					// The container finished before the last observation. No
-					// need to examine/count the older containers. Mark the
-					// container name as done.
-					containerDone.Insert(dockerContainerName)
-				}
+			if terminationState == nil {
+				// Not a dead container.
+				continue
 			}
-			if count {
+			// Only count dead containers terminated after last time we observed,
+			lastObservedTime, ok := lastObservedTime[dockerContainerName]
+			if !ok || terminationState.Terminated.FinishedAt.After(lastObservedTime.Time) {
 				containerStatus.RestartCount += 1
+			} else {
+				// The container finished before the last observation. No
+				// need to examine/count the older containers. Mark the
+				// container name as done.
+				containerDone.Insert(dockerContainerName)
 			}
 			continue
 		}
