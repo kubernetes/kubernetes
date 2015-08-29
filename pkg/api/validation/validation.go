@@ -1352,6 +1352,7 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 		min := map[string]int64{}
 		max := map[string]int64{}
 		defaults := map[string]int64{}
+		defaultRequests := map[string]int64{}
 
 		for k := range limit.Max {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].max[%s]", i, k))...)
@@ -1371,28 +1372,56 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 			q := limit.Default[k]
 			defaults[string(k)] = q.Value()
 		}
+		for k := range limit.DefaultRequest {
+			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k))...)
+			keys.Insert(string(k))
+			q := limit.DefaultRequest[k]
+			defaultRequests[string(k)] = q.Value()
+		}
+		for k := range limit.MaxLimitRequestRatio {
+			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].maxLimitRequestRatio[%s]", i, k))...)
+		}
 
 		for k := range keys {
 			minValue, minValueFound := min[k]
 			maxValue, maxValueFound := max[k]
 			defaultValue, defaultValueFound := defaults[k]
+			defaultRequestValue, defaultRequestValueFound := defaultRequests[k]
 
 			if minValueFound && maxValueFound && minValue > maxValue {
 				minQuantity := limit.Min[api.ResourceName(k)]
 				maxQuantity := limit.Max[api.ResourceName(k)]
-				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].max[%s]", i, k), minValue, fmt.Sprintf("min value %s is greater than max value %s", minQuantity.String(), maxQuantity.String())))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].min[%s]", i, k), minValue, fmt.Sprintf("min value %s is greater than max value %s", minQuantity.String(), maxQuantity.String())))
+			}
+
+			if defaultRequestValueFound && minValueFound && minValue > defaultRequestValue {
+				minQuantity := limit.Min[api.ResourceName(k)]
+				defaultRequestQuantity := limit.DefaultRequest[api.ResourceName(k)]
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k), defaultRequestValue, fmt.Sprintf("min value %s is greater than default request value %s", minQuantity.String(), defaultRequestQuantity.String())))
+			}
+
+			if defaultRequestValueFound && maxValueFound && defaultRequestValue > maxValue {
+				maxQuantity := limit.Max[api.ResourceName(k)]
+				defaultRequestQuantity := limit.DefaultRequest[api.ResourceName(k)]
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k), defaultRequestValue, fmt.Sprintf("default request value %s is greater than max value %s", defaultRequestQuantity.String(), maxQuantity.String())))
+			}
+
+			if defaultRequestValueFound && defaultValueFound && defaultRequestValue > defaultValue {
+				defaultQuantity := limit.Default[api.ResourceName(k)]
+				defaultRequestQuantity := limit.DefaultRequest[api.ResourceName(k)]
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k), defaultRequestValue, fmt.Sprintf("default request value %s is greater than default limit value %s", defaultRequestQuantity.String(), defaultQuantity.String())))
 			}
 
 			if defaultValueFound && minValueFound && minValue > defaultValue {
 				minQuantity := limit.Min[api.ResourceName(k)]
 				defaultQuantity := limit.Default[api.ResourceName(k)]
-				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].max[%s]", i, k), minValue, fmt.Sprintf("min value %s is greater than default value %s", minQuantity.String(), defaultQuantity.String())))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].default[%s]", i, k), minValue, fmt.Sprintf("min value %s is greater than default value %s", minQuantity.String(), defaultQuantity.String())))
 			}
 
 			if defaultValueFound && maxValueFound && defaultValue > maxValue {
 				maxQuantity := limit.Max[api.ResourceName(k)]
 				defaultQuantity := limit.Default[api.ResourceName(k)]
-				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].max[%s]", i, k), minValue, fmt.Sprintf("default value %s is greater than max value %s", defaultQuantity.String(), maxQuantity.String())))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].default[%s]", i, k), maxValue, fmt.Sprintf("default value %s is greater than max value %s", defaultQuantity.String(), maxQuantity.String())))
 			}
 		}
 	}
