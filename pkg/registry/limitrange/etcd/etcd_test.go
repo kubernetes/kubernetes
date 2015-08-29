@@ -76,3 +76,39 @@ func TestCreate(t *testing.T) {
 		},
 	)
 }
+
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test.TestUpdate(
+		// valid
+		validNewLimitRange(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.LimitRange)
+			object.Spec.Limits = []api.LimitRangeItem{
+				{
+					Type: api.LimitTypePod,
+					Max: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("1000"),
+						api.ResourceMemory: resource.MustParse("100000"),
+					},
+					Min: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("10"),
+						api.ResourceMemory: resource.MustParse("1000"),
+					},
+				},
+			}
+			return object
+		},
+	)
+}

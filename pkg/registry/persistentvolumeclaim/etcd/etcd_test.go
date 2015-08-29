@@ -86,6 +86,34 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestUpdate(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestUpdate(
+		// valid
+		validNewPersistentVolumeClaim("foo", api.NamespaceDefault),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.PersistentVolumeClaim)
+			object.Spec.Resources = api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+				},
+			}
+			return object
+		},
+	)
+}
+
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, _, fakeClient := newStorage(t)

@@ -80,6 +80,33 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test.TestUpdate(
+		// valid
+		validNewEndpoints(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.Endpoints)
+			object.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+				Ports:     []api.EndpointPort{{Port: 80, Protocol: "TCP"}},
+			}}
+			return object
+		},
+	)
+}
+
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
@@ -145,36 +172,6 @@ func TestEndpointsDecode(t *testing.T) {
 
 	if !api.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
-}
-
-func TestEtcdUpdateEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	endpoints := validChangedEndpoints()
-
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewEndpoints()), 0)
-
-	_, _, err := storage.Update(ctx, endpoints)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var endpointsOut api.Endpoints
-	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &endpointsOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	endpoints.ObjectMeta.ResourceVersion = endpointsOut.ObjectMeta.ResourceVersion
-	if !api.Semantic.DeepEqual(endpoints, &endpointsOut) {
-		t.Errorf("Unexpected endpoints: %#v, expected %#v", &endpointsOut, endpoints)
 	}
 }
 
