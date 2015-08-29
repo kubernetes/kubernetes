@@ -710,6 +710,7 @@ Complete this template for the scheduler pod:
         ],
         "livenessProbe": {
           "httpGet": {
+            "host" : "127.0.0.1",
             "path": "/healthz",
             "port": 10251
           },
@@ -766,6 +767,7 @@ Template for controller manager pod:
         ],
         "livenessProbe": {
           "httpGet": {
+            "host": "127.0.0.1",
             "path": "/healthz",
             "port": 10252
           },
