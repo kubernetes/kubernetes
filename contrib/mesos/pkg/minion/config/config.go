@@ -23,6 +23,8 @@ import (
 const (
 	DefaultLogMaxBackups   = 5 // how many backup to keep
 	DefaultLogMaxAgeInDays = 7 // after how many days to rotate at most
+
+	DefaultCgroupPrefix = "mesos"
 )
 
 // DefaultLogMaxSize returns the maximal log file size before rotation
