@@ -40,8 +40,43 @@ import (
 const (
 	HYPER_PROTO       = "unix"
 	HYPER_ADDR        = "/var/run/hyper.sock"
+	HYPER_SCHEME      = "http"
 	HYPER_MINVERSION  = "0.3.0"
 	DEFAULT_IMAGE_TAG = "latest"
+
+	KEY_ID             = "id"
+	KEY_IMAGEID        = "imageId"
+	KEY_IMAGENAME      = "imageName"
+	KEY_ITEM           = "item"
+	KEY_MEMORY         = "memory"
+	KEY_POD_ARGS       = "podArgs"
+	KEY_POD_ID         = "podId"
+	KEY_POD_NAME       = "podName"
+	KEY_RESOURCE       = "resource"
+	KEY_VCPU           = "vcpu"
+	KEY_TTY            = "tty"
+	KEY_TYPE           = "type"
+	KEY_VALUE          = "value"
+	KEY_NAME           = "name"
+	KEY_IMAGE          = "image"
+	KEY_VOLUMES        = "volumes"
+	KEY_CONTAINERS     = "containers"
+	KEY_VOLUME_SOURCE  = "source"
+	KEY_VOLUME_DRIVE   = "driver"
+	KEY_ENVS           = "envs"
+	KEY_CONTAINER_PORT = "containerPort"
+	KEY_HOST_PORT      = "hostPort"
+	KEY_PROTOCOL       = "protocol"
+	KEY_PORTS          = "ports"
+	KEY_MOUNTPATH      = "path"
+	KEY_READONLY       = "readOnly"
+	KEY_VOLUME         = "volume"
+	KEY_COMMAND        = "command"
+	KEY_CONTAINER_ARGS = "args"
+	KEY_WORKDIR        = "workdir"
+	VOLUME_TYPE_VFS    = "vfs"
+	TYPE_CONTAINER     = "container"
+	TYPE_POD           = "pod"
 )
 
 type HyperClient struct {
@@ -93,7 +128,7 @@ type hijackOptions struct {
 
 func NewHyperClient() *HyperClient {
 	var (
-		scheme = "http"
+		scheme = HYPER_SCHEME
 		proto  = HYPER_PROTO
 		addr   = HYPER_ADDR
 	)
@@ -287,7 +322,7 @@ func (client *HyperClient) Version() (string, error) {
 
 func (client *HyperClient) ListPods() ([]HyperPod, error) {
 	v := url.Values{}
-	v.Set("item", "pod")
+	v.Set(KEY_ITEM, TYPE_POD)
 	body, _, err := readBody(client.call("GET", "/list?"+v.Encode(), nil, nil))
 	if err != nil {
 		return nil, err
@@ -309,7 +344,7 @@ func (client *HyperClient) ListPods() ([]HyperPod, error) {
 		hyperPod.status = fields[3]
 
 		values := url.Values{}
-		values.Set("podName", hyperPod.podID)
+		values.Set(KEY_POD_NAME, hyperPod.podID)
 		body, _, err = readBody(client.call("GET", "/pod/info?"+values.Encode(), nil, nil))
 		if err != nil {
 			return nil, err
@@ -328,7 +363,7 @@ func (client *HyperClient) ListPods() ([]HyperPod, error) {
 
 func (client *HyperClient) ListContainers() ([]HyperContainer, error) {
 	v := url.Values{}
-	v.Set("item", "container")
+	v.Set(KEY_ITEM, TYPE_CONTAINER)
 	body, _, err := readBody(client.call("GET", "/list?"+v.Encode(), nil, nil))
 	if err != nil {
 		return nil, err
@@ -420,7 +455,7 @@ func (client *HyperClient) ListImages() ([]HyperImage, error) {
 
 func (client *HyperClient) RemoveImage(imageID string) error {
 	v := url.Values{}
-	v.Set("imageId", imageID)
+	v.Set(KEY_IMAGEID, imageID)
 	_, _, err := readBody(client.call("POST", "/images/remove?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
@@ -431,7 +466,7 @@ func (client *HyperClient) RemoveImage(imageID string) error {
 
 func (client *HyperClient) RemovePod(podID string) error {
 	v := url.Values{}
-	v.Set("podId", podID)
+	v.Set(KEY_POD_ID, podID)
 	_, _, err := readBody(client.call("POST", "/pod/remove?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
@@ -442,7 +477,7 @@ func (client *HyperClient) RemovePod(podID string) error {
 
 func (client *HyperClient) StartPod(podID string) error {
 	v := url.Values{}
-	v.Set("podId", podID)
+	v.Set(KEY_POD_ID, podID)
 	_, _, err := readBody(client.call("POST", "/pod/start?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
@@ -453,7 +488,7 @@ func (client *HyperClient) StartPod(podID string) error {
 
 func (client *HyperClient) StopPod(podID string) error {
 	v := url.Values{}
-	v.Set("podId", podID)
+	v.Set(KEY_POD_ID, podID)
 	v.Set("stopVM", "yes")
 	_, _, err := readBody(client.call("POST", "/pod/stop?"+v.Encode(), nil, nil))
 	if err != nil {
@@ -465,7 +500,7 @@ func (client *HyperClient) StopPod(podID string) error {
 
 func (client *HyperClient) PullImage(image string, credential string) error {
 	v := url.Values{}
-	v.Set("imageName", image)
+	v.Set(KEY_IMAGENAME, image)
 
 	headers := make(map[string][]string)
 	if credential != "" {
@@ -484,7 +519,7 @@ func (client *HyperClient) PullImage(image string, credential string) error {
 func (client *HyperClient) CreatePod(podArgs string) (map[string]interface{}, error) {
 	glog.V(5).Infof("Hyper: starting to create pod %s", podArgs)
 	v := url.Values{}
-	v.Set("podArgs", podArgs)
+	v.Set(KEY_POD_ARGS, podArgs)
 	body, _, err := readBody(client.call("POST", "/pod/create?"+v.Encode(), nil, nil))
 	if err != nil {
 		return nil, err
@@ -579,8 +614,8 @@ func (client *HyperClient) Attach(opts AttachToContainerOptions) error {
 	}
 
 	v := url.Values{}
-	v.Set("type", "container")
-	v.Set("value", opts.Container)
+	v.Set(KEY_TYPE, TYPE_CONTAINER)
+	v.Set(KEY_VALUE, opts.Container)
 	path := "/attach?" + v.Encode()
 	return client.hijack("POST", path, hijackOptions{
 		success:        opts.Success,

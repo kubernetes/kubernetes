@@ -319,69 +319,69 @@ func (r *runtime) buildHyperPod(pod *api.Pod, pullSecrets []api.Secret) ([]byte,
 	for name, volume := range volumeMap {
 		glog.V(4).Infof("Hyper: volume %s %s", name, volume.GetPath())
 		v := make(map[string]string)
-		v["name"] = name
-		v["source"] = volume.GetPath()
-		v["driver"] = "vfs"
+		v[KEY_NAME] = name
+		v[KEY_VOLUME_DRIVE] = VOLUME_TYPE_VFS
+		v[KEY_VOLUME_SOURCE] = volume.GetPath()
 		volumes = append(volumes, v)
 	}
-	specMap["volumes"] = volumes
+	specMap[KEY_VOLUMES] = volumes
 
 	// build hyper containers spec
 	var containers []map[string]interface{}
 	for _, container := range pod.Spec.Containers {
 		c := make(map[string]interface{})
-		c["name"] = r.buildHyperContainerFullName(
+		c[KEY_NAME] = r.buildHyperContainerFullName(
 			string(pod.UID),
 			string(pod.Name),
 			string(pod.Namespace),
 			container.Name,
 			container)
-		c["image"] = container.Image
-		c["tty"] = container.TTY
+		c[KEY_IMAGE] = container.Image
+		c[KEY_TTY] = container.TTY
 		if len(container.Command) > 0 {
-			c["command"] = container.Command
+			c[KEY_COMMAND] = container.Command
 		}
 		if container.WorkingDir != "" {
-			c["workdir"] = container.WorkingDir
+			c[KEY_WORKDIR] = container.WorkingDir
 		}
 		if len(container.Args) > 0 {
-			c["args"] = container.Args
+			c[KEY_CONTAINER_ARGS] = container.Args
 		}
 		if len(container.Env) > 0 {
-			c["envs"] = container.Env
+			c[KEY_ENVS] = container.Env
 		}
 
 		if len(container.Ports) > 0 {
 			var ports []map[string]interface{}
 			for _, port := range container.Ports {
 				p := make(map[string]interface{})
-				p["containerPort"] = port.ContainerPort
+				p[KEY_CONTAINER_PORT] = port.ContainerPort
 				if port.HostPort != 0 {
-					p["hostPort"] = port.HostPort
+					p[KEY_HOST_PORT] = port.HostPort
 				}
 				if port.Protocol != "" {
-					p["protocol"] = port.Protocol
+					p[KEY_PROTOCOL] = port.Protocol
 				}
 				ports = append(ports, p)
 			}
-			c["ports"] = ports
+			c[KEY_PORTS] = ports
 		}
 
 		if len(container.VolumeMounts) > 0 {
 			var containerVolumes []map[string]interface{}
 			for _, volume := range container.VolumeMounts {
 				v := make(map[string]interface{})
-				v["path"] = volume.MountPath
-				v["volume"] = volume.Name
-				v["readOnly"] = volume.ReadOnly
+				v[KEY_MOUNTPATH] = volume.MountPath
+				v[KEY_VOLUME] = volume.Name
+				v[KEY_READONLY] = volume.ReadOnly
 				containerVolumes = append(containerVolumes, v)
 			}
-			c["volumes"] = containerVolumes
+			c[KEY_VOLUMES] = containerVolumes
 		}
 
 		containers = append(containers, c)
 	}
-	specMap["containers"] = containers
+	specMap[KEY_CONTAINERS] = containers
 
 	// build hyper pod resources spec
 	var podCPULimit, podMemLimit int64
@@ -407,15 +407,15 @@ func (r *runtime) buildHyperPod(pod *api.Pod, pullSecrets []api.Secret) ([]byte,
 		podMemLimit += containerMemLimit
 	}
 
-	podResource["vcpu"] = (podCPULimit + 999) / 1000
-	podResource["memory"] = int64(hyperBaseMemory) + ((podMemLimit)/1000/1024)/1024
-	specMap["resource"] = podResource
-	glog.V(5).Infof("Hyper: pod limit vcpu=%v mem=%vMiB", podResource["vcpu"], podResource["memory"])
+	podResource[KEY_VCPU] = (podCPULimit + 999) / 1000
+	podResource[KEY_MEMORY] = int64(hyperBaseMemory) + ((podMemLimit)/1000/1024)/1024
+	specMap[KEY_RESOURCE] = podResource
+	glog.V(5).Infof("Hyper: pod limit vcpu=%v mem=%vMiB", podResource[KEY_VCPU], podResource[KEY_MEMORY])
 
 	// other params required
-	specMap["type"] = "pod"
-	specMap["id"] = r.buildHyperPodFullName(string(pod.UID), string(pod.Name), string(pod.Namespace))
-	specMap["tty"] = true
+	specMap[KEY_TYPE] = TYPE_POD
+	specMap[KEY_ID] = r.buildHyperPodFullName(string(pod.UID), string(pod.Name), string(pod.Namespace))
+	specMap[KEY_TTY] = true
 
 	podData, err := json.Marshal(specMap)
 	if err != nil {
