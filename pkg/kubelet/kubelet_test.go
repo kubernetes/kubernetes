@@ -329,6 +329,26 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	}
 }
 
+func TestSyncLoopAbort(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	kubelet.lastTimestampRuntimeUp = time.Now()
+	kubelet.networkConfigured = true
+
+	ch := make(chan PodUpdate)
+	close(ch)
+
+	// sanity check (also prevent this test from hanging in the next step)
+	ok := kubelet.syncLoopIteration(ch, kubelet)
+	if ok {
+		t.Fatalf("expected syncLoopIteration to return !ok since update chan was closed")
+	}
+
+	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
+	kubelet.syncLoop(ch, kubelet)
+}
+
 func TestSyncPodsStartPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
