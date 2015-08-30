@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"time"
 
@@ -51,6 +52,8 @@ type MinionServer struct {
 	exit           chan error    // to signal fatal errors
 
 	pathOverride string // the PATH environment for the sub-processes
+	cgroupPrefix string // e.g. mesos
+	cgroupRoot   string // e.g. /mesos/{container-id}, determined at runtime
 
 	logMaxSize      resource.Quantity
 	logMaxBackups   int
@@ -69,6 +72,7 @@ func NewMinionServer() *MinionServer {
 		done:                  make(chan struct{}),
 		exit:                  make(chan error),
 
+		cgroupPrefix:    config.DefaultCgroupPrefix,
 		logMaxSize:      config.DefaultLogMaxSize(),
 		logMaxBackups:   config.DefaultLogMaxBackups,
 		logMaxAgeInDays: config.DefaultLogMaxAgeInDays,
@@ -102,6 +106,22 @@ func filterArgsByFlagSet(args []string, flags *pflag.FlagSet) ([]string, []strin
 	return matched, notMatched
 }
 
+func findMesosCgroup(prefix string) string {
+	// derive our cgroup from MESOS_DIRECTORY environment
+	mesosDir := os.Getenv("MESOS_DIRECTORY")
+	if mesosDir == "" {
+		log.V(2).Infof("cannot derive executor's cgroup because MESOS_DIRECTORY is empty")
+		return ""
+	}
+
+	containerId := path.Base(mesosDir)
+	if containerId == "" {
+		log.V(2).Infof("cannot derive executor's cgroup from MESOS_DIRECTORY=%q", mesosDir)
+		return ""
+	}
+	return path.Join("/", prefix, containerId)
+}
+
 func (ms *MinionServer) launchProxyServer() {
 	bindAddress := "0.0.0.0"
 	if !ms.proxyBindall {
@@ -111,6 +131,7 @@ func (ms *MinionServer) launchProxyServer() {
 		fmt.Sprintf("--bind-address=%s", bindAddress),
 		fmt.Sprintf("--v=%d", ms.proxyLogV),
 		"--logtostderr=true",
+		"--resource-container=" + path.Join("/", ms.cgroupRoot, "kube-proxy"),
 	}
 
 	if ms.clientConfig.Host != "" {
@@ -131,6 +152,11 @@ func (ms *MinionServer) launchExecutorServer() {
 	executorFlags.SetOutput(ioutil.Discard)
 	ms.AddExecutorFlags(executorFlags)
 	executorArgs, _ := filterArgsByFlagSet(allArgs, executorFlags)
+
+	executorArgs = append(executorArgs, "--resource-container="+path.Join("/", ms.cgroupRoot, "kubelet"))
+	if ms.cgroupRoot != "" {
+		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
+	}
 
 	// run executor and quit minion server when this exits cleanly
 	err := ms.launchHyperkubeServer(hyperkube.CommandExecutor, &executorArgs, "executor.log")
@@ -257,6 +283,17 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 	ms.clientConfig = clientConfig
 
+	// derive the executor cgroup and use it as:
+	// - pod container cgroup root (e.g. docker cgroup-parent)
+	// - parent of kubelet container
+	// - parent of kube-proxy container
+	ms.cgroupRoot = findMesosCgroup(ms.cgroupPrefix)
+	cgroupLogger := log.Infof
+	if ms.cgroupRoot == "" {
+		cgroupLogger = log.Warningf
+	}
+	cgroupLogger("using cgroup-root %q", ms.cgroupRoot)
+
 	// run subprocesses until ms.done is closed on return of this function
 	defer close(ms.done)
 	if ms.runProxy {
@@ -275,6 +312,7 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	// general minion flags
+	fs.StringVar(&ms.cgroupPrefix, "mesos-cgroup-prefix", ms.cgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 	fs.BoolVar(&ms.privateMountNS, "private-mountns", ms.privateMountNS, "Enter a private mount NS before spawning procs (linux only). Experimental, not yet compatible with k8s volumes.")
 	fs.StringVar(&ms.pathOverride, "path-override", ms.pathOverride, "Override the PATH in the environment of the sub-processes.")
 
