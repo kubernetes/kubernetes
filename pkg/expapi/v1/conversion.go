@@ -212,7 +212,9 @@ func convert_v1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentSpec))(in)
 	}
-	out.Replicas = *in.Replicas
+	if in.Replicas != nil {
+		out.Replicas = *in.Replicas
+	}
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {

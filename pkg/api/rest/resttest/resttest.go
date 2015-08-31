@@ -445,7 +445,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, setFn SetFunc, 
 		toUpdate := update(copyOrDie(foo))
 		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdate)
 		if got != nil || created {
-			t.Errorf("expected nil object and no creation")
+			t.Errorf("expected nil object and no creation for object: %v", toUpdate)
 		}
 		if !errors.IsInvalid(err) && !errors.IsBadRequest(err) {
 			t.Errorf("expected invalid or bad request error, got %v", err)
