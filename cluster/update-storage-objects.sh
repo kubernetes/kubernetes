@@ -84,7 +84,7 @@ do
           echo "Looks like ${instance} got deleted. Ignoring it"
           continue
         fi
-        output=$("${KUBECTL}" update -f "${filename}" --namespace="${namespace}") || true
+        output=$("${KUBECTL}" replace -f "${filename}" --namespace="${namespace}") || true
         rm "${filename}"
         if [ -n "${output:-}" ]
         then
