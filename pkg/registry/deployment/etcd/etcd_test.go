@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"testing"
-	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
@@ -27,17 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-)
-
-const (
-	PASS = iota
-	FAIL
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
@@ -77,18 +69,12 @@ var validDeployment = *validNewDeployment()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	deployment := validNewDeployment()
 	deployment.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		deployment,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid (invalid selector)
 		&expapi.Deployment{
 			Spec: expapi.DeploymentSpec{
@@ -101,19 +87,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewDeployment(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*expapi.Deployment)
@@ -144,24 +121,40 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
-func TestEtcdGet(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewDeployment())
 }
 
-func TestEtcdList(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	test.TestList(
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewDeployment())
+}
+
+func TestWatch(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestWatch(
 		validNewDeployment(),
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"a": "c"},
+			{"foo": "bar"},
 		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matchin fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+	)
 }
 
 func TestEtcdDelete(t *testing.T) {
@@ -185,194 +178,6 @@ func TestEtcdDelete(t *testing.T) {
 	}
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-}
-
-func TestEtcdWatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	watching, err := storage.Watch(ctx,
-		labels.Everything(),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
-}
-
-// Tests that we can watch for the creation of Deployment with specified labels.
-func TestEtcdWatchWithLabels(t *testing.T) {
-	ctx := api.WithNamespace(api.NewDefaultContext(), validDeployment.Namespace)
-	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
-
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(validDeployment.Spec.Selector),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	// The watcher above is waiting for these Labels, on receiving them it should
-	// apply the deploymentStatus decorator, which lists pods, causing a query against
-	// the /registry/pods endpoint of the etcd client.
-	deployment := &expapi.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Labels:    validDeployment.Spec.Selector,
-			Namespace: "default",
-		},
-	}
-	deploymentBytes, _ := testapi.Codec().Encode(deployment)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(deploymentBytes),
-		},
-	}
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Error("unexpected timeout from result channel")
-	}
-	watching.Stop()
-}
-
-// Tests that we can watch for Deployment with specified fields.
-func TestEtcdWatchWithFields(t *testing.T) {
-	ctx := api.WithNamespace(api.NewDefaultContext(), validDeployment.Namespace)
-	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
-
-	testFieldMap := map[int][]fields.Set{
-		PASS: {
-			{"metadata.name": "foo"},
-		},
-		FAIL: {
-			{"metadata.name": "bar"},
-			{"name": "foo"},
-		},
-	}
-	testEtcdActions := []string{
-		etcdstorage.EtcdCreate,
-		etcdstorage.EtcdSet,
-		etcdstorage.EtcdCAS,
-		etcdstorage.EtcdDelete}
-
-	deployment := &expapi.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Labels:    validDeployment.Spec.Selector,
-			Namespace: "default",
-		},
-		Status: expapi.DeploymentStatus{
-			Replicas:        1,
-			UpdatedReplicas: 4,
-		},
-	}
-	deploymentBytes, _ := testapi.Codec().Encode(deployment)
-
-	for expectedResult, fieldSet := range testFieldMap {
-		for _, field := range fieldSet {
-			for _, action := range testEtcdActions {
-				watching, err := storage.Watch(ctx,
-					labels.Everything(),
-					field.AsSelector(),
-					"1",
-				)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				var prevNode *etcd.Node = nil
-				node := &etcd.Node{
-					Value: string(deploymentBytes),
-				}
-				if action == etcdstorage.EtcdDelete {
-					prevNode = node
-				}
-				fakeClient.WaitForWatchCompletion()
-				fakeClient.WatchResponse <- &etcd.Response{
-					Action:   action,
-					Node:     node,
-					PrevNode: prevNode,
-				}
-
-				select {
-				case r, ok := <-watching.ResultChan():
-					if expectedResult == FAIL {
-						t.Errorf("Unexpected result from channel %#v. Field: %v", r, field)
-					}
-					if !ok {
-						t.Errorf("watching channel should be open")
-					}
-				case <-time.After(time.Millisecond * 100):
-					if expectedResult == PASS {
-						t.Error("unexpected timeout from result channel")
-					}
-				}
-				watching.Stop()
-			}
-		}
-	}
-}
-
-func TestEtcdWatchNotMatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
-
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	deployment := &expapi.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"name": "bar",
-			},
-		},
-	}
-	deploymentBytes, _ := testapi.Codec().Encode(deployment)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(deploymentBytes),
-		},
-	}
-
-	select {
-	case <-watching.ResultChan():
-		t.Error("unexpected result from result channel")
-	case <-time.After(time.Millisecond * 100):
-		// expected case
 	}
 }
 

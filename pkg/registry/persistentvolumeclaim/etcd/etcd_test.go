@@ -67,18 +67,12 @@ func validChangedPersistentVolumeClaim() *api.PersistentVolumeClaim {
 
 func TestCreate(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	pv := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	pv.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		pv,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.PersistentVolumeClaim{
 			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
@@ -88,19 +82,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewPersistentVolumeClaim("foo", api.NamespaceDefault),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.PersistentVolumeClaim)
@@ -142,26 +127,16 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdGetPersistentVolumeClaims(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	claim := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	test.TestGet(claim)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
 }
 
-func TestEtcdListPersistentVolumeClaims(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	claim := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	test.TestList(
-		claim,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
 }
 
 func TestPersistentVolumeClaimsDecode(t *testing.T) {

@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -58,18 +57,12 @@ func validNewLimitRange() *api.LimitRange {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).GeneratesName()
+	test := registrytest.New(t, fakeClient, storage.Etcd).GeneratesName()
 	validLimitRange := validNewLimitRange()
 	validLimitRange.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		validLimitRange,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.LimitRange{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
@@ -79,19 +72,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validNewLimitRange(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.LimitRange)
@@ -111,4 +95,16 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 	)
+}
+
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewLimitRange())
+}
+
+func TestList(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewLimitRange())
 }

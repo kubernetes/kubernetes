@@ -79,18 +79,12 @@ var validController = validNewController()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	controller := validNewController()
 	controller.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		controller,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid (invalid selector)
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
@@ -104,20 +98,11 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewController(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
-		// updateFunc
+		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ReplicationController)
 			object.Spec.Replicas = object.Spec.Replicas + 1
@@ -191,40 +176,23 @@ func TestGenerationNumber(t *testing.T) {
 	}
 }
 
-func TestEtcdGetController(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewController())
 }
 
-func TestEtcdListControllers(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	test.TestList(
-		validNewController(),
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewController())
 }
 
-func TestWatchControllers(t *testing.T) {
+func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validController,
-		func() {
-			fakeClient.WaitForWatchCompletion()
-		},
-		func(err error) {
-			fakeClient.WatchInjectError <- err
-		},
-		func(obj runtime.Object, action string) error {
-			return registrytest.EmitObject(fakeClient, obj, action)
-		},
 		// matching labels
 		[]labels.Set{
 			{"a": "b"},
@@ -248,7 +216,6 @@ func TestWatchControllers(t *testing.T) {
 			{"status.replicas": "10", "metadata.name": "foo"},
 			{"status.replicas": "0", "metadata.name": "bar"},
 		},
-		registrytest.WatchActions,
 	)
 }
 

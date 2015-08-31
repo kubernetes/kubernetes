@@ -48,7 +48,7 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 	return r.store.Update(ctx, obj)
 }
 
-// NewStorage returns a RESTStorage object that will work against nodes.
+// NewREST returns a RESTStorage object that will work against nodes.
 func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
 	prefix := "/minions"
 

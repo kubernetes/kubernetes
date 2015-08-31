@@ -22,7 +22,11 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -37,12 +41,166 @@ func NewEtcdStorage(t *testing.T) (storage.Interface, *tools.FakeEtcdClient) {
 	return etcdStorage, fakeClient
 }
 
-var WatchActions = []string{etcdstorage.EtcdCreate, etcdstorage.EtcdSet, etcdstorage.EtcdCAS, etcdstorage.EtcdDelete}
+type Tester struct {
+	tester     *resttest.Tester
+	fakeClient *tools.FakeEtcdClient
+	storage    *etcdgeneric.Etcd
+}
+type UpdateFunc func(runtime.Object) runtime.Object
 
-type keyFunc func(api.Context, string) (string, error)
-type newFunc func() runtime.Object
+func New(t *testing.T, fakeClient *tools.FakeEtcdClient, storage *etcdgeneric.Etcd) *Tester {
+	return &Tester{
+		tester:     resttest.New(t, storage, fakeClient.SetError),
+		fakeClient: fakeClient,
+		storage:    storage,
+	}
+}
 
-func EmitObject(fakeClient *tools.FakeEtcdClient, obj runtime.Object, action string) error {
+func (t *Tester) TestNamespace() string {
+	return t.tester.TestNamespace()
+}
+
+func (t *Tester) ClusterScope() *Tester {
+	t.tester = t.tester.ClusterScope()
+	return t
+}
+
+func (t *Tester) AllowCreateOnUpdate() *Tester {
+	t.tester = t.tester.AllowCreateOnUpdate()
+	return t
+}
+
+func (t *Tester) GeneratesName() *Tester {
+	t.tester = t.tester.GeneratesName()
+	return t
+}
+
+func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
+	t.tester.TestCreate(
+		valid,
+		t.setObject,
+		t.getObject,
+		invalid...,
+	)
+}
+
+func (t *Tester) TestUpdate(valid runtime.Object, validUpdateFunc UpdateFunc, invalidUpdateFunc ...UpdateFunc) {
+	var invalidFuncs []resttest.UpdateFunc
+	for _, f := range invalidUpdateFunc {
+		invalidFuncs = append(invalidFuncs, resttest.UpdateFunc(f))
+	}
+	t.tester.TestUpdate(
+		valid,
+		t.setObject,
+		t.setResourceVersion,
+		t.getObject,
+		resttest.UpdateFunc(validUpdateFunc),
+		invalidFuncs...,
+	)
+}
+
+func (t *Tester) TestGet(valid runtime.Object) {
+	t.tester.TestGet(valid)
+}
+
+func (t *Tester) TestList(valid runtime.Object) {
+	t.tester.TestList(
+		valid,
+		t.setObjectsForList,
+		t.setResourceVersion,
+	)
+}
+
+func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels.Set, fieldsPass, fieldsFail []fields.Set) {
+	t.tester.TestWatch(
+		valid,
+		t.fakeClient.WaitForWatchCompletion,
+		t.injectWatchError,
+		t.emitObject,
+		labelsPass,
+		labelsFail,
+		fieldsPass,
+		fieldsFail,
+		[]string{etcdstorage.EtcdCreate, etcdstorage.EtcdSet, etcdstorage.EtcdCAS, etcdstorage.EtcdDelete},
+	)
+}
+
+// =============================================================================
+// Helper functions
+
+func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return nil, err
+	}
+	key, err := t.storage.KeyFunc(ctx, meta.Name)
+	if err != nil {
+		return nil, err
+	}
+	key = etcdtest.AddPrefix(key)
+	resp, err := t.fakeClient.Get(key, false, false)
+	if err != nil {
+		return nil, err
+	}
+	result := t.storage.NewFunc()
+	if err := testapi.Codec().DecodeInto([]byte(resp.Node.Value), result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return err
+	}
+	key, err := t.storage.KeyFunc(ctx, meta.Name)
+	if err != nil {
+		return err
+	}
+	key = etcdtest.AddPrefix(key)
+	_, err = t.fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), obj), 0)
+	return err
+}
+
+func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
+	result := make([]runtime.Object, len(objects))
+	key := etcdtest.AddPrefix(t.storage.KeyRootFunc(t.tester.TestContext()))
+
+	if len(objects) > 0 {
+		nodes := make([]*etcd.Node, len(objects))
+		for i, obj := range objects {
+			encoded := runtime.EncodeOrDie(testapi.Codec(), obj)
+			decoded, _ := testapi.Codec().Decode([]byte(encoded))
+			nodes[i] = &etcd.Node{Value: encoded}
+			result[i] = decoded
+		}
+		t.fakeClient.Data[key] = tools.EtcdResponseWithError{
+			R: &etcd.Response{
+				Node: &etcd.Node{
+					Nodes: nodes,
+				},
+			},
+			E: nil,
+		}
+	} else {
+		t.fakeClient.Data[key] = tools.EtcdResponseWithError{
+			R: &etcd.Response{},
+			E: t.fakeClient.NewError(tools.EtcdErrorCodeNotFound),
+		}
+	}
+	return result
+}
+
+func (t *Tester) setResourceVersion(resourceVersion uint64) {
+	t.fakeClient.ChangeIndex = resourceVersion
+}
+
+func (t *Tester) injectWatchError(err error) {
+	t.fakeClient.WatchInjectError <- err
+}
+
+func (t *Tester) emitObject(obj runtime.Object, action string) error {
 	encoded, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		return err
@@ -54,76 +212,10 @@ func EmitObject(fakeClient *tools.FakeEtcdClient, obj runtime.Object, action str
 	if action == etcdstorage.EtcdDelete {
 		prevNode = node
 	}
-	fakeClient.WatchResponse <- &etcd.Response{
+	t.fakeClient.WatchResponse <- &etcd.Response{
 		Action:   action,
 		Node:     node,
 		PrevNode: prevNode,
 	}
 	return nil
-}
-
-func GetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, newFn newFunc, ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	meta, err := api.ObjectMetaFor(obj)
-	if err != nil {
-		return nil, err
-	}
-	key, err := keyFn(ctx, meta.Name)
-	if err != nil {
-		return nil, err
-	}
-	key = etcdtest.AddPrefix(key)
-	resp, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		return nil, err
-	}
-	result := newFn()
-	if err := testapi.Codec().DecodeInto([]byte(resp.Node.Value), result); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-func SetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, ctx api.Context, obj runtime.Object) error {
-	meta, err := api.ObjectMetaFor(obj)
-	if err != nil {
-		return err
-	}
-	key, err := keyFn(ctx, meta.Name)
-	if err != nil {
-		return err
-	}
-	key = etcdtest.AddPrefix(key)
-	_, err = fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), obj), 0)
-	return err
-}
-
-func SetObjectsForKey(fakeClient *tools.FakeEtcdClient, key string, objects []runtime.Object) []runtime.Object {
-	result := make([]runtime.Object, len(objects))
-	if len(objects) > 0 {
-		nodes := make([]*etcd.Node, len(objects))
-		for i, obj := range objects {
-			encoded := runtime.EncodeOrDie(testapi.Codec(), obj)
-			decoded, _ := testapi.Codec().Decode([]byte(encoded))
-			nodes[i] = &etcd.Node{Value: encoded}
-			result[i] = decoded
-		}
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Nodes: nodes,
-				},
-			},
-			E: nil,
-		}
-	} else {
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{},
-			E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-		}
-	}
-	return result
-}
-
-func SetResourceVersion(fakeClient *tools.FakeEtcdClient, resourceVersion uint64) {
-	fakeClient.ChangeIndex = resourceVersion
 }
