@@ -64,8 +64,12 @@ $ kubectl label pods foo bar-`
 
 func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
-	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
-	validArgs := p.HandledResources()
+	validArgs := []string{}
+	p, err := f.Printer(nil, false, false, false, false, []string{})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
+	}
 
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",

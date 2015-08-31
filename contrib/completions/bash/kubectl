@@ -848,6 +848,7 @@ _kubectl_label()
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
     must_have_one_noun+=("serviceaccount")
+    must_have_one_noun+=("thirdpartyresource")
 }
 
 _kubectl_annotate()
