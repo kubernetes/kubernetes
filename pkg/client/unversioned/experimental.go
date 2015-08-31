@@ -119,9 +119,7 @@ func NewExperimentalOrDie(c *Config) *ExperimentalClient {
 }
 
 func setExperimentalDefaults(config *Config) error {
-	if config.Prefix == "" {
-		config.Prefix = "/experimental"
-	}
+	config.Prefix = "/experimental"
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
