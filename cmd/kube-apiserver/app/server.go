@@ -74,7 +74,6 @@ type APIServer struct {
 	TLSPrivateKeyFile          string
 	CertDirectory              string
 	APIPrefix                  string
-	ExpAPIPrefix               string
 	StorageVersion             string
 	ExpStorageVersion          string
 	CloudProvider              string
@@ -125,7 +124,6 @@ func NewAPIServer() *APIServer {
 		APIRate:                10.0,
 		APIBurst:               200,
 		APIPrefix:              "/api",
-		ExpAPIPrefix:           "/experimental",
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
@@ -186,7 +184,6 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
-	fs.StringVar(&s.ExpAPIPrefix, "experimental-prefix", s.ExpAPIPrefix, "The prefix for experimental API requests on the server. Default '/experimental'.")
 	fs.StringVar(&s.StorageVersion, "storage-version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
@@ -332,7 +329,7 @@ func (s *APIServer) Run(_ []string) error {
 
 	// "experimental/v1={true|false} allows users to enable/disable the experimental API.
 	// This takes preference over api/all, if specified.
-	enableExp := s.getRuntimeConfigValue("experimental/v1", false)
+	enableExp := s.getRuntimeConfigValue("experimental/v1alpha1", false)
 
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -347,9 +344,13 @@ func (s *APIServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
-	expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, explatest.InterfacesFor, explatest.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
-	if err != nil {
-		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+
+	var expEtcdStorage storage.Interface
+	if explatest.Version != "" {
+		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, explatest.InterfacesFor, explatest.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
+		if err != nil {
+			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+		}
 	}
 
 	n := s.ServiceClusterIPRange
@@ -431,7 +432,6 @@ func (s *APIServer) Run(_ []string) error {
 		EnableProfiling:        s.EnableProfiling,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
-		ExpAPIPrefix:           s.ExpAPIPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadWritePort:          s.SecurePort,
 		PublicAddress:          s.AdvertiseAddress,

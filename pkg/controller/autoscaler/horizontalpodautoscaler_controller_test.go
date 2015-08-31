@@ -54,6 +54,7 @@ const (
 )
 
 type serverResponse struct {
+	group      string
 	statusCode int
 	obj        interface{}
 }
@@ -66,7 +67,7 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	mkHandler := func(url string, response serverResponse) *util.FakeHandler {
 		handler := util.FakeHandler{
 			StatusCode:   response.statusCode,
-			ResponseBody: runtime.EncodeOrDie(testapi.Codec(), response.obj.(runtime.Object)),
+			ResponseBody: runtime.EncodeOrDie(testapi.Codec(response.group), response.obj.(runtime.Object)),
 		}
 		mux.Handle(url, &handler)
 		glog.Infof("Will handle %s", url)
@@ -84,12 +85,12 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	}
 
 	if responses[hpaListHandler] != nil {
-		handlers[hpaListHandler] = mkHandler("/experimental/v1/horizontalpodautoscalers", *responses[hpaListHandler])
+		handlers[hpaListHandler] = mkHandler("/api/experimental/"+testapi.Version("experimental")+"/horizontalpodautoscalers", *responses[hpaListHandler])
 	}
 
 	if responses[scaleHandler] != nil {
 		handlers[scaleHandler] = mkHandler(
-			fmt.Sprintf("/experimental/v1/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
+			fmt.Sprintf("/api/experimental/"+testapi.Version("experimental")+"/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
 	}
 
 	if responses[podListHandler] != nil {
@@ -98,12 +99,12 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 
 	if responses[heapsterHandler] != nil {
 		handlers[heapsterHandler] = mkRawHandler(
-			fmt.Sprintf("/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster/api/v1/model/namespaces/%s/pod-list/%s/metrics/cpu-usage",
+			fmt.Sprintf("/api/"+testapi.Version("")+"/proxy/namespaces/kube-system/services/monitoring-heapster/api/v1/model/namespaces/%s/pod-list/%s/metrics/cpu-usage",
 				namespace, podName), *responses[heapsterHandler])
 	}
 
 	if responses[updateHpaHandler] != nil {
-		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/experimental/v1/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
+		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/api/experimental/"+testapi.Version("experimental")+"/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
 			*responses[updateHpaHandler])
 	}
 
@@ -116,7 +117,7 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 
 func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 
-	hpaResponse := serverResponse{http.StatusOK, &expapi.HorizontalPodAutoscalerList{
+	hpaResponse := serverResponse{"experimental", http.StatusOK, &expapi.HorizontalPodAutoscalerList{
 		Items: []expapi.HorizontalPodAutoscaler{
 			{
 				ObjectMeta: api.ObjectMeta{
@@ -136,7 +137,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 				},
 			}}}}
 
-	scaleResponse := serverResponse{http.StatusOK, &expapi.Scale{
+	scaleResponse := serverResponse{"experimental", http.StatusOK, &expapi.Scale{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rcName,
 			Namespace: namespace,
@@ -150,7 +151,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		},
 	}}
 
-	podListResponse := serverResponse{http.StatusOK, &api.PodList{
+	podListResponse := serverResponse{"", http.StatusOK, &api.PodList{
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{
@@ -169,7 +170,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		CurrentReplicas: 1,
 		DesiredReplicas: 3,
 	}
-	updateHpaResponse := serverResponse{http.StatusOK, &expapi.HorizontalPodAutoscaler{
+	updateHpaResponse := serverResponse{"experimental", http.StatusOK, &expapi.HorizontalPodAutoscaler{
 
 		ObjectMeta: api.ObjectMeta{
 			Name:      hpaName,
@@ -191,7 +192,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 
 	heapsterRawResponse, _ := json.Marshal(&metrics)
 	heapsterStrResponse := string(heapsterRawResponse)
-	heapsterResponse := serverResponse{http.StatusOK, &heapsterStrResponse}
+	heapsterResponse := serverResponse{"", http.StatusOK, &heapsterStrResponse}
 
 	testServer, handlers := makeTestServer(t,
 		map[string]*serverResponse{
@@ -203,8 +204,9 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		})
 
 	defer testServer.Close()
+	fmt.Println("CHAO: testServer.URL", testServer.URL)
 	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.GroupAndVersion("experimental")})
 
 	hpaController := New(kubeClient, expClient)
 	err := hpaController.reconcileAutoscalers()

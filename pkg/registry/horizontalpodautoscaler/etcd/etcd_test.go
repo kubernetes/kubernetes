@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
 	// Ensure that expapi/v1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	_ "k8s.io/kubernetes/pkg/expapi/v1alpha1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -35,7 +35,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "experimental")
 	return NewREST(etcdStorage), fakeClient
 }
 
@@ -65,10 +65,10 @@ func TestCreate(t *testing.T) {
 		// valid
 		autoscaler,
 		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj, "experimental")
 		},
 		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj, "experimental")
 		},
 		// invalid
 		&expapi.HorizontalPodAutoscaler{},
@@ -82,13 +82,13 @@ func TestUpdate(t *testing.T) {
 		// valid
 		validNewHorizontalPodAutoscaler("foo"),
 		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj, "experimental")
 		},
 		func(resourceVersion uint64) {
 			registrytest.SetResourceVersion(fakeClient, resourceVersion)
 		},
 		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj, "experimental")
 		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
@@ -110,7 +110,7 @@ func TestDelete(t *testing.T) {
 		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), autoscaler),
+					Value:         runtime.EncodeOrDie(testapi.Codec("experimental"), autoscaler),
 					ModifiedIndex: 1,
 				},
 			},
@@ -141,7 +141,7 @@ func TestList(t *testing.T) {
 	test.TestList(
 		autoscaler,
 		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
+			return registrytest.SetObjectsForKey(fakeClient, key, objects, "experimental")
 		},
 		func(resourceVersion uint64) {
 			registrytest.SetResourceVersion(fakeClient, resourceVersion)

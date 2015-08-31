@@ -53,7 +53,7 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Comma separated list of API Versions that should be tested.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
 # Run tests with the standard (registry) and a custom etcd prefix
 # (kubernetes.io/registry).
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
@@ -131,7 +131,8 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_API_VERSION}_$(kube::util::sortable_date)"
+  local KUBE_TEST_API_NO_SLASH=echo "${KUBE_TEST_API//\//-}"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
 }
 
 produceJUnitXMLReport() {
@@ -205,7 +206,7 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_API_VERSION}/$(kube::util::sortable_date)"
+  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API}/$(kube::util::sortable_date)"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
@@ -266,7 +267,7 @@ reportCoverageToCoveralls() {
 }
 
 # Convert the CSVs to arrays.
-IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
 apiVersionsCount=${#apiVersions[@]}
 etcdPrefixesCount=${#etcdPrefixes[@]}
@@ -274,7 +275,7 @@ for (( i=0, j=0; ; )); do
   apiVersion=${apiVersions[i]}
   etcdPrefix=${etcdPrefixes[j]}
   echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
-  KUBE_API_VERSION="${apiVersion}" KUBE_API_VERSIONS="v1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1,experimental/v1alpha1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then

@@ -67,7 +67,7 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	// Create the WebService.
 	ws = a.newWebService()
 
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.GroupVersion, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
@@ -88,11 +88,11 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 func (a *APIInstaller) newWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
-	ws.Doc("API at " + a.prefix + " version " + a.group.Version)
+	ws.Doc("API at " + a.prefix + " version " + a.group.GroupVersion)
 	// TODO: change to restful.MIME_JSON when we set content type in client
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
-	ws.ApiVersion(a.group.Version)
+	ws.ApiVersion(a.group.GroupVersion)
 
 	return ws
 }
@@ -103,7 +103,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	serverVersion := a.group.ServerVersion
 	if len(serverVersion) == 0 {
-		serverVersion = a.group.Version
+		serverVersion = a.group.GroupVersion
 	}
 
 	var resource, subresource string
@@ -123,13 +123,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return err
 	}
-	versionedPtr, err := a.group.Creater.New(a.group.Version, kind)
+	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion, kind)
 	if err != nil {
 		return err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
+	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.GroupVersion)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
+		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.GroupVersion)
 		if err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isLister {
 		list := lister.NewList()
 		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion, listKind)
 		if err != nil {
 			return err
 		}
@@ -368,7 +368,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:          a.group.Creater,
 		Convertor:        a.group.Convertor,
 		Codec:            mapping.Codec,
-		APIVersion:       a.group.Version,
+		APIVersion:       a.group.GroupVersion,
 		ServerAPIVersion: serverVersion,
 		Resource:         resource,
 		Subresource:      subresource,
@@ -484,6 +484,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "create " + subresource + " of a " + kind
 			}
+			fmt.Println("Post action.Path", action.Path)
 			route := ws.POST(action.Path).To(handler).
 				Filter(m).
 				Doc(doc).

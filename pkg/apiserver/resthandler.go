@@ -88,7 +88,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		ctx := scope.ContextFunc(req)
@@ -96,11 +96,11 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 
 		result, err := getter(ctx, name, req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
@@ -149,14 +149,14 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 		opts, err := getRequestOptions(req, scope, connectOptionsKind, subpath, subpathKey)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		if admit.Handles(admission.Connect) {
@@ -169,19 +169,19 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 
 			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 		}
 		handler, err := connecter.Connect(ctx, name, opts)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		handler.ServeHTTP(w, req.Request)
 		err = handler.RequestError()
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 	}
@@ -194,7 +194,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -211,7 +211,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		out, err := queryToObject(req.Request.URL.Query(), scope, "ListOptions")
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		opts := *out.(*api.ListOptions)
@@ -224,7 +224,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
 			// TODO: allow bad request to set field causes based on query parameters
 			err = errors.NewBadRequest(err.Error())
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -241,6 +241,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				// single object.
 				errorJSON(
 					errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."),
+					scope.APIVersion,
 					scope.Codec,
 					w,
 				)
@@ -252,7 +253,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		if (opts.Watch || forceWatch) && rw != nil {
 			watcher, err := rw.Watch(ctx, opts.LabelSelector, opts.FieldSelector, opts.ResourceVersion)
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 			serveWatch(watcher, scope, w, req, minRequestTimeout)
@@ -261,11 +262,11 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		result, err := r.List(ctx, opts.LabelSelector, opts.FieldSelector)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		if err := setListSelfLink(result, req, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
@@ -289,7 +290,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			namespace, err = scope.Namer.Namespace(req)
 		}
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -298,14 +299,14 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		body, err := readBody(req.Request)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		obj := r.New()
 		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -314,7 +315,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 		}
@@ -327,12 +328,12 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return out, err
 		})
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -371,7 +372,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -385,46 +386,46 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 		}
 
 		versionedObj, err := converter.ConvertToVersion(obj, scope.APIVersion)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		original, err := r.Get(ctx, name)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		originalObjJS, err := scope.Codec.Encode(original)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		patchJS, err := readBody(req.Request)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		contentType := req.HeaderParameter("Content-Type")
 		patchedObjJS, err := getPatchedJS(contentType, originalObjJS, patchJS, versionedObj)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		if err := scope.Codec.DecodeInto(patchedObjJS, obj); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -434,12 +435,12 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return obj, err
 		})
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -457,7 +458,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		ctx := scope.ContextFunc(req)
@@ -465,19 +466,19 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 
 		body, err := readBody(req.Request)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		obj := r.New()
 		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -486,7 +487,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 		}
@@ -498,12 +499,12 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return obj, err
 		})
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -525,7 +526,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 		ctx := scope.ContextFunc(req)
@@ -535,12 +536,12 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		if checkBody {
 			body, err := readBody(req.Request)
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 			if len(body) > 0 {
 				if err := scope.Codec.DecodeInto(body, options); err != nil {
-					errorJSON(err, scope.Codec, w)
+					errorJSON(err, scope.APIVersion, scope.Codec, w)
 					return
 				}
 			}
@@ -551,7 +552,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
-				errorJSON(err, scope.Codec, w)
+				errorJSON(err, scope.APIVersion, scope.Codec, w)
 				return
 			}
 		}
@@ -560,7 +561,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			return r.Delete(ctx, name, options)
 		})
 		if err != nil {
-			errorJSON(err, scope.Codec, w)
+			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
 
@@ -579,7 +580,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			// when a non-status response is returned, set the self link
 			if _, ok := result.(*api.Status); !ok {
 				if err := setSelfLink(result, req, scope.Namer); err != nil {
-					errorJSON(err, scope.Codec, w)
+					errorJSON(err, scope.APIVersion, scope.Codec, w)
 					return
 				}
 			}

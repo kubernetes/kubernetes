@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -82,6 +83,7 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 
 	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
 	mapper, typer := f.Object()
+	fmt.Println(reflect.TypeOf(mapper))
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		Schema(schema).
 		ContinueOnError().
