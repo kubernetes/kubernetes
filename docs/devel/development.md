@@ -168,7 +168,7 @@ export GOPATH=$KPATH
 3) Populate your new GOPATH.
 
 ```sh
-cd $KPATH/src/github.com/kubernetes/kubernetes
+cd $KPATH/src/k8s.io/kubernetes
 godep restore
 ```
 
