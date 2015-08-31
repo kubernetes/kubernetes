@@ -67,7 +67,7 @@ spec:
     spec:
       containers:
       - name: es
-        image: kubernetes/elasticsearch:1.1
+        image: kubernetes/elasticsearch:1.2
         env:
           - name: "CLUSTER_NAME"
             value: "mytunes-db"
@@ -126,7 +126,7 @@ Let's check to see if the replication controller and pods are running:
 ```console
 $ kubectl get rc,pods --namespace=mytunes
 CONTROLLER   CONTAINER(S)   IMAGE(S)                       SELECTOR        REPLICAS
-music-db     es             kubernetes/elasticsearch:1.1   name=music-db   4
+music-db     es             kubernetes/elasticsearch:1.2   name=music-db   4
 NAME             READY     STATUS    RESTARTS   AGE
 music-db-5p46b   1/1       Running   0          34s
 music-db-8re0f   1/1       Running   0          34s
@@ -199,7 +199,7 @@ music-db-8re0f   1/1       Running   0          7m
 music-db-eq8j0   1/1       Running   0          7m
 music-db-uq5px   1/1       Running   0          7m
 CONTROLLER   CONTAINER(S)   IMAGE(S)                       SELECTOR        REPLICAS
-music-db     es             kubernetes/elasticsearch:1.1   name=music-db   4
+music-db     es             kubernetes/elasticsearch:1.2   name=music-db   4
 NAME           LABELS          SELECTOR        IP(S)             PORT(S)
 music-server   name=music-db   name=music-db   10.0.185.179      9200/TCP
                                                104.197.114.130   
