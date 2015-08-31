@@ -18,8 +18,7 @@ export CLUSTER_NAME=${CLUSTER_NAME:-elasticsearch-default}
 export NODE_MASTER=${NODE_MASTER:-true}
 export NODE_DATA=${NODE_DATA:-true}
 export MULTICAST=${MULTICAST:-false}
-readonly TOKEN=$(cat /etc/apiserver-secret/token)
-/elasticsearch_discovery --namespace="${NAMESPACE}" --token="${TOKEN}" --selector="${SELECTOR}" >> /elasticsearch-1.5.2/config/elasticsearch.yml
+/elasticsearch_discovery --namespace="${NAMESPACE}" --selector="${SELECTOR}" >> /elasticsearch-1.5.2/config/elasticsearch.yml
 export HTTP_PORT=${HTTP_PORT:-9200}
 export TRANSPORT_PORT=${TRANSPORT_PORT:-9300}
 /elasticsearch-1.5.2/bin/elasticsearch
