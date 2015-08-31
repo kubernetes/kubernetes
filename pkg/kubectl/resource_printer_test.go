@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -1219,5 +1220,41 @@ func TestTranslateTimestamp(t *testing.T) {
 			t.Errorf("On %v, expected '%v', but got '%v'",
 				test.name, test.exp, test.got)
 		}
+	}
+}
+
+func TestPrintDeployment(t *testing.T) {
+	tests := []struct {
+		deployment expapi.Deployment
+		expect     string
+	}{
+		{
+			expapi.Deployment{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: util.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: expapi.DeploymentSpec{
+					Replicas: 5,
+					Template: &api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: expapi.DeploymentStatus{
+					Replicas:        10,
+					UpdatedReplicas: 2,
+				},
+			},
+			"test1\t2/5\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printDeployment(&test.deployment, buf, false, false, true, []string{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
 	}
 }
