@@ -1788,8 +1788,10 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 		}
 	case e := <-plegCh:
 		pod, ok := kl.podManager.GetPodByUID(e.ID)
-		if !ok {
+		if !ok || e.Type == pleg.ContainerStarted || e.Type == pleg.NetworkSetupCompleted {
 			// If the pod no longer exists, ignore the event.
+			// Also ignore "succeeded" events for now until pod workers can
+			// properly filter out their expectations.
 			glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
 			break
 		}
