@@ -42,11 +42,11 @@ func (m *MockScheduler) slaveFor(id string) (slave *Slave, ok bool) {
 	ok = args.Bool(1)
 	return
 }
-func (m *MockScheduler) algorithm() (f PodScheduleFunc) {
+func (m *MockScheduler) algorithm() (f PodScheduler) {
 	args := m.Called()
 	x := args.Get(0)
 	if x != nil {
-		f = x.(PodScheduleFunc)
+		f = x.(PodScheduler)
 	}
 	return
 }

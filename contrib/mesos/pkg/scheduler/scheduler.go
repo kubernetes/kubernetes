@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -118,19 +117,17 @@ type KubernetesScheduler struct {
 	// and the invoking the pod registry interfaces.
 	// In particular, changes to podtask.T objects are currently guarded by this lock.
 	*sync.RWMutex
+	PodScheduler
 
 	// Config related, write-once
 
-	schedcfg                 *schedcfg.Config
-	executor                 *mesos.ExecutorInfo
-	executorGroup            uint64
-	scheduleFunc             PodScheduleFunc
-	client                   *client.Client
-	etcdClient               tools.EtcdClient
-	failoverTimeout          float64 // in seconds
-	reconcileInterval        int64
-	defaultContainerCPULimit mresource.CPUShares
-	defaultContainerMemLimit mresource.MegaBytes
+	schedcfg          *schedcfg.Config
+	executor          *mesos.ExecutorInfo
+	executorGroup     uint64
+	client            *client.Client
+	etcdClient        tools.EtcdClient
+	failoverTimeout   float64 // in seconds
+	reconcileInterval int64
 
 	// Mesos context.
 
@@ -157,33 +154,29 @@ type KubernetesScheduler struct {
 }
 
 type Config struct {
-	Schedcfg                 schedcfg.Config
-	Executor                 *mesos.ExecutorInfo
-	ScheduleFunc             PodScheduleFunc
-	Client                   *client.Client
-	EtcdClient               tools.EtcdClient
-	FailoverTimeout          float64
-	ReconcileInterval        int64
-	ReconcileCooldown        time.Duration
-	DefaultContainerCPULimit mresource.CPUShares
-	DefaultContainerMemLimit mresource.MegaBytes
+	Schedcfg          schedcfg.Config
+	Executor          *mesos.ExecutorInfo
+	Scheduler         PodScheduler
+	Client            *client.Client
+	EtcdClient        tools.EtcdClient
+	FailoverTimeout   float64
+	ReconcileInterval int64
+	ReconcileCooldown time.Duration
 }
 
 // New creates a new KubernetesScheduler
 func New(config Config) *KubernetesScheduler {
 	var k *KubernetesScheduler
 	k = &KubernetesScheduler{
-		schedcfg:                 &config.Schedcfg,
-		RWMutex:                  new(sync.RWMutex),
-		executor:                 config.Executor,
-		executorGroup:            uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
-		scheduleFunc:             config.ScheduleFunc,
-		client:                   config.Client,
-		etcdClient:               config.EtcdClient,
-		failoverTimeout:          config.FailoverTimeout,
-		reconcileInterval:        config.ReconcileInterval,
-		defaultContainerCPULimit: config.DefaultContainerCPULimit,
-		defaultContainerMemLimit: config.DefaultContainerMemLimit,
+		schedcfg:          &config.Schedcfg,
+		RWMutex:           new(sync.RWMutex),
+		executor:          config.Executor,
+		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
+		PodScheduler:      config.Scheduler,
+		client:            config.Client,
+		etcdClient:        config.EtcdClient,
+		failoverTimeout:   config.FailoverTimeout,
+		reconcileInterval: config.ReconcileInterval,
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				// filter the offers: the executor IDs must not identify a kubelet-
