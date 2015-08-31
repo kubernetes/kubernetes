@@ -95,6 +95,11 @@ func (self *MockContainerHandler) GetCgroupPath(path string) (string, error) {
 	return args.Get(0).(string), args.Error(1)
 }
 
+func (self *MockContainerHandler) GetContainerLabels() map[string]string {
+	args := self.Called()
+	return args.Get(0).(map[string]string)
+}
+
 type FactoryForMockContainerHandler struct {
 	Name                        string
 	PrepareContainerHandlerFunc func(name string, handler *MockContainerHandler)

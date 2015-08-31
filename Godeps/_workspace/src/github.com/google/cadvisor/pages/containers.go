@@ -18,7 +18,6 @@ package pages
 import (
 	"fmt"
 	"html/template"
-	"math"
 	"net/http"
 	"net/url"
 	"path"
@@ -149,15 +148,19 @@ func toMegabytes(bytes uint64) float64 {
 	return float64(bytes) / (1 << 20)
 }
 
+// Size after which we consider memory to be "unlimited". This is not
+// MaxInt64 due to rounding by the kernel.
+const maxMemorySize = uint64(1 << 62)
+
 func printSize(bytes uint64) string {
-	if bytes >= math.MaxInt64 {
+	if bytes >= maxMemorySize {
 		return "unlimited"
 	}
 	return ByteSize(bytes).Size()
 }
 
 func printUnit(bytes uint64) string {
-	if bytes >= math.MaxInt64 {
+	if bytes >= maxMemorySize {
 		return ""
 	}
 	return ByteSize(bytes).Unit()
@@ -228,20 +231,21 @@ func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) e
 	}
 
 	data := &pageData{
-		DisplayName:        displayName,
-		ContainerName:      cont.Name,
-		ParentContainers:   parentContainers,
-		Subcontainers:      subcontainerLinks,
-		Spec:               cont.Spec,
-		Stats:              cont.Stats,
-		MachineInfo:        machineInfo,
-		IsRoot:             cont.Name == "/",
-		ResourcesAvailable: cont.Spec.HasCpu || cont.Spec.HasMemory || cont.Spec.HasNetwork || cont.Spec.HasFilesystem,
-		CpuAvailable:       cont.Spec.HasCpu,
-		MemoryAvailable:    cont.Spec.HasMemory,
-		NetworkAvailable:   cont.Spec.HasNetwork,
-		FsAvailable:        cont.Spec.HasFilesystem,
-		Root:               rootDir,
+		DisplayName:            displayName,
+		ContainerName:          escapeContainerName(cont.Name),
+		ParentContainers:       parentContainers,
+		Subcontainers:          subcontainerLinks,
+		Spec:                   cont.Spec,
+		Stats:                  cont.Stats,
+		MachineInfo:            machineInfo,
+		IsRoot:                 cont.Name == "/",
+		ResourcesAvailable:     cont.Spec.HasCpu || cont.Spec.HasMemory || cont.Spec.HasNetwork || cont.Spec.HasFilesystem,
+		CpuAvailable:           cont.Spec.HasCpu,
+		MemoryAvailable:        cont.Spec.HasMemory,
+		NetworkAvailable:       cont.Spec.HasNetwork,
+		FsAvailable:            cont.Spec.HasFilesystem,
+		CustomMetricsAvailable: cont.Spec.HasCustomMetrics,
+		Root: rootDir,
 	}
 	err = pageTemplate.Execute(w, data)
 	if err != nil {

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 
 	auth "github.com/abbot/go-http-auth"
@@ -43,23 +44,24 @@ type keyVal struct {
 }
 
 type pageData struct {
-	DisplayName        string
-	ContainerName      string
-	ParentContainers   []link
-	Subcontainers      []link
-	Spec               info.ContainerSpec
-	Stats              []*info.ContainerStats
-	MachineInfo        *info.MachineInfo
-	IsRoot             bool
-	ResourcesAvailable bool
-	CpuAvailable       bool
-	MemoryAvailable    bool
-	NetworkAvailable   bool
-	FsAvailable        bool
-	Root               string
-	DockerStatus       []keyVal
-	DockerDriverStatus []keyVal
-	DockerImages       []manager.DockerImage
+	DisplayName            string
+	ContainerName          string
+	ParentContainers       []link
+	Subcontainers          []link
+	Spec                   info.ContainerSpec
+	Stats                  []*info.ContainerStats
+	MachineInfo            *info.MachineInfo
+	IsRoot                 bool
+	ResourcesAvailable     bool
+	CpuAvailable           bool
+	MemoryAvailable        bool
+	NetworkAvailable       bool
+	FsAvailable            bool
+	CustomMetricsAvailable bool
+	Root                   string
+	DockerStatus           []keyVal
+	DockerDriverStatus     []keyVal
+	DockerImages           []manager.DockerImage
 }
 
 func init() {
@@ -158,4 +160,13 @@ func getContainerDisplayName(cont info.ContainerReference) string {
 	}
 
 	return displayName
+}
+
+// Escape the non-path characters on a container name.
+func escapeContainerName(containerName string) string {
+	parts := strings.Split(containerName, "/")
+	for i := range parts {
+		parts[i] = url.QueryEscape(parts[i])
+	}
+	return strings.Join(parts, "/")
 }

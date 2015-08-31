@@ -53,7 +53,7 @@ func createManagerAndAddContainers(
 			spec,
 			nil,
 		).Once()
-		cont, err := newContainerData(name, memoryCache, mockHandler, nil, false, &collector.FakeCollectorManager{})
+		cont, err := newContainerData(name, memoryCache, mockHandler, nil, false, &collector.GenericCollectorManager{}, 60*time.Second, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -205,7 +205,7 @@ func TestDockerContainersInfo(t *testing.T) {
 }
 
 func TestNewNilManager(t *testing.T) {
-	_, err := New(nil, nil)
+	_, err := New(nil, nil, 60*time.Second, true)
 	if err == nil {
 		t.Fatalf("Expected nil manager to return error")
 	}
