@@ -470,12 +470,14 @@ function update-addons() {
     # be careful, reconcile-objects uses global variables
     reconcile-objects ${addon_path} ReplicationController "-" &
 
-    # We don't expect service names to be versioned, so
-    # we match entire name, ignoring version suffix.
+    # We don't expect names to be versioned for the following kinds, so
+    # we match the entire name, ignoring version suffix.
     # That's why we pass an empty string as the version separator.
-    # If the service description differs on disk, the service should be recreated.
+    # If the description differs on disk, the object should be recreated.
     # This is not implemented in this version.
     reconcile-objects ${addon_path} Service "" &
+    reconcile-objects ${addon_path} PersistentVolume "" &
+    reconcile-objects ${addon_path} PersistentVolumeClaim "" &
 
     wait-for-jobs
     if [[ $? -eq 0 ]]; then

@@ -45,7 +45,7 @@ selector for a new Service on the specified port. If no labels are specified, th
 re-use the labels from the resource it exposes.
 
 ```
-kubectl expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]
+kubectl expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]
 ```
 
 ### Examples
@@ -70,30 +70,31 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --container-port="": Synonym for --target-port
       --create-external-load-balancer[=false]: If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.
       --dry-run[=false]: If true, only print the object that would be sent, without creating it.
+      --external-ip="": External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.
   -f, --filename=[]: Filename, directory, or URL to a file identifying the resource to expose a service
       --generator="service/v2": The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.
   -h, --help[=false]: help for expose
   -l, --labels="": Labels to apply to the service created by this call.
       --name="": The name for the newly created object.
       --no-headers[=false]: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|template|templatefile|wide.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile|wide|jsonpath|name.
       --output-version="": Output the formatted object with the given version (default api-version).
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that the service should serve on. Copied from the resource being exposed, if unspecified
       --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
-      --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
       --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
       --session-affinity="": If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'
+  -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
       --target-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
+      --template="": Template string or path to template file to use when -o=template, -o=templatefile or -o=jsonpath.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]. The jsonpath template is composed of jsonpath expressions enclosed by {} [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md]
       --type="": Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless --create-external-load-balancer is specified.
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --alsologtostderr=false: log to standard error as well as files
+      --alsologtostderr[=false]: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
@@ -103,9 +104,9 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --insecure-skip-tls-verify[=false]: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log-backtrace-at=:0: when logging hits line file:N, emit a stack trace
-      --log-dir=: If non-empty, write log files in this directory
+      --log-dir="": If non-empty, write log files in this directory
       --log-flush-frequency=5s: Maximum number of seconds between log flushes
-      --logtostderr=true: log to standard error instead of files
+      --logtostderr[=true]: log to standard error instead of files
       --match-server-version[=false]: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --password="": Password for basic authentication to the API server.
@@ -115,7 +116,6 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --user="": The name of the kubeconfig user to use
       --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
-      --validate[=false]: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 ```
 
@@ -123,7 +123,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra at 2015-08-12 23:41:01.308576759 +0000 UTC
+###### Auto generated by spf13/cobra at 2015-08-26 09:03:39.976795003 +0000 UTC
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_expose.md?pixel)]()

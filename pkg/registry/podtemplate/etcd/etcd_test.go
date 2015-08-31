@@ -21,18 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 func validNewPodTemplate(name string) *api.PodTemplate {
@@ -63,14 +59,19 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 }
 
 func TestCreate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewREST(etcdStorage)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	pod := validNewPodTemplate("foo")
 	pod.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		pod,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.PodTemplate{
 			Template: api.PodTemplateSpec{},
@@ -79,30 +80,25 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewREST(etcdStorage)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	key, err := storage.KeyFunc(test.TestContext(), "foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	key = etcdtest.AddPrefix(key)
-
-	fakeEtcdClient.ExpectNotFoundGet(key)
-	fakeEtcdClient.ChangeIndex = 2
-	pod := validNewPodTemplate("foo")
-	existing := validNewPodTemplate("exists")
-	existing.Namespace = test.TestNamespace()
-	obj, err := storage.Create(test.TestContext(), existing)
-	if err != nil {
-		t.Fatalf("unable to create object: %v", err)
-	}
-	older := obj.(*api.PodTemplate)
-	older.ResourceVersion = "1"
-
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	test.TestUpdate(
-		pod,
-		existing,
-		older,
+		//valid
+		validNewPodTemplate("foo"),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.PodTemplate)
+			object.Template.Spec.NodeSelector = map[string]string{"a": "b"}
+			return object
+		},
 	)
 }

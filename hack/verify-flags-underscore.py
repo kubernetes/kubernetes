@@ -28,9 +28,6 @@ parser.add_argument("filenames", help="list of files to check, all files if unsp
 parser.add_argument("-e", "--skip-exceptions", help="ignore hack/verify-flags/exceptions.txt and print all output", action="store_true")
 args = parser.parse_args()
 
-
-dashRE = re.compile('[-_]')
-
 # Cargo culted from http://stackoverflow.com/questions/898669/how-can-i-detect-if-a-file-is-binary-non-text-in-python
 def is_binary(pathname):
     """Return true if the given filename is binary.
@@ -39,18 +36,17 @@ def is_binary(pathname):
     @author: Trent Mick <TrentM@ActiveState.com>
     @author: Jorge Orpinel <jorge@orpinel.com>"""
     try:
-        f = open(pathname, 'r')
-        CHUNKSIZE = 1024
-        while 1:
-            chunk = f.read(CHUNKSIZE)
-            if '\0' in chunk: # found null byte
-                return True
-            if len(chunk) < CHUNKSIZE:
-                break # done
+        with open(pathname, 'r') as f:
+            CHUNKSIZE = 1024
+            while 1:
+                chunk = f.read(CHUNKSIZE)
+                if '\0' in chunk: # found null byte
+                    return True
+                if len(chunk) < CHUNKSIZE:
+                    break # done
     except:
         return True
-    finally:
-        f.close()
+
     return False
 
 def get_all_files(rootdir):
@@ -96,10 +92,24 @@ def normalize_files(rootdir, files):
     return newfiles
 
 def line_has_bad_flag(line, flagre):
-    m  = flagre.search(line)
-    if not m:
-        return False
-    if "_" in m.group(0):
+    results  = flagre.findall(line)
+    for result in results:
+        if not "_" in result:
+            return False
+        # this should exclude many cases where jinja2 templates use kube flags
+        # as variables, except it uses _ for the variable name
+        if "{% set" + result + "= \"" in line:
+            return False
+        if "pillar[" + result + "]" in line:
+            return False
+        if "grains" + result in line:
+            return False
+        # These are usually yaml definitions
+        if result.endswith(":"):
+            return False
+         # something common in juju variables...
+        if "template_data[" + result + "]" in line:
+            return False
         return True
     return False
 
@@ -109,14 +119,16 @@ def line_has_bad_flag(line, flagre):
 # If running the golang files finds a new flag not in that file, return an
 # error and tell the user to add the flag to the flag list.
 def get_flags(rootdir, files):
-    # use a set for uniqueness
-    flags = set()
-
     # preload the 'known' flags
     pathname = os.path.join(rootdir, "hack/verify-flags/known-flags.txt")
     f = open(pathname, 'r')
-    for line in f.read().splitlines():
-        flags.add(line)
+    flags = set(f.read().splitlines())
+    f.close()
+
+    # preload the 'known' flags which don't follow the - standard
+    pathname = os.path.join(rootdir, "hack/verify-flags/excluded-flags.txt")
+    f = open(pathname, 'r')
+    excluded_flags = set(f.read().splitlines())
     f.close()
 
     regexs = [ re.compile('Var[P]?\([^,]*, "([^"]*)"'),
@@ -127,6 +139,7 @@ def get_flags(rootdir, files):
                re.compile('.StringSlice[P]?\("([^"]*)",[^,]+,[^)]+\)') ]
 
     new_flags = set()
+    new_excluded_flags = set()
     # walk all the files looking for any flags being declared
     for pathname in files:
         if not pathname.endswith(".go"):
@@ -138,24 +151,38 @@ def get_flags(rootdir, files):
         for regex in regexs:
             matches = matches + regex.findall(data)
         for flag in matches:
-            # if the flag doesn't have a - or _ it is not interesting
-            if not dashRE.search(flag):
+            if any(x in flag for x in excluded_flags):
+                continue
+            if "_" in flag:
+                new_excluded_flags.add(flag)
+            if not "-" in flag:
                 continue
             if flag not in flags:
                 new_flags.add(flag)
+    if len(new_excluded_flags) != 0:
+        print("Found a flag declared with an _ but which is not explicitly listed as a valid flag name in hack/verify-flags/excluded-flags.txt")
+        print("Are you certain this flag should not have been declared with an - instead?")
+        l = list(new_excluded_flags)
+        l.sort()
+        print("%s" % "\n".join(l))
+        sys.exit(1)
     if len(new_flags) != 0:
         print("Found flags in golang files not in the list of known flags. Please add these to hack/verify-flags/known-flags.txt")
-        print("%s" % "\n".join(new_flags))
+        l = list(new_flags)
+        l.sort()
+        print("%s" % "\n".join(l))
         sys.exit(1)
     return list(flags)
 
 def flags_to_re(flags):
-    """turn the list of all flags we found into a regex find both - and _ version"""
+    """turn the list of all flags we found into a regex find both - and _ versions"""
+    dashRE = re.compile('[-_]')
     flagREs = []
     for flag in flags:
         # turn all flag names into regexs which will find both types
         newre = dashRE.sub('[-_]', flag)
-        flagREs.append(newre)
+        # only match if there is not a leading or trailing alphanumeric character
+        flagREs.append("[^\w${]" + newre + "[^\w]")
     # turn that list of regex strings into a single large RE
     flagRE = "|".join(flagREs)
     flagRE = re.compile(flagRE)
@@ -205,9 +232,11 @@ def main():
 
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
-            print("Found illegal 'flag' usage. If this is a false positive add the following line(s) to hack/verify-flags/exceptions.txt:")
+            print("Found illegal 'flag' usage. If these are false positives you should run `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
+        bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))
+        return 1
 
 if __name__ == "__main__":
   sys.exit(main())

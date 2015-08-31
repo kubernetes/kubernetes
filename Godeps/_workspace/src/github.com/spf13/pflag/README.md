@@ -216,6 +216,25 @@ func aliasNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 myFlagSet.SetNormalizeFunc(aliasNormalizeFunc)
 ```
 
+## Deprecating a flag or its shorthand 
+It is possible to deprecate a flag, or just its shorthand. Deprecating a flag/shorthand hides it from help text and prints a usage message when the deprecated flag/shorthand is used. 
+
+**Example #1**: You want to deprecate a flag named "badflag" as well as inform the users what flag they should use instead. 
+```go
+// deprecate a flag by specifying its name and a usage message 
+flags.MarkDeprecated("badflag", "please use --good-flag instead")
+```
+This hides "badflag" from help text, and prints `Flag --badflag has been deprecated, please use --good-flag instead` when "badflag" is used. 
+
+**Example #2**: You want to keep a flag name "noshorthandflag" but deprecate its shortname "n". 
+```go
+// deprecate a flag shorthand by specifying its flag name and a usage message 
+flags.MarkShorthandDeprecated("noshorthandflag", "please use --noshorthandflag only")
+```
+This hides the shortname "n" from help text, and prints `Flag shorthand -n has been deprecated, please use --noshorthandflag only` when the shorthand "n" is used. 
+
+Note that usage message is essential here, and it should not be empty. 
+
 ## More info
 
 You can see the full reference documentation of the pflag package

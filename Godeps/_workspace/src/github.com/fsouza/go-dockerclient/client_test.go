@@ -329,16 +329,17 @@ func TestPingFailingWrongStatus(t *testing.T) {
 func TestPingErrorWithUnixSocket(t *testing.T) {
 	go func() {
 		li, err := net.Listen("unix", "/tmp/echo.sock")
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer li.Close()
 		if err != nil {
 			t.Fatalf("Expected to get listner, but failed: %#v", err)
-			return
 		}
 
 		fd, err := li.Accept()
 		if err != nil {
 			t.Fatalf("Expected to accept connection, but failed: %#v", err)
-			return
 		}
 
 		buf := make([]byte, 512)

@@ -545,7 +545,7 @@ func TestMatchedRouteName(t *testing.T) {
 	router := NewRouter()
 	route := router.NewRoute().Path("/products/").Name(routeName)
 
-	url := "http://www.domain.com/products/"
+	url := "http://www.example.com/products/"
 	request, _ := http.NewRequest("GET", url, nil)
 	var rv RouteMatch
 	ok := router.Match(request, &rv)
@@ -563,10 +563,10 @@ func TestMatchedRouteName(t *testing.T) {
 func TestSubRouting(t *testing.T) {
 	// Example from docs.
 	router := NewRouter()
-	subrouter := router.NewRoute().Host("www.domain.com").Subrouter()
+	subrouter := router.NewRoute().Host("www.example.com").Subrouter()
 	route := subrouter.NewRoute().Path("/products/").Name("products")
 
-	url := "http://www.domain.com/products/"
+	url := "http://www.example.com/products/"
 	request, _ := http.NewRequest("GET", url, nil)
 	var rv RouteMatch
 	ok := router.Match(request, &rv)

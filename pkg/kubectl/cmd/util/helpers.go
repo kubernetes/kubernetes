@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -257,6 +257,10 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
+}
+
+func AddValidateFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {

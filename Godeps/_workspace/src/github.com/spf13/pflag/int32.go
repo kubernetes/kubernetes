@@ -48,7 +48,7 @@ func (f *FlagSet) Int32Var(p *int32, name string, value int32, usage string) {
 	f.VarP(newInt32Value(value, p), name, "", usage)
 }
 
-// Like Int32Var, but accepts a shorthand letter that can be used after a single dash.
+// Int32VarP is like Int32Var, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Int32VarP(p *int32, name, shorthand string, value int32, usage string) {
 	f.VarP(newInt32Value(value, p), name, shorthand, usage)
 }
@@ -59,7 +59,7 @@ func Int32Var(p *int32, name string, value int32, usage string) {
 	CommandLine.VarP(newInt32Value(value, p), name, "", usage)
 }
 
-// Like Int32Var, but accepts a shorthand letter that can be used after a single dash.
+// Int32VarP is like Int32Var, but accepts a shorthand letter that can be used after a single dash.
 func Int32VarP(p *int32, name, shorthand string, value int32, usage string) {
 	CommandLine.VarP(newInt32Value(value, p), name, shorthand, usage)
 }
@@ -72,7 +72,7 @@ func (f *FlagSet) Int32(name string, value int32, usage string) *int32 {
 	return p
 }
 
-// Like Int32, but accepts a shorthand letter that can be used after a single dash.
+// Int32P is like Int32, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Int32P(name, shorthand string, value int32, usage string) *int32 {
 	p := new(int32)
 	f.Int32VarP(p, name, shorthand, value, usage)
@@ -85,7 +85,7 @@ func Int32(name string, value int32, usage string) *int32 {
 	return CommandLine.Int32P(name, "", value, usage)
 }
 
-// Like Int32, but accepts a shorthand letter that can be used after a single dash.
+// Int32P is like Int32, but accepts a shorthand letter that can be used after a single dash.
 func Int32P(name, shorthand string, value int32, usage string) *int32 {
 	return CommandLine.Int32P(name, shorthand, value, usage)
 }

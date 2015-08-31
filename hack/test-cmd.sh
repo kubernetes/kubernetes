@@ -234,6 +234,11 @@ runTests() {
   kube::test::get_object_assert 'pod valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pods/valid-pod' "{{$id_field}}" 'valid-pod'
+  # Repeat above test using jsonpath template
+  kube::test::get_object_jsonpath_assert pods "{.items[*]$id_field}" 'valid-pod'
+  kube::test::get_object_jsonpath_assert 'pod valid-pod' "{$id_field}" 'valid-pod'
+  kube::test::get_object_jsonpath_assert 'pod/valid-pod' "{$id_field}" 'valid-pod'
+  kube::test::get_object_jsonpath_assert 'pods/valid-pod' "{$id_field}" 'valid-pod'
   # Describe command should print detailed information
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Node:" "Labels:" "Status:" "Replication Controllers"
   # Describe command (resource only) should print detailed information
@@ -246,7 +251,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pod valid-pod "${kube_flags[@]}"
+  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -262,7 +267,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
+  kubectl delete -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}" --grace-period=0
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -278,7 +283,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' 'valid-pod:'
   # Command
-  kubectl delete pods -l'name in (valid-pod)' "${kube_flags[@]}"
+  kubectl delete pods -l'name in (valid-pod)' "${kube_flags[@]}" --grace-period=0
   # Post-condition: no POD is running
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
@@ -310,7 +315,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
+  kubectl delete --all pods "${kube_flags[@]}" --grace-period=0 # --all remove all the pods
   # Post-condition: no POD is running
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
@@ -327,7 +332,7 @@ runTests() {
   # Pre-condition: valid-pod and redis-proxy PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
   # Command
-  kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" # delete multiple pods at once
+  kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" --grace-period=0 # delete multiple pods at once
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -344,7 +349,7 @@ runTests() {
   # Pre-condition: valid-pod and redis-proxy PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
   # Command
-  kubectl stop pods valid-pod redis-proxy "${kube_flags[@]}" # stop multiple pods at once
+  kubectl stop pods valid-pod redis-proxy "${kube_flags[@]}" --grace-period=0 # stop multiple pods at once
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -368,7 +373,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -lnew-name=new-valid-pod "${kube_flags[@]}"
+  kubectl delete pods -lnew-name=new-valid-pod --grace-period=0 "${kube_flags[@]}"
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -385,6 +390,11 @@ runTests() {
   kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  ## Patch pod from JSON can change image
+  # Command
+  kubectl patch "${kube_flags[@]}" -f docs/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "kubernetes/pause"}]}}'
+  # Post-condition: valid-pod POD has image kubernetes/pause
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'kubernetes/pause:'
 
   ## --force replace pod can change other field, e.g., spec.container.name
   # Command
@@ -414,7 +424,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -l'name in (valid-pod-super-sayan)' "${kube_flags[@]}"
+  kubectl delete pods -l'name in (valid-pod-super-sayan)' --grace-period=0 "${kube_flags[@]}"
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -450,7 +460,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod
+  kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod --grace-period=0
   # Post-condition: no POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -623,6 +633,14 @@ __EOF__
   # Post-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
 
+  ### Scale replication controller from JSON with replicas only
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  # Command
+  kubectl scale  --replicas=2 -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  # Post-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+
   ### Scale multiple replication controllers
   kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
@@ -635,8 +653,8 @@ __EOF__
   kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
 
   ### Expose replication controller as service
-  # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  # Pre-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
   kubectl expose rc frontend --port=80 "${kube_flags[@]}"
   # Post-condition: service exists and the port is unnamed
@@ -789,8 +807,8 @@ __EOF__
     file="${KUBE_TEMP}/schema-${version}.json"
     curl -s "http://127.0.0.1:${API_PORT}/swaggerapi/api/${version}" > "${file}"
     [[ "$(grep "list of returned" "${file}")" ]]
-    [[ "$(grep "list of pods" "${file}")" ]]
-    [[ "$(grep "watch for changes to the described resources" "${file}")" ]]
+    [[ "$(grep "List of pods" "${file}")" ]]
+    [[ "$(grep "Watch for changes to the described resources" "${file}")" ]]
   fi
 
   kube::test::clear_all

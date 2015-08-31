@@ -91,11 +91,6 @@ function test-teardown {
 	echo "TODO: test-teardown" 1>&2
 }
 
-# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
-function get-password {
-	echo "TODO: get-password" 1>&2
-}
-
 # Providers util.sh scripts should define functions that override the above default functions impls
 if [ -n "${KUBERNETES_PROVIDER}" ]; then
 	PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"

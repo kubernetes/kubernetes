@@ -19,37 +19,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-cd "${KUBE_ROOT}"
+kube::golang::setup_env
+"${KUBE_ROOT}/hack/build-go.sh" cmd/genswaggertypedocs
 
-result=0
-
-find_files() {
-  find . -not \( \
-      \( \
-        -wholename './output' \
-        -o -wholename './_output' \
-        -o -wholename './release' \
-        -o -wholename './target' \
-        -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
-      \) -prune \
-    \) -wholename '*pkg/api/v*/types.go'
-}
-
-if [[ $# -eq 0 ]]; then
-  files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
-else
-  files=("${@}")
-fi
-
-for file in $files; do
-  if grep json: "${file}" | grep -v // | grep -v ,inline | grep -v -q description: ; then
-    echo "API file is missing the required field descriptions: ${file}"
-    result=1
-  fi
-done
-
-exit ${result}
+"${KUBE_ROOT}/hack/after-build/verify-description.sh" "$@"
 
 # ex: ts=2 sw=2 et filetype=sh

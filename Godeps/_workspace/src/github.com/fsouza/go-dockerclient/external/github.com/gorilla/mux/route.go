@@ -255,7 +255,7 @@ func (r *Route) HeadersRegexp(pairs ...string) *Route {
 // For example:
 //
 //     r := mux.NewRouter()
-//     r.Host("www.domain.com")
+//     r.Host("www.example.com")
 //     r.Host("{subdomain}.domain.com")
 //     r.Host("{subdomain:[a-z]+}.domain.com")
 //
@@ -414,7 +414,7 @@ func (r *Route) BuildVarsFunc(f BuildVarsFunc) *Route {
 // It will test the inner routes only if the parent route matched. For example:
 //
 //     r := mux.NewRouter()
-//     s := r.Host("www.domain.com").Subrouter()
+//     s := r.Host("www.example.com").Subrouter()
 //     s.HandleFunc("/products/", ProductsHandler)
 //     s.HandleFunc("/products/{key}", ProductHandler)
 //     s.HandleFunc("/articles/{category}/{id:[0-9]+}"), ArticleHandler)

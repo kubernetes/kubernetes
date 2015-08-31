@@ -49,7 +49,7 @@ func NewSourceURL(url string, header http.Header, nodeName string, period time.D
 		data:     nil,
 	}
 	glog.V(1).Infof("Watching URL %s", url)
-	go util.Forever(config.run, period)
+	go util.Until(config.run, period, util.NeverStop)
 }
 
 func (s *sourceURL) run() {

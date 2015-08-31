@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -213,7 +213,7 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 
 	sleepUpTo(resizingTime)
 	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
-	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize),
+	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 	_, err := config.Client.Pods(config.Namespace).List(selector, fields.Everything())

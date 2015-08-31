@@ -41,8 +41,8 @@ Documentation for other releases can be found at
 
 *Note: Libraries provided by outside parties are supported by their authors, not the core Kubernetes team*
 
-   * [Java (OSGI)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
-   * [Java (Fabric8)](https://github.com/fabric8io/fabric8/tree/master/components/kubernetes-api)
+   * [Java (OSGi)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
+   * [Java (Fabric8, OSGi)](https://github.com/fabric8io/kubernetes-client)
    * [Ruby](https://github.com/Ch00k/kuber)
    * [Ruby](https://github.com/abonas/kubeclient)
    * [PHP](https://github.com/devstub/kubernetes-api-php-client)

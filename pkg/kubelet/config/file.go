@@ -45,7 +45,7 @@ func NewSourceFile(path string, nodeName string, period time.Duration, updates c
 		updates:  updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
-	go util.Forever(config.run, period)
+	go util.Until(config.run, period, util.NeverStop)
 }
 
 func (s *sourceFile) run() {

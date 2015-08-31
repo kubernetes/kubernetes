@@ -149,12 +149,6 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
 	}
 	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
-
-	rsrcs, err := i.GetNodeResources(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.GetNodeResources(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found GetNodeResources(%s) = %s\n", srvs[0], rsrcs)
 }
 
 func TestZones(t *testing.T) {

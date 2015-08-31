@@ -39,6 +39,9 @@ scale is sent to the server.`
 	scale_example = `# Scale replication controller named 'foo' to 3.
 $ kubectl scale --replicas=3 replicationcontrollers foo
 
+# Scale a replication controller identified by type and name specified in "foo-controller.yaml" to 3.
+$ kubectl scale --replicas=3 -f foo-controller.yaml
+
 # If the replication controller named foo's current size is 2, scale foo to 3.
 $ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo
 
@@ -49,7 +52,7 @@ $ kubectl scale --replicas=5 rc/foo rc/bar`
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
 func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT TYPE NAME",
+		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
 		Short:   "Set a new size for a Replication Controller.",
@@ -68,6 +71,9 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait.")
 	cmd.MarkFlagRequired("replicas")
 	cmdutil.AddOutputFlagsForMutation(cmd)
+
+	usage := "Filename, directory, or URL to a file identifying the replication controller to set a new size"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
@@ -82,7 +88,7 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return cmdutil.UsageError(cmd, "--replicas=COUNT TYPE NAME")
 	}
 
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -91,14 +97,11 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
 	err = r.Err()
-	if err != nil {
-		return err
-	}
-	mapping, err := r.ResourceMapping()
 	if err != nil {
 		return err
 	}
@@ -107,7 +110,8 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-
+	info := infos[0]
+	mapping := info.ResourceMapping()
 	scaler, err := f.Scaler(mapping)
 	if err != nil {
 		return err

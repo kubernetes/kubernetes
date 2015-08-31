@@ -35,10 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -178,7 +178,9 @@ type RCConfig struct {
 	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
+	CpuRequest    int64 // millicores
 	CpuLimit      int64 // millicores
+	MemRequest    int64 // bytes
 	MemLimit      int64 // bytes
 
 	// Env vars, set the same for every pod.
@@ -524,7 +526,7 @@ func deleteNS(c *client.Client, namespace string) error {
 		return err
 	}
 
-	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
+	err := wait.Poll(5*time.Second, 5*time.Minute, func() (bool, error) {
 		if _, err := c.Namespaces().Get(namespace); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
@@ -829,19 +831,23 @@ func expectNoError(err error, explain ...interface{}) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
 
-// Stops everything from filePath from namespace ns and checks if everything maching selectors from the given namespace is correctly stopped.
+// Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 func cleanup(filePath string, ns string, selectors ...string) {
-	By("using stop to clean up resources")
+	By("using delete to clean up resources")
 	var nsArg string
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	runKubectl("stop", "-f", filePath, nsArg)
+	runKubectl("stop", "--grace-period=0", "-f", filePath, nsArg)
 
 	for _, selector := range selectors {
-		resources := runKubectl("get", "pods,rc,svc", "-l", selector, "--no-headers", nsArg)
+		resources := runKubectl("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
 		if resources != "" {
 			Failf("Resources left running after stop:\n%s", resources)
+		}
+		pods := runKubectl("get", "pods", "-l", selector, nsArg, "-t", "{{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+		if pods != "" {
+			Failf("Pods left unterminated after stop:\n%s", pods)
 		}
 	}
 }
@@ -1201,6 +1207,15 @@ func RunRC(config RCConfig) error {
 	if config.MemLimit > 0 {
 		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
 	}
+	if config.CpuRequest > 0 || config.MemRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{}
+	}
+	if config.CpuRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
+	}
+	if config.MemRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
+	}
 
 	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
@@ -1224,6 +1239,8 @@ func RunRC(config RCConfig) error {
 	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
+		terminating := 0
+
 		running := 0
 		waiting := 0
 		pending := 0
@@ -1233,10 +1250,13 @@ func RunRC(config RCConfig) error {
 		containerRestartNodes := util.NewStringSet()
 
 		pods := podStore.List()
-		if config.CreatedPods != nil {
-			*config.CreatedPods = pods
-		}
+		created := []*api.Pod{}
 		for _, p := range pods {
+			if p.DeletionTimestamp != nil {
+				terminating++
+				continue
+			}
+			created = append(created, p)
 			if p.Status.Phase == api.PodRunning {
 				running++
 				for _, v := range FailedContainers(p) {
@@ -1255,9 +1275,13 @@ func RunRC(config RCConfig) error {
 				unknown++
 			}
 		}
+		pods = created
+		if config.CreatedPods != nil {
+			*config.CreatedPods = pods
+		}
 
-		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d unknown ",
-			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, unknown)
+		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown ",
+			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown)
 
 		promPushRunningPending(running, pending)
 
@@ -1321,6 +1345,16 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	dumpNodeDebugInfo(c, badNodes.List())
 }
 
+func dumpAllPodInfo(c *client.Client) {
+	pods, err := c.Pods("").List(labels.Everything(), fields.Everything())
+	if err != nil {
+		Logf("unable to fetch pod debug info: %v", err)
+	}
+	for _, pod := range pods.Items {
+		Logf("Pod %s %s node=%s, deletionTimestamp=%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+	}
+}
+
 func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 	for _, n := range nodeNames {
 		Logf("\nLogging kubelet events for node %v", n)
@@ -1365,7 +1399,7 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 	return events.Items
 }
 
-func ScaleRC(c *client.Client, ns, name string, size uint) error {
+func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("%v Scaling replication controller %s in namespace %s to %d", time.Now(), name, ns, size))
 	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(c))
 	if err != nil {
@@ -1375,6 +1409,9 @@ func ScaleRC(c *client.Client, ns, name string, size uint) error {
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
 		return err
+	}
+	if !wait {
+		return nil
 	}
 	return waitForRCPodsRunning(c, ns, name)
 }
@@ -1420,15 +1457,47 @@ func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (p
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("%v Deleting replication controller %s in namespace %s", time.Now(), name, ns))
+	rc, err := c.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("RC %s was already deleted: %v", name, err)
+			return nil
+		}
+		return err
+	}
 	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
 	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("RC %s was already deleted: %v", name, err)
+			return nil
+		}
 		return err
 	}
 	startTime := time.Now()
 	_, err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
+	if apierrs.IsNotFound(err) {
+		Logf("RC %s was already deleted: %v", name, err)
+		return nil
+	}
 	deleteRCTime := time.Now().Sub(startTime)
 	Logf("Deleting RC took: %v", deleteRCTime)
+	if err == nil {
+		err = waitForRCPodsGone(c, rc)
+	}
+	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
+	Logf("Terminating RC pods took: %v", terminatePodTime)
 	return err
+}
+
+// waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
+// have completed termination).
+func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
+	return wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		if pods, err := c.Pods(rc.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 // Convenient wrapper around listing nodes supporting retries.
@@ -1516,7 +1585,7 @@ func NodeSSHHosts(c *client.Client) ([]string, error) {
 		for _, addr := range n.Status.Addresses {
 			// Use the first external IP address we find on the node, and
 			// use at most one per node.
-			// TODO(mbforbes): Use the "preferred" address for the node, once
+			// TODO(roberthbailey): Use the "preferred" address for the node, once
 			// such a thing is defined (#2462).
 			if addr.Type == api.NodeExternalIP {
 				hosts = append(hosts, addr.Address+":22")
@@ -1592,7 +1661,6 @@ func getSigner(provider string) (ssh.Signer, error) {
 		return nil, fmt.Errorf("getSigner(...) not implemented for %s", provider)
 	}
 	key := filepath.Join(keydir, keyfile)
-	Logf("Using SSH key: %s", key)
 
 	return util.MakePrivateKeySignerFromFile(key)
 }
@@ -1612,7 +1680,7 @@ func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeo
 	}
 	// Wait for them all to finish.
 	success := true
-	// TODO(mbforbes): Change to `for range` syntax and remove logging once we
+	// TODO(a-robinson): Change to `for range` syntax and remove logging once we
 	// support only Go >= 1.4.
 	for _, podName := range podNames {
 		if !<-result {

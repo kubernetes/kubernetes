@@ -56,6 +56,7 @@ KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public-address-override="127.0.0.1" \
+  --advertise-address="10.10.10.10" \
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --service-cluster-ip-range="10.0.0.0/24" >/dev/null 2>&1 &

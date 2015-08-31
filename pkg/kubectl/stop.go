@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -117,19 +117,20 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 
 	// The rc manager will try and detect all matching rcs for a pod's labels,
 	// and only sync the oldest one. This means if we have a pod with labels
-	// [(k1, v1)] and rcs with selectors [(k1, v2)] and [(k1, v1), (k2, v2)],
+	// [(k1: v1), (k2: v2)] and two rcs: rc1 with selector [(k1=v1)], and rc2 with selector [(k1=v1),(k2=v2)],
 	// the rc manager will sync the older of the two rcs.
 	//
 	// If there are rcs with a superset of labels, eg:
-	// deleting: (k1:v1), superset: (k2:v2, k1:v1)
+	// deleting: (k1=v1), superset: (k2=v2, k1=v1)
 	//	- It isn't safe to delete the rc because there could be a pod with labels
-	//	  (k1:v1) that isn't managed by the superset rc. We can't scale it down
-	//	  either, because there could be a pod (k2:v2, k1:v1) that it deletes
+	//	  (k1=v1) that isn't managed by the superset rc. We can't scale it down
+	//	  either, because there could be a pod (k2=v2, k1=v1) that it deletes
 	//	  causing a fight with the superset rc.
 	// If there are rcs with a subset of labels, eg:
-	// deleting: (k2:v2, k1:v1), subset: (k1: v1), superset: (k2:v2, k1:v1, k3:v3)
-	//  - It's safe to delete this rc without a scale down because all it's pods
-	//	  are being controlled by the subset rc.
+	// deleting: (k2=v2, k1=v1), subset: (k1=v1), superset: (k2=v2, k1=v1, k3=v3)
+	//  - Even if it's safe to delete this rc without a scale down because all it's pods
+	//	  are being controlled by the subset rc the code returns an error.
+
 	// In theory, creating overlapping controllers is user error, so the loop below
 	// tries to account for this logic only in the common case, where we end up
 	// with multiple rcs that have an exact match on selectors.

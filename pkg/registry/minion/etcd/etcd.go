@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/minion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -49,8 +49,24 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewStorage returns a RESTStorage object that will work against nodes.
-func NewStorage(s storage.Interface, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
 	prefix := "/minions"
+
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Node{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NoNamespaceKeyFunc(prefix, obj)
+			},
+			NewListFunc: func() runtime.Object { return &api.NodeList{} },
+		}
+		storageInterface = storage.NewCacher(config)
+	}
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
 		NewListFunc: func() runtime.Object { return &api.NodeList{} },
@@ -69,7 +85,7 @@ func NewStorage(s storage.Interface, connection client.ConnectionInfoGetter) (*R
 		CreateStrategy: minion.Strategy,
 		UpdateStrategy: minion.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	statusStore := *store

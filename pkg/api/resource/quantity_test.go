@@ -488,7 +488,7 @@ func TestUninitializedNoCrash(t *testing.T) {
 	q.Value()
 	q.MilliValue()
 	q.Copy()
-	q.String()
+	_ = q.String()
 	q.MarshalJSON()
 }
 

@@ -20,14 +20,11 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -35,12 +32,10 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	storage, statusStorage := NewStorage(etcdStorage)
-	return storage, statusStorage, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	storage, statusStorage := NewREST(etcdStorage)
+	return storage, statusStorage, fakeClient
 }
 
 func validNewPersistentVolume(name string) *api.PersistentVolume {
@@ -74,13 +69,19 @@ func validChangedPersistentVolume() *api.PersistentVolume {
 }
 
 func TestCreate(t *testing.T) {
-	storage, _, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	pv := validNewPersistentVolume("foo")
 	pv.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		pv,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.PersistentVolume{
 			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
@@ -88,19 +89,45 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestUpdate(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test.TestUpdate(
+		// valid
+		validNewPersistentVolume("foo"),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.PersistentVolume)
+			object.Spec.Capacity = api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+			}
+			return object
+		},
+	)
+}
+
 func TestDelete(t *testing.T) {
 	ctx := api.NewContext()
-	storage, _, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 
 	pv := validChangedPersistentVolume()
 	key, _ := storage.KeyFunc(ctx, pv.Name)
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, pv),
+					Value:         runtime.EncodeOrDie(testapi.Codec(), pv),
 					ModifiedIndex: 1,
 				},
 			},
@@ -108,153 +135,46 @@ func TestDelete(t *testing.T) {
 		return pv
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
-}
-
-func TestEtcdListPersistentVolumes(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, validNewPersistentVolume("foo")),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, validNewPersistentVolume("bar")),
-					},
-				},
-			},
-		},
-		E: nil,
-	}
-
-	pvObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	pvs := pvObj.(*api.PersistentVolumeList)
-
-	if len(pvs.Items) != 2 || pvs.Items[0].Name != "foo" || pvs.Items[1].Name != "bar" {
-		t.Errorf("Unexpected persistentVolume list: %#v", pvs)
-	}
+	test.TestDelete(createFn, gracefulSetFn)
 }
 
 func TestEtcdGetPersistentVolumes(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	persistentVolume := validNewPersistentVolume("foo")
-	name := persistentVolume.Name
-	key, _ := storage.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, persistentVolume), 0)
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var persistentVolumeOut api.PersistentVolume
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &persistentVolumeOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	obj, err := storage.Get(ctx, name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := obj.(*api.PersistentVolume)
-
-	persistentVolume.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := persistentVolume, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected persistentVolume: %#v, expected %#v", e, a)
-	}
+	test.TestGet(persistentVolume)
 }
 
-func TestListEmptyPersistentVolumesList(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-
-	persistentVolume, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(persistentVolume.(*api.PersistentVolumeList).Items) != 0 {
-		t.Errorf("Unexpected non-zero pod list: %#v", persistentVolume)
-	}
-	if persistentVolume.(*api.PersistentVolumeList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", persistentVolume)
-	}
-}
-
-func TestListPersistentVolumesList(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.PersistentVolume{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.PersistentVolume{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
+func TestEtcdListPersistentVolumes(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	persistentVolume := validNewPersistentVolume("foo")
+	test.TestList(
+		persistentVolume,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
-	}
-
-	persistentVolumeObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	persistentVolumeList := persistentVolumeObj.(*api.PersistentVolumeList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(persistentVolumeList.Items) != 2 {
-		t.Errorf("Unexpected persistentVolume list: %#v", persistentVolumeList)
-	}
-	if persistentVolumeList.Items[0].Name != "foo" {
-		t.Errorf("Unexpected persistentVolume: %#v", persistentVolumeList.Items[0])
-	}
-	if persistentVolumeList.Items[1].Name != "bar" {
-		t.Errorf("Unexpected persistentVolume: %#v", persistentVolumeList.Items[1])
-	}
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
 }
 
 func TestPersistentVolumesDecode(t *testing.T) {
-	storage, _, _, _ := newStorage(t)
+	storage, _, _ := newStorage(t)
 	expected := validNewPersistentVolume("foo")
-	body, err := latest.Codec.Encode(expected)
+	body, err := testapi.Codec().Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := latest.Codec.DecodeInto(body, actual); err != nil {
+	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -263,39 +183,9 @@ func TestPersistentVolumesDecode(t *testing.T) {
 	}
 }
 
-func TestEtcdUpdatePersistentVolumes(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
-	persistentVolume := validChangedPersistentVolume()
-
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewPersistentVolume("foo")), 0)
-
-	_, _, err := storage.Update(ctx, persistentVolume)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var persistentVolumeOut api.PersistentVolume
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &persistentVolumeOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	persistentVolume.ObjectMeta.ResourceVersion = persistentVolumeOut.ObjectMeta.ResourceVersion
-	if !api.Semantic.DeepEqual(persistentVolume, &persistentVolumeOut) {
-		t.Errorf("Unexpected persistentVolume: %#v, expected %#v", &persistentVolumeOut, persistentVolume)
-	}
-}
-
 func TestDeletePersistentVolumes(t *testing.T) {
 	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	persistentVolume := validNewPersistentVolume("foo")
 	name := persistentVolume.Name
 	key, _ := storage.KeyFunc(ctx, name)
@@ -304,7 +194,7 @@ func TestDeletePersistentVolumes(t *testing.T) {
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, persistentVolume),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), persistentVolume),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -317,14 +207,14 @@ func TestDeletePersistentVolumes(t *testing.T) {
 }
 
 func TestEtcdUpdateStatus(t *testing.T) {
-	storage, statusStorage, fakeClient, etcdStorage := newStorage(t)
-	ctx := api.NewContext()
+	storage, statusStorage, fakeClient := newStorage(t)
 	fakeClient.TestIndex = true
 
+	ctx := api.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvStart := validNewPersistentVolume("foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, pvStart), 1)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), pvStart), 0)
 
 	pvIn := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
@@ -345,12 +235,11 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	var pvOut api.PersistentVolume
-	key, _ = storage.KeyFunc(ctx, "foo")
-	if err := etcdStorage.Get(key, &pvOut, false); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	pvOut, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepEqual(expected, pvOut) {
-		t.Errorf("unexpected object: %s", util.ObjectDiff(expected, pvOut))
+	if !api.Semantic.DeepEqual(&expected, pvOut) {
+		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, pvOut))
 	}
 }

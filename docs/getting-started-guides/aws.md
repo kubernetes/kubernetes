@@ -51,6 +51,13 @@ Getting started on AWS EC2
 2. Install and configure [AWS Command Line Interface](http://aws.amazon.com/cli)
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
+NOTE: This script use the 'default' AWS profile by default.
+You may explicitly set AWS profile to use using the `AWS_DEFAULT_PROFILE` environment variable:
+
+```bash
+export AWS_DEFAULT_PROFILE=myawsprofile
+```
+
 ## Cluster turnup
 
 ### Supported procedure: `get-kube`
@@ -91,8 +98,8 @@ NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS
 
 ### Alternatives
 
-A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
-AWS CloudFormation or EC2 with user data (cloud-config).
+A contributed [example](coreos/coreos_multinode_cluster.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), using
+EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
 

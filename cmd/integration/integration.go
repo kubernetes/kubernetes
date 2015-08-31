@@ -39,8 +39,8 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/node"
 	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -80,10 +79,6 @@ type fakeKubeletClient struct{}
 
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
-}
-
-func (fakeKubeletClient) HealthCheck(host string) (probe.Result, string, error) {
-	return probe.Success, "", nil
 }
 
 type delegateHandler struct {
@@ -196,7 +191,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, nodecontroller.NewPodEvictor(util.NewFakeRateLimiter()),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
@@ -872,7 +867,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 
 	// Delete a pod to free up room.
 	glog.Infof("Deleting pod %v", bar.Name)
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, nil)
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, api.NewDeleteOptions(0))
 	if err != nil {
 		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
 	}
@@ -883,7 +878,11 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
 	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
-		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+		if pod, perr := client.Pods(api.NamespaceDefault).Get("phantom.bar"); perr == nil {
+			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v", pod)
+		} else {
+			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+		}
 	}
 
 	glog.Info("Scheduler doesn't make phantom pods: test passed.")

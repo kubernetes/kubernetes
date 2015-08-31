@@ -80,8 +80,8 @@ type TCPLoadBalancer interface {
 	// GetTCPLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
 	GetTCPLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
-	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the status of the balancer
-	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
+	// EnsureTCPLoadBalancer creates a new tcp load balancer, or updates an existing one. Returns the status of the balancer
+	EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// EnsureTCPLoadBalancerDeleted deletes the specified load balancer if it
@@ -107,8 +107,6 @@ type Instances interface {
 	InstanceID(name string) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
-	// GetNodeResources gets the resources for a particular node
-	GetNodeResources(name string) (*api.NodeResources, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error

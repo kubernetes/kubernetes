@@ -103,7 +103,7 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
-		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -172,12 +172,12 @@ func (b *gcePersistentDiskBuilder) SetUp() error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
 	// TODO: handle failed mounts here.
-	mountpoint, err := b.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 
@@ -199,22 +199,22 @@ func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
 	}
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
-		mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("isMountpoint check failed: %v", mntErr)
+			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
-		if mountpoint {
+		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("isMountpoint check failed: %v", mntErr)
+				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
-			if mountpoint {
+			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
 				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
@@ -257,11 +257,11 @@ func (c *gcePersistentDiskCleaner) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *gcePersistentDiskCleaner) TearDownAt(dir string) error {
-	mountpoint, err := c.mounter.IsMountPoint(dir)
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		return os.Remove(dir)
 	}
 
@@ -282,12 +282,12 @@ func (c *gcePersistentDiskCleaner) TearDownAt(dir string) error {
 			return err
 		}
 	}
-	mountpoint, mntErr := c.mounter.IsMountPoint(dir)
+	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("isMountpoint check failed: %v", mntErr)
+		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		if err := os.Remove(dir); err != nil {
 			return err
 		}

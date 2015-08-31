@@ -162,12 +162,12 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 	return listProcMounts(hostProcMountsPath)
 }
 
-// IsMountPoint determines whether a path is a mountpoint by calling findmnt
+// IsLikelyNotMountPoint determines whether a path is a mountpoint by calling findmnt
 // in the host's root mount namespace.
-func (n *NsenterMounter) IsMountPoint(file string) (bool, error) {
+func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	file, err := filepath.Abs(file)
 	if err != nil {
-		return false, err
+		return true, err
 	}
 
 	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "--", n.absHostPath("findmnt"), "-o", "target", "--noheadings", "--target", file}
@@ -177,16 +177,16 @@ func (n *NsenterMounter) IsMountPoint(file string) (bool, error) {
 	out, err := exec.Command(nsenterPath, args...).CombinedOutput()
 	if err != nil {
 		// If findmnt didn't run, just claim it's not a mount point.
-		return false, nil
+		return true, nil
 	}
 	strOut := strings.TrimSuffix(string(out), "\n")
 
-	glog.V(5).Infof("IsMountPoint findmnt output: %v", strOut)
+	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output: %v", strOut)
 	if strOut == file {
-		return true, nil
+		return false, nil
 	}
 
-	return false, nil
+	return true, nil
 }
 
 func (n *NsenterMounter) absHostPath(command string) string {

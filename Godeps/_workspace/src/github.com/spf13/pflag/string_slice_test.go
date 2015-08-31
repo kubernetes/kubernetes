@@ -12,7 +12,13 @@ import (
 
 func setUpSSFlagSet(ssp *[]string) *FlagSet {
 	f := NewFlagSet("test", ContinueOnError)
-	f.StringSliceVar(ssp, "ss", []string{}, "Command seperated list!")
+	f.StringSliceVar(ssp, "ss", []string{}, "Command separated list!")
+	return f
+}
+
+func setUpSSFlagSetWithDefault(ssp *[]string) *FlagSet {
+	f := NewFlagSet("test", ContinueOnError)
+	f.StringSliceVar(ssp, "ss", []string{"default", "values"}, "Command separated list!")
 	return f
 }
 
@@ -36,6 +42,60 @@ func TestEmptySS(t *testing.T) {
 func TestSS(t *testing.T) {
 	var ss []string
 	f := setUpSSFlagSet(&ss)
+
+	vals := []string{"one", "two", "4", "3"}
+	arg := fmt.Sprintf("--ss=%s", strings.Join(vals, ","))
+	err := f.Parse([]string{arg})
+	if err != nil {
+		t.Fatal("expected no error; got", err)
+	}
+	for i, v := range ss {
+		if vals[i] != v {
+			t.Fatalf("expected ss[%d] to be %s but got: %s", i, vals[i], v)
+		}
+	}
+
+	getSS, err := f.GetStringSlice("ss")
+	if err != nil {
+		t.Fatal("got an error from GetStringSlice():", err)
+	}
+	for i, v := range getSS {
+		if vals[i] != v {
+			t.Fatalf("expected ss[%d] to be %s from GetStringSlice but got: %s", i, vals[i], v)
+		}
+	}
+}
+
+func TestSSDefault(t *testing.T) {
+	var ss []string
+	f := setUpSSFlagSetWithDefault(&ss)
+
+	vals := []string{"default", "values"}
+
+	err := f.Parse([]string{})
+	if err != nil {
+		t.Fatal("expected no error; got", err)
+	}
+	for i, v := range ss {
+		if vals[i] != v {
+			t.Fatalf("expected ss[%d] to be %s but got: %s", i, vals[i], v)
+		}
+	}
+
+	getSS, err := f.GetStringSlice("ss")
+	if err != nil {
+		t.Fatal("got an error from GetStringSlice():", err)
+	}
+	for i, v := range getSS {
+		if vals[i] != v {
+			t.Fatalf("expected ss[%d] to be %s from GetStringSlice but got: %s", i, vals[i], v)
+		}
+	}
+}
+
+func TestSSWithDefault(t *testing.T) {
+	var ss []string
+	f := setUpSSFlagSetWithDefault(&ss)
 
 	vals := []string{"one", "two", "4", "3"}
 	arg := fmt.Sprintf("--ss=%s", strings.Join(vals, ","))

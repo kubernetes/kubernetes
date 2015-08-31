@@ -27,23 +27,21 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// REST implements a RESTStorage for service accounts against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-const Prefix = "/serviceaccounts"
-
-// NewStorage returns a RESTStorage object that will work against service accounts objects.
-func NewStorage(s storage.Interface) *REST {
+// NewREST returns a RESTStorage object that will work against service accounts.
+func NewREST(s storage.Interface) *REST {
+	prefix := "/serviceaccounts"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc: func() runtime.Object { return &api.ServiceAccountList{} },
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, Prefix)
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, Prefix, name)
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.ServiceAccount).Name, nil
@@ -53,12 +51,11 @@ func NewStorage(s storage.Interface) *REST {
 		},
 		EndpointName: "serviceaccounts",
 
+		CreateStrategy:      serviceaccount.Strategy,
+		UpdateStrategy:      serviceaccount.Strategy,
+		ReturnDeletedObject: true,
+
 		Storage: s,
 	}
-
-	store.CreateStrategy = serviceaccount.Strategy
-	store.UpdateStrategy = serviceaccount.Strategy
-	store.ReturnDeletedObject = true
-
 	return &REST{store}
 }

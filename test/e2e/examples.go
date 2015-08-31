@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -63,7 +63,7 @@ var _ = Describe("Examples e2e", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})
@@ -194,7 +194,7 @@ var _ = Describe("Examples e2e", func() {
 
 			By("starting workers")
 			runKubectl("create", "-f", workerControllerJson, nsFlag)
-			ScaleRC(c, ns, "spark-worker-controller", 2)
+			ScaleRC(c, ns, "spark-worker-controller", 2, true)
 			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -223,7 +223,7 @@ var _ = Describe("Examples e2e", func() {
 
 			By("create and scale rc")
 			runKubectl("create", "-f", controllerYaml, nsFlag)
-			err = ScaleRC(c, ns, "cassandra", 2)
+			err = ScaleRC(c, ns, "cassandra", 2, true)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
 				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
@@ -384,7 +384,7 @@ var _ = Describe("Examples e2e", func() {
 			checkDbInstances()
 
 			By("scaling rethinkdb")
-			ScaleRC(c, ns, "rethinkdb-rc", 2)
+			ScaleRC(c, ns, "rethinkdb-rc", 2, true)
 			checkDbInstances()
 
 			By("starting admin")
@@ -421,7 +421,7 @@ var _ = Describe("Examples e2e", func() {
 			})
 
 			By("scaling hazelcast")
-			ScaleRC(c, ns, "hazelcast", 2)
+			ScaleRC(c, ns, "hazelcast", 2, true)
 			forEachPod(c, ns, "name", "hazelcast", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -458,7 +458,7 @@ var _ = Describe("Examples e2e", func() {
 				var err error
 				namespaces[i], err = createTestingNS(fmt.Sprintf("dnsexample%d", i), c)
 				if namespaces[i] != nil {
-					defer c.Namespaces().Delete(namespaces[i].Name)
+					defer deleteNS(c, namespaces[i].Name)
 				}
 				Expect(err).NotTo(HaveOccurred())
 			}

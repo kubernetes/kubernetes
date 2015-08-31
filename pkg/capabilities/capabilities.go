@@ -25,11 +25,19 @@ import (
 type Capabilities struct {
 	AllowPrivileged bool
 
-	// List of pod sources for which using host network is allowed.
-	HostNetworkSources []string
+	// Pod sources from which to allow privileged capabilities like host networking, sharing the host
+	// IPC namespace, and sharing the host PID namespace.
+	PrivilegedSources PrivilegedSources
 
 	// PerConnectionBandwidthLimitBytesPerSec limits the throughput of each connection (currently only used for proxy, exec, attach)
 	PerConnectionBandwidthLimitBytesPerSec int64
+}
+
+// PrivilegedSources defines the pod sources allowed to make privileged requests for certain types
+// of capabilities like host networking, sharing the host IPC namespace, and sharing the host PID namespace.
+type PrivilegedSources struct {
+	// List of pod sources for which using host network is allowed.
+	HostNetworkSources []string
 }
 
 // TODO: Clean these up into a singleton
@@ -46,10 +54,10 @@ func Initialize(c Capabilities) {
 }
 
 // Setup the capability set.  It wraps Initialize for improving usibility.
-func Setup(allowPrivileged bool, hostNetworkSources []string, perConnectionBytesPerSec int64) {
+func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64) {
 	Initialize(Capabilities{
 		AllowPrivileged:                        allowPrivileged,
-		HostNetworkSources:                     hostNetworkSources,
+		PrivilegedSources:                      privilegedSources,
 		PerConnectionBandwidthLimitBytesPerSec: perConnectionBytesPerSec,
 	})
 }
@@ -68,8 +76,10 @@ func Get() Capabilities {
 	// This check prevents clobbering of capabilities that might've been set via SetForTests
 	if capabilities == nil {
 		Initialize(Capabilities{
-			AllowPrivileged:    false,
-			HostNetworkSources: []string{},
+			AllowPrivileged: false,
+			PrivilegedSources: PrivilegedSources{
+				HostNetworkSources: []string{},
+			},
 		})
 	}
 	return *capabilities

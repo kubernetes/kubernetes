@@ -1,0 +1,376 @@
+From nobody Tue Aug 11 10:13:54 2015
+Content-Type: multipart/mixed; boundary="===============6024533374511606659=="
+MIME-Version: 1.0
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-env.conf"
+
+#upstart-job
+
+description "Prepare kube node environment"
+
+start on cloud-config
+
+script
+	set -o errexit
+	set -o nounset
+
+	# Set the hostname to the short version.
+	short_hostname=$(hostname -s)
+	hostname $short_hostname
+
+	# We have seen that GCE image may have strict host firewall rules which drop
+	# most inbound/forwarded packets. In such a case, add rules to accept all
+	# TCP/UDP packets.
+	if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+		echo "Add rules to accpet all inbound TCP/UDP packets"
+		iptables -A INPUT -w -p TCP -j ACCEPT
+		iptables -A INPUT -w -p UDP -j ACCEPT
+	fi
+	if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+		echo "Add rules to accpet all forwarded TCP/UDP packets"
+		iptables -A FORWARD -w -p TCP -j ACCEPT
+		iptables -A FORWARD -w -p UDP -j ACCEPT
+	fi
+	# Create required directories.
+	mkdir -p /var/lib/kubelet
+	mkdir -p /var/lib/kube-proxy
+	mkdir -p /etc/kubernetes/manifests
+
+	# Fetch kube-env from GCE metadata server.
+	curl --fail --silent --show-error \
+		-H "X-Google-Metadata-Request: True" \
+		-o /tmp/kube-env-yaml \
+		http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+	# Convert the yaml format file into a shell-style file.
+	eval $(python -c '''
+import pipes,sys,yaml
+for k,v in yaml.load(sys.stdin).iteritems():
+  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
+''' < /tmp/kube-env-yaml > /etc/kube-env)
+
+	 #Create the kubelet kubeconfig file.
+	. /etc/kube-env
+	if [ -z "${KUBELET_CA_CERT:-}" ]; then
+		KUBELET_CA_CERT="${CA_CERT}"
+	fi
+	cat > /var/lib/kubelet/kubeconfig << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    client-certificate-data: ${KUBELET_CERT}
+    client-key-data: ${KUBELET_KEY}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${KUBELET_CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+
+	# Create the kube-proxy config file.
+	cat > /var/lib/kube-proxy/kubeconfig << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+end script
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-packages.conf"
+
+#upstart-job
+
+description "Install packages needed to run kubernetes"
+
+start on cloud-config
+
+script
+	set -o errexit
+	set -o nounset
+
+	apt-get update
+	# Install docker and brctl if they are not in the image.
+	if ! which docker > /dev/null; then
+  	echo "Do not find docker. Install it."
+		# We should install the docker that passes qualification. At present, it is version 1.7.1.
+		curl -sSL https://get.docker.com/ubuntu/ | DOCKER_VERSION=1.7.1 sh
+	fi
+	if ! which brctl > /dev/null; then
+		echo "Do not find brctl. Install it."
+		apt-get install --yes bridge-utils
+	fi
+end script
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-additional-packages.conf"
+
+#upstart-job
+
+description "Install additional packages used by kubernetes"
+
+start on stopped kube-install-packages
+
+script
+	set -o errexit
+	set -o nounset
+
+	# Socat and nsenter are not required for spinning up a cluster. We move the
+	# installation here to be in parallel with the cluster creation.
+	if ! which socat > /dev/null; then
+		echo "Do not find socat. Install it."
+		apt-get install --yes socat
+	fi
+	if ! which nsenter > /dev/null; then
+		echo "Do not find nsenter. Install it."
+		# Note: this is an easy way to install nsenter, but may not be the fastest way.
+		# In addition, this may not be a trusted source. So, replace it if we have a
+		# better solution.
+		docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+	fi
+end script
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-minion.conf"
+
+#upstart-job
+
+description "Download and install k8s binaries and configurations"
+
+start on stopped kube-env
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-env
+	# For a testing cluster, we pull kubelet and kube-proxy binaries, and place them
+	# in /usr/local/bin. For a non-test cluster, we use the binaries pre-installed
+	# in the image, or pull and place them in /usr/bin if they are not pre-installed.
+	BINARY_PATH="/usr/bin/"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/"
+	fi
+	if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null || [ "${TEST_CLUSTER:-}" = "true" ]; then
+		cd /tmp
+		k8s_sha1="${SERVER_BINARY_TAR_URL##*/}.sha1"
+		echo "Downloading k8s tar sha1 file ${k8s_sha1}"
+		curl -Lo "${k8s_sha1}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SERVER_BINARY_TAR_URL}.sha1"
+		k8s_tar="${SERVER_BINARY_TAR_URL##*/}"
+		echo "Downloading k8s tar file ${k8s_tar}"
+		curl -Lo "${k8s_tar}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SERVER_BINARY_TAR_URL}"
+		# Validate hash.
+		actual=$(sha1sum ${k8s_tar} | awk '{ print $1 }') || true
+		if [ "${actual}" != "${SERVER_BINARY_TAR_HASH}" ]; then
+			echo "== ${k8s_tar} corrupted, sha1 ${actual} doesn't match expected ${SERVER_BINARY_TAR_HASH} =="
+		else
+			echo "Validated ${SERVER_BINARY_TAR_URL} SHA1 = ${SERVER_BINARY_TAR_HASH}"
+		fi
+		tar xzf "/tmp/${k8s_tar}" -C /tmp/ --overwrite
+		cp /tmp/kubernetes/server/bin/kubelet ${BINARY_PATH}
+		cp /tmp/kubernetes/server/bin/kube-proxy ${BINARY_PATH}
+		rm -rf "/tmp/kubernetes"
+		rm "/tmp/${k8s_tar}"
+		rm "/tmp/${k8s_sha1}"
+	fi
+
+	# Put saltbase configuration files in /etc/saltbase. We will use the add-on yaml files.
+	mkdir -p /etc/saltbase
+	cd /etc/saltbase
+	salt_sha1="${SALT_TAR_URL##*/}.sha1"
+	echo "Downloading Salt tar sha1 file ${salt_sha1}"
+	curl -Lo "${salt_sha1}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SALT_TAR_URL}.sha1"
+	salt_tar="${SALT_TAR_URL##*/}"
+	echo "Downloading Salt tar file ${salt_tar}"
+	curl -Lo "${salt_tar}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SALT_TAR_URL}"
+	# Validate hash.
+	actual=$(sha1sum ${salt_tar} | awk '{ print $1 }') || true
+	if [ "${actual}" != "${SALT_TAR_HASH}" ]; then
+		echo "== ${salt_tar} corrupted, sha1 ${actual} doesn't match expected ${SALT_TAR_HASH} =="
+	else
+		echo "Validated ${SALT_TAR_URL} SHA1 = ${SALT_TAR_HASH}"
+	fi
+	tar xzf "/etc/saltbase/${salt_tar}" -C /etc/saltbase/ --overwrite
+	rm "/etc/saltbase/${salt_sha1}"
+	rm "/etc/saltbase/${salt_tar}"
+end script
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kubelet.conf"
+
+#upstart-job
+
+description "Run kubelet service"
+
+start on stopped kube-install-minion and stopped kube-install-packages
+
+respawn
+
+script
+	set -o errexit
+	set -o nounset
+
+	# TODO(andyzheng0831): Add health check functionality.
+	. /etc/kube-env
+	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+		ARGS="${KUBELET_TEST_ARGS}"
+	fi
+	BINARY_PATH="/usr/bin/kubelet"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/kubelet"
+	fi
+	${BINARY_PATH} \
+		--api-servers=https://${KUBERNETES_MASTER_NAME} \
+		--enable-debugging-handlers=true \
+		--cloud-provider=gce \
+		--config=/etc/kubernetes/manifests \
+		--allow-privileged=false \
+		--cluster-dns=${DNS_SERVER_IP} \
+		--cluster-domain=${DNS_DOMAIN} \
+		--configure-cbr0=true \
+		--cgroup-root=/ \
+		--system-container=/system \
+		${ARGS}
+end script
+
+# Wait for 10s to start kubelet again.
+post-stop exec sleep 10
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-proxy.conf"
+
+#upstart-job
+
+description "Start kube-proxy service"
+
+start on stopped kube-install-minion and stopped kube-install-packages
+
+respawn
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-env
+	ARGS="--v=2"
+	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
+		ARGS="${KUBEPROXY_TEST_ARGS}"
+	fi
+	BINARY_PATH="/usr/bin/kube-proxy"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/kube-proxy"
+	fi
+	${BINARY_PATH} \
+		--master=https://${KUBERNETES_MASTER_NAME} \
+		--kubeconfig=/var/lib/kube-proxy/kubeconfig \
+		${ARGS}
+end script
+
+# Wait for 10s to start kube-proxy again.
+post-stop exec sleep 10
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-docker.conf"
+
+#upstart-job
+
+description "Restart docker daemon"
+
+# The condition "stopped kube-install-additional-packages" is to avoid
+# breaking nsenter installation, which is through a docker container.
+# It can be removed if we find a better way to install nsenter.
+start on started kubelet and stopped kube-install-additional-packages
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-env
+	# Assemble docker deamon options
+	echo "DOCKER_OPTS=\"-p /var/run/docker.pid ${EXTRA_DOCKER_OPTS} --log-level=\"debug\" --bridge cbr0 --iptables=false --ip-masq=false\"" > /etc/default/docker
+	# Make sure the network interface cbr0 is created before restarting docker daemon
+	while ! [ -L /sys/class/net/cbr0 ]; do
+		echo "Sleep 1 second to wait for cbr0"
+		sleep 1
+	done
+	initctl restart docker
+	# Remove docker0
+	ifconfig docker0 down
+	brctl delbr docker0
+end script
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-addons.conf"
+
+#upstart-job
+
+description "Install kubelet add-on manifest files"
+
+start on stopped kube-docker
+
+script
+	set -o errexit
+	set -o nounset
+
+	# Configuration files are located at /etc/saltbase.
+	. /etc/kube-env
+	# Fluentd
+	if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
+		if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
+			cp /etc/saltbase/kubernetes/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml /etc/kubernetes/manifests/
+		elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
+			cp /etc/saltbase/kubernetes/saltbase/salt/fluentd-es/fluentd-es.yaml /etc/kubernetes/manifests/
+		fi
+	fi
+	# Kube-registry-proxy
+	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
+		cp /etc/saltbase/kubernetes/saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml /etc/kubernetes/manifests/
+	fi
+end script
+
+--===============6024533374511606659==--
+

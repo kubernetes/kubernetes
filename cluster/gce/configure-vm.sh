@@ -272,6 +272,7 @@ enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
 enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+enable_cluster_registry: '$(echo "$ENABLE_CLUSTER_REGISTRY" | sed -e "s/'/''/g")'
 dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
@@ -303,6 +304,28 @@ EOF
 kubeproxy_test_args: '$(echo "$KUBEPROXY_TEST_ARGS" | sed -e "s/'/''/g")'
 EOF
     fi
+    # TODO: Replace this  with a persistent volume (and create it).
+    if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+cluster_registry_disk_type: gce
+cluster_registry_disk_size: $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZE})
+cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
+EOF
+    fi
+}
+
+# The job of this function is simple, but the basic regular expression syntax makes
+# this difficult to read. What we want to do is convert from [0-9]+B, KB, KiB, MB, etc
+# into [0-9]+, Ki, Mi, Gi, etc.
+# This is done in two steps:
+#   1. Convert from [0-9]+X?i?B into [0-9]X? (X denotes the prefix, ? means the field
+#      is optional.
+#   2. Attach an 'i' to the end of the string if we find a letter.
+# The two step process is needed to handle the edge case in which we want to convert
+# a raw byte count, as the result should be a simple number (e.g. 5B -> 5).
+function convert-bytes-gce-kube() {
+  local -r storage_space=$1
+  echo "${storage_space}" | sed -e 's/^\([0-9]\+\)\([A-Z]\)\?i\?B$/\1\2/g' -e 's/\([A-Z]\)$/\1i/'
 }
 
 # This should only happen on cluster initialization.

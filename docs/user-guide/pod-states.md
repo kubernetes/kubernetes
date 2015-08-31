@@ -54,7 +54,7 @@ A pod containing containers that specify readiness probes will also report the R
 
 ## Container Probes
 
-A [Probe](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Handler):
+A [Probe](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#Handler):
 
 * `ExecAction`: executes a specified command inside the container expecting on success that the command exits with status code 0.
 * `TCPSocketAction`: performs a tcp check against the container's IP address on a specified port expecting on success that the port is open.
@@ -73,11 +73,11 @@ Currently, the kubelet optionally performs two independent diagnostics on runnin
 
 ## Container Statuses
 
-More detailed information about the current (and previous) container statuses can be found in [ContainerStatuses](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#PodStatus). The information reported depends on the current [ContainerState](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#ContainerState), which may be Waiting, Running, or Terminated.
+More detailed information about the current (and previous) container statuses can be found in [ContainerStatuses](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#PodStatus). The information reported depends on the current [ContainerState](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#ContainerState), which may be Waiting, Running, or Terminated.
 
 ## RestartPolicy
 
-The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If RestartPolicy is not set, the default value is `Always`. RestartPolicy applies to all containers in the pod. RestartPolicy only refers to restarts of the containers by the Kubelet on the same node. As discussed in the [pods document](pods.md#durability-of-pods-or-lack-thereof), once bound to a node, a pod will never be rebound to another node. This means that some kind of controller is necessary in order for a pod to survive node failure, even if just a single pod at a time is desired.
+The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If RestartPolicy is not set, the default value is `Always`. RestartPolicy applies to all containers in the pod. RestartPolicy only refers to restarts of the containers by the Kubelet on the same node. Failed containers that are restarted by Kubelet, are restarted with an exponential back-off delay, the delay is in multiples of sync-frequency 0, 1x, 2x, 4x, 8x ... capped at 5 minutes and is reset after 10 minutes of successful execution. As discussed in the [pods document](pods.md#durability-of-pods-or-lack-thereof), once bound to a node, a pod will never be rebound to another node. This means that some kind of controller is necessary in order for a pod to survive node failure, even if just a single pod at a time is desired.
 
 The only controller we have today is [`ReplicationController`](replication-controller.md).  `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`.  `ReplicationController` should refuse to instantiate any pod that has a different restart policy.
 

@@ -96,14 +96,15 @@ account, and the controller will update it with a generated token:
 ```json
 secret.json:
 {
-	"kind": "Secret",
-	"metadata": {
-		"name": "mysecretname",
-		"annotations": {
-			"kubernetes.io/service-account.name": "myserviceaccount"
-		}
-	}
-	"type": "kubernetes.io/service-account-token"
+    "kind": "Secret",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "mysecretname",
+        "annotations": {
+            "kubernetes.io/service-account.name": "myserviceaccount"
+        }
+    },
+    "type": "kubernetes.io/service-account-token"
 }
 ```
 
@@ -117,6 +118,11 @@ kubectl describe secret mysecretname
 ```sh
 kubectl delete secret mysecretname
 ```
+
+### Service Account Controller
+
+Service Account Controller manages ServiceAccount inside namespaces, and ensures
+a ServiceAccount named "default" exists in every active namespace.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

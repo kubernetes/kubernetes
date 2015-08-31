@@ -235,7 +235,7 @@ You have several choices for Kubernetes images:
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
     can be converted into docker images using a command like
     `docker load -i kube-apiserver.tar`
-  - You can verify if the image is loaded successfully with the right reposity and tag using
+  - You can verify if the image is loaded successfully with the right repository and tag using
     command like `docker images`
 
 For etcd, you can:
@@ -535,6 +535,7 @@ You will need to run one or more instances of etcd.
 availability.
 
 To run an etcd instance:
+
 1. copy `cluster/saltbase/salt/etcd/etcd.manifest`
 1. make any modifications needed
 1. start the pod by putting it into the kubelet manifest directory

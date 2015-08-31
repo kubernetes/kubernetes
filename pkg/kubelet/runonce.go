@@ -53,10 +53,15 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 
 // runOnce runs a given set of pods and returns their status.
 func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
-	kl.handleNotFittingPods(pods)
-
 	ch := make(chan RunPodResult)
+	admitted := []*api.Pod{}
 	for _, pod := range pods {
+		// Check if we can admit the pod.
+		if ok, reason, message := kl.canAdmitPod(append(admitted, pod), pod); !ok {
+			kl.rejectPod(pod, reason, message)
+		} else {
+			admitted = append(admitted, pod)
+		}
 		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{pod, err}

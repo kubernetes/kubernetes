@@ -39,7 +39,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/golang/glog"
@@ -110,6 +109,16 @@ type ELB interface {
 	DescribeLoadBalancers(*elb.DescribeLoadBalancersInput) (*elb.DescribeLoadBalancersOutput, error)
 	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
 	DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error)
+
+	DetachLoadBalancerFromSubnets(*elb.DetachLoadBalancerFromSubnetsInput) (*elb.DetachLoadBalancerFromSubnetsOutput, error)
+	AttachLoadBalancerToSubnets(*elb.AttachLoadBalancerToSubnetsInput) (*elb.AttachLoadBalancerToSubnetsOutput, error)
+
+	CreateLoadBalancerListeners(*elb.CreateLoadBalancerListenersInput) (*elb.CreateLoadBalancerListenersOutput, error)
+	DeleteLoadBalancerListeners(*elb.DeleteLoadBalancerListenersInput) (*elb.DeleteLoadBalancerListenersOutput, error)
+
+	ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsToLoadBalancerInput) (*elb.ApplySecurityGroupsToLoadBalancerOutput, error)
+
+	ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error)
 }
 
 // This is a simple pass-through of the Autoscaling client interface, which allows for testing
@@ -770,183 +779,6 @@ func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 func (aws *AWSCloud) List(filter string) ([]string, error) {
 	// TODO: Should really use tag query. No need to go regexp.
 	return aws.getInstancesByRegex(filter)
-}
-
-// GetNodeResources implements Instances.GetNodeResources
-func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	instance, err := aws.getInstanceByNodeName(name)
-	if err != nil {
-		return nil, err
-	}
-
-	resources, err := getResourcesByInstanceType(orEmpty(instance.InstanceType))
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
-}
-
-// Builds an api.NodeResources
-// cpu is in ecus, memory is in GiB
-// We pass the family in so that we could provide more info (e.g. GPU or not)
-func makeNodeResources(family string, cpu float64, memory float64) (*api.NodeResources, error) {
-	return &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(int64(cpu*1000), resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(int64(memory*1024*1024*1024), resource.BinarySI),
-		},
-	}, nil
-}
-
-// Maps an EC2 instance type to k8s resource information
-func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error) {
-	// There is no API for this (that I know of)
-	switch instanceType {
-	// t2: Burstable
-	// TODO: The ECUs are fake values (because they are burstable), so this is just a guess...
-	case "t1.micro":
-		return makeNodeResources("t1", 0.125, 0.615)
-
-		// t2: Burstable
-		// TODO: The ECUs are fake values (because they are burstable), so this is just a guess...
-	case "t2.micro":
-		return makeNodeResources("t2", 0.25, 1)
-	case "t2.small":
-		return makeNodeResources("t2", 0.5, 2)
-	case "t2.medium":
-		return makeNodeResources("t2", 1, 4)
-
-		// c1: Compute optimized
-	case "c1.medium":
-		return makeNodeResources("c1", 5, 1.7)
-	case "c1.xlarge":
-		return makeNodeResources("c1", 20, 7)
-
-		// cc2: Compute optimized
-	case "cc2.8xlarge":
-		return makeNodeResources("cc2", 88, 60.5)
-
-		// cg1: GPU instances
-	case "cg1.4xlarge":
-		return makeNodeResources("cg1", 33.5, 22.5)
-
-		// cr1: Memory optimized
-	case "cr1.8xlarge":
-		return makeNodeResources("cr1", 88, 244)
-
-		// c3: Compute optimized
-	case "c3.large":
-		return makeNodeResources("c3", 7, 3.75)
-	case "c3.xlarge":
-		return makeNodeResources("c3", 14, 7.5)
-	case "c3.2xlarge":
-		return makeNodeResources("c3", 28, 15)
-	case "c3.4xlarge":
-		return makeNodeResources("c3", 55, 30)
-	case "c3.8xlarge":
-		return makeNodeResources("c3", 108, 60)
-
-		// c4: Compute optimized
-	case "c4.large":
-		return makeNodeResources("c4", 8, 3.75)
-	case "c4.xlarge":
-		return makeNodeResources("c4", 16, 7.5)
-	case "c4.2xlarge":
-		return makeNodeResources("c4", 31, 15)
-	case "c4.4xlarge":
-		return makeNodeResources("c4", 62, 30)
-	case "c4.8xlarge":
-		return makeNodeResources("c4", 132, 60)
-
-		// g2: GPU instances
-	case "g2.2xlarge":
-		return makeNodeResources("g2", 26, 15)
-
-		// hi1: Storage optimized (SSD)
-	case "hi1.4xlarge":
-		return makeNodeResources("hs1", 35, 60.5)
-
-		// hs1: Storage optimized (HDD)
-	case "hs1.8xlarge":
-		return makeNodeResources("hs1", 35, 117)
-
-		// d2: Dense instances (next-gen of hs1)
-	case "d2.xlarge":
-		return makeNodeResources("d2", 14, 30.5)
-	case "d2.2xlarge":
-		return makeNodeResources("d2", 28, 61)
-	case "d2.4xlarge":
-		return makeNodeResources("d2", 56, 122)
-	case "d2.8xlarge":
-		return makeNodeResources("d2", 116, 244)
-
-		// m1: General purpose
-	case "m1.small":
-		return makeNodeResources("m1", 1, 1.7)
-	case "m1.medium":
-		return makeNodeResources("m1", 2, 3.75)
-	case "m1.large":
-		return makeNodeResources("m1", 4, 7.5)
-	case "m1.xlarge":
-		return makeNodeResources("m1", 8, 15)
-
-		// m2: Memory optimized
-	case "m2.xlarge":
-		return makeNodeResources("m2", 6.5, 17.1)
-	case "m2.2xlarge":
-		return makeNodeResources("m2", 13, 34.2)
-	case "m2.4xlarge":
-		return makeNodeResources("m2", 26, 68.4)
-
-		// m3: General purpose
-	case "m3.medium":
-		return makeNodeResources("m3", 3, 3.75)
-	case "m3.large":
-		return makeNodeResources("m3", 6.5, 7.5)
-	case "m3.xlarge":
-		return makeNodeResources("m3", 13, 15)
-	case "m3.2xlarge":
-		return makeNodeResources("m3", 26, 30)
-
-		// m4: General purpose
-	case "m4.large":
-		return makeNodeResources("m4", 6.5, 8)
-	case "m4.xlarge":
-		return makeNodeResources("m4", 13, 16)
-	case "m4.2xlarge":
-		return makeNodeResources("m4", 26, 32)
-	case "m4.4xlarge":
-		return makeNodeResources("m4", 53.5, 64)
-	case "m4.10xlarge":
-		return makeNodeResources("m4", 124.5, 160)
-
-		// i2: Storage optimized (SSD)
-	case "i2.xlarge":
-		return makeNodeResources("i2", 14, 30.5)
-	case "i2.2xlarge":
-		return makeNodeResources("i2", 27, 61)
-	case "i2.4xlarge":
-		return makeNodeResources("i2", 53, 122)
-	case "i2.8xlarge":
-		return makeNodeResources("i2", 104, 244)
-
-		// r3: Memory optimized
-	case "r3.large":
-		return makeNodeResources("r3", 6.5, 15)
-	case "r3.xlarge":
-		return makeNodeResources("r3", 13, 30.5)
-	case "r3.2xlarge":
-		return makeNodeResources("r3", 26, 61)
-	case "r3.4xlarge":
-		return makeNodeResources("r3", 52, 122)
-	case "r3.8xlarge":
-		return makeNodeResources("r3", 104, 244)
-
-	default:
-		glog.Errorf("unknown instanceType: %s", instanceType)
-		return nil, nil
-	}
 }
 
 // GetZone implements Zones.GetZone
@@ -1759,11 +1591,10 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 	}
 }
 
-// CreateTCPLoadBalancer implements TCPLoadBalancer.CreateTCPLoadBalancer
-// TODO(justinsb): This must be idempotent
+// EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anwyay.
-func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
+func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
 
 	elbClient, err := s.getELBClient(region)
 	if err != nil {
@@ -1794,7 +1625,7 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 	}
 
 	// Construct list of configured subnets
-	subnetIds := []*string{}
+	subnetIDs := []string{}
 	{
 		request := &ec2.DescribeSubnetsInput{}
 		filters := []*ec2.Filter{}
@@ -1810,7 +1641,7 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 		//	zones := []string{}
 		for _, subnet := range subnets {
-			subnetIds = append(subnetIds, subnet.SubnetID)
+			subnetIDs = append(subnetIDs, orEmpty(subnet.SubnetID))
 			if !strings.HasPrefix(orEmpty(subnet.AvailabilityZone), region) {
 				glog.Error("found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
 				return nil, fmt.Errorf("invalid AZ for region")
@@ -1849,60 +1680,37 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 			return nil, err
 		}
 	}
+	securityGroupIDs := []string{securityGroupID}
+
+	// Figure out what mappings we want on the load balancer
+	listeners := []*elb.Listener{}
+	for _, port := range ports {
+		if port.NodePort == 0 {
+			glog.Errorf("Ignoring port without NodePort defined: %v", port)
+			continue
+		}
+		instancePort := int64(port.NodePort)
+		loadBalancerPort := int64(port.Port)
+		protocol := strings.ToLower(string(port.Protocol))
+
+		listener := &elb.Listener{}
+		listener.InstancePort = &instancePort
+		listener.LoadBalancerPort = &loadBalancerPort
+		listener.Protocol = &protocol
+		listener.InstanceProtocol = &protocol
+
+		listeners = append(listeners, listener)
+	}
 
 	// Build the load balancer itself
-	var loadBalancer *elb.LoadBalancerDescription
-	{
-		loadBalancer, err = s.describeLoadBalancer(region, name)
-		if err != nil {
-			return nil, err
-		}
+	loadBalancer, err := s.ensureLoadBalancer(region, name, listeners, subnetIDs, securityGroupIDs)
+	if err != nil {
+		return nil, err
+	}
 
-		if loadBalancer == nil {
-			createRequest := &elb.CreateLoadBalancerInput{}
-			createRequest.LoadBalancerName = aws.String(name)
-
-			listeners := []*elb.Listener{}
-			for _, port := range ports {
-				if port.NodePort == 0 {
-					glog.Errorf("Ignoring port without NodePort defined: %v", port)
-					continue
-				}
-				instancePort := int64(port.NodePort)
-				loadBalancerPort := int64(port.Port)
-				protocol := strings.ToLower(string(port.Protocol))
-
-				listener := &elb.Listener{}
-				listener.InstancePort = &instancePort
-				listener.LoadBalancerPort = &loadBalancerPort
-				listener.Protocol = &protocol
-				listener.InstanceProtocol = &protocol
-
-				listeners = append(listeners, listener)
-			}
-
-			createRequest.Listeners = listeners
-
-			// We are supposed to specify one subnet per AZ.
-			// TODO: What happens if we have more than one subnet per AZ?
-			createRequest.Subnets = subnetIds
-
-			createRequest.SecurityGroups = []*string{&securityGroupID}
-
-			glog.Info("Creating load balancer with name: ", name)
-			_, err := elbClient.CreateLoadBalancer(createRequest)
-			if err != nil {
-				return nil, err
-			}
-
-			loadBalancer, err = s.describeLoadBalancer(region, name)
-			if err != nil {
-				glog.Warning("Unable to retrieve load balancer immediately after creation")
-				return nil, err
-			}
-		} else {
-			// TODO: Verify that load balancer configuration matches?
-		}
+	err = s.ensureLoadBalancerHealthCheck(region, loadBalancer, listeners)
+	if err != nil {
+		return nil, err
 	}
 
 	err = s.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
@@ -1911,22 +1719,12 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 		return nil, err
 	}
 
-	registerRequest := &elb.RegisterInstancesWithLoadBalancerInput{}
-	registerRequest.LoadBalancerName = loadBalancer.LoadBalancerName
-	for _, instance := range instances {
-		registerInstance := &elb.Instance{}
-		registerInstance.InstanceID = instance.InstanceID
-		registerRequest.Instances = append(registerRequest.Instances, registerInstance)
-	}
-
-	registerResponse, err := elbClient.RegisterInstancesWithLoadBalancer(registerRequest)
+	err = s.ensureLoadBalancerInstances(elbClient, orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
-		// TODO: Is it better to delete the load balancer entirely?
-		glog.Warningf("Error registering instances with load-balancer %s: %v", name, err)
+		glog.Warning("Error registering instances with the load balancer: %v", err)
 		return nil, err
 	}
 
-	glog.V(1).Infof("Updated instances registered with load-balancer %s: %v", name, registerResponse.Instances)
 	glog.V(1).Infof("Loadbalancer %s has DNS name %s", name, orEmpty(loadBalancer.DNSName))
 
 	// TODO: Wait for creation?
@@ -1975,7 +1773,7 @@ func findSecurityGroupForInstance(instance *ec2.Instance) *string {
 
 		if securityGroupId != nil {
 			// We create instances with one SG
-			glog.Warning("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceID), *securityGroupId)
+			glog.Warningf("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceID), *securityGroupId)
 			continue
 		} else {
 			securityGroupId = securityGroup.GroupID
@@ -2173,6 +1971,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 			}
 
 			if len(securityGroupIDs) == 0 {
+				glog.V(2).Info("deleted all security groups for load balancer: ", name)
 				break
 			}
 
@@ -2210,51 +2009,9 @@ func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) er
 		return fmt.Errorf("Load balancer not found")
 	}
 
-	existingInstances := map[string]*elb.Instance{}
-	for _, instance := range lb.Instances {
-		existingInstances[orEmpty(instance.InstanceID)] = instance
-	}
-
-	wantInstances := map[string]*ec2.Instance{}
-	for _, instance := range instances {
-		wantInstances[orEmpty(instance.InstanceID)] = instance
-	}
-
-	addInstances := []*elb.Instance{}
-	for instanceId := range wantInstances {
-		addInstance := &elb.Instance{}
-		addInstance.InstanceID = aws.String(instanceId)
-		addInstances = append(addInstances, addInstance)
-	}
-
-	removeInstances := []*elb.Instance{}
-	for instanceId := range existingInstances {
-		_, found := wantInstances[instanceId]
-		if !found {
-			removeInstance := &elb.Instance{}
-			removeInstance.InstanceID = aws.String(instanceId)
-			removeInstances = append(removeInstances, removeInstance)
-		}
-	}
-
-	if len(addInstances) > 0 {
-		registerRequest := &elb.RegisterInstancesWithLoadBalancerInput{}
-		registerRequest.Instances = addInstances
-		registerRequest.LoadBalancerName = lb.LoadBalancerName
-		_, err = elbClient.RegisterInstancesWithLoadBalancer(registerRequest)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(removeInstances) > 0 {
-		deregisterRequest := &elb.DeregisterInstancesFromLoadBalancerInput{}
-		deregisterRequest.Instances = removeInstances
-		deregisterRequest.LoadBalancerName = lb.LoadBalancerName
-		_, err = elbClient.DeregisterInstancesFromLoadBalancer(deregisterRequest)
-		if err != nil {
-			return err
-		}
+	err = s.ensureLoadBalancerInstances(elbClient, orEmpty(lb.LoadBalancerName), lb.Instances, instances)
+	if err != nil {
+		return nil
 	}
 
 	err = s.updateInstanceSecurityGroupsForLoadBalancer(lb, instances)

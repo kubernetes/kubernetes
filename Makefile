@@ -32,6 +32,27 @@ all:
 	hack/build-go.sh $(WHAT)
 .PHONY: all
 
+# Runs all the presubmission verifications.
+#
+# Args:
+#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
+#
+# Example:
+#   make verify
+#   make verify BRANCH=branch_x
+verify:
+	hack/verify-gofmt.sh
+	hack/verify-boilerplate.sh
+	hack/verify-description.sh
+	hack/verify-generated-conversions.sh
+	hack/verify-generated-deep-copies.sh
+	hack/verify-generated-docs.sh
+	hack/verify-swagger-spec.sh
+	hack/verify-linkcheck.sh
+	hack/verify-flags-underscore.py
+	hack/verify-godeps.sh $(BRANCH)
+.PHONY: verify
+
 # Build and run tests.
 #
 # Args:

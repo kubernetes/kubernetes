@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -36,6 +37,7 @@ type AnnotateOptions struct {
 	newAnnotations    map[string]string
 	removeAnnotations []string
 	builder           *resource.Builder
+	filenames         []string
 
 	overwrite       bool
 	all             bool
@@ -58,6 +60,9 @@ resourcequotas (quota) or secrets.`
 # If the same annotation is set multiple times, only the last value will be applied
 $ kubectl annotate pods foo description='my frontend'
 
+# Update a pod identified by type and name in "pod.json"
+$ kubectl annotate -f pod.json description='my frontend'
+
 # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
 $ kubectl annotate --overwrite pods foo description='my frontend running nginx'
 
@@ -76,11 +81,12 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "annotate [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
+		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the annotations on a resource",
 		Long:    annotate_long,
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
+			options.filenames = cmdutil.GetFlagStringSlice(cmd, "filename")
 			if err := options.Complete(f, args, out); err != nil {
 				cmdutil.CheckErr(err)
 			}
@@ -96,12 +102,14 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
+	usage := "Filename, directory, or URL to a file identifying the resource to update the annotation"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
 // Complete adapts from the command line args and factory to the data required.
 func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string, out io.Writer) (err error) {
-	namespace, _, err := f.DefaultNamespace()
+	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -124,7 +132,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string, out io.Wri
 			return fmt.Errorf("all resources must be specified before annotation changes: %s", s)
 		}
 	}
-	if len(o.resources) < 1 {
+	if len(o.resources) < 1 && len(o.filenames) == 0 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(annotationArgs) < 1 {
@@ -139,6 +147,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string, out io.Wri
 	o.builder = resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, o.filenames...).
 		ResourceTypeOrNameArgs(o.all, o.resources...).
 		Flatten().
 		Latest()
@@ -166,16 +175,19 @@ func (o AnnotateOptions) RunAnnotate() error {
 	if err := r.Err(); err != nil {
 		return err
 	}
-	return r.Visit(func(info *resource.Info) error {
-		_, err := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
+	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		_, uErr := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
 			err := o.updateAnnotations(obj)
 			if err != nil {
 				return err
 			}
 			return nil
 		})
-		if err != nil {
-			return err
+		if uErr != nil {
+			return uErr
 		}
 		return nil
 	})

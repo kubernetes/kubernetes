@@ -35,7 +35,7 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes with Calico Networking
 
 ## Introduction
 
-This document describes how to deploy Kubernetes on ubuntu bare metal nodes with Calico Networking plugin. See [projectcalico.org](http://projectcalico.org) for more information on what Calico is, and [the calicoctl github](https://github.com/Metaswitch/calico-docker) for more information on the command-line tool, `calicoctl`.
+This document describes how to deploy Kubernetes on ubuntu bare metal nodes with Calico Networking plugin. See [projectcalico.org](http://projectcalico.org) for more information on what Calico is, and [the calicoctl github](https://github.com/projectcalico/calico-docker) for more information on the command-line tool, `calicoctl`.
 
 This guide will set up a simple Kubernetes cluster with a master and two nodes. We will start the following processes with systemd:
 
@@ -91,7 +91,7 @@ sudo mv -f network-environment /etc
 
 ```
 # Get the Kubernetes Source
-wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.20.2/kubernetes.tar.gz
+wget https://github.com/kubernetes/kubernetes/releases/download/v1.0.3/kubernetes.tar.gz
 
 # Untar it
 tar -xf kubernetes.tar.gz
@@ -130,7 +130,7 @@ In order to allow the master to route to pods on our nodes, we will launch the c
 
 ```
 # Install the calicoctl binary, which will be used to launch calico
-wget https://github.com/Metaswitch/calico-docker/releases/download/v0.5.1/calicoctl
+wget https://github.com/projectcalico/calico-docker/releases/download/v0.5.5/calicoctl
 chmod +x calicoctl
 sudo cp -f calicoctl /usr/bin
 
@@ -163,7 +163,7 @@ cp calico-kubernetes-ubuntu-demo-master/node/network-environment-template networ
 
 3.) Edit `network-environment` to represent your current host's settings.
 
-4.) Move `netework-environment` into `/etc`
+4.) Move `network-environment` into `/etc`
 
 ```
 sudo mv -f network-environment /etc
@@ -207,7 +207,7 @@ The Docker daemon must be started and told to use the already configured cbr0 in
 
 ```
 # Get the calicoctl binary
-wget https://github.com/Metaswitch/calico-docker/releases/download/v0.5.1/calicoctl
+wget https://github.com/projectcalico/calico-docker/releases/download/v0.5.5/calicoctl
 chmod +x calicoctl
 sudo cp -f calicoctl /usr/bin
 
@@ -232,7 +232,7 @@ ETCD_AUTHORITY=<MASTER_IP>:4001 calicoctl pool add 192.168.0.0/16
 
 ```
 # Get the Kubernetes Source
-wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.20.2/kubernetes.tar.gz
+wget https://github.com/kubernetes/kubernetes/releases/download/v1.0.3/kubernetes.tar.gz
 
 # Untar it
 tar -xf kubernetes.tar.gz

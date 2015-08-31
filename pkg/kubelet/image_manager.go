@@ -25,7 +25,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
@@ -118,12 +118,12 @@ func (im *realImageManager) Start() error {
 		return err
 	}
 
-	go util.Forever(func() {
+	go util.Until(func() {
 		err := im.detectImages(time.Now())
 		if err != nil {
 			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
 		}
-	}, 5*time.Minute)
+	}, 5*time.Minute, util.NeverStop)
 
 	return nil
 }

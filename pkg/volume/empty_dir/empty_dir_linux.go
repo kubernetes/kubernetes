@@ -37,9 +37,9 @@ type realMountDetector struct {
 
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
 	glog.V(5).Infof("Determining mount medium of %v", path)
-	isMnt, err := m.mounter.IsMountPoint(path)
+	notMnt, err := m.mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
-		return 0, false, fmt.Errorf("IsMountPoint(%q): %v", path, err)
+		return 0, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
 	}
 	buf := syscall.Statfs_t{}
 	if err := syscall.Statfs(path, &buf); err != nil {
@@ -48,9 +48,9 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 
 	glog.V(5).Info("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
-		return mediumMemory, isMnt, nil
+		return mediumMemory, !notMnt, nil
 	}
-	return mediumUnknown, isMnt, nil
+	return mediumUnknown, !notMnt, nil
 }
 
 // selinuxEnabled determines whether SELinux is enabled.

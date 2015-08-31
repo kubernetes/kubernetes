@@ -98,7 +98,10 @@ func (r *Result) Infos() ([]*Info, error) {
 	}
 
 	infos := []*Info{}
-	err := r.visitor.Visit(func(info *Info) error {
+	err := r.visitor.Visit(func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
 		infos = append(infos, info)
 		return nil
 	})

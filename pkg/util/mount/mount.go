@@ -18,7 +18,12 @@ limitations under the License.
 // an alternate platform, we will need to abstract further.
 package mount
 
-import "github.com/golang/glog"
+import (
+	"strings"
+
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/exec"
+)
 
 type Interface interface {
 	// Mount mounts source to target as fstype with given options.
@@ -30,8 +35,8 @@ type Interface interface {
 	// it could change between chunked reads). This is guaranteed to be
 	// consistent.
 	List() ([]MountPoint, error)
-	// IsMountPoint determines if a directory is a mountpoint.
-	IsMountPoint(file string) (bool, error)
+	// IsLikelyNotMountPoint determines if a directory is a mountpoint.
+	IsLikelyNotMountPoint(file string) (bool, error)
 }
 
 // This represents a single line in /proc/mounts or /etc/fstab.
@@ -42,6 +47,69 @@ type MountPoint struct {
 	Opts   []string
 	Freq   int
 	Pass   int
+}
+
+// SafeFormatAndMount probes a device to see if it is formatted. If
+// so it mounts it otherwise it formats it and mounts it
+type SafeFormatAndMount struct {
+	Interface
+	Runner exec.Interface
+}
+
+// Mount mounts the given disk. If the disk is not formatted and the disk is not being mounted as read only
+// it will format the disk first then mount it.
+func (mounter *SafeFormatAndMount) Mount(source string, target string, fstype string, options []string) error {
+	// Don't attempt to format if mounting as readonly. Go straight to mounting.
+	for _, option := range options {
+		if option == "ro" {
+			return mounter.Interface.Mount(source, target, fstype, options)
+		}
+	}
+	return mounter.formatAndMount(source, target, fstype, options)
+}
+
+// formatAndMount uses unix utils to format and mount the given disk
+func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+	options = append(options, "defaults")
+
+	// Try to mount the disk
+	err := mounter.Interface.Mount(source, target, fstype, options)
+	if err != nil {
+		// It is possible that this disk is not formatted. Double check using 'file'
+		notFormatted, err := mounter.diskLooksUnformatted(source)
+		if err == nil && notFormatted {
+			// Disk is unformatted so format it.
+			// Use 'ext4' as the default
+			if len(fstype) == 0 {
+				fstype = "ext4"
+			}
+			args := []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
+			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
+			_, err := cmd.CombinedOutput()
+			if err == nil {
+				// the disk has been formatted sucessfully try to mount it again.
+				return mounter.Interface.Mount(source, target, fstype, options)
+			}
+			return err
+		}
+	}
+	return err
+}
+
+// diskLooksUnformatted uses 'file' to see if the given disk is unformated
+func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
+	args := []string{"-L", "--special-files", disk}
+	cmd := mounter.Runner.Command("file", args...)
+	dataOut, err := cmd.CombinedOutput()
+
+	// TODO (#13212): check if this disk has partitions and return false, and
+	// an error if so.
+
+	if err != nil {
+		return false, err
+	}
+
+	return !strings.Contains(string(dataOut), "filesystem"), nil
 }
 
 // New returns a mount.Interface for the current system.

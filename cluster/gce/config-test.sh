@@ -58,10 +58,10 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=4}"
 
 KUBELET_TEST_ARGS="--max-pods=100 $TEST_CLUSTER_LOG_LEVEL"
-APISERVER_TEST_ARGS="TEST_CLUSTER_LOG_LEVEL"
-CONTROLLER_MANAGER_TEST_ARGS="TEST_CLUSTER_LOG_LEVEL"
-SCHEDULER_TEST_ARGS="TEST_CLUSTER_LOG_LEVEL"
-KUBEPROXY_TEST_ARGS="TEST_CLUSTER_LOG_LEVEL"
+APISERVER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
+CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
+SCHEDULER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
+KUBEPROXY_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
@@ -82,6 +82,12 @@ DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
+# Optional: Install cluster docker registry.
+ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-true}"
+CLUSTER_REGISTRY_DISK="${CLUSTER_REGISTRY_DISK:-${INSTANCE_PREFIX}-kube-system-kube-registry}"
+CLUSTER_REGISTRY_DISK_SIZE="${CLUSTER_REGISTRY_DISK_SIZE:-200GB}"
+CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
+
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
@@ -98,3 +104,9 @@ ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContext
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
+
+# Optional: setting it to true denotes this is a testing cluster,
+# so that we can use pulled kubernetes binaries, even if binaries
+# are pre-installed in the image. Note that currently this logic
+# is only supported in trusty nodes.
+TEST_CLUSTER="${TEST_CLUSTER:-true}"

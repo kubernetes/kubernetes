@@ -31,7 +31,8 @@ type REST struct {
 	*etcdgeneric.Etcd
 }
 
-func NewStorage(s storage.Interface) *REST {
+// NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
+func NewREST(s storage.Interface) *REST {
 	prefix := "/limitranges"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.LimitRange{} },

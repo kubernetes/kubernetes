@@ -83,7 +83,12 @@ function verify-prereqs {
 
   if [ -z "${provider_found}" ]; then
     if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
-      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider, please fix and retry."
+      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider."
+      echo "Possible reasons could be: "
+      echo -e "\t- vmrun utility is not in your path"
+      echo -e "\t- Vagrant plugin was not found."
+      echo -e "\t- VAGRANT_DEFAULT_PROVIDER is set, but not found."
+      echo "Please fix and retry."
     else
       echo "Can't find the necessary components for any viable vagrant providers (e.g., virtualbox), please fix and retry."
     fi
@@ -133,7 +138,9 @@ function create-provision-scripts {
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
     echo "KUBE_USER='${KUBE_USER}'"
     echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
+    echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
     echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+    echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
     echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
@@ -246,19 +253,21 @@ function verify-cluster {
   }
 
   (
+    # ensures KUBECONFIG is set
+    get-kubeconfig-basicauth
     echo
     echo "Kubernetes cluster is running.  The master is running at:"
     echo
     echo "  https://${MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
+    echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
     )
 }
 
 # Instantiate a kubernetes cluster
 function kube-up {
-  get-password
+  gen-kube-basicauth
   get-tokens
   create-provision-scripts
 
@@ -288,7 +297,7 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
-  get-password
+  get-kubeconfig-basicauth
   create-provision-scripts
   vagrant provision
 }
@@ -307,13 +316,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
   kube-down
-}
-
-# Set the {user} and {password} environment values required to interact with provider
-function get-password {
-  export KUBE_USER=vagrant
-  export KUBE_PASSWORD=vagrant
-  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD" 1>&2
 }
 
 # Find the minion name based on the IP address

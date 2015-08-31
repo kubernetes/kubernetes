@@ -234,7 +234,6 @@ func TestValidateAnnotations(t *testing.T) {
 }
 
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
-
 	objMeta := api.ObjectMeta{Name: name}
 	if namespace != "" {
 		objMeta.Namespace = namespace
@@ -247,7 +246,6 @@ func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *a
 }
 
 func TestValidatePersistentVolumes(t *testing.T) {
-
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		volume            *api.PersistentVolume
@@ -358,7 +356,6 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 }
 
 func TestValidatePersistentVolumeClaim(t *testing.T) {
-
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		claim             *api.PersistentVolumeClaim
@@ -667,7 +664,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'status.phase', Details: supported values: metadata.name, metadata.namespace",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'status.phase', Details: supported values: metadata.name, metadata.namespace, status.podIP",
 		},
 	}
 	for _, tc := range errorCases {
@@ -802,7 +799,6 @@ func TestValidatePullPolicy(t *testing.T) {
 			t.Errorf("case[%s] expected policy %v, got %v", k, v.ExpectedPolicy, ctr.ImagePullPolicy)
 		}
 	}
-
 }
 
 func getResourceLimits(cpu, memory string) api.ResourceList {
@@ -1317,6 +1313,9 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
+	now := util.Now()
+	grace := int64(30)
+	grace2 := int64(31)
 	tests := []struct {
 		a       api.Pod
 		b       api.Pod
@@ -1402,6 +1401,30 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			false,
 			"more containers",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
+				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
+			},
+			true,
+			"deletion timestamp filled out",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
+				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
+				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
+			},
+			false,
+			"deletion grace period seconds cleared",
 		},
 		{
 			api.Pod{
@@ -1721,23 +1744,23 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid publicIPs localhost",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.DeprecatedPublicIPs = []string{"127.0.0.1"}
+				s.Spec.ExternalIPs = []string{"127.0.0.1"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid publicIPs",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.DeprecatedPublicIPs = []string{"0.0.0.0"}
+				s.Spec.ExternalIPs = []string{"0.0.0.0"}
 			},
 			numErrs: 1,
 		},
 		{
-			name: "valid publicIPs host",
+			name: "invalid publicIPs host",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.DeprecatedPublicIPs = []string{"myhost.mydomain"}
+				s.Spec.ExternalIPs = []string{"myhost.mydomain"}
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 		{
 			name: "dup port name",
@@ -2117,7 +2140,6 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
-
 }
 
 func TestValidateReplicationController(t *testing.T) {
@@ -2329,418 +2351,6 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "spec.template" &&
 				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.replicas" &&
-				field != "spec.template.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.labels" {
-				t.Errorf("%s: missing prefix for: %v", k, errs[i])
-			}
-		}
-	}
-}
-
-func TestValidateDaemonUpdate(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validSelector2 := map[string]string{"c": "d"}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-
-	validPodSpecAbc := api.PodSpec{
-		RestartPolicy: api.RestartPolicyAlways,
-		DNSPolicy:     api.DNSClusterFirst,
-		Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-	}
-	validPodSpecDef := api.PodSpec{
-		RestartPolicy: api.RestartPolicyAlways,
-		DNSPolicy:     api.DNSClusterFirst,
-		Containers:    []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-	}
-	validPodSpecNodeSelector := api.PodSpec{
-		NodeSelector:  validSelector,
-		NodeName:      "xyz",
-		RestartPolicy: api.RestartPolicyAlways,
-		DNSPolicy:     api.DNSClusterFirst,
-		Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-	}
-	validPodSpecVolume := api.PodSpec{
-		Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
-		RestartPolicy: api.RestartPolicyAlways,
-		DNSPolicy:     api.DNSClusterFirst,
-		Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-	}
-
-	validPodTemplateAbc := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: validPodSpecAbc,
-		},
-	}
-	validPodTemplateNodeSelector := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: validPodSpecNodeSelector,
-		},
-	}
-	validPodTemplateAbc2 := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector2,
-			},
-			Spec: validPodSpecAbc,
-		},
-	}
-	validPodTemplateDef := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector2,
-			},
-			Spec: validPodSpecDef,
-		},
-	}
-	invalidPodTemplate := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-			ObjectMeta: api.ObjectMeta{
-				Labels: invalidSelector,
-			},
-		},
-	}
-	readWriteVolumePodTemplate := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: validPodSpecVolume,
-		},
-	}
-
-	type dcUpdateTest struct {
-		old    api.Daemon
-		update api.Daemon
-	}
-	successCases := []dcUpdateTest{
-		{
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-		},
-		{
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector2,
-					Template: &validPodTemplateAbc2.Template,
-				},
-			},
-		},
-		{
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateNodeSelector.Template,
-				},
-			},
-		},
-	}
-	for _, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateDaemonUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-	errorCases := map[string]dcUpdateTest{
-		"change daemon name": {
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-		},
-		"invalid selector": {
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: invalidSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-		},
-		"invalid pod": {
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &invalidPodTemplate.Template,
-				},
-			},
-		},
-		"change container image": {
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateDef.Template,
-				},
-			},
-		},
-		"read-write volume": {
-			old: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &validPodTemplateAbc.Template,
-				},
-			},
-			update: api.Daemon{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: api.DaemonSpec{
-					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Template,
-				},
-			},
-		},
-	}
-	for testName, errorCase := range errorCases {
-		if errs := ValidateDaemonUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
-	}
-}
-
-func TestValidateDaemon(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			},
-		},
-	}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	invalidPodTemplate := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-			ObjectMeta: api.ObjectMeta{
-				Labels: invalidSelector,
-			},
-		},
-	}
-	successCases := []api.Daemon{
-		{
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-	}
-	for _, successCase := range successCases {
-		if errs := ValidateDaemon(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := map[string]api.Daemon{
-		"zero-length ID": {
-			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"missing-namespace": {
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"empty selector": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.DaemonSpec{
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"selector_doesnt_match": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.DaemonSpec{
-				Selector: map[string]string{"foo": "bar"},
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"invalid manifest": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-			},
-		},
-		"invalid_label": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-				Labels: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"invalid_label 2": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-				Labels: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: api.DaemonSpec{
-				Template: &invalidPodTemplate.Template,
-			},
-		},
-		"invalid_annotation": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-				Annotations: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"invalid restart policy 1": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyOnFailure,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-					},
-					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
-					},
-				},
-			},
-		},
-		"invalid restart policy 2": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: api.DaemonSpec{
-				Selector: validSelector,
-				Template: &api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyNever,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-					},
-					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
-					},
-				},
-			},
-		},
-	}
-	for k, v := range errorCases {
-		errs := ValidateDaemon(&v)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			field := errs[i].(*errors.ValidationError).Field
-			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name" &&
-				field != "metadata.namespace" &&
-				field != "spec.selector" &&
-				field != "spec.template" &&
-				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.template.labels" &&
 				field != "metadata.annotations" &&
 				field != "metadata.labels" {
@@ -3199,12 +2809,19 @@ func TestValidateLimitRange(t *testing.T) {
 					api.ResourceMemory: resource.MustParse("10000"),
 				},
 				Min: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("0"),
+					api.ResourceCPU:    resource.MustParse("5"),
 					api.ResourceMemory: resource.MustParse("100"),
 				},
 				Default: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("50"),
 					api.ResourceMemory: resource.MustParse("500"),
+				},
+				DefaultRequest: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("10"),
+					api.ResourceMemory: resource.MustParse("200"),
+				},
+				MaxLimitRequestRatio: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("20"),
 				},
 			},
 		},
@@ -3264,6 +2881,43 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 	}
 
+	invalidSpecRangeDefaultRequestOutsideRange := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("1000"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("100"),
+				},
+				DefaultRequest: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("2000"),
+				},
+			},
+		},
+	}
+
+	invalidSpecRangeRequestMoreThanDefaultRange := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("1000"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("100"),
+				},
+				Default: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("500"),
+				},
+				DefaultRequest: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("800"),
+				},
+			},
+		},
+	}
+
 	successCases := []api.LimitRange{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -3311,6 +2965,14 @@ func TestValidateLimitRange(t *testing.T) {
 		"invalid spec default outside range": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultOutsideRange},
 			"default value 2k is greater than max value 1k",
+		},
+		"invalid spec defaultrequest outside range": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultRequestOutsideRange},
+			"default request value 2k is greater than max value 1k",
+		},
+		"invalid spec defaultrequest more than default": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeRequestMoreThanDefaultRange},
+			"default request value 800 is greater than default limit value 500",
 		},
 	}
 	for k, v := range errorCases {
@@ -3948,6 +3610,19 @@ func TestValidateEndpoints(t *testing.T) {
 			},
 			errorType: "FieldValueRequired",
 		},
+		"Address is loopback": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+						Ports:     []api.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: "loopback",
+		},
 		"Address is link-local": {
 			endpoints: api.Endpoints{
 				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
@@ -3960,6 +3635,19 @@ func TestValidateEndpoints(t *testing.T) {
 			},
 			errorType:   "FieldValueInvalid",
 			errorDetail: "link-local",
+		},
+		"Address is link-local multicast": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "224.0.0.1"}},
+						Ports:     []api.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: "link-local multicast",
 		},
 	}
 

@@ -14,25 +14,13 @@ write_files:
       RuntimeMaxUse=50M
 
 coreos:
-  etcd:
-    name: ${name}
-    addr: ${public_ip}:4001
-    # bind-addr: 0.0.0.0
-    peer-addr: ${public_ip}:7001
-    # peers: {etcd_peers}
+  etcd2:
     discovery: ${discovery}
+    advertise-client-urls: http://${public_ip}:2379
+    initial-advertise-peer-urls: http://${public_ip}:2380
+    listen-client-urls: http://0.0.0.0:2379
+    listen-peer-urls: http://${public_ip}:2380
   units:
-    - name: etcd.service
-      drop-ins:
-        - name: opt-etcd2.conf
-          content: |
-            [Unit]
-            After=opt-etcd.mount
-            Requires=opt-etcd.mount
-
-            [Service]
-            ExecStart=
-            ExecStart=/opt/etcd/bin/etcd
     - name: static.network
       command: start
       content: |
@@ -80,7 +68,7 @@ coreos:
         ExecStart=/usr/sbin/iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE ! -d ${CONTAINER_SUBNET}
         RemainAfterExit=yes
         Type=oneshot
-    - name: etcd.service
+    - name: etcd2.service
       command: start
     - name: docker.service
       command: start
@@ -112,17 +100,6 @@ coreos:
         [Mount]
         What=kubernetes
         Where=/opt/kubernetes
-        Options=ro,trans=virtio,version=9p2000.L
-        Type=9p
-    - name: opt-etcd.mount
-      command: start
-      content: |
-        [Unit]
-        ConditionVirtualization=|vm
-
-        [Mount]
-        What=etcd
-        Where=/opt/etcd
         Options=ro,trans=virtio,version=9p2000.L
         Type=9p
   update:

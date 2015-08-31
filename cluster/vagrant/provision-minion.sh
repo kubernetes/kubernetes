@@ -72,15 +72,17 @@ EOF
 # See: https://github.com/mitchellh/vagrant/issues/2430
 hostnamectl set-hostname ${MINION_NAME}
 
-# Workaround to vagrant inability to guess interface naming sequence
-# Tell system to abandon the new naming scheme and use eth* instead
-rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
+if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
+  # Workaround to vagrant inability to guess interface naming sequence
+  # Tell system to abandon the new naming scheme and use eth* instead
+  rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
 
-# Disable network interface being managed by Network Manager (needed for Fedora 21+)
-NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-grep -q ^NM_CONTROLLED= ${NETWORK_CONF_PATH}ifcfg-eth1 || echo 'NM_CONTROLLED=no' >> ${NETWORK_CONF_PATH}ifcfg-eth1
-sed -i 's/^#NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
-systemctl restart network
+  # Disable network interface being managed by Network Manager (needed for Fedora 21+)
+  NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+  grep -q ^NM_CONTROLLED= ${NETWORK_CONF_PATH}ifcfg-eth1 || echo 'NM_CONTROLLED=no' >> ${NETWORK_CONF_PATH}ifcfg-eth1
+  sed -i 's/^#NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+  systemctl restart network
+fi
 
 # Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then

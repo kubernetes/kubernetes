@@ -18,21 +18,21 @@ package e2e
 
 import (
 	"fmt"
-	"path"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/util"
+	"path"
 
 	. "github.com/onsi/ginkgo"
 )
 
 const (
-	testImageRootUid    = "gcr.io/google_containers/mounttest:0.3"
-	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.1"
+	testImageRootUid    = "gcr.io/google_containers/mounttest:0.4"
+	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.2"
 )
 
 var _ = Describe("EmptyDir volumes", func() {
+
 	f := NewFramework("emptydir")
 
 	It("volume on tmpfs should have the correct mode", func() {
@@ -204,7 +204,6 @@ func formatMedium(medium api.StorageMedium) string {
 
 func testPodWithVolume(image, path string, source *api.EmptyDirVolumeSource) *api.Pod {
 	podName := "pod-" + string(util.NewUUID())
-
 	return &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",

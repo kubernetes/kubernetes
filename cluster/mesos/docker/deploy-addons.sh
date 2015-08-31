@@ -23,10 +23,11 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o errtrace
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util-temp-dir.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/common/bin/util-temp-dir.sh"
 kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
 

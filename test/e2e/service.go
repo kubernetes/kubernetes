@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
@@ -69,6 +69,7 @@ var _ = Describe("Services", func() {
 			}
 		}
 	})
+
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 	It("should provide secure master service", func() {
 		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
@@ -460,6 +461,16 @@ var _ = Describe("Services", func() {
 		By("hitting the pod through the service's NodePort")
 		ip := pickMinionIP(c)
 		testReachable(ip, nodePort)
+
+		hosts, err := NodeSSHHosts(c)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+		if code != 0 {
+			Failf("expected node port (%d) to be in use", nodePort)
+		}
 	})
 
 	It("should be able to change the type and nodeport settings of a service", func() {
@@ -586,21 +597,15 @@ var _ = Describe("Services", func() {
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
 			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
 		}
+
+		// TODO: Make this less of a hack.  Watch for events?
+		Logf("Waiting 2 minutes to give service time to settle after changing configuration")
+		time.Sleep(time.Second * 120)
+		service, err = waitForLoadBalancerIngress(f.Client, serviceName, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		ingress2 := service.Status.LoadBalancer.Ingress[0]
-
-		// TODO: Fix the issue here: http://issue.k8s.io/11002
-		if providerIs("aws") {
-			// TODO: Make this less of a hack (or fix the underlying bug)
-			time.Sleep(time.Second * 120)
-			service, err = waitForLoadBalancerIngress(f.Client, serviceName, f.Namespace.Name)
-			Expect(err).NotTo(HaveOccurred())
-
-			// We don't want the ingress point to change, but we should verify that the new ingress point still works
-			ingress2 = service.Status.LoadBalancer.Ingress[0]
-			Expect(ingress1).NotTo(Equal(ingress2))
-		} else {
-			Expect(ingress1).To(Equal(ingress2))
-		}
+		Expect(ingress1).To(Equal(ingress2))
 
 		By("hitting the pod through the service's updated NodePort")
 		testReachable(ip, nodePort2)
@@ -884,16 +889,26 @@ var _ = Describe("Services", func() {
 		if !ServiceNodePortRange.Contains(port.NodePort) {
 			Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
-		port1 := port.NodePort
+		nodePort := port.NodePort
 
 		By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", port1))
+		hosts, err := NodeSSHHosts(c)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+		if code == 0 {
+			Failf("expected node port (%d) to not be in use", nodePort)
+		}
+
+		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = api.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = port1
+		service.Spec.Ports[0].NodePort = nodePort
 		service, err = t.CreateService(service)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -1372,7 +1387,7 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 				passed = true
 				break
 			}
-			Logf("Expected pods: %v, got: %v", expectedPods, pods)
+			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, pods)
 		}
 		if !passed {
 			return fmt.Errorf("service verification failed for:\n %s", cmd)
@@ -1467,7 +1482,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 // CreateWebserverRC creates rc-backed pods with the well-known webserver
 // configuration and records it for cleanup.
 func (t *WebserverTest) CreateWebserverRC(replicas int) *api.ReplicationController {
-	rcSpec := rcByName(t.name, replicas, t.image, t.Labels)
+	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, t.Labels)
 	rcAct, err := t.createRC(rcSpec)
 	if err != nil {
 		Failf("Failed to create rc %s: %v", rcSpec.Name, err)
@@ -1518,7 +1533,7 @@ func (t *WebserverTest) Cleanup() []error {
 		if _, err := t.Client.ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}
-		// TODO(mbforbes): Wait.
+		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
 		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {

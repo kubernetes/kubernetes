@@ -330,7 +330,7 @@ Now, we can visit the running WordPress app.
 Use the external IP that you obtained above, and visit it on port 80:
 
 ```
-http://<external_ip>
+http://<external-ip>
 ```
 
 You should see the familiar WordPress init page.

@@ -312,6 +312,10 @@ func Vars(r *http.Request) map[string]string {
 }
 
 // CurrentRoute returns the matched route for the current request, if any.
+// This only works when called inside the handler of the matched route
+// because the matched route is stored in the request context which is cleared
+// after the handler returns, unless the KeepContext option is set on the
+// Router.
 func CurrentRoute(r *http.Request) *Route {
 	if rv := context.Get(r, routeKey); rv != nil {
 		return rv.(*Route)

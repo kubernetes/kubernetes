@@ -28,10 +28,11 @@ import (
 	"strconv"
 	"strings"
 
+	"time"
+
 	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/opts"
 	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/homedir"
 	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/stdcopy"
-	"time"
 )
 
 const userAgent = "go-dockerclient"
@@ -628,18 +629,20 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) error 
 		if hijackOptions.in != nil {
 			_, err := io.Copy(rwc, hijackOptions.in)
 			errChanIn <- err
+		} else {
+			errChanIn <- nil
 		}
 		rwc.(interface {
 			CloseWrite() error
 		}).CloseWrite()
 	}()
 	<-exit
-	select {
-	case err = <-errChanIn:
-		return err
-	case err = <-errChanOut:
-		return err
+	errIn := <-errChanIn
+	errOut := <-errChanOut
+	if errIn != nil {
+		return errIn
 	}
+	return errOut
 }
 
 func (c *Client) getURL(path string) string {

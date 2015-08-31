@@ -28,6 +28,10 @@ scale is sent to the server.
     Precondition for current size. Requires that the current size of the replication controller match this value in order to scale.
 
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the replication controller to set a new size
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for scale
 
@@ -138,10 +142,6 @@ scale is sent to the server.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -153,6 +153,9 @@ scale is sent to the server.
 .nf
 # Scale replication controller named 'foo' to 3.
 $ kubectl scale \-\-replicas=3 replicationcontrollers foo
+
+# Scale a replication controller identified by type and name specified in "foo\-controller.yaml" to 3.
+$ kubectl scale \-\-replicas=3 \-f foo\-controller.yaml
 
 # If the replication controller named foo's current size is 2, scale foo to 3.
 $ kubectl scale \-\-current\-replicas=2 \-\-replicas=3 replicationcontrollers foo

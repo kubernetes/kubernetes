@@ -24,33 +24,19 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	// Ensure that expapi/v1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 
 	"github.com/coreos/go-etcd/etcd"
 )
 
-var scheme *runtime.Scheme
-var codec runtime.Codec
-
-func init() {
-	// Ensure that expapi/v1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
-	dummy := v1.HorizontalPodAutoscaler{}
-	dummy.Spec = v1.HorizontalPodAutoscalerSpec{}
-}
-
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	storage := NewREST(etcdStorage)
-	return storage, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 func validNewHorizontalPodAutoscaler(name string) *expapi.HorizontalPodAutoscaler {
@@ -65,59 +51,63 @@ func validNewHorizontalPodAutoscaler(name string) *expapi.HorizontalPodAutoscale
 			},
 			MinCount: 1,
 			MaxCount: 5,
-			Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("0.8")},
+			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 		},
 	}
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	autoscaler := validNewHorizontalPodAutoscaler("foo")
 	autoscaler.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		autoscaler,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&expapi.HorizontalPodAutoscaler{},
 	)
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	key, err := storage.KeyFunc(test.TestContext(), "foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	key = etcdtest.AddPrefix(key)
-	fakeEtcdClient.ExpectNotFoundGet(key)
-	fakeEtcdClient.ChangeIndex = 2
-	autoscaler := validNewHorizontalPodAutoscaler("foo")
-	existing := validNewHorizontalPodAutoscaler("exists")
-	existing.Namespace = test.TestNamespace()
-	obj, err := storage.Create(test.TestContext(), existing)
-	if err != nil {
-		t.Fatalf("unable to create object: %v", err)
-	}
-	older := obj.(*expapi.HorizontalPodAutoscaler)
-	older.ResourceVersion = "1"
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	test.TestUpdate(
-		autoscaler,
-		existing,
-		older,
+		// valid
+		validNewHorizontalPodAutoscaler("foo"),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*expapi.HorizontalPodAutoscaler)
+			object.Spec.MaxCount = object.Spec.MaxCount + 1
+			return object
+		},
 	)
 }
 
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	autoscaler := validNewHorizontalPodAutoscaler("foo2")
 	key, _ := storage.KeyFunc(ctx, "foo2")
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
 					Value:         runtime.EncodeOrDie(testapi.Codec(), autoscaler),
@@ -128,104 +118,32 @@ func TestDelete(t *testing.T) {
 		return autoscaler
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
+	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdGet(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	autoscaler := validNewHorizontalPodAutoscaler("foo3")
-	name := autoscaler.Name
-	key, _ := registry.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), autoscaler), 0)
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var autoscalerOut expapi.HorizontalPodAutoscaler
-	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &autoscalerOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	obj, err := registry.Get(ctx, name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := obj.(*expapi.HorizontalPodAutoscaler)
-	autoscaler.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := autoscaler, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected autoscaler: %#v, expected %#v", e, a)
-	}
-}
-
-func TestEmptyList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-	autoscalerList, err := registry.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(autoscalerList.(*expapi.HorizontalPodAutoscalerList).Items) != 0 {
-		t.Errorf("Unexpected non-zero autoscaler list: %#v", autoscalerList)
-	}
-	if autoscalerList.(*expapi.HorizontalPodAutoscalerList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", autoscalerList)
-	}
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	autoscaler := validNewHorizontalPodAutoscaler("foo")
+	test.TestGet(autoscaler)
 }
 
 func TestList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.HorizontalPodAutoscaler{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.HorizontalPodAutoscaler{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	autoscaler := validNewHorizontalPodAutoscaler("foo")
+	test.TestList(
+		autoscaler,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
-	}
-	obj, err := registry.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	autoscalerList := obj.(*expapi.HorizontalPodAutoscalerList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(autoscalerList.Items) != 2 {
-		t.Errorf("Unexpected HorizontalPodAutoscaler list: %#v", autoscalerList)
-	}
-	if autoscalerList.Items[0].Name != "foo" {
-		t.Errorf("Unexpected HorizontalPodAutoscaler: %#v", autoscalerList.Items[0])
-	}
-	if autoscalerList.Items[1].Name != "bar" {
-		t.Errorf("Unexpected HorizontalPodAutoscaler: %#v", autoscalerList.Items[1])
-	}
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
 }

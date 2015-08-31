@@ -100,6 +100,19 @@ type ControllerLister interface {
 	GetPodControllers(*api.Pod) ([]api.ReplicationController, error)
 }
 
+// EmptyControllerLister implements ControllerLister on []api.ReplicationController returning empty data
+type EmptyControllerLister struct{}
+
+// List returns nil
+func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
+	return nil, nil
+}
+
+// GetPodControllers returns nil
+func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	return nil, nil
+}
+
 // FakeControllerLister implements ControllerLister on []api.ReplicationController for test purposes.
 type FakeControllerLister []api.ReplicationController
 

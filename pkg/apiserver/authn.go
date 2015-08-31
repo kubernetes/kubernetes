@@ -26,45 +26,77 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/keystone"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
+type AuthenticatorConfig struct {
+	BasicAuthFile         string
+	ClientCAFile          string
+	TokenAuthFile         string
+	OIDCIssuerURL         string
+	OIDCClientID          string
+	OIDCCAFile            string
+	OIDCUsernameClaim     string
+	ServiceAccountKeyFile string
+	ServiceAccountLookup  bool
+	Storage               storage.Interface
+	KeystoneURL           string
+}
+
 // NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, storage storage.Interface) (authenticator.Request, error) {
+func NewAuthenticator(config AuthenticatorConfig) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
-	if len(basicAuthFile) > 0 {
-		basicAuth, err := newAuthenticatorFromBasicAuthFile(basicAuthFile)
+	if len(config.BasicAuthFile) > 0 {
+		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {
 			return nil, err
 		}
 		authenticators = append(authenticators, basicAuth)
 	}
 
-	if len(clientCAFile) > 0 {
-		certAuth, err := newAuthenticatorFromClientCAFile(clientCAFile)
+	if len(config.ClientCAFile) > 0 {
+		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
 		if err != nil {
 			return nil, err
 		}
 		authenticators = append(authenticators, certAuth)
 	}
 
-	if len(tokenFile) > 0 {
-		tokenAuth, err := newAuthenticatorFromTokenFile(tokenFile)
+	if len(config.TokenAuthFile) > 0 {
+		tokenAuth, err := newAuthenticatorFromTokenFile(config.TokenAuthFile)
 		if err != nil {
 			return nil, err
 		}
 		authenticators = append(authenticators, tokenAuth)
 	}
 
-	if len(serviceAccountKeyFile) > 0 {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(serviceAccountKeyFile, serviceAccountLookup, storage)
+	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
+		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, oidcAuth)
+	}
+
+	if len(config.ServiceAccountKeyFile) > 0 {
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.Storage)
 		if err != nil {
 			return nil, err
 		}
 		authenticators = append(authenticators, serviceAccountAuth)
+	}
+
+	if len(config.KeystoneURL) > 0 {
+		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, keystoneAuth)
 	}
 
 	switch len(authenticators) {
@@ -103,6 +135,16 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 	return bearertoken.New(tokenAuthenticator), nil
 }
 
+// newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
+func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim string) (authenticator.Request, error) {
+	tokenAuthenticator, err := oidc.New(issuerURL, clientID, caFile, usernameClaim)
+	if err != nil {
+		return nil, err
+	}
+
+	return bearertoken.New(tokenAuthenticator), nil
+}
+
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
 func newServiceAccountAuthenticator(keyfile string, lookup bool, storage storage.Interface) (authenticator.Request, error) {
 	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
@@ -132,4 +174,14 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	opts.Roots = roots
 
 	return x509.New(opts, x509.CommonNameUserConversion), nil
+}
+
+// newAuthenticatorFromTokenFile returns an authenticator.Request or an error
+func newAuthenticatorFromKeystoneURL(keystoneConfigFile string) (authenticator.Request, error) {
+	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return basicauth.New(keystoneAuthenticator), nil
 }

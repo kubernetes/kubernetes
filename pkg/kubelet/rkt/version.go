@@ -21,25 +21,18 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	appctypes "github.com/appc/spec/schema/types"
 )
 
 type rktVersion []int
 
 func parseVersion(input string) (rktVersion, error) {
-	tail := strings.Index(input, "+")
-	if tail > 0 {
-		input = input[:tail]
+	nsv, err := appctypes.NewSemVer(input)
+	if err != nil {
+		return nil, err
 	}
-	var result rktVersion
-	tuples := strings.Split(input, ".")
-	for _, t := range tuples {
-		n, err := strconv.Atoi(t)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, n)
-	}
-	return result, nil
+	return rktVersion{int(nsv.Major), int(nsv.Minor), int(nsv.Patch)}, nil
 }
 
 func (r rktVersion) Compare(other string) (int, error) {

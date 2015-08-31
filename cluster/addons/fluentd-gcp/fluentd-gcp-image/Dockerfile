@@ -7,7 +7,7 @@
 # in the Google Developer Console. 
 
 FROM ubuntu:14.04
-MAINTAINER Satnam Singh "satnam@google.com"
+MAINTAINER Alex Robinson "arob@google.com"
 
 # Disable prompts from apt.
 ENV DEBIAN_FRONTEND noninteractive

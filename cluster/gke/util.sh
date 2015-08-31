@@ -113,6 +113,7 @@ function verify-prereqs() {
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
 #   MINION_SCOPES
+#   MACHINE_TYPE
 function kube-up() {
   echo "... in gke:kube-up()" >&2
   detect-project >&2
@@ -145,6 +146,7 @@ function kube-up() {
     "--network=${NETWORK}"
     "--scopes=${MINION_SCOPES}"
     "--cluster-version=${CLUSTER_API_VERSION}"
+    "--machine-type=${MACHINE_TYPE}"
   )
 
   # Bring up the cluster.
@@ -187,25 +189,6 @@ function test-setup() {
     --network="${NETWORK}"
 }
 
-# Ensure that we have a password created for validating to the master.
-#
-# Assumed vars:
-#  ZONE
-#  CLUSTER_NAME
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password() {
-  echo "... in gke:get-password()" >&2
-  detect-project >&2
-  KUBE_USER=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep password | cut -f 4 -d ' ')
-}
-
 # Detect the IP for the master. Note that on GKE, we don't know the name of the
 # master, so KUBE_MASTER is not set.
 #
@@ -241,9 +224,10 @@ function detect-minion-names {
   echo "... in gke:detect-minion-names()" >&2
   detect-project
   detect-node-instance-group
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_GROUP}" list --quiet \
-    | cut -d'/' -f11))
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
+    --format=yaml | grep instance: | cut -d ' ' -f 2))
+
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
 

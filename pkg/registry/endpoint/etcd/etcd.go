@@ -27,36 +27,50 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for endpoints against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewStorage returns a RESTStorage object that will work against endpoints.
-func NewStorage(s storage.Interface) *REST {
+// NewREST returns a RESTStorage object that will work against endpoints.
+func NewREST(s storage.Interface, useCacher bool) *REST {
 	prefix := "/services/endpoints"
-	return &REST{
-		&etcdgeneric.Etcd{
-			NewFunc:     func() runtime.Object { return &api.Endpoints{} },
+
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Endpoints{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NamespaceKeyFunc(prefix, obj)
+			},
 			NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
-			KeyRootFunc: func(ctx api.Context) string {
-				return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
-			},
-			KeyFunc: func(ctx api.Context, name string) (string, error) {
-				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
-			},
-			ObjectNameFunc: func(obj runtime.Object) (string, error) {
-				return obj.(*api.Endpoints).Name, nil
-			},
-			PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-				return endpoint.MatchEndpoints(label, field)
-			},
-			EndpointName: "endpoints",
-
-			CreateStrategy: endpoint.Strategy,
-			UpdateStrategy: endpoint.Strategy,
-
-			Storage: s,
-		},
+		}
+		storageInterface = storage.NewCacher(config)
 	}
+
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.Endpoints{} },
+		NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Endpoints).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return endpoint.MatchEndpoints(label, field)
+		},
+		EndpointName: "endpoints",
+
+		CreateStrategy: endpoint.Strategy,
+		UpdateStrategy: endpoint.Strategy,
+
+		Storage: storageInterface,
+	}
+	return &REST{store}
 }

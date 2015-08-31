@@ -87,7 +87,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	}, nil
 }
 
-// InfoForData creates an Info object for the given Object. An error is returned
+// InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {

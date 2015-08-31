@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectRestart bool) {
+func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRestarts int) {
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
 	_, err := c.Pods(ns).Create(podDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
@@ -43,7 +43,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		c.Pods(ns).Delete(podDescr.Name, nil)
+		c.Pods(ns).Delete(podDescr.Name, api.NewDeleteOptions(0))
 	}()
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
@@ -61,24 +61,35 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
 	// Wait for the restart state to be as desired.
-	restarts, deadline := false, time.Now().Add(2*time.Minute)
+	deadline := time.Now().Add(2 * time.Minute)
+	lastRestartCount := initialRestartCount
+	observedRestarts := 0
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = c.Pods(ns).Get(podDescr.Name)
 		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
 		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-		By(fmt.Sprintf("Restart count of pod %s/%s is now %d (%v elapsed)",
-			ns, podDescr.Name, restartCount, time.Since(start)))
-		if restartCount > initialRestartCount {
-			By(fmt.Sprintf("Restart count of pod %s/%s changed from %d to %d",
-				ns, podDescr.Name, initialRestartCount, restartCount))
-			restarts = true
+		if restartCount != lastRestartCount {
+			By(fmt.Sprintf("Restart count of pod %s/%s is now %d (%v elapsed)",
+				ns, podDescr.Name, restartCount, time.Since(start)))
+			if restartCount < lastRestartCount {
+				Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
+					ns, podDescr.Name, lastRestartCount, restartCount)
+			}
+		}
+		observedRestarts = restartCount - initialRestartCount
+		if expectNumRestarts > 0 && observedRestarts >= expectNumRestarts {
+			// Stop if we have observed more than expectNumRestarts restarts.
 			break
 		}
+		lastRestartCount = restartCount
 	}
 
-	if restarts != expectRestart {
-		Failf("pod %s/%s - expected restarts: %t, found restarts: %t",
-			ns, podDescr.Name, expectRestart, restarts)
+	// If we expected 0 restarts, fail if observed any restart.
+	// If we expected n restarts (n > 0), fail if we observed < n restarts.
+	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
+		observedRestarts < expectNumRestarts) {
+		Failf("pod %s/%s - expected number of restarts: %t, found restarts: %t",
+			ns, podDescr.Name, expectNumRestarts, observedRestarts)
 	}
 }
 
@@ -86,15 +97,14 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	podClient := c.Pods(ns)
 	By("creating pod")
-	defer podClient.Delete(pod.Name, nil)
-	_, err := podClient.Create(pod)
-	if err != nil {
+	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+	if _, err := podClient.Create(pod); err != nil {
 		Failf("Failed to create pod: %v", err)
 	}
 	By("ensuring that pod is running and has a hostIP")
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	err = waitForPodRunningInNamespace(c, pod.Name, ns)
+	err := waitForPodRunningInNamespace(c, pod.Name, ns)
 	Expect(err).NotTo(HaveOccurred())
 	// Try to make sure we get a hostIP for each pod.
 	hostIPTimeout := 2 * time.Minute
@@ -222,7 +232,7 @@ var _ = Describe("Pods", func() {
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
-		defer podClient.Delete(pod.Name, nil)
+		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		_, err = podClient.Create(pod)
 		if err != nil {
 			Failf("Failed to create pod: %v", err)
@@ -235,7 +245,7 @@ var _ = Describe("Pods", func() {
 		}
 		Expect(len(pods.Items)).To(Equal(1))
 
-		By("veryfying pod creation was observed")
+		By("verifying pod creation was observed")
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type != watch.Added {
@@ -312,7 +322,7 @@ var _ = Describe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
-			podClient.Delete(pod.Name, nil)
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 		pod, err := podClient.Create(pod)
 		if err != nil {
@@ -376,7 +386,7 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		defer framework.Client.Pods(framework.Namespace.Name).Delete(serverPod.Name, nil)
+		defer framework.Client.Pods(framework.Namespace.Name).Delete(serverPod.Name, api.NewDeleteOptions(0))
 		_, err := framework.Client.Pods(framework.Namespace.Name).Create(serverPod)
 		if err != nil {
 			Failf("Failed to create serverPod: %v", err)
@@ -467,7 +477,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, true)
+		}, 1)
 	})
 
 	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
@@ -493,7 +503,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, false)
+		}, 0)
 	})
 
 	It("should be restarted with a /healthz http liveness probe", func() {
@@ -520,7 +530,34 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, true)
+		}, 1)
+	})
+
+	PIt("should have monotonically increasing restart count", func() {
+		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-http",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/liveness",
+						Command: []string{"/server"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/healthz",
+									Port: util.NewIntOrStringFromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 5,
+						},
+					},
+				},
+			},
+		}, 8)
 	})
 
 	It("should *not* be restarted with a /healthz http liveness probe", func() {
@@ -553,7 +590,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, false)
+		}, 0)
 	})
 
 	// The following tests for remote command execution and port forwarding are
@@ -600,7 +637,7 @@ var _ = Describe("Pods", func() {
 				// We call defer here in case there is a problem with
 				// the test so we can ensure that we clean up after
 				// ourselves
-				podClient.Delete(pod.Name)
+				podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 			}()
 
 			By("waiting for the pod to start running")
@@ -673,7 +710,7 @@ var _ = Describe("Pods", func() {
 				// We call defer here in case there is a problem with
 				// the test so we can ensure that we clean up after
 				// ourselves
-				podClient.Delete(pod.Name)
+				podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 			}()
 
 			By("waiting for the pod to start running")

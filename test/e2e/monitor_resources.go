@@ -19,7 +19,7 @@ package e2e
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -36,7 +36,7 @@ var systemContainers = []string{"/docker-daemon", "/kubelet", "/kube-proxy", "/s
 //TODO tweak those values.
 var allowedUsage = resourceUsagePerContainer{
 	"/docker-daemon": &containerResourceUsage{
-		CPUUsageInCores:         0.07,
+		CPUUsageInCores:         0.08,
 		MemoryUsageInBytes:      4500000000,
 		MemoryWorkingSetInBytes: 1500000000,
 	},
@@ -46,14 +46,14 @@ var allowedUsage = resourceUsagePerContainer{
 		MemoryWorkingSetInBytes: 150000000,
 	},
 	"/kube-proxy": &containerResourceUsage{
-		CPUUsageInCores:         0.02,
+		CPUUsageInCores:         0.025,
 		MemoryUsageInBytes:      12000000,
 		MemoryWorkingSetInBytes: 12000000,
 	},
 	"/system": &containerResourceUsage{
-		CPUUsageInCores:         0.01,
+		CPUUsageInCores:         0.03,
 		MemoryUsageInBytes:      100000000,
-		MemoryWorkingSetInBytes: 75000000,
+		MemoryWorkingSetInBytes: 100000000,
 	},
 }
 

@@ -21,10 +21,10 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -105,6 +105,10 @@ type FlushFlag bool
 
 const FlushTables FlushFlag = true
 const NoFlushTables FlushFlag = false
+
+// Versions of iptables less than this do not support the -C / --check flag
+// (test whether a rule exists).
+const MinCheckVersion = "1.4.11"
 
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
@@ -306,7 +310,7 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
 	checkPresent, err := getIptablesHasCheckCommand(runner.exec)
 	if err != nil {
-		glog.Warning("Error checking iptables version, assuming version at least 1.4.11: %v", err)
+		glog.Warningf("Error checking iptables version, assuming version at least 1.4.11: %v", err)
 		checkPresent = true
 	}
 	if checkPresent {
@@ -326,12 +330,15 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
 
-	// Sadly, iptables has inconsistent quoting rules for comments.
-	// Just unquote any arg that is wrapped in quotes.
-	argsCopy := make([]string, len(args))
-	copy(argsCopy, args)
-	for i := range argsCopy {
-		unquote(&argsCopy[i])
+	// Sadly, iptables has inconsistent quoting rules for comments. Just remove all quotes.
+	// Also, quoted multi-word comments (which are counted as a single arg)
+	// will be unpacked into multiple args,
+	// in order to compare against iptables-save output (which will be split at whitespace boundary)
+	// e.g. a single arg('"this must be before the NodePort rules"') will be unquoted and unpacked into 7 args.
+	var argsCopy []string
+	for i := range args {
+		tmpField := strings.Trim(args[i], "\"")
+		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
 	}
 	argset := util.NewStringSet(argsCopy...)
 
@@ -340,14 +347,14 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 
 		// Check that this is a rule for the correct chain, and that it has
 		// the correct number of argument (+2 for "-A <chain name>")
-		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(args)+2 {
+		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(argsCopy)+2 {
 			continue
 		}
 
 		// Sadly, iptables has inconsistent quoting rules for comments.
-		// Just unquote any arg that is wrapped in quotes.
+		// Just remove all quotes.
 		for i := range fields {
-			unquote(&fields[i])
+			fields[i] = strings.Trim(fields[i], "\"")
 		}
 
 		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
@@ -358,12 +365,6 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 	}
 
 	return false, nil
-}
-
-func unquote(strp *string) {
-	if len(*strp) >= 2 && (*strp)[0] == '"' && (*strp)[len(*strp)-1] == '"' {
-		*strp = strings.TrimPrefix(strings.TrimSuffix(*strp, `"`), `"`)
-	}
 }
 
 // Executes the rule check using the "-C" flag
@@ -399,44 +400,24 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 
 // Checks if iptables has the "-C" flag
 func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
+	minVersion, err := semver.NewVersion(MinCheckVersion)
+	if err != nil {
+		return false, err
+	}
+	// Returns "vX.Y.Z".
 	vstring, err := GetIptablesVersionString(exec)
 	if err != nil {
 		return false, err
 	}
-
-	v1, v2, v3, err := extractIptablesVersion(vstring)
+	// Make a semver of the part after the v in "vX.X.X".
+	version, err := semver.NewVersion(vstring[1:])
 	if err != nil {
 		return false, err
 	}
-
-	return iptablesHasCheckCommand(v1, v2, v3), nil
-}
-
-// extractIptablesVersion returns the first three components of the iptables version.
-// e.g. "iptables v1.3.66" would return (1, 3, 66, nil)
-func extractIptablesVersion(str string) (int, int, int, error) {
-	versionMatcher := regexp.MustCompile("v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
-	result := versionMatcher.FindStringSubmatch(str)
-	if result == nil {
-		return 0, 0, 0, fmt.Errorf("no iptables version found in string: %s", str)
+	if version.LessThan(*minVersion) {
+		return false, nil
 	}
-
-	v1, err := strconv.Atoi(result[1])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	v2, err := strconv.Atoi(result[2])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	v3, err := strconv.Atoi(result[3])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	return v1, v2, v3, nil
+	return true, nil
 }
 
 // GetIptablesVersionString runs "iptables --version" to get the version string,
@@ -454,18 +435,4 @@ func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
 	return match[0], nil
-}
-
-// Checks if an iptables version is after 1.4.11, when --check was added
-func iptablesHasCheckCommand(v1 int, v2 int, v3 int) bool {
-	if v1 > 1 {
-		return true
-	}
-	if v1 == 1 && v2 > 4 {
-		return true
-	}
-	if v1 == 1 && v2 == 4 && v3 >= 11 {
-		return true
-	}
-	return false
 }

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
-	"speter.net/go/exp/math/dec/inf"
 )
 
 func TestIPAddress(t *testing.T) {
@@ -252,36 +251,4 @@ func Test_List(t *testing.T) {
 	if len(clusters) != 0 {
 		t.Fatalf("List with a reject-all filter should return a list of size 0: (actual: %#v)", clusters)
 	}
-}
-
-// test mesos.GetNodeResources
-func Test_GetNodeResources(t *testing.T) {
-	defer log.Flush()
-	md := FakeMasterDetector{}
-	httpServer, httpClient, httpTransport := makeHttpMocks()
-	defer httpServer.Close()
-	cacheTTL := 500 * time.Millisecond
-	mesosClient, err := createMesosClient(md, httpClient, httpTransport, cacheTTL)
-	mesosCloud := &MesosCloud{client: mesosClient, config: createDefaultConfig()}
-
-	resources, err := mesosCloud.GetNodeResources("mesos1.internal.company.com")
-
-	if err != nil {
-		t.Fatalf("GetNodeResources does not yield an error: %#v", err)
-	}
-
-	expectedCpu := inf.NewDec(8, 0)
-	expectedMem := inf.NewDec(15360, 0)
-
-	actualCpu := resources.Capacity["cpu"].Amount
-	actualMem := resources.Capacity["memory"].Amount
-
-	if actualCpu.Cmp(expectedCpu) != 0 {
-		t.Fatalf("GetNodeResources should return the expected amount of cpu: (expected: %#v, vactual: %#v)", expectedCpu, actualCpu)
-	}
-
-	if actualMem.Cmp(expectedMem) != 0 {
-		t.Fatalf("GetNodeResources should return the expected amount of memory: (expected: %#v, vactual: %#v)", expectedMem, actualMem)
-	}
-
 }

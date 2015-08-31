@@ -24,7 +24,7 @@ import (
 
 	influxdb "github.com/influxdb/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -92,6 +92,9 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				return nil, err
 			}
 			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				expectedPods = append(expectedPods, string(pod.UID))
 			}
 		}

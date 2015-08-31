@@ -25,7 +25,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -76,6 +76,7 @@ func TestRunOnce(t *testing.T) {
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 
 	podManager, _ := newFakePodManager()
+	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 
 	kb := &Kubelet{
 		rootDirectory:       "/tmp/kubelet",
@@ -88,6 +89,7 @@ func TestRunOnce(t *testing.T) {
 		podManager:          podManager,
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
+		diskSpaceManager:    diskSpaceManager,
 	}
 	kb.containerManager, _ = newContainerManager(cadvisor, "", "", "")
 

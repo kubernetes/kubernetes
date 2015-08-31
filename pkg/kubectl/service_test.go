@@ -27,12 +27,12 @@ import (
 func TestGenerateService(t *testing.T) {
 	tests := []struct {
 		generator Generator
-		params    map[string]string
+		params    map[string]interface{}
 		expected  api.Service
 	}{
 		{
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -61,7 +61,7 @@ func TestGenerateService(t *testing.T) {
 		{
 
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -89,7 +89,7 @@ func TestGenerateService(t *testing.T) {
 		},
 		{
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"labels":         "key1=value1,key2=value2",
 				"name":           "test",
@@ -122,13 +122,13 @@ func TestGenerateService(t *testing.T) {
 		},
 		{
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"public-ip":      "1.2.3.4",
+				"external-ip":    "1.2.3.4",
 			},
 			expected: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -146,19 +146,19 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					DeprecatedPublicIPs: []string{"1.2.3.4"},
+					ExternalIPs: []string{"1.2.3.4"},
 				},
 			},
 		},
 		{
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":                      "foo=bar,baz=blah",
 				"name":                          "test",
 				"port":                          "80",
 				"protocol":                      "UDP",
 				"container-port":                "foobar",
-				"public-ip":                     "1.2.3.4",
+				"external-ip":                   "1.2.3.4",
 				"create-external-load-balancer": "true",
 			},
 			expected: api.Service{
@@ -177,14 +177,14 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					Type:                api.ServiceTypeLoadBalancer,
-					DeprecatedPublicIPs: []string{"1.2.3.4"},
+					Type:        api.ServiceTypeLoadBalancer,
+					ExternalIPs: []string{"1.2.3.4"},
 				},
 			},
 		},
 		{
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -214,7 +214,7 @@ func TestGenerateService(t *testing.T) {
 		},
 		{
 			generator: ServiceGeneratorV2{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":                      "foo=bar,baz=blah",
 				"name":                          "test",
 				"port":                          "80",
@@ -245,7 +245,7 @@ func TestGenerateService(t *testing.T) {
 		},
 		{
 			generator: ServiceGeneratorV1{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
@@ -274,7 +274,7 @@ func TestGenerateService(t *testing.T) {
 		},
 		{
 			generator: ServiceGeneratorV1{},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"selector":         "foo=bar,baz=blah",
 				"name":             "test",
 				"port":             "80",

@@ -75,8 +75,8 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 
 		// These will add all of the "global" flags (defined with both the
 		// flag and pflag packages) to the new flag set we have.
-		util.AddFlagSetToPFlagSet(flag.CommandLine, hk.baseFlags)
-		util.AddPFlagSetToPFlagSet(pflag.CommandLine, hk.baseFlags)
+		hk.baseFlags.AddGoFlagSet(flag.CommandLine)
+		hk.baseFlags.AddFlagSet(pflag.CommandLine)
 
 	}
 	return hk.baseFlags
@@ -152,7 +152,7 @@ func (hk *HyperKube) Run(args []string) error {
 		return err
 	}
 
-	util.AddPFlagSetToPFlagSet(hk.Flags(), s.Flags())
+	s.Flags().AddFlagSet(hk.Flags())
 	err = s.Flags().Parse(args)
 	if err != nil || hk.helpFlagVal {
 		if err != nil {

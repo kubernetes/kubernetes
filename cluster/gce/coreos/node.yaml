@@ -151,7 +151,8 @@ coreos:
         --cluster-dns=10.0.0.10 \
         --cluster-domain=cluster.local \
         --logtostderr=true \
-        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}
+        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
+        --rkt-path=/opt/rkt/rkt/rkt
         Restart=always
         RestartSec=10
 
@@ -202,4 +203,4 @@ coreos:
         After=kubernetes-install-rkt.service
         [Service]
         EnvironmentFile=/etc/kube-env
-        ExecStart=/opt/rkt/rkt metadata-service
+        ExecStart=/opt/rkt/rkt/rkt metadata-service

@@ -17,8 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -40,12 +43,41 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	if strategy == nil {
 		return false, false, nil
 	}
-	_, _, kerr := objectMetaAndKind(strategy, obj)
+	objectMeta, _, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return false, false, kerr
 	}
+
+	// if the object is already being deleted
+	if objectMeta.DeletionTimestamp != nil {
+		// if we are already being deleted, we may only shorten the deletion grace period
+		// this means the object was gracefully deleted previously but deletionGracePeriodSeconds was not set,
+		// so we force deletion immediately
+		if objectMeta.DeletionGracePeriodSeconds == nil {
+			return false, false, nil
+		}
+		// only a shorter grace period may be provided by a user
+		if options.GracePeriodSeconds != nil {
+			period := int64(*options.GracePeriodSeconds)
+			if period > *objectMeta.DeletionGracePeriodSeconds {
+				return false, true, nil
+			}
+			now := util.NewTime(util.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+			objectMeta.DeletionTimestamp = &now
+			objectMeta.DeletionGracePeriodSeconds = &period
+			options.GracePeriodSeconds = &period
+			return true, false, nil
+		}
+		// graceful deletion is pending, do nothing
+		options.GracePeriodSeconds = objectMeta.DeletionGracePeriodSeconds
+		return false, true, nil
+	}
+
 	if !strategy.CheckGracefulDelete(obj, options) {
 		return false, false, nil
 	}
+	now := util.NewTime(util.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+	objectMeta.DeletionTimestamp = &now
+	objectMeta.DeletionGracePeriodSeconds = options.GracePeriodSeconds
 	return true, false, nil
 }

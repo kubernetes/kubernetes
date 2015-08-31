@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -310,7 +310,11 @@ func (e *EndpointController) syncService(key string) {
 				continue
 			}
 			if len(pod.Status.PodIP) == 0 {
-				glog.V(4).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+				glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+				continue
+			}
+			if pod.DeletionTimestamp != nil {
+				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
 

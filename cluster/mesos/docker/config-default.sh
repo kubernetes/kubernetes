@@ -36,3 +36,29 @@ DNS_REPLICAS=1
 
 # Optional: Deploy cluster web interface.
 ENABLE_CLUSTER_UI=true
+
+# Timeout (in seconds) to wait for ssl certs to be generated
+KUBE_KEYGEN_TIMEOUT="${KUBE_KEYGEN_TIMEOUT:-60}"
+
+# Timeout (in seconds) to wait for Etcd to come up
+MESOS_DOCKER_ETCD_TIMEOUT="${MESOS_DOCKER_ETCD_TIMEOUT:-60}"
+
+# Timeout (in seconds) to wait for the Mesos Master to come up
+MESOS_DOCKER_MESOS_TIMEOUT="${MESOS_DOCKER_MESOS_TIMEOUT:-60}"
+
+# Timeout (in seconds) to wait for the API Server to come up
+MESOS_DOCKER_API_TIMEOUT="${MESOS_DOCKER_API_TIMEOUT:-180}"
+
+# Timeout (in seconds) to wait for each addon to come up
+MESOS_DOCKER_ADDON_TIMEOUT="${MESOS_DOCKER_ADDON_TIMEOUT:-180}"
+
+# Path to directory on the host to use as the root for multiple docker volumes.
+# ${MESOS_DOCKER_WORK_DIR}/log - storage of component logs (written on deploy failure)
+# ${MESOS_DOCKER_WORK_DIR}/auth - storage of SSL certs/keys/tokens
+# ${MESOS_DOCKER_WORK_DIR}/<component>/mesos - storage of mesos slave work (e.g. task logs)
+# If using docker-machine or boot2docker, should be under /Users (which is mounted from the host into the docker vm).
+# If running in a container, $HOME should be resolved outside of the container.
+MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
+
+# Arguments to pass to docker-engine running on the mesos-slave-dind containers.
+DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:---log-level=error}"

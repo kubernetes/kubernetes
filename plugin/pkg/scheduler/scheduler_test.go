@@ -25,8 +25,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -85,13 +85,13 @@ func TestScheduler(t *testing.T) {
 			algo:             mockScheduler{"machine1", nil},
 			expectBind:       &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			expectAssumedPod: podWithID("foo", "machine1"),
-			eventReason:      "scheduled",
+			eventReason:      "Scheduled",
 		}, {
 			sendPod:        podWithID("foo", ""),
 			algo:           mockScheduler{"machine1", errS},
 			expectError:    errS,
 			expectErrorPod: podWithID("foo", ""),
-			eventReason:    "failedScheduling",
+			eventReason:    "FailedScheduling",
 		}, {
 			sendPod:         podWithID("foo", ""),
 			algo:            mockScheduler{"machine1", nil},
@@ -99,7 +99,7 @@ func TestScheduler(t *testing.T) {
 			injectBindError: errB,
 			expectError:     errB,
 			expectErrorPod:  podWithID("foo", ""),
-			eventReason:     "failedScheduling",
+			eventReason:     "FailedScheduling",
 		},
 	}
 
@@ -218,7 +218,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	s := New(c)
 	called := make(chan struct{})
 	events := eventBroadcaster.StartEventWatcher(func(e *api.Event) {
-		if e, a := "scheduled", e.Reason; e != a {
+		if e, a := "Scheduled", e.Reason; e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 		close(called)
@@ -277,7 +277,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 	called = make(chan struct{})
 	events = eventBroadcaster.StartEventWatcher(func(e *api.Event) {
-		if e, a := "scheduled", e.Reason; e != a {
+		if e, a := "Scheduled", e.Reason; e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 		close(called)

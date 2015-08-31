@@ -48,7 +48,7 @@ Documentation for other releases can be found at
     - [Environment variables](#environment-variables)
     - [DNS](#dns)
   - [Headless services](#headless-services)
-  - [External services](#external-services)
+  - [Publishing services - service types](#publishing-services---service-types)
     - [Type NodePort](#type-nodeport)
     - [Type LoadBalancer](#type-loadbalancer)
   - [Shortcomings](#shortcomings)
@@ -96,7 +96,7 @@ which redirects to the backend `Pods`.
 A `Service` in Kubernetes is a REST object, similar to a `Pod`.  Like all of the
 REST objects, a `Service` definition can be POSTed to the apiserver to create a
 new instance.  For example, suppose you have a set of `Pods` that each expose
-port 9376 and carry a label "app=MyApp".
+port 9376 and carry a label `"app=MyApp"`.
 
 ```json
 {
@@ -121,7 +121,7 @@ port 9376 and carry a label "app=MyApp".
 ```
 
 This specification will create a new `Service` object named "my-service" which
-targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  This `Service`
+targets TCP port 9376 on any `Pod` with the `"app=MyApp"` label.  This `Service`
 will also be assigned an IP address (sometimes called the "cluster IP"), which
 is used by the service proxies (see below).  The `Service`'s selector will be
 evaluated continuously and the results will be POSTed to an `Endpoints` object
@@ -195,6 +195,9 @@ created. You can manually map the service to your own specific endpoints:
 }
 ```
 
+NOTE: Endpoint IPs may not be loopback (127.0.0.0/8), link-local
+(169.254.0.0/16), or link-local multicast ((224.0.0.0/24).
+
 Accessing a `Service` without a selector works the same as if it had selector.
 The traffic will be routed to endpoints defined by the user (`1.2.3.4:80` in
 this example).
@@ -266,7 +269,7 @@ request.  To do this, set the `spec.clusterIP` field. For example, if you
 already have an existing DNS entry that you wish to replace, or legacy systems
 that are configured for a specific IP address and difficult to re-configure.
 The IP address that a user chooses must be a valid IP address and within the
-service-cluster-ip-range CIDR range that is specified by flag to the API
+`service-cluster-ip-range` CIDR range that is specified by flag to the API
 server.  If the IP address value is invalid, the apiserver returns a 422 HTTP
 status code to indicate that the value is invalid.
 
@@ -299,7 +302,7 @@ compatible](https://docs.docker.com/userguide/dockerlinks/) variables (see
 and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables,
 where the Service name is upper-cased and dashes are converted to underscores.
 
-For example, the Service "redis-master" which exposes TCP port 6379 and has been
+For example, the Service `"redis-master"` which exposes TCP port 6379 and has been
 allocated cluster IP address 10.0.0.11 produces the following environment
 variables:
 
@@ -325,17 +328,17 @@ DNS server watches the Kubernetes API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.
 
-For example, if you have a `Service` called "my-service" in Kubernetes
-`Namespace` "my-ns" a DNS record for "my-service.my-ns" is created.  `Pods`
-which exist in the "my-ns" `Namespace` should be able to find it by simply doing
-a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
-qualify the name as "my-service.my-ns".  The result of these name lookups is the
+For example, if you have a `Service` called `"my-service"` in Kubernetes
+`Namespace` `"my-ns"` a DNS record for `"my-service.my-ns"` is created.  `Pods`
+which exist in the `"my-ns"` `Namespace` should be able to find it by simply doing
+a name lookup for `"my-service"`.  `Pods` which exist in other `Namespaces` must
+qualify the name as `"my-service.my-ns"`.  The result of these name lookups is the
 cluster IP.
 
 Kubernetes also supports DNS SRV (service) records for named ports.  If the
-"my-service.my-ns" `Service` has a port named "http" with protocol `TCP`, you
-can do a DNS SRV query for "_http._tcp.my-service.my-ns" to discover the port
-number for "http".
+`"my-service.my-ns"` `Service` has a port named `"http"` with protocol `TCP`, you
+can do a DNS SRV query for `"_http._tcp.my-service.my-ns"` to discover the port
+number for `"http"`.
 
 ## Headless services
 
@@ -355,22 +358,30 @@ they desire, but leaves them freedom to do discovery in their own way.
 Applications can still use a self-registration pattern and adapters for other
 discovery systems could easily be built upon this API.
 
-## External services
+## Publishing services - service types
 
 For some parts of your application (e.g. frontends) you may want to expose a
 Service onto an external (outside of your cluster, maybe public internet) IP
-address.  Kubernetes supports two ways of doing this: `NodePort`s and
-`LoadBalancer`s.
+address, other services should be visible only from inside of the cluster.
 
-Every `Service` has a `type` field which defines how the `Service` can be
-accessed.  Valid values for this field are:
+
+Kubernetes `ServiceTypes` allow you to specify what kind of service you want.
+The default and base type is `ClusterIP`, which exposes a service to connection
+from inside the cluster. `NodePort` and `LoadBalancer` are two types that expose
+services to external traffic.
+
+Valid values for the `ServiceType` field are:
 
    * `ClusterIP`: use a cluster-internal IP only - this is the default and is
-     discussed above
-   * `NodePort`: use a cluster IP, but also expose the service on a port on each
-     node of the cluster (the same port on each node)
-   * `LoadBalancer`: use a ClusterIP and a NodePort, but also ask the cloud
-     provider for a load balancer which forwards to the `Service`
+     discussed above. Choosing this value means that you want this service to be
+     reachable only from inside of the cluster.
+   * `NodePort`: on top of having a cluster-internal IP, expose the service on a
+     port on each node of the cluster (the same port on each node). You'll be able
+     to contact the service on any `<NodeIP>:NodePort` address.
+   * `LoadBalancer`: on top of having a cluster-internal IP and exposing service
+     on a NodePort also, ask the cloud provider for a load balancer
+     which forwards to the `Service` exposed as a `<NodeIP>:NodePort`
+     for each Node.
 
 Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
 as of Kubernetes 1.0.
@@ -379,17 +390,20 @@ as of Kubernetes 1.0.
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
-node will proxy that port (the same port number on every node) into your `Service`.
+Node will proxy that port (the same port number on every Node) into your `Service`.
 That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
 
 If you want a specific port number, you can specify a value in the `nodePort`
 field, and the system will allocate you that port or else the API transaction
-will fail.  The value you specify must be in the configured range for node
-ports.
+will fail (i.e. you need to take care about possible port collisions yourself).
+The value you specify must be in the configured range for node ports.
 
 This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
 even to just expose one or more nodes' IPs directly.
+
+Note that this Service will be visible as both `<NodeIP>:spec.ports[*].nodePort`
+and `spec.clusterIp:spec.ports[*].port`.
 
 ### Type LoadBalancer
 

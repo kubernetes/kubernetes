@@ -71,6 +71,9 @@ type dockerContainerHandler struct {
 
 	// Metadata labels associated with the container.
 	labels map[string]string
+
+	// The container PID used to switch namespaces as required
+	pid int
 }
 
 func newDockerContainerHandler(
@@ -114,6 +117,7 @@ func newDockerContainerHandler(
 		return nil, fmt.Errorf("failed to inspect container %q: %v", id, err)
 	}
 	handler.creationTime = ctnr.Created
+	handler.pid = ctnr.State.Pid
 
 	// Add the name and bare ID as aliases of the container.
 	handler.aliases = append(handler.aliases, strings.TrimPrefix(ctnr.Name, "/"))
@@ -167,10 +171,28 @@ func libcontainerConfigToContainerSpec(config *libcontainerConfigs.Config, mi *i
 	}
 	spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.CpusetCpus, mi.NumCores)
 
-	spec.HasNetwork = len(config.Networks) > 0
+	// Docker reports a loop device for containers with --net=host. Ignore
+	// those too.
+	networkCount := 0
+	for _, n := range config.Networks {
+		if n.Type != "loopback" {
+			networkCount += 1
+		}
+	}
+
+	spec.HasNetwork = networkCount > 0 || hasNetNs(config.Namespaces)
 	spec.HasDiskIo = true
 
 	return spec
+}
+
+func hasNetNs(namespaces libcontainerConfigs.Namespaces) bool {
+	for _, ns := range namespaces {
+		if ns.Type == libcontainerConfigs.NEWNET {
+			return true
+		}
+	}
+	return false
 }
 
 func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
@@ -255,7 +277,7 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 			}
 		}
 	}
-	stats, err := containerLibcontainer.GetStats(self.cgroupManager, networkInterfaces)
+	stats, err := containerLibcontainer.GetStats(self.cgroupManager, networkInterfaces, self.pid)
 	if err != nil {
 		return stats, err
 	}

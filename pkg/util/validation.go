@@ -139,3 +139,11 @@ func IsValidPortName(port string) bool {
 func IsValidIPv4(value string) bool {
 	return net.ParseIP(value) != nil && net.ParseIP(value).To4() != nil
 }
+
+const percentFmt string = "[0-9]+%"
+
+var percentRegexp = regexp.MustCompile("^" + percentFmt + "$")
+
+func IsValidPercent(percent string) bool {
+	return percentRegexp.MatchString(percent)
+}

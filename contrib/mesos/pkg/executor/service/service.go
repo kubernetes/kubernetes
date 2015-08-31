@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/redirfd"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -131,12 +131,20 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		log.Info(err)
 	}
 
-	// derive the executor cgroup and use it as docker cgroup root
+	// derive the executor cgroup and use it as docker container cgroup root
 	mesosCgroup := findMesosCgroup(s.cgroupPrefix)
 	s.cgroupRoot = mesosCgroup
-	s.SystemContainer = mesosCgroup
-	s.ResourceContainer = mesosCgroup
 	log.V(2).Infof("passing cgroup %q to the kubelet as cgroup root", s.CgroupRoot)
+
+	// empty string for the docker and system containers (= cgroup paths). This
+	// stops the kubelet taking any control over other system processes.
+	s.SystemContainer = ""
+	s.DockerDaemonContainer = ""
+
+	// We set kubelet container to its own cgroup below the executor cgroup.
+	// In contrast to the docker and system container, this has no other
+	// undesired side-effects.
+	s.ResourceContainer = mesosCgroup + "/kubelet"
 
 	// create apiserver client
 	var apiclient *client.Client
@@ -253,6 +261,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		ConfigureCBR0:             s.ConfigureCBR0,
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
+		ResolverConfig:            s.ResolverConfig,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
@@ -266,12 +275,12 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	if s.HealthzPort > 0 {
 		healthz.DefaultHealthz()
-		go util.Forever(func() {
+		go util.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
 			if err != nil {
 				log.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second)
+		}, 5*time.Second, util.NeverStop)
 	}
 
 	// block until executor is shut down or commits shutdown
@@ -346,6 +355,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.OSInterface,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
+		kc.RktPath,
 		kc.Mounter,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
@@ -353,6 +363,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.PodCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler,
+		kc.ResolverConfig,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -495,8 +506,6 @@ func (kl *kubeletExecutor) Run(updates <-chan kubelet.PodUpdate) {
 	util.Until(func() { kl.Kubelet.Run(pipe) }, 0, kl.executorDone)
 
 	//TODO(jdef) revisit this if/when executor failover lands
-	err := kl.SyncPods([]*api.Pod{}, nil, nil, time.Now())
-	if err != nil {
-		log.Errorf("failed to cleanly remove all pods and associated state: %v", err)
-	}
+	// Force kubelet to delete all pods.
+	kl.HandlePodDeletions(kl.GetPods())
 }

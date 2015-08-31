@@ -99,6 +99,8 @@ export KUBERNETES_MASTER_IP=$(hostname -i)
 export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 ```
 
+Note that KUBERNETES_MASTER is used as the api endpoint. If you have existing `~/.kube/config` and point to another endpoint, you need to add option `--server=${KUBERNETES_MASTER}` to kubectl in later steps.
+
 ### Deploy etcd
 
 Start etcd and verify that it is running:
@@ -132,7 +134,7 @@ Update your PATH to more easily run the Kubernetes-Mesos binaries:
 export PATH="$(pwd)/_output/local/go/bin:$PATH"
 ```
 
-Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
+Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos-master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
 In order to let Kubernetes survive Mesos master changes, the ZooKeeper URL is recommended for production environments.
 
 ```bash
@@ -208,7 +210,7 @@ kubernetes       component=apiserver,provider=kubernetes   <none>     10.10.10.1
 ```
 
 Lastly, look for Kubernetes in the Mesos web GUI by pointing your browser to
-`http://<mesos_master_ip:port>`. Make sure you have an active VPN connection.
+`http://<mesos-master-ip:port>`. Make sure you have an active VPN connection.
 Go to the Frameworks tab, and look for an active framework named "Kubernetes".
 
 ## Spin up a pod

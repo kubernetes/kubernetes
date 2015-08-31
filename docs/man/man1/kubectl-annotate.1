@@ -34,6 +34,10 @@ resourcequotas (quota) or secrets.
     select all resources in the namespace of the specified resource types
 
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to update the annotation
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for annotate
 
@@ -43,7 +47,7 @@ resourcequotas (quota) or secrets.
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide.
+    Output format. One of: json|yaml|template|templatefile|wide|jsonpath|name.
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -58,13 +62,18 @@ resourcequotas (quota) or secrets.
     If non\-empty, the annotation update will only succeed if this is the current resource\-version for the object. Only valid when specifying a single resource.
 
 .PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
 \fB\-\-sort\-by\fP=""
     If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+    Template string or path to template file to use when \-o=template, \-o=templatefile or \-o=jsonpath.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]. The jsonpath template is composed of jsonpath expressions enclosed by {} [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]]
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -157,10 +166,6 @@ resourcequotas (quota) or secrets.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -173,6 +178,9 @@ resourcequotas (quota) or secrets.
 # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
 # If the same annotation is set multiple times, only the last value will be applied
 $ kubectl annotate pods foo description='my frontend'
+
+# Update a pod identified by type and name in "pod.json"
+$ kubectl annotate \-f pod.json description='my frontend'
 
 # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
 $ kubectl annotate \-\-overwrite pods foo description='my frontend running nginx'

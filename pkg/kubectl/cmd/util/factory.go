@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -67,7 +67,7 @@ type Factory struct {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error)
+	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
 	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
@@ -79,7 +79,7 @@ type Factory struct {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
-	Validator func() (validation.Schema, error)
+	Validator func(validate bool) (validation.Schema, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overriden.
@@ -110,25 +110,27 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
-
-	// Initialize the experimental client (if possible). Failing here is non-fatal, errors
-	// will be returned when an experimental client is explicitly requested.
-	var experimentalClient *client.ExperimentalClient
-	cfg, experimentalClientErr := clientConfig.ClientConfig()
-	if experimentalClientErr == nil {
-		experimentalClient, experimentalClientErr = client.NewExperimental(cfg)
-	}
+	expClients := NewExperimentalClientCache(clientConfig)
 
 	noClientErr := errors.New("could not get client")
-	getBothClients := func(group string, version string) (client *client.Client, expClient *client.ExperimentalClient, err error) {
-		err = noClientErr
+	getBothClients := func(group string, version string) (*client.Client, *client.ExperimentalClient, error) {
 		switch group {
 		case "api":
-			client, err = clients.ClientForVersion(version)
+			client, err := clients.ClientForVersion(version)
+			return client, nil, err
+
 		case "experimental":
-			expClient, err = experimentalClient, experimentalClientErr
+			client, err := clients.ClientForVersion(version)
+			if err != nil {
+				return nil, nil, err
+			}
+			expClient, err := expClients.Client()
+			if err != nil {
+				return nil, nil, err
+			}
+			return client, expClient, err
 		}
-		return
+		return nil, nil, noClientErr
 	}
 	return &Factory{
 		clients:    clients,
@@ -146,7 +148,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return clients.ClientForVersion("")
 		},
 		ExperimentalClient: func() (*client.ExperimentalClient, error) {
-			return experimentalClient, experimentalClientErr
+			return expClients.Client()
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return clients.ClientConfigForVersion("")
@@ -164,7 +166,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return client.RESTClient, nil
 			case "experimental":
-				client, err := experimentalClient, experimentalClientErr
+				client, err := expClients.Client()
 				if err != nil {
 					return nil, err
 				}
@@ -186,8 +188,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
-			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, columnLabels), nil
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, columnLabels), nil
 		},
 		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
@@ -254,13 +256,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return kubectl.ReaperFor(mapping.Kind, client, expClient)
 		},
-		Validator: func() (validation.Schema, error) {
-			if flags.Lookup("validate").Value.String() == "true" {
+		Validator: func(validate bool) (validation.Schema, error) {
+			if validate {
 				client, err := clients.ClientForVersion("")
 				if err != nil {
 					return nil, err
 				}
-				return &clientSwaggerSchema{client, experimentalClient, api.Scheme}, nil
+				expClient, _ := expClients.Client()
+				return &clientSwaggerSchema{client, expClient, api.Scheme}, nil
 			}
 			return validation.NullSchema{}, nil
 		},
@@ -277,20 +280,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
-	util.AddFlagSetToPFlagSet(flag.CommandLine, flags)
-
-	// This is necessary as github.com/spf13/cobra doesn't support "global"
-	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
-	util.AddPFlagSetToPFlagSet(pflag.CommandLine, flags)
-
-	// Hack for global access to validation flag.
-	// TODO: Refactor out after configuration flag overhaul.
-	if f.flags.Lookup("validate") == nil {
-		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
-	}
+	flags.AddGoFlagSet(flag.CommandLine)
 
 	// Merge factory's flags
-	util.AddPFlagSetToPFlagSet(f.flags, flags)
+	flags.AddFlagSet(f.flags)
 
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
@@ -467,7 +460,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			columnLabel = []string{}
 		}
-		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), columnLabel)
+		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), GetFlagBool(cmd, "show-all"), columnLabel)
 		if err != nil {
 			return nil, err
 		}

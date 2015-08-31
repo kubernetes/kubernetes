@@ -19,15 +19,15 @@ import (
 )
 
 var (
-	test_bool                    = Bool("test_bool", false, "bool value")
-	test_int                     = Int("test_int", 0, "int value")
-	test_int64                   = Int64("test_int64", 0, "int64 value")
-	test_uint                    = Uint("test_uint", 0, "uint value")
-	test_uint64                  = Uint64("test_uint64", 0, "uint64 value")
-	test_string                  = String("test_string", "0", "string value")
-	test_float64                 = Float64("test_float64", 0, "float64 value")
-	test_duration                = Duration("test_duration", 0, "time.Duration value")
-	test_optional_int            = Int("test_optional_int", 0, "optional int value")
+	testBool                     = Bool("test_bool", false, "bool value")
+	testInt                      = Int("test_int", 0, "int value")
+	testInt64                    = Int64("test_int64", 0, "int64 value")
+	testUint                     = Uint("test_uint", 0, "uint value")
+	testUint64                   = Uint64("test_uint64", 0, "uint64 value")
+	testString                   = String("test_string", "0", "string value")
+	testFloat                    = Float64("test_float64", 0, "float64 value")
+	testDuration                 = Duration("test_duration", 0, "time.Duration value")
+	testOptionalInt              = Int("test_optional_int", 0, "optional int value")
 	normalizeFlagNameInvocations = 0
 )
 
@@ -107,6 +107,23 @@ func TestUsage(t *testing.T) {
 	}
 	if !called {
 		t.Error("did not call Usage for unknown flag")
+	}
+}
+
+func TestAddFlagSet(t *testing.T) {
+	oldSet := NewFlagSet("old", ContinueOnError)
+	newSet := NewFlagSet("new", ContinueOnError)
+
+	oldSet.String("flag1", "flag1", "flag1")
+	oldSet.String("flag2", "flag2", "flag2")
+
+	newSet.String("flag2", "flag2", "flag2")
+	newSet.String("flag3", "flag3", "flag3")
+
+	oldSet.AddFlagSet(newSet)
+
+	if len(oldSet.formal) != 3 {
+		t.Errorf("Unexpected result adding a FlagSet to a FlagSet %v", oldSet)
 	}
 }
 
@@ -291,7 +308,7 @@ func testParse(f *FlagSet, t *testing.T) {
 		t.Error("mask flag should be 255.255.255.0, is ", (*maskFlag).String())
 	}
 	if v, err := f.GetIPv4Mask("mask"); err != nil || v.String() != (*maskFlag).String() {
-		t.Errorf("GetIP returned %v but maskFlag was %v", v, *maskFlag, err)
+		t.Errorf("GetIP returned %v maskFlag was %v error was %v", v, *maskFlag, err)
 	}
 	if *durationFlag != 2*time.Minute {
 		t.Error("duration flag should be 2m, is ", *durationFlag)
@@ -379,6 +396,34 @@ func TestParse(t *testing.T) {
 
 func TestFlagSetParse(t *testing.T) {
 	testParse(NewFlagSet("test", ContinueOnError), t)
+}
+
+func TestChangedHelper(t *testing.T) {
+	f := NewFlagSet("changedtest", ContinueOnError)
+	_ = f.Bool("changed", false, "changed bool")
+	_ = f.Bool("settrue", true, "true to true")
+	_ = f.Bool("setfalse", false, "false to false")
+	_ = f.Bool("unchanged", false, "unchanged bool")
+
+	args := []string{"--changed", "--settrue", "--setfalse=false"}
+	if err := f.Parse(args); err != nil {
+		t.Error("f.Parse() = false after Parse")
+	}
+	if !f.Changed("changed") {
+		t.Errorf("--changed wasn't changed!")
+	}
+	if !f.Changed("settrue") {
+		t.Errorf("--settrue wasn't changed!")
+	}
+	if !f.Changed("setfalse") {
+		t.Errorf("--setfalse wasn't changed!")
+	}
+	if f.Changed("unchanged") {
+		t.Errorf("--unchanged was changed!")
+	}
+	if f.Changed("invalid") {
+		t.Errorf("--invalid was changed!")
+	}
 }
 
 func replaceSeparators(name string, from []string, to string) string {
@@ -684,6 +729,21 @@ func TestDeprecatedFlagInDocs(t *testing.T) {
 	}
 }
 
+func TestDeprecatedFlagShorthandInDocs(t *testing.T) {
+	f := NewFlagSet("bob", ContinueOnError)
+	name := "noshorthandflag"
+	f.BoolP(name, "n", true, "always true")
+	f.MarkShorthandDeprecated("noshorthandflag", fmt.Sprintf("use --%s instead", name))
+
+	out := new(bytes.Buffer)
+	f.SetOutput(out)
+	f.PrintDefaults()
+
+	if strings.Contains(out.String(), "-n,") {
+		t.Errorf("found deprecated flag shorthand in usage!")
+	}
+}
+
 func parseReturnStderr(t *testing.T, f *FlagSet, args []string) (string, error) {
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
@@ -713,6 +773,24 @@ func TestDeprecatedFlagUsage(t *testing.T) {
 	f.MarkDeprecated("badflag", usageMsg)
 
 	args := []string{"--badflag"}
+	out, err := parseReturnStderr(t, f, args)
+	if err != nil {
+		t.Fatal("expected no error; got ", err)
+	}
+
+	if !strings.Contains(out, usageMsg) {
+		t.Errorf("usageMsg not printed when using a deprecated flag!")
+	}
+}
+
+func TestDeprecatedFlagShorthandUsage(t *testing.T) {
+	f := NewFlagSet("bob", ContinueOnError)
+	name := "noshorthandflag"
+	f.BoolP(name, "n", true, "always true")
+	usageMsg := fmt.Sprintf("use --%s instead", name)
+	f.MarkShorthandDeprecated(name, usageMsg)
+
+	args := []string{"-n"}
 	out, err := parseReturnStderr(t, f, args)
 	if err != nil {
 		t.Fatal("expected no error; got ", err)

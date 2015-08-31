@@ -137,10 +137,6 @@ namespaces (ns) or secrets.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -156,7 +152,7 @@ $ kubectl describe nodes kubernetes\-minion\-emt8.c.myproject.internal
 # Describe a pod
 $ kubectl describe pods/nginx
 
-# Describe a pod using the data in pod.json.
+# Describe a pod identified by type and name in "pod.json"
 $ kubectl describe \-f pod.json
 
 # Describe all pods

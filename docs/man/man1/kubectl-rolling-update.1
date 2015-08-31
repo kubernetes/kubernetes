@@ -48,7 +48,7 @@ existing replication controller and overwrite at least one (common) label in its
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide.
+    Output format. One of: json|yaml|template|templatefile|wide|jsonpath|name.
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -63,13 +63,18 @@ existing replication controller and overwrite at least one (common) label in its
     If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout
 
 .PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
 \fB\-\-sort\-by\fP=""
     If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+    Template string or path to template file to use when \-o=template, \-o=templatefile or \-o=jsonpath.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]. The jsonpath template is composed of jsonpath expressions enclosed by {} [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]]
 
 .PP
 \fB\-\-timeout\fP=5m0s
@@ -78,6 +83,10 @@ existing replication controller and overwrite at least one (common) label in its
 .PP
 \fB\-\-update\-period\fP=1m0s
     Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -168,10 +177,6 @@ existing replication controller and overwrite at least one (common) label in its
 .PP
 \fB\-\-v\fP=0
     log level for V logs
-
-.PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
 
 .PP
 \fB\-\-vmodule\fP=

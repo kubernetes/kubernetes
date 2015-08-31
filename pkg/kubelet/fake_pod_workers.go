@@ -42,6 +42,8 @@ func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateCompl
 
 func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {}
 
+func (f *fakePodWorkers) ForgetWorker(uid types.UID) {}
+
 type TestingInterface interface {
 	Errorf(format string, args ...interface{})
 }

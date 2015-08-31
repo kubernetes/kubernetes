@@ -82,6 +82,12 @@ __handle_filename_extension_flag()
     _filedir "@(${ext})"
 }
 
+__handle_subdirs_in_dir_flag()
+{
+    local dir="$1"
+    pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1
+}
+
 __handle_flag()
 {
     __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
@@ -175,6 +181,11 @@ __kubectl_get_resource()
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
 }
 
+__kubectl_get_resource_pod()
+{
+    __kubectl_parse_get "pod"
+}
+
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
@@ -207,13 +218,17 @@ __kubectl_require_pod_and_container()
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop)
-	    __kubectl_get_resource
+            __kubectl_get_resource
             return
             ;;
-	kubectl_logs)
-	    __kubectl_require_pod_and_container
-	    return
-	    ;;
+        kubectl_logs)
+            __kubectl_require_pod_and_container
+            return
+            ;;
+        kubectl_exec)
+            __kubectl_get_resource_pod
+            return
+            ;;
         *)
             ;;
     esac
@@ -230,6 +245,12 @@ _kubectl_get()
     flags_completion=()
 
     flags+=("--all-namespaces")
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--label-columns=")
@@ -240,6 +261,8 @@ _kubectl_get()
     flags+=("--output-version=")
     flags+=("--selector=")
     two_word_flags+=("-l")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--template=")
     two_word_flags+=("-t")
@@ -264,6 +287,7 @@ _kubectl_get()
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
     must_have_one_noun+=("serviceaccount")
+    must_have_one_noun+=("thirdpartyresource")
 }
 
 _kubectl_describe()
@@ -323,6 +347,7 @@ _kubectl_create()
     flags+=("-h")
     flags+=("--output=")
     two_word_flags+=("-o")
+    flags+=("--validate")
 
     must_have_one_flag=()
     must_have_one_flag+=("--filename=")
@@ -354,6 +379,7 @@ _kubectl_replace()
     flags+=("--output=")
     two_word_flags+=("-o")
     flags+=("--timeout=")
+    flags+=("--validate")
 
     must_have_one_flag=()
     must_have_one_flag+=("--filename=")
@@ -371,6 +397,12 @@ _kubectl_patch()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--output=")
@@ -414,6 +446,22 @@ _kubectl_delete()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    must_have_one_noun+=("componentstatus")
+    must_have_one_noun+=("endpoints")
+    must_have_one_noun+=("event")
+    must_have_one_noun+=("limitrange")
+    must_have_one_noun+=("namespace")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("persistentvolume")
+    must_have_one_noun+=("persistentvolumeclaim")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("podtemplate")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("secret")
+    must_have_one_noun+=("service")
+    must_have_one_noun+=("serviceaccount")
+    must_have_one_noun+=("thirdpartyresource")
 }
 
 _kubectl_namespace()
@@ -484,11 +532,14 @@ _kubectl_rolling-update()
     flags+=("--output-version=")
     flags+=("--poll-interval=")
     flags+=("--rollback")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--template=")
     two_word_flags+=("-t")
     flags+=("--timeout=")
     flags+=("--update-period=")
+    flags+=("--validate")
 
     must_have_one_flag=()
     must_have_one_flag+=("--filename=")
@@ -508,6 +559,12 @@ _kubectl_scale()
     flags_completion=()
 
     flags+=("--current-replicas=")
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--output=")
@@ -630,6 +687,7 @@ _kubectl_run()
     flags_completion=()
 
     flags+=("--attach")
+    flags+=("--command")
     flags+=("--dry-run")
     flags+=("--generator=")
     flags+=("--help")
@@ -647,6 +705,8 @@ _kubectl_run()
     flags+=("--replicas=")
     two_word_flags+=("-r")
     flags+=("--restart=")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--stdin")
     flags+=("-i")
@@ -703,6 +763,7 @@ _kubectl_expose()
     flags+=("--container-port=")
     flags+=("--create-external-load-balancer")
     flags+=("--dry-run")
+    flags+=("--external-ip=")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
     flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
@@ -722,9 +783,10 @@ _kubectl_expose()
     flags+=("--overrides=")
     flags+=("--port=")
     flags+=("--protocol=")
-    flags+=("--public-ip=")
     flags+=("--selector=")
     flags+=("--session-affinity=")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--target-port=")
     flags+=("--template=")
@@ -747,6 +809,12 @@ _kubectl_label()
     flags_completion=()
 
     flags+=("--all")
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--no-headers")
@@ -757,6 +825,8 @@ _kubectl_label()
     flags+=("--resource-version=")
     flags+=("--selector=")
     two_word_flags+=("-l")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--template=")
     two_word_flags+=("-t")
@@ -776,6 +846,12 @@ _kubectl_annotate()
     flags_completion=()
 
     flags+=("--all")
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--no-headers")
@@ -784,6 +860,8 @@ _kubectl_annotate()
     flags+=("--output-version=")
     flags+=("--overwrite")
     flags+=("--resource-version=")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--template=")
     two_word_flags+=("-t")
@@ -812,6 +890,8 @@ _kubectl_config_view()
     two_word_flags+=("-o")
     flags+=("--output-version=")
     flags+=("--raw")
+    flags+=("--show-all")
+    flags+=("-a")
     flags+=("--sort-by=")
     flags+=("--template=")
     two_word_flags+=("-t")
@@ -1072,7 +1152,6 @@ _kubectl()
     flags+=("--user=")
     flags+=("--username=")
     flags+=("--v=")
-    flags+=("--validate")
     flags+=("--vmodule=")
 
     must_have_one_flag=()

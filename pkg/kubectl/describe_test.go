@@ -26,8 +26,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/testclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -409,5 +409,73 @@ func TestGetPodsTotalRequests(t *testing.T) {
 		if !reflect.DeepEqual(reqs, testCase.expectedReqs) {
 			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
 		}
+	}
+}
+
+func TestPersistentVolumeDescriber(t *testing.T) {
+	tests := map[string]*api.PersistentVolume{
+
+		"hostpath": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{},
+				},
+			},
+		},
+		"gce": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+			},
+		},
+		"ebs": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+				},
+			},
+		},
+		"nfs": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					NFS: &api.NFSVolumeSource{},
+				},
+			},
+		},
+		"iscsi": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{},
+				},
+			},
+		},
+		"gluster": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Glusterfs: &api.GlusterfsVolumeSource{},
+				},
+			},
+		},
+		"rbd": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					RBD: &api.RBDVolumeSource{},
+				},
+			},
+		},
+	}
+
+	for name, pv := range tests {
+		fake := testclient.NewSimpleFake(pv)
+		c := PersistentVolumeDescriber{fake}
+		str, err := c.Describe("foo", "bar")
+		if err != nil {
+			t.Errorf("Unexpected error for test %s: %v", name, err)
+		}
+		if str == "" {
+			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", name)
+		}
+
 	}
 }

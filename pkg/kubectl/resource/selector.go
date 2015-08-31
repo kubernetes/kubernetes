@@ -17,11 +17,10 @@ limitations under the License.
 package resource
 
 import (
-	"github.com/golang/glog"
+	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -50,11 +49,10 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 	if err != nil {
 		if errors.IsBadRequest(err) || errors.IsNotFound(err) {
 			if r.Selector.Empty() {
-				glog.V(2).Infof("Unable to list %q: %v", r.Mapping.Resource, err)
+				return fmt.Errorf("Unable to list %q: %v", r.Mapping.Resource, err)
 			} else {
-				glog.V(2).Infof("Unable to find %q that match the selector %q: %v", r.Mapping.Resource, r.Selector, err)
+				return fmt.Errorf("Unable to find %q that match the selector %q: %v", r.Mapping.Resource, r.Selector, err)
 			}
-			return nil
 		}
 		return err
 	}
@@ -68,11 +66,11 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		Object:          list,
 		ResourceVersion: resourceVersion,
 	}
-	return fn(info)
+	return fn(info, nil)
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().APIVersion, r.Selector, fields.Everything())
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().APIVersion, r.Selector)
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

@@ -113,7 +113,7 @@ func NewDefaultRESTMapper(group string, versions []string, f VersionInterfacesFu
 }
 
 func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
-	plural, singular := kindToResource(kind, mixedCase)
+	plural, singular := KindToResource(kind, mixedCase)
 	m.plurals[singular] = plural
 	m.singulars[plural] = singular
 	meta := typeMeta{APIVersion: version, Kind: kind}
@@ -131,8 +131,8 @@ func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mi
 	m.scopes[meta] = scope
 }
 
-// kindToResource converts Kind to a resource name.
-func kindToResource(kind string, mixedCase bool) (plural, singular string) {
+// KindToResource converts Kind to a resource name.
+func KindToResource(kind string, mixedCase bool) (plural, singular string) {
 	if len(kind) == 0 {
 		return
 	}

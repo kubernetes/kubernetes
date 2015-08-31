@@ -144,7 +144,7 @@ func (ed *emptyDir) SetUp() error {
 
 // SetUpAt creates new directory.
 func (ed *emptyDir) SetUpAt(dir string) error {
-	isMnt, err := ed.mounter.IsMountPoint(dir)
+	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
 	if err != nil && !os.IsNotExist(err) {
@@ -156,7 +156,7 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	// medium is memory, and a mountpoint is present, then the volume is
 	// ready.
 	if volumeutil.IsReady(ed.getMetaDir()) {
-		if ed.medium == api.StorageMediumMemory && isMnt {
+		if ed.medium == api.StorageMediumMemory && !notMnt {
 			return nil
 		} else if ed.medium == api.StorageMediumDefault {
 			return nil

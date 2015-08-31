@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -89,6 +90,15 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.LabelSelector, _ = labels.Parse("a=b")
 			j.FieldSelector, _ = fields.ParseSelector("a=b")
 		},
+		func(j *api.PodSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			// has a default value
+			ttl := int64(30)
+			if c.RandBool() {
+				ttl = int64(c.Uint32())
+			}
+			j.TerminationGracePeriodSeconds = &ttl
+		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
@@ -110,7 +120,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
-		func(j *api.DaemonSpec, c fuzz.Continue) {
+		func(j *expapi.DaemonSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 		},
 		func(j *api.List, c fuzz.Continue) {
@@ -173,6 +183,28 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			storageLimit := randomQuantity()
 			q.Limits[api.ResourceStorage] = *storageLimit.Copy()
 			q.Requests[api.ResourceStorage] = *storageLimit.Copy()
+		},
+		func(q *api.LimitRangeItem, c fuzz.Continue) {
+			randomQuantity := func() resource.Quantity {
+				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+			}
+			cpuLimit := randomQuantity()
+
+			q.Type = api.LimitTypeContainer
+			q.Default = make(api.ResourceList)
+			q.Default[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.DefaultRequest = make(api.ResourceList)
+			q.DefaultRequest[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.Max = make(api.ResourceList)
+			q.Max[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.Min = make(api.ResourceList)
+			q.Min[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.MaxLimitRequestRatio = make(api.ResourceList)
+			q.MaxLimitRequestRatio[api.ResourceCPU] = resource.MustParse("10")
 		},
 		func(p *api.PullPolicy, c fuzz.Continue) {
 			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
@@ -291,6 +323,11 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(n *api.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)
 			n.Spec.ExternalID = "external"
+		},
+		func(s *expapi.APIVersion, c fuzz.Continue) {
+			// We can't use c.RandString() here because it may generate empty
+			// string, which will cause tests failure.
+			s.APIGroup = "something"
 		},
 	)
 	return f

@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -110,8 +110,7 @@ func waitForGroupSize(size int) error {
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
 }
 
-func waitForClusterSize(c *client.Client, size int) error {
-	timeout := 10 * time.Minute
+func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
@@ -256,8 +255,17 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 			return nil, err
 		}
 
-		Logf("Pod name %s: Found %d pods out of %d", name, len(pods.Items), replicas)
-		if len(pods.Items) == replicas {
+		created := []api.Pod{}
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
+			created = append(created, pod)
+		}
+		Logf("Pod name %s: Found %d pods out of %d", name, len(created), replicas)
+
+		if len(created) == replicas {
+			pods.Items = created
 			return pods, nil
 		}
 	}
@@ -414,8 +422,11 @@ var _ = Describe("Nodes", func() {
 			Failf("Not all nodes are ready: %v", err)
 		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
+		}
+		if err := deleteTestingNS(c); err != nil {
+			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
 		}
 	})
 
@@ -441,7 +452,7 @@ var _ = Describe("Nodes", func() {
 			if err := waitForGroupSize(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes); err != nil {
+			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				Failf("Couldn't restore the original cluster size: %v", err)
 			}
 		})
@@ -460,7 +471,7 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas-1)
+			err = waitForClusterSize(c, replicas-1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying whether the pods from the removed node are recreated")
@@ -484,7 +495,7 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas+1)
+			err = waitForClusterSize(c, replicas+1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))

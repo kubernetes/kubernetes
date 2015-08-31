@@ -18,6 +18,7 @@ package rkt
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -38,7 +39,25 @@ const (
 	Deleting       = "deleting" // This covers pod.isExitedDeleting and pod.isDeleting.
 	Exited         = "exited"   // This covers pod.isExited and pod.isExitedGarbage.
 	Garbage        = "garbage"
+
+	// The prefix before the app name for each app's exit code in the output of 'rkt status'.
+	exitCodePrefix = "app-"
 )
+
+// rktInfo represents the information of the rkt pod that stored in the
+// systemd service file.
+type rktInfo struct {
+	uuid         string
+	restartCount int
+}
+
+func emptyRktInfo() *rktInfo {
+	return &rktInfo{restartCount: -1}
+}
+
+func (r *rktInfo) isEmpty() bool {
+	return reflect.DeepEqual(r, emptyRktInfo())
+}
 
 // podInfo is the internal type that represents the state of
 // the rkt pod.
@@ -49,12 +68,21 @@ type podInfo struct {
 	ip string
 	// The pid of the init process in the pod.
 	pid int
-	// A map from image hashes to exit codes.
-	// TODO(yifan): Should be appName to exit code in the future.
+	// A map of [app name]:[exit code].
 	exitCodes map[string]int
+	// TODO(yifan): Expose [app name]:[image id].
 }
 
 // parsePodInfo parses the result of 'rkt status' into podInfo.
+//
+// Example output of 'rkt status':
+//
+// state=exited
+// pid=-1
+// exited=true
+// app-etcd=0         # The exit code of the app "etcd" in the pod.
+// app-redis=0        # The exit code of the app "redis" in the pod.
+//
 func parsePodInfo(status []string) (*podInfo, error) {
 	p := &podInfo{
 		pid:       -1,
@@ -80,12 +108,14 @@ func parsePodInfo(status []string) (*podInfo, error) {
 			}
 			p.pid = pid
 		}
-		if strings.HasPrefix(tuples[0], "sha512") {
+
+		if strings.HasPrefix(tuples[0], exitCodePrefix) {
 			exitcode, err := strconv.Atoi(tuples[1])
 			if err != nil {
 				return nil, fmt.Errorf("cannot parse exit code from %s : %v", tuples[1], err)
 			}
-			p.exitCodes[tuples[0]] = exitcode
+			appName := strings.TrimPrefix(tuples[0], exitCodePrefix)
+			p.exitCodes[appName] = exitcode
 		}
 	}
 	return p, nil
@@ -94,32 +124,29 @@ func parsePodInfo(status []string) (*podInfo, error) {
 // getIPFromNetworkInfo returns the IP of a pod by parsing the network info.
 // The network info looks like this:
 //
-// default:ip4=172.16.28.3, database:ip4=172.16.28.42
+// default:ip4=172.16.28.3
+// database:ip4=172.16.28.42
 //
 func getIPFromNetworkInfo(networkInfo string) string {
 	parts := strings.Split(networkInfo, ",")
-
 	for _, part := range parts {
-		if strings.HasPrefix(part, "default:") {
-			tuples := strings.Split(part, "=")
-			if len(tuples) == 2 {
-				return tuples[1]
-			}
+		tuples := strings.Split(part, "=")
+		if len(tuples) == 2 {
+			return tuples[1]
 		}
 	}
 	return ""
 }
 
-// getContainerStatus creates the api.containerStatus of a container from the podInfo.
-// TODO(yifan): Get more detailed info such as Image, ImageID, etc.
-func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.ContainerStatus {
+// makeContainerStatus creates the api.containerStatus of a container from the podInfo.
+func makeContainerStatus(container *kubecontainer.Container, podInfo *podInfo) api.ContainerStatus {
 	var status api.ContainerStatus
 	status.Name = container.Name
 	status.Image = container.Image
-	containerID, _ := parseContainerID(string(container.ID))
-	status.ImageID = containerID.imageID
+	status.ContainerID = string(container.ID)
+	// TODO(yifan): Add image ID info.
 
-	switch p.state {
+	switch podInfo.state {
 	case Running:
 		// TODO(yifan): Get StartedAt.
 		status.State = api.ContainerState{
@@ -130,11 +157,12 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 	case Embryo, Preparing, Prepared:
 		status.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
 	case AbortedPrepare, Deleting, Exited, Garbage:
-		exitCode, ok := p.exitCodes[status.ImageID]
+		exitCode, ok := podInfo.exitCodes[status.Name]
 		if !ok {
 			glog.Warningf("rkt: Cannot get exit code for container %v", container)
+			exitCode = -1
+
 		}
-		exitCode = -1
 		status.State = api.ContainerState{
 			Terminated: &api.ContainerStateTerminated{
 				ExitCode:  exitCode,
@@ -142,18 +170,20 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 			},
 		}
 	default:
-		glog.Warningf("rkt: Unknown pod state: %q", p.state)
+		glog.Warningf("rkt: Unknown pod state: %q", podInfo.state)
 	}
 	return status
 }
 
-// toPodStatus converts a podInfo type into an api.PodStatus type.
-func (p *podInfo) toPodStatus(pod *kubecontainer.Pod) api.PodStatus {
+// makePodStatus constructs the pod status from the pod info and rkt info.
+func makePodStatus(pod *kubecontainer.Pod, podInfo *podInfo, rktInfo *rktInfo) api.PodStatus {
 	var status api.PodStatus
-	status.PodIP = p.ip
+	status.PodIP = podInfo.ip
 	// For now just make every container's state the same as the pod.
 	for _, container := range pod.Containers {
-		status.ContainerStatuses = append(status.ContainerStatuses, p.getContainerStatus(container))
+		containerStatus := makeContainerStatus(container, podInfo)
+		containerStatus.RestartCount = rktInfo.restartCount
+		status.ContainerStatuses = append(status.ContainerStatuses, containerStatus)
 	}
 	return status
 }

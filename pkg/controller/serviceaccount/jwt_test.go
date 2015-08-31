@@ -25,8 +25,8 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/testclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
 const otherPublicKey = `-----BEGIN PUBLIC KEY-----

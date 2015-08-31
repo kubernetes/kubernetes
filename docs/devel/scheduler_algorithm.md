@@ -37,10 +37,10 @@ For each unscheduled Pod, the Kubernetes scheduler tries to find a node across t
 
 ## Filtering the nodes
 
-The purpose of filtering the nodes is to filter out the nodes that do not meet certain requirements of the Pod. For example, if the free resource on a node (measured by the capacity minus the sum of the resource limits of all the Pods that already run on the node) is less than the Pod's required resource, the node should not be considered in the ranking phase so it is filtered out. Currently, there are several "predicates" implementing different filtering policies, including:
+The purpose of filtering the nodes is to filter out the nodes that do not meet certain requirements of the Pod. For example, if the free resource on a node (measured by the capacity minus the sum of the resource requests of all the Pods that already run on the node) is less than the Pod's required resource, the node should not be considered in the ranking phase so it is filtered out. Currently, there are several "predicates" implementing different filtering policies, including:
 
 - `NoDiskConflict`: Evaluate if a pod can fit due to the volumes it requests, and those that are already mounted.
-- `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of limits of all Pods on the node.
+- `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of requests of all Pods on the node. To learn more about the resource QoS in Kubernetes, please check [QoS proposal](../proposals/resource-qos.md).
 - `PodFitsPorts`: Check if any HostPort required by the Pod is already occupied on the node.
 - `PodFitsHost`: Filter out all nodes except the one specified in the PodSpec's NodeName field.
 - `PodSelectorMatches`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field ([Here](../user-guide/node-selection/) is an example of how to use `nodeSelector` field).
@@ -58,7 +58,7 @@ After the scores of all nodes are calculated, the node with highest score is cho
 
 Currently, Kubernetes scheduler provides some practical priority functions, including:
 
-- `LeastRequestedPriority`: The node is prioritized based on the fraction of the node that would be free if the new Pod were scheduled onto the node. (In other words, (capacity - sum of limits of all Pods already on the node - limit of Pod that is being scheduled) / capacity). CPU and memory are equally weighted. The node with the highest free fraction is the most preferred. Note that this priority function has the effect of spreading Pods across the nodes with respect to resource consumption.
+- `LeastRequestedPriority`: The node is prioritized based on the fraction of the node that would be free if the new Pod were scheduled onto the node. (In other words, (capacity - sum of requests of all Pods already on the node - request of Pod that is being scheduled) / capacity). CPU and memory are equally weighted. The node with the highest free fraction is the most preferred. Note that this priority function has the effect of spreading Pods across the nodes with respect to resource consumption.
 - `CalculateNodeLabelPriority`: Prefer nodes that have the specified label.
 - `BalancedResourceAllocation`: This priority function tries to put the Pod on a node such that the CPU and Memory utilization rate is balanced after the Pod is deployed.
 - `CalculateSpreadPriority`: Spread Pods by minimizing the number of Pods belonging to the same service on the same node.

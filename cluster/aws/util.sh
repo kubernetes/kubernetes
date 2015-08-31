@@ -63,7 +63,9 @@ MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
-BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}]"
+BLOCK_DEVICE_MAPPINGS_BASE="{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
+MASTER_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MASTER_ROOT_DISK_SIZE},\"VolumeType\":\"${MASTER_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
+MINION_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MINION_ROOT_DISK_SIZE},\"VolumeType\":\"${MINION_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
 
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
@@ -542,24 +544,6 @@ function upload-server-tars() {
   SALT_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${salt_tar_path}"
 }
 
-
-# Ensure that we have a password created for validating to the master.  Will
-# read from kubeconfig for the current context if available.
-#
-# Assumed vars
-#   KUBE_ROOT
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
 # Adds a tag to an AWS resource
 # usage: add-tag <resource-id> <tag-name> <tag-value>
 function add-tag {
@@ -679,7 +663,7 @@ function kube-up {
 
   ensure-iam-profiles
 
-  get-password
+  gen-kube-basicauth
 
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
@@ -846,7 +830,7 @@ function kube-up {
     --key-name ${AWS_SSH_KEY_NAME} \
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
-    --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
+    --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -957,7 +941,7 @@ function kube-up {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${MINION_SG_ID} \
       ${public_ip_option} \
-      --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
+      --block-device-mappings "${MINION_BLOCK_DEVICE_MAPPINGS}" \
       --user-data "file://${KUBE_TEMP}/minion-user-data"
 
   echo "Creating autoscaling group"
@@ -1080,6 +1064,8 @@ function kube-up {
       done
   done
 
+  # ensures KUBECONFIG is set
+  get-kubeconfig-basicauth
   echo
   echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo
@@ -1239,7 +1225,7 @@ function kube-push {
     echo "sudo salt --force-color '*' state.highstate"
   ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo bash
 
-  get-password
+  get-kubeconfig-basicauth
 
   echo
   echo "Kubernetes cluster is running.  The master is running at:"

@@ -260,20 +260,6 @@ FLANNEL_OPTS=""
 EOF
 }
 
-# Ensure that we have a password created for validating to the master. Will
-# read from $HOME/.kubernetes_auth if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
 # Detect the IP for the master
 #
 # Assumed vars:
@@ -360,7 +346,7 @@ function kube-up() {
   source "${KUBE_ROOT}/cluster/common.sh"
 
   # set kubernetes user and password
-  get-password
+  gen-kube-basicauth
 
   create-kubeconfig
 }
@@ -442,7 +428,7 @@ function kube-down {
       echo "Cleaning on node ${i#*@}"
       ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
       # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
-      ssh -t $i 'rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; rm -rf ~/kube /var/lib/kubelet'
+      ssh -t $i 'sudo rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; sudo rm -rf ~/kube /var/lib/kubelet'
     }
   done
   wait

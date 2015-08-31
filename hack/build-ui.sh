@@ -26,13 +26,11 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 if ! which go-bindata > /dev/null 2>&1 ; then
-	echo "Cannot find go-bindata. Install with \"go get github.com/jteeuwen/go-bindata/...\""
-	exit 1
+  echo "Cannot find go-bindata. Install with \"go get github.com/jteeuwen/go-bindata/...\""
+  exit 1
 fi
 
 readonly TMP_DATAFILE="/tmp/datafile.go"
-readonly DASHBOARD_SRC="www/app/..."
-readonly DASHBOARD_PKG="dashboard"
 readonly SWAGGER_SRC="third_party/swagger-ui/..."
 readonly SWAGGER_PKG="swagger"
 
@@ -51,18 +49,6 @@ function kube::hack::build_ui() {
   gofmt -s -w "${TMP_DATAFILE}"
 
   mv "${TMP_DATAFILE}" "${output_file}"
-
 }
 
-case "${1:-}" in
-  dashboard)
-    kube::hack::build_ui "${DASHBOARD_PKG}" "${DASHBOARD_SRC}"
-    ;;
-  swagger)
-    kube::hack::build_ui "${SWAGGER_PKG}" "${SWAGGER_SRC}"
-    ;;
-  *)
-    kube::hack::build_ui "${DASHBOARD_PKG}" "${DASHBOARD_SRC}"
-    kube::hack::build_ui "${SWAGGER_PKG}" "${SWAGGER_SRC}"
-    ;;
-esac
+kube::hack::build_ui "${SWAGGER_PKG}" "${SWAGGER_SRC}"

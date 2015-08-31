@@ -36,9 +36,9 @@ import (
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
 	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -754,11 +754,11 @@ func (s *schedulingPlugin) Run(done <-chan struct{}) {
 // with the Modeler stuff removed since we don't use it because we have mesos.
 func (s *schedulingPlugin) scheduleOne() {
 	pod := s.config.NextPod()
-	log.V(3).Infof("Attempting to schedule: %v", pod)
+	log.V(3).Infof("Attempting to schedule: %+v", pod)
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister) // call kubeScheduler.Schedule
 	if err != nil {
-		log.V(1).Infof("Failed to schedule: %v", pod)
-		s.config.Recorder.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
+		log.V(1).Infof("Failed to schedule: %+v", pod)
+		s.config.Recorder.Eventf(pod, "FailedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -770,12 +770,12 @@ func (s *schedulingPlugin) scheduleOne() {
 		},
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
-		log.V(1).Infof("Failed to bind pod: %v", err)
-		s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
+		log.V(1).Infof("Failed to bind pod: %+v", err)
+		s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	s.config.Recorder.Eventf(pod, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 }
 
 // this pod may be out of sync with respect to the API server registry:

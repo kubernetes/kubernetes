@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -35,12 +35,10 @@ import (
 
 var testTTL uint64 = 60
 
-func NewTestEventStorage(t *testing.T) (*tools.FakeEtcdClient, *REST) {
-	f := tools.NewFakeEtcdClient(t)
-	f.TestIndex = true
-
-	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
-	return f, NewStorage(s, testTTL)
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	fakeClient.HideExpires = true
+	return NewREST(etcdStorage, testTTL), fakeClient
 }
 
 func TestEventCreate(t *testing.T) {
@@ -101,7 +99,7 @@ func TestEventCreate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		fakeClient, storage := NewTestEventStorage(t)
+		storage, fakeClient := newStorage(t)
 		fakeClient.Data[path] = item.existing
 		_, err := storage.Create(ctx, item.toCreate)
 		if !item.errOK(err) {
@@ -217,7 +215,7 @@ func TestEventUpdate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		fakeClient, storage := NewTestEventStorage(t)
+		storage, fakeClient := newStorage(t)
 		fakeClient.Data[path] = item.existing
 		_, _, err := storage.Update(ctx, item.toUpdate)
 		if !item.errOK(err) {

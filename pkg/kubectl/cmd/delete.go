@@ -47,6 +47,9 @@ $ kubectl delete -f ./pod.json
 # Delete a pod based on the type and name in the JSON passed into stdin.
 $ cat pod.json | kubectl delete -f -
 
+# Delete pods and services with same names "baz" and "foo"
+$ kubectl delete pod,service baz foo
+
 # Delete pods and services with label name=myLabel.
 $ kubectl delete pods,services -l name=myLabel
 
@@ -58,6 +61,9 @@ $ kubectl delete pods --all`
 )
 
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
+	validArgs := p.HandledResources()
+
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		Short:   "Delete resources by filenames, stdin, resources and names, or by resources and label selector.",
@@ -68,6 +74,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunDelete(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs: validArgs,
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to delete."
 	kubectl.AddJsonFilenameFlag(cmd, usage)
@@ -128,7 +135,10 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
-	err := r.Visit(func(info *resource.Info) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		found++
 		reaper, err := f.Reaper(info.Mapping)
 		if err != nil {
@@ -162,7 +172,10 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
-	err := r.Visit(func(info *resource.Info) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		found++
 		return deleteResource(info, out, shortOutput, mapper)
 	})

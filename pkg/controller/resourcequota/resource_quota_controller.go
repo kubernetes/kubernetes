@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -52,7 +52,7 @@ func NewResourceQuotaController(kubeClient client.Interface) *ResourceQuotaContr
 // Run begins watching and syncing.
 func (rm *ResourceQuotaController) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	go util.Forever(func() { rm.synchronize() }, period)
+	go util.Until(func() { rm.synchronize() }, period, util.NeverStop)
 }
 
 func (rm *ResourceQuotaController) synchronize() {

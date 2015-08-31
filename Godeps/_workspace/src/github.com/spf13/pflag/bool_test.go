@@ -51,7 +51,7 @@ func (v *triStateValue) String() string {
 	return fmt.Sprintf("%v", bool(*v == triStateTrue))
 }
 
-// The type of the flag as requred by the pflag.Value interface
+// The type of the flag as required by the pflag.Value interface
 func (v *triStateValue) Type() string {
 	return "version"
 }

@@ -18,7 +18,7 @@ package kubelet
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // This just exports required functions from kubelet proper, for use by network

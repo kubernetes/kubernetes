@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -129,9 +129,6 @@ var _ = Describe("Kubectl client", func() {
 
 		BeforeEach(func() {
 			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
-
-			// requires ExternalLoadBalancer support
-			SkipUnlessProviderIs("gce", "gke", "aws")
 		})
 
 		It("should create and stop a working application", func() {
@@ -335,7 +332,7 @@ var _ = Describe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
-			serviceTimeout := 30 * time.Second
+			serviceTimeout := 60 * time.Second
 
 			By("creating Redis RC")
 			runKubectl("create", "-f", controllerJson, nsFlag)
@@ -791,7 +788,7 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 		if strings.Contains(data.Image, jpgExpected) {
 			return nil
 		} else {
-			return errors.New(fmt.Sprintf("data served up in container is innaccurate, %s didn't contain %s", data, jpgExpected))
+			return errors.New(fmt.Sprintf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected))
 		}
 	}
 }

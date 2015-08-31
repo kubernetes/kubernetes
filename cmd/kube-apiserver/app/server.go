@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/master"
@@ -83,8 +83,13 @@ type APIServer struct {
 	BasicAuthFile              string
 	ClientCAFile               string
 	TokenAuthFile              string
+	OIDCIssuerURL              string
+	OIDCClientID               string
+	OIDCCAFile                 string
+	OIDCUsernameClaim          string
 	ServiceAccountKeyFile      string
 	ServiceAccountLookup       bool
+	KeystoneURL                string
 	AuthorizationMode          string
 	AuthorizationPolicyFile    string
 	AdmissionControl           string
@@ -151,10 +156,12 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
+	fs.MarkDeprecated("port", "see --insecure-port instead")
 	fs.IPVar(&s.InsecureBindAddress, "insecure-bind-address", s.InsecureBindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
 		"Defaults to localhost.")
 	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress, "DEPRECATED: see --insecure-bind-address instead")
+	fs.MarkDeprecated("address", "see --insecure-bind-address instread")
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
@@ -165,6 +172,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
 	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress, "DEPRECATED: see --bind-address instead")
+	fs.MarkDeprecated("public-address-override", "see --bind-address instead")
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
@@ -186,8 +194,15 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.")
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+	fs.StringVar(&s.OIDCIssuerURL, "oidc-issuer-url", s.OIDCIssuerURL, "The URL of the OpenID issuer, only HTTPS scheme will be accepted. If set, it will be used to verify the OIDC JSON Web Token (JWT)")
+	fs.StringVar(&s.OIDCClientID, "oidc-client-id", s.OIDCClientID, "The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set")
+	fs.StringVar(&s.OIDCCAFile, "oidc-ca-file", s.OIDCCAFile, "If set, the OpenID server's certificate will be verified by one of the authorities in the oidc-ca-file, otherwise the host's root CA set will be used")
+	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
+		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') is not "+
+		"guaranteed to be unique and immutable. This flag is experimental, please see the authentication documentation for further details.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, "File containing PEM-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup, "If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
+	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationPolicyFile, "authorization-policy-file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
 	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
@@ -205,7 +220,6 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/<version> key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
-	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ExternalHost, "external-hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
@@ -215,12 +229,23 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.SSHUser, "ssh-user", "", "If non-empty, use secure SSH proxy to the nodes, using this user name")
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", "", "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", 0, "If non-zero, throttle each user connection to this number of bytes/sec.  Currently only applies to long-running requests")
+	// Kubelet related flags:
+	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps, "Use https for kubelet connections")
+	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port, "Kubelet port")
+	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout, "Timeout for kubelet operations")
+	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile, "Path to a client key file for TLS.")
+	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile, "Path to a client key file for TLS.")
+	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile, "Path to a cert. file for the certificate authority.")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
 func (s *APIServer) verifyClusterIPFlags() {
 	if s.ServiceClusterIPRange.IP == nil {
 		glog.Fatal("No --service-cluster-ip-range specified")
+	}
+	var ones, bits = s.ServiceClusterIPRange.Mask.Size()
+	if bits-ones > 20 {
+		glog.Fatal("Specified --service-cluster-ip-range is too large")
 	}
 }
 
@@ -255,8 +280,9 @@ func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
 
 	// If advertise-address is not specified, use bind-address. If bind-address
-	// is also unset (or 0.0.0.0), setDefaults() in pkg/master/master.go will
-	// do the right thing and use the host's default interface.
+	// is not usable (unset, 0.0.0.0, or loopback), setDefaults() in
+	// pkg/master/master.go will do the right thing and use the host's default
+	// interface.
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		s.AdvertiseAddress = s.BindAddress
 	}
@@ -268,7 +294,9 @@ func (s *APIServer) Run(_ []string) error {
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
-		HostNetworkSources:                     []string{},
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostNetworkSources: []string{},
+		},
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
@@ -334,7 +362,20 @@ func (s *APIServer) Run(_ []string) error {
 			glog.Warning("no RSA key provided, service account token authentication disabled")
 		}
 	}
-	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, etcdStorage)
+	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
+		BasicAuthFile:         s.BasicAuthFile,
+		ClientCAFile:          s.ClientCAFile,
+		TokenAuthFile:         s.TokenAuthFile,
+		OIDCIssuerURL:         s.OIDCIssuerURL,
+		OIDCClientID:          s.OIDCClientID,
+		OIDCCAFile:            s.OIDCCAFile,
+		OIDCUsernameClaim:     s.OIDCUsernameClaim,
+		ServiceAccountKeyFile: s.ServiceAccountKeyFile,
+		ServiceAccountLookup:  s.ServiceAccountLookup,
+		Storage:               etcdStorage,
+		KeystoneURL:           s.KeystoneURL,
+	})
+
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}

@@ -43,11 +43,12 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
 
 - [Secrets](#secrets)
   - [Overview of Secrets](#overview-of-secrets)
-    - [Service Accounts Automatically Create and Use Secrets with API Credentials](#service-accounts-automatically-create-and-use-secrets-with-api-credentials)
+    - [Service Accounts Automatically Create and Attach Secrets with API Credentials](#service-accounts-automatically-create-and-attach-secrets-with-api-credentials)
     - [Creating a Secret Manually](#creating-a-secret-manually)
     - [Manually specifying a Secret to be Mounted on a Pod](#manually-specifying-a-secret-to-be-mounted-on-a-pod)
     - [Manually specifying an imagePullSecret](#manually-specifying-an-imagepullsecret)
-    - [Automatic use of Manually Created Secrets](#automatic-use-of-manually-created-secrets)
+    - [Arranging for imagePullSecrets to be Automatically Attached](#arranging-for-imagepullsecrets-to-be-automatically-attached)
+    - [Automatic Mounting of Manually Created Secrets](#automatic-mounting-of-manually-created-secrets)
   - [Details](#details)
     - [Restrictions](#restrictions)
     - [Consuming Secret Values](#consuming-secret-values)
@@ -64,19 +65,18 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
 
 ## Overview of Secrets
 
+A Secret is an object that contains a small amount of sensitive data such as
+a password, a token, or a key.  Such information might otherwise be put in a
+Pod specification or in an image; putting it in a Secret object allows for
+more control over how it is used, and reduces the risk of accidental exposure.
 
-Creation of secrets can be manual (done by the user) or automatic (done by
-automation built into the cluster).
+Users can create secrets, and the system also creates some secrets.
 
+To use a secret, a pod needs to reference the secret.
 A secret can be used with a pod in two ways: either as files in a [volume](volumes.md) mounted on one or more of
 its containers, or used by kubelet when pulling images for the pod.
 
-To use a secret, a pod needs to reference the secret.  This reference
-can likewise be added manually or automatically.
-
-A single Pod may use various combination of the above options.
-
-### Service Accounts Automatically Create and Use Secrets with API Credentials
+### Service Accounts Automatically Create and Attach Secrets with API Credentials
 
 Kubernetes automatically creates secrets which contain credentials for
 accessing the API and it automatically modifies your pods to use this type of
@@ -105,16 +105,15 @@ data:
 ```
 
 The data field is a map.  Its keys must match
-[DNS_SUBDOMAIN](../design/identifiers.md), except that leading dots are also
+[`DNS_SUBDOMAIN`](../design/identifiers.md), except that leading dots are also
 allowed.  The values are arbitrary data, encoded using base64. The values of
 username and password in the example above, before base64 encoding,
 are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
 
 Create the secret using [`kubectl create`](kubectl/kubectl_create.md).
 
-Once the secret is created, you can:
-  - create pods that automatically use it via a [Service Account](service-accounts.md).
-  - modify your pod specification to use the secret
+Once the secret is created, you can need to modify your pod to specify
+that it should use the secret.
 
 ### Manually specifying a Secret to be Mounted on a Pod
 
@@ -162,15 +161,22 @@ See another example of creating a secret and a pod that consumes that secret in 
 
 Use of imagePullSecrets is described in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
 
-### Automatic use of Manually Created Secrets
+### Arranging for imagePullSecrets to be Automatically Attached
 
-*This feature is planned but not implemented.  See [issue
-9902](http://issue.k8s.io/9902).*
+You can manually create an imagePullSecret, and reference it from
+a serviceAccount.  Any pods created with that serviceAccount
+or that default to use that serviceAccount, will get have the imagePullSecret of the
+field set to that of the service account.
+See [here](service-accounts.md#adding-imagepullsecrets-to-a-service-account)
+ for a detailed explanation of that process.
 
-You can reference manually created secrets from a [service account](service-accounts.md).
-Then, pods which use that service account will have
-`volumeMounts` and/or `imagePullSecrets` added to them.
-The secrets will be mounted at **TBD**.
+
+### Automatic Mounting of Manually Created Secrets
+
+We plan to extend the service account behavior so that manually created
+secrets (e.g. one containing a token for accessing a github account)
+can be automatically attached to pods based on their service account.
+*This is not implemented yet.  See [issue 9902](http://issue.k8s.io/9902).*
 
 ## Details
 
@@ -441,7 +447,7 @@ Both containers will have the following files present on their filesystems:
 Note how the specs for the two pods differ only in one field;  this facilitates
 creating pods with different capabilities from a common pod config template.
 
-You could further simplify the base pod specification by using two service accounts:
+You could further simplify the base pod specification by using two Service Accounts:
 one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
 `test-user` with the `test-db-secret`.  Then, the pod spec can be shortened to, for example:
 

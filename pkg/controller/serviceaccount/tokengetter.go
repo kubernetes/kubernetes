@@ -18,7 +18,7 @@ package serviceaccount
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/secret"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/serviceaccount"
@@ -75,7 +75,7 @@ func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) 
 // uses the specified storage to retrieve service accounts and secrets.
 func NewGetterFromStorageInterface(storage storage.Interface) ServiceAccountTokenGetter {
 	return NewGetterFromRegistries(
-		serviceaccount.NewRegistry(serviceaccountetcd.NewStorage(storage)),
-		secret.NewRegistry(secretetcd.NewStorage(storage)),
+		serviceaccount.NewRegistry(serviceaccountetcd.NewREST(storage)),
+		secret.NewRegistry(secretetcd.NewREST(storage)),
 	)
 }

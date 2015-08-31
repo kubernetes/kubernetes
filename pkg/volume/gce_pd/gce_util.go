@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/operationmanager"
 )
 
@@ -71,13 +70,13 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 	}
 
 	// Only mount the PD globally once.
-	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 				return err
 			}
-			mountpoint = false
+			notMnt = true
 		} else {
 			return err
 		}
@@ -86,7 +85,7 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	if !mountpoint {
+	if notMnt {
 		err = b.diskMounter.Mount(devicePath, globalPDPath, b.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)
@@ -331,37 +330,4 @@ func udevadmChangeToDrive(drivePath string) error {
 		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v.", drive, err)
 	}
 	return nil
-}
-
-// safe_format_and_mount is a utility script on GCE VMs that probes a persistent disk, and if
-// necessary formats it before mounting it.
-// This eliminates the necesisty to format a PD before it is used with a Pod on GCE.
-// TODO: port this script into Go and use it for all Linux platforms
-type gceSafeFormatAndMount struct {
-	mount.Interface
-	runner exec.Interface
-}
-
-// uses /usr/share/google/safe_format_and_mount to optionally mount, and format a disk
-func (mounter *gceSafeFormatAndMount) Mount(source string, target string, fstype string, options []string) error {
-	// Don't attempt to format if mounting as readonly. Go straight to mounting.
-	for _, option := range options {
-		if option == "ro" {
-			return mounter.Interface.Mount(source, target, fstype, options)
-		}
-	}
-	args := []string{}
-	// ext4 is the default for safe_format_and_mount
-	if len(fstype) > 0 && fstype != "ext4" {
-		args = append(args, "-m", fmt.Sprintf("mkfs.%s", fstype))
-	}
-	args = append(args, options...)
-	args = append(args, source, target)
-	glog.V(5).Infof("exec-ing: /usr/share/google/safe_format_and_mount %v", args)
-	cmd := mounter.runner.Command("/usr/share/google/safe_format_and_mount", args...)
-	dataOut, err := cmd.CombinedOutput()
-	if err != nil {
-		glog.Errorf("error running /usr/share/google/safe_format_and_mount\n%s", string(dataOut))
-	}
-	return err
 }

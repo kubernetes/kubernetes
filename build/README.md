@@ -1,15 +1,17 @@
 # Building Kubernetes
 
-To build Kubernetes you need to have access to a Docker installation through either of the following methods:
+Building Kubernetes is easy if you take advantage of the containerized build environment. This document will help guide you through understanding this build process.
 
 ## Requirements
 
-1. Be running Docker.  2 options supported/tested:
-  1. **Mac OS X** The best way to go is to use `boot2docker`.  See instructions [here](https://docs.docker.com/installation/mac/).  
+1. Docker, using one of the two following configurations:
+  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
   **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
-2. Have python installed.  Pretty much it is installed everywhere at this point so you can probably ignore this.
-3. *Optional* For uploading your release to Google Cloud Storage, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.
+2. [Python](https://www.python.org)
+3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
+
+You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
 
 ## Overview
 

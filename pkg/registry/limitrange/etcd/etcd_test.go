@@ -17,35 +17,26 @@ limitations under the License.
 package etcd
 
 import (
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
-func NewTestLimitRangeStorage(t *testing.T) (*tools.FakeEtcdClient, *REST) {
-	f := tools.NewFakeEtcdClient(t)
-	f.TestIndex = true
-	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
-	return f, NewStorage(s)
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
-func TestLimitRangeCreate(t *testing.T) {
-	limitRange := &api.LimitRange{
+func validNewLimitRange() *api.LimitRange {
+	return &api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
-			Namespace: "default",
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
@@ -63,72 +54,61 @@ func TestLimitRangeCreate(t *testing.T) {
 			},
 		},
 	}
+}
 
-	nodeWithLimitRange := tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), limitRange),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
+func TestCreate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).GeneratesName()
+	validLimitRange := validNewLimitRange()
+	validLimitRange.ObjectMeta = api.ObjectMeta{}
+	test.TestCreate(
+		// valid
+		validLimitRange,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
 		},
-		E: nil,
-	}
-
-	emptyNode := tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: tools.EtcdErrorNotFound,
-	}
-
-	ctx := api.NewDefaultContext()
-	key := "foo"
-	prefix := etcdtest.AddPrefix("limitranges")
-
-	path, err := etcdgeneric.NamespaceKeyFunc(ctx, prefix, key)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	table := map[string]struct {
-		existing tools.EtcdResponseWithError
-		expect   tools.EtcdResponseWithError
-		toCreate runtime.Object
-		errOK    func(error) bool
-	}{
-		"normal": {
-			existing: emptyNode,
-			expect:   nodeWithLimitRange,
-			toCreate: limitRange,
-			errOK:    func(err error) bool { return err == nil },
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
 		},
-		"preExisting": {
-			existing: nodeWithLimitRange,
-			expect:   nodeWithLimitRange,
-			toCreate: limitRange,
-			errOK:    errors.IsAlreadyExists,
+		// invalid
+		&api.LimitRange{
+			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
 		},
-	}
+	)
+}
 
-	for name, item := range table {
-		fakeClient, storage := NewTestLimitRangeStorage(t)
-		fakeClient.Data[path] = item.existing
-		_, err := storage.Create(ctx, item.toCreate)
-		if !item.errOK(err) {
-			t.Errorf("%v: unexpected error: %v", name, err)
-		}
-
-		received := fakeClient.Data[path]
-		var limitRange api.LimitRange
-		if err := testapi.Codec().DecodeInto([]byte(received.R.Node.Value), &limitRange); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		// Unset CreationTimestamp and UID which are set automatically by infrastructure.
-		limitRange.ObjectMeta.CreationTimestamp = util.Time{}
-		limitRange.ObjectMeta.UID = ""
-		received.R.Node.Value = runtime.EncodeOrDie(testapi.Codec(), &limitRange)
-
-		if e, a := item.expect, received; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
-		}
-	}
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test.TestUpdate(
+		// valid
+		validNewLimitRange(),
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.LimitRange)
+			object.Spec.Limits = []api.LimitRangeItem{
+				{
+					Type: api.LimitTypePod,
+					Max: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("1000"),
+						api.ResourceMemory: resource.MustParse("100000"),
+					},
+					Min: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("10"),
+						api.ResourceMemory: resource.MustParse("1000"),
+					},
+				},
+			}
+			return object
+		},
+	)
 }

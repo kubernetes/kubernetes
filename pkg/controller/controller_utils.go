@@ -24,9 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -281,11 +281,11 @@ func (r RealPodControl) CreateReplica(namespace string, controller *api.Replicat
 		return fmt.Errorf("unable to create pod replica, no labels")
 	}
 	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(controller, "failedCreate", "Error creating: %v", err)
+		r.Recorder.Eventf(controller, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pod replica: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v created pod %v", controller.Name, newPod.Name)
-		r.Recorder.Eventf(controller, "successfulCreate", "Created pod: %v", newPod.Name)
+		r.Recorder.Eventf(controller, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
 	return nil
 }
@@ -322,7 +322,8 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	var result []*api.Pod
 	for i := range pods {
 		if api.PodSucceeded != pods[i].Status.Phase &&
-			api.PodFailed != pods[i].Status.Phase {
+			api.PodFailed != pods[i].Status.Phase &&
+			pods[i].DeletionTimestamp == nil {
 			result = append(result, &pods[i])
 		}
 	}

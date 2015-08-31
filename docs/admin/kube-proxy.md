@@ -56,7 +56,7 @@ with the apiserver API to configure the proxy.
   -h, --help=false: help for kube-proxy
       --kubeconfig="": Path to kubeconfig file with authorization information (the master location is set by the master flag).
       --master="": The address of the Kubernetes API server (overrides any value in kubeconfig)
-      --oom-score-adj=0: The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]
+      --oom-score-adj=0: The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]
       --proxy-port-range=: Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
       --resource-container="": Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).
 ```

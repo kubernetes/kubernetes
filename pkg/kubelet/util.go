@@ -66,7 +66,7 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, source := range capabilities.Get().HostNetworkSources {
+	for _, source := range capabilities.Get().PrivilegedSources.HostNetworkSources {
 		if source == podSource {
 			return true, nil
 		}
