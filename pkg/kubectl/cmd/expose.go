@@ -127,6 +127,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	params["default-name"] = info.Name
+	params["generate-name"] = info.Name + "-"
 	if s, found := params["selector"]; !found || kubectl.IsZero(s) || cmdutil.GetFlagInt(cmd, "port") < 1 {
 		if kubectl.IsZero(s) {
 			s, err := f.PodSelectorForObject(inputObject)

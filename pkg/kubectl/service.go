@@ -50,6 +50,7 @@ func paramNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"default-name", true},
 		{"name", false},
+		{"generate-name", false},
 		{"selector", true},
 		{"port", true},
 		{"labels", false},
@@ -91,11 +92,15 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		}
 	}
 
+	var generateName string
 	name, found := params["name"]
 	if !found || len(name) == 0 {
-		name, found = params["default-name"]
-		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
+		generateName, found = params["generate-name"]
+		if !found || len(generateName) == 0 {
+			name, found = params["default-name"]
+			if !found || len(name) == 0 {
+				return nil, fmt.Errorf("'name' is a required parameter.")
+			}
 		}
 	}
 	portString, found := params["port"]
@@ -113,8 +118,9 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 	service := api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name:   name,
-			Labels: labels,
+			Name:         name,
+			GenerateName: generateName,
+			Labels:       labels,
 		},
 		Spec: api.ServiceSpec{
 			Selector: selector,
