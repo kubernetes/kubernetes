@@ -41,7 +41,5 @@ rbd import block foo
 
 echo "Ceph is ready"
 
-# Wait forever
-while true; do
-    sleep 10
-done
+tail -f /dev/null &
+wait

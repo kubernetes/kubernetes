@@ -33,7 +33,5 @@ trap stop TERM
 
 start "$@"
 
-while true; do
- read
-done
-
+tail -f /dev/null &
+wait

@@ -36,6 +36,5 @@ function stop()
 trap stop TERM
 start
 
-while true; do
-    sleep 5
-done
+tail -f /dev/null &
+wait
