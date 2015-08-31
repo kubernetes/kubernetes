@@ -87,6 +87,9 @@ const (
 	// suffice because a goroutine is dedicated to check the channel and does
 	// not block on anything else.
 	podKillingChannelCapacity = 50
+
+	// system default DNS resolver configuration
+	ResolvConfDefault = "/etc/resolv.conf"
 )
 
 var (
@@ -159,7 +162,8 @@ func NewMainKubelet(
 	configureCBR0 bool,
 	podCIDR string,
 	pods int,
-	dockerExecHandler dockertools.ExecHandler) (*Kubelet, error) {
+	dockerExecHandler dockertools.ExecHandler,
+	resolverConfig string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -275,6 +279,7 @@ func NewMainKubelet(
 		podCIDR:                        podCIDR,
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
+		resolverConfig:                 resolverConfig,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -542,6 +547,11 @@ type Kubelet struct {
 
 	// Channel for sending pods to kill.
 	podKillingCh chan *kubecontainer.Pod
+
+	// The configuration file used as the base to generate the container's
+	// DNS resolver configuration file. This can be used in conjunction with
+	// clusterDomain and clusterDNS.
+	resolverConfig string
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -948,12 +958,12 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 			opts.PodContainerDir = p
 		}
 	}
-	if pod.Spec.DNSPolicy == api.DNSClusterFirst {
-		opts.DNS, opts.DNSSearch, err = kl.getClusterDNS(pod)
-		if err != nil {
-			return nil, err
-		}
+
+	opts.DNS, opts.DNSSearch, err = kl.getClusterDNS(pod)
+	if err != nil {
+		return nil, err
 	}
+
 	return opts, nil
 }
 
@@ -1086,27 +1096,47 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 // getClusterDNS returns a list of the DNS servers and a list of the DNS search
 // domains of the cluster.
 func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
+	var hostDNS, hostSearch []string
 	// Get host DNS settings and append them to cluster DNS settings.
-	f, err := os.Open("/etc/resolv.conf")
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
+	if kl.resolverConfig != "" {
+		f, err := os.Open(kl.resolverConfig)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer f.Close()
 
-	hostDNS, hostSearch, err := parseResolvConf(f)
-	if err != nil {
-		return nil, nil, err
+		hostDNS, hostSearch, err = parseResolvConf(f)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
-
+	if pod.Spec.DNSPolicy != api.DNSClusterFirst {
+		// When the kubelet --resolv-conf flag is set to the empty string, use
+		// DNS settings that override the docker default (which is to use
+		// /etc/resolv.conf) and effectivly disable DNS lookups. According to
+		// the bind documentation, the behavior of the DNS client library when
+		// "nameservers" are not specified is to "use the nameserver on the
+		// local machine". A nameserver setting of localhost is equivalent to
+		// this documented behavior.
+		if kl.resolverConfig == "" {
+			hostDNS = []string{"127.0.0.1"}
+			hostSearch = []string{"."}
+		}
+		return hostDNS, hostSearch, nil
+	}
 	var dns, dnsSearch []string
 
 	if kl.clusterDNS != nil {
 		dns = append([]string{kl.clusterDNS.String()}, hostDNS...)
+	} else {
+		dns = hostDNS
 	}
 	if kl.clusterDomain != "" {
 		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
 		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
 		dnsSearch = append([]string{nsSvcDomain, svcDomain, kl.clusterDomain}, hostSearch...)
+	} else {
+		dnsSearch = hostSearch
 	}
 	return dns, dnsSearch, nil
 }

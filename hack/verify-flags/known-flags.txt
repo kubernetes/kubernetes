@@ -206,6 +206,7 @@ reject-paths
 repo-root
 report-dir
 required-contexts
+resolv-conf
 resource-container
 resource-quota-sync-period
 resource-version
