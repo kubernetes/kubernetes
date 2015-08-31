@@ -1,5 +1,6 @@
 accept-hosts
 accept-paths
+account-for-pod-resources
 admission-control
 admission-control-config-file
 advertise-address
@@ -43,6 +44,7 @@ cluster-name
 cluster-tag
 concurrent-endpoint-syncs
 configure-cbr0
+contain-pod-resources
 container-port
 container-runtime
 cors-allowed-origins

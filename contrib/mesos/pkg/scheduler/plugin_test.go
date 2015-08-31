@@ -393,13 +393,14 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	executor.Data = []byte{0, 1, 2}
 
 	// create scheduler
+	as := NewAllocationStrategy(
+		podtask.DefaultPredicate,
+		podtask.NewDefaultProcurement(mresource.DefaultDefaultContainerCPULimit, mresource.DefaultDefaultContainerMemLimit))
 	testScheduler := New(Config{
-		Executor:                 executor,
-		Client:                   client.NewOrDie(&client.Config{Host: testApiServer.server.URL, Version: testapi.Version()}),
-		ScheduleFunc:             FCFSScheduleFunc,
-		Schedcfg:                 *schedcfg.CreateDefaultConfig(),
-		DefaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
-		DefaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
+		Executor:  executor,
+		Client:    client.NewOrDie(&client.Config{Host: testApiServer.server.URL, Version: testapi.Version()}),
+		Scheduler: NewFCFSPodScheduler(as),
+		Schedcfg:  *schedcfg.CreateDefaultConfig(),
 	})
 
 	assert.NotNil(testScheduler.client, "client is nil")

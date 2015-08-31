@@ -55,13 +55,16 @@ type MinionServer struct {
 	kmBinary       string
 	tasks          []*tasks.Task
 
-	pathOverride string // the PATH environment for the sub-processes
-	cgroupPrefix string // e.g. mesos
-	cgroupRoot   string // e.g. /mesos/{container-id}, determined at runtime
+	pathOverride        string // the PATH environment for the sub-processes
+	cgroupPrefix        string // e.g. mesos
+	cgroupRoot          string // the cgroupRoot that we pass to the kubelet-executor, depends on containPodResources
+	mesosCgroup         string // discovered mesos cgroup root, e.g. /mesos/{container-id}
+	containPodResources bool
 
 	logMaxSize      resource.Quantity
 	logMaxBackups   int
 	logMaxAgeInDays int
+	logVerbosity    int32 // see glog.Level
 
 	runProxy     bool
 	proxyLogV    int
@@ -74,6 +77,7 @@ func NewMinionServer() *MinionServer {
 		KubeletExecutorServer: exservice.NewKubeletExecutorServer(),
 		privateMountNS:        false, // disabled until Docker supports customization of the parent mount namespace
 		cgroupPrefix:          config.DefaultCgroupPrefix,
+		containPodResources:   true,
 		logMaxSize:            config.DefaultLogMaxSize(),
 		logMaxBackups:         config.DefaultLogMaxBackups,
 		logMaxAgeInDays:       config.DefaultLogMaxAgeInDays,
@@ -131,7 +135,7 @@ func (ms *MinionServer) launchProxyServer() {
 		fmt.Sprintf("--bind-address=%s", bindAddress),
 		fmt.Sprintf("--v=%d", ms.proxyLogV),
 		"--logtostderr=true",
-		"--resource-container=" + path.Join("/", ms.cgroupRoot, "kube-proxy"),
+		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
 	}
 
 	if ms.clientConfig.Host != "" {
@@ -156,7 +160,7 @@ func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 	ms.AddExecutorFlags(executorFlags)
 	executorArgs, _ := filterArgsByFlagSet(allArgs, executorFlags)
 
-	executorArgs = append(executorArgs, "--resource-container="+path.Join("/", ms.cgroupRoot, "kubelet"))
+	executorArgs = append(executorArgs, "--resource-container="+path.Join("/", ms.mesosCgroup, "kubelet"))
 	if ms.cgroupRoot != "" {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
@@ -241,14 +245,23 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	ms.clientConfig = clientConfig
 
 	// derive the executor cgroup and use it as:
-	// - pod container cgroup root (e.g. docker cgroup-parent)
+	// - pod container cgroup root (e.g. docker cgroup-parent, optionally; see comments below)
 	// - parent of kubelet container
 	// - parent of kube-proxy container
-	ms.cgroupRoot = findMesosCgroup(ms.cgroupPrefix)
+	ms.mesosCgroup = findMesosCgroup(ms.cgroupPrefix)
+	log.Infof("discovered mesos cgroup at %q", ms.mesosCgroup)
+
+	// hack alert, this helps to work around systemd+docker+mesos integration problems
+	// when docker's cgroup-parent flag is used (!containPodResources = don't use the docker flag)
+	if ms.containPodResources {
+		ms.cgroupRoot = ms.mesosCgroup
+	}
+
 	cgroupLogger := log.Infof
 	if ms.cgroupRoot == "" {
 		cgroupLogger = log.Warningf
 	}
+
 	cgroupLogger("using cgroup-root %q", ms.cgroupRoot)
 
 	// run subprocesses until ms.done is closed on return of this function
@@ -302,6 +315,9 @@ func termSignalListener(abort <-chan struct{}) <-chan struct{} {
 
 func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 	ms.KubeletExecutorServer.AddFlags(fs)
+
+	// hack to forward log verbosity flag to the executor
+	fs.Int32Var(&ms.logVerbosity, "v", ms.logVerbosity, "log level for V logs")
 }
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
@@ -309,6 +325,7 @@ func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&ms.cgroupPrefix, "mesos-cgroup-prefix", ms.cgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 	fs.BoolVar(&ms.privateMountNS, "private-mountns", ms.privateMountNS, "Enter a private mount NS before spawning procs (linux only). Experimental, not yet compatible with k8s volumes.")
 	fs.StringVar(&ms.pathOverride, "path-override", ms.pathOverride, "Override the PATH in the environment of the sub-processes.")
+	fs.BoolVar(&ms.containPodResources, "contain-pod-resources", ms.containPodResources, "Allocate pod CPU and memory resources from offers and reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
 
 	// log file flags
 	fs.Var(resource.NewQuantityFlagValue(&ms.logMaxSize), "max-log-size", "Maximum log file size for the executor and proxy before rotation")
