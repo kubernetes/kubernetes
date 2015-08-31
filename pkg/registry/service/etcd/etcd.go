@@ -30,13 +30,13 @@ import (
 )
 
 type REST struct {
-	etcdgeneric.Etcd
+	*etcdgeneric.Etcd
 }
 
 // NewREST returns a RESTStorage object that will work against services.
 func NewREST(s storage.Interface) *REST {
 	prefix := "/services/specs"
-	store := etcdgeneric.Etcd{
+	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Service{} },
 		NewListFunc: func() runtime.Object { return &api.ServiceList{} },
 		KeyRootFunc: func(ctx api.Context) string {

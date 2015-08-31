@@ -75,18 +75,12 @@ func validChangedNode() *api.Node {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	node := validNewNode()
 	node.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		node,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Node{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
@@ -96,19 +90,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewNode(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Node)
@@ -146,42 +131,23 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdGetNode(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	node := validNewNode()
-	test.TestGet(node)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestGet(validNewNode())
 }
 
-func TestEtcdListNodes(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	node := validNewNode()
-	test.TestList(
-		node,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestList(validNewNode())
 }
 
 func TestWatchNodes(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	test.TestWatch(
 		validNewNode(),
-		func() {
-			fakeClient.WaitForWatchCompletion()
-		},
-		func(err error) {
-			fakeClient.WatchInjectError <- err
-		},
-		func(obj runtime.Object, action string) error {
-			return registrytest.EmitObject(fakeClient, obj, action)
-		},
 		// matching labels
 		[]labels.Set{
 			{"name": "foo"},
@@ -199,7 +165,6 @@ func TestWatchNodes(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},
-		registrytest.WatchActions,
 	)
 }
 

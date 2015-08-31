@@ -53,7 +53,7 @@ type PodStorage struct {
 
 // REST implements a RESTStorage for pods against etcd
 type REST struct {
-	etcdgeneric.Etcd
+	*etcdgeneric.Etcd
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
@@ -92,19 +92,19 @@ func NewStorage(s storage.Interface, useCacher bool, k client.ConnectionInfoGett
 		},
 		EndpointName: "pods",
 
+		CreateStrategy:      pod.Strategy,
+		UpdateStrategy:      pod.Strategy,
+		DeleteStrategy:      pod.Strategy,
+		ReturnDeletedObject: true,
+
 		Storage: storageInterface,
 	}
 	statusStore := *store
 
-	store.CreateStrategy = pod.Strategy
-	store.UpdateStrategy = pod.Strategy
-	store.DeleteStrategy = pod.Strategy
-	store.ReturnDeletedObject = true
-
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
 	return PodStorage{
-		Pod:         &REST{*store},
+		Pod:         &REST{store},
 		Binding:     &BindingREST{store: store},
 		Status:      &StatusREST{store: &statusStore},
 		Log:         &LogREST{store: store, kubeletConn: k},

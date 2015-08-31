@@ -28,13 +28,13 @@ import (
 )
 
 type REST struct {
-	etcdgeneric.Etcd
+	*etcdgeneric.Etcd
 }
 
 // NewREST returns a RESTStorage object that will work against pod templates.
 func NewREST(s storage.Interface) *REST {
 	prefix := "/podtemplates"
-	store := etcdgeneric.Etcd{
+	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PodTemplate{} },
 		NewListFunc: func() runtime.Object { return &api.PodTemplateList{} },
 		KeyRootFunc: func(ctx api.Context) string {

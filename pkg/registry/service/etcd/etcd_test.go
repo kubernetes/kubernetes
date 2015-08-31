@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -56,18 +55,12 @@ func validService() *api.Service {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	validService := validService()
 	validService.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		validService,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Service{
 			Spec: api.ServiceSpec{},
@@ -91,19 +84,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validService(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Service)
@@ -122,20 +106,23 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestGet(validService())
+}
+
+func TestList(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestList(validService())
+}
+
 func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validService(),
-		func() {
-			fakeClient.WaitForWatchCompletion()
-		},
-		func(err error) {
-			fakeClient.WatchInjectError <- err
-		},
-		func(obj runtime.Object, action string) error {
-			return registrytest.EmitObject(fakeClient, obj, action)
-		},
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -150,6 +137,5 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},
-		registrytest.WatchActions,
 	)
 }

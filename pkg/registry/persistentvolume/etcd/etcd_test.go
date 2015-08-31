@@ -70,18 +70,12 @@ func validChangedPersistentVolume() *api.PersistentVolume {
 
 func TestCreate(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	pv := validNewPersistentVolume("foo")
 	pv.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		pv,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.PersistentVolume{
 			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
@@ -91,19 +85,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewPersistentVolume("foo"),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.PersistentVolume)
@@ -143,26 +128,16 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdGetPersistentVolumes(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	persistentVolume := validNewPersistentVolume("foo")
-	test.TestGet(persistentVolume)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestGet(validNewPersistentVolume("foo"))
 }
 
-func TestEtcdListPersistentVolumes(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	persistentVolume := validNewPersistentVolume("foo")
-	test.TestList(
-		persistentVolume,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestList(validNewPersistentVolume("foo"))
 }
 
 func TestPersistentVolumesDecode(t *testing.T) {

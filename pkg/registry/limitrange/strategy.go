@@ -17,6 +17,8 @@ limitations under the License.
 package limitrange
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -68,10 +70,20 @@ func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
+func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
+	return fields.Set{}
 }
 
-func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	return labels.Set{}, fields.Set{}, nil
+func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			lr, ok := obj.(*api.LimitRange)
+			if !ok {
+				return nil, nil, fmt.Errorf("given object is not a limit range.")
+			}
+			return labels.Set(lr.ObjectMeta.Labels), LimitRangeToSelectableFields(lr), nil
+		},
+	}
 }
