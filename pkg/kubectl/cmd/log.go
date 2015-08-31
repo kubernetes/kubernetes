@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
@@ -116,15 +117,18 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return err
 	}
 
-	var container string
-	if cmdutil.GetFlagString(cmd, "container") != "" {
-		// [-c CONTAINER]
-		container = p.containerName
-	} else {
+	// [-c CONTAINER]
+	container := p.containerName
+	if len(container) == 0 {
 		// [CONTAINER] (container as arg not flag) is supported as legacy behavior. See PR #10519 for more details.
 		if len(args) == 1 {
 			if len(pod.Spec.Containers) != 1 {
-				return fmt.Errorf("POD %s has more than one container; please specify the container to print logs for", pod.ObjectMeta.Name)
+				podContainersNames := []string{}
+				for _, container := range pod.Spec.Containers {
+					podContainersNames = append(podContainersNames, container.Name)
+				}
+
+				return fmt.Errorf("Pod %s has the following containers: %s; please specify the container to print logs for with -c", pod.ObjectMeta.Name, strings.Join(podContainersNames, ", "))
 			}
 			container = pod.Spec.Containers[0].Name
 		} else {
