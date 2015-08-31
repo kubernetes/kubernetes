@@ -333,6 +333,61 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 	return
 }
 
+// Annotations that the kubelet adds to the pod.
+var localAnnotations = []string{
+	kubelet.ConfigSourceAnnotationKey,
+	kubelet.ConfigMirrorAnnotationKey,
+	kubelet.ConfigFirstSeenAnnotationKey,
+}
+
+func isLocalAnnotationKey(key string) bool {
+	for _, localKey := range localAnnotations {
+		if key == localKey {
+			return true
+		}
+	}
+	return false
+}
+
+// isAnnotationMapEqual returns true if the existing annotation Map is equal to candidate except
+// for local annotations.
+func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
+	if candidateMap == nil {
+		return true
+	}
+	for k, v := range candidateMap {
+		if existingValue, ok := existingMap[k]; ok && existingValue == v {
+			continue
+		}
+		return false
+	}
+	for k := range existingMap {
+		if isLocalAnnotationKey(k) {
+			continue
+		}
+		// stale entry in existing map.
+		if _, exists := candidateMap[k]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+// updateAnnotations returns an Annotation map containing the api annotation map plus
+// locally managed annotations
+func updateAnnotations(existing, ref *api.Pod) {
+	annotations := make(map[string]string, len(ref.Annotations)+len(localAnnotations))
+	for k, v := range ref.Annotations {
+		annotations[k] = v
+	}
+	for _, k := range localAnnotations {
+		if v, ok := existing.Annotations[k]; ok {
+			annotations[k] = v
+		}
+	}
+	existing.Annotations = annotations
+}
+
 // checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
 // returns false if there was no update.
 func checkAndUpdatePod(existing, ref *api.Pod) bool {
@@ -340,13 +395,15 @@ func checkAndUpdatePod(existing, ref *api.Pod) bool {
 	//       like the source annotation or the UID (to ensure safety)
 	if reflect.DeepEqual(existing.Spec, ref.Spec) &&
 		reflect.DeepEqual(existing.DeletionTimestamp, ref.DeletionTimestamp) &&
-		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) {
+		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) &&
+		isAnnotationMapEqual(existing.Annotations, ref.Annotations) {
 		return false
 	}
 	// this is an update
 	existing.Spec = ref.Spec
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
+	updateAnnotations(existing, ref)
 	return true
 }
 
