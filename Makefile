@@ -34,8 +34,12 @@ all:
 
 # Runs all the presubmission verifications.
 #
+# Args:
+#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
+#
 # Example:
 #   make verify
+#   make verify BRANCH=branch_x
 verify:
 	hack/verify-gofmt.sh
 	hack/verify-boilerplate.sh
@@ -46,7 +50,7 @@ verify:
 	hack/verify-swagger-spec.sh
 	hack/verify-linkcheck.sh
 	hack/verify-flags-underscore.py
-	hack/verify-godeps.sh
+	hack/verify-godeps.sh $(BRANCH)
 .PHONY: verify
 
 # Build and run tests.
