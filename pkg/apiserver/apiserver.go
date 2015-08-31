@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	rt "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -155,6 +156,27 @@ func InstallLogsSupport(mux Mux) {
 	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+}
+
+func InstallRecoverHandler(container *restful.Container) {
+	container.RecoverHandler(logStackOnRecover)
+}
+
+//TODO: Unify with RecoverPanics?
+func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) {
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
+	for i := 2; ; i += 1 {
+		_, file, line, ok := rt.Caller(i)
+		if !ok {
+			break
+		}
+		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
+	}
+	glog.Errorln(buffer.String())
+
+	// TODO: make status unversioned or plumb enough of the request to deduce the requested API version
+	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.Codec, httpWriter)
 }
 
 func InstallServiceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string) {
