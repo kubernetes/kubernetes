@@ -15,14 +15,22 @@
 package libcontainer
 
 import (
+	"bufio"
 	"fmt"
+	"net"
+	"os/exec"
 	"path"
+	"regexp"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
+	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/sysinfo"
+	"github.com/vishvananda/netns"
 )
 
 type CgroupSubsystems struct {
@@ -74,7 +82,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 }
 
 // Get cgroup and networking stats of the specified container
-func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.ContainerStats, error) {
+func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string, pid int) (*info.ContainerStats, error) {
 	cgroupStats, err := cgroupManager.GetStats()
 	if err != nil {
 		return nil, err
@@ -93,9 +101,116 @@ func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.
 		}
 		stats.Network.Interfaces[i] = interfaceStats
 	}
+
+	// If we know the pid & we haven't discovered any network interfaces yet
+	// try the network namespace.
+	if pid > 0 && len(stats.Network.Interfaces) == 0 {
+		nsStats, err := networkStatsFromNs(pid)
+		if err != nil {
+			glog.V(2).Infof("Unable to get network stats from pid %d: %v", pid, err)
+		} else {
+			stats.Network.Interfaces = append(stats.Network.Interfaces, nsStats...)
+		}
+	}
+
 	// For backwards compatibility.
-	if len(networkInterfaces) > 0 {
+	if len(stats.Network.Interfaces) > 0 {
 		stats.Network.InterfaceStats = stats.Network.Interfaces[0]
+	}
+
+	return stats, nil
+}
+
+func networkStatsFromNs(pid int) ([]info.InterfaceStats, error) {
+	// Lock the OS Thread so we only change the ns for this thread exclusively
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	stats := []info.InterfaceStats{}
+
+	// Save the current network namespace
+	origns, _ := netns.Get()
+	defer origns.Close()
+
+	// Switch to the pid netns
+	pidns, err := netns.GetFromPid(pid)
+	defer pidns.Close()
+	if err != nil {
+		return stats, nil
+	}
+	netns.Set(pidns)
+
+	// Defer setting back to original ns
+	defer netns.Set(origns)
+
+	ifaceStats, err := scanInterfaceStats()
+	if err != nil {
+		return stats, fmt.Errorf("couldn't read network stats: %v", err)
+	}
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return stats, fmt.Errorf("cannot find interfaces: %v", err)
+	}
+
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagLoopback == 0 {
+			if s, ok := ifaceStats[iface.Name]; ok {
+				stats = append(stats, s)
+			}
+		}
+	}
+
+	return stats, nil
+}
+
+// Borrowed from libnetwork Stats - https://github.com/docker/libnetwork/blob/master/sandbox/interface_linux.go
+// In older kernels (like the one in Centos 6.6 distro) sysctl does not have netns support. Therefore
+// we cannot gather the statistics from /sys/class/net/<dev>/statistics/<counter> files. Per-netns stats
+// are naturally found in /proc/net/dev in kernels which support netns (ifconfig relyes on that).
+const (
+	netStatsFile = "/proc/net/dev"
+)
+
+func scanInterfaceStats() (map[string]info.InterfaceStats, error) {
+	re := regexp.MustCompile("[  ]*(.+):([  ]+[0-9]+){16}")
+
+	var (
+		bkt uint64
+	)
+
+	stats := map[string]info.InterfaceStats{}
+
+	// For some reason ioutil.ReadFile(netStatsFile) reads the file in
+	// the default netns when this code is invoked from docker.
+	// Executing "cat <netStatsFile>" works as expected.
+	data, err := exec.Command("cat", netStatsFile).Output()
+	if err != nil {
+		return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
+	}
+
+	reader := strings.NewReader(string(data))
+	scanner := bufio.NewScanner(reader)
+
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if re.MatchString(line) {
+			line = strings.Replace(line, ":", "", -1)
+
+			i := info.InterfaceStats{}
+
+			_, err := fmt.Sscanf(line, "%s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+				&i.Name, &i.RxBytes, &i.RxPackets, &i.RxErrors, &i.RxDropped, &bkt, &bkt, &bkt,
+				&bkt, &i.TxBytes, &i.TxPackets, &i.TxErrors, &i.TxDropped, &bkt, &bkt, &bkt, &bkt)
+
+			if err != nil {
+				return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
+			}
+
+			stats[i.Name] = i
+		}
 	}
 
 	return stats, nil

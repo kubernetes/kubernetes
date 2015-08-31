@@ -334,7 +334,7 @@ func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
 	for i := range nd {
 		networkInterfaces[i] = nd[i].Name
 	}
-	stats, err := libcontainer.GetStats(self.cgroupManager, networkInterfaces)
+	stats, err := libcontainer.GetStats(self.cgroupManager, networkInterfaces, -1)
 	if err != nil {
 		return stats, err
 	}
