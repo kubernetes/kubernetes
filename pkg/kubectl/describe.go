@@ -82,12 +82,9 @@ func describerMap(c *client.Client) map[string]Describer {
 	return m
 }
 
-func expDescriberMap(c *client.Client, exp *client.ExperimentalClient) map[string]Describer {
+func expDescriberMap(c *client.Client) map[string]Describer {
 	return map[string]Describer{
-		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{
-			client:       c,
-			experimental: exp,
-		},
+		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{c},
 	}
 }
 
@@ -104,16 +101,17 @@ func DescribableResources() []string {
 
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind string, c *client.Client, ec *client.ExperimentalClient) (Describer, bool) {
+func DescriberFor(group string, kind string, c *client.Client) (Describer, bool) {
 	var f Describer
 	var ok bool
 
-	if c != nil {
+	switch group {
+	case "api":
 		f, ok = describerMap(c)[kind]
+	case "experimental":
+		f, ok = expDescriberMap(c)[kind]
 	}
-	if !ok && c != nil && ec != nil {
-		f, ok = expDescriberMap(c, ec)[kind]
-	}
+
 	return f, ok
 }
 
@@ -1153,12 +1151,11 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 
 // HorizontalPodAutoscalerDescriber generates information about a horizontal pod autoscaler.
 type HorizontalPodAutoscalerDescriber struct {
-	client       *client.Client
-	experimental *client.ExperimentalClient
+	client *client.Client
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (string, error) {
-	hpa, err := d.experimental.HorizontalPodAutoscalers(namespace).Get(name)
+	hpa, err := d.client.Experimental().HorizontalPodAutoscalers(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}

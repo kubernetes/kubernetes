@@ -49,7 +49,7 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 		Response: Response{StatusCode: 200, Body: &horizontalPodAutoscaler},
 	}
 
-	response, err := c.Setup().HorizontalPodAutoscalers(ns).Create(&horizontalPodAutoscaler)
+	response, err := c.Setup().Experimental().HorizontalPodAutoscalers(ns).Create(&horizontalPodAutoscaler)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 	}
 
-	response, err := c.Setup().HorizontalPodAutoscalers(ns).Get("abc")
+	response, err := c.Setup().Experimental().HorizontalPodAutoscalers(ns).Get("abc")
 	c.Validate(t, response, err)
 }
 
@@ -99,7 +99,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscalerList},
 	}
-	response, err := c.Setup().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	response, err := c.Setup().Experimental().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 
@@ -116,7 +116,7 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 	}
-	response, err := c.Setup().HorizontalPodAutoscalers(ns).Update(horizontalPodAutoscaler)
+	response, err := c.Setup().Experimental().HorizontalPodAutoscalers(ns).Update(horizontalPodAutoscaler)
 	c.Validate(t, response, err)
 }
 
@@ -126,7 +126,7 @@ func TestHorizontalPodAutoscalerDelete(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().HorizontalPodAutoscalers(ns).Delete("foo", nil)
+	err := c.Setup().Experimental().HorizontalPodAutoscalers(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
 }
 
@@ -138,6 +138,6 @@ func TestHorizontalPodAutoscalerWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().HorizontalPodAutoscalers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup().Experimental().HorizontalPodAutoscalers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }
