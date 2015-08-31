@@ -39,7 +39,7 @@ import (
 
 const (
 	// We'll attempt to recompute the required replicas of all replication controllers
-	// the have fulfilled their expectations at least this often. This recomputation
+	// that have fulfilled their expectations at least this often. This recomputation
 	// happens based on contents in local pod storage.
 	FullControllerResyncPeriod = 30 * time.Second
 
