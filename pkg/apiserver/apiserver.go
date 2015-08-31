@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -159,11 +160,31 @@ func InstallLogsSupport(mux Mux) {
 
 func InstallServiceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-		serviceErrorHandler(requestResolver, apiVersions, serviceErr, request, response)
+		serviceErrorHandler(container, requestResolver, apiVersions, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+func serviceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+	requestedPath := request.Request.URL.Path
+	// If there is any valid path with the requested path as prefix, then list all such paths.
+	for _, ws := range container.RegisteredWebServices() {
+		if strings.HasPrefix(requestedPath, ws.RootPath()) {
+			// List all valid paths which have the requested path as prefix.
+			var paths []string
+			for _, route := range ws.Routes() {
+				if strings.HasPrefix(route.Path, requestedPath) {
+					paths = append(paths, route.Path)
+				}
+			}
+			if len(paths) > 0 {
+				sort.Strings(paths)
+				writeRawJSON(http.StatusOK, api.RootPaths{Paths: paths}, response.ResponseWriter)
+				return
+			}
+		}
+	}
+
+	// There is no valid path with the requested path as prefix. Return a 404 with a JSON status object in this case.
 	requestInfo, err := requestResolver.GetAPIRequestInfo(request.Request)
 	codec := latest.Codec
 	if err == nil && requestInfo.APIVersion != "" {
