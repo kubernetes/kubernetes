@@ -60,6 +60,7 @@ dest-file
 disable-filter
 docker-endpoint
 docker-exec-handler
+dockercfg-path
 driver-port
 dry-run
 duration-sec
