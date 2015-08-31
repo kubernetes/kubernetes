@@ -99,7 +99,7 @@ function setup_contrail_manifest_files() {
 }
 
 # setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MASTER_IP
-function setup_contrail_networking() {
+function setup_contrail_master() {
     SAVED_OPTIONS=$(set +o)
     set -x
 
@@ -124,4 +124,8 @@ function setup_contrail_networking() {
 
     # setup_minions
     eval "$SAVED_OPTIONS"
+}
+
+# setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MINION_IP
+function setup_contrail_minion() {
 }
