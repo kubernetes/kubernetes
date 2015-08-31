@@ -22,8 +22,8 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -181,7 +181,7 @@ func TestEtcdDeleteController(t *testing.T) {
 	key, err := storage.KeyFunc(ctx, validDaemon.Name)
 	key = etcdtest.AddPrefix(key)
 
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewDaemon()), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewDaemon()), 0)
 	obj, err := storage.Delete(ctx, validDaemon.Name, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -252,7 +252,7 @@ func TestEtcdWatchControllersMatch(t *testing.T) {
 			Namespace: "default",
 		},
 	}
-	controllerBytes, _ := latest.Codec.Encode(controller)
+	controllerBytes, _ := testapi.Codec().Encode(controller)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "create",
 		Node: &etcd.Node{
@@ -303,7 +303,7 @@ func TestEtcdWatchControllersFields(t *testing.T) {
 			DesiredNumberScheduled: 4,
 		},
 	}
-	controllerBytes, _ := latest.Codec.Encode(controller)
+	controllerBytes, _ := testapi.Codec().Encode(controller)
 
 	for expectedResult, fieldSet := range testFieldMap {
 		for _, field := range fieldSet {
@@ -372,7 +372,7 @@ func TestEtcdWatchControllersNotMatch(t *testing.T) {
 			},
 		},
 	}
-	controllerBytes, _ := latest.Codec.Encode(controller)
+	controllerBytes, _ := testapi.Codec().Encode(controller)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "create",
 		Node: &etcd.Node{
@@ -401,7 +401,7 @@ func TestDelete(t *testing.T) {
 		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, dc),
+					Value:         runtime.EncodeOrDie(testapi.Codec(), dc),
 					ModifiedIndex: 1,
 				},
 			},
