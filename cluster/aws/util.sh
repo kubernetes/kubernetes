@@ -21,7 +21,6 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${KUBE_ROOT}/cluster/contrail_networking_setup.sh"
 
 ALLOCATE_NODE_CIDRS=true
 
@@ -1091,7 +1090,15 @@ function kube-up {
   echo
   echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
   echo
-  setup_contrail_networking $AWS_SSH_KEY $SSH_USER $KUBE_MASTER_IP
+
+  # Setup and provision contrail networking
+  if [ $OVERLAY_NETWORK_PROVIDER == "opencontrail" ]; then
+      source "${KUBE_ROOT}/cluster/overlay-network/opencontrail/provision.sh"
+      setup_contrail_master $AWS_SSH_KEY $SSH_USER $KUBE_MASTER_IP
+      for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
+          setup_contrail_minion $AWS_SSH_KEY $SSH_USER ${KUBE_MINION_IP_ADDRESSES[$i]}
+      done
+  fi
 }
 
 function kube-down {
