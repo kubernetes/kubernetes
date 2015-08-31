@@ -48,7 +48,10 @@ runTests() {
 
   kube::log::status "Running integration test scenario"
 
- KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} --api-version="$1" \
+ # TODO: fix the integration test to make the --api-version meaningful for integration test
+ # KUBE_API_VERSIONS="v1,experimental/v1alpha1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} --api-version="$1" \
+ #  --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
+ KUBE_API_VERSIONS="v1,experimental/v1alpha1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} --api-version="v1" \
   --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
