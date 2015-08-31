@@ -137,6 +137,28 @@ type Spec struct {
 	ReadOnly               bool
 }
 
+// VolumeConfig is how volume plugins receive configuration.  An instance specific to the plugin will be passed to
+// the plugin's ProbeVolumePlugins(config) func.  Reasonable defaults will be provided by the binary hosting
+// the plugins while allowing override of those default values.  Those config values are then set to an instance of
+// VolumeConfig and passed to the plugin.
+//
+// Values in VolumeConfig are intended to be relevant to several plugins, but not necessarily all plugins.  The
+// preference is to leverage strong typing in this struct.  All config items must have a descriptive but non-specific
+// name (i.e, RecyclerMinimumTimeout is OK but RecyclerMinimumTimeoutForNFS is !OK).  An instance of config will be
+// given directly to the plugin, so config names specific to plugins are unneeded and wrongly expose plugins
+// in this VolumeConfig struct.
+//
+// OtherAttributes is a map of string values intended for one-off configuration of a plugin or config that is only
+// relevant to a single plugin.  All values are passed by string and require interpretation by the plugin.
+// Passing config as strings is the least desirable option but can be used for truly one-off configuration.
+// The binary should still use strong typing for this value when binding CLI values before they are passed as strings
+// in OtherAttributes.
+type VolumeConfig struct {
+	// thockin: do we want to wait on this until we have an actual use case?  I can change the comments above to
+	// reflect our intention for one-off config.
+	OtherAttributes map[string]string
+}
+
 // NewSpecFromVolume creates an Spec from an api.Volume
 func NewSpecFromVolume(vs *api.Volume) *Spec {
 	return &Spec{

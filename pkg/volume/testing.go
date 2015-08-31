@@ -72,6 +72,19 @@ func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID, mounter
 	return plug.NewCleaner(spec.Name, podUID, mounter)
 }
 
+func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
+	if _, ok := config.OtherAttributes["fake-property"]; ok {
+		return []VolumePlugin{
+			&FakeVolumePlugin{
+				PluginName: "fake-plugin",
+				Host:       nil,
+				// SomeFakeProperty: config.OtherAttributes["fake-property"] -- string, may require parsing by plugin
+			},
+		}
+	}
+	return []VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
+}
+
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:
