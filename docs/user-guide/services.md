@@ -388,15 +388,64 @@ as of Kubernetes 1.0.
 
 ### Type NodePort
 
-If you set the `type` field to `"NodePort"`, the Kubernetes master will
+If you set the `spec.type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
 Node will proxy that port (the same port number on every Node) into your `Service`.
 That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
 
-If you want a specific port number, you can specify a value in the `nodePort`
+```json
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "type" : "NodePort",
+        "selector": {
+            "app": "MyApp"
+        },
+        "ports": [
+            {
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376
+            }
+        ]
+    }
+}
+```
+
+If you want a specific port number, you can specify a value in the `spec.ports[*].nodePort`
 field, and the system will allocate you that port or else the API transaction
 will fail (i.e. you need to take care about possible port collisions yourself).
-The value you specify must be in the configured range for node ports.
+The value you specify must be in the configured range for node ports. The example below, specifies
+`nodePort` 33000.
+
+
+```json
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "type" : "NodePort",
+        "selector": {
+            "app": "MyApp"
+        },
+        "ports": [
+            {
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376,
+                "nodePort": 33000
+            }
+        ]
+    }
+}
+```
 
 This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
