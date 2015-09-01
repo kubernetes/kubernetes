@@ -22,12 +22,18 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util"
+	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -37,9 +43,12 @@ type HollowNodeConfig struct {
 	KubeconfigPath      string
 	KubeletPort         int
 	KubeletReadOnlyPort int
+	Morph               string
 	NodeName            string
 	ServerPort          int
 }
+
+var knownMorphs = sets.NewString("kubelet", "proxy")
 
 func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.KubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
@@ -47,6 +56,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", 10255, "Read-only port on which Kubelet is listening.")
 	fs.StringVar(&c.NodeName, "name", "fake-node", "Name of this Hollow Node.")
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
+	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
 }
 
 func createClientFromFile(path string) (*client.Client, error) {
@@ -75,25 +85,48 @@ func main() {
 	config.addFlags(pflag.CommandLine)
 	util.InitFlags()
 
-	// create a client for Kubelet to communicate with API server.
+	if !knownMorphs.Has(config.Morph) {
+		glog.Fatal("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+	}
+
+	// create a client to communicate with API server.
 	cl, err := createClientFromFile(config.KubeconfigPath)
 	if err != nil {
 		glog.Fatal("Failed to create a Client. Exiting.")
 	}
-	cadvisorInterface := new(cadvisor.Fake)
 
-	fakeDockerClient := &dockertools.FakeDockerClient{}
-	fakeDockerClient.VersionInfo = docker.Env{"ApiVersion=1.18"}
-	fakeDockerClient.ContainerMap = make(map[string]*docker.Container)
-	fakeDockerClient.EnableSleep = true
+	if config.Morph == "kubelet" {
+		cadvisorInterface := new(cadvisor.Fake)
 
-	hollowKubelet := kubemark.NewHollowKubelet(
-		config.NodeName,
-		cl,
-		cadvisorInterface,
-		fakeDockerClient,
-		config.KubeletPort,
-		config.KubeletReadOnlyPort,
-	)
-	hollowKubelet.Run()
+		fakeDockerClient := &dockertools.FakeDockerClient{}
+		fakeDockerClient.VersionInfo = docker.Env{"ApiVersion=1.18"}
+		fakeDockerClient.ContainerMap = make(map[string]*docker.Container)
+		fakeDockerClient.EnableSleep = true
+
+		hollowKubelet := kubemark.NewHollowKubelet(
+			config.NodeName,
+			cl,
+			cadvisorInterface,
+			fakeDockerClient,
+			config.KubeletPort,
+			config.KubeletReadOnlyPort,
+		)
+		hollowKubelet.Run()
+	}
+
+	if config.Morph == "proxy" {
+		eventBroadcaster := record.NewBroadcaster()
+		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: config.NodeName})
+
+		iptInterface := fakeiptables.NewFake()
+
+		serviceConfig := proxyconfig.NewServiceConfig()
+		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
+
+		endpointsConfig := proxyconfig.NewEndpointsConfig()
+		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
+
+		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, cl, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
+		hollowProxy.Run()
+	}
 }

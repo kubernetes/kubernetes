@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
+source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 detect-project &> /dev/null
 export PROJECT
