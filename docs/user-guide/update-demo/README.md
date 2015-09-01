@@ -114,7 +114,7 @@ But if the replica count had been specified, the final replica count of the new 
 ### Step Five: Bring down the pods
 
 ```console
-$ kubectl stop rc update-demo-kitten
+$ kubectl delete rc update-demo-kitten
 ```
 
 This first stops the replication controller by turning the target number of replicas to 0 and then deletes the controller.
