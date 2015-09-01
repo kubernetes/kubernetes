@@ -206,7 +206,7 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
 
 <nop>2. To verify that the guestbook replication controller is running, run the `kubectl get rc` command:
 
-    ```
+    ```console
     $ kubectl get rc
     CONTROLLER            CONTAINER(S)         IMAGE(S)                    SELECTOR                  REPLICAS
     guestbook             guestbook            kubernetes/guestbook:v2     app=guestbook             3
@@ -244,7 +244,7 @@ Just like the others, we create a service to group the guestbook pods but this t
 
 <nop>2. To verify that the guestbook service is up, list all the services in the cluster with the `kubectl get services` command:
 
-    ```
+    ```console
     $ kubectl get services
     NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
     guestbook         10.0.217.218     146.148.81.8      3000/TCP      app=guestbook          1h
