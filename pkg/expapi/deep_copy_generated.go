@@ -822,12 +822,7 @@ func deepCopy_expapi_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *c
 	if err := deepCopy_expapi_DeploymentStrategy(in.Strategy, &out.Strategy, c); err != nil {
 		return err
 	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
-	} else {
-		out.UniqueLabelKey = nil
-	}
+	out.UniqueLabelKey = in.UniqueLabelKey
 	return nil
 }
 

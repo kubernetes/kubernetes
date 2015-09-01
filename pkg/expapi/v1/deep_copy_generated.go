@@ -953,11 +953,21 @@ func deepCopy_v1_ResourceConsumption(in ResourceConsumption, out *ResourceConsum
 }
 
 func deepCopy_v1_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
-	if err := deepCopy_util_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
-		return err
+	if in.MaxUnavailable != nil {
+		out.MaxUnavailable = new(util.IntOrString)
+		if err := deepCopy_util_IntOrString(*in.MaxUnavailable, out.MaxUnavailable, c); err != nil {
+			return err
+		}
+	} else {
+		out.MaxUnavailable = nil
 	}
-	if err := deepCopy_util_IntOrString(in.MaxSurge, &out.MaxSurge, c); err != nil {
-		return err
+	if in.MaxSurge != nil {
+		out.MaxSurge = new(util.IntOrString)
+		if err := deepCopy_util_IntOrString(*in.MaxSurge, out.MaxSurge, c); err != nil {
+			return err
+		}
+	} else {
+		out.MaxSurge = nil
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	return nil

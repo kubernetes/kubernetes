@@ -1557,22 +1557,6 @@ func convert_expapi_DeploymentStatus_To_v1_DeploymentStatus(in *expapi.Deploymen
 	return nil
 }
 
-func convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy(in *expapi.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.DeploymentStrategy))(in)
-	}
-	out.Type = DeploymentType(in.Type)
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(RollingUpdateDeployment)
-		if err := convert_expapi_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
-	return nil
-}
-
 func convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *expapi.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.HorizontalPodAutoscaler))(in)
@@ -1682,20 +1666,6 @@ func convert_expapi_ResourceConsumption_To_v1_ResourceConsumption(in *expapi.Res
 	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
 		return err
 	}
-	return nil
-}
-
-func convert_expapi_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *expapi.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.RollingUpdateDeployment))(in)
-	}
-	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.MaxSurge, &out.MaxSurge, 0); err != nil {
-		return err
-	}
-	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -2048,20 +2018,6 @@ func convert_v1_ResourceConsumption_To_expapi_ResourceConsumption(in *ResourceCo
 	return nil
 }
 
-func convert_v1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment(in *RollingUpdateDeployment, out *expapi.RollingUpdateDeployment, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RollingUpdateDeployment))(in)
-	}
-	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.MaxSurge, &out.MaxSurge, 0); err != nil {
-		return err
-	}
-	out.MinReadySeconds = in.MinReadySeconds
-	return nil
-}
-
 func convert_v1_Scale_To_expapi_Scale(in *Scale, out *expapi.Scale, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Scale))(in)
@@ -2208,7 +2164,6 @@ func init() {
 		convert_expapi_Daemon_To_v1_Daemon,
 		convert_expapi_DeploymentList_To_v1_DeploymentList,
 		convert_expapi_DeploymentStatus_To_v1_DeploymentStatus,
-		convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy,
 		convert_expapi_Deployment_To_v1_Deployment,
 		convert_expapi_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList,
 		convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
@@ -2216,7 +2171,6 @@ func init() {
 		convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
 		convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy,
 		convert_expapi_ResourceConsumption_To_v1_ResourceConsumption,
-		convert_expapi_RollingUpdateDeployment_To_v1_RollingUpdateDeployment,
 		convert_expapi_ScaleSpec_To_v1_ScaleSpec,
 		convert_expapi_ScaleStatus_To_v1_ScaleStatus,
 		convert_expapi_Scale_To_v1_Scale,
@@ -2264,7 +2218,6 @@ func init() {
 		convert_v1_ReplicationControllerDummy_To_expapi_ReplicationControllerDummy,
 		convert_v1_ResourceConsumption_To_expapi_ResourceConsumption,
 		convert_v1_ResourceRequirements_To_api_ResourceRequirements,
-		convert_v1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment,
 		convert_v1_SELinuxOptions_To_api_SELinuxOptions,
 		convert_v1_ScaleSpec_To_expapi_ScaleSpec,
 		convert_v1_ScaleStatus_To_expapi_ScaleStatus,

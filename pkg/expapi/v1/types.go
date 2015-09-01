@@ -186,7 +186,7 @@ type DeploymentSpec struct {
 	// not add any selector and label. If unspecified, system uses
 	// "deployment.kubernetes.io/podTemplateHash".
 	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
-	UniqueLabelKey *string `json:"uniqueLabel,omitempty" description:"key of the label that is added to existing pods to distinguish them from new ones; deployment.kubernetes.io/podTemplateHash is used by default; value of this label is hash of pod template spec; no label is added if this is set to empty string"`
+	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty" description:"key of the label that is added to existing pods to distinguish them from new ones; deployment.kubernetes.io/podTemplateHash is used by default; value of this label is hash of pod template spec; no label is added if this is set to empty string"`
 }
 
 type DeploymentStrategy struct {
@@ -222,7 +222,7 @@ type RollingUpdateDeployment struct {
 	// can be scaled down further, followed by scaling up the new RC, ensuring
 	// that at least 70% of original number of pods are available at all times
 	// during the update.
-	MaxUnavailable util.IntOrString `json:"maxUnavailable,omitempty" description:"max number of pods that can be unavailable during the update; value can be an absolute number or a percentage of total pods at start of update"`
+	MaxUnavailable *util.IntOrString `json:"maxUnavailable,omitempty" description:"max number of pods that can be unavailable during the update; value can be an absolute number or a percentage of total pods at start of update"`
 
 	// The maximum number of pods that can be scheduled above the original number of
 	// pods.
@@ -234,7 +234,7 @@ type RollingUpdateDeployment struct {
 	// immediately when the rolling update starts. Once old pods have been killed,
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of original pods.
-	MaxSurge util.IntOrString `json:"maxSurge,omitempty" description:"max number of pods that can be scheduled above the original number of pods; value can be an absolute number or a percentage of total pods at start of update"`
+	MaxSurge *util.IntOrString `json:"maxSurge,omitempty" description:"max number of pods that can be scheduled above the original number of pods; value can be an absolute number or a percentage of total pods at start of update"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
