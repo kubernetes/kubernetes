@@ -258,7 +258,6 @@ type DeploymentList struct {
 	Items []Deployment `json:"items" description:"list of deployments"`
 }
 
-<<<<<<< HEAD
 // DaemonSpec is the specification of a daemon.
 type DaemonSpec struct {
 	// Selector is a label query over pods that are managed by the daemon.

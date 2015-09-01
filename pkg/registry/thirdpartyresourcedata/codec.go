@@ -25,12 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type thirdPartyResourceDataMapper struct {
-	mapper meta.RESTMapper
-	kind   string
+	mapper  meta.RESTMapper
+	kind    string
+	version string
 }
 
 func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string, error) {
@@ -38,7 +40,16 @@ func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string
 }
 
 func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
-	mapping, err := t.mapper.RESTMapping(kind, versions...)
+	if len(versions) != 1 {
+		return nil, fmt.Errorf("unexpected set of versions: %v", versions)
+	}
+	if versions[0] != t.version {
+		return nil, fmt.Errorf("unknown version %s expected %s", versions[0], t.version)
+	}
+	if kind != "ThirdPartyResourceData" {
+		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
+	}
+	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -58,8 +69,12 @@ func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string
 	return t.mapper.VersionAndKindForResource(resource)
 }
 
-func NewMapper(mapper meta.RESTMapper, kind string) meta.RESTMapper {
-	return &thirdPartyResourceDataMapper{mapper, kind}
+func NewMapper(mapper meta.RESTMapper, kind, version string) meta.RESTMapper {
+	return &thirdPartyResourceDataMapper{
+		mapper:  mapper,
+		kind:    kind,
+		version: version,
+	}
 }
 
 type thirdPartyResourceDataCodec struct {
@@ -81,9 +96,13 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceD
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
+	return t.populateFromObject(objIn, mapObj, data)
+}
+
+func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *expapi.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
 	kind, ok := mapObj["kind"].(string)
 	if !ok {
-		return fmt.Errorf("unexpected object: %#v", obj)
+		return fmt.Errorf("unexpected object for kind: %#v", mapObj["kind"])
 	}
 	if kind != t.kind {
 		return fmt.Errorf("unexpected kind: %s, expected: %s", kind, t.kind)
@@ -91,22 +110,40 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceD
 
 	metadata, ok := mapObj["metadata"].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("unexpected object: %#v", obj)
+		return fmt.Errorf("unexpected object for metadata: %#v", mapObj["metadata"])
+	}
+
+	if resourceVersion, ok := metadata["resourceVersion"]; ok {
+		resourceVersionStr, ok := resourceVersion.(string)
+		if !ok {
+			return fmt.Errorf("unexpected object for resourceVersion: %v", resourceVersion)
+		}
+
+		objIn.ResourceVersion = resourceVersionStr
 	}
 
 	name, ok := metadata["name"].(string)
 	if !ok {
-		return fmt.Errorf("unexpected object: %#v", obj)
+		return fmt.Errorf("unexpected object for name: %#v", metadata)
 	}
-	
-	if resourceVersion, ok := metadata["resourceVersion"]; ok {
-		resourceVersionStr, ok := resourceVersion.(string)
+
+	if labels, ok := metadata["labels"]; ok {
+		labelMap, ok := labels.(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("unexpected object: %v", metadata["resourceVersion"])
+			return fmt.Errorf("unexpected object for labels: %v", labelMap)
 		}
-		objIn.ResourceVersion = strconv.Atoi(resourceVersionStr)
+		for key, value := range labelMap {
+			valueStr, ok := value.(string)
+			if !ok {
+				return fmt.Errorf("unexpected label: %v", value)
+			}
+			if objIn.Labels == nil {
+				objIn.Labels = map[string]string{}
+			}
+			objIn.Labels[key] = valueStr
+		}
 	}
-	
+
 	objIn.Name = name
 	objIn.Data = data
 	return nil
@@ -141,16 +178,50 @@ func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object
 	return t.populate(thirdParty, data)
 }
 
-func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, kind, version string) error {
+func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, version, kind string) error {
 	thirdParty, ok := obj.(*expapi.ThirdPartyResourceData)
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
+
+	if kind != "ThirdPartyResourceData" {
+		return fmt.Errorf("unexpeceted kind: %s", kind)
+	}
+
+	var dataObj interface{}
+	if err := json.Unmarshal(data, &dataObj); err != nil {
+		return err
+	}
+	mapObj, ok := dataObj.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unexpcted object: %#v", dataObj)
+	}
+	if kindObj, found := mapObj["kind"]; !found {
+		mapObj["kind"] = kind
+	} else {
+		kindStr, ok := kindObj.(string)
+		if !ok {
+			return fmt.Errorf("unexpected object for 'kind': %v", kindObj)
+		}
+		if kindStr != t.kind {
+			return fmt.Errorf("kind doesn't match, expecting: %s, got %s", kind, kindStr)
+		}
+	}
+	if versionObj, found := mapObj["apiVersion"]; !found {
+		mapObj["apiVersion"] = version
+	} else {
+		versionStr, ok := versionObj.(string)
+		if !ok {
+			return fmt.Errorf("unexpected object for 'apiVersion': %v", versionObj)
+		}
+		if versionStr != version {
+			return fmt.Errorf("version doesn't match, expecting: %s, got %s", version, versionStr)
+		}
+	}
+
 	if err := t.populate(thirdParty, data); err != nil {
 		return err
 	}
-	thirdParty.Kind = kind
-	thirdParty.APIVersion = version
 	return nil
 }
 
@@ -176,5 +247,28 @@ func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, e
 		return t.delegate.Encode(obj)
 	default:
 		return nil, fmt.Errorf("unexpected object to encode: %#v", obj)
+	}
+}
+
+func NewObjectCreator(version string, delegate runtime.ObjectCreater) runtime.ObjectCreater {
+	return &thirdPartyResourceDataCreator{version, delegate}
+}
+
+type thirdPartyResourceDataCreator struct {
+	version  string
+	delegate runtime.ObjectCreater
+}
+
+func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.Object, err error) {
+	if t.version != version {
+		return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+	}
+	switch kind {
+	case "ThirdPartyResourceData":
+		return &expapi.ThirdPartyResourceData{}, nil
+	case "ThirdPartyResourceDataList":
+		return &expapi.ThirdPartyResourceDataList{}, nil
+	default:
+		return t.delegate.New(latest.Version, kind)
 	}
 }

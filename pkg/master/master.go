@@ -799,11 +799,11 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	return &apiserver.APIGroupVersion{
 		Root: apiRoot,
 
-		Creater:   api.Scheme,
+		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind),
+		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
 		Codec:   explatest.Codec,
 		Linker:  explatest.SelfLinker,
 		Storage: storage,
