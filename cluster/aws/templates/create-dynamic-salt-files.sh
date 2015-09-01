@@ -38,6 +38,7 @@ dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+overlay_network_provider: '$(echo "$OVERLAY_NETWORK_PROVIDER")'
 kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
 EOF
 

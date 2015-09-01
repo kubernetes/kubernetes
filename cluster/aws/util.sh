@@ -823,6 +823,7 @@ function kube-up {
     echo "readonly SERVICE_CLUSTER_IP_GW='${SERVICE_CLUSTER_IP_GW:-}'"
     echo "readonly DNS_SERVER_IP_PUBLIC='${DNS_SERVER_IP_PUBLIC:-}'"
     echo "readonly KUBE_UI_IP_PUBLIC='${KUBE_UI_IP_PUBLIC:-}'"
+    echo "readonly OVERLAY_NETWORK_PROVIDER='${OVERLAY_NETWORK_PROVIDER:-}'"
     echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE:-}'"
     echo "readonly KUBELET_TOKEN='${KUBELET_TOKEN}'"
@@ -1090,15 +1091,6 @@ function kube-up {
   echo
   echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
   echo
-
-  # Setup and provision contrail networking
-  if [ $OVERLAY_NETWORK_PROVIDER == "opencontrail" ]; then
-      source "${KUBE_ROOT}/cluster/overlay-network/opencontrail/provision.sh"
-      setup_contrail_master $AWS_SSH_KEY $SSH_USER $KUBE_MASTER_IP
-      for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
-          setup_contrail_minion $AWS_SSH_KEY $SSH_USER ${KUBE_MINION_IP_ADDRESSES[$i]}
-      done
-  fi
 }
 
 function kube-down {

@@ -37,7 +37,7 @@ function retry() {
 
 # Run a command in kubernetes-master node
 function master() {
-    ssh -oStrictHostKeyChecking=no -i "${SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo "$*"
+    sudo "$*"
 }
 
 # Verify that contrail infra components are up and listening
@@ -109,14 +109,8 @@ function setup_contrail_manifest_files() {
 }
 
 # Setup contrail-controller components
-# Usage: setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MASTER_IP
 function setup_contrail_master() {
-    SAVED_OPTIONS=$(set +o)
     set -x
-
-    SSH_KEY=$1
-    SSH_USER=$2
-    KUBE_MASTER_IP=$3
 
     # Pull all contrail images and copy the manifest files
     setup_contrail_manifest_files
@@ -132,12 +126,6 @@ function setup_contrail_master() {
 
     # Setip kube-dns
     setup_kube_dns_endpoints
-
-    # setup_minions
-    eval "$SAVED_OPTIONS"
 }
 
-# Setup contrail vrouter-agent components
-# Usage: setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MINION_IP
-function setup_contrail_minion() {
-}
+setup_contrail_master
