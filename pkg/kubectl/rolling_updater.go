@@ -374,6 +374,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 
 	oldName := oldRc.ObjectMeta.Name
 	newName := newRc.ObjectMeta.Name
+	newGenerateName := newRc.ObjectMeta.GenerateName
 	retry := &RetryParams{interval, timeout}
 	waitForReplicas := &RetryParams{interval, timeout}
 	if newRc.Spec.Replicas <= 0 {
@@ -397,7 +398,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		}
 		newRc = rc
 	} else {
-		fmt.Fprintf(out, "Creating %s\n", newName)
+		fmt.Fprintf(out, "Creating replication contoller ")
+		if len(newName) > 0 {
+			fmt.Fprintf(out, "\"%s\"\n", newName)
+		} else if len(newGenerateName) > 0 {
+			fmt.Fprintf(out, "prefixed \"%s\"\n", newGenerateName)
+		}
 		if newRc.ObjectMeta.Annotations == nil {
 			newRc.ObjectMeta.Annotations = map[string]string{}
 		}
@@ -405,6 +411,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		newRc.ObjectMeta.Annotations[sourceIdAnnotation] = sourceId
 		newRc.Spec.Replicas = 0
 		newRc, err = r.c.CreateReplicationController(r.ns, newRc)
+		// if the rc is created without Name but with GeneratedName, we need to update rc name here
+		// otherwise it'll complain "no resource name" at clean up time
+		if len(newName) == 0 && len(newGenerateName) > 0 {
+			newName = newRc.ObjectMeta.Name
+			fmt.Fprintf(out, "Replication controller \"%s\" created\n", newName)
+		}
 		if err != nil {
 			return err
 		}
@@ -425,7 +437,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	if skipFirstUp {
 		direction = "down"
 	}
-	fmt.Fprintf(out, "Scaling up %s from %d to %d, scaling down %s from %d to 0 (scale %s first by %d each interval)\n",
+	fmt.Fprintf(out, "Scaling up \"%s\" from %d to %d, scaling down \"%s\" from %d to 0 (scale %s first by %d each interval)\n",
 		newRc.Name, newRc.Spec.Replicas, desired, oldRc.Name, oldRc.Spec.Replicas, direction, scaleAmount)
 
 	// Scale newRc and oldRc until newRc has the desired number of replicas and
