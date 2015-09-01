@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
+)
 
 func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
@@ -38,6 +41,38 @@ func addDefaultingFuncs() {
 				if len(obj.Labels) == 0 {
 					obj.Labels = labels
 				}
+			}
+		},
+		func(obj *Deployment) {
+			// Set DeploymentSpec.Replicas to 1 if it is not set.
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int)
+				*obj.Spec.Replicas = 1
+			}
+			strategy := &obj.Spec.Strategy
+			// Set default DeploymentType as RollingUpdate.
+			if strategy.Type == "" {
+				strategy.Type = DeploymentRollingUpdate
+			}
+			if strategy.Type == DeploymentRollingUpdate {
+				if strategy.RollingUpdate == nil {
+					rollingUpdate := RollingUpdateDeployment{}
+					strategy.RollingUpdate = &rollingUpdate
+				}
+				if strategy.RollingUpdate.MaxUnavailable == nil {
+					// Set default MaxUnavailable as 1 by default.
+					maxUnavailable := util.NewIntOrStringFromInt(1)
+					strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+				}
+				if strategy.RollingUpdate.MaxSurge == nil {
+					// Set default MaxSurge as 1 by default.
+					maxSurge := util.NewIntOrStringFromInt(1)
+					strategy.RollingUpdate.MaxSurge = &maxSurge
+				}
+			}
+			if obj.Spec.UniqueLabelKey == nil {
+				obj.Spec.UniqueLabelKey = new(string)
+				*obj.Spec.UniqueLabelKey = "deployment.kubernetes.io/podTemplateHash"
 			}
 		},
 	)

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestSetDefaultDaemon(t *testing.T) {
@@ -83,6 +84,111 @@ func TestSetDefaultDaemon(t *testing.T) {
 	}
 }
 
+func TestSetDefaultDeployment(t *testing.T) {
+	defaultIntOrString := util.NewIntOrStringFromInt(1)
+	differentIntOrString := util.NewIntOrStringFromInt(5)
+	deploymentLabelKey := "deployment.kubernetes.io/podTemplateHash"
+	tests := []struct {
+		original *Deployment
+		expected *Deployment
+	}{
+		{
+			original: &Deployment{},
+			expected: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(1),
+					Strategy: DeploymentStrategy{
+						Type: DeploymentRollingUpdate,
+						RollingUpdate: &RollingUpdateDeployment{
+							MaxSurge:       &defaultIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString(deploymentLabelKey),
+				},
+			},
+		},
+		{
+			original: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(5),
+					Strategy: DeploymentStrategy{
+						RollingUpdate: &RollingUpdateDeployment{
+							MaxSurge: &differentIntOrString,
+						},
+					},
+				},
+			},
+			expected: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(5),
+					Strategy: DeploymentStrategy{
+						Type: DeploymentRollingUpdate,
+						RollingUpdate: &RollingUpdateDeployment{
+							MaxSurge:       &differentIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString(deploymentLabelKey),
+				},
+			},
+		},
+		{
+			original: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(5),
+					Strategy: DeploymentStrategy{
+						Type: DeploymentRecreate,
+					},
+				},
+			},
+			expected: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(5),
+					Strategy: DeploymentStrategy{
+						Type: DeploymentRecreate,
+					},
+					UniqueLabelKey: newString(deploymentLabelKey),
+				},
+			},
+		},
+		{
+			original: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(5),
+					Strategy: DeploymentStrategy{
+						Type: DeploymentRecreate,
+					},
+					UniqueLabelKey: newString("customDeploymentKey"),
+				},
+			},
+			expected: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt(5),
+					Strategy: DeploymentStrategy{
+						Type: DeploymentRecreate,
+					},
+					UniqueLabelKey: newString("customDeploymentKey"),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*Deployment)
+		if !ok {
+			t.Errorf("unexpected object: %v", got)
+			t.FailNow()
+		}
+		if !reflect.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("got different than expected: %v, %v", got, expected)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := v1.Codec.Encode(obj)
 	if err != nil {
@@ -101,4 +207,16 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
+}
+
+func newInt(val int) *int {
+	p := new(int)
+	*p = val
+	return p
+}
+
+func newString(val string) *string {
+	p := new(string)
+	*p = val
+	return p
 }
