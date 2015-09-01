@@ -164,7 +164,8 @@ func NewMainKubelet(
 	podCIDR string,
 	pods int,
 	dockerExecHandler dockertools.ExecHandler,
-	resolverConfig string) (*Kubelet, error) {
+	resolverConfig string,
+	cpuCFSQuota bool) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -281,6 +282,7 @@ func NewMainKubelet(
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
+		cpuCFSQuota:                    cpuCFSQuota,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -317,7 +319,8 @@ func NewMainKubelet(
 			klet.httpClient,
 			dockerExecHandler,
 			oomAdjuster,
-			procFs)
+			procFs,
+			klet.cpuCFSQuota)
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -556,6 +559,9 @@ type Kubelet struct {
 
 	// Optionally shape the bandwidth of a pod
 	shaper bandwidth.BandwidthShaper
+
+	// True if container cpu limits should be enforced via cgroup CFS quota
+	cpuCFSQuota bool
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
