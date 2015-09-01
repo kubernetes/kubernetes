@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/gcfg"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
 	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
@@ -39,6 +38,7 @@ import (
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
 	"github.com/rackspace/gophercloud/pagination"
+	"github.com/scalingdata/gcfg"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"

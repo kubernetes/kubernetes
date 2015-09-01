@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
-	"code.google.com/p/gcfg"
 	"github.com/golang/glog"
+	"github.com/scalingdata/gcfg"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
