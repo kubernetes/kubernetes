@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import "strings"
 func GetVersion(groupVersion string) string {
 	s := strings.Split(groupVersion, "/")
 	if len(s) != 2 {
-		//e.g. return "v1" for groupVersion="v1"
+		// e.g. return "v1" for groupVersion="v1"
 		return s[len(s)-1]
 	}
 	return s[1]
@@ -30,7 +30,7 @@ func GetVersion(groupVersion string) string {
 func GetGroup(groupVersion string) string {
 	s := strings.Split(groupVersion, "/")
 	if len(s) == 1 {
-		//e.g. return "" for groupVersion="v1"
+		// e.g. return "" for groupVersion="v1"
 		return ""
 	}
 	return s[0]

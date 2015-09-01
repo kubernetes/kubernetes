@@ -93,7 +93,7 @@ func roundTripSame(t *testing.T, item runtime.Object, kind string, except ...str
 
 	version := testapi.Version()
 	codec := testapi.Codec()
-	//TODO: we should deduct if a kind belongs to "experimental" group once we
+	//TODO: we should detect if a kind belongs to "experimental" group once we
 	//divide the scheme for internal objects.
 	if api.Scheme.Recognizes(testapi.GroupAndVersion("experimental"), kind) {
 		version = testapi.Version("experimental")
