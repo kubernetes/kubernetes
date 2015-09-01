@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 // LabelOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -86,12 +87,13 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func validateNoOverwrites(meta *api.ObjectMeta, labels map[string]string) error {
+	allErrs := []error{}
 	for key := range labels {
 		if value, found := meta.Labels[key]; found {
-			return fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value)
+			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value))
 		}
 	}
-	return nil
+	return errors.NewAggregate(allErrs)
 }
 
 func parseLabels(spec []string) (map[string]string, []string, error) {
