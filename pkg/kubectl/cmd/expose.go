@@ -27,6 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
+// ExposeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type ExposeOptions struct {
+	Filenames []string
+}
+
 const (
 	expose_long = `Take a replicated application and expose it as Kubernetes Service.
 
@@ -48,13 +54,15 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream`
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &ExposeOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExpose(f, out, cmd, args)
+			err := RunExpose(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -76,11 +84,11 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	return cmd
 }
 
-func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ExposeOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -90,7 +98,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()

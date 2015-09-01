@@ -206,7 +206,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		cmd.SetOutput(buf)
 		cmd.Flags().Set("output", "json")
 		cmd.Flags().Set("output-version", test.outputVersion)
-		err := RunGet(f, buf, cmd, []string{"type/foo", "replicationcontrollers/foo"})
+		err := RunGet(f, buf, cmd, []string{"type/foo", "replicationcontrollers/foo"}, &GetOptions{})
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue

@@ -85,7 +85,6 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    annotate_long,
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.filenames = cmdutil.GetFlagStringSlice(cmd, "filename")
 			if err := options.Complete(f, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
@@ -101,7 +100,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the annotation"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.filenames, usage)
 	return cmd
 }
 
