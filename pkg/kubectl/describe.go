@@ -31,6 +31,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
+	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -714,6 +715,14 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
 		fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
 
+		resourceToQoS := qosutil.GetQoS(&container)
+		if len(resourceToQoS) > 0 {
+			fmt.Fprintf(out, "    QoS Tier:\n")
+		}
+		for resource, qos := range resourceToQoS {
+			fmt.Fprintf(out, "      %s:\t%s\n", resource, qos)
+		}
+
 		if len(container.Resources.Limits) > 0 {
 			fmt.Fprintf(out, "    Limits:\n")
 		}
@@ -1180,8 +1189,8 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) {
 	nonTerminatedPods := filterTerminatedPods(pods)
 	fmt.Fprintf(out, "Non-terminated Pods:\t(%d in total)\n", len(nonTerminatedPods))
-	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tMemory Requests\tCPU Limits\tMemory Limits\n")
-	fmt.Fprint(out, "  ─────────\t────\t\t────────────\t───────────────\t──────────\t─────────────\n")
+	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	fmt.Fprint(out, "  ─────────\t────\t\t────────────\t──────────\t───────────────\t─────────────\n")
 	totalMilliCPUReq := int64(0)
 	totalMemoryReq := int64(0)
 	fractionPodCPUReq := float64(0)
@@ -1216,13 +1225,13 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) {
 		fractionPodCPULimit = float64(podTotalMilliCPULimit) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
 		fractionPodMemoryLimit = float64(podTotalMemoryLimit) / float64(node.Status.Capacity.Memory().Value()) * 100
 		fmt.Fprintf(out, "  %s\t%s\t\t%dm (%d%%)\t%dKi (%d%%)\t%dm (%d%%)\t%dKi (%d%%)\n", pod.Namespace, pod.Name,
-			podTotalMilliCPUReq, int64(fractionPodCPUReq), podTotalMemoryReq/1000, int64(fractionPodMemoryReq), podTotalMilliCPULimit, int64(fractionPodCPULimit), podTotalMemoryLimit/1000, int64(fractionPodMemoryLimit))
+			podTotalMilliCPUReq, int64(fractionPodCPUReq), podTotalMilliCPULimit, int64(fractionPodCPULimit), podTotalMemoryReq/1000, int64(fractionPodMemoryReq), podTotalMemoryLimit/1000, int64(fractionPodMemoryLimit))
 	}
-	fmt.Fprint(out, "Allocated resources:\n  CPU Requests\tMemory Requests\tCPU Limits\tMemory Limits\n")
-	fmt.Fprint(out, "  ────────────\t───────────────\t──────────\t─────────────\n")
+	fmt.Fprint(out, "Allocated resources:\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	fmt.Fprint(out, "  ────────────\t──────────\t───────────────\t─────────────\n")
 	fractionTotalCPUReq = float64(totalMilliCPUReq) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
 	fractionTotalMemoryReq = float64(totalMemoryReq) / float64(node.Status.Capacity.Memory().Value()) * 100
-	fmt.Fprintf(out, "  %dm (%d%%)\t%dKi (%d%%)\t%dm\t%dKi\n", totalMilliCPUReq, int64(fractionTotalCPUReq), totalMemoryReq/1000, int64(fractionTotalMemoryReq), totalMilliCPULimit, totalMemoryLimit/1000)
+	fmt.Fprintf(out, "  %dm (%d%%)\t%dm\t%dKi (%d%%)\t%dKi\n", totalMilliCPUReq, int64(fractionTotalCPUReq), totalMilliCPULimit, totalMemoryReq/1000, int64(fractionTotalMemoryReq), totalMemoryLimit/1000)
 }
 
 func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
