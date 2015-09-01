@@ -60,6 +60,50 @@ func TestGenerate(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"port":     "-1",
+				"env":      []string{"a=b", "c=d"},
+			},
+			expected: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"run": "foo"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"run": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "foo",
+									Image: "someimage",
+									Env: []api.EnvVar{
+										{
+											Name:  "a",
+											Value: "b",
+										},
+										{
+											Name:  "c",
+											Value: "d",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+
 		{
 			params: map[string]interface{}{
 				"name":     "foo",
@@ -280,6 +324,49 @@ func TestGeneratePod(t *testing.T) {
 							Name:            "foo",
 							Image:           "someimage",
 							ImagePullPolicy: api.PullIfNotPresent,
+						},
+					},
+					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+				},
+			},
+		},
+		{
+			params: map[string]interface{}{
+				"name":  "foo",
+				"image": "someimage",
+				"env":   []string{"a", "c"},
+			},
+
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":  "foo",
+				"image": "someimage",
+				"env":   []string{"a=b", "c=d"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							ImagePullPolicy: api.PullIfNotPresent,
+							Env: []api.EnvVar{
+								{
+									Name:  "a",
+									Value: "b",
+								},
+								{
+									Name:  "c",
+									Value: "d",
+								},
+							},
 						},
 					},
 					DNSPolicy:     api.DNSClusterFirst,

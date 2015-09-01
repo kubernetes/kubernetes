@@ -38,6 +38,12 @@ Creates a replication controller to manage the created container(s).`
 	run_example = `# Start a single instance of nginx.
 $ kubectl run nginx --image=nginx
 
+# Start a single instance of hazelcast and let the container expose port 5701 .
+$ kubectl run hazelcast --image=hazelcast --port=5701
+
+# Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
+$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=local" --env="POD_NAMESPACE=default"
+
 # Start a replicated instance of nginx.
 $ kubectl run nginx --image=nginx --replicas=5
 
@@ -59,7 +65,7 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>`
 
 func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "run NAME --image=image [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]",
+		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]",
 		// run-container is deprecated
 		Aliases: []string{"run-container"},
 		Short:   "Run a particular image on the cluster.",
@@ -77,6 +83,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
+	cmd.Flags().StringSlice("env", []string{}, "Environment variables to set in the container")
 	cmd.Flags().Int("port", -1, "The port that this container exposes.")
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
@@ -137,6 +144,9 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if len(args) > 1 {
 		params["args"] = args[1:]
 	}
+
+	params["env"] = cmdutil.GetFlagStringSlice(cmd, "env")
+
 	err = kubectl.ValidateParams(names, params)
 	if err != nil {
 		return err
