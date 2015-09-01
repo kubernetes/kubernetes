@@ -127,6 +127,7 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
   admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
   enable_cpu_cfs_quota: '$(echo "$ENABLE_CPU_CFS_QUOTA" | sed -e "s/'/''/g")'
+  overlay_network_provider: '$(echo "$OVERLAY_NETWORK_PROVIDER" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master
