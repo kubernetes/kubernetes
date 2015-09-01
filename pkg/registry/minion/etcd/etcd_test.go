@@ -22,16 +22,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
 type fakeConnectionInfoGetter struct {
@@ -67,12 +62,6 @@ func validNewNode() *api.Node {
 	}
 }
 
-func validChangedNode() *api.Node {
-	node := validNewNode()
-	node.ResourceVersion = "1"
-	return node
-}
-
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
@@ -104,31 +93,9 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-
-	node := validChangedNode()
-	key, _ := storage.KeyFunc(ctx, node.Name)
-	key = etcdtest.AddPrefix(key)
-	createFn := func() runtime.Object {
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), node),
-					ModifiedIndex: 1,
-				},
-			},
-		}
-		return node
-	}
-	gracefulSetFn := func() bool {
-		if fakeClient.Data[key].R.Node == nil {
-			return false
-		}
-		return fakeClient.Data[key].R.Node.TTL == 30
-	}
-	test.TestDelete(createFn, gracefulSetFn)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestDelete(validNewNode())
 }
 
 func TestGet(t *testing.T) {
@@ -143,7 +110,7 @@ func TestList(t *testing.T) {
 	test.TestList(validNewNode())
 }
 
-func TestWatchNodes(t *testing.T) {
+func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	test.TestWatch(
@@ -166,24 +133,4 @@ func TestWatchNodes(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
-}
-
-func TestEtcdDeleteNode(t *testing.T) {
-	ctx := api.NewContext()
-	storage, fakeClient := newStorage(t)
-	node := validNewNode()
-	key, _ := storage.KeyFunc(ctx, node.Name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), node), 0)
-	_, err := storage.Delete(ctx, node.Name, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if len(fakeClient.DeletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
-	}
-	if fakeClient.DeletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
 }

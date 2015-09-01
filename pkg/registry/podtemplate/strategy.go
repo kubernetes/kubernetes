@@ -73,13 +73,20 @@ func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// MatchPodTemplate returns a generic matcher for a given label and field selector.
+func PodTemplateToSelectableFields(podTemplate *api.PodTemplate) fields.Set {
+	return fields.Set{}
+}
+
 func MatchPodTemplate(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		podObj, ok := obj.(*api.PodTemplate)
-		if !ok {
-			return false, fmt.Errorf("not a pod template")
-		}
-		return label.Matches(labels.Set(podObj.Labels)), nil
-	})
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			pt, ok := obj.(*api.PodTemplate)
+			if !ok {
+				return nil, nil, fmt.Errorf("given object is not a pod template.")
+			}
+			return labels.Set(pt.ObjectMeta.Labels), PodTemplateToSelectableFields(pt), nil
+		},
+	}
 }

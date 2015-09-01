@@ -103,9 +103,10 @@ func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) ge
 }
 
 // PersistentVolumeClaimToSelectableFields returns a label set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
 func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) labels.Set {
 	return labels.Set{
+		"metadata.name": persistentvolumeclaim.Name,
+		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolumeclaim.Name,
 	}
 }
