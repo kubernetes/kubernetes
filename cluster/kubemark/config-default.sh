@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # A configuration for Kubemark cluster. It doesn't need to be kept in
-# sync with gce/config-default.sh (except the filename, because I'm reusing 
+# sync with gce/config-default.sh (except the filename, because I'm reusing
 # gce/util.sh script which assumes config filename), but if some things that
 # are enabled by default should not run in hollow clusters, they should be disabled here.
 

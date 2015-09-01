@@ -19,6 +19,14 @@
 				}
 			},
 			"spec": {
+				"volumes": [
+					{
+						"name": "kubeconfig-volume",
+						"secret": {
+							"secretName": "kubeconfig"
+						}
+					}
+				],
 				"containers": [{
 					"name": "hollow-kubelet",
 					"image": "gcr.io/##project##/kubemark:latest",
@@ -40,6 +48,12 @@
 						"--server=$(MASTER_IP)",
 						"--api-server-port=8080",
 						"--v=3"
+					],
+					"volumeMounts": [
+						{
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig"
+						}
 					],
 					"resources": {
 						"requests": {
