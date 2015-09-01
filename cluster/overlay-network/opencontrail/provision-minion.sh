@@ -188,7 +188,7 @@ function setup_opencontrail_kubelet()
   (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet; python setup.py install) && cd
   
   mkdir -p /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail
-  if [ -f /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config ]; then
+  if [ ! -f /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config ]; then
      touch /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config
   fi
   config="/usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config"
