@@ -97,10 +97,15 @@
   {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
 {% endif %}
 
+{% set cpu_cfs_quota = "" %}
+{% if pillar['enable_cpu_cfs_quota'] is defined -%}
+ {% set cpu_cfs_quota = "--cpu-cfs-quota=" + pillar['enable_cpu_cfs_quota'] -%}
+{% endif -%}
+
 {% set test_args = "" -%}
 {% if pillar['kubelet_test_args'] is defined -%}
   {% set test_args=pillar['kubelet_test_args'] %}
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{cpu_cfs_quota}} {{test_args}}"
