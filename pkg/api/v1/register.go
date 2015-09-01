@@ -49,6 +49,8 @@ func addKnownTypes() {
 		&ReplicationControllerList{},
 		&Service{},
 		&ServiceList{},
+		&IngressPoint{},
+		&IngressPointList{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Node{},
@@ -100,6 +102,8 @@ func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
+func (*IngressPoint) IsAnAPIObject()              {}
+func (*IngressPointList) IsAnAPIObject()          {}
 func (*Endpoints) IsAnAPIObject()                 {}
 func (*EndpointsList) IsAnAPIObject()             {}
 func (*Node) IsAnAPIObject()                      {}

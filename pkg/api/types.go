@@ -1091,6 +1091,58 @@ type ServiceList struct {
 	Items []Service `json:"items"`
 }
 
+// IngressPoint encapsulates the inputs needed to connect an alias to endpoints.
+type IngressPoint struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the desired state of the ingressPoint
+	Spec IngressPointSpec `json:"spec" description:"desired state of the ingressPoint"`
+	// Status is the current state of the ingressPoint
+	Status IngressPointStatus `json:"status" description:"current state of the ingressPoint"`
+}
+
+// IngressPointList is a collection of IngressPoints
+type IngressPointList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []IngressPoint `json:"items" description:"list of ingressPoints"`
+}
+
+// ServiceRef is a reference to a single service:port.
+type ServiceRef struct {
+	Name      string
+	Namespace string
+	Port      int
+}
+
+type Path struct {
+	Url     string
+	Service ServiceRef
+}
+
+// IngressPointSpec describes the ingressPoint the user wishes to exist.
+type IngressPointSpec struct {
+	Host    string `json:"host" description:"optional: alias/dns that points to the service, can be host or host:port"`
+	PathMap map[string][]Path
+}
+
+// TLSTerminationType dictates where the secure communication will stop
+// Currently unused.
+type TLSTerminationType string
+
+const (
+	TLSTerminationEdge        TLSTerminationType = "edge"
+	TLSTerminationPassthrough TLSTerminationType = "passthrough"
+	TLSTerminationReencrypt   TLSTerminationType = "reencrypt"
+)
+
+// IngressPointStatus describes the current state of this ingressPoint.
+type IngressPointStatus struct {
+	Address string `json: "ip,omitempty"`
+}
+
 // Session Affinity Type string
 type ServiceAffinity string
 
