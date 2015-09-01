@@ -341,6 +341,7 @@ var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
+var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -376,6 +377,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(componentStatusColumns, printComponentStatusList)
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResource)
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
+	h.Handler(deploymentColumns, printDeployment)
+	h.Handler(deploymentColumns, printDeploymentList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1093,6 +1096,31 @@ func printThirdPartyResourceList(list *expapi.ThirdPartyResourceList, w io.Write
 		}
 	}
 
+	return nil
+}
+
+func printDeployment(deployment *expapi.Deployment, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", deployment.Namespace); err != nil {
+			return err
+		}
+	}
+
+	updatedReplicas := fmt.Sprintf("%d/%d", deployment.Status.UpdatedReplicas, deployment.Spec.Replicas)
+	age := translateTimestamp(deployment.CreationTimestamp)
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", deployment.Name, updatedReplicas, age); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(deployment.Labels, columnLabels))
+	return err
+}
+
+func printDeploymentList(list *expapi.DeploymentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printDeployment(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
