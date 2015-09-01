@@ -343,3 +343,16 @@ func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.E
 	err = fmt.Errorf("Could not find endpoints for service: %v", svc.Name)
 	return
 }
+
+// StoreToIngressPointLister makes a Store that lists pathmaps.
+type StoreToIngressPointLister struct {
+	Store
+}
+
+// List lists all pathMaps in the store.
+func (s *StoreToIngressPointLister) List() (pathMap api.IngressPointList, err error) {
+	for _, m := range s.Store.List() {
+		pathMap.Items = append(pathMap.Items, *(m.(*api.IngressPoint)))
+	}
+	return pathMap, nil
+}
