@@ -4,4 +4,5 @@ opencontrail-networking-master:
     - cwd: /
     - user: root
     - group: root
+    - mode: 755
     - shell: /bin/bash
