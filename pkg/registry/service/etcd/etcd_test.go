@@ -21,6 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -117,5 +119,37 @@ func TestUpdate(t *testing.T) {
 			}
 			return object
 		},
+	)
+}
+
+func TestWatch(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestWatch(
+		validService(),
+		func() {
+			fakeClient.WaitForWatchCompletion()
+		},
+		func(err error) {
+			fakeClient.WatchInjectError <- err
+		},
+		func(obj runtime.Object, action string) error {
+			return registrytest.EmitObject(fakeClient, obj, action)
+		},
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matchin fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+		},
+		registrytest.WatchActions,
 	)
 }

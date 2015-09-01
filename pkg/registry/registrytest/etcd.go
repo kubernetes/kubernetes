@@ -37,8 +37,30 @@ func NewEtcdStorage(t *testing.T) (storage.Interface, *tools.FakeEtcdClient) {
 	return etcdStorage, fakeClient
 }
 
+var WatchActions = []string{etcdstorage.EtcdCreate, etcdstorage.EtcdSet, etcdstorage.EtcdCAS, etcdstorage.EtcdDelete}
+
 type keyFunc func(api.Context, string) (string, error)
 type newFunc func() runtime.Object
+
+func EmitObject(fakeClient *tools.FakeEtcdClient, obj runtime.Object, action string) error {
+	encoded, err := testapi.Codec().Encode(obj)
+	if err != nil {
+		return err
+	}
+	node := &etcd.Node{
+		Value: string(encoded),
+	}
+	var prevNode *etcd.Node = nil
+	if action == etcdstorage.EtcdDelete {
+		prevNode = node
+	}
+	fakeClient.WatchResponse <- &etcd.Response{
+		Action:   action,
+		Node:     node,
+		PrevNode: prevNode,
+	}
+	return nil
+}
 
 func GetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, newFn newFunc, ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	meta, err := api.ObjectMetaFor(obj)
