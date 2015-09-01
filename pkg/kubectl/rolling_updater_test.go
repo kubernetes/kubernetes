@@ -131,6 +131,28 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 	return rc
 }
 
+func newGenerateNameRc(replicas int, desired int) *api.ReplicationController {
+	return &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "foo-",
+			UID:          "7764ae47-9092-11e4-8393-42010af018ff",
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: replicas,
+			Selector: map[string]string{"version": "v2"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					GenerateName: "foo-",
+					Labels:       map[string]string{"version": "v2"},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: replicas,
+		},
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	// Helpers
 	Percent := func(p int) *int {
@@ -161,8 +183,8 @@ func TestUpdate(t *testing.T) {
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (scale up first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 1, scaling down "foo-v1" from 1 to 0 (scale up first by 1 each interval)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 0
 Update succeeded. Deleting foo-v1
@@ -183,8 +205,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (scale up first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 1, scaling down "foo-v1" from 1 to 0 (scale up first by 1 each interval)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 0
 Update succeeded. Deleting foo-v1
@@ -208,8 +230,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(2, 2), nil},
 				{newRc(1, 1), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 2 to 0 (scale up first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 2, scaling down "foo-v1" from 2 to 0 (scale up first by 1 each interval)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 1
 Scaling foo-v2 up to 2
@@ -237,8 +259,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 7, scaling down foo-v1 from 2 to 0 (scale up first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 7, scaling down "foo-v1" from 2 to 0 (scale up first by 1 each interval)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 1
 Scaling foo-v2 up to 2
@@ -265,8 +287,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(2, 2), nil},
 				{newRc(2, 2), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 7 to 0 (scale up first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 2, scaling down "foo-v1" from 7 to 0 (scale up first by 1 each interval)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 6
 Scaling foo-v2 up to 2
@@ -284,8 +306,8 @@ Update succeeded. Deleting foo-v1
 				// scaling iteration (only up occurs since the update is rejected)
 				{newRc(1, 2), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 7 to 0 (scale up first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 2, scaling down "foo-v1" from 7 to 0 (scale up first by 1 each interval)
 Scaling foo-v2 up to 1
 `,
 		}, {
@@ -316,8 +338,8 @@ Scaling foo-v2 up to 1
 				{newRc(10, 10), nil},
 				{newRc(10, 10), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 10, scaling down foo-v1 from 10 to 0 (scale up first by 2 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 10, scaling down "foo-v1" from 10 to 0 (scale up first by 2 each interval)
 Scaling foo-v2 up to 2
 Scaling foo-v1 down to 8
 Scaling foo-v2 up to 4
@@ -348,8 +370,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(6, 6), nil},
 				{newRc(6, 6), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 6, scaling down foo-v1 from 2 to 0 (scale up first by 3 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 6, scaling down "foo-v1" from 2 to 0 (scale up first by 3 each interval)
 Scaling foo-v2 up to 3
 Scaling foo-v1 down to 0
 Scaling foo-v2 up to 6
@@ -374,8 +396,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(3, 3), nil},
 				{newRc(3, 3), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 3, scaling down foo-v1 from 10 to 0 (scale up first by 2 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 3, scaling down "foo-v1" from 10 to 0 (scale up first by 2 each interval)
 Scaling foo-v2 up to 2
 Scaling foo-v1 down to 8
 Scaling foo-v2 up to 3
@@ -401,8 +423,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(4, 4), nil},
 				{newRc(4, 4), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 4, scaling down foo-v1 from 4 to 0 (scale down first by 2 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 4, scaling down "foo-v1" from 4 to 0 (scale down first by 2 each interval)
 Scaling foo-v1 down to 2
 Scaling foo-v2 up to 2
 Scaling foo-v1 down to 0
@@ -425,8 +447,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(4, 4), nil},
 				{newRc(4, 4), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 4, scaling down foo-v1 from 2 to 0 (scale down first by 2 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 4, scaling down "foo-v1" from 2 to 0 (scale down first by 2 each interval)
 Scaling foo-v1 down to 0
 Scaling foo-v2 up to 4
 Update succeeded. Deleting foo-v1
@@ -452,8 +474,8 @@ Update succeeded. Deleting foo-v1
 				{newRc(2, 2), nil},
 				{newRc(2, 2), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 4 to 0 (scale down first by 1 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 2, scaling down "foo-v1" from 4 to 0 (scale down first by 1 each interval)
 Scaling foo-v1 down to 3
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 2
@@ -477,10 +499,33 @@ Update succeeded. Deleting foo-v1
 				{newRc(4, 4), nil},
 				{newRc(4, 4), nil},
 			},
-			output: `Creating foo-v2
-Scaling up foo-v2 from 0 to 4, scaling down foo-v1 from 4 to 0 (scale down first by 4 each interval)
+			output: `Creating replication contoller "foo-v2"
+Scaling up "foo-v2" from 0 to 4, scaling down "foo-v1" from 4 to 0 (scale down first by 4 each interval)
 Scaling foo-v1 down to 0
 Scaling foo-v2 up to 4
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(4),
+			newRc:    newGenerateNameRc(4, 4),
+			accepted: true,
+			percent:  Percent(-100),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{oldRc(0), nil},
+				{newGenerateNameRc(4, 4), nil},
+				// cleanup annotations
+				{newGenerateNameRc(4, 4), nil},
+				{newGenerateNameRc(4, 4), nil},
+				{newGenerateNameRc(4, 4), nil},
+			},
+			output: `Creating replication contoller prefixed "foo-"
+Replication controller "" created
+Scaling up "" from 0 to 4, scaling down "foo-v1" from 4 to 0 (scale down first by 4 each interval)
+Scaling foo-v1 down to 0
+Scaling  up to 4
 Update succeeded. Deleting foo-v1
 `,
 		},
