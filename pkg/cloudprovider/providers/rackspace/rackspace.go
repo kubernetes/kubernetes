@@ -24,12 +24,12 @@ import (
 	"regexp"
 	"time"
 
-	"code.google.com/p/gcfg"
 	"github.com/rackspace/gophercloud"
 	os_servers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"
 	"github.com/rackspace/gophercloud/rackspace"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
+	"github.com/scalingdata/gcfg"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"

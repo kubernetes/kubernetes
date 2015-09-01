@@ -15,10 +15,6 @@
 			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
-			"ImportPath": "code.google.com/p/gcfg",
-			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
-		},
-		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -500,6 +496,10 @@
 		{
 			"ImportPath": "github.com/samuel/go-zookeeper/zk",
 			"Rev": "d0e0d8e11f318e000a8cc434616d69e329edc374"
+		},
+		{
+			"ImportPath": "github.com/scalingdata/gcfg",
+			"Rev": "37aabad69cfd3d20b8390d902a8b10e245c615ff"
 		},
 		{
 			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
