@@ -151,12 +151,7 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
     "external\sload\sbalancer"
     "identically\snamed\sservices"
     "network\spartition"
-    "Reboot"
-    "Resize"
-    "Restart"
     "Services.*Type\sgoes\sfrom"
-    "Services.*nodeport\ssettings"
-    "Skipped"
     )
 
 GCE_RELEASE_SKIP_TESTS=(
@@ -307,6 +302,8 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="gce-soak-weekly"}
     : ${E2E_UP:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
@@ -321,7 +318,6 @@ case ${JOB_NAME} in
     # This list should match the list in kubernetes-e2e-gce-parallel. It
     # currently also excludes a slow namespace test.
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
