@@ -111,7 +111,7 @@ func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string
 
 func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
 	for {
-		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
 			return
 		}
@@ -125,7 +125,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			if isClosedError(err) {
 				return
 			}
-			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+			if !myInfo.isAlive() {
 				// Then the service port was just closed so the accept failure is to be expected.
 				return
 			}
@@ -198,7 +198,7 @@ func newClientCache() *clientCache {
 func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
-		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
 			break
 		}
