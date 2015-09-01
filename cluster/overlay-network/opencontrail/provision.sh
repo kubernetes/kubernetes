@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# contrail-kubernetes setup and provisioning script. For more info, please refer to
+# https://github.com/Juniper/contrail-kubernetes
+
+# Retry a command $RETRY times with $WAIT seconds delay in between
 function retry() {
     set +e
 
@@ -31,10 +35,12 @@ function retry() {
     exit -1
 }
 
+# Run a command in kubernetes-master node
 function master() {
     ssh -oStrictHostKeyChecking=no -i "${SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo "$*"
 }
 
+# Verify that contrail infra components are up and listening
 function verify_contrail_listen_services() {
     RETRY=20
     WAIT=3
@@ -56,7 +62,8 @@ function verify_contrail_listen_services() {
     retry master 'netstat -anp | grep LISTEN | grep -w 3000' # WebUI
 }
 
-function provision_bgp() {
+# Provision controller
+function provision_controller() {
     cmd='docker ps | grep contrail-api | grep -v pause | awk "{print \"docker exec \" \$1 \" curl -s https://raw.githubusercontent.com/Juniper/contrail-controller/R2.20/src/config/utils/provision_control.py -o /tmp/provision_control.py\"}" | sudo sh'
     master $cmd
     cmd='docker ps | grep contrail-api | grep -v pause | awk "{print \"docker exec \" \$1 \" curl -s https://raw.githubusercontent.com/Juniper/contrail-controller/R2.20/src/config/utils/provision_bgp.py -o /tmp/provision_bgp.py\"}" | sudo sh'
@@ -65,6 +72,7 @@ function provision_bgp() {
     master $cmd
 }
 
+# Provision link local service
 function provision_linklocal() {
     cmd='docker ps | grep contrail-api | grep -v pause | awk "{print \"docker exec \" \$1 \" curl -s https://raw.githubusercontent.com/Juniper/contrail-controller/R2.20/src/config/utils/provision_linklocal.py -o /tmp/provision_linklocal.py\"}" | sudo sh'
     master $cmd
@@ -72,11 +80,13 @@ function provision_linklocal() {
     master $cmd
 }
 
+# Setup kube dns endpoints
 function setup_kube_dns_endpoints() {
     master kubectl --namespace=kube-system create -f /etc/kubernetes/addons/kube-ui/kube-ui-endpoint.yaml || true
     master kubectl --namespace=kube-system create -f /etc/kubernetes/addons/kube-ui/kube-ui-svc-address.yaml || true
 }
 
+# Setup contrail manifest files under kubernetes
 function setup_contrail_manifest_files() {
     cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/fedora_ubuntu_demo/cluster/manifests.hash | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/fedora_ubuntu_demo/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
     master $cmd
@@ -98,7 +108,8 @@ function setup_contrail_manifest_files() {
 #   master grep source: /srv/salt/contrail-*/* | awk '{print $4}' | xargs -n1 wget -q --directory-prefix=/etc/kubernetes/manifests
 }
 
-# setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MASTER_IP
+# Setup contrail-controller components
+# Usage: setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MASTER_IP
 function setup_contrail_master() {
     SAVED_OPTIONS=$(set +o)
     set -x
@@ -113,8 +124,8 @@ function setup_contrail_master() {
     # Wait for contrail-control to be ready.
     verify_contrail_listen_services
 
-    # Provision bgp
-    provision_bgp
+    # Provision controller
+    provision_controller
 
     # Provision link-local service to connect to kube-api
     provision_linklocal
@@ -126,6 +137,7 @@ function setup_contrail_master() {
     eval "$SAVED_OPTIONS"
 }
 
-# setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MINION_IP
+# Setup contrail vrouter-agent components
+# Usage: setup_contrail_networking $SSH_KEY $SSH_USER $KUBE_MINION_IP
 function setup_contrail_minion() {
 }
