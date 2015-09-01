@@ -107,7 +107,7 @@ func initThirdParty(t *testing.T) (*tools.FakeEtcdClient, *httptest.Server) {
 		Versions: []expapi.APIVersion{
 			{
 				APIGroup: "group",
-				Name:     "v1",
+				Name:     "v3",
 			},
 		},
 	}

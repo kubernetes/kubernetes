@@ -98,7 +98,15 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceD
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
-
+	
+	if resourceVersion, ok := metadata["resourceVersion"]; ok {
+		resourceVersionStr, ok := resourceVersion.(string)
+		if !ok {
+			return fmt.Errorf("unexpected object: %v", metadata["resourceVersion"])
+		}
+		objIn.ResourceVersion = strconv.Atoi(resourceVersionStr)
+	}
+	
 	objIn.Name = name
 	objIn.Data = data
 	return nil
