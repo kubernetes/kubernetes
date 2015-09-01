@@ -174,7 +174,7 @@ KUBELET_PORT="--port=10250"
 KUBELET_HOSTNAME="--hostname-override=centos-minion"
 
 # Location of the api-server
-KUBELET_API_SERVER="--api-server=http://centos-master:8080"
+KUBELET_API_SERVER="--api-servers=http://centos-master:8080"
 
 # Add your own!
 KUBELET_ARGS=""
