@@ -200,12 +200,12 @@ func testEchoUDP(t *testing.T, address string, port int) {
 
 func waitForNumProxyLoops(t *testing.T, p *Proxier, want int32) {
 	var got int32
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 600; i++ {
 		got = atomic.LoadInt32(&p.numProxyLoops)
 		if got == want {
 			return
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 	t.Errorf("expected %d ProxyLoops running, got %d", want, got)
 }
