@@ -172,6 +172,8 @@ function setup_opencontrail_kubelet()
   cd ~/ockube && `git clone https://github.com/Juniper/contrail-kubernetes` && cd
   (cd ~/ockube/contrail-controller/src/vnsw/contrail-vrouter-api; python setup.py install) && cd
   (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet; python setup.py install) && cd
+
+  mkdir -p /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail
 }
 
 function update_restart_kubelet()
@@ -180,8 +182,8 @@ function update_restart_kubelet()
   kubeappendoc=" --network-plugin=opencontrail"
   kubeappendpv=" --allow_privileged=true"
   kubeappendmf=" --config=/etc/kubernetes/manifests"
+  source /etc/default/kubelet; kubecf=`echo $KUBELET_OPTS`
   kubepid=$(ps -ef|grep kubelet |grep manifests | awk '{print $2}')
-  source /etc/default/kubelet && kubecf=`echo $KUBELET_OPTS`
   if [[ $kubepid != `pidof kubelet` ]]; then
       mkdir -p /etc/kubernetes/manifests
       kubecf="$kubecf $kubeappendmf"
@@ -195,7 +197,25 @@ function update_restart_kubelet()
      kubecf="$kubecf $kubeappendoc"
   fi
   sed -i '/KUBELET_OPTS/d' /etc/default/kubelet
-  echo "KUBELET_OPTS=$kubecf" > /etc/default/kubelet
+  echo 'KUBELET_OPTS="'$kubecf'"' > /etc/default/kubelet
+}
+
+function stop_kube_svcs()
+{
+   if [[ -n `pidof kube-proxy` ]]; then
+      log_info_msg "Kube-proxy is running. Opencontrail does not use kube-proxy as it provides the function. Stoping it."
+      `service kube-proxy stop`
+   fi
+
+   if [[ -n `pidof flanneld` ]]; then
+      log_info_msg "flanneld is running. Opencontrail does not use flannel as it provides the function. Stoping it."
+      service flanneld stop
+      intf=$(ifconfig flannel | awk 'NR==1{print $1}')
+      if [ $intf == "flannel0" ]; then
+         `ifconfig $intf down`
+         `ifdown $intf`
+      fi
+   fi
 }
 
 function cleanup()
@@ -220,6 +240,7 @@ function main()
    setup_vhost
    setup_opencontrail_kubelet
    update_restart_kubelet
+   stop_kube_svcs
    cleanup
 }
 
