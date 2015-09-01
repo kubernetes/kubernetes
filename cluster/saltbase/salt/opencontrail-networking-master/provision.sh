@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 # contrail-kubernetes setup and provisioning script. For more info, please refer to
 # https://github.com/Juniper/contrail-kubernetes
 
@@ -99,7 +101,9 @@ function setup_contrail_manifest_files() {
     master $cmd
 
     cmd='grep \"image\": /etc/contrail/manifests/* | cut -d "\"" -f 4 | sort -u | xargs -n1 sudo docker pull'
-    master $cmd
+    RETRY=20
+    WAIT=3
+    retry master $cmd
     cmd='mv /etc/contrail/manifests/* /etc/kubernetes/manifests/'
     master $cmd
 
@@ -110,7 +114,6 @@ function setup_contrail_manifest_files() {
 
 # Setup contrail-controller components
 function setup_contrail_master() {
-    set -x
 
     # Pull all contrail images and copy the manifest files
     setup_contrail_manifest_files
