@@ -43,7 +43,7 @@ Display one or many resources.
 Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), endpoints (ep) or secrets.
+resourcequotas (quota), namespaces (ns), endpoints (ep), serviceaccounts or secrets.
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).
