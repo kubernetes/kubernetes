@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-
 export KUBERNETES_PROVIDER="kubemark"
 export KUBE_CONFIG_FILE="config-default.sh"
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+
+# We need an absolute path to KUBE_ROOT
+ABSOLUTE_ROOT=$(readlink -f ${KUBE_ROOT})
 
 source ${KUBE_ROOT}/cluster/kubemark/util.sh
 source ${KUBE_ROOT}/cluster/kubemark/config-default.sh
@@ -27,6 +30,7 @@ echo ${MASTER_NAME}
 
 detect-master
 
-export KUBE_MASTER_URL="http://${KUBE_MASTER_IP:-}:8080"
+export KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
+export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/kubeconfig.loc"
 
 ${KUBE_ROOT}/hack/ginkgo-e2e.sh --e2e-verify-service-account=false --ginkgo.focus="should\sallow\sstarting\s30\spods\sper\snode"
