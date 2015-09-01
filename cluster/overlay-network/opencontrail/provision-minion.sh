@@ -164,6 +164,9 @@ function setup_vhost()
 
 function setup_opencontrail_kubelet()
 {
+  mkdir ockube
+  cd ~/ockube && `git clone https://github.com/Juniper/contrail-controller` && cd
+  cd ~/ockube && `git clone https://github.com/Juniper/contrail-kubernetes` && cd
   if [ $OS_TYPE == $UBUNTU ]; then
      apt-get install -y python-setuptools
      apt-get install -y software-properties-common
@@ -171,6 +174,7 @@ function setup_opencontrail_kubelet()
      add-apt-repository -y ppa:opencontrail/r2.20
      apt-get update
      apt-get install -y python-contrail
+     (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-install/ubuntu1404; dpkg -i contrail-vrouter-init_3.0-2642_all.deb) && cd
   elif [ $OS_TYPE == $REDHAT ]; then
      yum install -y python-setuptools
      yum install -y software-properties-common
@@ -178,14 +182,23 @@ function setup_opencontrail_kubelet()
      yum install -y ppa:opencontrail/r2.20
      yum update
      yum install -y python-contrail
+     (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-install/fedora21; rpm -ivfh contrail-vrouter-init-3.0-2642.el7.centos.x86_64.rpm) && cd
   fi
-  mkdir ockube
-  cd ~/ockube && `git clone https://github.com/Juniper/contrail-controller` && cd
-  cd ~/ockube && `git clone https://github.com/Juniper/contrail-kubernetes` && cd
   (cd ~/ockube/contrail-controller/src/vnsw/contrail-vrouter-api; python setup.py install) && cd
   (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet; python setup.py install) && cd
-
+  
   mkdir -p /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail
+  if [ -f /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config ]; then
+     touch /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config
+  fi
+  config="/usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config"
+  ocp="/usr/bin/opencontrail-kubelet-plugin"
+  if [ ! -f $ocp ]; then
+     (cp ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet/opencontrail-kubelet-plugin $ocp)
+  fi
+  grep -q 'DEFAULTS' $config || echo "[DEFAULTS]" >> $config
+  grep -q 'api_server=$OPENCONTRAIL_CONTROLLER_IP' || echo "api_server=$OPENCONTRAIL_CONTROLLER_IP" >> $config
+  (cd /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail; `ln -s $ocp opencontrail`) && cd
 }
 
 function update_restart_kubelet()
