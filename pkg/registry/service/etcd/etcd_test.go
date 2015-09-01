@@ -106,6 +106,12 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
+func TestDelete(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestDelete(validService())
+}
+
 func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()

@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -122,50 +121,12 @@ func TestUpdate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ReturnDeletedObject()
+	test.TestDelete(validNewPod())
 
-	expectedNode := "some-node"
-	createFn := func() runtime.Object {
-		pod := validChangedPod()
-		pod.Spec.NodeName = expectedNode
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), pod),
-					ModifiedIndex: 1,
-				},
-			},
-		}
-		return pod
-	}
-	gracefulSetFn := func() bool {
-		if fakeClient.Data[key].R.Node == nil {
-			return false
-		}
-		obj, err := testapi.Codec().Decode([]byte(fakeClient.Data[key].R.Node.Value))
-		if err != nil {
-			return false
-		}
-		pod := obj.(*api.Pod)
-		t.Logf("found object %#v", pod.ObjectMeta)
-		return pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds != 0
-	}
-	test.TestDeleteGraceful(createFn, 30, gracefulSetFn)
-
-	expectedNode = ""
-	test.TestDelete(createFn, gracefulSetFn)
-}
-
-func expectPod(t *testing.T, out runtime.Object) (*api.Pod, bool) {
-	pod, ok := out.(*api.Pod)
-	if !ok || pod == nil {
-		t.Errorf("Expected an api.Pod object, was %#v", out)
-		return nil, false
-	}
-	return pod, true
+	scheduledPod := validNewPod()
+	scheduledPod.Spec.NodeName = "some-node"
+	test.TestDeleteGraceful(scheduledPod, 30)
 }
 
 func TestCreateRegistryError(t *testing.T) {
@@ -197,24 +158,6 @@ func TestCreateSetsFields(t *testing.T) {
 	}
 	if len(actual.UID) == 0 {
 		t.Errorf("expected pod UID to be set: %#v", actual)
-	}
-}
-
-func TestPodDecode(t *testing.T) {
-	storage, _, _, _ := newStorage(t)
-	expected := validNewPod()
-	body, err := testapi.Codec().Encode(expected)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	actual := storage.New()
-	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !api.Semantic.DeepEqual(expected, actual) {
-		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
 	}
 }
 
@@ -852,51 +795,5 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 	if !api.Semantic.DeepEqual(&expected, podOut) {
 		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, podOut))
-	}
-}
-
-func TestEtcdDeletePod(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	fakeClient.TestIndex = true
-
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec:       api.PodSpec{NodeName: "machine"},
-	}), 0)
-	_, err := storage.Delete(ctx, "foo", api.NewDeleteOptions(0))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if len(fakeClient.DeletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
-	} else if fakeClient.DeletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-}
-
-func TestEtcdDeletePodMultipleContainers(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	fakeClient.TestIndex = true
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec:       api.PodSpec{NodeName: "machine"},
-	}), 0)
-	_, err := storage.Delete(ctx, "foo", api.NewDeleteOptions(0))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if len(fakeClient.DeletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
-	}
-	if fakeClient.DeletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 }
