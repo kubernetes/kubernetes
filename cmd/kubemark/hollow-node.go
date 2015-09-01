@@ -26,8 +26,8 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -42,6 +42,7 @@ var (
 	fakeDockerClient dockertools.FakeDockerClient
 
 	apiServer           string
+	kubeconfigPath      string
 	kubeletPort         int
 	kubeletReadOnlyPort int
 	nodeName            string
@@ -50,6 +51,7 @@ var (
 
 func addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&apiServer, "server", "", "API server IP.")
+	fs.StringVar(&kubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
 	fs.IntVar(&kubeletPort, "kubelet-port", 10250, "Port on which HollowKubelet should be listening.")
 	fs.IntVar(&kubeletReadOnlyPort, "kubelet-read-only-port", 10255, "Read-only port on which Kubelet is listening.")
 	fs.StringVar(&nodeName, "name", "fake-node", "Name of this Hollow Node.")
@@ -70,13 +72,35 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 	return tempDir
 }
 
+func createClientFromFile(path string) (*client.Client, error) {
+	c, err := clientcmd.LoadFromFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error while loading kubeconfig from file %v: %v", path, err)
+	}
+	config, err := clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error while creating kubeconfig: %v", err)
+	}
+	client, err := client.New(config)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating client: %v", err)
+	}
+	if client.Timeout == 0 {
+		client.Timeout = 30 * time.Second
+	}
+	return client, nil
+}
+
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	addFlags(pflag.CommandLine)
 	util.InitFlags()
 
 	// create a client for Kubelet to communicate with API server.
-	cl := client.NewOrDie(&client.Config{Host: fmt.Sprintf("http://%v:%v", apiServer, serverPort), Version: latest.GroupOrDie("").Version})
+	cl, err := createClientFromFile(kubeconfigPath)
+	if err != nil {
+		glog.Fatal("Failed to create a Client. Exiting.")
+	}
 	cadvisorInterface := new(cadvisor.Fake)
 
 	testRootDir := makeTempDirOrDie("hollow-kubelet.", "")
