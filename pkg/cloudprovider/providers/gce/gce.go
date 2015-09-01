@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	ProviderName = "gce"
+	ProviderName    = "gce"
+	k8sNodeRouteTag = "k8s-node-route"
 )
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -65,7 +66,7 @@ type Config struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return NewGCECloud(config) })
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -117,8 +118,8 @@ func getNetworkName() (string, error) {
 	return parts[3], nil
 }
 
-// newGCECloud creates a new instance of GCECloud.
-func newGCECloud(config io.Reader) (*GCECloud, error) {
+// NewGCECloud creates a new instance of GCECloud.
+func NewGCECloud(config io.Reader) (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
