@@ -37,7 +37,7 @@ function retry() {
 
 # Run a command in kubernetes-master node
 function master() {
-    sudo "$*"
+    bash -c "sudo $*"
 }
 
 # Verify that contrail infra components are up and listening
