@@ -220,7 +220,13 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			return fmt.Errorf("cannot attach to %s: not implemented", kind)
 		}
 	}
-	return f.PrintObject(cmd, obj, cmdOut)
+
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	if outputFormat != "" {
+		return f.PrintObject(cmd, obj, cmdOut)
+	}
+	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
+	return nil
 }
 
 func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) error {
