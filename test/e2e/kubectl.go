@@ -188,6 +188,16 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 
+		It("should support inline execution and attach", func() {
+			By("executing a command with run and attach")
+			runOutput := runKubectl("run", fmt.Sprintf("--namespace=%v", ns), "run", "run-test", "--image=busybox", "--restart=Never", "--attach", "echo", "running", "in", "container")
+			expectedRunOutput := "running in container"
+			if runOutput != expectedRunOutput {
+				Failf("Unexpected kubectl exec output. Wanted '%s', got '%s'", runOutput, expectedRunOutput)
+			}
+			runKubectl("delete", "pods", "run-test")
+		})
+
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
 			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), simplePodName, fmt.Sprintf(":%d", simplePodPort))
