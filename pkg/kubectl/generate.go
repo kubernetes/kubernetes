@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 // GeneratorParam is a parameter for a generator
@@ -50,15 +51,16 @@ func IsZero(i interface{}) bool {
 
 // ValidateParams ensures that all required params are present in the params map
 func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) error {
+	allErrs := []error{}
 	for ix := range paramSpec {
 		if paramSpec[ix].Required {
 			value, found := params[paramSpec[ix].Name]
 			if !found || IsZero(value) {
-				return fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name)
+				allErrs = append(allErrs, fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name))
 			}
 		}
 	}
-	return nil
+	return errors.NewAggregate(allErrs)
 }
 
 // MakeParams is a utility that creates generator parameters from a command line
