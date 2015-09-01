@@ -325,6 +325,7 @@ func getSchemaAndValidate(c *client.RESTClient, data []byte, group, version stri
 		AbsPath("/swaggerapi", group, version).
 		Do().
 		Raw()
+
 	if err != nil {
 		return err
 	}
@@ -349,7 +350,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	//       instead of trying everything.
 	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version)
 	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version)
+		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "api", version)
 		if errExp == nil {
 			return nil
 		}

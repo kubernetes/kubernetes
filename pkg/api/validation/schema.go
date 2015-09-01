@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
+	"regexp"
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -87,7 +88,7 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	if kind == nil {
 		return fmt.Errorf("kind not set")
 	}
-	allErrs := s.ValidateObject(obj, apiVersion.(string), "", apiVersion.(string)+"."+kind.(string))
+	allErrs := s.ValidateObject(obj, apiutil.GetVersion(apiVersion.(string)), "", apiutil.GetVersion(apiVersion.(string))+"."+kind.(string))
 	if len(allErrs) == 1 {
 		return allErrs[0]
 	}
@@ -147,8 +148,15 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 	return allErrs
 }
 
+var versionRegexp = regexp.MustCompile(`^v.+\..*`)
+
 func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) errs.ValidationErrorList {
-	if strings.HasPrefix(fieldType, apiVersion) {
+	// TODO: caesarxuchao: because we have multiple group/versions and objects
+	// may reference objects in other group, the commented out way of checking
+	// if a filedType is a type defined by us is outdated. We use a hacky way
+	// for now.
+	if versionRegexp.MatchString(fieldType) {
+		// if strings.HasPrefix(fieldType, apiVersion) {
 		return s.ValidateObject(value, apiVersion, fieldName, fieldType)
 	}
 	allErrs := errs.ValidationErrorList{}
