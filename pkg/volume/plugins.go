@@ -125,6 +125,9 @@ type VolumeHost interface {
 
 	//Get cloud provider from kubelet
 	GetCloudProvider() cloudprovider.Interface
+
+	// Runs the command in the container
+	RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error)
 }
 
 // VolumePluginMgr tracks registered plugins.

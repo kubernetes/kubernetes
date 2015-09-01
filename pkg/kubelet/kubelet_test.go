@@ -797,6 +797,10 @@ func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port ui
 	return nil
 }
 
+func (f *fakeContainerCommandRunner) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	return nil, f.E
+}
+
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet

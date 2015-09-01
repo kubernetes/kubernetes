@@ -84,6 +84,10 @@ func (vh *volumeHost) GetCloudProvider() cloudprovider.Interface {
 	return vh.kubelet.cloud
 }
 
+func (vh *volumeHost) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	return vh.kubelet.RunContainerCommand(pod, container, cmd)
+}
+
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {

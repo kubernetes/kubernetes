@@ -1036,6 +1036,7 @@ var map_RBDVolumeSource = map[string]string{
 	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
+	"sidecar":   "Optional: Sidecar is the sidecar container's name",
 }
 
 func (RBDVolumeSource) SwaggerDoc() map[string]string {

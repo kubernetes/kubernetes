@@ -568,6 +568,8 @@ type RBDVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// Optional: Sidecar is the sidecar container's name
+	Sidecar string `json:"sidecar,omitempty"`
 }
 
 // CinderVolumeSource represents a cinder volume resource in Openstack.

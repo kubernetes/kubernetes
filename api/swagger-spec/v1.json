@@ -12262,6 +12262,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+     },
+     "sidecar": {
+      "type": "string",
+      "description": "Optional: Sidecar is the sidecar container's name"
      }
     }
    },

@@ -87,7 +87,7 @@ func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
 		// for fencing, check if lock already held for this host
 		// this edge case happens if host crashes in the middle of acquiring lock and mounting rbd
 		// for defencing, get the locker name, something like "client.1234"
-		cmd, err = b.plugin.execCommand("rbd",
+		cmd, err = runRBDcmd(b, "rbd",
 			append([]string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		output = string(cmd)
 
@@ -103,7 +103,7 @@ func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
 				return nil
 			}
 			// hold a lock: rbd lock add
-			cmd, err = b.plugin.execCommand("rbd",
+			cmd, err = runRBDcmd(b, "rbd",
 				append([]string{"lock", "add", b.Image, lock_id, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		} else {
 			// defencing, find locker name
@@ -115,7 +115,7 @@ func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
 				}
 			}
 			// remove a lock: rbd lock remove
-			cmd, err = b.plugin.execCommand("rbd",
+			cmd, err = runRBDcmd(b, "rbd",
 				append([]string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		}
 
@@ -175,7 +175,13 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 
 	return util.rbdLock(*c.rbdBuilder, false)
 }
-
+func runRBDcmd(b rbdBuilder, cmd string, args []string) ([]byte, error) {
+	glog.V(1).Infof("rbd:  sidecar %s", b.Sidecar)
+	if b.Sidecar != "" {
+		return b.plugin.runInSidecarContainer(b.Sidecar, []string{cmd}, args)
+	}
+	return b.plugin.execCommand(cmd, args)
+}
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
 	devicePath := strings.Join([]string{"/dev/rbd", b.Pool, b.Image}, "/")
@@ -195,10 +201,10 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 			mon := b.Mon[i%l]
 			glog.V(1).Infof("rbd: map mon %s", mon)
 			if b.Secret != "" {
-				_, err = b.plugin.execCommand("rbd",
+				_, err = runRBDcmd(b, "rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "--key=" + b.Secret})
 			} else {
-				_, err = b.plugin.execCommand("rbd",
+				_, err = runRBDcmd(b, "rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "-k", b.Keyring})
 			}
 			if err == nil {
@@ -256,7 +262,7 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 	// if device is no longer used, see if can unmap
 	if cnt <= 1 {
 		// rbd unmap
-		_, err = c.plugin.execCommand("rbd", []string{"unmap", device})
+		_, err = runRBDcmd(*c.rbdBuilder, "rbd", []string{"unmap", device})
 		if err != nil {
 			return fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err)
 		}

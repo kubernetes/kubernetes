@@ -1568,6 +1568,7 @@ func deepCopy_v1_RBDVolumeSource(in RBDVolumeSource, out *RBDVolumeSource, c *co
 		out.SecretRef = nil
 	}
 	out.ReadOnly = in.ReadOnly
+	out.Sidecar = in.Sidecar
 	return nil
 }
 

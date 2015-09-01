@@ -57,8 +57,9 @@ func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	if (spec.Volume != nil && spec.Volume.RBD == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil) {
 		return false
 	}
+
 	// see if rbd is there
-	_, err := plugin.execCommand("rbd", []string{"-h"})
+	_, err := plugin.execCommand("modinfo", []string{"rbd"})
 	if err == nil {
 		return true
 	}
@@ -128,6 +129,7 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 			podUID:   podUID,
 			volName:  spec.Name(),
 			Image:    source.RBDImage,
+			Sidecar:  source.Sidecar,
 			Pool:     pool,
 			ReadOnly: readOnly,
 			manager:  manager,
@@ -168,6 +170,7 @@ type rbd struct {
 	Pool     string
 	Image    string
 	ReadOnly bool
+	Sidecar  string
 	plugin   *rbdPlugin
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -238,4 +241,66 @@ func (c *rbdCleaner) TearDownAt(dir string) error {
 func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
+}
+
+func (plugin *rbdPlugin) runInSidecarContainer(containerName string, cmd []string, args []string) ([]byte, error) {
+	priv := true
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "rbd-sidecar-",
+			Namespace:    api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			HostNetwork:   true,
+			Volumes: []api.Volume{
+				{
+					Name: "sys",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/sys",
+						},
+					},
+				},
+				{
+					Name: "dev",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/dev",
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "rbd-sidecar",
+					Image: containerName,
+					SecurityContext: &api.SecurityContext{
+						Privileged: &priv,
+					},
+					Command: cmd,
+					Args:    args,
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "sys",
+							MountPath: "/sys",
+						},
+
+						{
+							Name:      "dev",
+							MountPath: "/dev",
+						},
+					},
+				},
+			},
+		},
+	}
+	kubeClient := plugin.host.GetKubeClient()
+	pod, err := kubeClient.Pods(pod.Namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create pod %s:  %+v", pod.Name, err)
+	}
+	defer kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil)
+	container := &pod.Spec.Containers[0]
+	return plugin.host.RunContainerCommand(pod, container, cmd)
 }

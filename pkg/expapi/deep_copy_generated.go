@@ -520,6 +520,7 @@ func deepCopy_api_RBDVolumeSource(in api.RBDVolumeSource, out *api.RBDVolumeSour
 		out.SecretRef = nil
 	}
 	out.ReadOnly = in.ReadOnly
+	out.Sidecar = in.Sidecar
 	return nil
 }
 

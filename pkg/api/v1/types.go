@@ -582,6 +582,8 @@ type RBDVolumeSource struct {
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// Optional: Sidecar is the sidecar container's name
+	Sidecar string `json:"sidecar,omitempty"`
 }
 
 // CinderVolumeSource represents a cinder volume resource in Openstack.

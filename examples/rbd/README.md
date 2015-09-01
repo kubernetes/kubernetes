@@ -51,6 +51,7 @@ Once you have installed Ceph and new Kubernetes, you can create a pod based on m
 - *secretName*: The name of the authentication secrets. If provided, *secretName* overrides *keyring*. Note, see below about how to create a secret.
 - *fsType*: The filesystem type (ext4, xfs, etc) that formatted on the device.
 - *readOnly*: Whether the filesystem is used as readOnly.
+- *sidecar*: The name of the sidecar container that can run *rbd* command.
 
 # Use Ceph Authentication Secret
 

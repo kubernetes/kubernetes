@@ -233,3 +233,7 @@ func (f *PersistentVolumeRecycler) NewWrapperCleaner(spec *volume.Spec, podUID t
 func (f *PersistentVolumeRecycler) GetCloudProvider() cloudprovider.Interface {
 	return nil
 }
+
+func (f *PersistentVolumeRecycler) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	return nil, fmt.Errorf("RunInContainer not supported by PVClaimBinder's VolumeHost implementation")
+}
