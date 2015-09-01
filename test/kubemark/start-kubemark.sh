@@ -200,11 +200,11 @@ contexts:
 current-context: kubemark-context
 EOF
 
-sed "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
-sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
+sed "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-node_template.json > ${KUBE_ROOT}/test/kubemark/hollow-node.json
+sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-node.json
 kubectl create -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json
 kubectl create -f ${KUBECONFIG_SECRET} --namespace="kubemark"
-kubectl create -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json --namespace="kubemark"
+kubectl create -f ${KUBE_ROOT}/test/kubemark/hollow-node.json --namespace="kubemark"
 
 rm ${KUBECONFIG_SECRET}
 
