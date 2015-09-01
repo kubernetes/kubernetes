@@ -26,30 +26,10 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 )
 
-// logs a testing.Fatalf if the elapsed time d passes before signal chan done is closed
-func fatalAfter(t *testing.T, done <-chan struct{}, d time.Duration, msg string, args ...interface{}) {
-	select {
-	case <-done:
-	case <-time.After(d):
-		t.Fatalf(msg, args...)
-	}
-}
-
-func errorAfter(errOnce ErrorOnce, done <-chan struct{}, d time.Duration, msg string, args ...interface{}) {
-	select {
-	case <-done:
-	case <-time.After(d):
-		//errOnce.Reportf(msg, args...)
-		panic(fmt.Sprintf(msg, args...))
-	}
-}
-
-// logs a testing.Fatalf if the signal chan closes before the elapsed time d passes
-func fatalOn(t *testing.T, done <-chan struct{}, d time.Duration, msg string, args ...interface{}) {
-	select {
-	case <-done:
-		t.Fatalf(msg, args...)
-	case <-time.After(d):
+func failOnError(t *testing.T, errOnce ErrorOnce) {
+	err, _ := <-errOnce.Err()
+	if err != nil {
+		t.Errorf("unexpected action scheduling error: %v", err)
 	}
 }
 
@@ -61,8 +41,8 @@ func TestProc_manyEndings(t *testing.T) {
 	for i := 0; i < COUNT; i++ {
 		runtime.On(p.End(), wg.Done)
 	}
-	fatalAfter(t, runtime.After(wg.Wait), 5*time.Second, "timed out waiting for loose End()s")
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	wg.Wait()
+	<-p.Done()
 }
 
 func TestProc_singleAction(t *testing.T) {
@@ -70,61 +50,84 @@ func TestProc_singleAction(t *testing.T) {
 	scheduled := make(chan struct{})
 	called := make(chan struct{})
 
+	errOnce := NewErrorOnce(p.Done())
 	go func() {
 		log.Infof("do'ing deferred action")
 		defer close(scheduled)
-		err := p.Do(func() {
+		errCh := p.Do(func() {
 			defer close(called)
 			log.Infof("deferred action invoked")
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errOnce.Send(errCh)
 	}()
 
-	fatalAfter(t, scheduled, 5*time.Second, "timed out waiting for deferred action to be scheduled")
-	fatalAfter(t, called, 5*time.Second, "timed out waiting for deferred action to be invoked")
+	failOnError(t, errOnce)
 
+	<-scheduled
+	<-called
 	p.End()
-
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
-func TestProc_singleActionEnd(t *testing.T) {
+func TestProc_singleActionThatPanics(t *testing.T) {
 	p := New()
 	scheduled := make(chan struct{})
 	called := make(chan struct{})
 
+	errOnce := NewErrorOnce(p.Done())
 	go func() {
 		log.Infof("do'ing deferred action")
 		defer close(scheduled)
-		err := p.Do(func() {
+		errCh := p.Do(func() {
+			defer close(called)
+			panic("panicing here")
+		})
+		errOnce.Send(errCh)
+	}()
+
+	failOnError(t, errOnce)
+
+	<-scheduled
+	<-called
+	p.End()
+	<-p.Done()
+}
+
+func TestProc_singleActionEndsProcess(t *testing.T) {
+	p := New()
+	called := make(chan struct{})
+
+	errOnce := NewErrorOnce(p.Done())
+	go func() {
+		log.Infof("do'ing deferred action")
+		errCh := p.Do(func() {
 			defer close(called)
 			log.Infof("deferred action invoked")
 			p.End()
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errOnce.Send(errCh)
 	}()
 
-	fatalAfter(t, scheduled, 5*time.Second, "timed out waiting for deferred action to be scheduled")
-	fatalAfter(t, called, 5*time.Second, "timed out waiting for deferred action to be invoked")
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-called
+
+	failOnError(t, errOnce)
+
+	<-p.Done()
 }
 
 func TestProc_multiAction(t *testing.T) {
 	p := New()
 	const COUNT = 10
 	var called sync.WaitGroup
-	called.Add(COUNT)
+	called.Add(COUNT * 2)
 
 	// test FIFO property
 	next := 0
 	for i := 0; i < COUNT; i++ {
 		log.Infof("do'ing deferred action %d", i)
 		idx := i
-		err := p.Do(func() {
+		errOnce := NewErrorOnce(p.Done())
+		errCh := p.Do(func() {
 			defer called.Done()
 			log.Infof("deferred action invoked")
 			if next != idx {
@@ -132,28 +135,28 @@ func TestProc_multiAction(t *testing.T) {
 			}
 			next++
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errOnce.Send(errCh)
+		go func() {
+			defer called.Done()
+			failOnError(t, errOnce)
+		}()
 	}
 
-	fatalAfter(t, runtime.After(called.Wait), 2*time.Second, "timed out waiting for deferred actions to be invoked")
-
+	called.Wait()
 	p.End()
-
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
 func TestProc_goodLifecycle(t *testing.T) {
 	p := New()
 	p.End()
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
 func TestProc_doWithDeadProc(t *testing.T) {
 	p := New()
 	p.End()
-	time.Sleep(100 * time.Millisecond)
+	<-p.Done()
 
 	errUnexpected := fmt.Errorf("unexpected execution of delegated action")
 	decorated := DoWith(p, DoerFunc(func(_ Action) <-chan error {
@@ -161,7 +164,7 @@ func TestProc_doWithDeadProc(t *testing.T) {
 	}))
 
 	decorated.Do(func() {})
-	fatalAfter(t, decorated.Done(), 5*time.Second, "timed out waiting for process death")
+	<-decorated.Done()
 }
 
 func TestProc_doWith(t *testing.T) {
@@ -185,13 +188,12 @@ func TestProc_doWith(t *testing.T) {
 		t.Fatalf("expected !nil error chan")
 	}
 
-	fatalAfter(t, executed, 5*time.Second, "timed out waiting deferred execution")
-	fatalAfter(t, decorated.OnError(err, func(e error) {
-		t.Fatalf("unexpected error: %v", err)
-	}), 1*time.Second, "timed out waiting for doer result")
-
+	<-executed
+	<-decorated.OnError(err, func(e error) {
+		t.Errorf("unexpected error: %v", err)
+	})
 	decorated.End()
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
 func TestProc_doWithNestedTwice(t *testing.T) {
@@ -220,13 +222,14 @@ func TestProc_doWithNestedTwice(t *testing.T) {
 		t.Fatalf("expected !nil error chan")
 	}
 
-	fatalAfter(t, executed, 5*time.Second, "timed out waiting deferred execution")
-	fatalAfter(t, decorated2.OnError(err, func(e error) {
-		t.Fatalf("unexpected error: %v", err)
-	}), 1*time.Second, "timed out waiting for doer result")
+	<-executed
+
+	<-decorated2.OnError(err, func(e error) {
+		t.Errorf("unexpected error: %v", err)
+	})
 
 	decorated2.End()
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
 func TestProc_doWithNestedErrorPropagation(t *testing.T) {
@@ -248,37 +251,40 @@ func TestProc_doWithNestedErrorPropagation(t *testing.T) {
 	}))
 
 	executed := make(chan struct{})
-	err := decorated2.Do(func() {
+	errCh := decorated2.Do(func() {
 		defer close(executed)
 		if !delegated {
 			t.Fatalf("expected delegated execution")
 		}
 		errOnce.Report(expectedErr)
 	})
-	if err == nil {
+	if errCh == nil {
 		t.Fatalf("expected !nil error chan")
 	}
-	errOnce.Send(err)
+	errOnce.Send(errCh)
 
 	foundError := false
-	fatalAfter(t, executed, 1*time.Second, "timed out waiting deferred execution")
-	fatalAfter(t, decorated2.OnError(errOnce.Err(), func(e error) {
+	<-executed
+
+	<-decorated2.OnError(errOnce.Err(), func(e error) {
 		if e != expectedErr {
-			t.Fatalf("unexpected error: %v", err)
+			t.Errorf("unexpected error: %v", e)
 		} else {
 			foundError = true
 		}
-	}), 1*time.Second, "timed out waiting for doer result")
+	})
 
+	// this has been flaky in the past. recent changes to error handling in
+	// processAdapter.Do should have fixed it.
 	if !foundError {
 		t.Fatalf("expected a propagated error")
 	}
 
 	decorated2.End()
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
-func runDelegationTest(t *testing.T, p Process, name string, errOnce ErrorOnce, timeout time.Duration) {
+func runDelegationTest(t *testing.T, p Process, name string, errOnce ErrorOnce) {
 	t.Logf("starting test case " + name + " at " + time.Now().String())
 	defer func() {
 		t.Logf("runDelegationTest finished at " + time.Now().String())
@@ -325,7 +331,7 @@ func runDelegationTest(t *testing.T, p Process, name string, errOnce ErrorOnce, 
 	// from errCh after this point
 	errOnce.Send(errCh)
 
-	errorAfter(errOnce, executed, timeout, "timed out waiting deferred execution of "+name)
+	<-executed
 	t.Logf("runDelegationTest received executed signal at " + time.Now().String())
 }
 
@@ -333,56 +339,41 @@ func TestProc_doWithNestedX(t *testing.T) {
 	t.Logf("starting test case at " + time.Now().String())
 	p := New()
 	errOnce := NewErrorOnce(p.Done())
-	timeout := 5 * time.Second
-	runDelegationTest(t, p, "nested", errOnce, timeout)
+	runDelegationTest(t, p, "nested", errOnce)
 	<-p.End()
-	select {
-	case err := <-errOnce.Err():
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	case <-time.After(2 * timeout):
-		t.Fatalf("timed out waiting for doer result")
+
+	err, _ := <-errOnce.Err()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+
+	<-p.Done()
 }
 
-// TODO(jdef): find a way to test this without killing CI builds.
 // intended to be run with -race
 func TestProc_doWithNestedXConcurrent(t *testing.T) {
-	t.Skip("disabled for causing CI timeouts.")
 	config := defaultConfig
-	config.actionQueueDepth = 0
+	config.actionQueueDepth = 4000
 	p := newConfigured(config)
 
 	var wg sync.WaitGroup
 	const CONC = 20
 	wg.Add(CONC)
 
-	// this test spins up TONS of goroutines that can take a little while to execute on a busy
-	// CI server. drawing the line at 10s because I've never seen it take anywhere near that long.
-	timeout := 10 * time.Second
-
 	for i := 0; i < CONC; i++ {
 		i := i
 		errOnce := NewErrorOnce(p.Done())
-		runtime.After(func() { runDelegationTest(t, p, fmt.Sprintf("nested%d", i), errOnce, timeout) }).Then(wg.Done)
+		runtime.After(func() { runDelegationTest(t, p, fmt.Sprintf("nested%d", i), errOnce) }).Then(wg.Done)
 		go func() {
-			select {
-			case err := <-errOnce.Err():
-				if err != nil {
-					t.Fatalf("delegate %d: unexpected error: %v", i, err)
-				}
-			case <-time.After(2 * timeout):
-				t.Fatalf("delegate %d: timed out waiting for doer result", i)
+			err, _ := <-errOnce.Err()
+			if err != nil {
+				t.Fatalf("delegate %d: unexpected error: %v", i, err)
 			}
 		}()
 	}
-	ch := runtime.After(wg.Wait)
-	fatalAfter(t, ch, 2*timeout, "timed out waiting for concurrent delegates")
-
+	wg.Wait()
 	<-p.End()
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+	<-p.Done()
 }
 
 func TestProcWithExceededActionQueueDepth(t *testing.T) {
@@ -391,16 +382,13 @@ func TestProcWithExceededActionQueueDepth(t *testing.T) {
 	p := newConfigured(config)
 
 	errOnce := NewErrorOnce(p.Done())
-	timeout := 5 * time.Second
-	runDelegationTest(t, p, "nested", errOnce, timeout)
+	runDelegationTest(t, p, "nested", errOnce)
 	<-p.End()
-	select {
-	case err := <-errOnce.Err():
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	case <-time.After(2 * timeout):
-		t.Fatalf("timed out waiting for doer result")
+
+	err, _ := <-errOnce.Err()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	fatalAfter(t, p.Done(), 5*time.Second, "timed out waiting for process death")
+
+	<-p.Done()
 }
