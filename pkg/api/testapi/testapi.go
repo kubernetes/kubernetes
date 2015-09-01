@@ -48,7 +48,7 @@ func GroupAndVersion(group ...string) string {
 	}
 	//TODO: we need a central place to store all available API groups and their metadata in their respective latest.go
 	if group[0] == "experimental" {
-		return explatest.GroupVersion
+		return explatest.Version
 	} else {
 		panic(fmt.Errorf("cannot find appropriate testing version for group %s", group))
 	}
@@ -140,7 +140,9 @@ func ResourcePathWithPrefix(prefix, resource, namespace, name string, group ...s
 	if len(group) == 0 {
 		path = "/api/" + Version()
 	} else {
-		path = "/api/" + group[0] + "/" + Version(group...)
+		// TODO: switch back once we have proper multiple group support
+		// path = "/api/" + group[0] + "/" + Version(group...)
+		path = "/" + group[0] + "/" + Version(group...)
 	}
 
 	if prefix != "" {

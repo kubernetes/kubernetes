@@ -85,12 +85,12 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	}
 
 	if responses[hpaListHandler] != nil {
-		handlers[hpaListHandler] = mkHandler("/api/experimental/"+testapi.Version("experimental")+"/horizontalpodautoscalers", *responses[hpaListHandler])
+		handlers[hpaListHandler] = mkHandler("/experimental/"+testapi.Version("experimental")+"/horizontalpodautoscalers", *responses[hpaListHandler])
 	}
 
 	if responses[scaleHandler] != nil {
 		handlers[scaleHandler] = mkHandler(
-			fmt.Sprintf("/api/experimental/"+testapi.Version("experimental")+"/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
+			fmt.Sprintf("/experimental/"+testapi.Version("experimental")+"/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
 	}
 
 	if responses[podListHandler] != nil {
@@ -104,7 +104,7 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	}
 
 	if responses[updateHpaHandler] != nil {
-		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/api/experimental/"+testapi.Version("experimental")+"/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
+		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/experimental/"+testapi.Version("experimental")+"/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
 			*responses[updateHpaHandler])
 	}
 
