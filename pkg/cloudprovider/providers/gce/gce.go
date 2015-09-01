@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
-	"code.google.com/p/gcfg"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -39,6 +38,7 @@ import (
 	container "google.golang.org/api/container/v1beta1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
+	"gopkg.in/gcfg.v1"
 )
 
 const (

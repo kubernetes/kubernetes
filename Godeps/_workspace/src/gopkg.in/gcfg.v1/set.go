@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"code.google.com/p/gcfg/types"
+	"gopkg.in/gcfg.v1/types"
 )
 
 type tag struct {
