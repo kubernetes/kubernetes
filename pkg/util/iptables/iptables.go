@@ -110,16 +110,32 @@ const NoFlushTables FlushFlag = false
 // (test whether a rule exists).
 const MinCheckVersion = "1.4.11"
 
+// Minimum iptables versions supporting the -w and -w2 flags
+const MinWaitVersion = "1.4.20"
+const MinWait2Version = "1.4.22"
+
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
 	mu       sync.Mutex
 	exec     utilexec.Interface
 	protocol Protocol
+	hasCheck bool
+	waitFlag []string
 }
 
 // New returns a new Interface which will exec iptables.
 func New(exec utilexec.Interface, protocol Protocol) Interface {
-	return &runner{exec: exec, protocol: protocol}
+	vstring, err := GetIptablesVersionString(exec)
+	if err != nil {
+		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
+		vstring = MinCheckVersion
+	}
+	return &runner{
+		exec:     exec,
+		protocol: protocol,
+		hasCheck: getIptablesHasCheckCommand(vstring),
+		waitFlag: getIptablesWaitFlag(vstring),
+	}
 }
 
 // EnsureChain is part of Interface.
@@ -299,7 +315,8 @@ func (runner *runner) iptablesCommand() string {
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
 	iptablesCmd := runner.iptablesCommand()
 
-	fullArgs := append([]string{string(op)}, args...)
+	fullArgs := append(runner.waitFlag, string(op))
+	fullArgs = append(fullArgs, args...)
 	glog.V(4).Infof("running iptables %s %v", string(op), args)
 	return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 	// Don't log err here - callers might not think it is an error.
@@ -308,12 +325,7 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
-	checkPresent, err := getIptablesHasCheckCommand(runner.exec)
-	if err != nil {
-		glog.Warningf("Error checking iptables version, assuming version at least 1.4.11: %v", err)
-		checkPresent = true
-	}
-	if checkPresent {
+	if runner.hasCheck {
 		return runner.checkRuleUsingCheck(makeFullArgs(table, chain, args...))
 	} else {
 		return runner.checkRuleWithoutCheck(table, chain, args...)
@@ -399,40 +411,64 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 }
 
 // Checks if iptables has the "-C" flag
-func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
+func getIptablesHasCheckCommand(vstring string) bool {
 	minVersion, err := semver.NewVersion(MinCheckVersion)
 	if err != nil {
-		return false, err
+		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinCheckVersion, err)
+		return true
 	}
-	// Returns "vX.Y.Z".
-	vstring, err := GetIptablesVersionString(exec)
+	version, err := semver.NewVersion(vstring)
 	if err != nil {
-		return false, err
-	}
-	// Make a semver of the part after the v in "vX.X.X".
-	version, err := semver.NewVersion(vstring[1:])
-	if err != nil {
-		return false, err
+		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		return true
 	}
 	if version.LessThan(*minVersion) {
-		return false, nil
+		return false
 	}
-	return true, nil
+	return true
 }
 
-// GetIptablesVersionString runs "iptables --version" to get the version string,
-// then matches for vX.X.X e.g. if "iptables --version" outputs: "iptables v1.3.66"
-// then it would would return "v1.3.66", nil
+// Checks if iptables version has a "wait" flag
+func getIptablesWaitFlag(vstring string) []string {
+	version, err := semver.NewVersion(vstring)
+	if err != nil {
+		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		return nil
+	}
+
+	minVersion, err := semver.NewVersion(MinWaitVersion)
+	if err != nil {
+		glog.Errorf("MinWaitVersion (%s) is not a valid version string: %v", MinWaitVersion, err)
+		return nil
+	}
+	if version.LessThan(*minVersion) {
+		return nil
+	}
+
+	minVersion, err = semver.NewVersion(MinWait2Version)
+	if err != nil {
+		glog.Errorf("MinWait2Version (%s) is not a valid version string: %v", MinWait2Version, err)
+		return nil
+	}
+	if version.LessThan(*minVersion) {
+		return []string{"-w"}
+	} else {
+		return []string{"-w2"}
+	}
+}
+
+// GetIptablesVersionString runs "iptables --version" to get the version string
+// in the form "X.X.X"
 func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
 	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
-	versionMatcher := regexp.MustCompile("v[0-9]+\\.[0-9]+\\.[0-9]+")
+	versionMatcher := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9]+)")
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
-	return match[0], nil
+	return match[1], nil
 }
