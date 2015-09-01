@@ -61,9 +61,11 @@ type rawContainerHandler struct {
 
 	fsInfo         fs.FsInfo
 	externalMounts []mount
+
+	rootFs string
 }
 
-func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *InotifyWatcher) (container.ContainerHandler, error) {
+func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *InotifyWatcher, rootFs string) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
 	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
 	for key, val := range cgroupSubsystems.MountPoints {
@@ -108,6 +110,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		hasNetwork:         hasNetwork,
 		externalMounts:     externalMounts,
 		watcher:            watcher,
+		rootFs:             rootFs,
 	}, nil
 }
 
@@ -326,15 +329,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	nd, err := self.GetRootNetworkDevices()
-	if err != nil {
-		return new(info.ContainerStats), err
-	}
-	networkInterfaces := make([]string, len(nd))
-	for i := range nd {
-		networkInterfaces[i] = nd[i].Name
-	}
-	stats, err := libcontainer.GetStats(self.cgroupManager, networkInterfaces)
+	stats, err := libcontainer.GetStats(self.cgroupManager, self.rootFs, os.Getpid())
 	if err != nil {
 		return stats, err
 	}
