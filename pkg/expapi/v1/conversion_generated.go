@@ -62,6 +62,16 @@ func convert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *v1.C
 	return nil
 }
 
+func convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderVolumeSource, out *v1.CinderVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.CinderVolumeSource))(in)
+	}
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_api_Container_To_v1_Container(in *api.Container, out *v1.Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Container))(in)
@@ -704,6 +714,14 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *v1.V
 	} else {
 		out.RBD = nil
 	}
+	if in.Cinder != nil {
+		out.Cinder = new(v1.CinderVolumeSource)
+		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
+	}
 	return nil
 }
 
@@ -738,6 +756,16 @@ func convert_v1_Capabilities_To_api_Capabilities(in *v1.Capabilities, out *api.C
 	} else {
 		out.Drop = nil
 	}
+	return nil
+}
+
+func convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in *v1.CinderVolumeSource, out *api.CinderVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.CinderVolumeSource))(in)
+	}
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -1382,6 +1410,14 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *api.V
 		}
 	} else {
 		out.RBD = nil
+	}
+	if in.Cinder != nil {
+		out.Cinder = new(api.CinderVolumeSource)
+		if err := convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
 	}
 	return nil
 }
@@ -2132,6 +2168,7 @@ func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		convert_api_Capabilities_To_v1_Capabilities,
+		convert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
 		convert_api_ContainerPort_To_v1_ContainerPort,
 		convert_api_Container_To_v1_Container,
 		convert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource,
@@ -2189,6 +2226,7 @@ func init() {
 		convert_v1_APIVersion_To_expapi_APIVersion,
 		convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		convert_v1_Capabilities_To_api_Capabilities,
+		convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		convert_v1_ContainerPort_To_api_ContainerPort,
 		convert_v1_Container_To_api_Container,
 		convert_v1_DaemonList_To_expapi_DaemonList,
