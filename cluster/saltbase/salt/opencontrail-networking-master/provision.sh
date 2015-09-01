@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -ex
+set -o pipefail
 
 # contrail-kubernetes setup and provisioning script. For more info, please refer to
 # https://github.com/Juniper/contrail-kubernetes
