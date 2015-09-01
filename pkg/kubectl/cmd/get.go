@@ -27,6 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// GetOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type GetOptions struct {
+	Filenames []string
+}
+
 const (
 	get_long = `Display one or many resources.
 
@@ -70,6 +76,7 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7`
 func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
 	validArgs := p.HandledResources()
+	options := &GetOptions{}
 
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|template|templatefile|wide|jsonpath|...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
@@ -77,7 +84,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    get_long,
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunGet(f, out, cmd, args)
+			err := RunGet(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: validArgs,
@@ -89,13 +96,13 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag statements like -L label1 -L label2...")
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	return cmd
 }
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	mapper, typer := f.Object()
@@ -105,9 +112,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return err
 	}
 
-	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
-
-	if len(args) == 0 && len(filenames) == 0 {
+	if len(args) == 0 && len(options.Filenames) == 0 {
 		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources, `   * componentstatuses (aka 'cs')
    * endpoints (aka 'ep')
 `)
@@ -119,7 +124,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-			FilenameParam(enforceNamespace, filenames...).
+			FilenameParam(enforceNamespace, options.Filenames...).
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
@@ -172,7 +177,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-		FilenameParam(enforceNamespace, filenames...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().

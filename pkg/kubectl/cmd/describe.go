@@ -32,6 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 )
 
+// DescribeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type DescribeOptions struct {
+	Filenames []string
+}
+
 const (
 	describe_long = `Show details of a specific resource or group of resources.
 
@@ -68,31 +74,32 @@ $ kubectl describe pods frontend`
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &DescribeOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		Short:   "Show details of a specific resource or group of resources",
 		Long:    describe_long,
 		Example: describe_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunDescribe(f, out, cmd, args)
+			err := RunDescribe(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: kubectl.DescribableResources(),
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to describe"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }
 
-func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *DescribeOptions) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
-	if len(args) == 0 && len(filenames) == 0 {
+	if len(args) == 0 && len(options.Filenames) == 0 {
 		fmt.Fprint(out, "You must specify the type of resource to describe. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
@@ -101,7 +108,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, filenames...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
 		Flatten().
