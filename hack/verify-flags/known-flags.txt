@@ -264,3 +264,4 @@ whitelist-override-label
 www-prefix
 retry_time
 file_content_in_loop
+cpu-cfs-quota
