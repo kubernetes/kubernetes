@@ -42,6 +42,7 @@ func addKnownTypes() {
 		&ThirdPartyResourceList{},
 		&DaemonList{},
 		&Daemon{},
+		&Status{},
 	)
 }
 
@@ -55,3 +56,4 @@ func (*ThirdPartyResource) IsAnAPIObject()          {}
 func (*ThirdPartyResourceList) IsAnAPIObject()      {}
 func (*Daemon) IsAnAPIObject()                      {}
 func (*DaemonList) IsAnAPIObject()                  {}
+func (*Status) IsAnAPIObject()                      {}

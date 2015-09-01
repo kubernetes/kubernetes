@@ -318,3 +318,161 @@ type DaemonList struct {
 	// Items is a list of daemons.
 	Items []Daemon `json:"items"`
 }
+
+// Status is a return value for calls that don't return other objects.
+type Status struct {
+	v1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	v1.ListMeta `json:"metadata,omitempty"`
+
+	// Status of the operation.
+	// One of: "Success" or "Failure".
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status string `json:"status,omitempty"`
+	// A human-readable description of the status of this operation.
+	Message string `json:"message,omitempty"`
+	// A machine-readable description of why this operation is in the
+	// "Failure" status. If this value is empty there
+	// is no information available. A Reason clarifies an HTTP status
+	// code but does not override it.
+	Reason StatusReason `json:"reason,omitempty"`
+	// Extended data associated with the reason. Each reason may define its
+	// own extended details. This field is optional and the data returned
+	// is not guaranteed to conform to any schema except that defined by
+	// the reason type.
+	Details *StatusDetails `json:"details,omitempty"`
+	// Suggested HTTP return code for this status, 0 if not set.
+	Code int `json:"code,omitempty"`
+}
+
+// StatusDetails is a set of additional properties that MAY be set by the
+// server to provide additional information about a response. The Reason
+// field of a Status object defines what attributes will be set. Clients
+// must ignore fields that do not match the defined type of each attribute,
+// and should assume that any attribute may be empty, invalid, or under
+// defined.
+type StatusDetails struct {
+	// The name attribute of the resource associated with the status StatusReason
+	// (when there is a single name which can be described).
+	Name string `json:"name,omitempty"`
+	// The kind attribute of the resource associated with the status StatusReason.
+	// On some operations may differ from the requested resource Kind.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	Kind string `json:"kind,omitempty"`
+	// The Causes array includes more details associated with the StatusReason
+	// failure. Not all StatusReasons may provide detailed causes.
+	Causes []StatusCause `json:"causes,omitempty"`
+	// If specified, the time in seconds before the operation should be retried.
+	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
+}
+
+// Values of Status.Status
+const (
+	StatusSuccess = "Success"
+	StatusFailure = "Failure"
+)
+
+// StatusReason is an enumeration of possible failure causes. Each StatusReason
+// must map to a single HTTP status code, but multiple reasons may map
+// to the same HTTP status code.
+// TODO: move to apiserver
+type StatusReason string
+
+const (
+	// StatusReasonUnknown means the server has declined to indicate a specific reason.
+	// The details field may contain other information about this error.
+	// Status code 500.
+	StatusReasonUnknown StatusReason = ""
+
+	// StatusReasonNotFound means one or more resources required for this operation
+	// could not be found.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the missing resource
+	//                   on some operations may differ from the requested
+	//                   resource.
+	//   "id"   string - the identifier of the missing resource
+	// Status code 404
+	StatusReasonNotFound StatusReason = "NotFound"
+
+	// StatusReasonAlreadyExists means the resource you are creating already exists.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the conflicting resource
+	//   "id"   string - the identifier of the conflicting resource
+	// Status code 409
+	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
+
+	// StatusReasonConflict means the requested update operation cannot be completed
+	// due to a conflict in the operation. The client may need to alter the request.
+	// Each resource may define custom details that indicate the nature of the
+	// conflict.
+	// Status code 409
+	StatusReasonConflict StatusReason = "Conflict"
+
+	// StatusReasonInvalid means the requested create or update operation cannot be
+	// completed due to invalid data provided as part of the request. The client may
+	// need to alter the request. When set, the client may use the StatusDetails
+	// message field as a summary of the issues encountered.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the invalid resource
+	//   "id"   string - the identifier of the invalid resource
+	//   "causes"      - one or more StatusCause entries indicating the data in the
+	//                   provided resource that was invalid. The code, message, and
+	//                   field attributes will be set.
+	// Status code 422
+	StatusReasonInvalid StatusReason = "Invalid"
+
+	// StatusReasonServerTimeout means the server can be reached and understood the request,
+	// but cannot complete the action in a reasonable time. The client should retry the request.
+	// This is may be due to temporary server load or a transient communication issue with
+	// another server. Status code 500 is used because the HTTP spec provides no suitable
+	// server-requested client retry and the 5xx class represents actionable errors.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the resource being acted on.
+	//   "id"   string - the operation that is being attempted.
+	// Status code 500
+	StatusReasonServerTimeout StatusReason = "ServerTimeout"
+)
+
+// StatusCause provides more information about an api.Status failure, including
+// cases when multiple errors are encountered.
+type StatusCause struct {
+	// A machine-readable description of the cause of the error. If this value is
+	// empty there is no information available.
+	Type CauseType `json:"reason,omitempty"`
+	// A human-readable description of the cause of the error. This field may be
+	// presented as-is to a reader.
+	Message string `json:"message,omitempty"`
+	// The field of the resource that has caused this error, as named by its JSON
+	// serialization. May include dot and postfix notation for nested attributes.
+	// Arrays are zero-indexed. Fields may appear more than once in an array of
+	// causes due to fields having multiple errors.
+	//
+	// Examples:
+	//   "name" - the field "name" on the current resource
+	//   "items[0].name" - the field "name" on the first array entry in "items"
+	Field string `json:"field,omitempty"`
+}
+
+// CauseType is a machine readable value providing more detail about what
+// occurred in a status response. An operation may have multiple causes for a
+// status (whether Failure or Success).
+type CauseType string
+
+const (
+	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
+	// (e.g. looking up an ID).
+	CauseTypeFieldValueNotFound CauseType = "FieldValueNotFound"
+	// CauseTypeFieldValueRequired is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	CauseTypeFieldValueRequired CauseType = "FieldValueRequired"
+	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	CauseTypeFieldValueDuplicate CauseType = "FieldValueDuplicate"
+	// CauseTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match).
+	CauseTypeFieldValueInvalid CauseType = "FieldValueInvalid"
+	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
+	// values that can not be handled (e.g. an enumerated string).
+	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
+)
