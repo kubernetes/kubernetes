@@ -1,4 +1,13 @@
+#!/bin/bash
+
+##############################################################
+# opencontrail-kubernetes minion setup and provisioning script. 
+# For more info, please refer to the following link
+# https://github.com/Juniper/contrail-kubernetes
+##############################################################
 source /etc/contrail/opencontrail-rc
+
+readonly PROGNAME=$(basename "$0")
 
 LOGFILE=/var/log/contrail/provision_minion.log
 OS_TYPE="none"
@@ -6,7 +15,10 @@ REDHAT="redhat"
 UBUNTU="ubuntu"
 VROUTER="vrouter"
 VHOST="vhost0"
-MINION_OVERLAY_NET_IP="none"
+if [[ -z $OPENCONTRAIL_VROUTER_INTF ]];then
+   OPENCONTRAIL_VROUTER_INTF="eth0"
+fi
+MINION_OVERLAY_NET_IP=$(/sbin/ifconfig $OPENCONTRAIL_VROUTER_INTF | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
 
 timestamp() {
     date
@@ -232,7 +244,6 @@ function cleanup()
 
 function main()
 {
-   MINION_OVERLAY_NET_IP=$(/sbin/ifconfig eth1 | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')  
    detect_os
    prep_to_build
    build_vrouter
