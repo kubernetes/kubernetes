@@ -34,6 +34,9 @@ base:
 {% else %}
     - monit
 {% endif %}
+{% if pillar.get('overlay_network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-minion
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
@@ -71,6 +74,9 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
     - docker
     - kubelet
+{% endif %}
+{% if pillar.get('overlay_network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-master
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':

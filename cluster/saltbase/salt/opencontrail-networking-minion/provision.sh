@@ -268,4 +268,5 @@ function main()
    cleanup
 }
 
+exit
 main
