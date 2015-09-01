@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"testing"
-	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
@@ -27,17 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-)
-
-const (
-	PASS = iota
-	FAIL
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
@@ -84,16 +76,16 @@ func validNewDaemon() *expapi.Daemon {
 	}
 }
 
-var validDaemon = *validNewDaemon()
+var validDaemon = validNewDaemon()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
-	controller := validNewDaemon()
-	controller.ObjectMeta = api.ObjectMeta{}
+	daemon := validNewDaemon()
+	daemon.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		controller,
+		daemon,
 		func(ctx api.Context, obj runtime.Object) error {
 			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
 		},
@@ -175,13 +167,49 @@ func TestEtcdListControllers(t *testing.T) {
 		})
 }
 
+func TestWatchControllers(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestWatch(
+		validDaemon,
+		func() {
+			fakeClient.WaitForWatchCompletion()
+		},
+		func(err error) {
+			fakeClient.WatchInjectError <- err
+		},
+		func(obj runtime.Object, action string) error {
+			return registrytest.EmitObject(fakeClient, obj, action)
+		},
+		// matching labels
+		[]labels.Set{
+			{"a": "b"},
+		},
+		// not matching labels
+		[]labels.Set{
+			{"a": "c"},
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// notmatching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+		registrytest.WatchActions,
+	)
+}
+
 func TestEtcdDeleteController(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, err := storage.KeyFunc(ctx, validDaemon.Name)
 	key = etcdtest.AddPrefix(key)
 
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewDaemon()), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validDaemon), 0)
 	obj, err := storage.Delete(ctx, validDaemon.Name, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -196,195 +224,6 @@ func TestEtcdDeleteController(t *testing.T) {
 	}
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-}
-
-func TestEtcdWatchController(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	watching, err := storage.Watch(ctx,
-		labels.Everything(),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
-}
-
-// Tests that we can watch for the creation of daemon controllers with specified labels.
-func TestEtcdWatchControllersMatch(t *testing.T) {
-	ctx := api.WithNamespace(api.NewDefaultContext(), validDaemon.Namespace)
-	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
-
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(validDaemon.Spec.Selector),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	// The watcher above is waiting for these Labels, on receiving them it should
-	// apply the ControllerStatus decorator, which lists pods, causing a query against
-	// the /registry/pods endpoint of the etcd client.
-	controller := &expapi.Daemon{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Labels:    validDaemon.Spec.Selector,
-			Namespace: "default",
-		},
-	}
-	controllerBytes, _ := testapi.Codec().Encode(controller)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(controllerBytes),
-		},
-	}
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Error("unexpected timeout from result channel")
-	}
-	watching.Stop()
-}
-
-// Tests that we can watch for daemon controllers with specified fields.
-func TestEtcdWatchControllersFields(t *testing.T) {
-	ctx := api.WithNamespace(api.NewDefaultContext(), validDaemon.Namespace)
-	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
-
-	testFieldMap := map[int][]fields.Set{
-		PASS: {
-			{"metadata.name": "foo"},
-		},
-		FAIL: {
-			{"metadata.name": "bar"},
-			{"name": "foo"},
-		},
-	}
-	testEtcdActions := []string{
-		etcdstorage.EtcdCreate,
-		etcdstorage.EtcdSet,
-		etcdstorage.EtcdCAS,
-		etcdstorage.EtcdDelete}
-
-	controller := &expapi.Daemon{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Labels:    validDaemon.Spec.Selector,
-			Namespace: "default",
-		},
-		Status: expapi.DaemonStatus{
-			CurrentNumberScheduled: 2,
-			NumberMisscheduled:     1,
-			DesiredNumberScheduled: 4,
-		},
-	}
-	controllerBytes, _ := testapi.Codec().Encode(controller)
-
-	for expectedResult, fieldSet := range testFieldMap {
-		for _, field := range fieldSet {
-			for _, action := range testEtcdActions {
-				watching, err := storage.Watch(ctx,
-					labels.Everything(),
-					field.AsSelector(),
-					"1",
-				)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				var prevNode *etcd.Node = nil
-				node := &etcd.Node{
-					Value: string(controllerBytes),
-				}
-				if action == etcdstorage.EtcdDelete {
-					prevNode = node
-				}
-				fakeClient.WaitForWatchCompletion()
-				fakeClient.WatchResponse <- &etcd.Response{
-					Action:   action,
-					Node:     node,
-					PrevNode: prevNode,
-				}
-
-				select {
-				case r, ok := <-watching.ResultChan():
-					if expectedResult == FAIL {
-						t.Errorf("Unexpected result from channel %#v", r)
-					}
-					if !ok {
-						t.Errorf("watching channel should be open")
-					}
-				case <-time.After(time.Millisecond * 100):
-					if expectedResult == PASS {
-						t.Error("unexpected timeout from result channel")
-					}
-				}
-				watching.Stop()
-			}
-		}
-	}
-}
-
-func TestEtcdWatchControllersNotMatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
-
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	controller := &expapi.Daemon{
-		ObjectMeta: api.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"name": "bar",
-			},
-		},
-	}
-	controllerBytes, _ := testapi.Codec().Encode(controller)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(controllerBytes),
-		},
-	}
-
-	select {
-	case <-watching.ResultChan():
-		t.Error("unexpected result from result channel")
-	case <-time.After(time.Millisecond * 100):
-		// expected case
 	}
 }
 

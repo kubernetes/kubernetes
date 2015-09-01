@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -376,23 +375,53 @@ func TestDeletePod(t *testing.T) {
 func TestEtcdGet(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
-	pod := validNewPod()
-	test.TestGet(pod)
+	test.TestGet(validNewPod())
 }
 
 func TestEtcdList(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
 	key := etcdtest.AddPrefix(storage.Etcd.KeyRootFunc(test.TestContext()))
-	pod := validNewPod()
 	test.TestList(
-		pod,
+		validNewPod(),
 		func(objects []runtime.Object) []runtime.Object {
 			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
 		func(resourceVersion uint64) {
 			registrytest.SetResourceVersion(fakeClient, resourceVersion)
 		})
+}
+
+func TestEtcdWatch(t *testing.T) {
+	storage, _, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestWatch(
+		validNewPod(),
+		func() {
+			fakeClient.WaitForWatchCompletion()
+		},
+		func(err error) {
+			fakeClient.WatchInjectError <- err
+		},
+		func(obj runtime.Object, action string) error {
+			return registrytest.EmitObject(fakeClient, obj, action)
+		},
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matchin fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+		},
+		registrytest.WatchActions,
+	)
 }
 
 func TestEtcdCreate(t *testing.T) {
@@ -891,109 +920,5 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	}
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-}
-
-func TestEtcdWatchPods(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	watching, err := storage.Watch(ctx,
-		labels.Everything(),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchPodsMatch(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: "default",
-			Labels: map[string]string{
-				"name": "foo",
-			},
-		},
-	}
-	podBytes, _ := testapi.Codec().Encode(pod)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(podBytes),
-		},
-	}
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Error("unexpected timeout from result channel")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchPodsNotMatch(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"name": "bar",
-			},
-		},
-	}
-	podBytes, _ := testapi.Codec().Encode(pod)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(podBytes),
-		},
-	}
-
-	select {
-	case <-watching.ResultChan():
-		t.Error("unexpected result from result channel")
-	case <-time.After(time.Millisecond * 100):
-		// expected case
 	}
 }
