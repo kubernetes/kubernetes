@@ -120,21 +120,18 @@ into apiserver start parameters.
 **easyrsa** can be used to manually generate certificates for your cluster.
 
 1.  Download, unpack, and initialize the patched version of easyrsa3.
-
-          curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
-          tar xzf easy-rsa.tar.gz
-          cd easy-rsa-master/easyrsa3
-          ./easyrsa init-pki
-1.  Generate a CA. (`--batch` set automatic mode. `--req-cn` default CN to use.)
-
-          ./easyrsa --batch "--req-cn=${MASTER_IP}@`date +%s`" build-ca nopass
-1.  Generate server certificate and key.
+    `curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz`
+    `tar xzf easy-rsa.tar.gz`
+    `cd easy-rsa-master/easyrsa3`
+    `./easyrsa init-pki`
+2.  Generate a CA. (--batch set automatic mode. --req-cn default CN to use.)
+    `./easyrsa --batch "--req-cn=${MASTER_IP}@date +%s" build-ca nopass`
+3.  Generate server certificate and key.
     (build-server-full [filename]: Generate a keypair and sign locally for a client or server)
-
-          ./easyrsa --subject-alt-name="IP:${MASTER_IP}" build-server-full kubernetes-master nopass
-1.  Copy `pki/ca.crt`  `pki/issued/kubernetes-master.crt`
-    `pki/private/kubernetes-master.key` to your directory.
-1.  Remember fill the parameters
+    `./easyrsa --subject-alt-name="${MASTER_IP}" build-server-full kubernetes-master nopass`
+4.  Copy /pki/ca.crt  /pki/issued/kubernetes-master.crt
+    /pki/private/kubernetes-master.key to your directory.
+5.  Remember fill the parameters
     `--client-ca-file=/yourdirectory/ca.crt`
     `--tls-cert-file=/yourdirectory/server.cert`
     `--tls-private-key-file=/yourdirectory/server.key`
@@ -144,16 +141,16 @@ into apiserver start parameters.
 
 1.  Generate a ca.key with 2048bit
     `openssl genrsa -out ca.key 2048`
-1.  According to the ca.key generate a ca.crt.  (-days set the certificate effective time).
+2.  According to the ca.key generate a ca.crt.  (-days set the certificate effective time).
     `openssl req -x509 -new -nodes -key ca.key -subj "/CN=${MASTER_IP}" -days 10000 -out ca.crt`
-1.  Generate a server.key with 2048bit
+3.  Generate a server.key with 2048bit
     `openssl genrsa -out server.key 2048`
-1.  According to the server.key generate a server.csr.
+4.  According to the server.key generate a server.csr.
     `openssl req -new -key server.key -subj "/CN=${MASTER_IP}" -out server.csr`
-1.  According to the ca.key, ca.crt and server.csr generate the server.crt.
+5.  According to the ca.key, ca.crt and server.csr generate the server.crt.
     `openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
     -days 10000`
-1.  View the certificate.
+6.  View the certificate.
     `openssl x509  -noout -text -in ./server.crt`
     Finally, do not forget fill the same parameters and add parameters into apiserver start parameters.
 
