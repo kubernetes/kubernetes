@@ -121,6 +121,7 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
   instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
   admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+  overlay_network_provider: '$(echo "$OVERLAY_NETWORK_PROVIDER" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master
