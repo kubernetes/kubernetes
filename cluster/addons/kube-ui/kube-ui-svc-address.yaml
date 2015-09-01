@@ -9,7 +9,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-ui
-  externalIPs: [ {{ pillar['kube_ui_public'] }} ]
+  externalIPs: [ 10.1.4.80 ]
   ports:
   - port: 80
     targetPort: 8080

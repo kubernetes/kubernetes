@@ -8,7 +8,7 @@ metadata:
   namespace: kube-system
 subsets:
 - addresses:
-  - ip: {{ pillar['kube_ui_public'] }}
+  - ip: 10.1.4.80
   ports:
   - port: 8080
     protocol: TCP
