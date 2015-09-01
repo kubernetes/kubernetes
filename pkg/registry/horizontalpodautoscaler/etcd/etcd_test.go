@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
 	// Ensure that expapi/v1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/expapi/v1alpha1"
+	_ "k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"

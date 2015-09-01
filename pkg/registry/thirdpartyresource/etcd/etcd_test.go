@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/v1alpha1"
+	"k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -36,7 +36,7 @@ import (
 
 func init() {
 	// Ensure that expapi/v1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
-	_ = v1alpha1.ThirdPartyResource{}
+	_ = v1.ThirdPartyResource{}
 }
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
