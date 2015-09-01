@@ -83,6 +83,8 @@ func TestFindExternalAddress(t *testing.T) {
 	}
 }
 
+var versionsToTest = []string{"v1", "v3"}
+
 type Foo struct {
 	api.TypeMeta   `json:",inline"`
 	api.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
@@ -98,7 +100,7 @@ type FooList struct {
 	items []Foo `json:"items"`
 }
 
-func initThirdParty(t *testing.T) (*tools.FakeEtcdClient, *httptest.Server) {
+func initThirdParty(t *testing.T, version string) (*tools.FakeEtcdClient, *httptest.Server) {
 	master := &Master{}
 	api := &expapi.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
@@ -107,7 +109,7 @@ func initThirdParty(t *testing.T) (*tools.FakeEtcdClient, *httptest.Server) {
 		Versions: []expapi.APIVersion{
 			{
 				APIGroup: "group",
-				Name:     "v3",
+				Name:     version,
 			},
 		},
 	}
@@ -127,12 +129,18 @@ func initThirdParty(t *testing.T) (*tools.FakeEtcdClient, *httptest.Server) {
 }
 
 func TestInstallThirdPartyAPIList(t *testing.T) {
-	fakeClient, server := initThirdParty(t)
+	for _, version := range versionsToTest {
+		testInstallThirdPartyAPIListVersion(t, version)
+	}
+}
+
+func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
+	fakeClient, server := initThirdParty(t, version)
 	defer server.Close()
 
 	fakeClient.ExpectNotFoundGet(etcdtest.PathPrefix() + "/ThirdPartyResourceData/company.com/foos/default")
 
-	resp, err := http.Get(server.URL + "/thirdparty/company.com/v1/namespaces/default/foos")
+	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -190,7 +198,13 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 }
 
 func TestInstallThirdPartyAPIGet(t *testing.T) {
-	fakeClient, server := initThirdParty(t)
+	for _, version := range versionsToTest {
+		testInstallThirdPartyAPIGetVersion(t, version)
+	}
+}
+
+func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
+	fakeClient, server := initThirdParty(t, version)
 	defer server.Close()
 
 	expectedObj := Foo{
@@ -198,7 +212,8 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 			Name: "test",
 		},
 		TypeMeta: api.TypeMeta{
-			Kind: "Foo",
+			Kind:       "Foo",
+			APIVersion: version,
 		},
 		SomeField:  "test field",
 		OtherField: 10,
@@ -209,7 +224,7 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 		return
 	}
 
-	resp, err := http.Get(server.URL + "/thirdparty/company.com/v1/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -229,7 +244,13 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 }
 
 func TestInstallThirdPartyAPIPost(t *testing.T) {
-	fakeClient, server := initThirdParty(t)
+	for _, version := range versionsToTest {
+		testInstallThirdPartyAPIPostForVersion(t, version)
+	}
+}
+
+func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
+	fakeClient, server := initThirdParty(t, version)
 	defer server.Close()
 
 	inputObj := Foo{
@@ -237,7 +258,8 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 			Name: "test",
 		},
 		TypeMeta: api.TypeMeta{
-			Kind: "Foo",
+			Kind:       "Foo",
+			APIVersion: version,
 		},
 		SomeField:  "test field",
 		OtherField: 10,
@@ -248,7 +270,7 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 		return
 	}
 
-	resp, err := http.Post(server.URL+"/thirdparty/company.com/v1/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
+	resp, err := http.Post(server.URL+"/thirdparty/company.com/"+version+"/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -270,6 +292,7 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 	etcdResp, err := fakeClient.Get(etcdtest.PathPrefix()+"/ThirdPartyResourceData/company.com/foos/default/test", false, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
 	}
 	obj, err := explatest.Codec.Decode([]byte(etcdResp.Node.Value))
 	if err != nil {
@@ -290,7 +313,13 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 }
 
 func TestInstallThirdPartyAPIDelete(t *testing.T) {
-	fakeClient, server := initThirdParty(t)
+	for _, version := range versionsToTest {
+		testInstallThirdPartyAPIDeleteVersion(t, version)
+	}
+}
+
+func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
+	fakeClient, server := initThirdParty(t, version)
 	defer server.Close()
 
 	expectedObj := Foo{
@@ -309,7 +338,7 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 		return
 	}
 
-	resp, err := http.Get(server.URL + "/thirdparty/company.com/v1/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -328,7 +357,7 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	resp, err = httpDelete(server.URL + "/thirdparty/company.com/v1/namespaces/default/foos/test")
+	resp, err = httpDelete(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -338,7 +367,7 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 		t.Errorf("unexpected status: %v", resp)
 	}
 
-	resp, err = http.Get(server.URL + "/thirdparty/company.com/v1/namespaces/default/foos/test")
+	resp, err = http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
