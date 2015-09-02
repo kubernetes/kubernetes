@@ -154,6 +154,12 @@ function create-provision-scripts {
     echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
     echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
     echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
+    echo "OVERLAY_NETWORK_PROVIDER='${OVERLAY_NETWORK_PROVIDER:-}'"
+    echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
+    echo "SERVICE_CLUSTER_IP_GW='${SERVICE_CLUSTER_IP_GW:-}'"
+    echo "KUBE_UI_IP_PUBLIC='${KUBE_UI_IP_PUBLIC:-}'"
+    echo "DNS_SERVER_IP_PUBLIC='${DNS_SERVER_IP_PUBLIC:-}'"
+
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"

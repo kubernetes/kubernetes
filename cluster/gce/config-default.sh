@@ -108,3 +108,10 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAcco
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
+
+# opencontrail settings
+OVERLAY_NETWORK_PROVIDER="${OVERLAY_NETWORK_PROVIDER:-none}" # opencontrail
+OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+SERVICE_CLUSTER_IP_GW="${SERVICE_CLUSTER_IP_GW:-10.0.0.1}"
+KUBE_UI_IP_PUBLIC="${KUBE_UI_IP_PUBLIC:-10.1.4.80}"
+DNS_SERVER_IP_PUBLIC="${DNS_SERVER_IP_PUBLIC:-10.1.4.53}"
