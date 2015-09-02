@@ -150,7 +150,7 @@ function verify-master() {
         validated="1"
         ((try_count=try_count+2))
         if [[ ${try_count} -gt ${PROCESS_CHECK_TIMEOUT} ]]; then
-          printf "\nWarning: Process \"${daemon}\" status check timeout, please check manually.\n"
+          printf "\nWarning: Process \"${daemon}\" failed to run on ${MASTER}, please check.\n"
           exit 1
         fi
         sleep 2
@@ -178,7 +178,7 @@ function verify-minion() {
         validated="1"
         ((try_count=try_count+2))
         if [[ ${try_count} -gt ${PROCESS_CHECK_TIMEOUT} ]] ; then
-          printf "\nWarning: Process \"${daemon}\" status check timeout, please check manually.\n"
+          printf "\nWarning: Process \"${daemon}\" failed to run on ${1}, please check.\n"
           exit 1
         fi
         sleep 2
@@ -237,13 +237,14 @@ function provision-master() {
   ensure-setup-dir ${MASTER}
 
   # scp -r ${SSH_OPTS} master config-default.sh copy-files.sh util.sh "${MASTER}:${KUBE_TEMP}" 
-  kube-scp ${MASTER} "${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}" 
+  kube-scp ${MASTER} "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}" 
   (
     echo "cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes"
     echo "chmod -R +x /opt/kubernetes/bin"
 
+    echo "bash ${KUBE_TEMP}/make-ca-cert.sh ${master_ip} IP:${master_ip},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
     echo "bash ${KUBE_TEMP}/master/scripts/etcd.sh"
-    echo "bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE}"
+    echo "bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE} ${ADMISSION_CONTROL}"
     echo "bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${master_ip}"
     echo "bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${master_ip}"
 
@@ -265,10 +266,10 @@ function provision-minion() {
   local master_ip=${MASTER#*@}
   local minion=$1
   local minion_ip=${minion#*@}
-  ensure-setup-dir ${minion_ip}
+  ensure-setup-dir ${minion}
 
   # scp -r ${SSH_OPTS} minion config-default.sh copy-files.sh util.sh "${minion_ip}:${KUBE_TEMP}" 
-  kube-scp ${minion_ip} "${ROOT}/binaries/minion ${ROOT}/minion ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
+  kube-scp ${minion} "${ROOT}/binaries/minion ${ROOT}/minion ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
   (
     echo "cp -r ${KUBE_TEMP}/minion/bin /opt/kubernetes"
     echo "chmod -R +x /opt/kubernetes/bin"
@@ -278,7 +279,7 @@ function provision-minion() {
     echo "bash ${KUBE_TEMP}/minion/scripts/kubelet.sh ${master_ip} ${minion_ip}"
     echo "bash ${KUBE_TEMP}/minion/scripts/proxy.sh ${master_ip}"
 
-  ) | kube-ssh "${minion_ip}"
+  ) | kube-ssh "${minion}"
 }
 
 # Create dirs that'll be used during setup on target machine.
@@ -297,7 +298,7 @@ function ensure-setup-dir() {
 function kube-ssh() {
   local host="$1"
   shift
-  ssh ${SSH_OPTS-} "${host}" "$@" >/dev/null 2>&1
+  ssh ${SSH_OPTS-} "${host}" "$@" # >/dev/null 2>&1
 }
 
 # Copy file recursively over ssh
