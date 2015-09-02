@@ -218,8 +218,6 @@ replicationcontrollers   0         20
 resourcequotas           1         1
 secrets                  1         10
 services                 0         5
-
-
 ```
 
 ## More information
