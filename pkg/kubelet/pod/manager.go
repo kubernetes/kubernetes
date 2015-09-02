@@ -43,6 +43,7 @@ type Manager interface {
 	GetPods() []*api.Pod
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
+	GetPodByUID(types.UID) (*api.Pod, bool)
 	GetPodByMirrorPod(*api.Pod) (*api.Pod, bool)
 	GetMirrorPodByPod(*api.Pod) (*api.Pod, bool)
 	GetPodsAndMirrorPods() ([]*api.Pod, []*api.Pod)
@@ -175,6 +176,15 @@ func (pm *basicManager) getAllPods() []*api.Pod {
 func (pm *basicManager) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	podFullName := kubecontainer.BuildPodFullName(name, namespace)
 	return pm.GetPodByFullName(podFullName)
+}
+
+// GetPodByUID provides the (non-mirror) pod that matches pod UID as well as
+// whether the pod was found.
+func (pm *basicManager) GetPodByUID(uid types.UID) (*api.Pod, bool) {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	pod, ok := pm.podByUID[uid]
+	return pod, ok
 }
 
 // GetPodByName returns the (non-mirror) pod that matches full name, as well as
