@@ -823,6 +823,7 @@ function kube-up {
     echo "readonly SERVICE_CLUSTER_IP_GW='${SERVICE_CLUSTER_IP_GW:-}'"
     echo "readonly DNS_SERVER_IP_PUBLIC='${DNS_SERVER_IP_PUBLIC:-}'"
     echo "readonly KUBE_UI_IP_PUBLIC='${KUBE_UI_IP_PUBLIC:-}'"
+    echo "readonly OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
     echo "readonly OVERLAY_NETWORK_PROVIDER='${OVERLAY_NETWORK_PROVIDER:-}'"
     echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE:-}'"
