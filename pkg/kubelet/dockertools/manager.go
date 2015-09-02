@@ -476,6 +476,14 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		if containerStatus, found := statuses[container.Name]; found {
 			reason, ok := dm.reasonCache.Get(uid, container.Name)
 			if ok && reason == kubecontainer.ErrCrashLoopBackOff.Error() {
+				// We need to increment the restart count if we are going to
+				// move the current state to last terminated state.
+				if containerStatus.State.Terminated != nil {
+					lastObservedTime, ok := lastObservedTime[container.Name]
+					if !ok || containerStatus.State.Terminated.FinishedAt.After(lastObservedTime.Time) {
+						containerStatus.RestartCount += 1
+					}
+				}
 				containerStatus.LastTerminationState = containerStatus.State
 				containerStatus.State.Waiting = &api.ContainerStateWaiting{Reason: reason}
 				containerStatus.State.Running = nil
