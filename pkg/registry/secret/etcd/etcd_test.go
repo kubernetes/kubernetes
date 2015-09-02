@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -45,18 +44,12 @@ func validNewSecret(name string) *api.Secret {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	secret := validNewSecret("foo")
 	secret.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
 		// valid
 		secret,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Secret{},
 		&api.Secret{
@@ -72,19 +65,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewSecret("foo"),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Secret)
@@ -92,4 +76,16 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 	)
+}
+
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewSecret("foo"))
+}
+
+func TestList(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewSecret("foo"))
 }

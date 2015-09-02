@@ -61,18 +61,12 @@ func validChangedEndpoints() *api.Endpoints {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	endpoints := validNewEndpoints()
 	endpoints.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		endpoints,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Endpoints{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
@@ -82,19 +76,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).AllowCreateOnUpdate()
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validNewEndpoints(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Endpoints)
@@ -135,26 +120,16 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdGetEndpoints(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	endpoints := validNewEndpoints()
-	test.TestGet(endpoints)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewEndpoints())
 }
 
-func TestEtcdListEndpoints(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	endpoints := validNewEndpoints()
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	test.TestList(
-		endpoints,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewEndpoints())
 }
 
 func TestEndpointsDecode(t *testing.T) {

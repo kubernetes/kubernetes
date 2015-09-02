@@ -20,9 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -46,34 +44,14 @@ func validNewNamespace() *api.Namespace {
 	}
 }
 
-func validChangedNamespace() *api.Namespace {
-	namespace := validNewNamespace()
-	namespace.ResourceVersion = "1"
-	namespace.Labels = map[string]string{
-		"foo": "bar",
-	}
-	return namespace
-}
-
-func TestStorage(t *testing.T) {
-	storage, _ := newStorage(t)
-	namespace.NewRegistry(storage)
-}
-
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		namespace,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Namespace{
 			ObjectMeta: api.ObjectMeta{Name: "bad value"},
@@ -137,24 +115,14 @@ func TestNamespaceDecode(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	namespace := validNewNamespace()
-	test.TestGet(namespace)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestGet(validNewNamespace())
 }
 
 func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	namespace := validNewNamespace()
-	test.TestList(
-		namespace,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestList(validNewNamespace())
 }
 
 func TestDeleteNamespace(t *testing.T) {

@@ -37,17 +37,6 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-// createController is a helper function that returns a controller with the updated resource version.
-func createController(storage *REST, dc expapi.Daemon, t *testing.T) (expapi.Daemon, error) {
-	ctx := api.WithNamespace(api.NewContext(), dc.Namespace)
-	obj, err := storage.Create(ctx, &dc)
-	if err != nil {
-		t.Errorf("Failed to create controller, %v", err)
-	}
-	newDc := obj.(*expapi.Daemon)
-	return *newDc, nil
-}
-
 func validNewDaemon() *expapi.Daemon {
 	return &expapi.Daemon{
 		ObjectMeta: api.ObjectMeta{
@@ -80,18 +69,12 @@ var validDaemon = validNewDaemon()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	daemon := validNewDaemon()
 	daemon.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		daemon,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid (invalid selector)
 		&expapi.Daemon{
 			Spec: expapi.DaemonSpec{
@@ -104,19 +87,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewDaemon(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*expapi.Daemon)
@@ -147,40 +121,23 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
-func TestEtcdGetController(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewDaemon())
 }
 
-func TestEtcdListControllers(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	test.TestList(
-		validNewDaemon(),
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewDaemon())
 }
 
-func TestWatchControllers(t *testing.T) {
+func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validDaemon,
-		func() {
-			fakeClient.WaitForWatchCompletion()
-		},
-		func(err error) {
-			fakeClient.WatchInjectError <- err
-		},
-		func(obj runtime.Object, action string) error {
-			return registrytest.EmitObject(fakeClient, obj, action)
-		},
 		// matching labels
 		[]labels.Set{
 			{"a": "b"},
@@ -199,11 +156,10 @@ func TestWatchControllers(t *testing.T) {
 			{"metadata.name": "bar"},
 			{"name": "foo"},
 		},
-		registrytest.WatchActions,
 	)
 }
 
-func TestEtcdDeleteController(t *testing.T) {
+func TestEtcdDeleteDaemon(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, err := storage.KeyFunc(ctx, validDaemon.Name)
@@ -248,7 +204,7 @@ func TestDelete(t *testing.T) {
 		return dc
 	}
 	gracefulSetFn := func() bool {
-		// If the controller is still around after trying to delete either the delete
+		// If the daemon is still around after trying to delete either the delete
 		// failed, or we're deleting it gracefully.
 		if fakeClient.Data[key].R.Node != nil {
 			return true

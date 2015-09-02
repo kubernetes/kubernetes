@@ -58,18 +58,12 @@ func validNewHorizontalPodAutoscaler(name string) *expapi.HorizontalPodAutoscale
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	autoscaler := validNewHorizontalPodAutoscaler("foo")
 	autoscaler.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		autoscaler,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&expapi.HorizontalPodAutoscaler{},
 	)
@@ -77,19 +71,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewHorizontalPodAutoscaler("foo"),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*expapi.HorizontalPodAutoscaler)
@@ -128,22 +113,12 @@ func TestDelete(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	autoscaler := validNewHorizontalPodAutoscaler("foo")
-	test.TestGet(autoscaler)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewHorizontalPodAutoscaler("foo"))
 }
 
 func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	autoscaler := validNewHorizontalPodAutoscaler("foo")
-	test.TestList(
-		autoscaler,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewHorizontalPodAutoscaler("foo"))
 }

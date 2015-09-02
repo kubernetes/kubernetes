@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -60,29 +59,14 @@ func validNewResourceQuota() *api.ResourceQuota {
 	}
 }
 
-func validChangedResourceQuota() *api.ResourceQuota {
-	resourcequota := validNewResourceQuota()
-	resourcequota.ResourceVersion = "1"
-	resourcequota.Labels = map[string]string{
-		"foo": "bar",
-	}
-	return resourcequota
-}
-
 func TestCreate(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		resourcequota,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.ResourceQuota{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
@@ -177,40 +161,23 @@ func TestDeleteResourceQuota(t *testing.T) {
 	}
 }
 
-func TestEtcdGet(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewResourceQuota())
 }
 
-func TestEtcdList(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.Etcd.KeyRootFunc(test.TestContext()))
-	test.TestList(
-		validNewResourceQuota(),
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewResourceQuota())
 }
 
-func TestEtcdWatch(t *testing.T) {
+func TestWatch(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validNewResourceQuota(),
-		func() {
-			fakeClient.WaitForWatchCompletion()
-		},
-		func(err error) {
-			fakeClient.WatchInjectError <- err
-		},
-		func(obj runtime.Object, action string) error {
-			return registrytest.EmitObject(fakeClient, obj, action)
-		},
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -225,7 +192,6 @@ func TestEtcdWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},
-		registrytest.WatchActions,
 	)
 }
 
