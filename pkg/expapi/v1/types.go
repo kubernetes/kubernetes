@@ -24,29 +24,30 @@ import (
 
 // ScaleSpec describes the attributes a Scale subresource
 type ScaleSpec struct {
-	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas,omitempty" description:"number of replicas desired; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"`
+	// Replicas is the number of desired replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
+	Replicas int `json:"replicas,omitempty"`
 }
 
 // ScaleStatus represents the current status of a Scale subresource.
 type ScaleStatus struct {
-	// Replicas is the number of actual replicas.
-	Replicas int `json:"replicas" description:"most recently oberved number of replicas; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"`
+	// Replicas is the number of actual replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	Replicas int `json:"replicas"`
 
-	// Selector is a label query over pods that should match the replicas count.
-	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to be controlled by this replication controller, if empty defaulted to labels on Pod template; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"`
+	// Selector is a label query over pods that should match the replicas count. If it is empty, it is defaulted to labels on Pod template; More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // Scale subresource, applicable to ReplicationControllers and (in future) Deployment.
 type Scale struct {
-	v1.TypeMeta   `json:",inline"`
-	v1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+	v1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the behavior of the scale.
-	Spec ScaleSpec `json:"spec,omitempty" description:"specification of the desired behavior of the scale; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+	// Spec defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	Spec ScaleSpec `json:"spec,omitempty"`
 
-	// Status represents the current status of the scale.
-	Status ScaleStatus `json:"status,omitempty" description:"most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+	// Status represents the current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	Status ScaleStatus `json:"status,omitempty"`
 }
 
 // Dummy definition
@@ -56,11 +57,16 @@ type ReplicationControllerDummy struct {
 
 // SubresourceReference contains enough information to let you inspect or modify the referred subresource.
 type SubresourceReference struct {
-	Kind        string `json:"kind,omitempty" description:"kind of the referent; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"`
-	Namespace   string `json:"namespace,omitempty" description:"namespace of the referent; see http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"`
-	Name        string `json:"name,omitempty" description:"name of the referent; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"`
-	APIVersion  string `json:"apiVersion,omitempty" description:"API version of the referent"`
-	Subresource string `json:"subresource,omitempty" decription:"subresource name of the referent"`
+	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+	Kind string `json:"kind,omitempty"`
+	// Namespace of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md
+	Namespace string `json:"namespace,omitempty"`
+	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	Name string `json:"name,omitempty"`
+	// API version of the referent
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Subresource name of the referent
+	Subresource string `json:"subresource,omitempty"`
 }
 
 // ResourceConsumption is an object for specifying average resource consumption of a particular resource.
@@ -73,32 +79,32 @@ type ResourceConsumption struct {
 type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
 	// and will set the desired number of pods by modyfying its spec.
-	ScaleRef *SubresourceReference `json:"scaleRef" description:"reference to scale subresource for quering the current resource cosumption and for setting the desired number of pods"`
+	ScaleRef *SubresourceReference `json:"scaleRef"`
 	// MinCount is the lower limit for the number of pods that can be set by the autoscaler.
-	MinCount int `json:"minCount" description:"lower limit for the number of pods"`
+	MinCount int `json:"minCount"`
 	// MaxCount is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinCount.
-	MaxCount int `json:"maxCount" description:"upper limit for the number of pods"`
+	MaxCount int `json:"maxCount"`
 	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
 	// Currently two types of resources are supported: "cpu" and "memory".
-	Target ResourceConsumption `json:"target" description:"target average consumption of resource that the autoscaler will try to maintain by adjusting the desired number of pods"`
+	Target ResourceConsumption `json:"target"`
 }
 
 // HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatus struct {
 	// CurrentReplicas is the number of replicas of pods managed by this autoscaler.
-	CurrentReplicas int `json:"currentReplicas" description:"number of replicas observed by the autoscaler"`
+	CurrentReplicas int `json:"currentReplicas"`
 
 	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.
-	DesiredReplicas int `json:"desiredReplicas" description:"number of desired replicas"`
+	DesiredReplicas int `json:"desiredReplicas"`
 
 	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
 	// try to maintain by adjusting the desired number of pods.
 	// Two types of resources are supported: "cpu" and "memory".
-	CurrentConsumption *ResourceConsumption `json:"currentConsumption" description:"current resource consumption"`
+	CurrentConsumption *ResourceConsumption `json:"currentConsumption"`
 
 	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
 	// This is used by the autoscaler to controll how often the number of pods is changed.
-	LastScaleTimestamp *util.Time `json:"lastScaleTimestamp,omitempty" description:"last time the autoscaler made decision about changing the number of pods"`
+	LastScaleTimestamp *util.Time `json:"lastScaleTimestamp,omitempty"`
 }
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
@@ -106,8 +112,8 @@ type HorizontalPodAutoscaler struct {
 	v1.TypeMeta   `json:",inline"`
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the behaviour of autoscaler.
-	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the autoscaler; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+	// Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
 
 	// Status represents the current information about the autoscaler.
 	Status *HorizontalPodAutoscalerStatus `json:"status,omitempty"`
@@ -118,39 +124,52 @@ type HorizontalPodAutoscalerList struct {
 	v1.TypeMeta `json:",inline"`
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	Items []HorizontalPodAutoscaler `json:"items" description:"list of horizontal pod autoscalers"`
+	// Items is the list of horizontal pod autoscalers.
+	Items []HorizontalPodAutoscaler `json:"items"`
 }
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
 type ThirdPartyResource struct {
-	v1.TypeMeta   `json:",inline"`
-	v1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+	v1.TypeMeta `json:",inline"`
 
-	Description string `json:"description,omitempty" description:"The description of this object"`
+	// Standard object metadata
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	Versions []APIVersion `json:"versions,omitempty" description:"The versions for this third party object"`
+	// Description is the description of this object.
+	Description string `json:"description,omitempty"`
+
+	// Versions are versions for this third party object
+	Versions []APIVersion `json:"versions,omitempty"`
 }
 
 type ThirdPartyResourceList struct {
 	v1.TypeMeta `json:",inline"`
-	v1.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
 
-	Items []ThirdPartyResource `json:"items" description:"items is a list of schema objects"`
+	// Standard list metadata.
+	v1.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of horizontal pod autoscalers.
+	Items []ThirdPartyResource `json:"items"`
 }
 
 // An APIVersion represents a single concrete version of an object model.
 type APIVersion struct {
-	Name     string `json:"name,omitempty" description:"name of this version (e.g. 'v1')"`
-	APIGroup string `json:"apiGroup,omitempty" description:"The API group to add this object into, default 'experimental'"`
+	// Name of this version (e.g. 'v1').
+	Name string `json:"name,omitempty"`
+
+	// The API group to add this object into, default 'experimental'.
+	APIGroup string `json:"apiGroup,omitempty"`
 }
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 type ThirdPartyResourceData struct {
-	v1.TypeMeta   `json:",inline"`
-	v1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+	v1.TypeMeta `json:",inline"`
+	// Standard object metadata.
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
+	// Data is the raw JSON data for this data.
+	Data []byte `json:"name,omitempty"`
 }
 
 type Deployment struct {
@@ -158,26 +177,26 @@ type Deployment struct {
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the Deployment.
-	Spec DeploymentSpec `json:"spec,omitempty" description: "specification of the desired behavior of deployment"`
+	Spec DeploymentSpec `json:"spec,omitempty"`
 
 	// Most recently observed status of the Deployment.
-	Status DeploymentStatus `json:"status,omitempty" description: "most recently observed status of deployment"`
+	Status DeploymentStatus `json:"status,omitempty"`
 }
 
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
-	Replicas *int `json:"replicas,omitempty" description:"number of desired pods; Defaults to 1"`
+	Replicas *int `json:"replicas,omitempty"`
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be scaled down.
-	Selector map[string]string `json:"selector,omitempty" description:"label selector for pods; existing replication controllers whose pods are selected by this will be scaled down`
+	Selector map[string]string `json:"selector,omitempty"`
 
-	// Describes the pods that will be created.
-	Template *v1.PodTemplateSpec `json:"template,omitempty" description:"template to describe the pods that will be created"`
+	// Template describes the pods that will be created.
+	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 
 	// The deployment strategy to use to replace existing pods with new ones.
-	Strategy DeploymentStrategy `json:"strategy,omitempty" description:"deployment strategy to use to replace existing pods with new ones"`
+	Strategy DeploymentStrategy `json:"strategy,omitempty"`
 
 	// Key of the selector that is added to existing RCs (and label key that is
 	// added to its pods) to prevent the existing RCs to select new pods (and old
@@ -186,18 +205,20 @@ type DeploymentSpec struct {
 	// not add any selector and label. If unspecified, system uses
 	// "deployment.kubernetes.io/podTemplateHash".
 	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
-	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty" description:"key of the label that is added to existing pods to distinguish them from new ones; deployment.kubernetes.io/podTemplateHash is used by default; value of this label is hash of pod template spec; no label is added if this is set to empty string"`
+	// No label is added if this is set to empty string.
+	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
 }
 
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
-	Type DeploymentType `json:"type,omitempty" description:"type of deployment; can be Recreate or RollingUpdate; defaults to RollingUpdate"`
+	Type DeploymentType `json:"type,omitempty"`
 
-	// TODO: Update this to follow our convention for oneOf, whatever we decide it
-	// to be.
 	// Rolling update config params. Present only if DeploymentType =
 	// RollingUpdate.
-	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty" description:"rolling update config params; present only if deploymentType=RollingUpdate"`
+	//---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be.
+	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty"`
 }
 
 type DeploymentType string
@@ -222,7 +243,7 @@ type RollingUpdateDeployment struct {
 	// can be scaled down further, followed by scaling up the new RC, ensuring
 	// that at least 70% of original number of pods are available at all times
 	// during the update.
-	MaxUnavailable *util.IntOrString `json:"maxUnavailable,omitempty" description:"max number of pods that can be unavailable during the update; value can be an absolute number or a percentage of total pods at start of update"`
+	MaxUnavailable *util.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// The maximum number of pods that can be scheduled above the original number of
 	// pods.
@@ -234,28 +255,29 @@ type RollingUpdateDeployment struct {
 	// immediately when the rolling update starts. Once old pods have been killed,
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of original pods.
-	MaxSurge *util.IntOrString `json:"maxSurge,omitempty" description:"max number of pods that can be scheduled above the original number of pods; value can be an absolute number or a percentage of total pods at start of update"`
+	MaxSurge *util.IntOrString `json:"maxSurge,omitempty"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	MinReadySeconds int `json:"minReadySeconds,omitempty" description:"min seconds for which a newly created pod should be ready for it to be considered available"`
+	MinReadySeconds int `json:"minReadySeconds,omitempty"`
 }
 
 type DeploymentStatus struct {
 	// Total number of ready pods targeted by this deployment (this
 	// includes both the old and new pods).
-	Replicas int `json:"replicas,omitempty" description:"total number of ready pods targeted by this deployment (includes both old and new pods"`
+	Replicas int `json:"replicas,omitempty"`
 
 	// Total number of new ready pods with the desired template spec.
-	UpdatedReplicas int `json:"updatedReplicas,omitempty" description:"total number of new ready pods with the desired template spec"`
+	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
 }
 
 type DeploymentList struct {
 	v1.TypeMeta `json:",inline"`
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	Items []Deployment `json:"items" description:"list of deployments"`
+	// Items is the list of deployments.
+	Items []Deployment `json:"items"`
 }
 
 // DaemonSpec is the specification of a daemon.
@@ -296,7 +318,7 @@ type Daemon struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the specification of the desired behavior of this daemon.
+	// Spec defines the desired behavior of this daemon.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Spec DaemonSpec `json:"spec,omitempty"`
 
