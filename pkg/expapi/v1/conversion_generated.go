@@ -62,6 +62,32 @@ func convert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *v1.C
 	return nil
 }
 
+func convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in *api.CephFSVolumeSource, out *v1.CephFSVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.CephFSVolumeSource))(in)
+	}
+	if in.Monitors != nil {
+		out.Monitors = make([]string, len(in.Monitors))
+		for i := range in.Monitors {
+			out.Monitors[i] = in.Monitors[i]
+		}
+	} else {
+		out.Monitors = nil
+	}
+	out.User = in.User
+	out.SecretFile = in.SecretFile
+	if in.SecretRef != nil {
+		out.SecretRef = new(v1.LocalObjectReference)
+		if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderVolumeSource, out *v1.CinderVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.CinderVolumeSource))(in)
@@ -722,6 +748,14 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *v1.V
 	} else {
 		out.Cinder = nil
 	}
+	if in.CephFS != nil {
+		out.CephFS = new(v1.CephFSVolumeSource)
+		if err := convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in.CephFS, out.CephFS, s); err != nil {
+			return err
+		}
+	} else {
+		out.CephFS = nil
+	}
 	return nil
 }
 
@@ -756,6 +790,32 @@ func convert_v1_Capabilities_To_api_Capabilities(in *v1.Capabilities, out *api.C
 	} else {
 		out.Drop = nil
 	}
+	return nil
+}
+
+func convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource(in *v1.CephFSVolumeSource, out *api.CephFSVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.CephFSVolumeSource))(in)
+	}
+	if in.Monitors != nil {
+		out.Monitors = make([]string, len(in.Monitors))
+		for i := range in.Monitors {
+			out.Monitors[i] = in.Monitors[i]
+		}
+	} else {
+		out.Monitors = nil
+	}
+	out.User = in.User
+	out.SecretFile = in.SecretFile
+	if in.SecretRef != nil {
+		out.SecretRef = new(api.LocalObjectReference)
+		if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -1418,6 +1478,14 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *api.V
 		}
 	} else {
 		out.Cinder = nil
+	}
+	if in.CephFS != nil {
+		out.CephFS = new(api.CephFSVolumeSource)
+		if err := convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource(in.CephFS, out.CephFS, s); err != nil {
+			return err
+		}
+	} else {
+		out.CephFS = nil
 	}
 	return nil
 }
@@ -2124,6 +2192,7 @@ func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		convert_api_Capabilities_To_v1_Capabilities,
+		convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
 		convert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
 		convert_api_ContainerPort_To_v1_ContainerPort,
 		convert_api_Container_To_v1_Container,
@@ -2180,6 +2249,7 @@ func init() {
 		convert_v1_APIVersion_To_expapi_APIVersion,
 		convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		convert_v1_Capabilities_To_api_Capabilities,
+		convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
 		convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		convert_v1_ContainerPort_To_api_ContainerPort,
 		convert_v1_Container_To_api_Container,

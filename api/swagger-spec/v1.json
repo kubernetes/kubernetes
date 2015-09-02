@@ -12078,6 +12078,10 @@
       "$ref": "v1.CinderVolumeSource",
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -12319,6 +12323,38 @@
      }
     }
    },
+   "v1.CephFSVolumeSource": {
+    "id": "v1.CephFSVolumeSource",
+    "description": "CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "user": {
+      "type": "string",
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "secretFile": {
+      "type": "string",
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -12517,6 +12553,10 @@
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
      }
     }
    },
