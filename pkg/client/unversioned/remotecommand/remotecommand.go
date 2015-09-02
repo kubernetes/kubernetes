@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -155,17 +156,19 @@ func (e *Streamer) doStream() error {
 	}
 	defer conn.Close()
 
-	doneChan := make(chan struct{}, 2)
 	errorChan := make(chan error)
+	var wg sync.WaitGroup
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
+		// TODO: Always do wg.Done() once the bug with stdin not
+		// closing (and thus io.Copy never unblocking) is fixed
+		if s == api.StreamTypeStdout || s == api.StreamTypeStderr {
+			defer wg.Done()
+		}
 		glog.V(4).Infof("Copying %s", s)
 		defer glog.V(4).Infof("Done copying %s", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			glog.Errorf("Error copying %s: %v", s, err)
-		}
-		if s == api.StreamTypeStdout || s == api.StreamTypeStderr {
-			doneChan <- struct{}{}
 		}
 	}
 
@@ -175,6 +178,7 @@ func (e *Streamer) doStream() error {
 	if err != nil {
 		return err
 	}
+	defer errorStream.Reset()
 	go func() {
 		message, err := ioutil.ReadAll(errorStream)
 		if err != nil && err != io.EOF {
@@ -185,8 +189,8 @@ func (e *Streamer) doStream() error {
 			errorChan <- fmt.Errorf("Error executing remote command: %s", message)
 			return
 		}
+		errorChan <- nil
 	}()
-	defer errorStream.Reset()
 
 	if e.stdin != nil {
 		headers.Set(api.StreamType, api.StreamTypeStdin)
@@ -199,45 +203,38 @@ func (e *Streamer) doStream() error {
 		// because stdin is not closed until the process exits. If we try to call
 		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
 		// exit when the process exits, instead.
+		// Uncomment when the above is fixed:
+		// wg.Add(1)
 		go cp(api.StreamTypeStdin, remoteStdin, e.stdin)
 	}
 
-	waitCount := 0
-	completedStreams := 0
-
 	if e.stdout != nil {
-		waitCount++
 		headers.Set(api.StreamType, api.StreamTypeStdout)
 		remoteStdout, err := conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
 		defer remoteStdout.Reset()
+		wg.Add(1)
 		go cp(api.StreamTypeStdout, e.stdout, remoteStdout)
 	}
 
 	if e.stderr != nil && !e.tty {
-		waitCount++
 		headers.Set(api.StreamType, api.StreamTypeStderr)
 		remoteStderr, err := conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
 		defer remoteStderr.Reset()
+		wg.Add(1)
 		go cp(api.StreamTypeStderr, e.stderr, remoteStderr)
 	}
 
-Loop:
-	for {
-		select {
-		case <-doneChan:
-			completedStreams++
-			if completedStreams == waitCount {
-				break Loop
-			}
-		case err := <-errorChan:
-			return err
-		}
+	wg.Wait()
+
+	// We expect exactly one error
+	if err := <-errorChan; err != nil {
+		return err
 	}
 
 	return nil

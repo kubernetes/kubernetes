@@ -19,7 +19,7 @@ package remotecommand
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -63,6 +63,7 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 		for {
 			select {
 			case stream := <-streamCh:
+
 				streamType := stream.Headers().Get(api.StreamType)
 				switch streamType {
 				case api.StreamTypeError:
@@ -70,7 +71,6 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 					receivedStreams++
 				case api.StreamTypeStdin:
 					stdinStream = stream
-					stdinStream.Close()
 					receivedStreams++
 				case api.StreamTypeStdout:
 					stdoutStream = stream
@@ -83,6 +83,7 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 				}
 
 				defer stream.Reset()
+				defer stream.Close()
 
 				if receivedStreams == expectedStreams {
 					break WaitForStreams
@@ -92,19 +93,17 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 
 		if len(errorData) > 0 {
 			fmt.Fprint(errorStream, errorData)
-			errorStream.Close()
 		}
 
 		if len(stdoutData) > 0 {
 			fmt.Fprint(stdoutStream, stdoutData)
-			stdoutStream.Close()
 		}
 		if len(stderrData) > 0 {
 			fmt.Fprint(stderrStream, stderrData)
-			stderrStream.Close()
 		}
 		if len(stdinData) > 0 {
-			data, err := ioutil.ReadAll(stdinStream)
+			data := make([]byte, len(stdinData))
+			_, err := io.ReadFull(stdinStream, data)
 			if err != nil {
 				t.Errorf("%d: error reading stdin stream: %v", i, err)
 			}
