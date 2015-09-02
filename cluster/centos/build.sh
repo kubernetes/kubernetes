@@ -16,7 +16,7 @@
 
 # Download the flannel, etcd, docker, bridge-utils and K8s binaries automatically 
 # and store into binaries directory.
-# Run as root only
+# Run as sudoers only
 
 # author @kevin-wangzefeng
 
@@ -56,7 +56,7 @@ function download-releases() {
   curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest -o ${RELEASES_DIR}/docker
 
   echo "Download bridge-utils from yum repo ..."
-  yum --downloadonly --downloaddir=${RELEASES_DIR} install bridge-utils
+  sudo yum --downloadonly --downloaddir=${RELEASES_DIR} install bridge-utils
 
   mkdir -p ${RELEASES_DIR}/brctl-tmp
   local rpm_file=$(ls ${RELEASES_DIR}/bridge-utils-*.rpm)

@@ -32,7 +32,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 KUBECTL_PATH=${KUBE_ROOT}/cluster/centos/binaries/kubectl
 
 # Directory to be used for master and minion provisioning.
-KUBE_TEMP="~/kubernetes"
+KUBE_TEMP="~/kube_temp"
 
 
 # Must ensure that the following ENV vars are set
@@ -144,7 +144,7 @@ function verify-master() {
     local daemon
     for daemon in "${required_daemon[@]}"; do
       local rc=0
-      kube-ssh "${MASTER}" "pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
+      kube-ssh "${MASTER}" "sudo pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
       if [[ "${rc}" -ne "0" ]]; then
         printf "."
         validated="1"
@@ -172,7 +172,7 @@ function verify-minion() {
     local daemon
     for daemon in "${required_daemon[@]}"; do
       local rc=0
-      kube-ssh "${1}" "pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
+      kube-ssh "${1}" "sudo pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
       if [[ "${rc}" -ne "0" ]]; then
         printf "."
         validated="1"
@@ -193,17 +193,16 @@ function tear-down-master() {
 echo "[INFO] tear-down-master on ${MASTER}"
   for service_name in etcd kube-apiserver kube-controller-manager kube-scheduler ; do
       service_file="/usr/lib/systemd/system/${service_name}.service"
-      (
-        echo "if [[ -f $service_file ]]; then"
-        echo "systemctl stop $service_name"
-        echo "systemctl disable $service_name"
-        echo "rm -f $service_file"
-        echo "fi"
-      ) | kube-ssh "$MASTER"
+      kube-ssh "$MASTER" " \
+        if [[ -f $service_file ]]; then \
+          sudo systemctl stop $service_name; \
+          sudo systemctl disable $service_name; \
+          sudo rm -f $service_file; \
+        fi"
   done
-  kube-ssh "${MASTER}" "rm -rf /opt/kubernetes"
-  kube-ssh "${MASTER}" "rm -rf ${KUBE_TEMP}"
-  kube-ssh "${MASTER}" "rm -rf /var/lib/etcd"
+  kube-ssh "${MASTER}" "sudo rm -rf /opt/kubernetes"
+  kube-ssh "${MASTER}" "sudo rm -rf ${KUBE_TEMP}"
+  kube-ssh "${MASTER}" "sudo rm -rf /var/lib/etcd"
 }
 
 # Clean up on minion
@@ -211,17 +210,16 @@ function tear-down-minion() {
 echo "[INFO] tear-down-minion on $1"
   for service_name in kube-proxy kubelet docker flannel ; do
       service_file="/usr/lib/systemd/system/${service_name}.service"
-      (
-        echo "if [[ -f $service_file ]]; then"
-        echo "systemctl stop $service_name"
-        echo "systemctl disable $service_name"
-        echo "rm -f $service_file"
-        echo "fi"
-      ) | kube-ssh "$1"
+      kube-ssh "$1" " \
+        if [[ -f $service_file ]]; then \
+          sudo systemctl stop $service_name; \
+          sudo systemctl disable $service_name; \
+          sudo rm -f $service_file; \
+        fi"
   done
-  kube-ssh "$1" "rm -rf /run/flannel"
-  kube-ssh "$1" "rm -rf /opt/kubernetes"
-  kube-ssh "$1" "rm -rf ${KUBE_TEMP}"
+  kube-ssh "$1" "sudo rm -rf /run/flannel"
+  kube-ssh "$1" "sudo rm -rf /opt/kubernetes"
+  kube-ssh "$1" "sudo rm -rf ${KUBE_TEMP}"
 }
 
 # Provision master
@@ -238,17 +236,14 @@ function provision-master() {
 
   # scp -r ${SSH_OPTS} master config-default.sh copy-files.sh util.sh "${MASTER}:${KUBE_TEMP}" 
   kube-scp ${MASTER} "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}" 
-  (
-    echo "cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes"
-    echo "chmod -R +x /opt/kubernetes/bin"
-
-    echo "bash ${KUBE_TEMP}/make-ca-cert.sh ${master_ip} IP:${master_ip},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
-    echo "bash ${KUBE_TEMP}/master/scripts/etcd.sh"
-    echo "bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE} ${ADMISSION_CONTROL}"
-    echo "bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${master_ip}"
-    echo "bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${master_ip}"
-
-  ) | kube-ssh "${MASTER}"
+  kube-ssh "${MASTER}" " \
+    sudo cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes; \
+    sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo bash ${KUBE_TEMP}/make-ca-cert.sh ${master_ip} IP:${master_ip},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+    sudo bash ${KUBE_TEMP}/master/scripts/etcd.sh; \
+    sudo bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE} ${ADMISSION_CONTROL}; \
+    sudo bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${master_ip}; \
+    sudo bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${master_ip}"
 }
 
 
@@ -270,16 +265,13 @@ function provision-minion() {
 
   # scp -r ${SSH_OPTS} minion config-default.sh copy-files.sh util.sh "${minion_ip}:${KUBE_TEMP}" 
   kube-scp ${minion} "${ROOT}/binaries/minion ${ROOT}/minion ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
-  (
-    echo "cp -r ${KUBE_TEMP}/minion/bin /opt/kubernetes"
-    echo "chmod -R +x /opt/kubernetes/bin"
-
-    echo "bash ${KUBE_TEMP}/minion/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}"
-    echo "bash ${KUBE_TEMP}/minion/scripts/docker.sh \"${DOCKER_OPTS}\""
-    echo "bash ${KUBE_TEMP}/minion/scripts/kubelet.sh ${master_ip} ${minion_ip}"
-    echo "bash ${KUBE_TEMP}/minion/scripts/proxy.sh ${master_ip}"
-
-  ) | kube-ssh "${minion}"
+  kube-ssh "${minion}" " \
+    sudo cp -r ${KUBE_TEMP}/minion/bin /opt/kubernetes; \
+    sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo bash ${KUBE_TEMP}/minion/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
+    sudo bash ${KUBE_TEMP}/minion/scripts/docker.sh \"${DOCKER_OPTS}\"; \
+    sudo bash ${KUBE_TEMP}/minion/scripts/kubelet.sh ${master_ip} ${minion_ip}; \
+    sudo bash ${KUBE_TEMP}/minion/scripts/proxy.sh ${master_ip}"
 }
 
 # Create dirs that'll be used during setup on target machine.
@@ -287,18 +279,16 @@ function provision-minion() {
 # Assumed vars:
 #   KUBE_TEMP
 function ensure-setup-dir() {
-  (
-    echo "mkdir -p ${KUBE_TEMP}"
-    echo "mkdir -p /opt/kubernetes/bin"
-    echo "mkdir -p /opt/kubernetes/cfg"
-  ) | kube-ssh "${1}"
+  kube-ssh "${1}" "mkdir -p ${KUBE_TEMP}; \
+                   sudo mkdir -p /opt/kubernetes/bin; \
+                   sudo mkdir -p /opt/kubernetes/cfg"
 }
 
 # Run command over ssh
 function kube-ssh() {
   local host="$1"
   shift
-  ssh ${SSH_OPTS-} "${host}" "$@" # >/dev/null 2>&1
+  ssh ${SSH_OPTS} -t "${host}" "$@" >/dev/null 2>&1
 }
 
 # Copy file recursively over ssh
@@ -306,7 +296,7 @@ function kube-scp() {
   local host="$1"
   local src=($2)
   local dst="$3"
-  scp -r ${SSH_OPTS-} ${src[*]} "${host}:${dst}"
+  scp -r ${SSH_OPTS} ${src[*]} "${host}:${dst}"
 }
 
 # Ensure that we have a password created for validating to the master. Will
