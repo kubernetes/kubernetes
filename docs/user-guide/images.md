@@ -55,9 +55,9 @@ The `image` property of a container supports the same syntax as the `docker` com
 
 ## Updating Images
 
-The default pull policy is `PullIfNotPresent` which causes the Kubelet to not
+The default pull policy is `IfNotPresent` which causes the Kubelet to not
 pull an image if it already exists. If you would like to always force a pull
-you must set a pull image policy of `PullAlways` or specify a `:latest` tag on
+you must set a pull image policy of `Always` or specify a `:latest` tag on
 your image.
 
 ## Using a Private Registry
