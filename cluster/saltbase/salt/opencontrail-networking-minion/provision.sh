@@ -74,10 +74,10 @@ function prep_to_build()
 {
   if [ "$OS_TYPEi" == $REDHAT ]; then
     yum update
-    yum install -y automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel python-lxml
+    yum install -y automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel python-lxml git
   elif [ "$OS_TYPE" == $UBUNTU ]; then
     apt-get update
-    apt-get install -y automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev python-lxml
+    apt-get install -y automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev python-lxml git
   fi
 }
 
@@ -297,6 +297,19 @@ function cleanup()
   rm -rf ~/ockube
 }
 
+# Setup contrail manifest files under kubernetes
+function setup_contrail_vrouter_agent_manifest() {
+    cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | grep contrail-vrouter-agent | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
+    master $cmd
+
+    cmd='grep \"image\": /etc/contrail/manifests/* | cut -d "\"" -f 4 | sort -u | xargs -n1 sudo docker pull'
+    RETRY=20
+    WAIT=3
+    retry master $cmd
+    cmd='mv /etc/contrail/manifests/* /etc/kubernetes/manifests/'
+    master $cmd
+}
+
 
 function main()
 {
@@ -304,6 +317,7 @@ function main()
    prep_to_build
    build_vrouter
    modprobe_vrouter
+   setup_contrail_vrouter_agent_manifest
    setup_vhost
    setup_opencontrail_kubelet
    update_restart_kubelet
