@@ -1281,12 +1281,41 @@ func (self *AWSCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return false, nil
 }
 
+// Retrieves instance's vpc id from metadata
+func (self *AWSCloud) findVPCID() (string, error) {
+
+	metadata := self.awsServices.Metadata()
+	macsBytes, err := metadata.GetMetaData("network/interfaces/macs/")
+	if err != nil {
+		return "", fmt.Errorf("Could not list interfaces of the instance", err)
+	}
+
+	// loop over interfaces, first vpc id returned wins
+	for _, macPath := range strings.Split(string(macsBytes), "\n") {
+
+		if len(macPath) == 0 {
+			continue
+		}
+		url := fmt.Sprintf("network/interfaces/macs/%svpc-id", macPath)
+		vpcIDBytes, err := metadata.GetMetaData(url)
+		if err != nil {
+			continue
+		}
+		return string(vpcIDBytes), nil
+	}
+	return "", fmt.Errorf("Could not find VPC id in instance metadata")
+}
+
 // Find the kubernetes VPC
 func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 	request := &ec2.DescribeVPCsInput{}
 
-	name := "kubernetes-vpc"
-	filters := []*ec2.Filter{newEc2Filter("tag:Name", name)}
+	// find by vpcID from metadata
+	vpcID, err := self.findVPCID()
+	if err != nil {
+		return nil, err
+	}
+	filters := []*ec2.Filter{newEc2Filter("vpc-id", vpcID)}
 	request.Filters = self.addFilters(filters)
 
 	vpcs, err := self.ec2.DescribeVPCs(request)
@@ -1301,7 +1330,7 @@ func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 	if len(vpcs) == 1 {
 		return vpcs[0], nil
 	}
-	return nil, fmt.Errorf("Found multiple matching VPCs for name: %s", name)
+	return nil, fmt.Errorf("Found multiple matching VPCs for vpcID = %s", vpcID)
 }
 
 // Retrieves the specified security group from the AWS API, or returns nil if not found
