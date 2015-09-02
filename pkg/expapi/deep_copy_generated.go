@@ -187,6 +187,28 @@ func deepCopy_api_ContainerPort(in api.ContainerPort, out *api.ContainerPort, c 
 	return nil
 }
 
+func deepCopy_api_DownwardAPIVolumeFile(in api.DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, c *conversion.Cloner) error {
+	out.Path = in.Path
+	if err := deepCopy_api_ObjectFieldSelector(in.FieldRef, &out.FieldRef, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_api_DownwardAPIVolumeSource(in api.DownwardAPIVolumeSource, out *api.DownwardAPIVolumeSource, c *conversion.Cloner) error {
+	if in.Items != nil {
+		out.Items = make([]api.DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_api_DownwardAPIVolumeFile(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_api_EmptyDirVolumeSource(in api.EmptyDirVolumeSource, out *api.EmptyDirVolumeSource, c *conversion.Cloner) error {
 	out.Medium = in.Medium
 	return nil
@@ -708,6 +730,14 @@ func deepCopy_api_VolumeSource(in api.VolumeSource, out *api.VolumeSource, c *co
 	} else {
 		out.CephFS = nil
 	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(api.DownwardAPIVolumeSource)
+		if err := deepCopy_api_DownwardAPIVolumeSource(*in.DownwardAPI, out.DownwardAPI, c); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -1090,6 +1120,8 @@ func init() {
 		deepCopy_api_CinderVolumeSource,
 		deepCopy_api_Container,
 		deepCopy_api_ContainerPort,
+		deepCopy_api_DownwardAPIVolumeFile,
+		deepCopy_api_DownwardAPIVolumeSource,
 		deepCopy_api_EmptyDirVolumeSource,
 		deepCopy_api_EnvVar,
 		deepCopy_api_EnvVarSource,
