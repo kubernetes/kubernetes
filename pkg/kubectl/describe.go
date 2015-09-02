@@ -725,7 +725,7 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 		}
 		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
 		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
-		fmt.Fprintf(out, "    Variables:\n")
+		fmt.Fprintf(out, "    Environment Variables:\n")
 		for _, e := range container.Env {
 			if e.ValueFrom != nil && e.ValueFrom.FieldRef != nil {
 				valueFrom := envValueFrom(pod, e)
