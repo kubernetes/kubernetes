@@ -62,9 +62,13 @@ var _ = Describe("Examples e2e", func() {
 	})
 
 	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
+		if testContext.DeleteNamespace {
+			By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
+			if err := deleteNS(c, ns); err != nil {
+				Failf("Couldn't delete ns %s", err)
+			}
+		} else {
+			Logf("Skipping namespace deletion!")
 		}
 	})
 
@@ -457,8 +461,13 @@ var _ = Describe("Examples e2e", func() {
 			for i := range namespaces {
 				var err error
 				namespaces[i], err = createTestingNS(fmt.Sprintf("dnsexample%d", i), c)
-				if namespaces[i] != nil {
-					defer deleteNS(c, namespaces[i].Name)
+				if testContext.DeleteNamespace {
+
+					if namespaces[i] != nil {
+						defer deleteNS(c, namespaces[i].Name)
+					}
+				} else {
+					Logf("Skipping namespace deletion!")
 				}
 				Expect(err).NotTo(HaveOccurred())
 			}

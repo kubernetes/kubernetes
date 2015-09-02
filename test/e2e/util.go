@@ -121,6 +121,7 @@ type TestContextType struct {
 	MinStartupPods        int
 	UpgradeTarget         string
 	PrometheusPushGateway string
+	DeleteNamespace       bool
 }
 
 var testContext TestContextType

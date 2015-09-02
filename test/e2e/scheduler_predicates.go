@@ -169,9 +169,13 @@ var _ = Describe("SchedulerPredicates", func() {
 			expectNoError(err)
 		}
 
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
+		if testContext.DeleteNamespace {
+			By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
+			if err := deleteNS(c, ns); err != nil {
+				Failf("Couldn't delete ns %s", err)
+			}
+		} else {
+			Logf("Skipping namespace deletion!")
 		}
 	})
 

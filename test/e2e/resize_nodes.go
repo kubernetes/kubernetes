@@ -421,12 +421,16 @@ var _ = Describe("Nodes", func() {
 		if err := allNodesReady(c, time.Minute); err != nil {
 			Failf("Not all nodes are ready: %v", err)
 		}
-		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete namespace '%s', %v", ns, err)
-		}
-		if err := deleteTestingNS(c); err != nil {
-			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
+		if testContext.DeleteNamespace {
+			By(fmt.Sprintf("destroying namespace for this suite %s", ns))
+			if err := deleteNS(c, ns); err != nil {
+				Failf("Couldn't delete namespace '%s', %v", ns, err)
+			}
+			if err := deleteTestingNS(c); err != nil {
+				Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
+			}
+		} else {
+			Logf("Skipping namespace deletion!")
 		}
 	})
 
