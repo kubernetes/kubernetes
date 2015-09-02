@@ -199,7 +199,7 @@ type DeploymentSpec struct {
 	// not add any selector and label. If unspecified, system uses
 	// "deployment.kubernetes.io/podTemplateHash".
 	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
-	UniqueLabelKey *string `json:"uniqueLabel,omitempty"`
+	UniqueLabelKey string `json:"uniqueLabelKey,omitempty"`
 }
 
 type DeploymentStrategy struct {

@@ -238,9 +238,7 @@ func ValidateDeploymentSpec(spec *expapi.DeploymentSpec) errs.ValidationErrorLis
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(spec.Replicas), "replicas")...)
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, "template")...)
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, "strategy")...)
-	if spec.UniqueLabelKey != nil {
-		allErrs = append(allErrs, apivalidation.ValidateLabelName(*spec.UniqueLabelKey, "uniqueLabel")...)
-	}
+	allErrs = append(allErrs, apivalidation.ValidateLabelName(spec.UniqueLabelKey, "uniqueLabel")...)
 	return allErrs
 }
 

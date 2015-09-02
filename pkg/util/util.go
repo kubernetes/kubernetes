@@ -172,6 +172,9 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 }
 
 func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
+	if intstr == nil {
+		return
+	}
 	if c.RandBool() {
 		intstr.Kind = IntstrInt
 		c.Fuzz(&intstr.IntVal)

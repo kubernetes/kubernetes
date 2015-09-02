@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func addConversionFuncs() {
@@ -32,7 +33,10 @@ func addConversionFuncs() {
 		convert_v1_PodSpec_To_api_PodSpec,
 		convert_expapi_DeploymentSpec_To_v1_DeploymentSpec,
 		convert_v1_DeploymentSpec_To_expapi_DeploymentSpec,
+		convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy,
 		convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy,
+		convert_expapi_RollingUpdateDeployment_To_v1_RollingUpdateDeployment,
+		convert_v1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -199,12 +203,8 @@ func convert_expapi_DeploymentSpec_To_v1_DeploymentSpec(in *expapi.DeploymentSpe
 	if err := convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
-	} else {
-		out.UniqueLabelKey = nil
-	}
+	out.UniqueLabelKey = new(string)
+	*out.UniqueLabelKey = in.UniqueLabelKey
 	return nil
 }
 
@@ -235,10 +235,23 @@ func convert_v1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out 
 		return err
 	}
 	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
+		out.UniqueLabelKey = *in.UniqueLabelKey
+	}
+	return nil
+}
+
+func convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy(in *expapi.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.DeploymentStrategy))(in)
+	}
+	out.Type = DeploymentType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateDeployment)
+		if err := convert_expapi_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
 	} else {
-		out.UniqueLabelKey = nil
+		out.RollingUpdate = nil
 	}
 	return nil
 }
@@ -256,5 +269,39 @@ func convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy(in *DeploymentSt
 	} else {
 		out.RollingUpdate = nil
 	}
+	return nil
+}
+
+func convert_expapi_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *expapi.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.RollingUpdateDeployment))(in)
+	}
+	if out.MaxUnavailable == nil {
+		out.MaxUnavailable = &util.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	if out.MaxSurge == nil {
+		out.MaxSurge = &util.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
+		return err
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	return nil
+}
+
+func convert_v1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment(in *RollingUpdateDeployment, out *expapi.RollingUpdateDeployment, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*RollingUpdateDeployment))(in)
+	}
+	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
+		return err
+	}
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }

@@ -572,6 +572,7 @@ func validDeployment() *expapi.Deployment {
 					},
 				},
 			},
+			UniqueLabelKey: "my-label",
 		},
 	}
 }
@@ -606,8 +607,7 @@ func TestValidateDeployment(t *testing.T) {
 
 	// invalid unique label key.
 	invalidUniqueLabelDeployment := validDeployment()
-	invalidUniqueLabel := "abc/def/ghi"
-	invalidUniqueLabelDeployment.Spec.UniqueLabelKey = &invalidUniqueLabel
+	invalidUniqueLabelDeployment.Spec.UniqueLabelKey = "abc/def/ghi"
 	errorCases["spec.uniqueLabel: invalid value"] = invalidUniqueLabelDeployment
 
 	// rollingUpdate should be nil for recreate.
