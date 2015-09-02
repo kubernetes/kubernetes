@@ -2335,7 +2335,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{}}},
 	}}).ReactionChain
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -2353,8 +2353,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{"node.kubernetes.io/container-runtime-version": "docker_1.5.0"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -2421,7 +2424,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{}},
 			Spec:       api.NodeSpec{},
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -2457,8 +2460,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{"node.kubernetes.io/container-runtime-version": "docker_1.5.0"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -2532,7 +2538,10 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	fakeRuntime.VersionInfo = ""
 
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
+		{ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{},
+		}},
 	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
@@ -2551,8 +2560,11 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:   testKubeletHostname,
+			Labels: map[string]string{"node.kubernetes.io/container-runtime-version": "docker_1.5.0"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
