@@ -194,7 +194,7 @@ function setup_opencontrail_kubelet()
 {
   rm -rf ~/ockube
   mkdir ockube
-  cd ~/ockube && `git clone https://github.com/Juniper/contrail-kubernetes` && cd
+  cd ~/ockube && `git clone -b vrouter-manifest https://github.com/Juniper/contrail-kubernetes` && cd
   if [ "$OS_TYPE" == $UBUNTU ]; then
      apt-get install -y python-setuptools
      apt-get install -y python-pip
