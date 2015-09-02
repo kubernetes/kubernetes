@@ -1827,8 +1827,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		}
 
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
-		err = dm.KillPod(pod, runningPod)
-		if err != nil {
+		if err := dm.KillPod(pod, runningPod); err != nil {
 			return err
 		}
 	} else {
@@ -1845,9 +1844,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 						break
 					}
 				}
-				err = dm.KillContainerInPod(container.ID, podContainer, pod)
-				if err != nil {
+				if err := dm.KillContainerInPod(container.ID, podContainer, pod); err != nil {
 					glog.Errorf("Error killing container: %v", err)
+					return err
 				}
 			}
 		}
@@ -1893,6 +1892,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
 	}
 
+	containersStarted := 0
 	// Start everything
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
@@ -1946,11 +1946,15 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
 			continue
 		}
+		containersStarted++
 		// Successfully started the container; clear the entry in the failure
 		// reason cache.
 		dm.clearReasonCache(pod, container)
 	}
 
+	if containersStarted != len(containerChanges.ContainersToStart) {
+		return fmt.Errorf("not all containers have started: %d != %d", containersStarted, containerChanges.ContainersToStart)
+	}
 	return nil
 }
 

@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -432,7 +433,10 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.runtimeCache = runtimeCache
-	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder)
+	klet.workQueue = queue.NewBasicWorkQueue()
+	// TODO(yujuhong): backoff and resync interval should be set differently
+	// once we switch to using pod event generator.
+	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, klet.resyncInterval)
 
 	metrics.Register(runtimeCache)
 
@@ -468,13 +472,14 @@ type nodeLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	hostname       string
-	nodeName       string
-	dockerClient   dockertools.DockerInterface
-	runtimeCache   kubecontainer.RuntimeCache
-	kubeClient     client.Interface
-	rootDirectory  string
-	podWorkers     PodWorkers
+	hostname      string
+	nodeName      string
+	dockerClient  dockertools.DockerInterface
+	runtimeCache  kubecontainer.RuntimeCache
+	kubeClient    client.Interface
+	rootDirectory string
+	podWorkers    PodWorkers
+
 	resyncInterval time.Duration
 	resyncTicker   *time.Ticker
 	sourcesReady   SourcesReadyFn
@@ -642,6 +647,9 @@ type Kubelet struct {
 
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *api.NodeDaemonEndpoints
+
+	// A queue used to trigger pod workers.
+	workQueue queue.WorkQueue
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -1417,7 +1425,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
+func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) (syncErr error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	start := time.Now()
@@ -1438,6 +1446,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		status, err := kl.generatePodStatus(pod)
 		if err != nil {
 			glog.Errorf("Unable to generate status for pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+			// Propagate the error upstream.
+			syncErr = err
 		} else {
 			podToUpdate := pod
 			if mirrorPod != nil {
@@ -2073,7 +2083,10 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 // state every sync-frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
-	kl.resyncTicker = time.NewTicker(kl.resyncInterval)
+	// The resyncTicker wakes up kubelet to checks if there are any pod workers
+	// that need to be sync'd. A one-second period is sufficient because the
+	// sync interval is defaulted to 10s.
+	kl.resyncTicker = time.NewTicker(time.Second)
 	var housekeepingTimestamp time.Time
 	for {
 		if !kl.containerRuntimeUp() {
@@ -2138,9 +2151,15 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
 	case <-kl.resyncTicker.C:
-		// Periodically syncs all the pods and performs cleanup tasks.
-		glog.V(4).Infof("SyncLoop (periodic sync)")
-		handler.HandlePodSyncs(kl.podManager.GetPods())
+		podUIDs := kl.workQueue.GetWork()
+		var podsToSync []*api.Pod
+		for _, uid := range podUIDs {
+			if pod, ok := kl.podManager.GetPodByUID(uid); ok {
+				podsToSync = append(podsToSync, pod)
+			}
+		}
+		glog.V(2).Infof("SyncLoop (SYNC): %d pods", len(podsToSync))
+		kl.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		// We only care about failures (signalling container death) here.
 		if update.Result == proberesults.Failure {
