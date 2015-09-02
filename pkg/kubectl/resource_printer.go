@@ -367,6 +367,7 @@ var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODE
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
+var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
 
@@ -406,6 +407,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
 	h.Handler(deploymentColumns, printDeployment)
 	h.Handler(deploymentColumns, printDeploymentList)
+	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscaler)
+	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscalerList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1145,6 +1148,52 @@ func printDeployment(deployment *expapi.Deployment, w io.Writer, withNamespace b
 func printDeploymentList(list *expapi.DeploymentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printDeployment(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printHorizontalPodAutoscaler(hpa *expapi.HorizontalPodAutoscaler, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	namespace := hpa.Namespace
+	name := hpa.Name
+	reference := fmt.Sprintf("%s/%s/%s/%s",
+		hpa.Spec.ScaleRef.Kind,
+		hpa.Spec.ScaleRef.Namespace,
+		hpa.Spec.ScaleRef.Name,
+		hpa.Spec.ScaleRef.Subresource)
+	target := fmt.Sprintf("%s %v", hpa.Spec.Target.Quantity.String(), hpa.Spec.Target.Resource)
+
+	current := "<waiting>"
+	if hpa.Status != nil && hpa.Status.CurrentConsumption != nil {
+		current = fmt.Sprintf("%s %v", hpa.Status.CurrentConsumption.Quantity.String(), hpa.Status.CurrentConsumption.Resource)
+	}
+	minPods := hpa.Spec.MinCount
+	maxPods := hpa.Spec.MaxCount
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s",
+		name,
+		reference,
+		target,
+		current,
+		minPods,
+		maxPods,
+		translateTimestamp(hpa.CreationTimestamp),
+	); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(hpa.Labels, columnLabels))
+	return err
+}
+
+func printHorizontalPodAutoscalerList(list *expapi.HorizontalPodAutoscalerList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for i := range list.Items {
+		if err := printHorizontalPodAutoscaler(&list.Items[i], w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}
