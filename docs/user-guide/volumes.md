@@ -63,6 +63,7 @@ Familiarity with [pods](pods.md) is suggested.
     - [gitRepo](#gitrepo)
     - [secret](#secret)
     - [persistentVolumeClaim](#persistentvolumeclaim)
+    - [downwardAPI](#downwardapi)
   - [Resources](#resources)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -380,6 +381,13 @@ iSCSI volume) without knowing the details of the particular cloud environment.
 
 See the [PersistentVolumes example](persistent-volumes/) for more
 details.
+
+### downwardAPI
+
+A `downwardAPI` volume is used to make downward API data available to applications.
+It mounts a directory and writes the requested data in plain text files.
+
+See the [`downwardAPI` volume example](downward-api/volume/README.md)  for more details.
 
 ## Resources
 

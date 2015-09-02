@@ -280,8 +280,12 @@ type VolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
+
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
+
+	// DownwardAPI represents downward API about the pod that should populate this volume
+	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -2524,6 +2528,20 @@ type ComponentStatusList struct {
 
 	// List of ComponentStatus objects.
 	Items []ComponentStatus `json:"items"`
+}
+
+// DownwardAPIVolumeSource represents a volume containing downward API info
+type DownwardAPIVolumeSource struct {
+	// Items is a list of downward API volume file
+	Items []DownwardAPIVolumeFile `json:"items,omitempty"`
+}
+
+// DownwardAPIVolumeFile represents information to create the file containing the pod field
+type DownwardAPIVolumeFile struct {
+	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	Path string `json:"path"`
+	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	FieldRef ObjectFieldSelector `json:"fieldRef"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
