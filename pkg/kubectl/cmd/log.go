@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	libutil "k8s.io/kubernetes/pkg/util"
 )
@@ -145,7 +146,10 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if cmdutil.GetFlagBool(cmd, "previous") {
 		previous = true
 	}
+	return handleLog(client, namespace, podID, container, follow, previous, out)
+}
 
+func handleLog(client *client.Client, namespace, podID, container string, follow, previous bool, out io.Writer) error {
 	readCloser, err := client.RESTClient.Get().
 		Namespace(namespace).
 		Name(podID).

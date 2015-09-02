@@ -190,12 +190,10 @@ var _ = Describe("Kubectl client", func() {
 
 		It("should support inline execution and attach", func() {
 			By("executing a command with run and attach")
-			runOutput := runKubectl("run", fmt.Sprintf("--namespace=%v", ns), "run", "run-test", "--image=busybox", "--restart=Never", "--attach", "echo", "running", "in", "container")
+			runOutput := runKubectl(fmt.Sprintf("--namespace=%v", ns), "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "echo", "running", "in", "container")
 			expectedRunOutput := "running in container"
-			if runOutput != expectedRunOutput {
-				Failf("Unexpected kubectl exec output. Wanted '%s', got '%s'", runOutput, expectedRunOutput)
-			}
-			runKubectl("delete", "pods", "run-test")
+			Expect(runOutput).To(ContainSubstring(expectedRunOutput))
+			// everything in the ns will be deleted at the end of the test
 		})
 
 		It("should support port-forward", func() {
