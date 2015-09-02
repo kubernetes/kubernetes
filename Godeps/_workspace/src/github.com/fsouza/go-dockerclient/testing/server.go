@@ -532,7 +532,7 @@ func (s *DockerServer) startContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	container.HostConfig = &hostConfig
 	if container.State.Running {
-		http.Error(w, "Container already running", http.StatusBadRequest)
+		http.Error(w, "", http.StatusNotModified)
 		return
 	}
 	container.State.Running = true

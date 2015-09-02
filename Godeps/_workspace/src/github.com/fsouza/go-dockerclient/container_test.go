@@ -1122,10 +1122,7 @@ func TestAttachToContainerRawTerminalFalse(t *testing.T) {
 		Stream:       true,
 		RawTerminal:  false,
 	}
-	err := client.AttachToContainer(opts)
-	if err != nil {
-		t.Fatal(err)
-	}
+	client.AttachToContainer(opts)
 	expected := map[string][]string{
 		"stdin":  {"1"},
 		"stdout": {"1"},
