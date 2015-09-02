@@ -2214,61 +2214,6 @@ func convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *S
 	return nil
 }
 
-func convert_api_Status_To_v1_Status(in *api.Status, out *Status, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.Status))(in)
-	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	out.Status = in.Status
-	out.Message = in.Message
-	out.Reason = StatusReason(in.Reason)
-	if in.Details != nil {
-		out.Details = new(StatusDetails)
-		if err := convert_api_StatusDetails_To_v1_StatusDetails(in.Details, out.Details, s); err != nil {
-			return err
-		}
-	} else {
-		out.Details = nil
-	}
-	out.Code = in.Code
-	return nil
-}
-
-func convert_api_StatusCause_To_v1_StatusCause(in *api.StatusCause, out *StatusCause, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.StatusCause))(in)
-	}
-	out.Type = CauseType(in.Type)
-	out.Message = in.Message
-	out.Field = in.Field
-	return nil
-}
-
-func convert_api_StatusDetails_To_v1_StatusDetails(in *api.StatusDetails, out *StatusDetails, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.StatusDetails))(in)
-	}
-	out.Name = in.Name
-	out.Kind = in.Kind
-	if in.Causes != nil {
-		out.Causes = make([]StatusCause, len(in.Causes))
-		for i := range in.Causes {
-			if err := convert_api_StatusCause_To_v1_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Causes = nil
-	}
-	out.RetryAfterSeconds = in.RetryAfterSeconds
-	return nil
-}
-
 func convert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, out *TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.TCPSocketAction))(in)
@@ -4632,61 +4577,6 @@ func convert_v1_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.S
 	return nil
 }
 
-func convert_v1_Status_To_api_Status(in *Status, out *api.Status, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*Status))(in)
-	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	out.Status = in.Status
-	out.Message = in.Message
-	out.Reason = api.StatusReason(in.Reason)
-	if in.Details != nil {
-		out.Details = new(api.StatusDetails)
-		if err := convert_v1_StatusDetails_To_api_StatusDetails(in.Details, out.Details, s); err != nil {
-			return err
-		}
-	} else {
-		out.Details = nil
-	}
-	out.Code = in.Code
-	return nil
-}
-
-func convert_v1_StatusCause_To_api_StatusCause(in *StatusCause, out *api.StatusCause, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*StatusCause))(in)
-	}
-	out.Type = api.CauseType(in.Type)
-	out.Message = in.Message
-	out.Field = in.Field
-	return nil
-}
-
-func convert_v1_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *api.StatusDetails, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*StatusDetails))(in)
-	}
-	out.Name = in.Name
-	out.Kind = in.Kind
-	if in.Causes != nil {
-		out.Causes = make([]api.StatusCause, len(in.Causes))
-		for i := range in.Causes {
-			if err := convert_v1_StatusCause_To_api_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Causes = nil
-	}
-	out.RetryAfterSeconds = in.RetryAfterSeconds
-	return nil
-}
-
 func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*TCPSocketAction))(in)
@@ -4973,9 +4863,6 @@ func init() {
 		convert_api_ServiceSpec_To_v1_ServiceSpec,
 		convert_api_ServiceStatus_To_v1_ServiceStatus,
 		convert_api_Service_To_v1_Service,
-		convert_api_StatusCause_To_v1_StatusCause,
-		convert_api_StatusDetails_To_v1_StatusDetails,
-		convert_api_Status_To_v1_Status,
 		convert_api_TCPSocketAction_To_v1_TCPSocketAction,
 		convert_api_ThirdPartyResourceData_To_v1_ThirdPartyResourceData,
 		convert_api_TypeMeta_To_v1_TypeMeta,
@@ -5091,9 +4978,6 @@ func init() {
 		convert_v1_ServiceSpec_To_api_ServiceSpec,
 		convert_v1_ServiceStatus_To_api_ServiceStatus,
 		convert_v1_Service_To_api_Service,
-		convert_v1_StatusCause_To_api_StatusCause,
-		convert_v1_StatusDetails_To_api_StatusDetails,
-		convert_v1_Status_To_api_Status,
 		convert_v1_TCPSocketAction_To_api_TCPSocketAction,
 		convert_v1_ThirdPartyResourceData_To_api_ThirdPartyResourceData,
 		convert_v1_TypeMeta_To_api_TypeMeta,

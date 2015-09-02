@@ -2002,52 +2002,6 @@ func deepCopy_v1_ServiceStatus(in ServiceStatus, out *ServiceStatus, c *conversi
 	return nil
 }
 
-func deepCopy_v1_Status(in Status, out *Status, c *conversion.Cloner) error {
-	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	out.Status = in.Status
-	out.Message = in.Message
-	out.Reason = in.Reason
-	if in.Details != nil {
-		out.Details = new(StatusDetails)
-		if err := deepCopy_v1_StatusDetails(*in.Details, out.Details, c); err != nil {
-			return err
-		}
-	} else {
-		out.Details = nil
-	}
-	out.Code = in.Code
-	return nil
-}
-
-func deepCopy_v1_StatusCause(in StatusCause, out *StatusCause, c *conversion.Cloner) error {
-	out.Type = in.Type
-	out.Message = in.Message
-	out.Field = in.Field
-	return nil
-}
-
-func deepCopy_v1_StatusDetails(in StatusDetails, out *StatusDetails, c *conversion.Cloner) error {
-	out.Name = in.Name
-	out.Kind = in.Kind
-	if in.Causes != nil {
-		out.Causes = make([]StatusCause, len(in.Causes))
-		for i := range in.Causes {
-			if err := deepCopy_v1_StatusCause(in.Causes[i], &out.Causes[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Causes = nil
-	}
-	out.RetryAfterSeconds = in.RetryAfterSeconds
-	return nil
-}
-
 func deepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *conversion.Cloner) error {
 	if err := deepCopy_util_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
@@ -2352,9 +2306,6 @@ func init() {
 		deepCopy_v1_ServicePort,
 		deepCopy_v1_ServiceSpec,
 		deepCopy_v1_ServiceStatus,
-		deepCopy_v1_Status,
-		deepCopy_v1_StatusCause,
-		deepCopy_v1_StatusDetails,
 		deepCopy_v1_TCPSocketAction,
 		deepCopy_v1_ThirdPartyResourceData,
 		deepCopy_v1_TypeMeta,
