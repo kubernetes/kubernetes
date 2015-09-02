@@ -94,6 +94,11 @@ func logError(err error) {
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
 
+// Forever is syntactic sugar on top of Until
+func Forever(f func(), period time.Duration) {
+	Until(f, period, NeverStop)
+}
+
 // Until loops until stop channel is closed, running f every period.
 // Catches any panics, and keeps going. f may not be invoked if
 // stop channel is already closed. Pass NeverStop to Until if you
