@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
@@ -1363,20 +1364,26 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return err
+	var queryObj interface{}
+	switch obj.(type) {
+	case *v1.List, *api.List:
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		queryObj = map[string]interface{}{}
+		if err := json.Unmarshal(data, &queryObj); err != nil {
+			return err
+		}
+	default:
+		queryObj = obj
 	}
-	out := map[string]interface{}{}
-	if err := json.Unmarshal(data, &out); err != nil {
-		return err
-	}
-	if err = j.JSONPath.Execute(w, out); err != nil {
+
+	if err := j.JSONPath.Execute(w, queryObj); err != nil {
 		fmt.Fprintf(w, "Error executing template: %v\n", err)
 		fmt.Fprintf(w, "template was:\n\t%v\n", j.rawTemplate)
-		fmt.Fprintf(w, "raw data was:\n\t%v\n", string(data))
-		fmt.Fprintf(w, "object given to template engine was:\n\t%+v\n", out)
-		return fmt.Errorf("error executing jsonpath '%v': '%v'\n----data----\n%+v\n", j.rawTemplate, err, out)
+		fmt.Fprintf(w, "object given to jsonpath engine was:\n\t%#v\n", queryObj)
+		return fmt.Errorf("error executing jsonpath '%v': '%v'\n----data----\n%+v\n", j.rawTemplate, err, obj)
 	}
 	return nil
 }
