@@ -32,7 +32,7 @@ import (
 // This is the primary entrypoint for volume plugins.
 // Tests covering recycling should not use this func but instead
 // use their own array of plugins w/ a custom recyclerFunc as appropriate
-func ProbeVolumePlugins() []volume.VolumePlugin {
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{&nfsPlugin{nil, newRecycler}}
 }
 
