@@ -24,13 +24,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 function generate_version() {
-	local version=$1
+	local groupVersion=$1
 	local TMPFILE="/tmp/types_swagger_doc_generated.$(date +%s).go"
 
-	echo "Generating swagger type docs for version ${version}"
+	echo "Generating swagger type docs for ${groupVersion}"
 
 	sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > $TMPFILE
-  echo "package ${version}" >> $TMPFILE
+  echo "package ${groupVersion##*/}" >> $TMPFILE
 	cat >> $TMPFILE <<EOF
 
 // This file contains a collection of methods that can be used from go-resful to
@@ -46,21 +46,21 @@ function generate_version() {
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	GOPATH=$(godep path):$GOPATH go run cmd/genswaggertypedocs/swagger_type_docs.go -s "pkg/api/${version}/types.go" -f - >>  $TMPFILE
+	GOPATH=$(godep path):$GOPATH go run cmd/genswaggertypedocs/swagger_type_docs.go -s "pkg/${groupVersion}/types.go" -f - >>  $TMPFILE
 
 	echo "// AUTO-GENERATED FUNCTIONS END HERE" >> $TMPFILE
 
 	gofmt -w -s $TMPFILE
-	mv $TMPFILE "pkg/api/${version}/types_swagger_doc_generated.go"
+	mv $TMPFILE "pkg/${groupVersion}/types_swagger_doc_generated.go"
 }
 
-VERSIONS="v1"
+GROUP_VERSIONS="api/v1 expapi/v1"
 # To avoid compile errors, remove the currently existing files.
-for ver in $VERSIONS; do
-	rm -f "pkg/api/${ver}/types_swagger_doc_generated.go"
+for groupVersion in $GROUP_VERSIONS; do
+	rm -f "pkg/${groupVersion}/types_swagger_doc_generated.go"
 done
-for ver in $VERSIONS; do
-	generate_version "${ver}"
+for groupVersion in $GROUP_VERSIONS; do
+	generate_version "${groupVersion}"
 done
 
 "${KUBE_ROOT}/hack/update-swagger-spec.sh"
