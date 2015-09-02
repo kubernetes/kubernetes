@@ -20,15 +20,16 @@ VHOST="vhost0"
 if [[ -z $ocver ]]; then
    ocver="R2.20"
 fi
+rcfile="/etc/contrail/opencontrail-rc"
 if [[ -z $OPENCONTRAIL_CONTROLLER_IP ]]; then
    kube_api_port=$(cat /etc/default/kubelet | grep -o 'api-servers=[^;]*' | awk -F// '{print $2}' | awk '{print $1}')
    kube_api_ip=$(echo $kube_api_port| awk -F':' '{print $1}')
    OPENCONTRAIL_CONTROLLER_IP=$kube_api_ip
-   echo "OPENCONTRAIL_CONTROLLER_IP=$kube_api_ip" >> /etc/contrail/opencontrail-rc
+   echo "OPENCONTRAIL_CONTROLLER_IP=$kube_api_ip" >> $rcfile
 fi
 if [[ -z $OPENCONTRAIL_VROUTER_INTF ]];then
    OPENCONTRAIL_VROUTER_INTF="eth0"
-   echo "OPENCONTRAIL_VROUTER_INTF="eth0"" >> /etc/contrail/opencontrail-rc
+   echo "OPENCONTRAIL_VROUTER_INTF="eth0"" >> $rcfile
 fi
 MINION_OVERLAY_NET_IP=$(/sbin/ifconfig $OPENCONTRAIL_VROUTER_INTF | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
 
@@ -71,10 +72,10 @@ function detect_os()
 
 function prep_to_build()
 {
-  if [ $OS_TYPE == $REDHAT ]; then
+  if [ "$OS_TYPEi" == $REDHAT ]; then
     yum update
     yum install -y automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel python-lxml
-  elif [ $OS_TYPE == $UBUNTU ]; then
+  elif [ "$OS_TYPE" == $UBUNTU ]; then
     apt-get update
     apt-get install -y automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev python-lxml
   fi
@@ -94,12 +95,21 @@ function build_vrouter()
 function modprobe_vrouter()
 {
   vr=$(lsmod | grep vrouter | awk '{print $1}')
-  if [[ $vr == $VROUTER ]]; then
+  if [ "$vr" == $VROUTER ]; then
      `rmmod vrouter`
-      rm -rf /lib/modules/`uname -r`/extra/net/vrouter
+      if [ "$OS_TYPE" == $REDHAT ]; then
+         rm -rf /lib/modules/`uname -r`/extra/net/vrouter
+      elif [ "$OS_TYPE" == $UBUNTU ]; then
+         rm -rf /lib/modules/`uname -r`/updates/dkms/vrouter.ko
+      fi
   fi
-  mkdir -p /lib/modules/`uname -r`/extra/net/vrouter
-  mv ~/vrouter-build/vrouter/vrouter.ko /lib/modules/`uname -r`/extra/net/vrouter
+  if [ "$OS_TYPE" == $REDHAT ]; then
+     mkdir -p /lib/modules/`uname -r`/extra/net/vrouter
+     mv ~/vrouter-build/vrouter/vrouter.ko /lib/modules/`uname -r`/extra/net/vrouter
+  elif [ "$OS_TYPE" == $UBUNTU ]; then
+      mkdir -p /lib/modules/`uname -r`/updates/dkms
+      mv ~/vrouter-build/vrouter/vrouter.ko /lib/modules/`uname -r`/updates/dkms
+  fi
   mv ~/vrouter-build/build/debug/vrouter/utils/vif /usr/bin
   mv ~/vrouter-build/build/debug/vrouter/utils/rt /usr/bin
   mv ~/vrouter-build/build/debug/vrouter/utils/dropstats /usr/bin
@@ -113,7 +123,7 @@ function modprobe_vrouter()
   cd /lib/modules/`uname -r` && depmod && cd
   `modprobe vrouter`
   vr=$(lsmod | grep vrouter | awk '{print $1}')
-  if [[ $vr == $VROUTER ]]; then
+  if [ "$vr" == $VROUTER ]; then
      log_info_msg "Latest version of Opencontrail kernel module - $vr instaled"
   else
      log_info_msg "Installing Opencontrail kernel module - $vr failed"
@@ -123,12 +133,16 @@ function modprobe_vrouter()
 
 function setup_vhost()
 {
+  if [ -z $MINION_OVERLAY_NET_IP ]; then 
+     log_info_msg "MINION_OVERLAY_NET_IP is empty. Please check the interface for IP. If it is already assigned to vhost0, there will be no change required"
+     exit
+  fi
   phy_itf=$(ip a |grep $MINION_OVERLAY_NET_IP | awk '{print $7}')
   mask=$(ifconfig $phy_itf | grep -i '\(netmask\|mask\)' | awk '{print $4}' | cut -d ":" -f 2)
   mac=$(ifconfig $phy_itf | grep HWaddr | awk '{print $5}')
   echo $mac >> /etc/contrail/default_pmac
-  if [ $OS_TYPE == $REDHAT ]; then
-    if [ $phy_itf != $VHOST ]; then
+  if [ "$OS_TYPE" == $REDHAT ]; then
+    if [ "$phy_itf" != $VHOST ]; then
       intf="/etc/sysconfig/network-scripts/ifcfg-$phy_itf"
       sed -i '/IPADDR/d' $intf
       sed -i '/NETMASK/d' $intf
@@ -155,8 +169,8 @@ function setup_vhost()
          sed -i 's/$phy_itf/$VHOST/g' /etc/sysconfig/network-scripts/route-$VHOST
       fi
     fi
-  elif [ $OS_TYPE == $UBUNTU ]; then
-     if [ $phy_itf != $VHOST ]; then
+  elif [ "$OS_TYPE" == $UBUNTU ]; then
+     if [ "$phy_itf" != $VHOST ]; then
         itf="/etc/network/interfaces"
         rt=$(cat $itf | grep route |grep $phy_itf)
         rtv=$(sed "s/$phy_itf/$VHOST/g" <<<"$rt")
@@ -176,40 +190,12 @@ function setup_vhost()
   fi   
 }
 
-function setup_vhost_init()
-{
-  rm -rf ~/vhost-init
-  mkdir vhost-init
-  cd ~/vhost-init && `git clone -b $ocver https://github.com/Juniper/contrail-packaging` && cd
-  ctrailbin="/opt/contrail/bin"
-  ctrailetc="/etc/contrail"
-  if [ ! -f $ctrailbin ]; then
-     mkdir -p $ctrailbin
-  fi
-  if [ ! -f $ctrailetc ]; then
-     mkdir -p $ctrailetc
-  fi
-  if [ $OS_TYPE == $UBUNTU ]; then
-     cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-pre-stop.sh $ctrailbin
-     cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-pre-start.sh $ctrailbin
-     cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-post-start.sh $ctrailbin
-  elif [ $OS_TYPE == $REDHAT ]; then
-     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_param_setup.sh $ctrailbin
-     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_ExecStopPost.sh $ctrailetc
-     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_ExecStartPre.sh $ctrailetc
-     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_ExecStartPost.sh $ctrailetc
-  fi   
-  cp ~/vhost-init/contrail-packaging/common/control_files/if-vhost0 $ctrailbin && cd
-  cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-functions.sh $ctrailbin && cd
-  cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-agent.conf.sh $ctrailbin && cd
-}
-
 function setup_opencontrail_kubelet()
 {
   rm -rf ~/ockube
   mkdir ockube
   cd ~/ockube && `git clone https://github.com/Juniper/contrail-kubernetes` && cd
-  if [ $OS_TYPE == $UBUNTU ]; then
+  if [ "$OS_TYPE" == $UBUNTU ]; then
      apt-get install -y python-setuptools
      apt-get install -y python-pip
      apt-get install -y software-properties-common
@@ -217,14 +203,13 @@ function setup_opencontrail_kubelet()
      add-apt-repository -y ppa:opencontrail/r2.20
      apt-get update
      apt-get install -y python-contrail python-contrail-vrouter-api 
-  elif [ $OS_TYPE == $REDHAT ]; then
+  elif [ "$OS_TYPE" == $REDHAT ]; then
      yum install -y python-setuptools
      yum install -y python-pip
-     yum install -y software-properties-common
      #TODO get vn-api and python-contrail-vrouter-api
   fi
   ockub=$(pip freeze | grep kubelet | awk -F= '{print $1}')
-  if [ ! -z $ockub ]; then
+  if [ ! -z "$ockub" ]; then
      pip uninstall -y opencontrail-kubelet
   fi
   (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet; python setup.py install) && cd
@@ -235,12 +220,13 @@ function setup_opencontrail_kubelet()
   fi
   config="/usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config"
   ocp="/usr/local/bin/opencontrail-kubelet-plugin"
-  if [ ! -f $ocp ]; then
+  if [ ! -f "$ocp" ]; then
      log_info_msg "Opencontrail-kubelet-plugin not found. Please check the package opencontrail-kubelet"
      exit 1
   fi
   grep -q 'DEFAULTS' $config || echo "[DEFAULTS]" >> $config
-  grep -q 'api_server=$OPENCONTRAIL_CONTROLLER_IP' $config || echo "api_server=$OPENCONTRAIL_CONTROLLER_IP" >> $config
+  sed -i '/api_server/d' $config
+  echo "api_server=$OPENCONTRAIL_CONTROLLER_IP" >> $config
   (cd /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail; `ln -s $ocp opencontrail`) && cd
 }
 
@@ -273,6 +259,8 @@ function stop_kube_svcs()
    if [[ -n `pidof kube-proxy` ]]; then
       log_info_msg "Kube-proxy is running. Opencontrail does not use kube-proxy as it provides the function. Stoping it."
       `service kube-proxy stop`
+      `update-rc.d -f kube-proxy disable`
+      `update-rc.d -f kube-proxy remove`
    fi
 
    if [[ -n `pidof flanneld` ]]; then
@@ -282,16 +270,28 @@ function stop_kube_svcs()
       if [ $intf == "flannel0" ]; then
          `ifconfig $intf down`
          `ifdown $intf`
+         `update-rc.d -f flanneld disable`
+         `update-rc.d -f flanneld remove`
       fi
    fi
 }
 
+function update_vhost_pre_up()
+{
+  preup="/etc/network/if-pre-up.d"
+  if [ "$OS_TYPE" == $REDHAT ]; then
+     preup="/etc/sysconfig/network-scripts"
+  fi
+  cp ~/ockube/contrail-kubernetes/scripts/opencontrail-install/ifup-vhost $preup
+  `chmod +x $preup/ifup-vhost`
+}
+
 function cleanup()
 {
-  if [ $OS_TYPE == $REDHAT ]; then
-    yum remove -y flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel
-  elif [ $OS_TYPE == $UBUNTU ]; then
-    apt-get remove -y flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev
+  if [ "$OS_TYPE" == $REDHAT ]; then
+    yum remove -y flex bison gcc gcc-c++ boost boost-devel scons libxml2-devel
+  elif [ "$OS_TYPE" == $UBUNTU ]; then
+    apt-get remove -y flex bison g++ gcc make libboost-all-dev scons libxml2-dev
   fi
   rm -rf ~/vrouter-build
   rm -rf ~/ockube
@@ -308,6 +308,7 @@ function main()
    setup_opencontrail_kubelet
    update_restart_kubelet
    stop_kube_svcs
+   update_vhost_pre_up
    cleanup
 }
 
