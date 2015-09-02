@@ -18,6 +18,8 @@ package bandwidth
 
 import (
 	"errors"
+	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -95,7 +97,7 @@ func TestHexCIDR(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			input:  "1.2.3.4/16",
+			input:  "1.2.0.0/16",
 			output: "01020000/ffff0000",
 		},
 		{
@@ -120,6 +122,13 @@ func TestHexCIDR(t *testing.T) {
 			if output != test.output {
 				t.Errorf("expected: %s, saw: %s", test.output, output)
 			}
+			input, err := asciiCIDR(output)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if input != test.input {
+				t.Errorf("expected: %s, saw: %s", test.input, input)
+			}
 		}
 	}
 }
@@ -137,6 +146,7 @@ func TestFindCIDRClass(t *testing.T) {
 		cidr           string
 		output         string
 		expectErr      bool
+		expectNotFound bool
 		expectedClass  string
 		expectedHandle string
 		err            error
@@ -152,6 +162,11 @@ func TestFindCIDRClass(t *testing.T) {
 			output:         tcFilterOutput,
 			expectedClass:  "1:2",
 			expectedHandle: "800::801",
+		},
+		{
+			cidr:           "2.2.3.4/16",
+			output:         tcFilterOutput,
+			expectNotFound: true,
 		},
 		{
 			err:       errors.New("test error"),
@@ -172,7 +187,7 @@ func TestFindCIDRClass(t *testing.T) {
 			},
 		}
 		shaper := &tcShaper{e: &fexec}
-		class, handle, err := shaper.findCIDRClass(test.cidr)
+		class, handle, found, err := shaper.findCIDRClass(test.cidr)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("unexpected non-error")
@@ -181,28 +196,78 @@ func TestFindCIDRClass(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if class != test.expectedClass {
-				t.Errorf("expected: %s, found %s", test.expectedClass, class)
-			}
-			if handle != test.expectedHandle {
-				t.Errorf("expected: %s, found %s", test.expectedHandle, handle)
+			if test.expectNotFound {
+				if found {
+					t.Errorf("unexpectedly found an interface: %s %s", class, handle)
+				}
+			} else {
+				if class != test.expectedClass {
+					t.Errorf("expected: %s, found %s", test.expectedClass, class)
+				}
+				if handle != test.expectedHandle {
+					t.Errorf("expected: %s, found %s", test.expectedHandle, handle)
+				}
 			}
 		}
 	}
 }
 
+func TestGetCIDRs(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte(tcFilterOutput), nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd {
+				return exec.InitFakeCmd(&fcmd, cmd, args...)
+			},
+		},
+	}
+	shaper := &tcShaper{e: &fexec}
+	cidrs, err := shaper.GetCIDRs()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedCidrs := []string{"172.17.0.2/32", "1.2.0.0/16"}
+	if !reflect.DeepEqual(cidrs, expectedCidrs) {
+		t.Errorf("expected: %v, saw: %v", expectedCidrs, cidrs)
+	}
+}
+
 func TestLimit(t *testing.T) {
 	tests := []struct {
-		cidr      string
-		ingress   *resource.Quantity
-		egress    *resource.Quantity
-		expectErr bool
-		err       error
+		cidr          string
+		ingress       *resource.Quantity
+		egress        *resource.Quantity
+		expectErr     bool
+		expectedCalls int
+		err           error
 	}{
 		{
-			cidr:    "1.2.3.4/32",
-			ingress: resource.NewQuantity(10, resource.DecimalSI),
-			egress:  resource.NewQuantity(20, resource.DecimalSI),
+			cidr:          "1.2.3.4/32",
+			ingress:       resource.NewQuantity(10, resource.DecimalSI),
+			egress:        resource.NewQuantity(20, resource.DecimalSI),
+			expectedCalls: 6,
+		},
+		{
+			cidr:          "1.2.3.4/32",
+			ingress:       resource.NewQuantity(10, resource.DecimalSI),
+			egress:        nil,
+			expectedCalls: 3,
+		},
+		{
+			cidr:          "1.2.3.4/32",
+			ingress:       nil,
+			egress:        resource.NewQuantity(20, resource.DecimalSI),
+			expectedCalls: 3,
+		},
+		{
+			cidr:          "1.2.3.4/32",
+			ingress:       nil,
+			egress:        nil,
+			expectedCalls: 0,
 		},
 		{
 			err:       errors.New("test error"),
@@ -217,8 +282,8 @@ func TestLimit(t *testing.T) {
 			CombinedOutputScript: []exec.FakeCombinedOutputAction{
 				func() ([]byte, error) { return []byte(tcClassOutput), test.err },
 				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte(tcClassOutput2), test.err },
 				func() ([]byte, error) { return []byte{}, test.err },
+				func() ([]byte, error) { return []byte(tcClassOutput2), test.err },
 				func() ([]byte, error) { return []byte{}, test.err },
 				func() ([]byte, error) { return []byte{}, test.err },
 			},
@@ -236,7 +301,7 @@ func TestLimit(t *testing.T) {
 		}
 		iface := "cbr0"
 		shaper := &tcShaper{e: &fexec, iface: iface}
-		if err := shaper.Limit(test.cidr, *test.ingress, *test.egress); err != nil && !test.expectErr {
+		if err := shaper.Limit(test.cidr, test.ingress, test.egress); err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v", err)
 			return
 		} else if err == nil && test.expectErr {
@@ -251,8 +316,8 @@ func TestLimit(t *testing.T) {
 			return
 		}
 
-		if fcmd.CombinedOutputCalls != 6 {
-			t.Errorf("unexpected number of calls: %d, expected: 6", fcmd.CombinedOutputCalls)
+		if fcmd.CombinedOutputCalls != test.expectedCalls {
+			t.Errorf("unexpected number of calls: %d, expected: %d", fcmd.CombinedOutputCalls, test.expectedCalls)
 		}
 
 		for ix := range fcmd.CombinedOutputLog {
@@ -264,27 +329,33 @@ func TestLimit(t *testing.T) {
 				t.Errorf("unexpected interface: %s, expected %s (%v)", output[4], iface, output)
 			}
 			if ix == 1 {
-				if output[11] != makeKBitString(*test.ingress) {
-					t.Errorf("unexpected ingress: %s, expected: %s", output[11], makeKBitString(*test.ingress))
+				var expectedRate string
+				if test.ingress != nil {
+					expectedRate = makeKBitString(test.ingress)
+				} else {
+					expectedRate = makeKBitString(test.egress)
+				}
+				if output[11] != expectedRate {
+					t.Errorf("unexpected ingress: %s, expected: %s", output[11], expectedRate)
 				}
 				if output[8] != "1:5" {
 					t.Errorf("unexpected class: %s, expected: %s", output[8], "1:5")
 				}
 			}
-			if ix == 3 {
-				if output[11] != makeKBitString(*test.egress) {
-					t.Errorf("unexpected egress: %s, expected: %s", output[11], makeKBitString(*test.egress))
-				}
-				if output[8] != "1:6" {
-					t.Errorf("unexpected class: %s, expected: %s", output[8], "1:6")
-				}
-			}
-			if ix == 4 {
+			if ix == 2 {
 				if output[15] != test.cidr {
 					t.Errorf("unexpected cidr: %s, expected: %s", output[15], test.cidr)
 				}
 				if output[17] != "1:5" {
 					t.Errorf("unexpected class: %s, expected: %s", output[17], "1:5")
+				}
+			}
+			if ix == 4 {
+				if output[11] != makeKBitString(test.egress) {
+					t.Errorf("unexpected egress: %s, expected: %s", output[11], makeKBitString(test.egress))
+				}
+				if output[8] != "1:6" {
+					t.Errorf("unexpected class: %s, expected: %s", output[8], "1:6")
 				}
 			}
 			if ix == 5 {
@@ -374,6 +445,177 @@ func TestReset(t *testing.T) {
 			}
 			if ix == 2 && output[8] != test.expectedClass {
 				t.Errorf("unexpected class: %s, expected: %s", output[8], test.expectedClass)
+			}
+		}
+	}
+}
+
+var tcQdisc = "qdisc htb 1: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n"
+
+func TestReconcileInterfaceExists(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte(tcQdisc), nil },
+		},
+	}
+
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	iface := "cbr0"
+	shaper := &tcShaper{e: &fexec, iface: iface}
+	err := shaper.ReconcileInterface()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if fcmd.CombinedOutputCalls != 1 {
+		t.Errorf("unexpected number of calls: %d", fcmd.CombinedOutputCalls)
+	}
+
+	output := fcmd.CombinedOutputLog[0]
+	if len(output) != 5 {
+		t.Errorf("unexpected command: %v", output)
+	}
+	if output[0] != "tc" {
+		t.Errorf("unexpected command: %s", output[0])
+	}
+	if output[4] != iface {
+		t.Errorf("unexpected interface: %s, expected %s", output[4], iface)
+	}
+	if output[2] != "show" {
+		t.Errorf("unexpected action: %s", output[2])
+	}
+}
+
+func TestReconcileInterfaceDoesntExist(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte("\n"), nil },
+			func() ([]byte, error) { return []byte("\n"), nil },
+		},
+	}
+
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	iface := "cbr0"
+	shaper := &tcShaper{e: &fexec, iface: iface}
+	err := shaper.ReconcileInterface()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("unexpected number of calls: %d", fcmd.CombinedOutputCalls)
+	}
+
+	for ix, output := range fcmd.CombinedOutputLog {
+		if output[0] != "tc" {
+			t.Errorf("unexpected command: %s", output[0])
+		}
+		if output[4] != iface {
+			t.Errorf("unexpected interface: %s, expected %s", output[4], iface)
+		}
+		if ix == 0 {
+			if len(output) != 5 {
+				t.Errorf("unexpected command: %v", output)
+			}
+			if output[2] != "show" {
+				t.Errorf("unexpected action: %s", output[2])
+			}
+		}
+		if ix == 1 {
+			if len(output) != 11 {
+				t.Errorf("unexpected command: %v", output)
+			}
+			if output[2] != "add" {
+				t.Errorf("unexpected action: %s", output[2])
+			}
+			if output[7] != "1:" {
+				t.Errorf("unexpected root class: %s", output[7])
+			}
+			if output[8] != "htb" {
+				t.Errorf("unexpected qdisc algo: %s", output[8])
+			}
+		}
+	}
+}
+
+var tcQdiscWrong = []string{
+	"qdisc htb 2: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n",
+	"qdisc foo 1: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n",
+}
+
+func TestReconcileInterfaceIsWrong(t *testing.T) {
+	for _, test := range tcQdiscWrong {
+		fcmd := exec.FakeCmd{
+			CombinedOutputScript: []exec.FakeCombinedOutputAction{
+				func() ([]byte, error) { return []byte(test), nil },
+				func() ([]byte, error) { return []byte("\n"), nil },
+				func() ([]byte, error) { return []byte("\n"), nil },
+			},
+		}
+
+		fexec := exec.FakeExec{
+			CommandScript: []exec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			},
+		}
+		iface := "cbr0"
+		shaper := &tcShaper{e: &fexec, iface: iface}
+		err := shaper.ReconcileInterface()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if fcmd.CombinedOutputCalls != 3 {
+			t.Errorf("unexpected number of calls: %d", fcmd.CombinedOutputCalls)
+		}
+
+		for ix, output := range fcmd.CombinedOutputLog {
+			if output[0] != "tc" {
+				t.Errorf("unexpected command: %s", output[0])
+			}
+			if output[4] != iface {
+				t.Errorf("unexpected interface: %s, expected %s", output[4], iface)
+			}
+			if ix == 0 {
+				if len(output) != 5 {
+					t.Errorf("unexpected command: %v", output)
+				}
+				if output[2] != "show" {
+					t.Errorf("unexpected action: %s", output[2])
+				}
+			}
+			if ix == 1 {
+				if len(output) != 8 {
+					t.Errorf("unexpected command: %v", output)
+				}
+				if output[2] != "delete" {
+					t.Errorf("unexpected action: %s", output[2])
+				}
+				if output[7] != strings.Split(test, " ")[2] {
+					t.Errorf("unexpected class: %s, expected: %s", output[7], strings.Split(test, " ")[2])
+				}
+			}
+			if ix == 2 {
+				if len(output) != 11 {
+					t.Errorf("unexpected command: %v", output)
+				}
+				if output[7] != "1:" {
+					t.Errorf("unexpected root class: %s", output[7])
+				}
+				if output[8] != "htb" {
+					t.Errorf("unexpected qdisc algo: %s", output[8])
+				}
 			}
 		}
 	}
