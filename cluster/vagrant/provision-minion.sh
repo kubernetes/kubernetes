@@ -155,6 +155,10 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 
+# QoS support requires that swap memory is disabled on each of the minions
+echo "Disable swap memory to ensure proper QoS"
+swapoff -a
+
 # we will run provision to update code each time we test, so we do not want to do salt install each time
 if ! which salt-minion >/dev/null 2>&1; then
   # Install Salt
