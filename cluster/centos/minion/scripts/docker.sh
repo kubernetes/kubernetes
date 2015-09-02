@@ -20,7 +20,7 @@ DOCKER_OPTS=${1:-""}
 DOCKER_CONFIG=/opt/kubernetes/cfg/docker
 
 cat <<EOF >$DOCKER_CONFIG
-DOCKER_OPTS="-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock --selinux-enabled=false ${DOCKER_OPTS}"
+DOCKER_OPTS="-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock -s devicemapper --selinux-enabled=false ${DOCKER_OPTS}"
 EOF
 
 cat <<EOF >/usr/lib/systemd/system/docker.service

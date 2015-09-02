@@ -274,7 +274,7 @@ function provision-minion() {
     echo "chmod -R +x /opt/kubernetes/bin"
 
     echo "bash ${KUBE_TEMP}/minion/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}"
-    echo "bash ${KUBE_TEMP}/minion/scripts/docker.sh ${DOCKER_OPTS}"
+    echo "bash ${KUBE_TEMP}/minion/scripts/docker.sh \"${DOCKER_OPTS}\""
     echo "bash ${KUBE_TEMP}/minion/scripts/kubelet.sh ${master_ip} ${minion_ip}"
     echo "bash ${KUBE_TEMP}/minion/scripts/proxy.sh ${master_ip}"
 
