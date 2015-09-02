@@ -57,9 +57,9 @@ const MaxReadThenCreateRetries = 30
 
 // Abstraction over AWS, to allow mocking/other implementations
 type AWSServices interface {
-	Compute(region string) (EC2, error)
-	LoadBalancing(region string) (ELB, error)
-	Autoscaling(region string) (ASG, error)
+	Compute(region string, endpoint string) (EC2, error)
+	LoadBalancing(region string, endpoint string) (ELB, error)
+	Autoscaling(region string, endpoint string) (ASG, error)
 	Metadata() AWSMetadata
 }
 
@@ -177,6 +177,7 @@ type AWSCloud struct {
 	cfg              *AWSCloudConfig
 	availabilityZone string
 	region           string
+	endpoint         string
 
 	filterTags map[string]string
 
@@ -190,7 +191,9 @@ type AWSCloudConfig struct {
 	Global struct {
 		// TODO: Is there any use for this?  We can get it from the instance metadata service
 		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
-		Zone string
+		Zone     string
+		Region   string
+		Endpoint string
 
 		KubernetesClusterTag string
 	}
@@ -205,27 +208,30 @@ type awsSDKProvider struct {
 	creds *credentials.Credentials
 }
 
-func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
+func (p *awsSDKProvider) Compute(regionName string, endpoint string) (EC2, error) {
 	ec2 := &awsSdkEC2{
 		ec2: ec2.New(&aws.Config{
 			Region:      regionName,
+			Endpoint:    endpoint,
 			Credentials: p.creds,
 		}),
 	}
 	return ec2, nil
 }
 
-func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
+func (p *awsSDKProvider) LoadBalancing(regionName string, endpoint string) (ELB, error) {
 	elbClient := elb.New(&aws.Config{
 		Region:      regionName,
+		Endpoint:    endpoint,
 		Credentials: p.creds,
 	})
 	return elbClient, nil
 }
 
-func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
+func (p *awsSDKProvider) Autoscaling(regionName string, endpoint string) (ASG, error) {
 	client := autoscaling.New(&aws.Config{
 		Region:      regionName,
+		Endpoint:    endpoint,
 		Credentials: p.creds,
 	})
 	return client, nil
@@ -536,24 +542,30 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	if len(zone) <= 1 {
 		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
 	}
-	regionName := zone[:len(zone)-1]
 
-	valid := isRegionValid(regionName)
-	if !valid {
-		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
+	regionName := cfg.Global.Region
+	if len(regionName) <= 1 {
+		regionName = zone[:len(zone)-1]
 	}
 
-	ec2, err := awsServices.Compute(regionName)
+	endpoint := cfg.Global.Endpoint
+
+	valid := isRegionValid(regionName)
+	if len(cfg.Global.Region) <= 0 && !valid {
+		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", regionName)
+	}
+
+	ec2, err := awsServices.Compute(regionName, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS EC2 client: %v", err)
 	}
 
-	elb, err := awsServices.LoadBalancing(regionName)
+	elb, err := awsServices.LoadBalancing(regionName, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS ELB client: %v", err)
 	}
 
-	asg, err := awsServices.Autoscaling(regionName)
+	asg, err := awsServices.Autoscaling(regionName, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
 	}
@@ -566,6 +578,7 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		cfg:              cfg,
 		region:           regionName,
 		availabilityZone: zone,
+		endpoint:         endpoint,
 	}
 
 	filterTags := map[string]string{}
