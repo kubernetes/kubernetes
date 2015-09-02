@@ -1,8 +1,5 @@
 #!/bin/bash
 
-set -ex
-set -o pipefail
-
 ##############################################################
 # opencontrail-kubernetes minion setup and provisioning script. 
 # For more info, please refer to the following link
@@ -12,14 +9,26 @@ source /etc/contrail/opencontrail-rc
 
 readonly PROGNAME=$(basename "$0")
 
+ocver=$1
+
 LOGFILE=/var/log/contrail/provision_minion.log
 OS_TYPE="none"
 REDHAT="redhat"
 UBUNTU="ubuntu"
 VROUTER="vrouter"
 VHOST="vhost0"
+if [[ -z $ocver ]]; then
+   ocver="R2.20"
+fi
+if [[ -z $OPENCONTRAIL_CONTROLLER_IP ]]; then
+   kube_api_port=$(cat /etc/default/kubelet | grep -o 'api-servers=[^;]*' | awk -F// '{print $2}' | awk '{print $1}')
+   kube_api_ip=$(echo $kube_api_port| awk -F':' '{print $1}')
+   OPENCONTRAIL_CONTROLLER_IP=$kube_api_ip
+   echo "OPENCONTRAIL_CONTROLLER_IP=$kube_api_ip" >> /etc/contrail/opencontrail-rc
+fi
 if [[ -z $OPENCONTRAIL_VROUTER_INTF ]];then
    OPENCONTRAIL_VROUTER_INTF="eth0"
+   echo "OPENCONTRAIL_VROUTER_INTF="eth0"" >> /etc/contrail/opencontrail-rc
 fi
 MINION_OVERLAY_NET_IP=$(/sbin/ifconfig $OPENCONTRAIL_VROUTER_INTF | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
 
@@ -64,10 +73,10 @@ function prep_to_build()
 {
   if [ $OS_TYPE == $REDHAT ]; then
     yum update
-    yum install -y automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel
+    yum install -y automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel python-lxml
   elif [ $OS_TYPE == $UBUNTU ]; then
     apt-get update
-    apt-get install -y automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev
+    apt-get install -y automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev python-lxml
   fi
 }
 
@@ -75,11 +84,11 @@ function build_vrouter()
 {
   rm -rf ~/vrouter-build
   mkdir -p vrouter-build/tools
-  cd ~/vrouter-build && `git clone https://github.com/Juniper/contrail-vrouter` && `mv contrail-vrouter vrouter`
+  cd ~/vrouter-build && `git clone -b $ocver https://github.com/Juniper/contrail-vrouter` && `mv contrail-vrouter vrouter`
   cd ~/vrouter-build/tools && `git clone https://github.com/Juniper/contrail-build` && `mv contrail-build build`
-  cd ~/vrouter-build/tools && `git clone https://github.com/Juniper/contrail-sandesh` && `mv contrail-sandesh sandesh` 
+  cd ~/vrouter-build/tools && `git clone -b $ocver https://github.com/Juniper/contrail-sandesh` && `mv contrail-sandesh sandesh` 
   cp ~/vrouter-build/tools/build/SConstruct ~/vrouter-build
-  cd ~/vrouter-build && `scons vrouter`
+  cd ~/vrouter-build && `scons vrouter` 2>&1 | tee $LOGFILE
 }
 
 function modprobe_vrouter()
@@ -100,6 +109,7 @@ function modprobe_vrouter()
   mv ~/vrouter-build/build/debug/vrouter/utils/nh /usr/bin
   mv ~/vrouter-build/build/debug/vrouter/utils/vxlan /usr/bin
   mv ~/vrouter-build/build/debug/vrouter/utils/vrfstats /usr/bin
+  mv ~/vrouter-build/build/debug/vrouter/utils/vrouter /usr/bin
   cd /lib/modules/`uname -r` && depmod && cd
   `modprobe vrouter`
   vr=$(lsmod | grep vrouter | awk '{print $1}')
@@ -130,6 +140,7 @@ function setup_vhost()
       ivhost0="/etc/sysconfig/network-scripts/ifcfg-$VHOST"
       grep -q '#Contrail vhost0' $ivhost0 || echo "#Contrail vhost0" >> $ivhost0
       grep -q 'DEVICE=vhost0' $ivhost0 || echo "DEVICE=vhost0" >> $ivhost0
+      grep -q 'DEVICETYPE=vhost' $ivhost0 || echo "DEVICETYPE=vhost" >> $ivhost0
       grep -q 'ONBOOT=yes' $ivhost0 || echo "ONBOOT=yes" >> $ivhost0
       grep -q 'BOOTPROTO=none' $ivhost0 || echo "BOOTPROTO=none" >> $ivhost0
       grep -q 'IPV6INIT=no' $ivhost0 || echo "IPV6INIT=no" >> $ivhost0
@@ -165,29 +176,54 @@ function setup_vhost()
   fi   
 }
 
+function setup_vhost_init()
+{
+  rm -rf ~/vhost-init
+  mkdir vhost-init
+  cd ~/vhost-init && `git clone -b $ocver https://github.com/Juniper/contrail-packaging` && cd
+  ctrailbin="/opt/contrail/bin"
+  ctrailetc="/etc/contrail"
+  if [ ! -f $ctrailbin ]; then
+     mkdir -p $ctrailbin
+  fi
+  if [ ! -f $ctrailetc ]; then
+     mkdir -p $ctrailetc
+  fi
+  if [ $OS_TYPE == $UBUNTU ]; then
+     cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-pre-stop.sh $ctrailbin
+     cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-pre-start.sh $ctrailbin
+     cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-post-start.sh $ctrailbin
+  elif [ $OS_TYPE == $REDHAT ]; then
+     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_param_setup.sh $ctrailbin
+     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_ExecStopPost.sh $ctrailetc
+     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_ExecStartPre.sh $ctrailetc
+     cp ~/vhost-init/contrail-packaging/common/control_files/vnagent_ExecStartPost.sh $ctrailetc
+  fi   
+  cp ~/vhost-init/contrail-packaging/common/control_files/if-vhost0 $ctrailbin && cd
+  cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-functions.sh $ctrailbin && cd
+  cp ~/vhost-init/contrail-packaging/common/control_files/vrouter-agent.conf.sh $ctrailbin && cd
+}
+
 function setup_opencontrail_kubelet()
 {
+  rm -rf ~/ockube
   mkdir ockube
-  cd ~/ockube && `git clone https://github.com/Juniper/contrail-controller` && cd
   cd ~/ockube && `git clone https://github.com/Juniper/contrail-kubernetes` && cd
   if [ $OS_TYPE == $UBUNTU ]; then
      apt-get install -y python-setuptools
+     apt-get install -y python-pip
      apt-get install -y software-properties-common
      add-apt-repository -y ppa:opencontrail/ppa
      add-apt-repository -y ppa:opencontrail/r2.20
      apt-get update
-     apt-get install -y python-contrail
-     (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-install/ubuntu1404; dpkg -i contrail-vrouter-init_3.0-2642_all.deb) && cd
+     apt-get install -y python-contrail python-contrail-vrouter-api 
   elif [ $OS_TYPE == $REDHAT ]; then
      yum install -y python-setuptools
+     yum install -y python-pip
      yum install -y software-properties-common
-     yum install -y ppa:opencontrail/ppa
-     yum install -y ppa:opencontrail/r2.20
-     yum update
-     yum install -y python-contrail
-     (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-install/fedora21; rpm -ivfh contrail-vrouter-init-3.0-2642.el7.centos.x86_64.rpm) && cd
+     #TODO get vn-api and python-contrail-vrouter-api
   fi
-  (cd ~/ockube/contrail-controller/src/vnsw/contrail-vrouter-api; python setup.py install) && cd
+  pip uninstall -y opencontrail-kubelet
   (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet; python setup.py install) && cd
   
   mkdir -p /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail
@@ -195,9 +231,10 @@ function setup_opencontrail_kubelet()
      touch /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config
   fi
   config="/usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail/config"
-  ocp="/usr/bin/opencontrail-kubelet-plugin"
+  ocp="/usr/local/bin/opencontrail-kubelet-plugin"
   if [ ! -f $ocp ]; then
-     (cp ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet/opencontrail-kubelet-plugin $ocp)
+     log_info_msg "Opencontrail-kubelet-plugin not found. Please check the package opencontrail-kubelet"
+     exit 1
   fi
   grep -q 'DEFAULTS' $config || echo "[DEFAULTS]" >> $config
   grep -q 'api_server=$OPENCONTRAIL_CONTROLLER_IP' || echo "api_server=$OPENCONTRAIL_CONTROLLER_IP" >> $config
