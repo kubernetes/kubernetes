@@ -55,7 +55,6 @@ function verify_contrail_listen_services() {
     retry master 'netstat -anp | grep LISTEN | grep -w 8443' # IFMAP
     retry master 'netstat -anp | grep LISTEN | grep -w 8082' # API-Server
     retry master 'netstat -anp | grep LISTEN | grep -w 8087' # Schema
-    retry master 'netstat -anp | grep LISTEN | grep -w 5998' # discovery
     retry master 'netstat -anp | grep LISTEN | grep -w 8086' # Collector
     retry master 'netstat -anp | grep LISTEN | grep -w 8081' # OpServer
     retry master 'netstat -anp | grep LISTEN | grep -w 8091' # query-engine
@@ -63,6 +62,9 @@ function verify_contrail_listen_services() {
     retry master 'netstat -anp | grep LISTEN | grep -w 8143' # WebUI
     retry master 'netstat -anp | grep LISTEN | grep -w 8070' # WebUI
     retry master 'netstat -anp | grep LISTEN | grep -w 3000' # WebUI
+#   retry master 'netstat -anp | grep LISTEN | grep -w 5998' # discovery
+#   retry master 'netstat -anp | grep LISTEN | grep -w 8094' # dns
+#   retry master 'netstat -anp | grep LISTEN | grep -w 53' # named
 }
 
 # Provision controller
@@ -91,7 +93,7 @@ function setup_kube_dns_endpoints() {
 
 # Setup contrail manifest files under kubernetes
 function setup_contrail_manifest_files() {
-    cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/fedora_ubuntu_demo/cluster/manifests.hash | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/fedora_ubuntu_demo/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
+    cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
     master $cmd
 
     # Fix kube_network_manager command line args
