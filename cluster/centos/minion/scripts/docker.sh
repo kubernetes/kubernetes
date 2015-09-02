@@ -36,7 +36,7 @@ EnvironmentFile=-/run/flannel/docker
 EnvironmentFile=-/opt/kubernetes/cfg/docker
 WorkingDirectory=/opt/kubernetes/bin
 ExecStartPre=/opt/kubernetes/bin/remove-docker0.sh
-ExecStart=/opt/kubernetes/bin/docker -d \$DOCKER_OPT_BIP \$DOCKER_OPT_MTU \$DOCKER_OPTS
+ExecStart=/opt/kubernetes/bin/docker daemon \$DOCKER_OPT_BIP \$DOCKER_OPT_MTU \$DOCKER_OPTS
 LimitNOFILE=1048576
 LimitNPROC=1048576
 
