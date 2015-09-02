@@ -130,51 +130,66 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	return podVolumes, nil
 }
 
+type volumeTuple struct {
+	Kind string
+	Name string
+}
+
+func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
+	var volumes []*volumeTuple
+	podVolDir := kl.getPodVolumesDir(podUID)
+	volumeKindDirs, err := ioutil.ReadDir(podVolDir)
+	if err != nil {
+		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+	}
+	for _, volumeKindDir := range volumeKindDirs {
+		volumeKind := volumeKindDir.Name()
+		volumeKindPath := path.Join(podVolDir, volumeKind)
+		volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
+		if err != nil {
+			return []*volumeTuple{}, fmt.Errorf("could not read directory %s: %v", volumeKindPath, err)
+		}
+		for _, volumeNameDir := range volumeNameDirs {
+			volumes = append(volumes, &volumeTuple{Kind: volumeKind, Name: volumeNameDir.Name()})
+		}
+	}
+	return volumes, nil
+}
+
 // getPodVolumesFromDisk examines directory structure to determine volumes that
 // are presently active and mounted. Returns a map of volume.Cleaner types.
 func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 	currentVolumes := make(map[string]volume.Cleaner)
-
 	podUIDs, err := kl.listPodsFromDisk()
 	if err != nil {
 		glog.Errorf("Could not get pods from disk: %v", err)
 		return map[string]volume.Cleaner{}
 	}
-
 	// Find the volumes for each on-disk pod.
 	for _, podUID := range podUIDs {
-		podVolDir := kl.getPodVolumesDir(podUID)
-		volumeKindDirs, err := ioutil.ReadDir(podVolDir)
+		volumes, err := kl.getPodVolumes(podUID)
 		if err != nil {
-			glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+			glog.Errorf("%v", err)
+			continue
 		}
-		for _, volumeKindDir := range volumeKindDirs {
-			volumeKind := volumeKindDir.Name()
-			volumeKindPath := path.Join(podVolDir, volumeKind)
-			volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
-			if err != nil {
-				glog.Errorf("Could not read directory %s: %v", volumeKindPath, err)
-			}
-			for _, volumeNameDir := range volumeNameDirs {
-				volumeName := volumeNameDir.Name()
-				identifier := fmt.Sprintf("%s/%s", podUID, volumeName)
-				glog.V(4).Infof("Making a volume.Cleaner for %s", volumeKindPath)
-				// TODO(thockin) This should instead return a reference to an extant
-				// volume object, except that we don't actually hold on to pod specs
-				// or volume objects.
+		for _, volume := range volumes {
+			identifier := fmt.Sprintf("%s/%s", podUID, volume.Name)
+			glog.V(4).Infof("Making a volume.Cleaner for volume %s/%s of pod %s", volume.Kind, volume.Name, podUID)
+			// TODO(thockin) This should instead return a reference to an extant
+			// volume object, except that we don't actually hold on to pod specs
+			// or volume objects.
 
-				// Try to use a plugin for this volume.
-				cleaner, err := kl.newVolumeCleanerFromPlugins(volumeKind, volumeName, podUID, kl.mounter)
-				if err != nil {
-					glog.Errorf("Could not create volume cleaner for %s: %v", volumeNameDir.Name(), err)
-					continue
-				}
-				if cleaner == nil {
-					glog.Errorf("Could not create volume cleaner for %s: %v", volumeNameDir.Name(), errUnsupportedVolumeType)
-					continue
-				}
-				currentVolumes[identifier] = cleaner
+			// Try to use a plugin for this volume.
+			cleaner, err := kl.newVolumeCleanerFromPlugins(volume.Kind, volume.Name, podUID, kl.mounter)
+			if err != nil {
+				glog.Errorf("Could not create volume cleaner for %s: %v", volume.Name, err)
+				continue
 			}
+			if cleaner == nil {
+				glog.Errorf("Could not create volume cleaner for %s: %v", volume.Name, errUnsupportedVolumeType)
+				continue
+			}
+			currentVolumes[identifier] = cleaner
 		}
 	}
 	return currentVolumes
