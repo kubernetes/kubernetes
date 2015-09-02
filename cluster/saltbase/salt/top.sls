@@ -77,6 +77,7 @@ base:
 {% endif %}
 {% if pillar.get('overlay_network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
+    - kube-network-manager
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':
