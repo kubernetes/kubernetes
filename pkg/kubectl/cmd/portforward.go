@@ -30,16 +30,16 @@ import (
 
 const (
 	portforward_example = `
-# listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
+# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
 $ kubectl port-forward mypod 5000 6000
 
-# listens on port 8888 locally, forwarding to 5000 in the pod
+# Listen on port 8888 locally, forwarding to 5000 in the pod
 $ kubectl port-forward mypod 8888:5000
 
-# listens on a random port locally, forwarding to 5000 in the pod
+# Listen on a random port locally, forwarding to 5000 in the pod
 $ kubectl port-forward mypod :5000
 
-# listens on a random port locally, forwarding to 5000 in the pod
+# Listen on a random port locally, forwarding to 5000 in the pod
 $ kubectl port-forward  mypod 0:5000`
 )
 
