@@ -689,24 +689,22 @@ func TestUpdate_progressTimeout(t *testing.T) {
 	}
 }
 
-/*
- TODO: this was a bad commit @ironcladlou at red hat needs to fix this.
 func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 	oldRc := oldRc(1, 1)
 	delete(oldRc.Annotations, originalReplicasAnnotation)
 	newRc := newRc(1, 1)
 	var updatedOldRc *api.ReplicationController
 	fake := &testclient.Fake{}
-	fake.ReactFn = func(action testclient.Action) (runtime.Object, error) {
+	fake.AddReactor("*", "*", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 		switch a := action.(type) {
 		case testclient.GetAction:
-			return oldRc, nil
+			return true, oldRc, nil
 		case testclient.UpdateAction:
 			updatedOldRc = a.GetObject().(*api.ReplicationController)
-			return updatedOldRc, nil
+			return true, updatedOldRc, nil
 		}
-		return nil, nil
-	}
+		return false, nil, nil
+	})
 	updater := &RollingUpdater{
 		c:  fake,
 		ns: "default",
@@ -745,7 +743,6 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		t.Fatalf("expected annotation value %s, got %s", e, a)
 	}
 }
-*/
 
 // TestRollingUpdater_cleanupWithClients ensures that the cleanup policy is
 // correctly implemented.
