@@ -39,6 +39,7 @@ type portal struct {
 }
 
 type serviceInfo struct {
+	isAliveAtomic       int32 // Only access this with atomic ops
 	portal              portal
 	protocol            api.Protocol
 	proxyPort           int
@@ -50,6 +51,18 @@ type serviceInfo struct {
 	stickyMaxAgeMinutes int
 	// Deprecated, but required for back-compat (including e2e)
 	deprecatedPublicIPs []string
+}
+
+func (info *serviceInfo) setAlive(b bool) {
+	var i int32
+	if b {
+		i = 1
+	}
+	atomic.StoreInt32(&info.isAliveAtomic, i)
+}
+
+func (info *serviceInfo) isAlive() bool {
+	return atomic.LoadInt32(&info.isAliveAtomic) != 0
 }
 
 func logTimeout(err error) bool {
@@ -197,6 +210,7 @@ func (proxier *Proxier) stopProxy(service ServicePortName, info *serviceInfo) er
 // This assumes proxier.mu is locked.
 func (proxier *Proxier) stopProxyInternal(service ServicePortName, info *serviceInfo) error {
 	delete(proxier.serviceMap, service)
+	info.setAlive(false)
 	err := info.socket.Close()
 	port := info.socket.ListenPort()
 	proxier.proxyPorts.Release(port)
@@ -235,6 +249,7 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 		return nil, err
 	}
 	si := &serviceInfo{
+		isAliveAtomic:       1,
 		proxyPort:           portNum,
 		protocol:            protocol,
 		socket:              sock,
