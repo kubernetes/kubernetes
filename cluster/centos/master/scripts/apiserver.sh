@@ -18,6 +18,7 @@
 MASTER_ADDRESS=${1:-"8.8.8.18"}
 ETCD_SERVERS=${2:-"http://8.8.8.18:4001"}
 SERVICE_CLUSTER_IP_RANGE=${3:-"10.10.10.0/24"}
+ADMISSION_CONTROL=${4:-""}
 
 cat <<EOF >/opt/kubernetes/cfg/kube-apiserver
 # --logtostderr=true: log to standard error instead of files
@@ -52,8 +53,21 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 #   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
 #   NamespaceLifecycle, NamespaceAutoProvision, DenyExecOnPrivileged, 
 #   AlwaysAdmit, ServiceAccount, ResourceQuota
-#KUBE_ADMISSION_CONTROL=""
+#KUBE_ADMISSION_CONTROL="--admission-control=\"${ADMISSION_CONTROL}\""
 
+# --client-ca-file="": If set, any request presenting a client certificate signed
+# by one of the authorities in the client-ca-file is authenticated with an identity
+# corresponding to the CommonName of the client certificate.
+KUBE_API_CLIENT_CA_FILE="--client-ca-file=/srv/kubernetes/ca.crt"
+
+# --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any,
+# concatenated after server cert). If HTTPS serving is enabled, and --tls-cert-file
+# and --tls-private-key-file are not provided, a self-signed certificate and key are
+# generated for the public address and saved to /var/run/kubernetes.
+KUBE_API_TLS_CERT_FILE="--tls-cert-file=/srv/kubernetes/server.cert"
+
+# --tls-private-key-file="": File containing x509 private key matching --tls-cert-file.
+KUBE_API_TLS_PRIVATE_KEY_FILE="--tls-private-key-file=/srv/kubernetes/server.key"
 EOF
 
 KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
@@ -63,7 +77,10 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
                         \${KUBE_API_PORT}            \\
                         \${MINION_PORT}              \\
                         \${KUBE_ALLOW_PRIV}          \\
-                        \${KUBE_SERVICE_ADDRESSES}"
+                        \${KUBE_SERVICE_ADDRESSES}   \\
+                        \${KUBE_API_CLIENT_CA_FILE}  \\
+                        \${KUBE_API_TLS_CERT_FILE}   \\
+                        \${KUBE_API_TLS_PRIVATE_KEY_FILE}"
 
 
 cat <<EOF >/usr/lib/systemd/system/kube-apiserver.service
