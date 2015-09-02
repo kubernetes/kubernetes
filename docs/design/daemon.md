@@ -1,14 +1,14 @@
-# Daemons in Kubernetes
+# Daemon Controller in Kubernetes
 
 **Author**: Ananya Kumar (@AnanyaKumar)
 
 **Status**: Draft proposal; prototype in progress.
 
-This document presents the design of a daemon controller for Kubernetes, outlines relevant Kubernetes concepts, describes use cases, and lays out milestones for its development.
+This document presents the design of the Kubernetes daemon controller, describes use cases, and gives an overview of the code.
 
 ## Motivation
 
-In Kubernetes, a Replication Controller ensures that the specified number of a specified pod are running in the cluster at all times (pods are restarted if they are killed). With the Replication Controller, users cannot control which nodes their pods run on - Kubernetes decides how to schedule the pods onto nodes. However, many users want control over how certain pods are scheduled. In particular, many users have requested for a way to run a daemon on every node in the cluster, or on a certain set of nodes in the cluster. This is essential for use cases such as building a sharded datastore, or running a logger on every node. In comes the daemon controller, a way to conveniently create and manage daemon-like workloads in Kubernetes.  
+Many users have requested for a way to run a daemon on every node in a Kubernetes cluster, or on a certain set of nodes in a cluster. This is essential for use cases such as building a sharded datastore, or running a logger on every node. In comes the daemon controller, a way to conveniently create and manage daemon-like workloads in Kubernetes.  
 
 ## Use Cases
 
@@ -24,15 +24,15 @@ For other uses, see the related [feature request](https://github.com/GoogleCloud
 
 ## Functionality
 
-The Daemon Controller will support standard API features:
+The Daemon Controller supports standard API features:
 - create
-  - The spec for daemon controllers will have a pod template field.
+  - The spec for daemon controllers has a pod template field.
   - Using the pod’s node selector field, Daemon controllers can be restricted to operate over nodes that have a certain label. For example, suppose that in a cluster some nodes are labeled ‘database’. You can use a daemon controller to launch a datastore pod on exactly those nodes labeled ‘database’.
   - Using the pod's node name field, Daemon controllers can be restricted to operate on a specified node.
   - The spec for pod templates that run with the Daemon Controller is the same as the spec for pod templates that run with the Replication Controller, except there will not be a ‘replicas’ field (exactly 1 daemon pod will be launched per node).
-  - We will not guarantee that daemon pods show up on nodes before regular pods - run ordering is out of scope for this controller.
-  - The Daemon Controller will not guarantee that Daemon pods show up on nodes (for example because of resource limitations of the node), but will make a best effort to launch Daemon pods (like Replication Controllers do with pods)
-  - A daemon controller named “foo” will add a “controller: foo” annotation to all the pods that it creates
+  - We will not guarantee that daemon pods show up on nodes before regular pods - run ordering is out of scope for this controller. 
+  - The initial implementation of Daemon Controller does not guarantee that Daemon pods show up on nodes (for example because of resource limitations of the node), but makes a best effort to launch Daemon pods (like Replication Controllers do with pods). Subsequent revisions might ensure that Daemon pods show up on nodes, pushing out other pods if necessary.
+  - A daemon controller named “foo” adds a “controller: foo” annotation to all the pods that it creates
   - YAML example:
 ```YAML
   apiVersion: v1
@@ -61,18 +61,19 @@ The Daemon Controller will support standard API features:
     - describe
   - Modifiers
     - delete
-    - stop: first we turn down the Daemon Controller foo, and then we turn down all pods matching the query “controller: foo”
+    - stop: first we turn down all the pods controller by the daemon (by setting the nodeName to a non-existed name). Then we turn down the daemon controller.
     - label
     - update
-    - Daemon controllers will have labels, so you could, for example, list all daemon controllers with a certain label (the same way you would for a Replication Controller).
-  - In general, for all the supported features like get, describe, update, etc, the Daemon Controller will work in a similar way to the Replication Controller. However, note that the Daemon Controller and the Replication Controller are different constructs.
+    - Daemon controllers have labels, so you could, for example, list all daemon controllers with a certain label (the same way you would for a Replication Controller).
+  - In general, for all the supported features like get, describe, update, etc, the Daemon Controller works in a similar way to the Replication Controller. However, note that the Daemon Controller and the Replication Controller are different constructs.
 
-### Health checks
-  - Ordinary health checks specified in the pod template will of course work to keep pods created by a Daemon Controller running.
+### Persisting Pods
+  - Ordinary health checks specified in the pod template work to keep pods created by a Daemon Controller running.
+  - If a daemon pod is killed or stopped, the daemon controller will create a new replica of the daemon pod on the node.
 
 ### Cluster Mutations
-  - When a new node is added to the cluster the daemon controller should start the daemon on the node (if the node’s labels match the user-specified selectors). This is a big advantage of the Daemon Controller compared to alternative ways of launching daemons and configuring clusters.
-  - Suppose the user launches a daemon controller that runs a logging daemon on all nodes labeled “tolog”. If the user then adds the “tolog” label to a node (that did not initially have the “tolog” label), the logging daemon should be launched on the node. Additionally, if a user removes the “tolog” label from a node, the logging daemon on that node should be killed.
+  - When a new node is added to the cluster the daemon controller starts the daemon on the node (if the node’s labels match the user-specified selectors). This is a big advantage of the Daemon Controller compared to alternative ways of launching daemons and configuring clusters.
+  - Suppose the user launches a daemon controller that runs a logging daemon on all nodes labeled “tolog”. If the user then adds the “tolog” label to a node (that did not initially have the “tolog” label), the logging daemon will launch on the node. Additionally, if a user removes the “tolog” label from a node, the logging daemon on that node will be killed.
 
 ## Alternatives Considered
 
@@ -101,19 +102,19 @@ A third alternative is to generalize the Replication Controller. We could add a 
 
 #### Apiserver
 - Accept, parse, validate client commands
-- REST API calls will be handled in registry/daemon
+- REST API calls are handled in registry/daemon
   - In particular, the api server will add the object to etcd
   - DaemonManager listens for updates to etcd (using Framework.informer)
-- API object for Daemon Controller will be created in expapi/v1/types.go and expapi/v1/register.go
+- API objects for Daemon Controller were created in expapi/v1/types.go and expapi/v1/register.go
 - Validation code is in expapi/validation
 
 #### Daemon Manager
 - Creates new daemon controllers when requested. Launches the corresponding daemon pod on all nodes with labels matching the new daemon controller’s selector.
 - Listens for addition of new nodes to the cluster, by setting up a framework.NewInformer that watches for the creation of Node API objects. When a new node is added, the daemon manager will loop through each daemon controller. If the label of the node matches the selector of the daemon controller, then the daemon manager will create the corresponding daemon pod in the new node.
-- The daemon manager will create a pod on a node by sending a command to the API server, requesting for a pod to be bound to the node (the node will be specified via its hostname)
+- The daemon manager creates a pod on a node by sending a command to the API server, requesting for a pod to be bound to the node (the node will be specified via its hostname)
 
 #### Kubelet
-- Does not need to be modified, but health checking for the daemon pods and revive the pods if they are killed (we will set the pod restartPolicy to Always). We reject Daemon Controller objects with pod templates that don’t have restartPolicy set to Always.
+- Does not need to be modified, but health checking will occur for the daemon pods and revive the pods if they are killed (we set the pod restartPolicy to Always). We reject Daemon Controller objects with pod templates that don’t have restartPolicy set to Always.
 
 ## Testing
 
@@ -124,5 +125,4 @@ End to End Tests:
 One end-to-end test was implemented. The end-to-end test verified that the daemon manager runs the daemon on every node, that when a daemon pod is stopped it restarts, that the daemon controller can be reaped (stopped), and that the daemon adds/removes daemon pods appropriately from nodes when their labels change.
 
 ## Open Issues
-- Rolling updates across nodes should be performed according to the [anti-affinity policy in scheduler](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/plugin/pkg/scheduler/api/v1/types.go). We need to figure out how to share that configuration.
 - See how this can work with [Deployment design](https://github.com/GoogleCloudPlatform/kubernetes/issues/1743).
