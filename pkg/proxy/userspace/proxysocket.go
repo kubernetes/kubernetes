@@ -31,6 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
+const (
+	// 4KiB should be enough for most whole-packets
+	bufferSize = 4096
+)
+
 // Abstraction over TCP/UDP sockets which are proxied.
 type proxySocket interface {
 	// Addr gets the net.Addr for a proxySocket.
@@ -72,9 +77,6 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }
 
-// Generic function type for proxying TCP and UDP request
-type proxyMethod func(in, out net.Conn, err error)
-
 // How long we wait for a connection to a backend in seconds
 var endpointDialTimeout = []time.Duration{1, 2, 4, 8}
 
@@ -89,11 +91,15 @@ func (tcp *tcpProxySocket) ListenPort() int {
 	return tcp.port
 }
 
-func connectAndProxy(service proxy.ServicePortName, inConn net.Conn, srcAddr net.Addr, protocol string, proxier *Proxier, prxMd proxyMethod) {
+// Generic function type for proxying TCP and UDP request
+type proxyMethod func(in, out net.Conn, err error)
+
+func connectAndProxy(service proxy.ServicePortName, inConn net.Conn, srcAddr net.Addr, protocol string, proxier *Proxier, proxy proxyMethod) {
 	var outConn net.Conn
+	var endpoint string
 	var err error
 	for _, retryTimeout := range endpointDialTimeout {
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
+		endpoint, err = proxier.loadBalancer.NextEndpoint(service, srcAddr)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			break
@@ -113,7 +119,7 @@ func connectAndProxy(service proxy.ServicePortName, inConn net.Conn, srcAddr net
 	if outConn == nil && err == nil {
 		err = fmt.Errorf("failed to connect to an endpoint.")
 	}
-	prxMd(inConn, outConn, err)
+	proxy(inConn, outConn, err)
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
@@ -201,7 +207,7 @@ func newClientCache() *clientCache {
 }
 
 func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
-	var buffer [4096]byte // 4KiB should be enough for most whole-packets
+	var buffer [bufferSize]byte
 	for {
 		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
@@ -221,13 +227,11 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			glog.Errorf("ReadFrom failed, exiting ProxyLoop: %v", err)
 			break
 		}
-		udp.connectBackend(myInfo, &buffer, n, cliAddr, proxier, service)
+		udp.connectBackend(myInfo.activeClients, &buffer, n, cliAddr, proxier, service, myInfo.timeout)
 	}
 }
 
-func (udp *udpProxySocket) connectBackend(myInfo *serviceInfo, buffer *[4096]byte, n int, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortName) {
-	activeClients := myInfo.activeClients
-	timeout := myInfo.timeout
+func (udp *udpProxySocket) connectBackend(activeClients *clientCache, buffer *[bufferSize]byte, n int, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortName, timeout time.Duration) {
 	activeClients.mu.Lock()
 	defer activeClients.mu.Unlock()
 
@@ -249,28 +253,29 @@ func (udp *udpProxySocket) connectBackend(myInfo *serviceInfo, buffer *[4096]byt
 =======
 		glog.V(2).Infof("New UDP connection from %s", cliAddr)
 		go connectAndProxy(service, udp, cliAddr, "udp", proxier, func(in, svrConn net.Conn, err error) {
+			if err != nil {
+				return
+			}
 			if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
 				glog.Errorf("SetDeadline failed: %v", err)
+				return
 			}
 			activeClients.clients[cliAddr.String()] = svrConn
-			func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
+			go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
 				defer util.HandleCrash()
 				udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
 			}(cliAddr, svrConn, activeClients, timeout)
-			writeData(svrConn, buffer, n, myInfo, err)
+			writeData(svrConn, buffer, n, timeout)
 		})
 		return
 	}
-	writeData(svrConn, buffer, n, myInfo, nil)
+	writeData(svrConn, buffer, n, timeout)
 }
 
-func writeData(svrConn net.Conn, buffer *[4096]byte, n int, myInfo *serviceInfo, err error) {
-	if err != nil {
-		return
-	}
+func writeData(svrConn net.Conn, buffer *[bufferSize]byte, n int, timeout time.Duration) {
 	// TODO: It would be nice to let the goroutine handle this write, but we don't
 	// really want to copy the buffer.  We could do a pool of buffers or something.
-	_, err = svrConn.Write(buffer[0:n])
+	_, err := svrConn.Write(buffer[0:n])
 	if err != nil {
 		if !logTimeout(err) {
 			glog.Errorf("Write failed: %v", err)
@@ -279,7 +284,7 @@ func writeData(svrConn net.Conn, buffer *[4096]byte, n int, myInfo *serviceInfo,
 		}
 		return
 	}
-	err = svrConn.SetDeadline(time.Now().Add(myInfo.timeout))
+	err = svrConn.SetDeadline(time.Now().Add(timeout))
 	if err != nil {
 		glog.Errorf("SetDeadline failed: %v", err)
 		return
