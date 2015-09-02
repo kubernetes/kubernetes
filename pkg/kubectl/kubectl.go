@@ -96,6 +96,7 @@ func expandResourceShortcut(resource string) string {
 		"cs":     "componentstatuses",
 		"ev":     "events",
 		"ep":     "endpoints",
+		"hpa":    "horizontalpodautoscalers",
 		"limits": "limitranges",
 		"no":     "nodes",
 		"ns":     "namespaces",
