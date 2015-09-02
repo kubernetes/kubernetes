@@ -96,13 +96,6 @@ function setup_contrail_manifest_files() {
     cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
     master $cmd
 
-    # Fix kube_network_manager command line args
-    SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}
-    cmd='sed -i s#--portal_net=10.0.0.0/16#--portal_net='
-    cmd="$cmd$SERVICE_CLUSTER_IP_RANGE"
-    cmd="$cmd# /etc/contrail/manifests/kube-network-manager.manifest"
-    master $cmd
-
     cmd='grep \"image\": /etc/contrail/manifests/* | cut -d "\"" -f 4 | sort -u | xargs -n1 sudo docker pull'
     RETRY=20
     WAIT=3
