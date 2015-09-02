@@ -109,7 +109,5 @@ func MatchResourceQuota(label labels.Selector, field fields.Selector) generic.Ma
 func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) labels.Set {
 	return labels.Set{
 		"metadata.name": resourcequota.Name,
-		// Having "name" is a bug, but it must be supported for v1 API backward compatibility.
-		"name": resourcequota.Name,
 	}
 }
