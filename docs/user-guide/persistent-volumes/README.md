@@ -122,8 +122,7 @@ $ curl 10.0.0.241:3000
 I love Kubernetes storage!
 ```
 
-Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join
-[`#google-containers`](https://botbot.me/freenode/google-containers/) on IRC and ask!
+Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join the team on [Slack](../../troubleshooting.md#slack) and ask!
 
 Enjoy!
 

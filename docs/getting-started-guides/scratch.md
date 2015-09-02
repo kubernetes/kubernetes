@@ -875,7 +875,7 @@ pinging or SSH-ing from one node to another.
 ### Getting Help
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
-[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on [Slack](../troubleshooting.md#slack).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
