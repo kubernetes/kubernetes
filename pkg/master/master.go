@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/expapi"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -71,6 +72,8 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
+	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
+	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -233,6 +236,9 @@ type Master struct {
 	lastSync       int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
 	clock          util.Clock
+
+	// storage for third party objects
+	thirdPartyStorage storage.Interface
 }
 
 // NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
@@ -763,6 +769,52 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version.Version = "v1"
 	version.Codec = v1.Codec
 	return version
+}
+
+func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
+	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	if err != nil {
+		return err
+	}
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
+	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
+		glog.Fatalf("Unable to setup thirdparty api: %v", err)
+	}
+	thirdPartyPrefix := "/thirdparty/" + group + "/"
+	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
+	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
+	return nil
+}
+
+func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
+	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
+
+	apiRoot := "/thirdparty/" + group + "/"
+
+	storage := map[string]rest.Storage{
+		strings.ToLower(kind) + "s": resourceStorage,
+	}
+
+	return &apiserver.APIGroupVersion{
+		Root: apiRoot,
+
+		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+
+		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
+		Codec:   explatest.Codec,
+		Linker:  explatest.SelfLinker,
+		Storage: storage,
+		Version: version,
+
+		Admit:   m.admissionControl,
+		Context: m.requestContextMapper,
+
+		ProxyDialerFn:     m.dialer,
+		MinRequestTimeout: m.minRequestTimeout,
+	}
 }
 
 // expapi returns the resources and codec for the experimental api

@@ -1076,6 +1076,44 @@ func deepCopy_expapi_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyRe
 	return nil
 }
 
+func deepCopy_expapi_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make([]uint8, len(in.Data))
+		for i := range in.Data {
+			out.Data[i] = in.Data[i]
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResourceData, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_expapi_ThirdPartyResourceData(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_expapi_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1176,6 +1214,8 @@ func init() {
 		deepCopy_expapi_ScaleStatus,
 		deepCopy_expapi_SubresourceReference,
 		deepCopy_expapi_ThirdPartyResource,
+		deepCopy_expapi_ThirdPartyResourceData,
+		deepCopy_expapi_ThirdPartyResourceDataList,
 		deepCopy_expapi_ThirdPartyResourceList,
 		deepCopy_util_IntOrString,
 		deepCopy_util_Time,
