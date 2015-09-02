@@ -223,7 +223,10 @@ function setup_opencontrail_kubelet()
      yum install -y software-properties-common
      #TODO get vn-api and python-contrail-vrouter-api
   fi
-  pip uninstall -y opencontrail-kubelet
+  ockub=$(pip freeze | grep kubelet | awk -F= '{print $1}')
+  if [ ! -z $ockub ]; then
+     pip uninstall -y opencontrail-kubelet
+  fi
   (cd ~/ockube/contrail-kubernetes/scripts/opencontrail-kubelet; python setup.py install) && cd
   
   mkdir -p /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail
@@ -237,7 +240,7 @@ function setup_opencontrail_kubelet()
      exit 1
   fi
   grep -q 'DEFAULTS' $config || echo "[DEFAULTS]" >> $config
-  grep -q 'api_server=$OPENCONTRAIL_CONTROLLER_IP' || echo "api_server=$OPENCONTRAIL_CONTROLLER_IP" >> $config
+  grep -q 'api_server=$OPENCONTRAIL_CONTROLLER_IP' $config || echo "api_server=$OPENCONTRAIL_CONTROLLER_IP" >> $config
   (cd /usr/libexec/kubernetes/kubelet-plugins/net/exec/opencontrail; `ln -s $ocp opencontrail`) && cd
 }
 
@@ -308,5 +311,4 @@ function main()
    cleanup
 }
 
-exit
 main
