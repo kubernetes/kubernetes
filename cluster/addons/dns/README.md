@@ -16,7 +16,7 @@ history of clients that, on purpose or on accident, do not respect DNS TTLs
 ## Where does resolution work?
 Kubernetes Service DNS names can be resolved using standard methods (e.g. [`gethostbyname`](
 http://linux.die.net/man/3/gethostbyname)) inside any pod, except pods which
-have the `hostNet` field set to `true`.
+have the `hostNetwork` field set to `true`.
 
 ## Supported DNS schema
 The following sections detail the supported record types and layout that is
