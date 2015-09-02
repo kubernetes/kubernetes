@@ -46,6 +46,11 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	return s.Delegate.PrintObj(obj, out)
 }
 
+// TODO: implement HandledResources()
+func (p *SortingPrinter) HandledResources() []string {
+	return []string{}
+}
+
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	objs, err := runtime.ExtractList(obj)
 	if err != nil {

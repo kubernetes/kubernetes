@@ -102,6 +102,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 type ResourcePrinter interface {
 	// Print receives a runtime object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
+	HandledResources() []string
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -110,6 +111,11 @@ type ResourcePrinterFunc func(runtime.Object, io.Writer) error
 // PrintObj implements ResourcePrinter
 func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 	return fn(obj, w)
+}
+
+// TODO: implement HandledResources()
+func (fn ResourcePrinterFunc) HandledResources() []string {
+	return []string{}
 }
 
 // VersionedPrinter takes runtime objects and ensures they are converted to a given API version
@@ -148,6 +154,11 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return p.printer.PrintObj(converted, w)
 	}
 	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.version)
+}
+
+// TODO: implement HandledResources()
+func (p *VersionedPrinter) HandledResources() []string {
+	return []string{}
 }
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
@@ -200,6 +211,11 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return nil
 }
 
+// TODO: implement HandledResources()
+func (p *NamePrinter) HandledResources() []string {
+	return []string{}
+}
+
 // JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
 type JSONPrinter struct {
 }
@@ -215,6 +231,11 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	dst.WriteByte('\n')
 	_, err = w.Write(dst.Bytes())
 	return err
+}
+
+// TODO: implement HandledResources()
+func (p *JSONPrinter) HandledResources() []string {
+	return []string{}
 }
 
 // YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
@@ -233,6 +254,11 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 	_, err = fmt.Fprint(w, string(output))
 	return err
+}
+
+// TODO: implement HandledResources()
+func (p *YAMLPrinter) HandledResources() []string {
+	return []string{}
 }
 
 type handlerEntry struct {
@@ -1243,6 +1269,11 @@ func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return nil
 }
 
+// TODO: implement HandledResources()
+func (p *TemplatePrinter) HandledResources() []string {
+	return []string{}
+}
+
 // safeExecute tries to execute the template, but catches panics and returns an error
 // should the template engine panic.
 func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
@@ -1386,4 +1417,9 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return fmt.Errorf("error executing jsonpath '%v': '%v'\n----data----\n%+v\n", j.rawTemplate, err, obj)
 	}
 	return nil
+}
+
+// TODO: implement HandledResources()
+func (p *JSONPathPrinter) HandledResources() []string {
+	return []string{}
 }
