@@ -74,10 +74,10 @@ function prep_to_build()
 {
   if [ "$OS_TYPEi" == $REDHAT ]; then
     yum update
-    yum install -y automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel python-lxml git
+    yum install -y git automake flex bison gcc gcc-c++ boost boost-devel scons kernel-devel-`uname -r` libxml2-devel python-lxml
   elif [ "$OS_TYPE" == $UBUNTU ]; then
     apt-get update
-    apt-get install -y automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev python-lxml git
+    apt-get install -y git automake flex bison g++ gcc make libboost-all-dev scons linux-headers-`uname -r` libxml2-dev python-lxml
   fi
 }
 
@@ -135,7 +135,7 @@ function setup_vhost()
 {
   if [ -z $MINION_OVERLAY_NET_IP ]; then 
      log_info_msg "MINION_OVERLAY_NET_IP is empty. Please check the interface for IP. If it is already assigned to vhost0, there will be no change required"
-     exit
+     return
   fi
   phy_itf=$(ip a |grep $MINION_OVERLAY_NET_IP | awk '{print $7}')
   mask=$(ifconfig $phy_itf | grep -i '\(netmask\|mask\)' | awk '{print $4}' | cut -d ":" -f 2)
@@ -236,6 +236,9 @@ function update_restart_kubelet()
   kubeappendoc=" --network-plugin=opencontrail"
   kubeappendpv=" --allow_privileged=true"
   kubeappendmf=" --config=/etc/kubernetes/manifests"
+  if [ ! -f /etc/kubernetes/manifests ]; then
+     mkdir -p /etc/kubernetes/manifests
+  fi
   source /etc/default/kubelet; kubecf=`echo $KUBELET_OPTS`
   kubepid=$(ps -ef|grep kubelet |grep manifests | awk '{print $2}')
   if [[ $kubepid != `pidof kubelet` ]]; then
@@ -286,28 +289,26 @@ function update_vhost_pre_up()
   `chmod +x $preup/ifup-vhost`
 }
 
+function vrouter_agent_startup()
+{
+  if [ ! -f /etc/kubernetes/manifests ]; then
+     mkdir -p /etc/kubernetes/manifests
+  fi
+  vragent="~/ockube/contrail-kubernetes/cluster/contrail-vrouter-agent.manifest"
+  vrimg=$(cat $vragent | grep image | awk -F, '{print $1}' | awk '{print $2}')
+  `docker pull $vrimg`
+  cp ~/ockube/contrail-kubernetes/cluster/contrail-vrouter-agent.manifest /etc/kubernetes/manifests
+}
+
 function cleanup()
 {
   if [ "$OS_TYPE" == $REDHAT ]; then
-    yum remove -y flex bison gcc gcc-c++ boost boost-devel scons libxml2-devel
+    yum remove -y git flex bison gcc gcc-c++ boost boost-devel scons libxml2-devel kernel-devel-`uname -r`
   elif [ "$OS_TYPE" == $UBUNTU ]; then
-    apt-get remove -y flex bison g++ gcc make libboost-all-dev scons libxml2-dev
+    apt-get remove -y git flex bison g++ gcc make libboost-all-dev scons libxml2-dev linux-headers-`uname -r`
   fi
   rm -rf ~/vrouter-build
   rm -rf ~/ockube
-}
-
-# Setup contrail manifest files under kubernetes
-function setup_contrail_vrouter_agent_manifest() {
-    cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | grep contrail-vrouter-agent | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
-    bash -c "sudo $cmd"
-
-    cmd='grep \"image\": /etc/contrail/manifests/* | cut -d "\"" -f 4 | sort -u | xargs -n1 sudo docker pull'
-    RETRY=20
-    WAIT=3
-    bash -c "sudo $cmd"
-    cmd='mv /etc/contrail/manifests/* /etc/kubernetes/manifests/'
-    bash -c "sudo $cmd"
 }
 
 
@@ -317,12 +318,12 @@ function main()
    prep_to_build
    build_vrouter
    modprobe_vrouter
-   setup_contrail_vrouter_agent_manifest
    setup_vhost
    setup_opencontrail_kubelet
    update_restart_kubelet
    stop_kube_svcs
    update_vhost_pre_up
+   vrouter_agent_startup
    cleanup
 }
 
