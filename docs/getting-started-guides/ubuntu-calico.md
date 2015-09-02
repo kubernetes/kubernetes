@@ -35,7 +35,7 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes with Calico Networking
 
 ## Introduction
 
-This document describes how to deploy Kubernetes on ubuntu bare metal nodes with Calico Networking plugin. See [projectcalico.org](http://projectcalico.org) for more information on what Calico is, and [the calicoctl github](https://github.com/projectcalico/calico-docker) for more information on the command-line tool, `calicoctl`.
+This document describes how to deploy Kubernetes on Ubuntu bare metal nodes with Calico Networking plugin. See [projectcalico.org](http://projectcalico.org) for more information on what Calico is, and [the calicoctl github](https://github.com/projectcalico/calico-docker) for more information on the command-line tool, `calicoctl`.
 
 This guide will set up a simple Kubernetes cluster with a master and two nodes. We will start the following processes with systemd:
 
@@ -54,7 +54,8 @@ On each Node:
 ## Prerequisites
 
 1. This guide uses `systemd` and thus uses Ubuntu 15.04 which supports systemd natively.
-2. All Kubernetes nodes should have the latest docker stable version installed. At the time of writing, that is Docker 1.7.0.
+2. All machines should have the latest docker stable version installed. At the time of writing, that is Docker 1.7.0.
+	- To install docker, follow [these instructions](https://docs.docker.com/installation/ubuntulinux/)
 3. All hosts should be able to communicate with each other, as well as the internet, to download the necessary files.
 4. This demo assumes that none of the hosts have been configured with any Kubernetes or Calico software yet.
 
@@ -122,8 +123,6 @@ sudo systemctl start kube-controller-manager.service
 sudo systemctl start kube-scheduler.service
 ```
 
-> *You may want to consider checking their status after to ensure everything is running.*
-
 ### Install Calico on Master
 
 In order to allow the master to route to pods on our nodes, we will launch the calico-node daemon on our master. This will allow it to learn routes over BGP from the other calico-node daemons in the cluster. The docker daemon should already be running before calico is started.
@@ -176,6 +175,7 @@ sudo mv -f network-environment /etc
 Instead of using docker's default interface (docker0), we will configure a new one to use desired IP ranges
 
 ```
+sudo apt-get install -y bridge-utils
 sudo brctl addbr cbr0
 sudo ifconfig cbr0 up
 sudo ifconfig cbr0 <IP>/24
@@ -197,9 +197,12 @@ The Docker daemon must be started and told to use the already configured cbr0 in
 
 2.) Find the line that reads `ExecStart=/usr/bin/docker -d -H fd://` and append the following flags: `--bridge=cbr0 --iptables=false --ip-masq=false`
 
-3.) Reload systemctl with `sudo systemctl daemon-reload`
+3.) Reload systemctl and restart docker.
 
-4.) Restart docker with with `sudo systemctl restart docker`
+```
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
 
 ### Install Calico on the Node
 
@@ -241,6 +244,10 @@ kubernetes/cluster/ubuntu/build.sh
 
 # Add binaries to /usr/bin
 sudo cp -f binaries/minion/* /usr/bin
+
+# Get the iptables based kube-proxy reccomended for this demo
+sudo wget https://github.com/projectcalico/calico-kubernetes/releases/download/v0.1.1/kube-proxy -P /usr/bin/
+sudo chmod +x /usr/bin/kube-proxy
 ```
 
 2.) Install and launch the sample systemd processes settings for launching Kubernetes services
@@ -256,6 +263,14 @@ sudo systemctl start kube-kubelet.service
 
 >*You may want to consider checking their status after to ensure everything is running*
 
+## Install the DNS Addon
+
+Most Kubernetes deployments will require the DNS addon for service discovery.  For more on DNS service discovery, check [here](../../cluster/addons/dns/).
+
+The config repository for this guide comes with manifest files to start the DNS addon.  To install DNS, do the following on your Master node.
+
+Replace `<MASTER_IP>` in `calico-kubernetes-ubuntu-demo-master/dns/skydns-rc.yaml` with your Master's IP address.  Then, create `skydns-rc.yaml` and `skydns-svc.yaml` using `kubectl create -f <FILE>`.
+
 ## Launch other Services With Calico-Kubernetes
 
 At this point, you have a fully functioning cluster running on kubernetes with a master and 2 nodes networked with Calico. You can now follow any of the [standard documentation](../../examples/) to set up other services on your cluster.
@@ -268,12 +283,15 @@ With this sample configuration, because the containers have private `192.168.0.0
 
 The simplest method for enabling connectivity from containers to the internet is to use an iptables masquerade rule. This is the standard mechanism [recommended](../../docs/admin/networking.md#google-compute-engine-gce) in the Kubernetes GCE environment.
 
-We need to NAT traffic that has a destination outside of the cluster. Internal traffic includes the master/nodes, and the container IP pools. Assuming that the master and nodes are in the `172.25.0.0/24` subnet, the cbr0 IP ranges are all in the `192.168.0.0/16` network, and the nodes use the interface `eth0` for external connectivity, a suitable masquerade chain would look like this:
+We need to NAT traffic that has a destination outside of the cluster. Internal traffic includes the master/nodes, and the container IP pools. A suitable masquerade chain would follow the pattern below, replacing the following variables:
+- `CONTAINER_SUBNET`: The cluster-wide subnet from which container IPs are chosen.  All cbr0 bridge subnets fall within this range. The above example uses `192.168.0.0/16`.
+- `KUBERNETES_HOST_SUBNET`: The subnet from which Kubernetes node / master IP addresses have been chosen.
+- `HOST_INTERFACE`: The interface on the Kubernetes node which is used for external connectivity.  The above example uses `eth0`
 
 ```
 sudo iptables -t nat -N KUBE-OUTBOUND-NAT
-sudo iptables -t nat -A KUBE-OUTBOUND-NAT -d 192.168.0.0/16 -o eth0 -j RETURN
-sudo iptables -t nat -A KUBE-OUTBOUND-NAT -d 172.25.0.0/24 -o eth0 -j RETURN
+sudo iptables -t nat -A KUBE-OUTBOUND-NAT -d <CONTAINER_SUBNET> -o <HOST_INTERFACE> -j RETURN
+sudo iptables -t nat -A KUBE-OUTBOUND-NAT -d <KUBERNETES_HOST_SUBNET> -o <HOST_INTERFACE> -j RETURN
 sudo iptables -t nat -A KUBE-OUTBOUND-NAT -j MASQUERADE
 sudo iptables -t nat -A POSTROUTING -j KUBE-OUTBOUND-NAT
 ```
