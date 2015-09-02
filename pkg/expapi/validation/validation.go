@@ -255,3 +255,15 @@ func ValidateDeployment(obj *expapi.Deployment) errs.ValidationErrorList {
 	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec).Prefix("spec")...)
 	return allErrs
 }
+
+func ValidateThirdPartyResourceDataUpdate(old, update *expapi.ThirdPartyResourceData) errs.ValidationErrorList {
+	return ValidateThirdPartyResourceData(update)
+}
+
+func ValidateThirdPartyResourceData(obj *expapi.ThirdPartyResourceData) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(obj.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
+	}
+	return allErrs
+}

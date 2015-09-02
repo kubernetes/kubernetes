@@ -2050,24 +2050,6 @@ func deepCopy_api_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *c
 	return nil
 }
 
-func deepCopy_api_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
-	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if in.Data != nil {
-		out.Data = make([]uint8, len(in.Data))
-		for i := range in.Data {
-			out.Data[i] = in.Data[i]
-		}
-	} else {
-		out.Data = nil
-	}
-	return nil
-}
-
 func deepCopy_api_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
@@ -2354,7 +2336,6 @@ func init() {
 		deepCopy_api_StatusCause,
 		deepCopy_api_StatusDetails,
 		deepCopy_api_TCPSocketAction,
-		deepCopy_api_ThirdPartyResourceData,
 		deepCopy_api_TypeMeta,
 		deepCopy_api_Volume,
 		deepCopy_api_VolumeMount,

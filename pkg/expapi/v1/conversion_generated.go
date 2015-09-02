@@ -1888,6 +1888,45 @@ func convert_expapi_ThirdPartyResource_To_v1_ThirdPartyResource(in *expapi.Third
 	return nil
 }
 
+func convert_expapi_ThirdPartyResourceData_To_v1_ThirdPartyResourceData(in *expapi.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.ThirdPartyResourceData))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_expapi_ThirdPartyResourceDataList_To_v1_ThirdPartyResourceDataList(in *expapi.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.ThirdPartyResourceDataList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResourceData, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_ThirdPartyResourceData_To_v1_ThirdPartyResourceData(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func convert_expapi_ThirdPartyResourceList_To_v1_ThirdPartyResourceList(in *expapi.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.ThirdPartyResourceList))(in)
@@ -2237,6 +2276,45 @@ func convert_v1_ThirdPartyResource_To_expapi_ThirdPartyResource(in *ThirdPartyRe
 	return nil
 }
 
+func convert_v1_ThirdPartyResourceData_To_expapi_ThirdPartyResourceData(in *ThirdPartyResourceData, out *expapi.ThirdPartyResourceData, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ThirdPartyResourceData))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_ThirdPartyResourceDataList_To_expapi_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *expapi.ThirdPartyResourceDataList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ThirdPartyResourceDataList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.ThirdPartyResourceData, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_ThirdPartyResourceData_To_expapi_ThirdPartyResourceData(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func convert_v1_ThirdPartyResourceList_To_expapi_ThirdPartyResourceList(in *ThirdPartyResourceList, out *expapi.ThirdPartyResourceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceList))(in)
@@ -2318,6 +2396,8 @@ func init() {
 		convert_expapi_ScaleStatus_To_v1_ScaleStatus,
 		convert_expapi_Scale_To_v1_Scale,
 		convert_expapi_SubresourceReference_To_v1_SubresourceReference,
+		convert_expapi_ThirdPartyResourceDataList_To_v1_ThirdPartyResourceDataList,
+		convert_expapi_ThirdPartyResourceData_To_v1_ThirdPartyResourceData,
 		convert_expapi_ThirdPartyResourceList_To_v1_ThirdPartyResourceList,
 		convert_expapi_ThirdPartyResource_To_v1_ThirdPartyResource,
 		convert_v1_APIVersion_To_expapi_APIVersion,
@@ -2372,6 +2452,8 @@ func init() {
 		convert_v1_SecurityContext_To_api_SecurityContext,
 		convert_v1_SubresourceReference_To_expapi_SubresourceReference,
 		convert_v1_TCPSocketAction_To_api_TCPSocketAction,
+		convert_v1_ThirdPartyResourceDataList_To_expapi_ThirdPartyResourceDataList,
+		convert_v1_ThirdPartyResourceData_To_expapi_ThirdPartyResourceData,
 		convert_v1_ThirdPartyResourceList_To_expapi_ThirdPartyResourceList,
 		convert_v1_ThirdPartyResource_To_expapi_ThirdPartyResource,
 		convert_v1_TypeMeta_To_api_TypeMeta,

@@ -2279,22 +2279,6 @@ func convert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, 
 	return nil
 }
 
-func convert_api_ThirdPartyResourceData_To_v1_ThirdPartyResourceData(in *api.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ThirdPartyResourceData))(in)
-	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
 func convert_api_TypeMeta_To_v1_TypeMeta(in *api.TypeMeta, out *TypeMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.TypeMeta))(in)
@@ -4697,22 +4681,6 @@ func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out 
 	return nil
 }
 
-func convert_v1_ThirdPartyResourceData_To_api_ThirdPartyResourceData(in *ThirdPartyResourceData, out *api.ThirdPartyResourceData, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ThirdPartyResourceData))(in)
-	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
 func convert_v1_TypeMeta_To_api_TypeMeta(in *TypeMeta, out *api.TypeMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*TypeMeta))(in)
@@ -4977,7 +4945,6 @@ func init() {
 		convert_api_StatusDetails_To_v1_StatusDetails,
 		convert_api_Status_To_v1_Status,
 		convert_api_TCPSocketAction_To_v1_TCPSocketAction,
-		convert_api_ThirdPartyResourceData_To_v1_ThirdPartyResourceData,
 		convert_api_TypeMeta_To_v1_TypeMeta,
 		convert_api_VolumeMount_To_v1_VolumeMount,
 		convert_api_VolumeSource_To_v1_VolumeSource,
@@ -5095,7 +5062,6 @@ func init() {
 		convert_v1_StatusDetails_To_api_StatusDetails,
 		convert_v1_Status_To_api_Status,
 		convert_v1_TCPSocketAction_To_api_TCPSocketAction,
-		convert_v1_ThirdPartyResourceData_To_api_ThirdPartyResourceData,
 		convert_v1_TypeMeta_To_api_TypeMeta,
 		convert_v1_VolumeMount_To_api_VolumeMount,
 		convert_v1_VolumeSource_To_api_VolumeSource,
