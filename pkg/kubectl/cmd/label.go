@@ -65,6 +65,12 @@ $ kubectl label pods foo bar-`
 
 func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
+	validArgs := []string{}
+	p, err := f.Printer(nil, false, false, false, false, []string{})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
+	}
 
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
@@ -75,6 +81,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunLabel(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs: validArgs,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
