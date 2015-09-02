@@ -300,14 +300,14 @@ function cleanup()
 # Setup contrail manifest files under kubernetes
 function setup_contrail_vrouter_agent_manifest() {
     cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | grep contrail-vrouter-agent | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
-    master $cmd
+    bash -c "sudo $cmd"
 
     cmd='grep \"image\": /etc/contrail/manifests/* | cut -d "\"" -f 4 | sort -u | xargs -n1 sudo docker pull'
     RETRY=20
     WAIT=3
-    retry master $cmd
+    bash -c "sudo $cmd"
     cmd='mv /etc/contrail/manifests/* /etc/kubernetes/manifests/'
-    master $cmd
+    bash -c "sudo $cmd"
 }
 
 
