@@ -53,6 +53,13 @@ type foo struct {
 
 func (*foo) IsAnAPIObject() {}
 
+type baz struct {
+	Ptr  *int  `json:"ptr"`
+	Bptr *bool `json:"bptr,omitempty"`
+}
+
+func (*baz) IsAnAPIObject() {}
+
 func validateResult(t *testing.T, input interface{}, actual, expected url.Values) {
 	local := url.Values{}
 	for k, v := range expected {
@@ -131,6 +138,19 @@ func TestConvert(t *testing.T) {
 			},
 			expected: url.Values{"str": {""}, "namedStr": {"named str"}},
 		},
+		{
+			input: &baz{
+				Ptr:  intp(5),
+				Bptr: boolp(true),
+			},
+			expected: url.Values{"ptr": {"5"}, "bptr": {"true"}},
+		},
+		{
+			input: &baz{
+				Bptr: boolp(true),
+			},
+			expected: url.Values{"ptr": {"<nil>"}, "bptr": {"true"}},
+		},
 	}
 
 	for _, test := range tests {
@@ -141,3 +161,7 @@ func TestConvert(t *testing.T) {
 		validateResult(t, test.input, result, test.expected)
 	}
 }
+
+func intp(n int) *int { return &n }
+
+func boolp(b bool) *bool { return &b }

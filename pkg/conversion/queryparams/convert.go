@@ -50,6 +50,10 @@ func formatValue(value interface{}) string {
 	return fmt.Sprintf("%v", value)
 }
 
+func isPointerKind(kind reflect.Kind) bool {
+	return kind == reflect.Ptr
+}
+
 func isValueKind(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16,
@@ -92,11 +96,11 @@ func Convert(obj runtime.Object) (url.Values, error) {
 	case reflect.Ptr, reflect.Interface:
 		sv = reflect.ValueOf(obj).Elem()
 	default:
-		return nil, fmt.Errorf("Expecting a pointer or interface")
+		return nil, fmt.Errorf("expecting a pointer or interface")
 	}
 	st := sv.Type()
 	if st.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("Expecting a pointer to a struct")
+		return nil, fmt.Errorf("expecting a pointer to a struct")
 	}
 	for i := 0; i < st.NumField(); i++ {
 		field := sv.Field(i)
@@ -105,10 +109,18 @@ func Convert(obj runtime.Object) (url.Values, error) {
 			continue
 		}
 		ft := field.Type()
+
+		kind := ft.Kind()
+		if isPointerKind(kind) {
+			kind = ft.Elem().Kind()
+			if !field.IsNil() {
+				field = reflect.Indirect(field)
+			}
+		}
 		switch {
-		case isValueKind(ft.Kind()):
+		case isValueKind(kind):
 			addParam(result, tag, omitempty, field)
-		case ft.Kind() == reflect.Array || ft.Kind() == reflect.Slice:
+		case kind == reflect.Array || kind == reflect.Slice:
 			if isValueKind(ft.Elem().Kind()) {
 				addListOfParams(result, tag, omitempty, field)
 			}
