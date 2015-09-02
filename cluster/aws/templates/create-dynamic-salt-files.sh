@@ -40,6 +40,7 @@ dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 overlay_network_provider: '$(echo "$OVERLAY_NETWORK_PROVIDER")'
 kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
+opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 EOF
 
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"

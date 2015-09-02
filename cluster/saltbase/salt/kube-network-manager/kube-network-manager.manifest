@@ -4,8 +4,8 @@
 {% set params = params + " --portal_net=" + pillar['service_cluster_ip_range'] -%}
 {% endif -%}
 
-{% if pillar['kube_ui_public'] is defined -%}
-{% set params = params + " --public_net=" + pillar['kube_ui_public'] -%}
+{% if pillar['opencontrail_public_subnet'] is defined -%}
+{% set params = params + " --public_net=" + pillar['opencontrail_public_subnet'] -%}
 {% endif -%}
 
 {
