@@ -93,7 +93,7 @@ function setup_kube_dns_endpoints() {
 
 # Setup contrail manifest files under kubernetes
 function setup_contrail_manifest_files() {
-    cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
+    cmd='wget -qO - https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash | grep -v kube-network-manager | awk "{print \"https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/\"\$1}" | xargs -n1 sudo wget -q --directory-prefix=/etc/contrail/manifests --continue'
     master $cmd
 
     cmd='grep \"image\": /etc/contrail/manifests/* | cut -d "\"" -f 4 | sort -u | xargs -n1 sudo docker pull'
