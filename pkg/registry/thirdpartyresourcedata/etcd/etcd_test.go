@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -63,7 +64,7 @@ func validNewThirdPartyResourceData(name string) *expapi.ThirdPartyResourceData 
 
 func TestCreate(t *testing.T) {
 	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := registrytest.New(t, fakeEtcdClient, storage.Etcd)
 	rsrc := validNewThirdPartyResourceData("foo")
 	rsrc.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -75,28 +76,17 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	key, err := storage.KeyFunc(test.TestContext(), "foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	key = etcdtest.AddPrefix(key)
-	fakeEtcdClient.ExpectNotFoundGet(key)
-	fakeEtcdClient.ChangeIndex = 2
-	rsrc := validNewThirdPartyResourceData("foo")
-	existing := validNewThirdPartyResourceData("exists")
-	existing.Namespace = test.TestNamespace()
-	obj, err := storage.Create(test.TestContext(), existing)
-	if err != nil {
-		t.Fatalf("unable to create object: %v", err)
-	}
-	older := obj.(*expapi.ThirdPartyResourceData)
-	older.ResourceVersion = "1"
+	storage, fakeClient, _ := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
-		rsrc,
-		existing,
-		older,
+		// valid
+		validNewThirdPartyResourceData("foo"),
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*expapi.ThirdPartyResourceData)
+			object.Data = []byte("new description")
+			return object
+		},
 	)
 }
 
