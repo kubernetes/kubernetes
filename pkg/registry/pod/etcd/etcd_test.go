@@ -82,7 +82,7 @@ func validChangedPod() *api.Pod {
 
 func TestCreate(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	pod := validNewPod()
 	pod.ObjectMeta = api.ObjectMeta{}
 	// Make an invalid pod with an an incorrect label.
@@ -94,12 +94,6 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		pod,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid (empty contains list)
 		&api.Pod{
 			Spec: api.PodSpec{
@@ -113,19 +107,10 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewPod(),
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Pod)
@@ -383,40 +368,23 @@ func TestDeletePod(t *testing.T) {
 	}
 }
 
-func TestEtcdGet(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewPod())
 }
 
-func TestEtcdList(t *testing.T) {
+func TestList(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.Etcd.KeyRootFunc(test.TestContext()))
-	test.TestList(
-		validNewPod(),
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewPod())
 }
 
-func TestEtcdWatch(t *testing.T) {
+func TestWatch(t *testing.T) {
 	storage, _, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validNewPod(),
-		func() {
-			fakeClient.WaitForWatchCompletion()
-		},
-		func(err error) {
-			fakeClient.WatchInjectError <- err
-		},
-		func(obj runtime.Object, action string) error {
-			return registrytest.EmitObject(fakeClient, obj, action)
-		},
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -431,7 +399,6 @@ func TestEtcdWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},
-		registrytest.WatchActions,
 	)
 }
 
