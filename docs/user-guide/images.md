@@ -126,8 +126,8 @@ spec:
   containers:
     - name: uses-private-image
       image: $PRIVATE_IMAGE_NAME
+      imagePullPolicy: Always
       command: [ "echo", "SUCCESS" ]
-  imagePullPolicy: Always
 EOF
 $ kubectl create -f /tmp/private-image-test-1.yaml
 pods/private-image-test-1
