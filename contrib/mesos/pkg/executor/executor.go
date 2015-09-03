@@ -533,11 +533,10 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 	task.podName = podFullName
 	k.pods[podFullName] = pod
 
-	// send the latest snapshot of the set of pods to the kubelet via the pod update channel.
-	// this results in the kubelet spinning up the new pod.
-	update := kubelet.PodUpdate{Op: kubelet.SET}
-	for _, p := range k.pods {
-		update.Pods = append(update.Pods, p)
+	// send the new pod to the kubelet which will spin it up
+	update := kubelet.PodUpdate{
+		Op:   kubelet.ADD,
+		Pods: []*api.Pod{pod},
 	}
 	k.updateChan <- update
 
@@ -729,16 +728,17 @@ func (k *KubernetesExecutor) removePodTask(driver bindings.ExecutorDriver, tid, 
 	k.resetSuicideWatch(driver)
 
 	pid := task.podName
-	if _, found := k.pods[pid]; !found {
+	pod, found := k.pods[pid]
+	if !found {
 		log.Warningf("Cannot remove unknown pod %v for task %v", pid, tid)
 	} else {
 		log.V(2).Infof("deleting pod %v for task %v", pid, tid)
 		delete(k.pods, pid)
 
-		// Send the pod updates to the channel.
-		update := kubelet.PodUpdate{Op: kubelet.SET}
-		for _, p := range k.pods {
-			update.Pods = append(update.Pods, p)
+		// tell the kubelet to remove the pod
+		update := kubelet.PodUpdate{
+			Op:   kubelet.REMOVE,
+			Pods: []*api.Pod{pod},
 		}
 		k.updateChan <- update
 	}

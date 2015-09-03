@@ -321,7 +321,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		MaxContainers:      kc.MaxContainerCount,
 	}
 
-	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates, kc.Recorder)
+	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kc.Recorder)
 	updates := pc.Channel(MESOS_CFG_SOURCE)
 
 	klet, err := kubelet.NewMainKubelet(
