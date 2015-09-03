@@ -36,7 +36,7 @@ import (
 	skymsg "github.com/skynetservices/skydns/msg"
 	kapi "k8s.io/kubernetes/pkg/api"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	kcache "k8s.io/kubernetes/pkg/client/unversioned/cache"
+	kcache "k8s.io/kubernetes/pkg/client/cache"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
 	kSelector "k8s.io/kubernetes/pkg/fields"
