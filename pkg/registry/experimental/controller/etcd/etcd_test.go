@@ -21,29 +21,17 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
-
-	"k8s.io/kubernetes/pkg/expapi"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
-}
-
-func newStorage(t *testing.T) (*RcREST, *ScaleREST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage)
-	return storage.ReplicationController, storage.Scale, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*ScaleREST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewStorage(etcdStorage).Scale, fakeClient
 }
 
 var validPodTemplate = api.PodTemplate{
@@ -90,43 +78,32 @@ var validScale = expapi.Scale{
 }
 
 func TestGet(t *testing.T) {
-	expect := &validScale
+	storage, fakeClient := newStorage(t)
 
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-
+	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), &validController),
-				ModifiedIndex: 1,
-			},
-		},
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	storage := NewStorage(etcdStorage).Scale
 
-	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "test"), "foo")
+	expect := &validScale
+	obj, err := storage.Get(ctx, "foo")
 	scale := obj.(*expapi.Scale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if e, a := expect, scale; !api.Semantic.DeepEqual(e, a) {
-		t.Errorf("Unexpected scale: %s", util.ObjectDiff(e, a))
+		t.Errorf("unexpected scale: %s", util.ObjectDiff(e, a))
 	}
 }
 
 func TestUpdate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage).Scale
+	storage, fakeClient := newStorage(t)
 
+	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), &validController),
-				ModifiedIndex: 1,
-			},
-		},
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
 	update := expapi.Scale{
@@ -136,13 +113,12 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	_, _, err := storage.Update(api.WithNamespace(api.NewContext(), "test"), &update)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	if _, _, err := storage.Update(ctx, &update); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	response, err := fakeEtcdClient.Get(key, false, false)
+	response, err := fakeClient.Get(key, false, false)
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	var controller api.ReplicationController
