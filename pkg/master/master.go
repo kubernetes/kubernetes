@@ -1024,6 +1024,7 @@ func (m *Master) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
 }
 
 func (m *Master) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
+	// TODO: user is not used. Consider removing it as an input to the function.
 	private, public, err := util.GenerateKey(2048)
 	if err != nil {
 		return err
