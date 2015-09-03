@@ -242,8 +242,15 @@ func (s *CMServer) Run(_ []string) error {
 	resourceQuotaController := resourcequotacontroller.NewResourceQuotaController(kubeClient)
 	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
-	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, s.NamespaceSyncPeriod)
+	// An OR of all flags to enable/disable experimental features
+	experimentalMode := s.EnableHorizontalPodAutoscaler
+	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, experimentalMode, s.NamespaceSyncPeriod)
 	namespaceController.Run()
+
+	if s.EnableHorizontalPodAutoscaler {
+		horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient))
+		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
+	}
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
 	pvclaimBinder.Run()
@@ -286,16 +293,6 @@ func (s *CMServer) Run(_ []string) error {
 		kubeClient,
 		serviceaccount.DefaultServiceAccountsControllerOptions(),
 	).Run()
-
-	if s.EnableHorizontalPodAutoscaler {
-		expClient, err := client.NewExperimental(kubeconfig)
-		if err != nil {
-			glog.Fatalf("Invalid API configuration: %v", err)
-		}
-		horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient,
-			metrics.NewHeapsterMetricsClient(kubeClient))
-		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
-	}
 
 	select {}
 }
