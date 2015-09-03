@@ -54,6 +54,10 @@ func isPointerKind(kind reflect.Kind) bool {
 	return kind == reflect.Ptr
 }
 
+func isStructKind(kind reflect.Kind) bool {
+	return kind == reflect.Struct
+}
+
 func isValueKind(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16,
@@ -105,9 +109,17 @@ func Convert(obj runtime.Object) (url.Values, error) {
 		return nil, fmt.Errorf("expecting a pointer or interface")
 	}
 	st := sv.Type()
-	if st.Kind() != reflect.Struct {
+	if !isStructKind(st.Kind()) {
 		return nil, fmt.Errorf("expecting a pointer to a struct")
 	}
+
+	// Check all object fields
+	convertStruct(result, st, sv)
+
+	return result, nil
+}
+
+func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 	for i := 0; i < st.NumField(); i++ {
 		field := sv.Field(i)
 		tag, omitempty := jsonTag(st.Field(i))
@@ -123,6 +135,7 @@ func Convert(obj runtime.Object) (url.Values, error) {
 				field = reflect.Indirect(field)
 			}
 		}
+
 		switch {
 		case isValueKind(kind):
 			addParam(result, tag, omitempty, field)
@@ -130,7 +143,8 @@ func Convert(obj runtime.Object) (url.Values, error) {
 			if isValueKind(ft.Elem().Kind()) {
 				addListOfParams(result, tag, omitempty, field)
 			}
+		case isStructKind(kind) && !(zeroValue(field) && omitempty):
+			convertStruct(result, ft, field)
 		}
 	}
-	return result, nil
 }
