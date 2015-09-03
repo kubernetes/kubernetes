@@ -177,14 +177,12 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 
 	defer testServer.Close()
 	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
-	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
-
 	fakeRC := fakeResourceConsumptionClient{metrics: map[api.ResourceName]expapi.ResourceConsumption{
 		api.ResourceCPU: {Resource: api.ResourceCPU, Quantity: resource.MustParse("650m")},
 	}}
 	fake := fakeMetricsClient{consumption: &fakeRC}
 
-	hpaController := New(kubeClient, expClient, &fake)
+	hpaController := New(kubeClient, &fake)
 
 	err := hpaController.reconcileAutoscalers()
 	if err != nil {
@@ -193,7 +191,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	for _, h := range handlers {
 		h.ValidateRequestCount(t, 1)
 	}
-	obj, err := expClient.Codec.Decode([]byte(handlers[updateHpaHandler].RequestBody))
+	obj, err := kubeClient.Codec.Decode([]byte(handlers[updateHpaHandler].RequestBody))
 	if err != nil {
 		t.Fatal("Failed to decode: %v %v", err)
 	}
