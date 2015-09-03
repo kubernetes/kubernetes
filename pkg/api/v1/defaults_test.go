@@ -364,6 +364,9 @@ func TestSetDefaultNamespace(t *testing.T) {
 	if s2.Status.Phase != versioned.NamespaceActive {
 		t.Errorf("Expected phase %v, got %v", versioned.NamespaceActive, s2.Status.Phase)
 	}
+	/*if s2.Spec.NetworkPolicy != versioned.NamespacePublic {
+		t.Errorf("Expected network policy %v, got %v", versioned.NamespacePublic, s2.Spec.NetworkPolicy)
+	}*/
 }
 
 func TestSetDefaultPodSpecHostNetwork(t *testing.T) {

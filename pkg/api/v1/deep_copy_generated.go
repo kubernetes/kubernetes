@@ -884,6 +884,7 @@ func deepCopy_v1_NamespaceSpec(in NamespaceSpec, out *NamespaceSpec, c *conversi
 	} else {
 		out.Finalizers = nil
 	}
+	out.NetworkPolicy = in.NetworkPolicy
 	return nil
 }
 

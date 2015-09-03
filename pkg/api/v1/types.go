@@ -1449,6 +1449,10 @@ const (
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+
+    // ServiceTypePrivate means a service will only be accessible inside the
+    // namespace, via the Cluster IP.
+	ServiceTypePrivate ServiceType = "Private"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -1498,7 +1502,7 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
 
-	// Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer.
+	// Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or Private.
 	// Defaults to ClusterIP.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
@@ -1889,11 +1893,26 @@ const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
 )
 
+// NamespaceNetworkPolicy determines who is authorized to access pods in the namespace
+type NamespaceNetworkPolicy string
+
+// These are the valid network policies of a namespace
+const(
+    // Private namespaces are only accessible by pods within the namespace
+	NamespacePrivate NamespaceNetworkPolicy = "Private"
+    // Public namespaces are accessible from anywhere in the cluster
+	NamespacePublic NamespaceNetworkPolicy = "Public"
+)
+
 // NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
 	// More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers
 	Finalizers []FinalizerName `json:"finalizers,omitempty"`
+
+	// NetworkPolicy determines who is authorized to access pods in the namespace
+	// Must be either Private or Public. Defaults to Public
+	NetworkPolicy NamespaceNetworkPolicy `json:"networkPolicy,omitempty"`
 }
 
 // NamespaceStatus is information about the current status of a Namespace.

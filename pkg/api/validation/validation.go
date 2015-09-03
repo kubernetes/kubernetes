@@ -1132,9 +1132,9 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 	return allErrs
 }
 
-var supportedSessionAffinityType = sets.NewString(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
-var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
-	string(api.ServiceTypeLoadBalancer))
+var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
+var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
+	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypePrivate))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1198,6 +1198,14 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].NodePort != 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type ClusterIP"))
+			}
+		}
+	}
+
+	if service.Spec.Type == api.ServiceTypePrivate {
+		for i := range service.Spec.Ports {
+			if service.Spec.Ports[i].NodePort != 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type Private"))
 			}
 		}
 	}
@@ -1695,6 +1703,8 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 	return allErrs
 }
 
+var supportedNamespaceNetworkPolicy = util.NewStringSet(string(api.NamespacePublic), string(api.NamespacePrivate))
+
 // ValidateNamespace tests if required fields are set.
 func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -1702,6 +1712,16 @@ func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]))...)
 	}
+
+	/*if namespace.Spec.NetworkPolicy == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.networkPolicy"))
+	} else*/
+	if namespace.Spec.NetworkPolicy != "" {
+		if !supportedNamespaceNetworkPolicy.Has(string(namespace.Spec.NetworkPolicy)) {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.networkPolicy", namespace.Spec.NetworkPolicy, supportedNamespaceNetworkPolicy.List()))
+		}
+	}
+
 	return allErrs
 }
 

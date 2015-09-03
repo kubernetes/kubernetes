@@ -262,7 +262,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(p *api.ServiceType, c fuzz.Continue) {
-			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer}
+			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer, api.ServiceTypePrivate}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
@@ -322,6 +322,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+			networkPolicies := []api.NamespaceNetworkPolicy{api.NamespacePublic, api.NamespacePrivate}
+			s.NetworkPolicy = networkPolicies[c.Rand.Intn(len(networkPolicies))]
 		},
 		func(s *api.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = api.NamespaceActive
