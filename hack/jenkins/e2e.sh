@@ -72,6 +72,7 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   : ${MASTER_SIZE:="n1-standard-2"}
   : ${MINION_SIZE:="n1-standard-2"}
   : ${NUM_MINIONS:="3"}
+  : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -221,6 +222,24 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
     ;;
 
+  # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
+  kubernetes-pull-build-test-e2e-gce)
+    : ${E2E_CLUSTER_NAME:="jenkins-pull-gce-e2e-${EXECUTOR_NUMBER}"}
+    : ${E2E_NETWORK:="pull-e2e-parallel-${EXECUTOR_NUMBER}"}
+    : ${GINKGO_PARALLEL:="y"}
+    # This list should match the list in kubernetes-e2e-gce-parallel.
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
+    : ${PROJECT:="kubernetes-jenkins-pull"}
+    # Override GCE defaults
+    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
+    ;;
+
   # Runs all non-flaky tests on GCE in parallel.
   kubernetes-e2e-gce-parallel)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
@@ -234,8 +253,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
     : ${PROJECT:="kubernetes-jenkins"}
-    # Override GCE defaults.
-    NUM_MINIONS="6"
+    # Override GCE defaults
+    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
 
   # Runs all non-flaky tests on AWS in parallel.
@@ -266,7 +285,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     # Override GCE defaults.
-    NUM_MINIONS="4"
+    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
 
   # Runs only the reboot tests on GCE.
@@ -308,23 +327,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${PROJECT:="kubernetes-jenkins"}
-    ;;
-
-  # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
-  kubernetes-pull-build-test-e2e-gce)
-    : ${E2E_CLUSTER_NAME:="jenkins-pull-gce-e2e-${EXECUTOR_NUMBER}"}
-    : ${E2E_NETWORK:="pull-e2e-parallel-${EXECUTOR_NUMBER}"}
-    : ${GINKGO_PARALLEL:="y"}
-    # This list should match the list in kubernetes-e2e-gce-parallel. It
-    # currently also excludes a slow namespace test.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
-    : ${PROJECT:="kubernetes-jenkins-pull"}
     ;;
 
   # Runs non-flaky tests on GCE on the release-latest branch,
