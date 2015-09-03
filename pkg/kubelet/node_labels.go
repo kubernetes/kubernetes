@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -116,10 +115,6 @@ func (nlm *nodeLabelManager) updateNodeLabels() error {
 			if err := nlm.readJson(f, nl); err != nil {
 				return err
 			}
-		case ".sh", ".py":
-			if err := nlm.execSh(f, nl); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -135,17 +130,6 @@ func (nlm *nodeLabelManager) GetNodeLabels() map[string]string {
 	nlm.mutext.RLock()
 	defer nlm.mutext.RUnlock()
 	return nlm.labels
-}
-
-// ExecSh executes the f pointed to by f and parses the stdout into labels.  These
-// labels are added to ol.
-func (nlm *nodeLabelManager) execSh(f string, l map[string]string) error {
-	cmd := exec.Command(f)
-	data, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	return nlm.parseJson(data, l)
 }
 
 // ReadJson parses f into labels and adds them to ol.
