@@ -1,7 +1,7 @@
 /etc/kubernetes/manifests/kube-network-manager.manifest:
   file.managed:
-    - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/master/cluster/kube-network-manager.manifest.sls
-    - source_hash: https://raw.githubusercontent.com/juniper/contrail-kubernetes/master/cluster/manifests.hash
+    - source: https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/kube-network-manager.manifest.sls
+    - source_hash: https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash
     - template: jinja
     - user: root
     - group: root
