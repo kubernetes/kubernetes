@@ -1,7 +1,8 @@
 opencontrail-networking-minion:
   cmd.script:
-    - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/vrouter-manifest/cluster/provision_minion.sh
-    - source_hash: https://raw.githubusercontent.com/juniper/contrail-kubernetes/vrouter-manifest/cluster/manifests.hash
+    - unless: test -f /var/log/contrail/provision_minion.log
+    - source: https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/provision_minion.sh
+    - source_hash: https://raw.githubusercontent.com/rombie/contrail-kubernetes/manifests/cluster/manifests.hash
     - cwd: /
     - user: root
     - group: root
