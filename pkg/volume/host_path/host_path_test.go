@@ -37,13 +37,13 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/host-path" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -65,7 +65,7 @@ func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, newMockRecycler}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	spec := &volume.Spec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}
+	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -74,8 +74,8 @@ func TestRecycler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make a new Recyler: %v", err)
 	}
-	if recycler.GetPath() != spec.PersistentVolumeSource.HostPath.Path {
-		t.Errorf("Expected %s but got %s", spec.PersistentVolumeSource.HostPath.Path, recycler.GetPath())
+	if recycler.GetPath() != spec.PersistentVolume.Spec.HostPath.Path {
+		t.Errorf("Expected %s but got %s", spec.PersistentVolume.Spec.HostPath.Path, recycler.GetPath())
 	}
 	if err := recycler.Recycle(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
@@ -84,7 +84,7 @@ func TestRecycler(t *testing.T) {
 
 func newMockRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
 	return &mockRecycler{
-		path: spec.PersistentVolumeSource.HostPath.Path,
+		path: spec.PersistentVolume.Spec.HostPath.Path,
 	}, nil
 }
 

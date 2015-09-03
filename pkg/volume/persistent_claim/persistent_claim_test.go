@@ -51,13 +51,13 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/persistent-claim" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}}) {
 		t.Errorf("Expected false")
 	}
-	if plug.CanSupport(&volume.Spec{VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -247,10 +247,7 @@ func TestNewBuilder(t *testing.T) {
 		if err != nil {
 			t.Errorf("Can't find the plugin by name")
 		}
-		spec := &volume.Spec{
-			Name:         "vol1",
-			VolumeSource: item.podVolume,
-		}
+		spec := &volume.Spec{Volume: &api.Volume{VolumeSource: item.podVolume}}
 		pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 		builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
 
@@ -305,10 +302,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &volume.Spec{
-		Name:         "vol1",
-		VolumeSource: podVolume,
-	}
+	spec := &volume.Spec{Volume: &api.Volume{VolumeSource: podVolume}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
 	if builder != nil {
