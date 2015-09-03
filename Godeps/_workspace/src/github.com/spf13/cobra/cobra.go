@@ -25,6 +25,13 @@ import (
 	"text/template"
 )
 
+var templateFuncs template.FuncMap = template.FuncMap{
+	"trim": strings.TrimSpace,
+	"rpad": rpad,
+	"gt":   Gt,
+	"eq":   Eq,
+}
+
 var initializers []func()
 
 // automatic prefix matching can be a dangerous thing to automatically enable in CLI tools.
@@ -38,6 +45,20 @@ var MousetrapHelpText string = `This is a command line tool
 
 You need to open cmd.exe and run it from there.
 `
+
+//AddTemplateFunc adds a template function that's available to Usage and Help
+//template generation.
+func AddTemplateFunc(name string, tmplFunc interface{}) {
+	templateFuncs[name] = tmplFunc
+}
+
+//AddTemplateFuncs adds multiple template functions availalble to Usage and
+//Help template generation.
+func AddTemplateFuncs(tmplFuncs template.FuncMap) {
+	for k, v := range tmplFuncs {
+		templateFuncs[k] = v
+	}
+}
 
 //OnInitialize takes a series of func() arguments and appends them to a slice of func().
 func OnInitialize(y ...func()) {
@@ -101,12 +122,7 @@ func rpad(s string, padding int) string {
 // tmpl executes the given template text on data, writing the result to w.
 func tmpl(w io.Writer, text string, data interface{}) error {
 	t := template.New("top")
-	t.Funcs(template.FuncMap{
-		"trim": strings.TrimSpace,
-		"rpad": rpad,
-		"gt":   Gt,
-		"eq":   Eq,
-	})
+	t.Funcs(templateFuncs)
 	template.Must(t.Parse(text))
 	return t.Execute(w, data)
 }
