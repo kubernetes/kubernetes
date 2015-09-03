@@ -74,7 +74,13 @@ func addParam(values url.Values, tag string, omitempty bool, value reflect.Value
 	if omitempty && zeroValue(value) {
 		return
 	}
-	values.Add(tag, fmt.Sprintf("%v", value.Interface()))
+	val := ""
+	iValue := fmt.Sprintf("%v", value.Interface())
+
+	if iValue != "<nil>" {
+		val = iValue
+	}
+	values.Add(tag, val)
 }
 
 func addListOfParams(values url.Values, tag string, omitempty bool, list reflect.Value) {

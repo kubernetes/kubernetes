@@ -151,6 +151,12 @@ func TestConvert(t *testing.T) {
 			},
 			expected: url.Values{"ptr": {"<nil>"}, "bptr": {"true"}},
 		},
+		{
+			input: &baz{
+				Ptr: intp(5),
+			},
+			expected: url.Values{"ptr": {"5"}},
+		},
 	}
 
 	for _, test := range tests {
