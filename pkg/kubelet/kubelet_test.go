@@ -89,7 +89,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.os = kubecontainer.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
-	kubelet.nodeLabels = NewNodeLabelMap(testKubeletHostname, "")
+	kubelet.nodeLabels = NewNodeLabelManager(testKubeletHostname, "")
 	kubelet.nodeName = testKubeletHostname
 	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))

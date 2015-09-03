@@ -282,7 +282,7 @@ func NewMainKubelet(
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
-		nodeLabels:                     NewNodeLabelMap(hostname, nodeLabelPluginDir),
+		nodeLabels:                     NewNodeLabelManager(hostname, nodeLabelPluginDir),
 	}
 
 	// Start polling for node labels
@@ -563,7 +563,7 @@ type Kubelet struct {
 	shaper bandwidth.BandwidthShaper
 
 	// The plugin directory containing labels to apply to this node
-	nodeLabels *NodeLabelMap
+	nodeLabels NodeLabelManager
 }
 
 // getRootDir returns the full path to the directory under which kubelet can

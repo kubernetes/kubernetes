@@ -14,26 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet_test
+package kubelet
 
 import (
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/kubelet"
 	"os"
 	"path"
 	"testing"
 )
 
 func TestGetNodeLabels_Empty(t *testing.T) {
-	nlm := kubelet.NewNodeLabelMap("", "")
+	nlm := NewNodeLabelManager("", "").(*nodeLabelManager)
 	actual := nlm.GetNodeLabels()
 	expected := map[string]string{
 		"kubernetes.io/hostname": "",
 	}
 	assert.Equal(t, expected, actual)
 
-	nlm.UpdateNodeLabels()
+	nlm.updateNodeLabels()
 	actual = nlm.GetNodeLabels()
 	assert.Equal(t, expected, actual)
 }
@@ -53,8 +52,8 @@ func TestGetNodeLabels_TopNameSpace(t *testing.T) {
 		"b.node.kubernetes.io/key4": "value4"
 	}`)
 
-	nlm := kubelet.NewNodeLabelMap("hn", name)
-	nlm.UpdateNodeLabels()
+	nlm := NewNodeLabelManager("hn", name).(*nodeLabelManager)
+	nlm.updateNodeLabels()
 	actual := nlm.GetNodeLabels()
 	expected := map[string]string{
 		"kubernetes.io/hostname":    "hn",
@@ -81,8 +80,8 @@ func TestGetNodeLabels_JsonOnly(t *testing.T) {
 		"b.node.kubernetes.io/key4": "value4"
 	}`)
 
-	nlm := kubelet.NewNodeLabelMap("hn", name)
-	nlm.UpdateNodeLabels()
+	nlm := NewNodeLabelManager("hn", name).(*nodeLabelManager)
+	nlm.updateNodeLabels()
 	actual := nlm.GetNodeLabels()
 	assert.NoError(t, err)
 	expected := map[string]string{
@@ -107,8 +106,8 @@ func TestGetNodeLabels_ExecSh(t *testing.T) {
 	err = ioutil.WriteFile(path.Join(name, "label1.sh"), []byte(sh), 0555)
 	assert.NoError(t, err)
 
-	nlm := kubelet.NewNodeLabelMap("hn", name)
-	nlm.UpdateNodeLabels()
+	nlm := NewNodeLabelManager("hn", name).(*nodeLabelManager)
+	nlm.updateNodeLabels()
 	actual := nlm.GetNodeLabels()
 	assert.NoError(t, err)
 	expected := map[string]string{
@@ -152,8 +151,8 @@ func TestGetNodeLabels_JsonAndExecSh(t *testing.T) {
 		"b.node.kubernetes.io/key6": "value4"
 	}`)
 
-	nlm := kubelet.NewNodeLabelMap("hn", name)
-	nlm.UpdateNodeLabels()
+	nlm := NewNodeLabelManager("hn", name).(*nodeLabelManager)
+	nlm.updateNodeLabels()
 	actual := nlm.GetNodeLabels()
 	assert.NoError(t, err)
 	expected := map[string]string{
@@ -185,8 +184,8 @@ func TestGetNodeLabels_DuplicateLabels(t *testing.T) {
 		"a.node.kubernetes.io/key2": "value4"
 	}`)
 
-	nlm := kubelet.NewNodeLabelMap("hn", name)
-	nlm.UpdateNodeLabels()
+	nlm := NewNodeLabelManager("hn", name).(*nodeLabelManager)
+	nlm.updateNodeLabels()
 	actual := nlm.GetNodeLabels()
 	expected := map[string]string{
 		"kubernetes.io/hostname": "hn",
@@ -205,8 +204,8 @@ func TestGetNodeLabels_BadNameSpace(t *testing.T) {
 		"node.kubernetes.io/key3": "value3"
 	}`)
 
-	nlm := kubelet.NewNodeLabelMap("hn", name)
-	nlm.UpdateNodeLabels()
+	nlm := NewNodeLabelManager("hn", name).(*nodeLabelManager)
+	nlm.updateNodeLabels()
 	actual := nlm.GetNodeLabels()
 	expected := map[string]string{
 		"kubernetes.io/hostname": "hn",
@@ -215,70 +214,70 @@ func TestGetNodeLabels_BadNameSpace(t *testing.T) {
 }
 
 func TestParseJson_BadNameSpace(t *testing.T) {
-	nlm := kubelet.NewNodeLabelMap("", "")
+	nlm := NewNodeLabelManager("", "").(*nodeLabelManager)
 
 	// Verify custom child namespace is ok
 	actual := make(map[string]string)
-	err := nlm.ParseJson([]byte(`{"a.node.kubernetes.io/a": "value3"}`), actual)
+	err := nlm.parseJson([]byte(`{"a.node.kubernetes.io/a": "value3"}`), actual)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]string{"a.node.kubernetes.io/a": "value3"}, actual)
 
 	// Verify default namespace is not ok
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"node.kubernetes.io/a": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"node.kubernetes.io/a": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify parent namespace is not allowed
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"kubernetes.io/key3": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"kubernetes.io/key3": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify sibling namespace is not allowed
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"anode.kubernetes.io/key3": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"anode.kubernetes.io/key3": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify sibling namespace is not allowed
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{".node.kubernetes.io/key3": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{".node.kubernetes.io/key3": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify sibling namespace is not allowed
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"ode.kubernetes.io/key3": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"ode.kubernetes.io/key3": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify changing namespace suffix is not allowed
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"node.kubernetes.io./key3": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"node.kubernetes.io./key3": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify changing namespace suffix is not allowed
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"node.kubernetes.io.a/key3": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"node.kubernetes.io.a/key3": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify label is required
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"node.kubernetes.io": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"node.kubernetes.io": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	// Verify label is required
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"node.kubernetes.io/": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"node.kubernetes.io/": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 
 	actual = make(map[string]string)
-	err = nlm.ParseJson([]byte(`{"node.kubernetes.io /a": "value3"}`), actual)
+	err = nlm.parseJson([]byte(`{"node.kubernetes.io /a": "value3"}`), actual)
 	assert.Error(t, err)
 	assert.Equal(t, make(map[string]string), actual)
 }

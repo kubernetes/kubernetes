@@ -37,8 +37,12 @@ const validNameSpaces = `^.+\.node.kubernetes.io/.+$`
 
 var validNameSpacesRegex = regexp.MustCompile(validNameSpaces)
 
-// TODO(pwittrock): Make and interface for this before merging to master
-type NodeLabelMap struct {
+type NodeLabelManager interface {
+	Run()
+	GetNodeLabels() map[string]string
+}
+
+type nodeLabelManager struct {
 	labels    map[string]string
 	hostname  string
 	directory string
@@ -47,8 +51,8 @@ type NodeLabelMap struct {
 	started bool
 }
 
-func NewNodeLabelMap(hostname string, directory string) *NodeLabelMap {
-	return &NodeLabelMap{
+func NewNodeLabelManager(hostname string, directory string) NodeLabelManager {
+	return &nodeLabelManager{
 		labels:    map[string]string{"kubernetes.io/hostname": hostname},
 		hostname:  hostname,
 		directory: directory,
@@ -56,7 +60,7 @@ func NewNodeLabelMap(hostname string, directory string) *NodeLabelMap {
 	}
 }
 
-func (nlm *NodeLabelMap) setRunning() bool {
+func (nlm *nodeLabelManager) setRunning() bool {
 	nlm.mutext.Lock()
 	defer nlm.mutext.Unlock()
 	if nlm.started {
@@ -68,33 +72,32 @@ func (nlm *NodeLabelMap) setRunning() bool {
 
 // Run initializes the node labels from the plugin directory, and then schedules periodic
 // polling for updates to labels.
-func (nlm *NodeLabelMap) Run() {
+func (nlm *nodeLabelManager) Run() {
 	if !nlm.setRunning() {
 		glog.Errorln("Node labels already running.  Cannot call Run() a second time.")
 		return
 	}
 
 	// Make sure that the node labels have been updated at least once when this returns
-	err := nlm.UpdateNodeLabels()
+	err := nlm.updateNodeLabels()
 	if err != nil {
 		glog.Errorln(err)
 	}
 
 	go util.Until(func() {
-		err := nlm.UpdateNodeLabels()
+		err := nlm.updateNodeLabels()
 		if err != nil {
 			glog.Errorln(err)
 		}
 	}, pollPluginDuration, util.NeverStop)
 }
 
-// visible for testing
 // UpdateNodeLabels updates the map of labels using plugins in the plugin directory.
 // Json files are loaded and expected to contain map[string]string.  Sh files
 // are executed in serial and expected to emit a Json map[string]string from Stdout.
 // If any errors are encountered while reading plugins the error is logged and
 // all label updates are ignored.
-func (nlm *NodeLabelMap) UpdateNodeLabels() error {
+func (nlm *nodeLabelManager) updateNodeLabels() error {
 	// Look for node label plugins
 	if nlm.directory == "" {
 		return nil
@@ -110,11 +113,11 @@ func (nlm *NodeLabelMap) UpdateNodeLabels() error {
 		f := path.Join(nlm.directory, fi.Name())
 		switch filepath.Ext(fi.Name()) {
 		case ".json":
-			if err := nlm.ReadJson(f, nl); err != nil {
+			if err := nlm.readJson(f, nl); err != nil {
 				return err
 			}
 		case ".sh", ".py":
-			if err := nlm.ExecSh(f, nl); err != nil {
+			if err := nlm.execSh(f, nl); err != nil {
 				return err
 			}
 		}
@@ -128,7 +131,7 @@ func (nlm *NodeLabelMap) UpdateNodeLabels() error {
 }
 
 // GetNodeLabels returns the current map[string]string of labels to be applied to the node.
-func (nlm *NodeLabelMap) GetNodeLabels() map[string]string {
+func (nlm *nodeLabelManager) GetNodeLabels() map[string]string {
 	nlm.mutext.RLock()
 	defer nlm.mutext.RUnlock()
 	return nlm.labels
@@ -136,28 +139,27 @@ func (nlm *NodeLabelMap) GetNodeLabels() map[string]string {
 
 // ExecSh executes the f pointed to by f and parses the stdout into labels.  These
 // labels are added to ol.
-func (nlm *NodeLabelMap) ExecSh(f string, l map[string]string) error {
+func (nlm *nodeLabelManager) execSh(f string, l map[string]string) error {
 	cmd := exec.Command(f)
 	data, err := cmd.Output()
 	if err != nil {
 		return err
 	}
-	return nlm.ParseJson(data, l)
+	return nlm.parseJson(data, l)
 }
 
 // ReadJson parses f into labels and adds them to ol.
-func (nlm *NodeLabelMap) ReadJson(f string, l map[string]string) error {
+func (nlm *nodeLabelManager) readJson(f string, l map[string]string) error {
 	data, err := ioutil.ReadFile(f)
 	if err != nil {
 		return err
 	}
-	return nlm.ParseJson(data, l)
+	return nlm.parseJson(data, l)
 }
 
-// visible for testing
 // ParseJson Unmarshals data into a map[string]string and adds each entry to ol.  Returns an error if any
 // any of the labels are invalid or not permitted.  Otherwise returns nil.
-func (nlm *NodeLabelMap) ParseJson(data []byte, l map[string]string) error {
+func (nlm *nodeLabelManager) parseJson(data []byte, l map[string]string) error {
 	var nl map[string]string
 	err := json.Unmarshal(data, &nl)
 	if err != nil {
@@ -180,7 +182,7 @@ func (nlm *NodeLabelMap) ParseJson(data []byte, l map[string]string) error {
 // - k or v do not conform to permitted label key, value formats
 // - k is not in the correct namespace
 // - k has already been defined
-func (nlm *NodeLabelMap) checkLabelOk(k string, v string, ol map[string]string) error {
+func (nlm *nodeLabelManager) checkLabelOk(k string, v string, ol map[string]string) error {
 	// Verify Key is ok
 	if !util.IsQualifiedName(k) {
 		return fielderrors.NewFieldInvalid("label key", k, "Invalid label key")

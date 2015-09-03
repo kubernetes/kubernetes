@@ -262,7 +262,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
 		ResolverConfig:            s.ResolverConfig,
-		NodeLabelPluginDir	   s.NodeLabelPluginDir,
+		NodeLabelPluginDir:        s.NodeLabelPluginDir,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
