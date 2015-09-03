@@ -34,7 +34,7 @@ base:
 {% else %}
     - monit
 {% endif %}
-{% if pillar.get('overlay_network_provider', '').lower() == 'opencontrail' %}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-minion
 {% endif %}
 
@@ -75,7 +75,7 @@ base:
     - docker
     - kubelet
 {% endif %}
-{% if pillar.get('overlay_network_provider', '').lower() == 'opencontrail' %}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
     - kube-network-manager
 {% endif %}
