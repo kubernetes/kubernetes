@@ -66,7 +66,7 @@ With the final markdown all set, cut and paste it to the top of `CHANGELOG.md`
 
 ### 5) Update the Release page
 
-   * Switch to the [releases](https://github.com/GoogleCloudPlatform/kubernetes/releases) page.
+   * Switch to the [releases](https://github.com/kubernetes/kubernetes/releases) page.
    * Open up the release you are working on.
    * Cut and paste the final markdown from above into the release notes
    * Press Save.

@@ -57,7 +57,7 @@ In this guide I will demonstrate how to deploy a Kubernetes cluster to Azure clo
 To get started, you need to checkout the code:
 
 ```sh
-git clone https://github.com/GoogleCloudPlatform/kubernetes
+git clone https://github.com/kubernetes/kubernetes
 cd kubernetes/docs/getting-started-guides/coreos/azure/
 ```
 
