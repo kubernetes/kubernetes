@@ -110,27 +110,6 @@ func waitForGroupSize(size int) error {
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
 }
 
-func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-		if err != nil {
-			Logf("Failed to list nodes: %v", err)
-			continue
-		}
-		// Filter out not-ready nodes.
-		filterNodes(nodes, func(node api.Node) bool {
-			return isNodeReadySetAsExpected(&node, true)
-		})
-
-		if len(nodes.Items) == size {
-			Logf("Cluster has reached the desired size %d", size)
-			return nil
-		}
-		Logf("Waiting for cluster size %d, current size %d", size, len(nodes.Items))
-	}
-	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
-}
-
 func svcByName(name string) *api.Service {
 	return &api.Service{
 		ObjectMeta: api.ObjectMeta{
