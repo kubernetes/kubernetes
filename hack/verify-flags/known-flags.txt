@@ -208,6 +208,12 @@ proxy-logv
 proxy-port-range
 public-address-override
 pvclaimbinder-sync-period
+pv-recycler-pod-template-filepath-nfs
+pv-recycler-minimum-timeout-nfs
+pv-recycler-increment-timeout-nfs
+pv-recycler-pod-template-filepath-hostpath
+pv-recycler-minimum-timeout-hostpath
+pv-recycler-timeout-increment-hostpath
 read-only-port
 really-crash-for-testing
 reconcile-cooldown
