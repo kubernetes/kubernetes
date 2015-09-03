@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 )
 
 // imagePuller pulls the image using Runtime.PullImage().
