@@ -100,12 +100,12 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceD
 }
 
 func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *expapi.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
-	kind, ok := mapObj["kind"].(string)
-	if !ok {
-		return fmt.Errorf("unexpected object for kind: %#v", mapObj["kind"])
+	typeMeta := api.TypeMeta{}
+	if err := json.Unmarshal(data, &typeMeta); err != nil {
+		return err
 	}
-	if kind != t.kind {
-		return fmt.Errorf("unexpected kind: %s, expected: %s", kind, t.kind)
+	if typeMeta.Kind != t.kind {
+		return fmt.Errorf("unexpected kind: %s, expected %s", typeMeta.Kind, t.kind)
 	}
 
 	metadata, ok := mapObj["metadata"].(map[string]interface{})
@@ -113,38 +113,15 @@ func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *expapi.ThirdPart
 		return fmt.Errorf("unexpected object for metadata: %#v", mapObj["metadata"])
 	}
 
-	if resourceVersion, ok := metadata["resourceVersion"]; ok {
-		resourceVersionStr, ok := resourceVersion.(string)
-		if !ok {
-			return fmt.Errorf("unexpected object for resourceVersion: %v", resourceVersion)
-		}
-
-		objIn.ResourceVersion = resourceVersionStr
+	metadataData, err := json.Marshal(metadata)
+	if err != nil {
+		return err
 	}
 
-	name, ok := metadata["name"].(string)
-	if !ok {
-		return fmt.Errorf("unexpected object for name: %#v", metadata)
+	if err := json.Unmarshal(metadataData, &objIn.ObjectMeta); err != nil {
+		return err
 	}
 
-	if labels, ok := metadata["labels"]; ok {
-		labelMap, ok := labels.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("unexpected object for labels: %v", labelMap)
-		}
-		for key, value := range labelMap {
-			valueStr, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("unexpected label: %v", value)
-			}
-			if objIn.Labels == nil {
-				objIn.Labels = map[string]string{}
-			}
-			objIn.Labels[key] = valueStr
-		}
-	}
-
-	objIn.Name = name
 	objIn.Data = data
 	return nil
 }
@@ -230,16 +207,33 @@ const template = `{
   "items": [ %s ]
 }`
 
+func encodeToJSON(obj *expapi.ThirdPartyResourceData) ([]byte, error) {
+	var objOut interface{}
+	if err := json.Unmarshal(obj.Data, &objOut); err != nil {
+		return nil, err
+	}
+	objMap, ok := objOut.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected type: %v", objOut)
+	}
+	objMap["metadata"] = obj.ObjectMeta
+	return json.Marshal(objMap)
+}
+
 func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, err error) {
 	switch obj := obj.(type) {
 	case *expapi.ThirdPartyResourceData:
-		return obj.Data, nil
+		return encodeToJSON(obj)
 	case *expapi.ThirdPartyResourceDataList:
 		// TODO: There must be a better way to do this...
 		buff := &bytes.Buffer{}
 		dataStrings := make([]string, len(obj.Items))
 		for ix := range obj.Items {
-			dataStrings[ix] = string(obj.Items[ix].Data)
+			data, err := encodeToJSON(&obj.Items[ix])
+			if err != nil {
+				return nil, err
+			}
+			dataStrings[ix] = string(data)
 		}
 		fmt.Fprintf(buff, template, t.kind+"List", strings.Join(dataStrings, ","))
 		return buff.Bytes(), nil
