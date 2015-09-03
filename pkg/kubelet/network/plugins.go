@@ -17,126 +17,96 @@ limitations under the License.
 package network
 
 import (
-	"fmt"
-	"net"
-	"strings"
-
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	"github.com/appc/cni"
+	cniTypes "github.com/appc/cni/pkg/types"
 )
 
-const DefaultPluginName = "kubernetes.io/no-op"
+const (
+	DefaultPluginName = "kubernetes.io/no-op"
+	DefaultNetDir = "/etc/cni/net.d"
+	DefaultCNIDir = "/opt/cni/bin"
+)
 
-// Plugin is an interface to network plugins for the kubelet
-type NetworkPlugin interface {
-	// Init initializes the plugin.  This will be called exactly once
-	// before any other methods are called.
-	Init(host Host) error
-
-	// Name returns the plugin's name. This will be used when searching
-	// for a plugin by name, e.g.
-	Name() string
-
-	// SetUpPod is the method called after the infra container of
-	// the pod has been created but before the other containers of the
-	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
-
-	// TearDownPod is the method called before a pod's infra container will be deleted
-	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
-
-	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) (*PodNetworkStatus, error)
-}
-
-// PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
-// This struct represents version "v1"
-type PodNetworkStatus struct {
-	api.TypeMeta `json:",inline"`
-
-	// IP is the primary ipv4/ipv6 address of the pod. Among other things it is the address that -
-	//   - kube expects to be reachable across the cluster
-	//   - service endpoints are constructed with
-	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
-	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
-}
-
-// Host is an interface that plugins can use to access the kubelet.
-type Host interface {
-	// Get the pod structure by its name, namespace
-	GetPodByName(namespace, name string) (*api.Pod, bool)
-
-	// GetKubeClient returns a client interface
-	GetKubeClient() client.Interface
-}
-
-// InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host) (NetworkPlugin, error) {
-	if networkPluginName == "" {
-		// default to the no_op plugin
-		plug := &noopNetworkPlugin{}
-		return plug, nil
+func AddNetwork(podName string, podNamespace string, podInfraContainerID string, podNetnsPath string, plugin NetworkPlugin) (*cniTypes.Result, error) {
+	rt, err := buildRtConfig(podName, podNamespace, podInfraContainerID, podNetnsPath)
+	if err != nil {
+		glog.Errorf("Error adding network: %v", err)
+		return nil, err
 	}
 
-	pluginMap := map[string]NetworkPlugin{}
-
-	allErrs := []error{}
-	for _, plugin := range plugins {
-		name := plugin.Name()
-		if !util.IsQualifiedName(name) {
-			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %#v", plugin))
-			continue
-		}
-
-		if _, found := pluginMap[name]; found {
-			allErrs = append(allErrs, fmt.Errorf("network plugin %q was registered more than once", name))
-			continue
-		}
-		pluginMap[name] = plugin
+	netconf, cninet := plugin.NetworkConfig, plugin.CNIConfig
+	glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
+	res, err := cninet.AddNetwork(netconf, rt)
+	if err != nil {
+		glog.Errorf("Error adding network: %v", err)
+		return nil, err
 	}
 
-	chosenPlugin := pluginMap[networkPluginName]
-	if chosenPlugin != nil {
-		err := chosenPlugin.Init(host)
-		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
-		} else {
-			glog.V(1).Infof("Loaded network plugin %q", networkPluginName)
-		}
-	} else {
-		allErrs = append(allErrs, fmt.Errorf("Network plugin %q not found.", networkPluginName))
+	return res, nil
+}
+
+func DeleteNetwork(podName string, podNamespace string, podInfraContainerID string, podNetnsPath string, plugin NetworkPlugin) error {
+	rt, err := buildRtConfig(podName, podNamespace, podInfraContainerID, podNetnsPath)
+	if err != nil {
+		glog.Errorf("Error deleting network: %v", err)
+		return err
 	}
 
-	return chosenPlugin, errors.NewAggregate(allErrs)
-}
-
-func UnescapePluginName(in string) string {
-	return strings.Replace(in, "~", "/", -1)
-}
-
-type noopNetworkPlugin struct {
-}
-
-func (plugin *noopNetworkPlugin) Init(host Host) error {
+	netconf, cninet := plugin.NetworkConfig, plugin.CNIConfig
+	glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
+	err = cninet.DelNetwork(netconf, rt)
+	if err != nil {
+		glog.Errorf("Error deleting network: %v", err)
+		return err
+	}
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) Name() string {
-	return DefaultPluginName
+type NetworkPlugin struct {
+	Name			string
+	NetworkConfig	*cni.NetworkConfig
+	CNIConfig		*cni.CNIConfig
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
-	return nil
+func LoadNetworkPlugin(pluginName string) (NetworkPlugin, error) {
+	// Expect "kubernetes.io/no-op" if no plugin was specified on kubelet start.
+	if pluginName == "" {
+		pluginName = DefaultPluginName
+	}
+
+	// TODO-PAT: fix log levels
+	glog.V(2).Infof("Calling CNI network plugin '%v'", pluginName)
+
+	netconf, err := cni.LoadConf(DefaultNetDir, pluginName)
+	if err != nil {
+		glog.Errorf("Error loading network config: '%v'", err)
+		return NetworkPlugin{}, err
+	}
+	glog.V(2).Infof("Loaded network config")
+
+	cninet := &cni.CNIConfig{
+		Path: []string{DefaultCNIDir},
+		// TODO-PAT: Add vendor path, too?
+	}
+
+	return NetworkPlugin{pluginName, netconf, cninet}, nil
 }
 
-func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
-	return nil
-}
+func buildRtConfig(podName string, podNs string, podInfraContainerID string, podNetnsPath string) (*cni.RuntimeConf, error){
+	glog.V(2).Infof("Got netns path %v", podNetnsPath)
+	glog.V(2).Infof("Using netns path %v", podNs)
 
-func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID) (*PodNetworkStatus, error) {
-	return nil, nil
+	rt := &cni.RuntimeConf{
+		ContainerID: "cni",
+		NetNS:       podNetnsPath,
+		IfName:      "eth0",
+		Args:        [][2]string{
+			{"K8S_POD_NAMESPACE", podNs},
+			{"K8S_POD_NAME", podName},
+			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID},
+		},
+	}
+
+	return rt, nil
 }

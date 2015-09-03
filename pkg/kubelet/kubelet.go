@@ -131,7 +131,6 @@ func NewMainKubelet(
 	clusterDNS net.IP,
 	masterServiceNamespace string,
 	volumePlugins []volume.VolumePlugin,
-	networkPlugins []network.NetworkPlugin,
 	networkPluginName string,
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
@@ -268,10 +267,10 @@ func NewMainKubelet(
 		syncLoopMonitor:                util.AtomicValue{},
 	}
 
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
+	if plugin, err := network.LoadNetworkPlugin(networkPluginName); err != nil {
 		return nil, err
 	} else {
-		klet.networkPlugin = plug
+		klet.networkPlugin = plugin
 	}
 
 	machineInfo, err := klet.GetCachedMachineInfo()

@@ -51,8 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	"github.com/appc/cni"
-	cniTypes "github.com/appc/cni/pkg/types"
 )
 
 const (
@@ -74,9 +72,6 @@ const (
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
 
-	EnvCNIPath = "CNI_PATH"
-	EnvNetDir  = "NETCONFPATH"
-	DefaultNetDir = "/etc/cni/net.d"
 	DockerNetnsFmt = "/proc/%v/ns/net"
 )
 
@@ -202,7 +197,7 @@ func NewDockerManager(
 		dockerPuller:           newDockerPuller(client, qps, burst),
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
-		networkPlugin:          networkPlugin,
+		networkPlugin:      	networkPlugin,
 		prober:                 nil,
 		generator:              generator,
 		execHandler:            execHandler,
@@ -1155,7 +1150,15 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) err
 	}
 	wg.Wait()
 	if networkContainer != nil {
-		if err := tearDownPod(runningPod.Name, runningPod.Namespace, string(networkContainer.ID), dm.networkPlugin, dm.client); err != nil {
+		inspectResult, err := dm.client.InspectContainer(string(networkContainer.ID))
+		if err != nil {
+			glog.Errorf("Error inspecting container: '%v'", err)
+			return err
+		}
+
+		netnsPath := fmt.Sprintf(DockerNetnsFmt, inspectResult.State.Pid)
+
+		if err := network.DeleteNetwork(runningPod.Name, runningPod.Namespace, string(runningPod.ID), netnsPath, dm.networkPlugin); err != nil {
 			glog.Errorf("Failed tearing down the infra container: %v", err)
 			errs <- err
 		}
@@ -1171,24 +1174,6 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) err
 			errList = append(errList, err)
 		}
 		return fmt.Errorf("failed to delete containers (%v)", errList)
-	}
-	return nil
-}
-
-// TODO-PAT: refactor this into the plugin.
-func tearDownPod(podName string, podNamespace string, podInfraContainerID string, networkPlugin network.NetworkPlugin, client DockerInterface) error {
-	netconf, cninet, err := loadPlugin(networkPlugin)
-	rt, err := buildRtConfig(podName, podNamespace, podInfraContainerID, client)
-	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
-		return err
-	}
-
-	glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
-	err = cninet.DelNetwork(netconf, rt)
-	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
-		return err
 	}
 	return nil
 }
@@ -1332,7 +1317,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode string) (kubeletTypes.DockerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode string) (kubeletTypes.DockerID, int, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1345,12 +1330,12 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 	opts, err := dm.generator.GenerateRunContainerOptions(pod, container)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	// Remember this reference so we can report events about this container
@@ -1362,7 +1347,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		handlerErr := dm.runner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			dm.killContainer(types.UID(id), container, pod)
-			return kubeletTypes.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
+			return kubeletTypes.DockerID(""), 0, fmt.Errorf("failed to call event handler: %v", handlerErr)
 		}
 	}
 
@@ -1380,11 +1365,11 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// Container information is used in adjusting OOM scores and adding ndots.
 	containerInfo, err := dm.client.InspectContainer(string(id))
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	// Ensure the PID actually exists, else we'll move ourselves.
 	if containerInfo.State.Pid == 0 {
-		return "", fmt.Errorf("failed to get init PID for Docker container %q", string(id))
+		return "", 0, fmt.Errorf("failed to get init PID for Docker container %q", string(id))
 	}
 
 	// Set OOM score of the container based on the priority of the container.
@@ -1399,10 +1384,10 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	}
 	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if err = dm.oomAdjuster.ApplyOomScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	// currently, Docker does not have a flag by which the ndots option can be passed.
@@ -1415,7 +1400,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		err = addNDotsOption(containerInfo.ResolvConfPath)
 	}
 
-	return kubeletTypes.DockerID(id), err
+	return kubeletTypes.DockerID(id), containerInfo.State.Pid, err
 }
 
 func addNDotsOption(resolvFilePath string) error {
@@ -1449,7 +1434,7 @@ func appendToFile(filePath, stringToAppend string) error {
 }
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.DockerID, error) {
+func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.DockerID, int, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("createPodInfraContainer").Observe(metrics.SinceInMicroseconds(start))
@@ -1478,15 +1463,15 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 
 	// No pod secrets for the infra container.
 	if err := dm.imagePuller.PullImage(pod, container, nil); err != nil {
-		return "", err
+		return "", 0, err
 	}
 
-	id, err := dm.runContainerInPod(pod, container, netNamespace, "")
+	id, pid, err := dm.runContainerInPod(pod, container, netNamespace, "")
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
-	return id, nil
+	return id, pid, nil
 }
 
 // TODO(vmarmol): This will soon be made non-public when its only use is internal.
@@ -1686,13 +1671,14 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	podInfraContainerID := containerChanges.InfraContainerId
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
-		podInfraContainerID, err = dm.createPodInfraContainer(pod)
+		podInfraContainerID, pid, err := dm.createPodInfraContainer(pod)
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
 		}
 
-		res, err := setUpPod(pod.Name, pod.Namespace, string(podInfraContainerID), dm.networkPlugin, dm.client)
+		netnsPath := fmt.Sprintf(DockerNetnsFmt, pid)
+		res, err := network.AddNetwork(pod.Name, pod.Namespace, string(podInfraContainerID), netnsPath, dm.networkPlugin)
 		if err != nil {
 			glog.Errorf("Failed setting up pod infra container: %v", err)
 			return err
@@ -1730,7 +1716,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode)
+		_, _, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode)
 		dm.updateReasonCache(pod, container, err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
@@ -1743,73 +1729,6 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 
 	return nil
-}
-
-// TODO-PAT: refactor this into the plugin.
-func setUpPod(podName string, podNamespace string, podInfraContainerID string, networkPlugin network.NetworkPlugin, client DockerInterface) (*cniTypes.Result, error) {
-	netconf, cninet, err := loadPlugin(networkPlugin)
-	rt, err := buildRtConfig(podName, podNamespace, podInfraContainerID, client)
-	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
-		return nil, err
-	}
-
-	glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
-	res, err := cninet.AddNetwork(netconf, rt)
-	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
-		return nil, err
-	}
-
-	return res, nil
-}
-
-// TODO-PAT: This should be refactored to be run when the network plugin is loaded.
-func loadPlugin(networkPlugin network.NetworkPlugin) (*cni.NetworkConfig, *cni.CNIConfig, error) {
-	// Expect "kubernetes.io/no-op" if no plugin was specified on kubelet start.
-	pluginName := networkPlugin.Name()
-
-	// TODO-PAT: fix log levels
-	glog.V(2).Infof("Calling CNI network plugin '%v'", pluginName)
-
-	netconf, err := cni.LoadConf(DefaultNetDir, pluginName)
-	if err != nil {
-		glog.Errorf("Error loading network config: '%v'", err)
-		return nil, nil, err
-	}
-	glog.V(2).Infof("Got network config %v", netconf)
-
-	cninet := &cni.CNIConfig{
-		// TODO-PAT: this should be a constant path, e.g. /opt/cni or RKT_NETPLUGIN_PATH=/usr/lib/rkt/plugins/net
-		Path: strings.Split(os.Getenv(EnvCNIPath), ":"),
-	}
-
-	return netconf, cninet, nil
-}
-
-func buildRtConfig(podName string, podNs string, podInfraContainerID string, client DockerInterface) (*cni.RuntimeConf, error){
-	inspectResult, err := client.InspectContainer(podInfraContainerID)
-	if err != nil {
-		glog.Errorf("Error inspecting container: '%v'", err)
-		return nil, err
-	}
-
-	pid := inspectResult.State.Pid
-	netns := fmt.Sprintf(DockerNetnsFmt, pid)
-	glog.V(2).Infof("Got netns path %v", netns)
-
-	rt := &cni.RuntimeConf{
-		ContainerID: "cni",
-		NetNS:       netns,
-		IfName:      "eth0",
-		Args:        [][2]string{
-			{"POD_NAMESPACE", podNs},
-			{"POD_NAME", podName},
-			{"POD_INFRA_CONTAINER_ID", podInfraContainerID},
-		},
-	}
-
-	return rt, nil
 }
 
 // verifyNonRoot returns an error if the container or image will run as the root user.

@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
@@ -337,7 +336,6 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		KubeClient:                     nil,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  ProbeVolumePlugins(),
-		NetworkPlugins:                 ProbeNetworkPlugins(s.NetworkPluginDir),
 		NetworkPluginName:              s.NetworkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		TLSOptions:                     tlsOptions,
@@ -740,7 +738,6 @@ type KubeletConfig struct {
 	Runonce                        bool
 	MasterServiceNamespace         string
 	VolumePlugins                  []volume.VolumePlugin
-	NetworkPlugins                 []network.NetworkPlugin
 	NetworkPluginName              string
 	StreamingConnectionIdleTimeout time.Duration
 	Recorder                       record.EventRecorder
@@ -798,7 +795,6 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ClusterDNS,
 		kc.MasterServiceNamespace,
 		kc.VolumePlugins,
-		kc.NetworkPlugins,
 		kc.NetworkPluginName,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,

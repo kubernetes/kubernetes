@@ -20,9 +20,6 @@ package app
 import (
 	// Credential providers
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
-	// Network plugins
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/exec"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
@@ -58,16 +55,6 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, persistent_claim.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
-
-	return allPlugins
-}
-
-// ProbeNetworkPlugins collects all compiled-in plugins
-func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
-	allPlugins := []network.NetworkPlugin{}
-
-	// for each existing plugin, add to the list
-	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins(pluginDir)...)
 
 	return allPlugins
 }
