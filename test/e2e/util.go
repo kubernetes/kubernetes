@@ -2048,3 +2048,28 @@ func waitForApiserverUp(c *client.Client) error {
 	}
 	return fmt.Errorf("waiting for apiserver timed out")
 }
+
+// waitForClusterSize waits until the cluster has desired size and there is no not-ready nodes in it.
+func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		if err != nil {
+			Logf("Failed to list nodes: %v", err)
+			continue
+		}
+		numNodes := len(nodes.Items)
+
+		// Filter out not-ready nodes.
+		filterNodes(nodes, func(node api.Node) bool {
+			return isNodeReadySetAsExpected(&node, true)
+		})
+		numReady := len(nodes.Items)
+
+		if numNodes == size && numReady == size {
+			Logf("Cluster has reached the desired size %d", size)
+			return nil
+		}
+		Logf("Waiting for cluster size %d, current size %d, not ready nodes %d", size, numNodes, numNodes-numReady)
+	}
+	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
+}
