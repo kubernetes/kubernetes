@@ -104,10 +104,12 @@ func TestReadAWSCloudConfig(t *testing.T) {
 }
 
 type FakeAWSServices struct {
-	availabilityZone string
-	instances        []*ec2.Instance
-	instanceId       string
-	privateDnsName   string
+	availabilityZone        string
+	instances               []*ec2.Instance
+	instanceId              string
+	privateDnsName          string
+	networkInterfacesMacs   []string
+	networkInterfacesVpcIDs []string
 
 	ec2      *FakeEC2
 	elb      *FakeELB
@@ -122,6 +124,9 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.elb = &FakeELB{aws: s}
 	s.asg = &FakeASG{aws: s}
 	s.metadata = &FakeMetadata{aws: s}
+
+	s.networkInterfacesMacs = []string{"aa:bb:cc:dd:ee:00", "aa:bb:cc:dd:ee:01"}
+	s.networkInterfacesVpcIDs = []string{"vpc-mac0", "vpc-mac1"}
 
 	s.instanceId = "i-self"
 	s.privateDnsName = "ip-172-20-0-100.ec2.internal"
@@ -308,12 +313,28 @@ type FakeMetadata struct {
 }
 
 func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
+	networkInterfacesPrefix := "network/interfaces/macs/"
 	if key == "placement/availability-zone" {
 		return []byte(self.aws.availabilityZone), nil
 	} else if key == "instance-id" {
 		return []byte(self.aws.instanceId), nil
 	} else if key == "local-hostname" {
 		return []byte(self.aws.privateDnsName), nil
+	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
+		if key == networkInterfacesPrefix {
+			return []byte(strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n"), nil
+		} else {
+			keySplit := strings.Split(key, "/")
+			macParam := keySplit[3]
+			if len(keySplit) == 5 && keySplit[4] == "vpc-id" {
+				for i, macElem := range self.aws.networkInterfacesMacs {
+					if macParam == macElem {
+						return []byte(self.aws.networkInterfacesVpcIDs[i]), nil
+					}
+				}
+			}
+			return nil, nil
+		}
 	} else {
 		return nil, nil
 	}
@@ -625,5 +646,21 @@ func TestGetRegion(t *testing.T) {
 	}
 	if zone.FailureDomain != "us-west-2e" {
 		t.Errorf("Unexpected FailureDomain: %s", zone.FailureDomain)
+	}
+}
+
+func TestFindVPCID(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	vpcID, err := c.findVPCID()
+	if err != nil {
+		t.Errorf("Unexpected error:", err)
+	}
+	if vpcID != "vpc-mac0" {
+		t.Errorf("Unexpected vpcID: %s", vpcID)
 	}
 }
