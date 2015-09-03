@@ -260,7 +260,7 @@ Apart from the above, we want to add support for the following:
 
 ## References
 
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/1743 has most of the
+- https://github.com/kubernetes/kubernetes/issues/1743 has most of the
   discussion that resulted in this proposal.
 
 

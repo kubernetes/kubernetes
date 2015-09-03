@@ -114,7 +114,7 @@ The current best practice for pets is to create a replication controller with `r
 
 Pod is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Pod API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_pod).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_pod).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
