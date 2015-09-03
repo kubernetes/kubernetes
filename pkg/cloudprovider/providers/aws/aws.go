@@ -130,7 +130,7 @@ type ASG interface {
 // Abstraction over the AWS metadata service
 type AWSMetadata interface {
 	// Query the EC2 metadata service (used to discover instance-id etc)
-	GetMetaData(key string) ([]byte, error)
+	GetMetadata(key string) ([]byte, error)
 }
 
 type VolumeOptions struct {
@@ -330,8 +330,8 @@ var metadataClient = http.Client{
 	Timeout: time.Second * 10,
 }
 
-// Implements AWSMetadata.GetMetaData
-func (self *awsSdkMetadata) GetMetaData(key string) ([]byte, error) {
+// Implements AWSMetadata.GetMetadata
+func (self *awsSdkMetadata) GetMetadata(key string) ([]byte, error) {
 	// TODO Get an implementation of this merged into aws-sdk-go
 	url := "http://169.254.169.254/latest/meta-data/" + key
 
@@ -511,7 +511,7 @@ func readAWSCloudConfig(config io.Reader, metadata AWSMetadata) (*AWSCloudConfig
 }
 
 func getAvailabilityZone(metadata AWSMetadata) (string, error) {
-	availabilityZoneBytes, err := metadata.GetMetaData("placement/availability-zone")
+	availabilityZoneBytes, err := metadata.GetMetadata("placement/availability-zone")
 	if err != nil {
 		return "", err
 	}
@@ -519,6 +519,29 @@ func getAvailabilityZone(metadata AWSMetadata) (string, error) {
 		return "", fmt.Errorf("Unable to determine availability-zone from instance metadata")
 	}
 	return string(availabilityZoneBytes), nil
+}
+
+// Queries the AWS metadata service to find the VPC id in which we are launched
+// Actually finds the VPC of the primary network interface
+func getVPCID(metadata AWSMetadata) (string, error) {
+	macBytes, err := metadata.GetMetadata("mac")
+	if err != nil {
+		return "", err
+	}
+	if macBytes == nil || len(macBytes) == 0 {
+		return "", fmt.Errorf("Unable to determine primary interface MAC address from instance metadata")
+	}
+	mac := string(macBytes)
+	glog.V(2).Info("Got primary interface MAC address: ", mac)
+
+	vpcBytes, err := metadata.GetMetadata("network/interfaces/macs/" + mac + "/vpc-id")
+	if err != nil {
+		return "", err
+	}
+	if vpcBytes == nil || len(vpcBytes) == 0 {
+		return "", fmt.Errorf("Unable to determine vpc-id from instance metadata (interface MAC=%q)", mac)
+	}
+	return string(vpcBytes), nil
 }
 
 func isRegionValid(region string) bool {
@@ -1072,11 +1095,11 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 	i := s.selfAWSInstance
 	if i == nil {
 		metadata := s.awsServices.Metadata()
-		instanceIdBytes, err := metadata.GetMetaData("instance-id")
+		instanceIdBytes, err := metadata.GetMetadata("instance-id")
 		if err != nil {
 			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
 		}
-		privateDnsNameBytes, err := metadata.GetMetaData("local-hostname")
+		privateDnsNameBytes, err := metadata.GetMetadata("local-hostname")
 		if err != nil {
 			return nil, fmt.Errorf("error fetching local-hostname from ec2 metadata service: %v", err)
 		}
@@ -1282,27 +1305,31 @@ func (self *AWSCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return false, nil
 }
 
-// Find the kubernetes VPC
-func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
+// Gets the kubernetes VPC
+// We assume that we are running in the VPC, and use the metadata service
+// Returns an error if the VPC could not be found: vpc == nil <=> err != nil
+func (c *AWSCloud) getVPC() (*ec2.VPC, error) {
+	vpcId, err := getVPCID(c.awsServices.Metadata())
+	if err != nil {
+		return nil, err
+	}
+
 	request := &ec2.DescribeVPCsInput{}
+	request.VPCIDs = []*string{&vpcId}
 
-	name := "kubernetes-vpc"
-	filters := []*ec2.Filter{newEc2Filter("tag:Name", name)}
-	request.Filters = self.addFilters(filters)
-
-	vpcs, err := self.ec2.DescribeVPCs(request)
+	vpcs, err := c.ec2.DescribeVPCs(request)
 	if err != nil {
 		glog.Error("error listing VPCs", err)
 		return nil, err
 	}
 
 	if len(vpcs) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("did not find vpc with id (from metadata service): %q", vpcId)
 	}
 	if len(vpcs) == 1 {
 		return vpcs[0], nil
 	}
-	return nil, fmt.Errorf("Found multiple matching VPCs for name: %s", name)
+	return nil, fmt.Errorf("found multiple matching VPCs for id: %q", vpcId)
 }
 
 // Retrieves the specified security group from the AWS API, or returns nil if not found
@@ -1616,13 +1643,10 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		return nil, err
 	}
 
-	vpc, err := s.findVPC()
+	vpc, err := s.getVPC()
 	if err != nil {
 		glog.Error("error finding VPC", err)
 		return nil, err
-	}
-	if vpc == nil {
-		return nil, fmt.Errorf("Unable to find VPC")
 	}
 
 	// Construct list of configured subnets
