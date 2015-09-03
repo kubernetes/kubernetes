@@ -42,6 +42,9 @@ Session.vim
 .vagrant
 network_closure.sh
 
+# Local cluster env variables
+/cluster/env.sh
+
 # Compiled binaries in third_party
 /third_party/pkg
 
