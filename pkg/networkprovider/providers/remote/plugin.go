@@ -20,6 +20,7 @@ import (
 	"errors"
 	"github.com/docker/docker/pkg/tlsconfig"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/sock"
 	"sync"
 )
 
@@ -54,7 +55,7 @@ type Plugin struct {
 	// TLS configuration of the plugin
 	TLSConfig tlsconfig.Options
 	// Client attached to the plugin
-	Client *Client `json:"-"`
+	Client *sock.Client `json:"-"`
 
 	activatErr   error
 	activateOnce sync.Once
@@ -76,7 +77,7 @@ func (p *Plugin) activate() error {
 }
 
 func (p *Plugin) activateWithLock() error {
-	c, err := NewClient(p.Addr, p.TLSConfig)
+	c, err := sock.NewClient(p.Addr, p.TLSConfig)
 	if err != nil {
 		return err
 	}

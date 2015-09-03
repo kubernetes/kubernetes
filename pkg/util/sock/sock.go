@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package sock
 
 import (
 	"bytes"
@@ -86,8 +86,6 @@ func (c *Client) callWithRetry(serviceMethod string, args interface{}, ret inter
 		return err
 	}
 
-	glog.V(4).Infof("Networkprovider request remote with %v", args)
-
 	req, err := http.NewRequest("POST", "/"+serviceMethod, &buf)
 	if err != nil {
 		return err
@@ -123,8 +121,6 @@ func (c *Client) callWithRetry(serviceMethod string, args interface{}, ret inter
 				return err
 			}
 		}
-
-		glog.V(4).Infof("Networkprovider received response %v", resp.Body)
 
 		return json.NewDecoder(resp.Body).Decode(&ret)
 	}
