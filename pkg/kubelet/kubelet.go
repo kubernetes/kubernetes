@@ -91,6 +91,10 @@ const (
 
 	// system default DNS resolver configuration
 	ResolvConfDefault = "/etc/resolv.conf"
+
+	// Minimum period for performing global cleanup tasks, i.e., housekeeping
+	// will not be performed more than once per housekeepingMinimumPeriod.
+	housekeepingMinimumPeriod = time.Second * 2
 )
 
 var (
@@ -1861,23 +1865,37 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 // state every sync-frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
+	var housekeepingTimestamp time.Time
 	for {
+		if !kl.containerRuntimeUp() {
+			time.Sleep(5 * time.Second)
+			glog.Infof("Skipping pod synchronization, container runtime is not up.")
+			continue
+		}
+		if !kl.doneNetworkConfigure() {
+			time.Sleep(5 * time.Second)
+			glog.Infof("Skipping pod synchronization, network is not configured")
+			continue
+		}
+		// We don't want to perform housekeeping too often, so we set a minimum
+		// period for it. Housekeeping would be performed at least once every
+		// kl.resyncInterval, and *no* more than once every
+		// housekeepingMinimumPeriod.
+		// TODO (#13418): Investigate whether we can/should spawn a dedicated
+		// goroutine for housekeeping
+		if housekeepingTimestamp.IsZero() || time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
+			glog.V(4).Infof("SyncLoop (housekeeping)")
+			if err := handler.HandlePodCleanups(); err != nil {
+				glog.Errorf("Failed cleaning pods: %v", err)
+			}
+			housekeepingTimestamp = time.Now()
+		}
 		kl.syncLoopIteration(updates, handler)
 	}
 }
 
 func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) {
 	kl.syncLoopMonitor.Store(time.Now())
-	if !kl.containerRuntimeUp() {
-		time.Sleep(5 * time.Second)
-		glog.Infof("Skipping pod synchronization, container runtime is not up.")
-		return
-	}
-	if !kl.doneNetworkConfigure() {
-		time.Sleep(5 * time.Second)
-		glog.Infof("Skipping pod synchronization, network is not configured")
-		return
-	}
 	select {
 	case u, ok := <-updates:
 		if !ok {
@@ -1902,11 +1920,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 		// Periodically syncs all the pods and performs cleanup tasks.
 		glog.V(4).Infof("SyncLoop (periodic sync)")
 		handler.HandlePodSyncs(kl.podManager.GetPods())
-		if err := handler.HandlePodCleanups(); err != nil {
-			glog.Errorf("Failed cleaning pods: %v", err)
-		}
 	}
-
 	kl.syncLoopMonitor.Store(time.Now())
 }
 
