@@ -99,7 +99,7 @@ service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
 MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
 # opencontrail settings
-OVERLAY_NETWORK_PROVIDER="${OVERLAY_NETWORK_PROVIDER:-none}" # opencontrail
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 SERVICE_CLUSTER_IP_GW="${SERVICE_CLUSTER_IP_GW:-10.247.0.1}"
 KUBE_UI_IP_PUBLIC="${KUBE_UI_IP_PUBLIC:-10.1.4.80}"

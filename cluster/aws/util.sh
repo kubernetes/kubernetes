@@ -830,7 +830,7 @@ function kube-up {
     echo "readonly DNS_SERVER_IP_PUBLIC='${DNS_SERVER_IP_PUBLIC:-}'"
     echo "readonly KUBE_UI_IP_PUBLIC='${KUBE_UI_IP_PUBLIC:-}'"
     echo "readonly OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
-    echo "readonly OVERLAY_NETWORK_PROVIDER='${OVERLAY_NETWORK_PROVIDER:-}'"
+    echo "readonly NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
