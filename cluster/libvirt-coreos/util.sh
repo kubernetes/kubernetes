@@ -294,7 +294,7 @@ function upload-server-tars {
   tar -x -C "$POOL_PATH/kubernetes" -f "$SERVER_BINARY_TAR" kubernetes
   rm -rf "$POOL_PATH/kubernetes/bin"
   mv "$POOL_PATH/kubernetes/kubernetes/server/bin" "$POOL_PATH/kubernetes/bin"
-  rmdir "$POOL_PATH/kubernetes/kubernetes/server" "$POOL_PATH/kubernetes/kubernetes"
+  rm -fr "$POOL_PATH/kubernetes/kubernetes"
 }
 
 # Update a kubernetes cluster with latest source
