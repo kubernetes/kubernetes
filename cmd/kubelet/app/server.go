@@ -124,7 +124,7 @@ type KubeletServer struct {
 	MaxPods                        int
 	DockerExecHandlerName          string
 	ResolverConfig                 string
-
+	CPUCFSQuota                    bool
 	// Flags intended for testing
 
 	// Crash immediately, rather than eating panics.
@@ -189,6 +189,7 @@ func NewKubeletServer() *KubeletServer {
 		SystemContainer:             "",
 		ConfigureCBR0:               false,
 		DockerExecHandlerName:       "native",
+		CPUCFSQuota:                 false,
 	}
 }
 
@@ -255,6 +256,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
 	fs.StringVar(&s.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
 	fs.StringVar(&s.ResolverConfig, "resolv-conf", kubelet.ResolvConfDefault, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
+	fs.BoolVar(&s.CPUCFSQuota, "cpu-cfs-quota", s.CPUCFSQuota, "Enable CPU CFS quota enforcement for containers that specify CPU limits")
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
@@ -362,6 +364,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
 		ResolverConfig:            s.ResolverConfig,
+		CPUCFSQuota:               s.CPUCFSQuota,
 	}, nil
 }
 
@@ -604,6 +607,7 @@ func SimpleKubelet(client *client.Client,
 		MaxPods:                   32,
 		DockerExecHandler:         &dockertools.NativeExecHandler{},
 		ResolverConfig:            kubelet.ResolvConfDefault,
+		CPUCFSQuota:               false,
 	}
 	return &kcfg
 }
@@ -774,6 +778,7 @@ type KubeletConfig struct {
 	MaxPods                        int
 	DockerExecHandler              dockertools.ExecHandler
 	ResolverConfig                 string
+	CPUCFSQuota                    bool
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -833,7 +838,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.PodCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler,
-		kc.ResolverConfig)
+		kc.ResolverConfig,
+		kc.CPUCFSQuota)
 
 	if err != nil {
 		return nil, nil, err
