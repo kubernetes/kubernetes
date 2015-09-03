@@ -17,6 +17,8 @@ limitations under the License.
 package kubectl
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -34,6 +36,95 @@ const (
 	padding_character = ' '
 	flags             = 0
 )
+
+// MassageJSONPath attempts to be flexible with JSONPath expressions, it accepts:
+//   * metadata.name (no leading '.' or curly brances '{...}'
+//   * {metadata.name} (no leading '.')
+//   * .metadata.name (no curly braces '{...}')
+//   * {.metadata.name} (complete expression)
+// And transforms them all into a valid jsonpat expression:
+//   {.metadata.name}
+func massageJSONPath(pathExpression string) string {
+	if len(pathExpression) == 0 {
+		return pathExpression
+	}
+	if pathExpression[0] != '{' {
+		if pathExpression[0] == '.' {
+			return fmt.Sprintf("{%s}", pathExpression)
+		} else {
+			return fmt.Sprintf("{.%s}", pathExpression)
+		}
+	} else {
+		if pathExpression[1] == '.' {
+			return pathExpression
+		} else {
+			return fmt.Sprintf("{.%s}", pathExpression[1:len(pathExpression)-1])
+		}
+	}
+}
+
+// NewCustomColumnsPrinterFromSpec creates a custom columns printer from a comma separated list of <header>:<jsonpath-field-spec> pairs.
+// e.g. NAME:metadata.name,API_VERSION:apiVersion creates a printer that prints:
+//
+//      NAME               API_VERSION
+//      foo                bar
+func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error) {
+	parts := strings.Split(spec, ",")
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
+	}
+	columns := make([]Column, len(parts))
+	for ix := range parts {
+		colSpec := strings.Split(parts[ix], ":")
+		if len(colSpec) != 2 {
+			return nil, fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", parts[ix])
+		}
+		columns[ix] = Column{Header: colSpec[0], FieldSpec: massageJSONPath(colSpec[1])}
+	}
+	return &CustomColumnsPrinter{Columns: columns}, nil
+}
+
+func splitOnWhitespace(line string) []string {
+	lineScanner := bufio.NewScanner(bytes.NewBufferString(line))
+	lineScanner.Split(bufio.ScanWords)
+	result := []string{}
+	for lineScanner.Scan() {
+		result = append(result, lineScanner.Text())
+	}
+	return result
+}
+
+// NewCustomColumnsPrinterFromTemplate creates a custom columns printer from a template stream.  The template is expected
+// to consist of two lines, whitespace separated.  The first line is the header line, the second line is the jsonpath field spec
+// For example the template below:
+// NAME               API_VERSION
+// {metadata.name}    {apiVersion}
+func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColumnsPrinter, error) {
+	scanner := bufio.NewScanner(templateReader)
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("invalid template, missing header line")
+	}
+	headers := splitOnWhitespace(scanner.Text())
+
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("invalid template, missing spec line")
+	}
+	specs := splitOnWhitespace(scanner.Text())
+	fmt.Printf("SPECS: %v", specs)
+
+	if len(headers) != len(specs) {
+		return nil, fmt.Errorf("number of headers (%d) and field specifications (%d) don't match", len(headers), len(specs))
+	}
+
+	columns := make([]Column, len(headers))
+	for ix := range headers {
+		columns[ix] = Column{
+			Header:    headers[ix],
+			FieldSpec: massageJSONPath(specs[ix]),
+		}
+	}
+	return &CustomColumnsPrinter{Columns: columns}, nil
+}
 
 // Column represents a user specified column
 type Column struct {
@@ -104,4 +195,8 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	}
 	fmt.Fprintln(out, strings.Join(columns, "\t"))
 	return nil
+}
+
+func (s *CustomColumnsPrinter) HandledResources() []string {
+	return []string{}
 }
