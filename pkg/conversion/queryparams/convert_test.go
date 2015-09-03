@@ -111,12 +111,12 @@ func TestConvert(t *testing.T) {
 		},
 		{
 			input: &foo{
-				Str: "ignore embedded struct",
+				Str: "don't ignore embedded struct",
 				Foobar: bar{
 					Float1: 5.0,
 				},
 			},
-			expected: url.Values{"str": {"ignore embedded struct"}},
+			expected: url.Values{"str": {"don't ignore embedded struct"}, "float1": {"5"}, "float2": {"0"}},
 		},
 		{
 			// Ignore untagged fields
@@ -149,7 +149,7 @@ func TestConvert(t *testing.T) {
 			input: &baz{
 				Bptr: boolp(true),
 			},
-			expected: url.Values{"ptr": {"<nil>"}, "bptr": {"true"}},
+			expected: url.Values{"ptr": {""}, "bptr": {"true"}},
 		},
 		{
 			input: &baz{
