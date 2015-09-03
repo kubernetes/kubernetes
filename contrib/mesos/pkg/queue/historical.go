@@ -277,7 +277,7 @@ func (f *HistoricalFIFO) pop(cancel chan struct{}) interface{} {
 	}
 }
 
-func (f *HistoricalFIFO) Replace(objs []interface{}) error {
+func (f *HistoricalFIFO) Replace(objs []interface{}, resourceVersion string) error {
 	notifications := make([]Entry, 0, len(objs))
 	defer func() {
 		for _, e := range notifications {

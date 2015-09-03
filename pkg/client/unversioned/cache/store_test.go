@@ -70,7 +70,7 @@ func doTestStore(t *testing.T, store Store) {
 	store.Replace([]interface{}{
 		mkObj("foo", "foo"),
 		mkObj("bar", "bar"),
-	})
+	}, "0")
 
 	{
 		found := util.StringSet{}

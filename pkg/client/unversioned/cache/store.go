@@ -43,7 +43,7 @@ type Store interface {
 	// Replace will delete the contents of the store, using instead the
 	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
-	Replace([]interface{}) error
+	Replace([]interface{}, string) error
 }
 
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
@@ -193,7 +193,7 @@ func (c *cache) GetByKey(key string) (item interface{}, exists bool, err error) 
 // Replace will delete the contents of 'c', using instead the given list.
 // 'c' takes ownership of the list, you should not reference the list again
 // after calling this function.
-func (c *cache) Replace(list []interface{}) error {
+func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 	items := map[string]interface{}{}
 	for _, item := range list {
 		key, err := c.keyFunc(item)
@@ -202,7 +202,7 @@ func (c *cache) Replace(list []interface{}) error {
 		}
 		items[key] = item
 	}
-	c.cacheStorage.Replace(items)
+	c.cacheStorage.Replace(items, resourceVersion)
 	return nil
 }
 
