@@ -36,15 +36,14 @@ func TestAdmissionDeny(t *testing.T) {
 }
 
 func testAdmission(t *testing.T, pod *api.Pod, shouldAccept bool) {
-	mockClient := &testclient.Fake{
-		ReactFn: func(action testclient.Action) (runtime.Object, error) {
-			if action.Matches("get", "pods") && action.(testclient.GetAction).GetName() == pod.Name {
-				return pod, nil
-			}
-			t.Errorf("Unexpected API call: %#v", action)
-			return nil, nil
-		},
-	}
+	mockClient := &testclient.Fake{}
+	mockClient.AddReactor("get", "pods", func(action testclient.Action) (bool, runtime.Object, error) {
+		if action.(testclient.GetAction).GetName() == pod.Name {
+			return true, pod, nil
+		}
+		t.Errorf("Unexpected API call: %#v", action)
+		return true, nil, nil
+	})
 	handler := &denyExecOnPrivileged{
 		client: mockClient,
 	}

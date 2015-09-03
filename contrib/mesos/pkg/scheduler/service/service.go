@@ -95,13 +95,13 @@ type SchedulerServer struct {
 	MesosRole           string
 	MesosAuthPrincipal  string
 	MesosAuthSecretFile string
+	MesosCgroupPrefix   string
 	Checkpoint          bool
 	FailoverTimeout     float64
 
 	ExecutorLogV           int
 	ExecutorBindall        bool
 	ExecutorSuicideTimeout time.Duration
-	ExecutorCgroupPrefix   string
 
 	RunProxy     bool
 	ProxyBindall bool
@@ -163,7 +163,6 @@ func NewSchedulerServer() *SchedulerServer {
 
 		RunProxy:                 true,
 		ExecutorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
-		ExecutorCgroupPrefix:     execcfg.DefaultCgroupPrefix,
 		DefaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
 		DefaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
 
@@ -172,6 +171,7 @@ func NewSchedulerServer() *SchedulerServer {
 		MinionLogMaxAgeInDays: minioncfg.DefaultLogMaxAgeInDays,
 
 		MesosAuthProvider:    sasl.ProviderName,
+		MesosCgroupPrefix:    minioncfg.DefaultCgroupPrefix,
 		MesosMaster:          defaultMesosMaster,
 		MesosUser:            defaultMesosUser,
 		ReconcileInterval:    defaultReconcileInterval,
@@ -215,6 +215,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.MesosAuthSecretFile, "mesos-authentication-secret-file", s.MesosAuthSecretFile, "Mesos authentication secret file.")
 	fs.StringVar(&s.MesosAuthProvider, "mesos-authentication-provider", s.MesosAuthProvider, fmt.Sprintf("Authentication provider to use, default is SASL that supports mechanisms: %+v", mech.ListSupported()))
 	fs.StringVar(&s.DockerCfgPath, "dockercfg-path", s.DockerCfgPath, "Path to a dockercfg file that will be used by the docker instance of the minions.")
+	fs.StringVar(&s.MesosCgroupPrefix, "mesos-cgroup-prefix", s.MesosCgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 	fs.BoolVar(&s.Checkpoint, "checkpoint", s.Checkpoint, "Enable/disable checkpointing for the kubernetes-mesos framework.")
 	fs.Float64Var(&s.FailoverTimeout, "failover-timeout", s.FailoverTimeout, fmt.Sprintf("Framework failover timeout, in sec."))
 	fs.UintVar(&s.DriverPort, "driver-port", s.DriverPort, "Port that the Mesos scheduler driver process should listen on.")
@@ -234,7 +235,6 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ExecutorLogV, "executor-logv", s.ExecutorLogV, "Logging verbosity of spawned minion and executor processes.")
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
 	fs.DurationVar(&s.ExecutorSuicideTimeout, "executor-suicide-timeout", s.ExecutorSuicideTimeout, "Executor self-terminates after this period of inactivity. Zero disables suicide watch.")
-	fs.StringVar(&s.ExecutorCgroupPrefix, "executor-cgroup-prefix", s.ExecutorCgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 
 	fs.BoolVar(&s.ProxyBindall, "proxy-bindall", s.ProxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.RunProxy, "run-proxy", s.RunProxy, "Run the kube-proxy as a side process of the executor.")
@@ -364,7 +364,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, "--address=0.0.0.0")
 	}
 
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cgroup-prefix=%v", s.ExecutorCgroupPrefix))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--mesos-cgroup-prefix=%v", s.MesosCgroupPrefix))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.KubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.KubeletSyncFrequency))
 

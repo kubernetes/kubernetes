@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
@@ -101,6 +102,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 type ResourcePrinter interface {
 	// Print receives a runtime object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
+	HandledResources() []string
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -109,6 +111,11 @@ type ResourcePrinterFunc func(runtime.Object, io.Writer) error
 // PrintObj implements ResourcePrinter
 func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 	return fn(obj, w)
+}
+
+// TODO: implement HandledResources()
+func (fn ResourcePrinterFunc) HandledResources() []string {
+	return []string{}
 }
 
 // VersionedPrinter takes runtime objects and ensures they are converted to a given API version
@@ -147,6 +154,11 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return p.printer.PrintObj(converted, w)
 	}
 	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.version)
+}
+
+// TODO: implement HandledResources()
+func (p *VersionedPrinter) HandledResources() []string {
+	return []string{}
 }
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
@@ -199,6 +211,11 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return nil
 }
 
+// TODO: implement HandledResources()
+func (p *NamePrinter) HandledResources() []string {
+	return []string{}
+}
+
 // JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
 type JSONPrinter struct {
 }
@@ -214,6 +231,11 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	dst.WriteByte('\n')
 	_, err = w.Write(dst.Bytes())
 	return err
+}
+
+// TODO: implement HandledResources()
+func (p *JSONPrinter) HandledResources() []string {
+	return []string{}
 }
 
 // YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
@@ -232,6 +254,11 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 	_, err = fmt.Fprint(w, string(output))
 	return err
+}
+
+// TODO: implement HandledResources()
+func (p *YAMLPrinter) HandledResources() []string {
+	return []string{}
 }
 
 type handlerEntry struct {
@@ -1242,6 +1269,11 @@ func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return nil
 }
 
+// TODO: implement HandledResources()
+func (p *TemplatePrinter) HandledResources() []string {
+	return []string{}
+}
+
 // safeExecute tries to execute the template, but catches panics and returns an error
 // should the template engine panic.
 func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
@@ -1363,20 +1395,31 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return err
+	var queryObj interface{}
+	switch obj.(type) {
+	case *v1.List, *api.List:
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		queryObj = map[string]interface{}{}
+		if err := json.Unmarshal(data, &queryObj); err != nil {
+			return err
+		}
+	default:
+		queryObj = obj
 	}
-	out := map[string]interface{}{}
-	if err := json.Unmarshal(data, &out); err != nil {
-		return err
-	}
-	if err = j.JSONPath.Execute(w, out); err != nil {
+
+	if err := j.JSONPath.Execute(w, queryObj); err != nil {
 		fmt.Fprintf(w, "Error executing template: %v\n", err)
 		fmt.Fprintf(w, "template was:\n\t%v\n", j.rawTemplate)
-		fmt.Fprintf(w, "raw data was:\n\t%v\n", string(data))
-		fmt.Fprintf(w, "object given to template engine was:\n\t%+v\n", out)
-		return fmt.Errorf("error executing jsonpath '%v': '%v'\n----data----\n%+v\n", j.rawTemplate, err, out)
+		fmt.Fprintf(w, "object given to jsonpath engine was:\n\t%#v\n", queryObj)
+		return fmt.Errorf("error executing jsonpath '%v': '%v'\n----data----\n%+v\n", j.rawTemplate, err, obj)
 	}
 	return nil
+}
+
+// TODO: implement HandledResources()
+func (p *JSONPathPrinter) HandledResources() []string {
+	return []string{}
 }

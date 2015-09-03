@@ -45,7 +45,7 @@ var _ = Describe("Docker Containers", func() {
 	})
 
 	It("should use the image defaults if command and args are blank", func() {
-		testContainerOutputInNamespace("use defaults", c, entrypointTestPod(), 0, []string{
+		testContainerOutput("use defaults", c, entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
 		}, ns)
 	})
@@ -54,7 +54,7 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace("override arguments", c, pod, 0, []string{
+		testContainerOutput("override arguments", c, pod, 0, []string{
 			"[/ep override arguments]",
 		}, ns)
 	})
@@ -65,7 +65,7 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		testContainerOutputInNamespace("override command", c, pod, 0, []string{
+		testContainerOutput("override command", c, pod, 0, []string{
 			"[/ep-2]",
 		}, ns)
 	})
@@ -75,7 +75,7 @@ var _ = Describe("Docker Containers", func() {
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace("override all", c, pod, 0, []string{
+		testContainerOutput("override all", c, pod, 0, []string{
 			"[/ep-2 override arguments]",
 		}, ns)
 	})

@@ -186,6 +186,11 @@ __kubectl_get_resource_pod()
     __kubectl_parse_get "pod"
 }
 
+__kubectl_get_resource_rc()
+{
+    __kubectl_parse_get "rc"
+}
+
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
@@ -227,6 +232,10 @@ __custom_func() {
             ;;
         kubectl_exec)
             __kubectl_get_resource_pod
+            return
+            ;;
+        kubectl_rolling-update)
+            __kubectl_get_resource_rc
             return
             ;;
         *)
@@ -835,6 +844,23 @@ _kubectl_label()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    must_have_one_noun+=("componentstatus")
+    must_have_one_noun+=("deployment")
+    must_have_one_noun+=("endpoints")
+    must_have_one_noun+=("event")
+    must_have_one_noun+=("limitrange")
+    must_have_one_noun+=("namespace")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("persistentvolume")
+    must_have_one_noun+=("persistentvolumeclaim")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("podtemplate")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("secret")
+    must_have_one_noun+=("service")
+    must_have_one_noun+=("serviceaccount")
+    must_have_one_noun+=("thirdpartyresource")
 }
 
 _kubectl_annotate()

@@ -102,8 +102,7 @@ func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourc
 	if c.Namespace != "" {
 		action = NewWatchAction("events", c.Namespace, label, field, resourceVersion)
 	}
-	c.Fake.Invokes(action, nil)
-	return c.Fake.Watch, c.Fake.Err()
+	return c.Fake.InvokesWatch(action)
 }
 
 // Search returns a list of events matching the specified object.

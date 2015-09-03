@@ -28,7 +28,6 @@ bind-pods-qps
 cadvisor-port
 cert-dir
 certificate-authority
-cgroup-prefix
 cgroup-root
 chaos-chance
 cleanup-iptables
@@ -74,7 +73,6 @@ etcd-server
 etcd-servers
 event-ttl
 executor-bindall
-executor-cgroup-prefix
 executor-logv
 executor-path
 executor-suicide-timeout
@@ -110,6 +108,11 @@ insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
 iptables-sync-period
+ir-data-source
+ir-dbname
+ir-influxdb-host
+ir-password
+ir-user
 jenkins-host
 jenkins-jobs
 km-path
@@ -152,6 +155,7 @@ max-requests-inflight
 mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file
+mesos-cgroup-prefix
 mesos-master
 mesos-role
 mesos-user

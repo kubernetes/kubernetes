@@ -236,6 +236,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../docs/user-guide/downward-api": {
 			"dapi-pod": &api.Pod{},
 		},
+		"../docs/user-guide/downward-api/volume/": {
+			"dapi-volume": &api.Pod{},
+		},
 		"../examples/elasticsearch": {
 			"mytunes-namespace": &api.Namespace{},
 			"music-rc":          &api.ReplicationController{},
@@ -331,6 +334,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"storm-worker-controller": &api.ReplicationController{},
 			"zookeeper-service":       &api.Service{},
 			"zookeeper":               &api.Pod{},
+		},
+		"../examples/cephfs/": {
+			"cephfs":             &api.Pod{},
+			"cephfs-with-secret": &api.Pod{},
 		},
 	}
 

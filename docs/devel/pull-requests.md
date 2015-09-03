@@ -59,7 +59,7 @@ There are several requirements for the submit queue to work:
 * No changes can be made since last lgtm label was applied
 * k8s-bot must have reported the GCE E2E build and test steps passed (Travis, Shippable and Jenkins build)
 
-Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/contrib/tree/master/submit-queue/whitelist.txt).
+Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/kubernetes/contrib/tree/master/submit-queue/whitelist.txt).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

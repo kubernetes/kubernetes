@@ -72,6 +72,5 @@ func (c *FakeServiceAccounts) Delete(name string) error {
 }
 
 func (c *FakeServiceAccounts) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("serviceaccounts", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+	return c.Fake.InvokesWatch(NewWatchAction("serviceaccounts", c.Namespace, label, field, resourceVersion))
 }

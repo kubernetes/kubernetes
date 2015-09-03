@@ -112,6 +112,11 @@ func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	return t.Err
 }
 
+// TODO: implement HandledResources()
+func (t *testPrinter) HandledResources() []string {
+	return []string{}
+}
+
 type testDescriber struct {
 	Name, Namespace string
 	Output          string

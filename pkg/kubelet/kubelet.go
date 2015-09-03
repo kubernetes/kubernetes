@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilErrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -90,6 +91,10 @@ const (
 
 	// system default DNS resolver configuration
 	ResolvConfDefault = "/etc/resolv.conf"
+
+	// Minimum period for performing global cleanup tasks, i.e., housekeeping
+	// will not be performed more than once per housekeepingMinimumPeriod.
+	housekeepingMinimumPeriod = time.Second * 2
 )
 
 var (
@@ -552,6 +557,9 @@ type Kubelet struct {
 	// DNS resolver configuration file. This can be used in conjunction with
 	// clusterDomain and clusterDNS.
 	resolverConfig string
+
+	// Optionally shape the bandwidth of a pod
+	shaper bandwidth.BandwidthShaper
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1314,6 +1322,31 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
+	ingress, egress, err := extractBandwidthResources(pod)
+	if err != nil {
+		return err
+	}
+	if egress != nil || ingress != nil {
+		if pod.Spec.HostNetwork {
+			kl.recorder.Event(pod, "host network not supported", "Bandwidth shaping is not currently supported on the host network")
+		} else if kl.shaper != nil {
+			status, found := kl.statusManager.GetPodStatus(pod.UID)
+			if !found {
+				statusPtr, err := kl.containerRuntime.GetPodStatus(pod)
+				if err != nil {
+					glog.Errorf("Error getting pod for bandwidth shaping")
+					return err
+				}
+				status = *statusPtr
+			}
+			if len(status.PodIP) > 0 {
+				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", status.PodIP), egress, ingress)
+			}
+		} else {
+			kl.recorder.Event(pod, "nil shaper", "Pod requests bandwidth shaping, but the shaper is undefined")
+		}
+	}
+
 	if isStaticPod(pod) {
 		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 			// The mirror pod is semantically different from the static pod. Remove
@@ -1384,19 +1417,59 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, runningPods []*kubeco
 		if active.Has(string(uid)) {
 			continue
 		}
-		if err := os.Remove(kl.getPodVolumesDir(uid)); err != nil {
-			// If we cannot remove the volumes directory, it implies that the
-			// the directory is not empty. We should wait for the volume
-			// cleanup to complete before attempting to delete the directory.
-			glog.V(3).Infof("Orphaned pod %q found, but unable to remove the volume directory", uid)
+		if volumes, err := kl.getPodVolumes(uid); err != nil || len(volumes) != 0 {
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up; err: %v, volumes: %v ", uid, err, volumes)
 			continue
 		}
+
 		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
 		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
 			errlist = append(errlist, err)
 		}
 	}
 	return utilErrors.NewAggregate(errlist)
+}
+
+func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
+	if kl.shaper == nil {
+		return nil
+	}
+	currentCIDRs, err := kl.shaper.GetCIDRs()
+	if err != nil {
+		return err
+	}
+	possibleCIDRs := util.StringSet{}
+	for ix := range allPods {
+		pod := allPods[ix]
+		ingress, egress, err := extractBandwidthResources(pod)
+		if err != nil {
+			return err
+		}
+		if ingress == nil && egress == nil {
+			glog.V(8).Infof("Not a bandwidth limited container...")
+			continue
+		}
+		status, found := kl.statusManager.GetPodStatus(pod.UID)
+		if !found {
+			statusPtr, err := kl.containerRuntime.GetPodStatus(pod)
+			if err != nil {
+				return err
+			}
+			status = *statusPtr
+		}
+		if status.Phase == api.PodRunning {
+			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
+		}
+	}
+	for _, cidr := range currentCIDRs {
+		if !possibleCIDRs.Has(cidr) {
+			glog.V(2).Infof("Removing CIDR: %s (%v)", cidr, possibleCIDRs)
+			if err := kl.shaper.Reset(cidr); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Compares the map of current volumes to the map of desired volumes.
@@ -1631,6 +1704,11 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		glog.Errorf("Failed to cleanup terminated pods: %v", err)
 	}
 
+	// Clear out any old bandwith rules
+	if err = kl.cleanupBandwidthLimits(allPods); err != nil {
+		return err
+	}
+
 	kl.backOff.GC()
 	return err
 }
@@ -1787,23 +1865,37 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 // state every sync-frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
+	var housekeepingTimestamp time.Time
 	for {
+		if !kl.containerRuntimeUp() {
+			time.Sleep(5 * time.Second)
+			glog.Infof("Skipping pod synchronization, container runtime is not up.")
+			continue
+		}
+		if !kl.doneNetworkConfigure() {
+			time.Sleep(5 * time.Second)
+			glog.Infof("Skipping pod synchronization, network is not configured")
+			continue
+		}
+		// We don't want to perform housekeeping too often, so we set a minimum
+		// period for it. Housekeeping would be performed at least once every
+		// kl.resyncInterval, and *no* more than once every
+		// housekeepingMinimumPeriod.
+		// TODO (#13418): Investigate whether we can/should spawn a dedicated
+		// goroutine for housekeeping
+		if housekeepingTimestamp.IsZero() || time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
+			glog.V(4).Infof("SyncLoop (housekeeping)")
+			if err := handler.HandlePodCleanups(); err != nil {
+				glog.Errorf("Failed cleaning pods: %v", err)
+			}
+			housekeepingTimestamp = time.Now()
+		}
 		kl.syncLoopIteration(updates, handler)
 	}
 }
 
 func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) {
 	kl.syncLoopMonitor.Store(time.Now())
-	if !kl.containerRuntimeUp() {
-		time.Sleep(5 * time.Second)
-		glog.Infof("Skipping pod synchronization, container runtime is not up.")
-		return
-	}
-	if !kl.doneNetworkConfigure() {
-		time.Sleep(5 * time.Second)
-		glog.Infof("Skipping pod synchronization, network is not configured")
-		return
-	}
 	select {
 	case u, ok := <-updates:
 		if !ok {
@@ -1828,11 +1920,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 		// Periodically syncs all the pods and performs cleanup tasks.
 		glog.V(4).Infof("SyncLoop (periodic sync)")
 		handler.HandlePodSyncs(kl.podManager.GetPods())
-		if err := handler.HandlePodCleanups(); err != nil {
-			glog.Errorf("Failed cleaning pods: %v", err)
-		}
 	}
-
 	kl.syncLoopMonitor.Store(time.Now())
 }
 
@@ -2079,7 +2167,11 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	if err := ensureCbr0(cidr); err != nil {
 		return err
 	}
-	return nil
+	if kl.shaper == nil {
+		glog.V(5).Info("Shaper is nil, creating")
+		kl.shaper = bandwidth.NewTCShaper("cbr0")
+	}
+	return kl.shaper.ReconcileInterface()
 }
 
 // updateNodeStatus updates node status to master with retries.
@@ -2649,4 +2741,39 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 // is exported to simplify integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
+}
+
+var minRsrc = resource.MustParse("1k")
+var maxRsrc = resource.MustParse("1P")
+
+func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
+	if rsrc.Value() < minRsrc.Value() {
+		return fmt.Errorf("resource is unreasonably small (< 1kbit)")
+	}
+	if rsrc.Value() > maxRsrc.Value() {
+		return fmt.Errorf("resoruce is unreasonably large (> 1Pbit)")
+	}
+	return nil
+}
+
+func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity, err error) {
+	str, found := pod.Annotations["kubernetes.io/ingress-bandwidth"]
+	if found {
+		if ingress, err = resource.ParseQuantity(str); err != nil {
+			return nil, nil, err
+		}
+		if err := validateBandwidthIsReasonable(ingress); err != nil {
+			return nil, nil, err
+		}
+	}
+	str, found = pod.Annotations["kubernetes.io/egress-bandwidth"]
+	if found {
+		if egress, err = resource.ParseQuantity(str); err != nil {
+			return nil, nil, err
+		}
+		if err := validateBandwidthIsReasonable(egress); err != nil {
+			return nil, nil, err
+		}
+	}
+	return ingress, egress, nil
 }

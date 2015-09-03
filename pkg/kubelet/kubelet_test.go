@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
@@ -2333,9 +2334,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
-	}}).ReactFn
+	}}).ReactionChain
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -2418,7 +2419,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Spec:       api.NodeSpec{},
@@ -2439,7 +2440,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				},
 			},
 		},
-	}}).ReactFn
+	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -2530,9 +2531,9 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	// simulates that container runtime is down.
 	fakeRuntime.VersionInfo = ""
 
-	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
-	}}).ReactFn
+	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -2618,7 +2619,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
-	testKubelet.fakeKubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactFn
+	testKubelet.fakeKubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactionChain
 
 	if err := kubelet.updateNodeStatus(); err == nil {
 		t.Errorf("unexpected non error: %v", err)
@@ -3007,23 +3008,22 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = func(action testclient.Action) (runtime.Object, error) {
-		switch action.GetVerb() {
-		case "create":
-			// Return an error on create.
-			return &api.Node{}, &apierrors.StatusError{
-				ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
-			}
-		case "get":
-			// Return an existing (matching) node on get.
-			return &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-				Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
-			}, nil
-		default:
-			return nil, fmt.Errorf("no reaction implemented for %s", action)
+	kubeClient.AddReactor("create", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
+		// Return an error on create.
+		return true, &api.Node{}, &apierrors.StatusError{
+			ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
 		}
-	}
+	})
+	kubeClient.AddReactor("get", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
+		// Return an existing (matching) node on get.
+		return true, &api.Node{
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
+		}, nil
+	})
+	kubeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -3386,4 +3386,248 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	pods = []*api.Pod{}
 	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{}
 	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, false)
+}
+
+func TestCleanupBandwidthLimits(t *testing.T) {
+	tests := []struct {
+		status           *api.PodStatus
+		pods             []*api.Pod
+		inputCIDRs       []string
+		expectResetCIDRs []string
+		cacheStatus      bool
+		expectedCalls    []string
+		name             string
+	}{
+		{
+			status: &api.PodStatus{
+				PodIP: "1.2.3.4",
+				Phase: api.PodRunning,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "foo",
+						Annotations: map[string]string{
+							"kubernetes.io/ingress-bandwidth": "10M",
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "bar",
+					},
+				},
+			},
+			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
+			expectedCalls:    []string{"GetPodStatus"},
+			name:             "pod running",
+		},
+		{
+			status: &api.PodStatus{
+				PodIP: "1.2.3.4",
+				Phase: api.PodRunning,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "foo",
+						Annotations: map[string]string{
+							"kubernetes.io/ingress-bandwidth": "10M",
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "bar",
+					},
+				},
+			},
+			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
+			expectedCalls:    []string{},
+			cacheStatus:      true,
+			name:             "pod running with cache",
+		},
+		{
+			status: &api.PodStatus{
+				PodIP: "1.2.3.4",
+				Phase: api.PodFailed,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "foo",
+						Annotations: map[string]string{
+							"kubernetes.io/ingress-bandwidth": "10M",
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "bar",
+					},
+				},
+			},
+			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectedCalls:    []string{"GetPodStatus"},
+			name:             "pod not running",
+		},
+		{
+			status: &api.PodStatus{
+				PodIP: "1.2.3.4",
+				Phase: api.PodFailed,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "foo",
+						Annotations: map[string]string{
+							"kubernetes.io/ingress-bandwidth": "10M",
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "bar",
+					},
+				},
+			},
+			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectedCalls:    []string{},
+			cacheStatus:      true,
+			name:             "pod not running with cache",
+		},
+		{
+			status: &api.PodStatus{
+				PodIP: "1.2.3.4",
+				Phase: api.PodRunning,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "foo",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name: "bar",
+					},
+				},
+			},
+			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
+			name:             "no bandwidth limits",
+		},
+	}
+	for _, test := range tests {
+		shaper := &bandwidth.FakeShaper{
+			CIDRs: test.inputCIDRs,
+		}
+
+		testKube := newTestKubelet(t)
+		testKube.kubelet.shaper = shaper
+		testKube.fakeRuntime.PodStatus = *test.status
+
+		if test.cacheStatus {
+			for _, pod := range test.pods {
+				testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
+			}
+		}
+
+		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
+		if err != nil {
+			t.Errorf("unexpected error: %v (%s)", test.name)
+		}
+		if !reflect.DeepEqual(shaper.ResetCIDRs, test.expectResetCIDRs) {
+			t.Errorf("[%s]\nexpected: %v, saw: %v", test.name, test.expectResetCIDRs, shaper.ResetCIDRs)
+		}
+
+		if test.cacheStatus {
+			if len(testKube.fakeRuntime.CalledFunctions) != 0 {
+				t.Errorf("unexpected function calls: %v", testKube.fakeRuntime.CalledFunctions)
+			}
+		} else if !reflect.DeepEqual(testKube.fakeRuntime.CalledFunctions, test.expectedCalls) {
+			t.Errorf("[%s], expected %v, saw %v", test.name, test.expectedCalls, testKube.fakeRuntime.CalledFunctions)
+		}
+	}
+}
+
+func TestExtractBandwidthResources(t *testing.T) {
+	four, _ := resource.ParseQuantity("4M")
+	ten, _ := resource.ParseQuantity("10M")
+	twenty, _ := resource.ParseQuantity("20M")
+	tests := []struct {
+		pod             *api.Pod
+		expectedIngress *resource.Quantity
+		expectedEgress  *resource.Quantity
+		expectError     bool
+	}{
+		{
+			pod: &api.Pod{},
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						"kubernetes.io/ingress-bandwidth": "10M",
+					},
+				},
+			},
+			expectedIngress: ten,
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						"kubernetes.io/egress-bandwidth": "10M",
+					},
+				},
+			},
+			expectedEgress: ten,
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						"kubernetes.io/ingress-bandwidth": "4M",
+						"kubernetes.io/egress-bandwidth":  "20M",
+					},
+				},
+			},
+			expectedIngress: four,
+			expectedEgress:  twenty,
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						"kubernetes.io/ingress-bandwidth": "foo",
+					},
+				},
+			},
+			expectError: true,
+		},
+	}
+	for _, test := range tests {
+		ingress, egress, err := extractBandwidthResources(test.pod)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if !reflect.DeepEqual(ingress, test.expectedIngress) {
+			t.Errorf("expected: %v, saw: %v", ingress, test.expectedIngress)
+		}
+		if !reflect.DeepEqual(egress, test.expectedEgress) {
+			t.Errorf("expected: %v, saw: %v", egress, test.expectedEgress)
+		}
+	}
 }

@@ -20,11 +20,13 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestSortingPrinter(t *testing.T) {
+	intPtr := func(val int) *int { return &val }
+
 	tests := []struct {
 		obj   runtime.Object
 		sort  runtime.Object
@@ -71,7 +73,7 @@ func TestSortingPrinter(t *testing.T) {
 					},
 				},
 			},
-			field: "{.ObjectMeta.Name}",
+			field: "{.metadata.name}",
 		},
 		{
 			name: "reverse-order",
@@ -113,7 +115,7 @@ func TestSortingPrinter(t *testing.T) {
 					},
 				},
 			},
-			field: "{.ObjectMeta.Name}",
+			field: "{.metadata.name}",
 		},
 		{
 			name: "random-order-numbers",
@@ -121,17 +123,17 @@ func TestSortingPrinter(t *testing.T) {
 				Items: []api.ReplicationController{
 					{
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 5,
+							Replicas: intPtr(5),
 						},
 					},
 					{
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 1,
+							Replicas: intPtr(1),
 						},
 					},
 					{
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 9,
+							Replicas: intPtr(9),
 						},
 					},
 				},
@@ -140,22 +142,22 @@ func TestSortingPrinter(t *testing.T) {
 				Items: []api.ReplicationController{
 					{
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 1,
+							Replicas: intPtr(1),
 						},
 					},
 					{
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 5,
+							Replicas: intPtr(5),
 						},
 					},
 					{
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 9,
+							Replicas: intPtr(9),
 						},
 					},
 				},
 			},
-			field: "{.Spec.Replicas}",
+			field: "{.spec.replicas}",
 		},
 	}
 	for _, test := range tests {

@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -120,8 +121,23 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
-		func(j *expapi.DaemonSpec, c fuzz.Continue) {
+		func(j *expapi.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			// Ensure that strategyType is one of valid values.
+			strategyTypes := []expapi.DeploymentType{expapi.DeploymentRecreate, expapi.DeploymentRollingUpdate}
+			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
+			if j.Type != expapi.DeploymentRollingUpdate {
+				j.RollingUpdate = nil
+			} else {
+				rollingUpdate := expapi.RollingUpdateDeployment{}
+				if c.RandBool() {
+					rollingUpdate.MaxUnavailable = util.NewIntOrStringFromInt(int(c.RandUint64()))
+					rollingUpdate.MaxSurge = util.NewIntOrStringFromInt(int(c.RandUint64()))
+				} else {
+					rollingUpdate.MaxSurge = util.NewIntOrStringFromString(fmt.Sprintf("%d%%", c.RandUint64()))
+				}
+				j.RollingUpdate = &rollingUpdate
+			}
 		},
 		func(j *api.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
@@ -220,7 +236,18 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			i := int(c.RandUint64() % uint64(v.NumField()))
 			v = v.Field(i).Addr()
 			// Use a new fuzzer which cannot populate nil to ensure one field will be set.
-			fuzz.New().NilChance(0).NumElements(1, 1).Fuzz(v.Interface())
+			f := fuzz.New().NilChance(0).NumElements(1, 1)
+			f.Funcs(
+				// Only api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
+				// defaulted to a version otherwise roundtrip will fail
+				// For the remaining volume plugins the default fuzzer is enough.
+				func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
+					m.Path = c.RandString()
+					versions := []string{"v1"}
+					m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
+					m.FieldRef.FieldPath = c.RandString()
+				},
+			).Fuzz(v.Interface())
 		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}

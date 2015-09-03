@@ -35,10 +35,10 @@ import (
 const (
 	run_long = `Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).`
-	run_example = `# Starts a single instance of nginx.
+	run_example = `# Start a single instance of nginx.
 $ kubectl run nginx --image=nginx
 
-# Starts a replicated instance of nginx.
+# Start a replicated instance of nginx.
 $ kubectl run nginx --image=nginx --replicas=5
 
 # Dry run. Print the corresponding API objects without creating them.
