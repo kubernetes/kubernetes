@@ -51,13 +51,13 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/persistent-claim" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}}) {
 		t.Errorf("Expected false")
 	}
-	if plug.CanSupport(&volume.Spec{VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -141,7 +141,7 @@ func TestNewBuilder(t *testing.T) {
 					ClaimName: "claimB",
 				},
 			},
-			plugin: host_path.ProbeVolumePlugins()[0],
+			plugin: host_path.ProbeVolumePlugins(volume.VolumeConfig{})[0],
 			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
 				if builder.GetPath() != "/tmp" {
 					return fmt.Errorf("Expected HostPath.Path /tmp, got: %s", builder.GetPath())
@@ -237,7 +237,8 @@ func TestNewBuilder(t *testing.T) {
 		o := testclient.NewObjects(api.Scheme, api.Scheme)
 		o.Add(item.pv)
 		o.Add(item.claim)
-		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
+		client := &testclient.Fake{}
+		client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
 
 		plugMgr := volume.VolumePluginMgr{}
 		plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
@@ -246,10 +247,7 @@ func TestNewBuilder(t *testing.T) {
 		if err != nil {
 			t.Errorf("Can't find the plugin by name")
 		}
-		spec := &volume.Spec{
-			Name:         "vol1",
-			VolumeSource: item.podVolume,
-		}
+		spec := &volume.Spec{Volume: &api.Volume{VolumeSource: item.podVolume}}
 		pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 		builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
 
@@ -294,7 +292,8 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	o.Add(pv)
 	o.Add(claim)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
+	client := &testclient.Fake{}
+	client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
@@ -303,10 +302,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &volume.Spec{
-		Name:         "vol1",
-		VolumeSource: podVolume,
-	}
+	spec := &volume.Spec{Volume: &api.Volume{VolumeSource: podVolume}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
 	if builder != nil {
@@ -317,7 +313,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 func testProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, ProbeVolumePlugins()...)
 	return allPlugins
 }

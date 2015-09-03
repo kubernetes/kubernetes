@@ -695,16 +695,16 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 	newRc := newRc(1, 1)
 	var updatedOldRc *api.ReplicationController
 	fake := &testclient.Fake{}
-	fake.ReactFn = func(action testclient.Action) (runtime.Object, error) {
+	fake.AddReactor("*", "*", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 		switch a := action.(type) {
 		case testclient.GetAction:
-			return oldRc, nil
+			return true, oldRc, nil
 		case testclient.UpdateAction:
 			updatedOldRc = a.GetObject().(*api.ReplicationController)
-			return updatedOldRc, nil
+			return true, updatedOldRc, nil
 		}
-		return nil, nil
-	}
+		return false, nil, nil
+	})
 	updater := &RollingUpdater{
 		c:  fake,
 		ns: "default",

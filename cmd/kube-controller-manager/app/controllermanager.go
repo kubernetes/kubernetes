@@ -67,6 +67,7 @@ type CMServer struct {
 	ResourceQuotaSyncPeriod           time.Duration
 	NamespaceSyncPeriod               time.Duration
 	PVClaimBinderSyncPeriod           time.Duration
+	VolumeConfigFlags                 VolumeConfigFlags
 	HorizontalPodAutoscalerSyncPeriod time.Duration
 	RegisterRetryCount                int
 	NodeMonitorGracePeriod            time.Duration
@@ -106,8 +107,20 @@ func NewCMServer() *CMServer {
 		PodEvictionTimeout:                5 * time.Minute,
 		ClusterName:                       "kubernetes",
 		EnableHorizontalPodAutoscaler:     false,
+		VolumeConfigFlags: VolumeConfigFlags{
+			// default values here
+			PersistentVolumeRecyclerTimeoutNFS: 300,
+		},
 	}
 	return &s
+}
+
+// VolumeConfigFlags is used to bind CLI flags to variables.  This top-level struct contains *all* enumerated
+// CLI flags meant to configure all volume plugins.  From this config, the binary will create many instances
+// of volume.VolumeConfig which are then passed to the appropriate plugin. The ControllerManager binary is the only
+// part of the code which knows what plugins are supported and which CLI flags correspond to each plugin.
+type VolumeConfigFlags struct {
+	PersistentVolumeRecyclerTimeoutNFS int
 }
 
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
@@ -125,6 +138,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource-quota-sync-period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
 	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace-sync-period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PVClaimBinderSyncPeriod, "pvclaimbinder-sync-period", s.PVClaimBinderSyncPeriod, "The period for syncing persistent volumes and persistent volume claims")
+	// TODO markt -- make this example a working config item with Recycler Config PR.
+	//	fs.MyExample(&s.VolumeConfig.PersistentVolumeRecyclerTimeoutNFS, "pv-recycler-timeout-nfs", s.VolumeConfig.PersistentVolumeRecyclerTimeoutNFS, "The minimum timeout for an NFS PV recycling operation")
 	fs.DurationVar(&s.HorizontalPodAutoscalerSyncPeriod, "horizontal-pod-autoscaler-sync-period", s.HorizontalPodAutoscalerSyncPeriod, "The period for syncing the number of pods in horizontal pod autoscaler.")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod-eviction-timeout", s.PodEvictionTimeout, "The grace period for deleting pods on failed nodes.")
 	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
@@ -231,7 +246,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
 	pvclaimBinder.Run()
-	pvRecycler, err := volumeclaimbinder.NewPersistentVolumeRecycler(kubeClient, s.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins())
+	pvRecycler, err := volumeclaimbinder.NewPersistentVolumeRecycler(kubeClient, s.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins(s.VolumeConfigFlags))
 	if err != nil {
 		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
 	}

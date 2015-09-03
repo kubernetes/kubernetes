@@ -69,6 +69,19 @@ func (Capabilities) SwaggerDoc() map[string]string {
 	return map_Capabilities
 }
 
+var map_CephFSVolumeSource = map[string]string{
+	"":           "CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod",
+	"monitors":   "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
+	"user":       "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
+	"secretFile": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
+	"secretRef":  "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
+	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
+}
+
+func (CephFSVolumeSource) SwaggerDoc() map[string]string {
+	return map_CephFSVolumeSource
+}
+
 var map_CinderVolumeSource = map[string]string{
 	"":         "CinderVolumeSource represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet.",
 	"volumeID": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
@@ -217,6 +230,25 @@ var map_DeleteOptions = map[string]string{
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
+}
+
+var map_DownwardAPIVolumeFile = map[string]string{
+	"":         "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+	"path":     "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
+	"fieldRef": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+}
+
+func (DownwardAPIVolumeFile) SwaggerDoc() map[string]string {
+	return map_DownwardAPIVolumeFile
+}
+
+var map_DownwardAPIVolumeSource = map[string]string{
+	"":      "DownwardAPIVolumeSource represents a volume containing downward API info",
+	"items": "Items is a list of downward API volume file",
+}
+
+func (DownwardAPIVolumeSource) SwaggerDoc() map[string]string {
+	return map_DownwardAPIVolumeSource
 }
 
 var map_EmptyDirVolumeSource = map[string]string{
@@ -800,6 +832,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"rbd":                  "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
 	"iscsi":                "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
 	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1373,8 +1406,10 @@ var map_VolumeSource = map[string]string{
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/iscsi/README.md",
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims",
-	"rbd":    "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
-	"cinder": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"rbd":         "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
+	"cinder":      "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":      "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

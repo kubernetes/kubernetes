@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path"
 	"reflect"
 	"regexp"
@@ -379,6 +380,14 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateCinderVolumeSource(source.Cinder).Prefix("cinder")...)
 	}
+	if source.CephFS != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateCephFS(source.CephFS).Prefix("cephfs")...)
+	}
+	if source.DownwardAPI != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateDownwardAPIVolumeSource(source.DownwardAPI).Prefix("downwardApi")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -488,6 +497,31 @@ func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource) errs.ValidationErro
 	return allErrs
 }
 
+var validDownwardAPIFieldPathExpressions = util.NewStringSet("metadata.name", "metadata.namespace", "metadata.labels", "metadata.annotations")
+
+func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for _, downwardAPIVolumeFile := range downwardAPIVolume.Items {
+		if len(downwardAPIVolumeFile.Path) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired("path"))
+		}
+		if path.IsAbs(downwardAPIVolumeFile.Path) {
+			allErrs = append(allErrs, errs.NewFieldForbidden("path", "must not be an absolute path"))
+		}
+		items := strings.Split(downwardAPIVolumeFile.Path, string(os.PathSeparator))
+		for _, item := range items {
+			if item == ".." {
+				allErrs = append(allErrs, errs.NewFieldInvalid("path", downwardAPIVolumeFile.Path, "must not contain \"..\"."))
+			}
+		}
+		if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("path", downwardAPIVolumeFile.Path, "must not start with \"..\"."))
+		}
+		allErrs = append(allErrs, validateObjectFieldSelector(&downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions).Prefix("FieldRef")...)
+	}
+	return allErrs
+}
+
 func validateRBD(rbd *api.RBDVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(rbd.CephMonitors) == 0 {
@@ -509,6 +543,14 @@ func validateCinderVolumeSource(cd *api.CinderVolumeSource) errs.ValidationError
 	}
 	if cd.FSType == "" || (cd.FSType != "ext3" && cd.FSType != "ext4") {
 		allErrs = append(allErrs, errs.NewFieldRequired("fsType required and should be of type ext3 or ext4"))
+	}
+	return allErrs
+}
+
+func validateCephFS(cephfs *api.CephFSVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(cephfs.Monitors) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("monitors"))
 	}
 	return allErrs
 }
@@ -567,6 +609,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.RBD != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateRBD(pv.Spec.RBD).Prefix("rbd")...)
+	}
+	if pv.Spec.CephFS != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateCephFS(pv.Spec.CephFS).Prefix("cephfs")...)
 	}
 	if pv.Spec.ISCSI != nil {
 		numVolumes++
@@ -693,6 +739,8 @@ func validateEnv(vars []api.EnvVar) errs.ValidationErrorList {
 	return allErrs
 }
 
+var validFieldPathExpressionsEnv = util.NewStringSet("metadata.name", "metadata.namespace", "status.podIP")
+
 func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
@@ -705,7 +753,7 @@ func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	switch {
 	case ev.ValueFrom.FieldRef != nil:
 		numSources++
-		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef).Prefix("fieldRef")...)
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv).Prefix("fieldRef")...)
 	}
 
 	if ev.Value != "" && numSources != 0 {
@@ -715,9 +763,7 @@ func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressions = util.NewStringSet("metadata.name", "metadata.namespace", "status.podIP")
-
-func validateObjectFieldSelector(fs *api.ObjectFieldSelector) errs.ValidationErrorList {
+func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if fs.APIVersion == "" {
@@ -728,8 +774,8 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector) errs.ValidationErr
 		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
 		if err != nil {
 			allErrs = append(allErrs, errs.NewFieldInvalid("fieldPath", fs.FieldPath, "error converting fieldPath"))
-		} else if !validFieldPathExpressions.Has(internalFieldPath) {
-			allErrs = append(allErrs, errs.NewFieldValueNotSupported("fieldPath", internalFieldPath, validFieldPathExpressions.List()))
+		} else if !expressions.Has(internalFieldPath) {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported("fieldPath", internalFieldPath, expressions.List()))
 		}
 	}
 

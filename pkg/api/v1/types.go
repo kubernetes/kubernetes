@@ -280,6 +280,12 @@ type VolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
+
+	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
+
+	// DownwardAPI represents downward API about the pod that should populate this volume
+	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -328,6 +334,8 @@ type PersistentVolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
+	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -591,6 +599,26 @@ type CinderVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod
+type CephFSVolumeSource struct {
+	// Required: Monitors is a collection of Ceph monitors
+	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+	Monitors []string `json:"monitors"`
+	// Optional: User is the rados user name, default is admin
+	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+	User string `json:"user,omitempty"`
+	// Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+	SecretFile string `json:"secretFile,omitempty"`
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -2500,6 +2528,20 @@ type ComponentStatusList struct {
 
 	// List of ComponentStatus objects.
 	Items []ComponentStatus `json:"items"`
+}
+
+// DownwardAPIVolumeSource represents a volume containing downward API info
+type DownwardAPIVolumeSource struct {
+	// Items is a list of downward API volume file
+	Items []DownwardAPIVolumeFile `json:"items,omitempty"`
+}
+
+// DownwardAPIVolumeFile represents information to create the file containing the pod field
+type DownwardAPIVolumeFile struct {
+	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	Path string `json:"path"`
+	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	FieldRef ObjectFieldSelector `json:"fieldRef"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.

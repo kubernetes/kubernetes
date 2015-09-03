@@ -166,7 +166,7 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 // Replace will convert all items in the given list to TimestampedEntries
 // before attempting the replace operation. The replace operation will
 // delete the contents of the ExpirationCache `c`.
-func (c *ExpirationCache) Replace(list []interface{}) error {
+func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) error {
 	items := map[string]interface{}{}
 	ts := c.clock.Now()
 	for _, item := range list {
@@ -176,7 +176,7 @@ func (c *ExpirationCache) Replace(list []interface{}) error {
 		}
 		items[key] = &timestampedEntry{item, ts}
 	}
-	c.cacheStorage.Replace(items)
+	c.cacheStorage.Replace(items, resourceVersion)
 	return nil
 }
 

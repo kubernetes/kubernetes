@@ -53,7 +53,7 @@ func (plugin *cinderPlugin) Name() string {
 }
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.PersistentVolumeSource.Cinder != nil || spec.VolumeSource.Cinder != nil
+	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
 }
 
 func (plugin *cinderPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -68,10 +68,10 @@ func (plugin *cinderPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume
 
 func (plugin *cinderPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Builder, error) {
 	var cinder *api.CinderVolumeSource
-	if spec.VolumeSource.Cinder != nil {
-		cinder = spec.VolumeSource.Cinder
+	if spec.Volume != nil && spec.Volume.Cinder != nil {
+		cinder = spec.Volume.Cinder
 	} else {
-		cinder = spec.PersistentVolumeSource.Cinder
+		cinder = spec.PersistentVolume.Spec.Cinder
 	}
 
 	pdName := cinder.VolumeID
@@ -81,7 +81,7 @@ func (plugin *cinderPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 	return &cinderVolumeBuilder{
 		cinderVolume: &cinderVolume{
 			podUID:  podUID,
-			volName: spec.Name,
+			volName: spec.Name(),
 			pdName:  pdName,
 			mounter: mounter,
 			manager: manager,

@@ -689,8 +689,7 @@ func (k *KubernetesScheduler) makeTaskRegistryReconciler() ReconcilerAction {
 // tasks identified by annotations in the Kubernetes pod registry.
 func (k *KubernetesScheduler) makePodRegistryReconciler() ReconcilerAction {
 	return ReconcilerAction(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
-		ctx := api.NewDefaultContext()
-		podList, err := k.client.Pods(api.NamespaceValue(ctx)).List(labels.Everything(), fields.Everything())
+		podList, err := k.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return proc.ErrorChanf("failed to reconcile pod registry: %v", err)
 		}
@@ -920,8 +919,7 @@ requestLoop:
 }
 
 func (ks *KubernetesScheduler) recoverTasks() error {
-	ctx := api.NewDefaultContext()
-	podList, err := ks.client.Pods(api.NamespaceValue(ctx)).List(labels.Everything(), fields.Everything())
+	podList, err := ks.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		log.V(1).Infof("failed to recover pod registry, madness may ensue: %v", err)
 		return err

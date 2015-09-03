@@ -37,13 +37,11 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/cinder" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{
-		Name:         "foo",
-		VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
 
-	if !plug.CanSupport(&volume.Spec{Name: "foo", PersistentVolumeSource: api.PersistentVolumeSource{Cinder: &api.CinderVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{Cinder: &api.CinderVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }

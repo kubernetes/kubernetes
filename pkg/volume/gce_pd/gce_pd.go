@@ -55,7 +55,8 @@ func (plugin *gcePersistentDiskPlugin) Name() string {
 }
 
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.GCEPersistentDisk != nil || spec.PersistentVolumeSource.GCEPersistentDisk != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.GCEPersistentDisk != nil) ||
+		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -76,11 +77,11 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 	var readOnly bool
 
 	var gce *api.GCEPersistentDiskVolumeSource
-	if spec.VolumeSource.GCEPersistentDisk != nil {
-		gce = spec.VolumeSource.GCEPersistentDisk
+	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
+		gce = spec.Volume.GCEPersistentDisk
 		readOnly = gce.ReadOnly
 	} else {
-		gce = spec.PersistentVolumeSource.GCEPersistentDisk
+		gce = spec.PersistentVolume.Spec.GCEPersistentDisk
 		readOnly = spec.ReadOnly
 	}
 
@@ -94,7 +95,7 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 	return &gcePersistentDiskBuilder{
 		gcePersistentDisk: &gcePersistentDisk{
 			podUID:    podUID,
-			volName:   spec.Name,
+			volName:   spec.Name(),
 			pdName:    pdName,
 			partition: partition,
 			mounter:   mounter,

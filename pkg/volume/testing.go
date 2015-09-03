@@ -75,7 +75,20 @@ func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID, mounter
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewCleaner(spec.Name, podUID, mounter)
+	return plug.NewCleaner(spec.Name(), podUID, mounter)
+}
+
+func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
+	if _, ok := config.OtherAttributes["fake-property"]; ok {
+		return []VolumePlugin{
+			&FakeVolumePlugin{
+				PluginName: "fake-plugin",
+				Host:       nil,
+				// SomeFakeProperty: config.OtherAttributes["fake-property"] -- string, may require parsing by plugin
+			},
+		}
+	}
+	return []VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
 }
 
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
@@ -99,12 +112,12 @@ func (plugin *FakeVolumePlugin) Name() string {
 }
 
 func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
-	// TODO: maybe pattern-match on spec.Name to decide?
+	// TODO: maybe pattern-match on spec.Name() to decide?
 	return true
 }
 
 func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
-	return &FakeVolume{pod.UID, spec.Name, plugin}, nil
+	return &FakeVolume{pod.UID, spec.Name(), plugin}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (Cleaner, error) {

@@ -12078,6 +12078,10 @@
       "$ref": "v1.CinderVolumeSource",
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -12319,6 +12323,38 @@
      }
     }
    },
+   "v1.CephFSVolumeSource": {
+    "id": "v1.CephFSVolumeSource",
+    "description": "CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "user": {
+      "type": "string",
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "secretFile": {
+      "type": "string",
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -12517,6 +12553,14 @@
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
+     },
+     "downwardAPI": {
+      "$ref": "v1.DownwardAPIVolumeSource",
+      "description": "DownwardAPI represents downward API about the pod that should populate this volume"
      }
     }
    },
@@ -12575,6 +12619,54 @@
      "readOnly": {
       "type": "boolean",
       "description": "Will force the ReadOnly setting in VolumeMounts. Default false."
+     }
+    }
+   },
+   "v1.DownwardAPIVolumeSource": {
+    "id": "v1.DownwardAPIVolumeSource",
+    "description": "DownwardAPIVolumeSource represents a volume containing downward API info",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.DownwardAPIVolumeFile"
+      },
+      "description": "Items is a list of downward API volume file"
+     }
+    }
+   },
+   "v1.DownwardAPIVolumeFile": {
+    "id": "v1.DownwardAPIVolumeFile",
+    "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+    "required": [
+     "path",
+     "fieldRef"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'"
+     },
+     "fieldRef": {
+      "$ref": "v1.ObjectFieldSelector",
+      "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+     }
+    }
+   },
+   "v1.ObjectFieldSelector": {
+    "id": "v1.ObjectFieldSelector",
+    "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
+    "required": [
+     "fieldPath"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\"."
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "Path of the field to select in the specified API version."
      }
     }
    },
@@ -12732,23 +12824,6 @@
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
       "description": "Selects a field of the pod. Only name and namespace are supported."
-     }
-    }
-   },
-   "v1.ObjectFieldSelector": {
-    "id": "v1.ObjectFieldSelector",
-    "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
-    "required": [
-     "fieldPath"
-    ],
-    "properties": {
-     "apiVersion": {
-      "type": "string",
-      "description": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\"."
-     },
-     "fieldPath": {
-      "type": "string",
-      "description": "Path of the field to select in the specified API version."
      }
     }
    },

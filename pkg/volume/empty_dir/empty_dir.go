@@ -63,7 +63,7 @@ func (plugin *emptyDirPlugin) Name() string {
 }
 
 func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.EmptyDir != nil {
+	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
 		return true
 	}
 	return false
@@ -75,12 +75,12 @@ func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts v
 
 func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions, chconRunner chconRunner) (volume.Builder, error) {
 	medium := api.StorageMediumDefault
-	if spec.VolumeSource.EmptyDir != nil { // Support a non-specified source as EmptyDir.
-		medium = spec.VolumeSource.EmptyDir.Medium
+	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
+		medium = spec.Volume.EmptyDir.Medium
 	}
 	return &emptyDir{
 		pod:           pod,
-		volName:       spec.Name,
+		volName:       spec.Name(),
 		medium:        medium,
 		mounter:       mounter,
 		mountDetector: mountDetector,

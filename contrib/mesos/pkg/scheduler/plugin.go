@@ -893,11 +893,11 @@ func (psa *podStoreAdapter) Get(obj interface{}) (interface{}, bool, error) {
 
 // Replace will delete the contents of the store, using instead the
 // given map. This store implementation does NOT take ownership of the map.
-func (psa *podStoreAdapter) Replace(objs []interface{}) error {
+func (psa *podStoreAdapter) Replace(objs []interface{}, resourceVersion string) error {
 	newobjs := make([]interface{}, len(objs))
 	for i, v := range objs {
 		pod := v.(*api.Pod)
 		newobjs[i] = &Pod{Pod: pod}
 	}
-	return psa.FIFO.Replace(newobjs)
+	return psa.FIFO.Replace(newobjs, resourceVersion)
 }

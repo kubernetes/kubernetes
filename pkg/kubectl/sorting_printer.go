@@ -46,6 +46,11 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	return s.Delegate.PrintObj(obj, out)
 }
 
+// TODO: implement HandledResources()
+func (p *SortingPrinter) HandledResources() []string {
+	return []string{}
+}
+
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	objs, err := runtime.ExtractList(obj)
 	if err != nil {
@@ -87,6 +92,23 @@ func (r *RuntimeSort) Swap(i, j int) {
 	r.objs[i], r.objs[j] = r.objs[j], r.objs[i]
 }
 
+func isLess(i, j reflect.Value) (bool, error) {
+	switch i.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return i.Int() < j.Int(), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return i.Uint() < j.Uint(), nil
+	case reflect.Float32, reflect.Float64:
+		return i.Float() < j.Float(), nil
+	case reflect.String:
+		return i.String() < j.String(), nil
+	case reflect.Ptr:
+		return isLess(i.Elem(), j.Elem())
+	default:
+		return false, fmt.Errorf("unsortable type: %v", i.Kind())
+	}
+}
+
 func (r *RuntimeSort) Less(i, j int) bool {
 	iObj := r.objs[i]
 	jObj := r.objs[j]
@@ -106,18 +128,9 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	iField := iValues[0][0]
 	jField := jValues[0][0]
 
-	switch iField.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return iField.Int() < jField.Int()
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return iField.Uint() < jField.Uint()
-	case reflect.Float32, reflect.Float64:
-		return iField.Float() < jField.Float()
-	case reflect.String:
-		return iField.String() < jField.String()
-	default:
+	less, err := isLess(iField, jField)
+	if err != nil {
 		glog.Fatalf("Field %s in %v is an unsortable type: %s", r.field, iObj, iField.Kind().String())
 	}
-	// default to preserving order
-	return i < j
+	return less
 }

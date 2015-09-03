@@ -61,6 +61,7 @@ func validNewDeployment() *expapi.Deployment {
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
+			UniqueLabelKey: "my-label",
 		},
 	}
 }

@@ -86,7 +86,7 @@ type Cacher struct {
 	storage Interface
 
 	// "sliding window" of recent changes of objects and the current state.
-	watchCache *cache.WatchCache
+	watchCache *watchCache
 	reflector  *cache.Reflector
 
 	// Registered watchers.
@@ -104,7 +104,7 @@ type Cacher struct {
 // internal cache and updating its cache in the background based on the given
 // configuration.
 func NewCacher(config CacherConfig) *Cacher {
-	watchCache := cache.NewWatchCache(config.CacheCapacity)
+	watchCache := newWatchCache(config.CacheCapacity)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
 	cacher := &Cacher{
@@ -272,7 +272,7 @@ func (c *Cacher) Codec() runtime.Codec {
 	return c.storage.Codec()
 }
 
-func (c *Cacher) processEvent(event cache.WatchCacheEvent) {
+func (c *Cacher) processEvent(event watchCacheEvent) {
 	c.Lock()
 	defer c.Unlock()
 	for _, watcher := range c.watchers {
@@ -361,16 +361,16 @@ func (lw *cacherListerWatcher) Watch(resourceVersion string) (watch.Interface, e
 // cacherWatch implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
-	input   chan cache.WatchCacheEvent
+	input   chan watchCacheEvent
 	result  chan watch.Event
 	filter  FilterFunc
 	stopped bool
 	forget  func()
 }
 
-func newCacheWatcher(initEvents []cache.WatchCacheEvent, filter FilterFunc, forget func()) *cacheWatcher {
+func newCacheWatcher(initEvents []watchCacheEvent, filter FilterFunc, forget func()) *cacheWatcher {
 	watcher := &cacheWatcher{
-		input:   make(chan cache.WatchCacheEvent, 10),
+		input:   make(chan watchCacheEvent, 10),
 		result:  make(chan watch.Event, 10),
 		filter:  filter,
 		stopped: false,
@@ -400,11 +400,11 @@ func (c *cacheWatcher) stop() {
 	}
 }
 
-func (c *cacheWatcher) add(event cache.WatchCacheEvent) {
+func (c *cacheWatcher) add(event watchCacheEvent) {
 	c.input <- event
 }
 
-func (c *cacheWatcher) sendWatchCacheEvent(event cache.WatchCacheEvent) {
+func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
 	curObjPasses := event.Type != watch.Deleted && c.filter(event.Object)
 	oldObjPasses := false
 	if event.PrevObject != nil {
@@ -430,7 +430,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event cache.WatchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(initEvents []cache.WatchCacheEvent) {
+func (c *cacheWatcher) process(initEvents []watchCacheEvent) {
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
 	}

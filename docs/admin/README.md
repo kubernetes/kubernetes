@@ -54,6 +54,7 @@ It assumes some familiarity with concepts in the [User Guide](../user-guide/READ
     1. [The kube-controller-manager binary](kube-controller-manager.md)
   1. [Administrating Kubernetes Nodes](node.md)
     1. [The kubelet binary](kubelet.md)
+      1. [Garbage Collection](garbage-collection.md)
     1. [The kube-proxy binary](kube-proxy.md)
   1. Administrating Addons
     1. [DNS](dns.md)
