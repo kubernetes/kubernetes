@@ -2301,7 +2301,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.NodeInfo.OsImage = verinfo.ContainerOsVersion
 		// TODO: Determine the runtime is docker or rocket
 		// Set additional labels that maybe used for scheduling.
-		node.ObjectMeta.Labels["node.kubernetes.io/container-runtime-version"] = "docker_" + verinfo.DockerVersion
+		if verinfo.DockerVersion != "" {
+			node.ObjectMeta.Labels["node.kubernetes.io/container-runtime-version"] = "docker_" + verinfo.DockerVersion
+		}
 		node.Status.NodeInfo.ContainerRuntimeVersion = "docker://" + verinfo.DockerVersion
 		node.Status.NodeInfo.KubeletVersion = version.Get().String()
 		// TODO: kube-proxy might be different version from kubelet in the future
