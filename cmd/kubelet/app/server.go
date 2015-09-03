@@ -124,6 +124,7 @@ type KubeletServer struct {
 	MaxPods                        int
 	DockerExecHandlerName          string
 	ResolverConfig                 string
+	NodeLabelPluginDir             string
 
 	// Flags intended for testing
 
@@ -244,6 +245,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.NetworkPluginDir, "network-plugin-dir", s.NetworkPluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for network plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
+	fs.StringVar(&s.NodeLabelPluginDir, "node-label-plugin-dir", s.NodeLabelPluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for plugins to specify additional node labels")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
@@ -362,6 +364,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
 		ResolverConfig:            s.ResolverConfig,
+		NodeLabelPluginDir:        s.NodeLabelPluginDir,
 	}, nil
 }
 
@@ -774,6 +777,7 @@ type KubeletConfig struct {
 	MaxPods                        int
 	DockerExecHandler              dockertools.ExecHandler
 	ResolverConfig                 string
+	NodeLabelPluginDir             string
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -833,7 +837,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.PodCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler,
-		kc.ResolverConfig)
+		kc.ResolverConfig,
+		kc.NodeLabelPluginDir)
 
 	if err != nil {
 		return nil, nil, err
