@@ -36,6 +36,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -72,6 +73,7 @@ type CMServer struct {
 	PVClaimBinderSyncPeriod           time.Duration
 	VolumeConfigFlags                 VolumeConfigFlags
 	HorizontalPodAutoscalerSyncPeriod time.Duration
+	DeploymentControllerSyncPeriod    time.Duration
 	RegisterRetryCount                int
 	NodeMonitorGracePeriod            time.Duration
 	NodeStartupGracePeriod            time.Duration
@@ -88,6 +90,7 @@ type CMServer struct {
 	AllocateNodeCIDRs             bool
 	EnableProfiling               bool
 	EnableHorizontalPodAutoscaler bool
+	EnableDeploymentController    bool
 
 	Master     string
 	Kubeconfig string
@@ -107,10 +110,12 @@ func NewCMServer() *CMServer {
 		NamespaceSyncPeriod:               5 * time.Minute,
 		PVClaimBinderSyncPeriod:           10 * time.Second,
 		HorizontalPodAutoscalerSyncPeriod: 1 * time.Minute,
+		DeploymentControllerSyncPeriod:    1 * time.Minute,
 		RegisterRetryCount:                10,
 		PodEvictionTimeout:                5 * time.Minute,
 		ClusterName:                       "kubernetes",
 		EnableHorizontalPodAutoscaler:     false,
+		EnableDeploymentController:        false,
 		VolumeConfigFlags: VolumeConfigFlags{
 			// default values here
 			PersistentVolumeRecyclerTimeoutNFS: 300,
@@ -145,6 +150,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	// TODO markt -- make this example a working config item with Recycler Config PR.
 	//	fs.MyExample(&s.VolumeConfig.PersistentVolumeRecyclerTimeoutNFS, "pv-recycler-timeout-nfs", s.VolumeConfig.PersistentVolumeRecyclerTimeoutNFS, "The minimum timeout for an NFS PV recycling operation")
 	fs.DurationVar(&s.HorizontalPodAutoscalerSyncPeriod, "horizontal-pod-autoscaler-sync-period", s.HorizontalPodAutoscalerSyncPeriod, "The period for syncing the number of pods in horizontal pod autoscaler.")
+	fs.DurationVar(&s.DeploymentControllerSyncPeriod, "deployment-controller-sync-period", s.DeploymentControllerSyncPeriod, "Period for syncing the deployments.")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod-eviction-timeout", s.PodEvictionTimeout, "The grace period for deleting pods on failed nodes.")
 	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
 	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
@@ -168,6 +174,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.BoolVar(&s.EnableHorizontalPodAutoscaler, "enable-horizontal-pod-autoscaler", s.EnableHorizontalPodAutoscaler, "Enables horizontal pod autoscaler (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
+	fs.BoolVar(&s.EnableDeploymentController, "enable-deployment-controller", s.EnableDeploymentController, "Enables deployment controller (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
 }
 
 // Run runs the CMServer.  This should never exit.
@@ -249,13 +256,17 @@ func (s *CMServer) Run(_ []string) error {
 	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
 	// An OR of all flags to enable/disable experimental features
-	experimentalMode := s.EnableHorizontalPodAutoscaler
+	experimentalMode := s.EnableHorizontalPodAutoscaler || s.EnableDeploymentController
 	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, experimentalMode, s.NamespaceSyncPeriod)
 	namespaceController.Run()
 
 	if s.EnableHorizontalPodAutoscaler {
 		horizontalPodAutoscalerController := podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient))
 		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
+	}
+	if s.EnableDeploymentController {
+		deploymentController := deployment.New(kubeClient)
+		deploymentController.Run(s.DeploymentControllerSyncPeriod)
 	}
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
