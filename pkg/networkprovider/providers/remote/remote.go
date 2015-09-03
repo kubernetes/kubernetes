@@ -69,12 +69,17 @@ func (p *Plugin) CheckTenantID(tenantID string) (bool, error) {
 	return ret.Result, nil
 }
 
-// Networks returns an network interface
+// Network interface is self
 func (p *Plugin) Networks() networkprovider.Networks {
 	return p
 }
 
-// LoadBalancer returns a balancer interface
+// Pods interface is self
+func (p *Plugin) Pods() networkprovider.Pods{
+	return p
+}
+
+// LoadBalancer interface is self
 func (p *Plugin) LoadBalancers() networkprovider.LoadBalancers {
 	return p
 }
@@ -246,4 +251,73 @@ func (p *Plugin) DeleteLoadBalancer(name string) error {
 	}
 
 	return nil
+}
+
+// Setup pod
+func (p *Plugin) SetupPod(podName, namespace, podInfraContainerID string, network *networkprovider.Network) error {
+	ret := SetupPodResponse{}
+	args := SetupPodRequest{
+		PodName: podName,
+		Namespace: namespace,
+		PodInfraContainerID: podInfraContainerID,
+		Network: network,
+	}
+	err := p.Client.Call(SetupPodMethod, args, &ret)
+	if err != nil {
+		glog.Warningf("NetworkProvider setup pod %s failed: %v", podName, err)
+		return err
+	}
+
+	if ret.GetError() != "" {
+		glog.Warningf("NetworkProvider setup pod %s failed: %v", podName, ret.GetError())
+		return errors.New(ret.GetError())
+	}
+
+	return nil
+}
+
+// Teardown pod
+func (p *Plugin) TeardownPod(podName, namespace, podInfraContainerID string, network *networkprovider.Network) error {
+	ret := TeardownPodResponse{}
+	args := TeardownPodRequest{
+		PodName: podName,
+		Namespace: namespace,
+		PodInfraContainerID: podInfraContainerID,
+		Network: network,
+	}
+	err := p.Client.Call(TeardownPodMethod, args, &ret)
+	if err != nil {
+		glog.Warningf("NetworkProvider teardown pod %s failed: %v", podName, err)
+		return err
+	}
+
+	if ret.GetError() != "" {
+		glog.Warningf("NetworkProvider teardown pod %s failed: %v", podName, ret.GetError())
+		return errors.New(ret.GetError())
+	}
+
+	return nil
+}
+
+// Status of pod
+func (p *Plugin) PodStatus(podName, namespace, podInfraContainerID string, network *networkprovider.Network) (string, error) {
+	ret := PodStatusResponse{}
+	args := PodStatusRequest{
+		PodName: podName,
+		Namespace: namespace,
+		PodInfraContainerID: podInfraContainerID,
+		Network: network,
+	}
+	err := p.Client.Call(PodStatudMethod, args, &ret)
+	if err != nil {
+		glog.Warningf("NetworkProvider get status of pod %s failed: %v", podName, err)
+		return "", err
+	}
+
+	if ret.GetError() != "" {
+		glog.Warningf("NetworkProvider get status of pod %s failed: %v", podName, ret.GetError())
+		return "", errors.New(ret.GetError())
+	}
+
+	return ret.Result.IP, nil
 }

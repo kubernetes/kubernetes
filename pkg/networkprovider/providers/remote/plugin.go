@@ -25,6 +25,7 @@ import (
 )
 
 const (
+	// NetworkController methods
 	ActivateMethod           = "Activate"
 	GetNetworkMethod         = "GetNetwork"
 	CreateNetworkMethod      = "CreateNetwork"
@@ -35,6 +36,11 @@ const (
 	CreateLoadBalancerMethod = "CreateLoadBalancer"
 	UpdateLoadBalancerMethod = "UpdateLoadBalancer"
 	DeleteLoadBalancerMethod = "DeleteLoadBalancer"
+
+	// Kubelet methods
+	SetupPodMethod			 = "SetupPod"
+	TeardownPodMethod		 = "TeardownPod"
+	PodStatudMethod			 = "PodStatus"
 )
 
 var (

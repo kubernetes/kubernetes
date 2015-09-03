@@ -31,7 +31,9 @@ var ErrMultipleResults = errors.New("MultipleResults")
 
 // Interface is an abstract, pluggable interface for network providers.
 type Interface interface {
-	// Networks returns an network interface
+	// Pods returns a pod interface
+	Pods() Pods
+	// Networks returns a network interface
 	Networks() Networks
 	// LoadBalancer returns a balancer interface
 	LoadBalancers() LoadBalancers
@@ -84,6 +86,15 @@ type Route struct {
 	// Destination CIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string `json:"destinationCIDR,omitempty"`
+}
+
+type Pods interface {
+	// Setup pod
+	SetupPod(podName, namespace, podInfraContainerID string, network *Network) error
+	// Teardown pod
+	TeardownPod(podName, namespace, podInfraContainerID string, network *Network) error
+	// Status of pod
+	PodStatus(podName, namespace, podInfraContainerID string, network *Network) (string, error)
 }
 
 // Networks is an abstract, pluggable interface for network segment

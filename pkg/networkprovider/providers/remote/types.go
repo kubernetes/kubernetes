@@ -122,3 +122,41 @@ type DeleteLoadBalancerRequest struct {
 type DeleteLoadBalancerResponse struct {
 	Response
 }
+
+type SetupPodRequest struct {
+	PodName				string	`json:"podName"`
+	Namespace   		string	`json:"namespace"`
+	PodInfraContainerID string	`json:"podInfraContainerID"`
+	Network 			*networkprovider.Network	`json:"network"`
+}
+
+type SetupPodResponse struct {
+	Response
+}
+
+type TeardownPodRequest struct {
+	PodName				string	`json:"podName"`
+	Namespace   		string	`json:"namespace"`
+	PodInfraContainerID string	`json:"podInfraContainerID"`
+	Network 			*networkprovider.Network	`json:"network"`
+}
+
+type TeardownPodResponse struct {
+	Response
+}
+
+type PodStatusRequest struct {
+	PodName				string	`json:"podName"`
+	Namespace   		string	`json:"namespace"`
+	PodInfraContainerID string	`json:"podInfraContainerID"`
+	Network 			*networkprovider.Network	`json:"network"`
+}
+
+type PodStatusResult struct {
+	IP string `json:"IP,omitempty"`
+}
+
+type PodStatusResponse struct {
+	Result *PodStatusResult `json:"Result"`
+	Response
+}

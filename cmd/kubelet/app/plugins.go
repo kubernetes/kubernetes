@@ -23,6 +23,10 @@ import (
 	// Network plugins
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/exec"
+	"k8s.io/kubernetes/pkg/kubelet/network/remote"
+	// NetworkProviders
+	"k8s.io/kubernetes/pkg/networkprovider"
+	networkProviders "k8s.io/kubernetes/pkg/networkprovider/providers"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
@@ -42,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/secret"
 	//Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+
 )
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
@@ -80,4 +85,14 @@ func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
 	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins(pluginDir)...)
 
 	return allPlugins
+}
+
+// ProbeNetworkProviders collects all networkproviders
+func ProbeNetworkProviders() {
+	networkProviders.ProbeNetworkProviders()
+}
+
+// NetworkProvider network plugin
+func NewRemoteNetworkPlugin(provider networkprovider.Interface) network.NetworkPlugin {
+	return remote.NewRemoteNetworkPlugin(provider)
 }
