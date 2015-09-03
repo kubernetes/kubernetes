@@ -445,7 +445,7 @@ func (p *Parser) parse() ([]Requirement, error) {
 		case IdentifierToken:
 			r, err := p.parseRequirement()
 			if err != nil {
-				return nil, fmt.Errorf("unable to parse requiremnt: %v", err)
+				return nil, fmt.Errorf("unable to parse requirement: %v", err)
 			}
 			requirements = append(requirements, *r)
 			t, l := p.consume(Values)
