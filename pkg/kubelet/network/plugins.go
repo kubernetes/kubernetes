@@ -20,12 +20,14 @@ import (
 	"github.com/golang/glog"
 	"github.com/appc/cni"
 	cniTypes "github.com/appc/cni/pkg/types"
+	"fmt"
 )
 
 const (
-	DefaultPluginName = "kubernetes.io/no-op"
+	DefaultPluginName = "kubernetes-bridge"
 	DefaultNetDir = "/etc/cni/net.d"
 	DefaultCNIDir = "/opt/cni/bin"
+	VendorCNIDirTemplate = "/opt/%s/bin"
 )
 
 func AddNetwork(podName string, podNamespace string, podInfraContainerID string, podNetnsPath string, plugin NetworkPlugin) (*cniTypes.Result, error) {
@@ -85,9 +87,10 @@ func LoadNetworkPlugin(pluginName string) (NetworkPlugin, error) {
 	}
 	glog.V(2).Infof("Loaded network config")
 
+	// Search for vendor-specific plugins as well as default plugins in the CNI codebase.
+	vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, pluginName)
 	cninet := &cni.CNIConfig{
-		Path: []string{DefaultCNIDir},
-		// TODO-PAT: Add vendor path, too?
+		Path: []string{vendorCNIDir, DefaultCNIDir},
 	}
 
 	return NetworkPlugin{pluginName, netconf, cninet}, nil
