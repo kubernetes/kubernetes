@@ -99,7 +99,7 @@ function verify-prereqs() {
     sudo_prefix="sudo"
   fi
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update "${CMD_GROUP}"|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update ${CMD_GROUP:-} || true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update kubectl|| true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
@@ -150,7 +150,7 @@ function kube-up() {
   )
 
   # Bring up the cluster.
-  "${GCLOUD}" "${CMD_GROUP}" container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+  "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -200,7 +200,7 @@ function test-setup() {
 function detect-master() {
   echo "... in gke:detect-master()" >&2
   detect-project >&2
-  KUBE_MASTER_IP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
+  KUBE_MASTER_IP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
 }
@@ -242,7 +242,7 @@ function detect-minion-names {
 #   NODE_INSTANCE_GROUP
 function detect-node-instance-group {
   echo "... in gke:detect-node-instance-group()" >&2
-  NODE_INSTANCE_GROUP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
+  NODE_INSTANCE_GROUP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep instanceGroupManagers | cut -d '/' -f 11)
 }
@@ -318,6 +318,6 @@ function test-teardown() {
 function kube-down() {
   echo "... in gke:kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" "${CMD_GROUP}" container clusters delete --project="${PROJECT}" \
+  "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
 }
