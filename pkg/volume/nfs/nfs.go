@@ -59,7 +59,8 @@ func (plugin *nfsPlugin) Name() string {
 }
 
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.NFS != nil || spec.PersistentVolumeSource.NFS != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
+		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -77,16 +78,16 @@ func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Builder, error) {
 	var source *api.NFSVolumeSource
 	var readOnly bool
-	if spec.VolumeSource.NFS != nil {
-		source = spec.VolumeSource.NFS
-		readOnly = spec.VolumeSource.NFS.ReadOnly
+	if spec.Volume != nil && spec.Volume.NFS != nil {
+		source = spec.Volume.NFS
+		readOnly = spec.Volume.NFS.ReadOnly
 	} else {
-		source = spec.PersistentVolumeSource.NFS
+		source = spec.PersistentVolume.Spec.NFS
 		readOnly = spec.ReadOnly
 	}
 	return &nfsBuilder{
 		nfs: &nfs{
-			volName: spec.Name,
+			volName: spec.Name(),
 			mounter: mounter,
 			pod:     pod,
 			plugin:  plugin,
@@ -236,13 +237,13 @@ func (c *nfsCleaner) TearDownAt(dir string) error {
 }
 
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
-	if spec.PersistentVolumeSource.NFS == nil {
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.NFS == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
 	}
 	return &nfsRecycler{
-		name:   spec.Name,
-		server: spec.PersistentVolumeSource.NFS.Server,
-		path:   spec.PersistentVolumeSource.NFS.Path,
+		name:   spec.Name(),
+		server: spec.PersistentVolume.Spec.NFS.Server,
+		path:   spec.PersistentVolume.Spec.NFS.Path,
 		host:   host,
 	}, nil
 }

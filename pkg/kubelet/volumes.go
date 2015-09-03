@@ -73,7 +73,7 @@ func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mou
 		// Not found but not an error
 		return nil, nil
 	}
-	c, err := plugin.NewCleaner(spec.Name, podUID, mounter)
+	c, err := plugin.NewCleaner(spec.Name(), podUID, mounter)
 	if err == nil && c == nil {
 		return nil, errUnsupportedVolumeType
 	}
@@ -87,7 +87,7 @@ func (vh *volumeHost) GetCloudProvider() cloudprovider.Interface {
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name, err)
+		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
 	}
 	if plugin == nil {
 		// Not found but not an error
@@ -95,9 +95,9 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, 
 	}
 	builder, err := plugin.NewBuilder(spec, pod, opts, mounter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spec.Name, err)
+		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spec.Name(), err)
 	}
-	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spec.Name)
+	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spec.Name())
 	return builder, nil
 }
 

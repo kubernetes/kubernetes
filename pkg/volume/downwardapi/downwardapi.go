@@ -61,19 +61,19 @@ func (plugin *downwardAPIPlugin) Name() string {
 }
 
 func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.DownwardAPI != nil
+	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
 func (plugin *downwardAPIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	v := &downwardAPIVolume{
-		volName: spec.Name,
+		volName: spec.Name(),
 		pod:     pod,
 		podUID:  pod.UID,
 		plugin:  plugin,
 		mounter: mounter,
 	}
 	v.fieldReferenceFileNames = make(map[string]string)
-	for _, fileInfo := range spec.VolumeSource.DownwardAPI.Items {
+	for _, fileInfo := range spec.Volume.DownwardAPI.Items {
 		v.fieldReferenceFileNames[fileInfo.FieldRef.FieldPath] = path.Clean(fileInfo.Path)
 	}
 	return &downwardAPIVolumeBuilder{
@@ -97,8 +97,7 @@ type downwardAPIVolume struct {
 
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
-	Name:         "not-used",
-	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}},
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
 }
 
 // downwardAPIVolumeBuilder fetches info from downward API from the pod

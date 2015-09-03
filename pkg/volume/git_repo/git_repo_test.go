@@ -51,7 +51,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
 }
