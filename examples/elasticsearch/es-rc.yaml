@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: es
+  labels:
+    component: elasticsearch
+spec:
+  replicas: 1
+  selector:
+    component: elasticsearch
+  template:
+    metadata:
+      labels:
+        component: elasticsearch
+    spec:
+      serviceAccount: elasticsearch
+      containers:
+      - name: es
+        securityContext:
+          capabilities:
+            add:
+              - IPC_LOCK
+        image: quay.io/pires/docker-elasticsearch-kubernetes:1.7.1-4
+        env:
+        - name: KUBERNETES_CA_CERTIFICATE_FILE
+          value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: "CLUSTER_NAME"
+          value: "myesdb"
+        - name: "DISCOVERY_SERVICE"
+          value: "elasticsearch"
+        - name: NODE_MASTER
+          value: "true"
+        - name: NODE_DATA
+          value: "true"
+        - name: HTTP_ENABLE
+          value: "true"
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data
+          name: storage
+      volumes:
+      - name: storage
+        source:
+          emptyDir: {}
