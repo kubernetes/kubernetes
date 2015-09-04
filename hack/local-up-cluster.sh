@@ -25,6 +25,24 @@ ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+# Overlay settings
+USE_OVERLAY=${USE_OVERLAY:-"false"}
+if [ "${USE_OVERLAY}" == "true" ]; then
+    HOST_ADDRESS=$(hostname -i)
+    ALLOCATE_NODE_CIDRS="true"
+else
+    HOST_ADDRESS="127.0.0.1"
+fi
+FLANNEL_SUBNET_FILE=${FLANNEL_SUBNET_FILE:-"/var/run/flannel/subnet.env"}
+FLANNEL_SERVER=${FLANNEL_SERVER:-"127.0.0.1:8081"}
+CONFIGURE_CBR0=${CONFIGURE_CBR0:-"false"}
+HOSTNAME_OVERRIDE=${HOST_ADDRESS}
+# This needs to match what's in the flannel network config if USE_OVERLAY
+CLUSTER_CIDR=${CLUSTER_CIDR:-"10.0.0.0/16"}
+ALLOCATE_NODE_CIDRS=${ALLOCATE_NODE_CIDRS:-"false"}
+FLANNEL_NETWORK_CONFIG=${FLANNEL_NETWORK_CONFIG:-"./cluster/saltbase/salt/flannel/network.json"}
+
 cd "${KUBE_ROOT}"
 
 if [ "$(id -u)" != "0" ]; then
@@ -179,6 +197,13 @@ cleanup()
   [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(pgrep -P ${SCHEDULER_PID} ; ps -o pid= -p ${SCHEDULER_PID})
   [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
 
+  # Check if flannel is still running
+  [[ -n "${FLANNEL_PID-}" ]] && FLANNEL_PIDS=$(pgrep -P ${FLANNEL_PID} ; ps -o pid= -p ${FLANNEL_PID})
+  [[ -n "${FLANNEL_DOCKER_PID-}" ]] && FLANNEL_DOCKER_PIDS=$(pgrep -P ${FLANNEL_DOCKER_PID} ; ps -o pid= -p ${FLANNEL_DOCKER_PID})
+  [[ -n "${FLANNEL_DOCKER_PIDS-}" ]] && sudo kill ${FLANNEL_DOCKER_PIDS} && sudo service docker start
+  [[ -n "${FLANNEL_PIDS-}" ]] && sudo kill ${FLANNEL_PIDS}
+  [[ -f ${FLANNEL_SUBNET_FILE} ]] && sudo rm -rf ${FLANNEL_SUBNET_FILE}
+
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
   [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
@@ -189,6 +214,36 @@ cleanup()
 function startETCD {
     echo "Starting etcd"
     kube::etcd::start
+}
+
+function start_flannel {
+    if [[  ! $(which flanneld) ]]; then
+        echo "Please install flanneld"
+        exit 1
+    fi
+    echo "Starting flannel"
+
+    # Hand manage docker so we don't mess with localhost settings like /etc/defaults
+    # TODO: Figure out how to test the kubelet->flannel handshake with a local cluster.
+    sudo service docker stop
+
+    FLANNEL_LOG=/tmp/flannel.log
+    FLANNEL_OPTIONS=${FLANNEL_OPTIONS:-"-subnet-file ${FLANNEL_SUBNET_FILE} -remote ${FLANNEL_SERVER}"}
+    sudo flanneld ${FLANNEL_OPTIONS} > "${FLANNEL_LOG}" 2>&1 &
+    FLANNEL_PID=$!
+    while [ ! -f ${FLANNEL_SUBNET_FILE} ]
+    do
+        echo "Waiting for flannel to initialize subnet in ${FLANNEL_SUBNET_FILE}"
+        sleep 1
+    done
+    echo "Flannel subnet file:"
+    cat ${FLANNEL_SUBNET_FILE}
+    source ${FLANNEL_SUBNET_FILE}
+
+    sudo ip link delete docker0
+    DOCKER_LOG=/tmp/docker.log
+    sudo docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} --ip-masq=false --iptables=false > "${DOCKER_LOG}" 2>&1 &
+    FLANNEL_DOCKER_PID=$!
 }
 
 function set_service_accounts {
@@ -247,6 +302,8 @@ function start_controller_manager {
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
+      --cluster-cidr="${CLUSTER_CIDR}" \
+      --allocate-node-cidrs="${ALLOCATE_NODE_CIDRS}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -260,10 +317,14 @@ function start_kubelet {
         --container-runtime="${CONTAINER_RUNTIME}" \
         --rkt-path="${RKT_PATH}" \
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
-        --hostname-override="127.0.0.1" \
-        --address="127.0.0.1" \
+        --hostname-override="${HOSTNAME_OVERRIDE}" \
+        --address="${HOST_ADDRESS}" \
+        --pod-cidr="${POD_CIDR}" \
+        --configure-cbr0="${CONFIGURE_CBR0}" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --use-default-overlay="${USE_OVERLAY}" \
+        --network-config="${FLANNEL_NETWORK_CONFIG}" \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
@@ -333,11 +394,20 @@ echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 trap cleanup EXIT
 echo "Starting services now!"
+
+# This is just to get the password prompt out of the way
+# since input gets garbled when multiple background services
+# ask for a password.
+sudo echo "Password test"
+
 startETCD
 set_service_accounts
 start_apiserver
 start_controller_manager
 start_kubelet
+if [ "${USE_OVERLAY}" == "true" ]; then
+    start_flannel
+fi
 start_kubeproxy
 print_success
 
