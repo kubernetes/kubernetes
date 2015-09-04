@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 // GetPrinter takes a format type, an optional format argument. It will return true
@@ -902,7 +901,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 		claimRefUID += pv.Spec.ClaimRef.Name
 	}
 
-	modesStr := volume.GetAccessModesAsString(pv.Spec.AccessModes)
+	modesStr := api.GetAccessModesAsString(pv.Spec.AccessModes)
 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.String()
@@ -947,7 +946,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, wit
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
-		accessModes = volume.GetAccessModesAsString(pvc.Status.AccessModes)
+		accessModes = api.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
