@@ -365,7 +365,7 @@ func TestSimpleStop(t *testing.T) {
 	}
 	for _, test := range tests {
 		fake := test.fake
-		reaper, err := ReaperFor(test.kind, fake, nil)
+		reaper, err := ReaperFor(test.kind, fake)
 		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}

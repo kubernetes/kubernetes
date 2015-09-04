@@ -171,10 +171,6 @@ func (c *Fake) ReplicationControllers(namespace string) client.ReplicationContro
 	return &FakeReplicationControllers{Fake: c, Namespace: namespace}
 }
 
-func (c *Fake) Daemons(namespace string) client.DaemonInterface {
-	return &FakeDaemons{Fake: c, Namespace: namespace}
-}
-
 func (c *Fake) Nodes() client.NodeInterface {
 	return &FakeNodes{Fake: c}
 }
@@ -219,6 +215,10 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
+func (c *Fake) Experimental() client.ExperimentalInterface {
+	return &FakeExperimental{c}
+}
+
 func (c *Fake) ServerVersion() (*version.Info, error) {
 	action := ActionImpl{}
 	action.Verb = "get"
@@ -240,4 +240,24 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
+}
+
+type FakeExperimental struct {
+	*Fake
+}
+
+func (c *FakeExperimental) Daemons(namespace string) client.DaemonInterface {
+	return &FakeDaemons{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeExperimental) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
+	panic("unimplemented")
+}
+
+func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
+	panic("unimplemented")
+}
+
+func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterface {
+	panic("unimplemented")
 }
