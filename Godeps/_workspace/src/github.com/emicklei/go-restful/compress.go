@@ -73,15 +73,13 @@ func NewCompressingResponseWriter(httpWriter http.ResponseWriter, encoding strin
 	c.writer = httpWriter
 	var err error
 	if ENCODING_GZIP == encoding {
-		c.compressor, err = gzip.NewWriterLevel(httpWriter, gzip.BestSpeed)
-		if err != nil {
-			return nil, err
-		}
+		w := GzipWriterPool.Get().(*gzip.Writer)
+		w.Reset(httpWriter)
+		c.compressor = w
 	} else if ENCODING_DEFLATE == encoding {
-		c.compressor, err = zlib.NewWriterLevel(httpWriter, zlib.BestSpeed)
-		if err != nil {
-			return nil, err
-		}
+		w := ZlibWriterPool.Get().(*zlib.Writer)
+		w.Reset(httpWriter)
+		c.compressor = w
 	} else {
 		return nil, errors.New("Unknown encoding:" + encoding)
 	}
