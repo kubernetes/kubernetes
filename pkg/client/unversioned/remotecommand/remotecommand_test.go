@@ -19,7 +19,7 @@ package remotecommand
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
 
-func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, errorData string, tty bool) http.HandlerFunc {
+func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, errorData string, tty bool, messageCount int) http.HandlerFunc {
 	// error + stdin + stdout
 	expectedStreams := 3
 	if !tty {
@@ -70,7 +70,6 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 					receivedStreams++
 				case api.StreamTypeStdin:
 					stdinStream = stream
-					stdinStream.Close()
 					receivedStreams++
 				case api.StreamTypeStdout:
 					stdoutStream = stream
@@ -82,8 +81,6 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 					t.Errorf("%d: unexpected stream type: %q", i, streamType)
 				}
 
-				defer stream.Reset()
-
 				if receivedStreams == expectedStreams {
 					break WaitForStreams
 				}
@@ -91,37 +88,67 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 		}
 
 		if len(errorData) > 0 {
-			fmt.Fprint(errorStream, errorData)
+			n, err := fmt.Fprint(errorStream, errorData)
+			if err != nil {
+				t.Errorf("%d: error writing to errorStream: %v", i, err)
+			}
+			if e, a := len(errorData), n; e != a {
+				t.Errorf("%d: expected to write %d bytes to errorStream, but only wrote %d", i, e, a)
+			}
 			errorStream.Close()
 		}
 
 		if len(stdoutData) > 0 {
-			fmt.Fprint(stdoutStream, stdoutData)
+			for j := 0; j < messageCount; j++ {
+				n, err := fmt.Fprint(stdoutStream, stdoutData)
+				if err != nil {
+					t.Errorf("%d: error writing to stdoutStream: %v", i, err)
+				}
+				if e, a := len(stdoutData), n; e != a {
+					t.Errorf("%d: expected to write %d bytes to stdoutStream, but only wrote %d", i, e, a)
+				}
+			}
 			stdoutStream.Close()
 		}
 		if len(stderrData) > 0 {
-			fmt.Fprint(stderrStream, stderrData)
+			for j := 0; j < messageCount; j++ {
+				n, err := fmt.Fprint(stderrStream, stderrData)
+				if err != nil {
+					t.Errorf("%d: error writing to stderrStream: %v", i, err)
+				}
+				if e, a := len(stderrData), n; e != a {
+					t.Errorf("%d: expected to write %d bytes to stderrStream, but only wrote %d", i, e, a)
+				}
+			}
 			stderrStream.Close()
 		}
 		if len(stdinData) > 0 {
-			data, err := ioutil.ReadAll(stdinStream)
-			if err != nil {
-				t.Errorf("%d: error reading stdin stream: %v", i, err)
+			data := make([]byte, len(stdinData))
+			for j := 0; j < messageCount; j++ {
+				n, err := io.ReadFull(stdinStream, data)
+				if err != nil {
+					t.Errorf("%d: error reading stdin stream: %v", i, err)
+				}
+				if e, a := len(stdinData), n; e != a {
+					t.Errorf("%d: expected to read %d bytes from stdinStream, but only read %d", i, e, a)
+				}
+				if e, a := stdinData, string(data); e != a {
+					t.Errorf("%d: stdin: expected %q, got %q", i, e, a)
+				}
 			}
-			if e, a := stdinData, string(data); e != a {
-				t.Errorf("%d: stdin: expected %q, got %q", i, e, a)
-			}
+			stdinStream.Close()
 		}
 	})
 }
 
 func TestRequestExecuteRemoteCommand(t *testing.T) {
 	testCases := []struct {
-		Stdin  string
-		Stdout string
-		Stderr string
-		Error  string
-		Tty    bool
+		Stdin        string
+		Stdout       string
+		Stderr       string
+		Error        string
+		Tty          bool
+		MessageCount int
 	}{
 		{
 			Error: "bail",
@@ -130,6 +157,15 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 			Stdin:  "a",
 			Stdout: "b",
 			Stderr: "c",
+			// TODO bump this to a larger number such as 100 once
+			// https://github.com/docker/spdystream/issues/55 is fixed and the Godep
+			// is bumped. Sending multiple messages over stdin/stdout/stderr results
+			// in more frames being spread across multiple spdystream frame workers.
+			// This makes it more likely that the spdystream bug will be encountered,
+			// where streams are closed as soon as a goaway frame is received, and
+			// any pending frames that haven't been processed yet may not be
+			// delivered (it's a race).
+			MessageCount: 1,
 		},
 		{
 			Stdin:  "a",
@@ -142,7 +178,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		localOut := &bytes.Buffer{}
 		localErr := &bytes.Buffer{}
 
-		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty))
+		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount))
 
 		url, _ := url.ParseRequestURI(server.URL)
 		c := client.NewRESTClient(url, "x", nil, -1, -1)
@@ -151,8 +187,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		conf := &client.Config{
 			Host: server.URL,
 		}
-		e := New(req, conf, []string{"ls", "/"}, strings.NewReader(testCase.Stdin), localOut, localErr, testCase.Tty)
-		//e.upgrader = testCase.Upgrader
+		e := New(req, conf, []string{"ls", "/"}, strings.NewReader(strings.Repeat(testCase.Stdin, testCase.MessageCount)), localOut, localErr, testCase.Tty)
 		err := e.Execute()
 		hasErr := err != nil
 
@@ -176,13 +211,13 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		}
 
 		if len(testCase.Stdout) > 0 {
-			if e, a := testCase.Stdout, localOut; e != a.String() {
+			if e, a := strings.Repeat(testCase.Stdout, testCase.MessageCount), localOut; e != a.String() {
 				t.Errorf("%d: expected stdout data '%s', got '%s'", i, e, a)
 			}
 		}
 
 		if testCase.Stderr != "" {
-			if e, a := testCase.Stderr, localErr; e != a.String() {
+			if e, a := strings.Repeat(testCase.Stderr, testCase.MessageCount), localErr; e != a.String() {
 				t.Errorf("%d: expected stderr data '%s', got '%s'", i, e, a)
 			}
 		}
@@ -219,7 +254,7 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		localOut := &bytes.Buffer{}
 		localErr := &bytes.Buffer{}
 
-		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty))
+		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, 1))
 
 		url, _ := url.ParseRequestURI(server.URL)
 		c := client.NewRESTClient(url, "x", nil, -1, -1)
@@ -229,7 +264,6 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 			Host: server.URL,
 		}
 		e := NewAttach(req, conf, strings.NewReader(testCase.Stdin), localOut, localErr, testCase.Tty)
-		//e.upgrader = testCase.Upgrader
 		err := e.Execute()
 		hasErr := err != nil
 
