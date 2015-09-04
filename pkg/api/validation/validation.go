@@ -1079,10 +1079,19 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		return allErrs
 	}
 	pod := *newPod
+	restartPolicyNever := oldPod.Spec.RestartPolicy == api.RestartPolicyNever
 	// Tricky, we need to copy the container list so that we don't overwrite the update
 	var newContainers []api.Container
 	for ix, container := range pod.Spec.Containers {
 		container.Image = oldPod.Spec.Containers[ix].Image
+		oldContainerResources := oldPod.Spec.Containers[ix].Resources
+		if restartPolicyNever {
+			if !api.Semantic.DeepEqual(newPod.Spec.Containers[ix].Resources, oldContainerResources) {
+				allErrs = append(allErrs, errs.NewFieldInvalid("spec.restartpolicy", newPod.Spec.RestartPolicy, "may not update resources of pods with restartPolicy: Never"))
+				return allErrs
+			}
+		}
+		container.Resources = oldContainerResources
 		newContainers = append(newContainers, container)
 	}
 	pod.Spec.Containers = newContainers

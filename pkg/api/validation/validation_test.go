@@ -1564,8 +1564,40 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
+			true,
+			"cpu change with default restartPolicy",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyNever,
+					Containers: []api.Container{
+						{
+							Image: "foo:V1",
+							Resources: api.ResourceRequirements{
+								Limits: getResourceLimits("100m", "0"),
+							},
+						},
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyNever,
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
+							Resources: api.ResourceRequirements{
+								Limits: getResourceLimits("1000m", "0"),
+							},
+						},
+					},
+				},
+			},
 			false,
-			"cpu change",
+			"cpu change with restartPolicy: Never",
 		},
 		{
 			api.Pod{
