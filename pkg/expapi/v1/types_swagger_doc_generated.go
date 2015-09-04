@@ -260,6 +260,15 @@ func (ThirdPartyResourceData) SwaggerDoc() map[string]string {
 	return map_ThirdPartyResourceData
 }
 
+var map_ThirdPartyResourceDataList = map[string]string{
+	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is a list of third party objects",
+}
+
+func (ThirdPartyResourceDataList) SwaggerDoc() map[string]string {
+	return map_ThirdPartyResourceDataList
+}
+
 var map_ThirdPartyResourceList = map[string]string{
 	"metadata": "Standard list metadata.",
 	"items":    "Items is the list of horizontal pod autoscalers.",
