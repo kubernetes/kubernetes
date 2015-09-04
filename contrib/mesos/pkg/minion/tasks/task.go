@@ -214,10 +214,7 @@ func notStartedTask(t *Task) taskStateFn {
 	if len(t.env) > 0 {
 		cmd.Env = t.env
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid:   true,
-		Pdeathsig: syscall.SIGKILL, // see cmdProcess.Kill
-	}
+	cmd.SysProcAttr = sysProcAttr()
 
 	// last min check for shouldQuit here
 	select {
