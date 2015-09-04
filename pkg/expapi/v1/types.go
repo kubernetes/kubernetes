@@ -343,7 +343,10 @@ type DaemonList struct {
 
 type ThirdPartyResourceDataList struct {
 	v1.TypeMeta `json:",inline"`
-	v1.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+	// Standard list metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	v1.ListMeta `json:"metadata,omitempty"`
 
-	Items []ThirdPartyResourceData `json:"items" description:"items is a list of third party objects"`
+	// Items is a list of third party objects
+	Items []ThirdPartyResourceData `json:"items"`
 }
