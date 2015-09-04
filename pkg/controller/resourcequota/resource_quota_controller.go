@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequotacontroller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -163,18 +164,6 @@ func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 		switch k {
 		case api.ResourcePods:
 			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
-		case api.ResourceMemory:
-			val := int64(0)
-			for _, pod := range filteredPods {
-				val = val + PodMemory(pod).Value()
-			}
-			value = resource.NewQuantity(int64(val), resource.DecimalSI)
-		case api.ResourceCPU:
-			val := int64(0)
-			for _, pod := range filteredPods {
-				val = val + PodCPU(pod).MilliValue()
-			}
-			value = resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 		case api.ResourceServices:
 			items, err := rm.kubeClient.Services(usage.Namespace).List(labels.Everything())
 			if err != nil {
@@ -205,6 +194,10 @@ func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
+		case api.ResourceMemory:
+			value = PodsRequests(filteredPods, api.ResourceMemory)
+		case api.ResourceCPU:
+			value = PodsRequests(filteredPods, api.ResourceCPU)
 		}
 
 		// ignore fields we do not understand (assume another controller is tracking it)
@@ -224,7 +217,73 @@ func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 	return nil
 }
 
-// PodCPU computes total cpu usage of a pod
+// PodsRequests returns sum of each resource request for each pod in list
+// If a given pod in the list does not have a request for the named resource, we log the error
+// but still attempt to get the most representative count
+func PodsRequests(pods []*api.Pod, resourceName api.ResourceName) *resource.Quantity {
+	var sum *resource.Quantity
+	for i := range pods {
+		pod := pods[i]
+		podQuantity, err := PodRequests(pod, resourceName)
+		if err != nil {
+			// log the error, but try to keep the most accurate count possible in log
+			// rationale here is that you may have had pods in a namespace that did not have
+			// explicit requests prior to adding the quota
+			glog.Infof("No explicit request for resource, pod %s/%s, %s", pod.Namespace, pod.Name, resourceName)
+		} else {
+			if sum == nil {
+				sum = podQuantity
+			} else {
+				sum.Add(*podQuantity)
+			}
+		}
+	}
+	// if list is empty
+	if sum == nil {
+		q := resource.MustParse("0")
+		sum = &q
+	}
+	return sum
+}
+
+// PodRequests returns sum of each resource request across all containers in pod
+func PodRequests(pod *api.Pod, resourceName api.ResourceName) (*resource.Quantity, error) {
+	if !PodHasRequests(pod, resourceName) {
+		return nil, fmt.Errorf("Each container in pod %s/%s does not have an explicit request for resource %s.", pod.Namespace, pod.Name, resourceName)
+	}
+	var sum *resource.Quantity
+	for j := range pod.Spec.Containers {
+		value, _ := pod.Spec.Containers[j].Resources.Requests[resourceName]
+		if sum == nil {
+			sum = value.Copy()
+		} else {
+			err := sum.Add(value)
+			if err != nil {
+				return sum, err
+			}
+		}
+	}
+	// if list is empty
+	if sum == nil {
+		q := resource.MustParse("0")
+		sum = &q
+	}
+	return sum, nil
+}
+
+// PodHasRequests verifies that each container in the pod has an explicit request that is non-zero for a named resource
+func PodHasRequests(pod *api.Pod, resourceName api.ResourceName) bool {
+	for j := range pod.Spec.Containers {
+		value, valueSet := pod.Spec.Containers[j].Resources.Requests[resourceName]
+		if !valueSet || value.Value() == int64(0) {
+			return false
+		}
+	}
+	return true
+}
+
+// PodCPU computes total cpu limit across all containers in pod
+// TODO: Remove this once the mesos scheduler becomes request aware
 func PodCPU(pod *api.Pod) *resource.Quantity {
 	val := int64(0)
 	for j := range pod.Spec.Containers {
@@ -233,29 +292,8 @@ func PodCPU(pod *api.Pod) *resource.Quantity {
 	return resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 }
 
-// IsPodCPUUnbounded returns true if the cpu use is unbounded for any container in pod
-func IsPodCPUUnbounded(pod *api.Pod) bool {
-	for j := range pod.Spec.Containers {
-		container := pod.Spec.Containers[j]
-		if container.Resources.Limits.Cpu().MilliValue() == int64(0) {
-			return true
-		}
-	}
-	return false
-}
-
-// IsPodMemoryUnbounded returns true if the memory use is unbounded for any container in pod
-func IsPodMemoryUnbounded(pod *api.Pod) bool {
-	for j := range pod.Spec.Containers {
-		container := pod.Spec.Containers[j]
-		if container.Resources.Limits.Memory().Value() == int64(0) {
-			return true
-		}
-	}
-	return false
-}
-
-// PodMemory computes the memory usage of a pod
+// PodMemory computes total memory limit across all containers in a pod
+// TODO: Remove this once the mesos scheduler becomes request aware
 func PodMemory(pod *api.Pod) *resource.Quantity {
 	val := int64(0)
 	for j := range pod.Spec.Containers {
