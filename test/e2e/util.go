@@ -977,6 +977,11 @@ func (b kubectlBuilder) withStdinData(data string) *kubectlBuilder {
 	return &b
 }
 
+func (b kubectlBuilder) withStdinReader(reader io.Reader) *kubectlBuilder {
+	b.cmd.Stdin = reader
+	return &b
+}
+
 func (b kubectlBuilder) exec() string {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd

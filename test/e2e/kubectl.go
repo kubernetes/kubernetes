@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -158,11 +159,35 @@ var _ = Describe("Kubectl client", func() {
 		It("should support exec", func() {
 			By("executing a command in the container")
 			execOutput := runKubectl("exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", "running", "in", "container")
-			expectedExecOutput := "running in container"
-			if execOutput != expectedExecOutput {
-				Failf("Unexpected kubectl exec output. Wanted '%s', got '%s'", execOutput, expectedExecOutput)
+			if e, a := "running in container", execOutput; e != a {
+				Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
+			}
+
+			By("executing a command in the container with noninteractive stdin")
+			execOutput = newKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
+				withStdinData("abcd1234").
+				exec()
+			if e, a := "abcd1234", execOutput; e != a {
+				Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
+			}
+
+			// pretend that we're a user in an interactive shell
+			r, c, err := newBlockingReader("echo hi\nexit\n")
+			if err != nil {
+				Failf("Error creating blocking reader: %v", err)
+			}
+			// NOTE this is solely for test cleanup!
+			defer c.Close()
+
+			By("executing a command in the container with pseudo-interactive stdin")
+			execOutput = newKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "bash").
+				withStdinReader(r).
+				exec()
+			if e, a := "hi", execOutput; e != a {
+				Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 		})
+
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
 			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), simplePodName, fmt.Sprintf(":%d", simplePodPort))
@@ -790,4 +815,21 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 			return errors.New(fmt.Sprintf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected))
 		}
 	}
+}
+
+// newBlockingReader returns a reader that allows reading the given string,
+// then blocks until Close() is called on the returned closer.
+//
+// We're explicitly returning the reader and closer separately, because
+// the closer needs to be the *os.File we get from os.Pipe(). This is required
+// so the exec of kubectl can pass the underlying file descriptor to the exec
+// syscall, instead of creating another os.Pipe and blocking on the io.Copy
+// between the source (e.g. stdin) and the write half of the pipe.
+func newBlockingReader(s string) (io.Reader, io.Closer, error) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	w.Write([]byte(s))
+	return r, w, nil
 }
