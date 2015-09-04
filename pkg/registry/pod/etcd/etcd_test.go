@@ -34,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient) {
@@ -256,14 +254,10 @@ func TestResourceLocation(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	for _, tc := range testCases {
 		storage, _, _, fakeClient := newStorage(t)
-		key, _ := storage.Etcd.KeyFunc(ctx, "foo")
+		key, _ := storage.KeyFunc(ctx, tc.pod.Name)
 		key = etcdtest.AddPrefix(key)
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value: runtime.EncodeOrDie(testapi.Codec(), &tc.pod),
-				},
-			},
+		if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &tc.pod), 0); err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
 
 		redirector := rest.Redirector(storage)
@@ -281,33 +275,6 @@ func TestResourceLocation(t *testing.T) {
 		if location.Host != tc.location {
 			t.Errorf("Expected %v, but got %v", tc.location, location.Host)
 		}
-	}
-}
-
-func TestDeletePod(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	ctx := api.NewDefaultContext()
-	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Pod{
-					ObjectMeta: api.ObjectMeta{
-						Name:      "foo",
-						Namespace: api.NamespaceDefault,
-					},
-					Spec: api.PodSpec{NodeName: "machine"},
-				}),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
-		},
-	}
-	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -351,12 +318,7 @@ func TestEtcdCreate(t *testing.T) {
 	fakeClient.TestIndex = true
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
+	fakeClient.ExpectNotFoundGet(key)
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -395,12 +357,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
+	fakeClient.ExpectNotFoundGet(key)
 	// Assume that a pod has undergone the following:
 	// - Create (apiserver)
 	// - Schedule (scheduler)
@@ -443,12 +400,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	fakeClient.TestIndex = true
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
+	fakeClient.ExpectNotFoundGet(key)
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -490,12 +442,7 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := storage.KeyFunc(ctx, "foo")
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
+	fakeClient.ExpectNotFoundGet(key)
 
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
@@ -528,12 +475,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	fakeClient.TestIndex = true
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
+	fakeClient.ExpectNotFoundGet(key)
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -564,9 +506,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 }
 
 func TestEtcdCreateBinding(t *testing.T) {
-	storage, bindingStorage, _, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
-	fakeClient.TestIndex = true
 
 	testCases := map[string]struct {
 		binding api.Binding
@@ -609,14 +549,11 @@ func TestEtcdCreateBinding(t *testing.T) {
 		},
 	}
 	for k, test := range testCases {
+		storage, bindingStorage, _, fakeClient := newStorage(t)
 		key, _ := storage.KeyFunc(ctx, "foo")
 		key = etcdtest.AddPrefix(key)
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: nil,
-			},
-			E: tools.EtcdErrorNotFound,
-		}
+		fakeClient.ExpectNotFoundGet(key)
+
 		if _, err := storage.Create(ctx, validNewPod()); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}

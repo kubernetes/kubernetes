@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -544,7 +543,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, setFn SetFunc, getFn G
 func (t *Tester) testDeleteNonExist(obj runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(obj)
 
-	t.withStorageError(&etcd.EtcdError{ErrorCode: tools.EtcdErrorCodeNotFound}, func() {
+	t.withStorageError(tools.EtcdErrorNotFound, func() {
 		_, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.Name, nil)
 		if err == nil || !errors.IsNotFound(err) {
 			t.Errorf("unexpected error: %v", err)
