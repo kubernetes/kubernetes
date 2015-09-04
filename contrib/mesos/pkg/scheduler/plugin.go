@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -56,8 +55,9 @@ const (
 // scheduler abstraction to allow for easier unit testing
 type schedulerInterface interface {
 	sync.Locker // synchronize scheduler plugin operations
+
 	SlaveIndex
-	algorithm() PodScheduleFunc // see types.go
+	algorithm() PodScheduler
 	offers() offers.Registry
 	tasks() podtask.Registry
 
@@ -76,8 +76,8 @@ type k8smScheduler struct {
 	internal *KubernetesScheduler
 }
 
-func (k *k8smScheduler) algorithm() PodScheduleFunc {
-	return k.internal.scheduleFunc
+func (k *k8smScheduler) algorithm() PodScheduler {
+	return k.internal
 }
 
 func (k *k8smScheduler) offers() offers.Registry {
@@ -231,10 +231,8 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 }
 
 type kubeScheduler struct {
-	api                      schedulerInterface
-	podUpdates               queue.FIFO
-	defaultContainerCPULimit mresource.CPUShares
-	defaultContainerMemLimit mresource.MegaBytes
+	api        schedulerInterface
+	podUpdates queue.FIFO
 }
 
 // recoverAssignedSlave recovers the assigned Mesos slave from a pod by searching
@@ -318,7 +316,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		}
 	}
 	if err == nil && offer == nil {
-		offer, err = k.api.algorithm()(k.api.offers(), k.api, task)
+		offer, err = k.api.algorithm().SchedulePod(k.api.offers(), k.api, task)
 	}
 	if err != nil {
 		return "", err
@@ -338,18 +336,8 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 		}
 
-		// write resource limits into the pod spec which is transferred to the executor. From here
-		// on we can expect that the pod spec of a task has proper limits for CPU and memory.
-		// TODO(sttts): For a later separation of the kubelet and the executor also patch the pod on the apiserver
-		if unlimitedCPU := mresource.LimitPodCPU(&task.Pod, k.defaultContainerCPULimit); unlimitedCPU {
-			log.Warningf("Pod %s/%s without cpu limits is admitted %.2f cpu shares", task.Pod.Namespace, task.Pod.Name, mresource.PodCPULimit(&task.Pod))
-		}
-		if unlimitedMem := mresource.LimitPodMem(&task.Pod, k.defaultContainerMemLimit); unlimitedMem {
-			log.Warningf("Pod %s/%s without memory limits is admitted %.2f MB", task.Pod.Namespace, task.Pod.Name, mresource.PodMemLimit(&task.Pod))
-		}
-
 		task.Offer = offer
-		task.FillFromDetails(details)
+		k.api.algorithm().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
 
 		if err := k.api.tasks().Update(task); err != nil {
 			offer.Release()
@@ -556,7 +544,7 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 				defer k.api.Unlock()
 				switch task, state := k.api.tasks().Get(task.ID); state {
 				case podtask.StatePending:
-					return !task.Has(podtask.Launched) && task.AcceptOffer(offer)
+					return !task.Has(podtask.Launched) && k.api.algorithm().FitPredicate()(task, offer)
 				default:
 					// no point in continuing to check for matching offers
 					return true
@@ -698,10 +686,8 @@ func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *ht
 		Config: &plugin.Config{
 			MinionLister: nil,
 			Algorithm: &kubeScheduler{
-				api:                      kapi,
-				podUpdates:               podUpdates,
-				defaultContainerCPULimit: k.defaultContainerCPULimit,
-				defaultContainerMemLimit: k.defaultContainerMemLimit,
+				api:        kapi,
+				podUpdates: podUpdates,
 			},
 			Binder:   &binder{api: kapi},
 			NextPod:  q.yield,
