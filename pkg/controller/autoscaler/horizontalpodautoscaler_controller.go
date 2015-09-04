@@ -17,64 +17,33 @@ limitations under the License.
 package autoscalercontroller
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/autoscaler/metrics"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
-
-	heapster "k8s.io/heapster/api/v1/types"
-)
-
-const (
-	heapsterNamespace = "kube-system"
-	heapsterService   = "monitoring-heapster"
 )
 
 type HorizontalPodAutoscalerController struct {
-	client    client.Interface
-	expClient client.ExperimentalInterface
+	client        client.Interface
+	expClient     client.ExperimentalInterface
+	metricsClient metrics.MetricsClient
 }
 
-// Aggregates results into ResourceConsumption. Also returns number of
-// pods included in the aggregation.
-type metricAggregator func(heapster.MetricResultList) (expapi.ResourceConsumption, int)
-
-type metricDefinition struct {
-	name       string
-	aggregator metricAggregator
-}
-
-var resourceDefinitions = map[api.ResourceName]metricDefinition{
-	//TODO: add memory
-	api.ResourceCPU: {"cpu-usage",
-		func(metrics heapster.MetricResultList) (expapi.ResourceConsumption, int) {
-			sum, count := calculateSumFromLatestSample(metrics)
-			value := "0"
-			if count > 0 {
-				// assumes that cpu usage is in millis
-				value = fmt.Sprintf("%dm", sum/uint64(count))
-			}
-			return expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(value)}, count
-		}},
-}
-
-var heapsterQueryStart, _ = time.ParseDuration("-5m")
 var downscaleForbiddenWindow, _ = time.ParseDuration("20m")
 var upscaleForbiddenWindow, _ = time.ParseDuration("3m")
 
-func New(client client.Interface, expClient client.ExperimentalInterface) *HorizontalPodAutoscalerController {
+func New(client client.Interface, expClient client.ExperimentalInterface, metricsClient metrics.MetricsClient) *HorizontalPodAutoscalerController {
 	return &HorizontalPodAutoscalerController{
-		client:    client,
-		expClient: expClient,
+		client:        client,
+		expClient:     expClient,
+		metricsClient: metricsClient,
 	}
 }
 
@@ -100,57 +69,18 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 			glog.Warningf("Failed to query scale subresource for %s: %v", reference, err)
 			continue
 		}
-		podList, err := a.client.Pods(hpa.Spec.ScaleRef.Namespace).
-			List(labels.SelectorFromSet(labels.Set(scale.Status.Selector)), fields.Everything())
+		currentReplicas := scale.Status.Replicas
+		currentConsumption, err := a.metricsClient.ResourceConsumption(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.Target.Resource,
+			scale.Status.Selector)
 
+		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
-			glog.Warningf("Failed to get pod list for %s: %v", reference, err)
-			continue
-		}
-		podNames := []string{}
-		for _, pod := range podList.Items {
-			podNames = append(podNames, pod.Name)
-		}
-
-		metricSpec, metricDefined := resourceDefinitions[hpa.Spec.Target.Resource]
-		if !metricDefined {
-			glog.Warningf("Heapster metric not defined for %s %v", reference, hpa.Spec.Target.Resource)
-			continue
-		}
-		now := time.Now()
-
-		startTime := now.Add(heapsterQueryStart)
-		metricPath := fmt.Sprintf("/api/v1/model/namespaces/%s/pod-list/%s/metrics/%s",
-			hpa.Spec.ScaleRef.Namespace,
-			strings.Join(podNames, ","),
-			metricSpec.name)
-
-		resultRaw, err := a.client.Services(heapsterNamespace).
-			ProxyGet(heapsterService, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
-			DoRaw()
-
-		if err != nil {
-			glog.Warningf("Failed to get pods metrics for %s: %v", reference, err)
-			continue
-		}
-
-		var metrics heapster.MetricResultList
-		err = json.Unmarshal(resultRaw, &metrics)
-		if err != nil {
-			glog.Warningf("Failed to unmarshall heapster response: %v", err)
-			continue
-		}
-
-		glog.Infof("Metrics available for %s: %s", reference, string(resultRaw))
-
-		currentConsumption, count := metricSpec.aggregator(metrics)
-		if count != len(podList.Items) {
-			glog.Warningf("Metrics obtained for %d/%d of pods", count, len(podList.Items))
+			glog.Warningf("Error while getting metrics for %s: %v", reference, err)
 			continue
 		}
 
 		// if the ratio is 1.2 we want to have 2 replicas
-		desiredReplicas := 1 + int((currentConsumption.Quantity.MilliValue()*int64(count))/hpa.Spec.Target.Quantity.MilliValue())
+		desiredReplicas := 1 + int((currentConsumption.Quantity.MilliValue()*int64(currentReplicas))/hpa.Spec.Target.Quantity.MilliValue())
 
 		if desiredReplicas < hpa.Spec.MinCount {
 			desiredReplicas = hpa.Spec.MinCount
@@ -158,18 +88,17 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 		if desiredReplicas > hpa.Spec.MaxCount {
 			desiredReplicas = hpa.Spec.MaxCount
 		}
-
+		now := time.Now()
 		rescale := false
-
-		if desiredReplicas != count {
+		if desiredReplicas != currentReplicas {
 			// Going down
-			if desiredReplicas < count && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+			if desiredReplicas < currentReplicas && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
 				rescale = true
 			}
 
 			// Going up
-			if desiredReplicas > count && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+			if desiredReplicas > currentReplicas && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
 				rescale = true
 			}
@@ -185,9 +114,9 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 		}
 
 		status := expapi.HorizontalPodAutoscalerStatus{
-			CurrentReplicas:    count,
+			CurrentReplicas:    currentReplicas,
 			DesiredReplicas:    desiredReplicas,
-			CurrentConsumption: &currentConsumption,
+			CurrentConsumption: currentConsumption,
 		}
 		hpa.Status = &status
 		if rescale {
@@ -202,23 +131,4 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 		}
 	}
 	return nil
-}
-
-func calculateSumFromLatestSample(metrics heapster.MetricResultList) (uint64, int) {
-	sum := uint64(0)
-	count := 0
-	for _, metrics := range metrics.Items {
-		var newest *heapster.MetricPoint
-		newest = nil
-		for _, metricPoint := range metrics.Metrics {
-			if newest == nil || newest.Timestamp.Before(metricPoint.Timestamp) {
-				newest = &metricPoint
-			}
-		}
-		if newest != nil {
-			sum += newest.Value
-			count++
-		}
-	}
-	return sum, count
 }
