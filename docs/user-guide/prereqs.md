@@ -37,7 +37,7 @@ To deploy and manage applications on Kubernetes, you’ll use the Kubernetes com
 
 ## Installing kubectl
 
-If you downloaded a pre-compiled [release](https://github.com/GoogleCloudPlatform/kubernetes/releases), kubectl should be under `platforms/<os>/<arch>` from the tar bundle.
+If you downloaded a pre-compiled [release](https://github.com/kubernetes/kubernetes/releases), kubectl should be under `platforms/<os>/<arch>` from the tar bundle.
 
 If you built from source, kubectl should be either under `_output/local/bin/<os>/<arch>` or `_output/dockerized/bin/<os>/<arch>`.
 

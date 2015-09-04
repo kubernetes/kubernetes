@@ -69,7 +69,7 @@ Ubuntu 15 which use systemd instead of upstart. We are working around fixing thi
 First clone the kubernetes github repo
 
 ``` console
-$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+$ git clone https://github.com/kubernetes/kubernetes.git
 ```
 
 Then download all the needed binaries into given directory (cluster/ubuntu/binaries)

@@ -88,8 +88,8 @@ option to the apiserver during startup. The plugin is implemented in
 For details on how to use keystone to manage projects and users, refer to the
 [Keystone documentation](http://docs.openstack.org/developer/keystone/). Please note that
 this plugin is still experimental which means it is subject to changes.
-Please refer to the [discussion](https://github.com/GoogleCloudPlatform/kubernetes/pull/11798#issuecomment-129655212)
-and the [blueprint](https://github.com/GoogleCloudPlatform/kubernetes/issues/11626) for more details
+Please refer to the [discussion](https://github.com/kubernetes/kubernetes/pull/11798#issuecomment-129655212)
+and the [blueprint](https://github.com/kubernetes/kubernetes/issues/11626) for more details
 
 ## Plugin Development
 

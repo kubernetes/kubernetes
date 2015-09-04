@@ -106,7 +106,7 @@ EC2 with user data (cloud-config).
 ### Command line administration tool: `kubectl`
 
 The cluster startup script will leave you with a `kubernetes` directory on your workstation.
-Alternately, you can download the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+Alternately, you can download the latest Kubernetes release from [this page](https://github.com/kubernetes/kubernetes/releases).
 
 Next, add the appropriate binary folder to your `PATH` to access kubectl:
 
