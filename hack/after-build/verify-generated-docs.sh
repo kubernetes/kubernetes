@@ -24,9 +24,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 # Find binary
-gendocs=$(kube::util::find-binary "gendocs")
-genman=$(kube::util::find-binary "genman")
-genbashcomp=$(kube::util::find-binary "genbashcomp")
 mungedocs=$(kube::util::find-binary "mungedocs")
 
 DOCROOT="${KUBE_ROOT}/docs/"
