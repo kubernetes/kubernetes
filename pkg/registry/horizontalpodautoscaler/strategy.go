@@ -74,13 +74,20 @@ func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// MatchAutoscaler returns a generic matcher for a given label and field selector.
+func AutoscalerToSelectableFields(limitRange *expapi.HorizontalPodAutoscaler) fields.Set {
+	return fields.Set{}
+}
+
 func MatchAutoscaler(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		autoscaler, ok := obj.(*expapi.HorizontalPodAutoscaler)
-		if !ok {
-			return false, fmt.Errorf("not a horizontal pod autoscaler")
-		}
-		return label.Matches(labels.Set(autoscaler.Labels)), nil
-	})
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			hpa, ok := obj.(*expapi.HorizontalPodAutoscaler)
+			if !ok {
+				return nil, nil, fmt.Errorf("given object is not a horizontal pod autoscaler.")
+			}
+			return labels.Set(hpa.ObjectMeta.Labels), AutoscalerToSelectableFields(hpa), nil
+		},
+	}
 }
