@@ -159,18 +159,22 @@ kube::util::wait-for-jobs() {
 # $1 is the directory to put those generated documents
 kube::util::gen-docs() {
   local dest="$1"
+  local binaries=()
+  local comands=()
 
-  # Find binary
-  gendocs=$(kube::util::find-binary "gendocs")
-  genman=$(kube::util::find-binary "genman")
-  genbashcomp=$(kube::util::find-binary "genbashcomp")
+  binaries=($(kube::util::find-binary "kubectl"))
+  commands=("genmd" "genman" "genbash")
+  directories=("docs/user-guide/kubectl" "docs/man/man1" "contrib/completions/bash")
 
-  mkdir -p "${dest}/docs/user-guide/kubectl/"
-  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
-  mkdir -p "${dest}/docs/man/man1/"
-  "${genman}" "${dest}/docs/man/man1/"
-  mkdir -p "${dest}/contrib/completions/bash/"
-  "${genbashcomp}" "${dest}/contrib/completions/bash/"
+  for directory in "${directories[@]}"; do
+    mkdir -p "${dest}/${directory}"
+  done
+
+  for bin in "${binaries[@]}"; do
+    for i in "${!commands[@]}"; do
+      "${bin}" "${commands[$i]}" "${dest}"/"${directories[$i]}" > /dev/null 2>&1
+    done
+  done
 
   # create the list of generated files
   pushd "${dest}" > /dev/null
