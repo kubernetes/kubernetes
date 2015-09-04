@@ -55,7 +55,7 @@ func TestListDaemons(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup().Daemons(ns).List(labels.Everything())
+	receivedControllerList, err := c.Setup().Experimental().Daemons(ns).List(labels.Everything())
 	c.Validate(t, receivedControllerList, err)
 
 }
@@ -80,14 +80,14 @@ func TestGetDaemon(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().Daemons(ns).Get("foo")
+	receivedController, err := c.Setup().Experimental().Daemons(ns).Get("foo")
 	c.Validate(t, receivedController, err)
 }
 
 func TestGetDaemonWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{Error: true}
-	receivedPod, err := c.Setup().Daemons(ns).Get("")
+	receivedPod, err := c.Setup().Experimental().Daemons(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}
@@ -118,7 +118,7 @@ func TestUpdateDaemon(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().Daemons(ns).Update(requestController)
+	receivedController, err := c.Setup().Experimental().Daemons(ns).Update(requestController)
 	c.Validate(t, receivedController, err)
 }
 
@@ -128,7 +128,7 @@ func TestDeleteDaemon(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Daemons(ns).Delete("foo")
+	err := c.Setup().Experimental().Daemons(ns).Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -155,6 +155,6 @@ func TestCreateDaemon(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().Daemons(ns).Create(requestController)
+	receivedController, err := c.Setup().Experimental().Daemons(ns).Create(requestController)
 	c.Validate(t, receivedController, err)
 }
