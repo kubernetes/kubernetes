@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Describer generates output for the named resource or an error
@@ -637,7 +636,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 			fmt.Fprintf(out, "Claim:\t%s\n", "")
 		}
 		fmt.Fprintf(out, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
-		fmt.Fprintf(out, "Access Modes:\t%s\n", volume.GetAccessModesAsString(pv.Spec.AccessModes))
+		fmt.Fprintf(out, "Access Modes:\t%s\n", api.GetAccessModesAsString(pv.Spec.AccessModes))
 		fmt.Fprintf(out, "Capacity:\t%s\n", storage.String())
 		fmt.Fprintf(out, "Message:\t%s\n", pv.Status.Message)
 		fmt.Fprintf(out, "Source:\n")
@@ -680,7 +679,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
-		accessModes = volume.GetAccessModesAsString(pvc.Status.AccessModes)
+		accessModes = api.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
