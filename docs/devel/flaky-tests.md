@@ -64,7 +64,7 @@ spec:
         - name: TEST_PACKAGE
           value: pkg/tools
         - name: REPO_SPEC
-          value: https://github.com/GoogleCloudPlatform/kubernetes
+          value: https://github.com/kubernetes/kubernetes
 ```
 
 Note that we omit the labels and the selector fields of the replication controller, because they will be populated from the labels field of the pod template by default.

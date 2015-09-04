@@ -61,7 +61,7 @@ HorizontalPodAutoscaler object will be bound with exactly one Scale subresource 
 autoscaling associated replication controller/deployment through it.
 The main advantage of such approach is that whenever we introduce another type we want to auto-scale,
 we just need to implement Scale subresource for it (w/o modifying autoscaler code or API).
-The wider discussion regarding Scale took place in [#1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629).
+The wider discussion regarding Scale took place in [#1629](https://github.com/kubernetes/kubernetes/issues/1629).
 
 Scale subresource will be present in API for replication controller or deployment under the following paths:
 
@@ -192,7 +192,7 @@ The autoscaler will be implemented as a control loop.
 It will periodically (e.g.: every 1 minute) query pods described by ```Status.PodSelector``` of Scale subresource,
 and check their average CPU or memory usage from the last 1 minute
 (there will be API on master for this purpose, see
-[#11951](https://github.com/GoogleCloudPlatform/kubernetes/issues/11951).
+[#11951](https://github.com/kubernetes/kubernetes/issues/11951).
 Then, it will compare the current CPU or memory consumption with the Target,
 and adjust the count of the Scale if needed to match the target
 (preserving condition: MinCount <= Count <= MaxCount).
@@ -265,9 +265,9 @@ Our design is in general compatible with them.
   and then turned-on when there is a demand for them.
   When a request to service with no pods arrives, kube-proxy will generate an event for autoscaler
   to create a new pod.
-  Discussed in [#3247](https://github.com/GoogleCloudPlatform/kubernetes/issues/3247).
+  Discussed in [#3247](https://github.com/kubernetes/kubernetes/issues/3247).
 * When scaling down, make more educated decision which pods to kill (e.g.: if two or more pods are on the same node, kill one of them).
-  Discussed in [#4301](https://github.com/GoogleCloudPlatform/kubernetes/issues/4301).
+  Discussed in [#4301](https://github.com/kubernetes/kubernetes/issues/4301).
 * Allow rule based autoscaling: instead of specifying the target value for metric,
   specify a rule, e.g.: “if average CPU consumption of pod is higher than 80% add two more replicas”.
   This approach was initially suggested in

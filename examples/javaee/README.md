@@ -37,7 +37,7 @@ The following document describes the deployment of a Java EE application using [
 
 ### Prerequisites
 
-https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/user-guide/prereqs.md
+https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/prereqs.md
 
 ### Start MySQL Pod
 

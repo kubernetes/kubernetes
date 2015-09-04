@@ -90,7 +90,7 @@ By default, some containers will already be running on your cluster. Containers 
 
 The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
 
-Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
+Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/kubernetes/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
 ```bash
 cd kubernetes
