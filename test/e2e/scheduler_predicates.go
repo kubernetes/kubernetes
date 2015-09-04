@@ -241,7 +241,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		cleanupPods(c, ns)
 	})
 
-	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacit.
+	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	It("validates resource limits of pods that are allowed to run.", func() {
@@ -267,9 +267,10 @@ var _ = Describe("SchedulerPredicates", func() {
 		}
 
 		var podsNeededForSaturation int
+		milliCpuPerPod := int64(500)
 		for name, leftCapacity := range nodeToCapacityMap {
 			Logf("Node: %v has capacity: %v", name, leftCapacity)
-			podsNeededForSaturation += (int)(leftCapacity / 100)
+			podsNeededForSaturation += (int)(leftCapacity / milliCpuPerPod)
 		}
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
@@ -289,7 +290,7 @@ var _ = Describe("SchedulerPredicates", func() {
 						Image: "gcr.io/google_containers/pause:go",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(100, "DecimalSI"),
+								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},
 					},
@@ -313,7 +314,7 @@ var _ = Describe("SchedulerPredicates", func() {
 						Image: "gcr.io/google_containers/pause:go",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(100, "DecimalSI"),
+								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},
 					},
