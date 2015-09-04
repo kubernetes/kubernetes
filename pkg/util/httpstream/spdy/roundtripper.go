@@ -79,11 +79,14 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return s.dialWithoutProxy(req.URL)
 	}
 
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(req.URL)
+
 	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
 	proxyReq := http.Request{
 		Method: "CONNECT",
 		URL:    &url.URL{},
-		Host:   req.URL.Host,
+		Host:   targetHost,
 	}
 
 	proxyDialConn, err := s.dialWithoutProxy(proxyURL)
