@@ -82,6 +82,7 @@ const (
 	testDomain       = "cluster.local."
 	basePath         = "/skydns/local/cluster"
 	serviceSubDomain = "svc"
+	podSubDomain     = "pod"
 )
 
 func newKube2Sky(ec etcdClient) *kube2sky {
@@ -94,8 +95,8 @@ func newKube2Sky(ec etcdClient) *kube2sky {
 	}
 }
 
-func getEtcdPathForA(name, namespace string) string {
-	return path.Join(basePath, serviceSubDomain, namespace, name)
+func getEtcdPathForA(name, namespace, subDomain string) string {
+	return path.Join(basePath, subDomain, namespace, name)
 }
 
 func getEtcdPathForSRV(portName, protocol, name, namespace string) string {
@@ -121,13 +122,27 @@ func getHostPortFromString(data string) (*hostPort, error) {
 }
 
 func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *hostPort) {
-	key := getEtcdPathForA(serviceName, namespace)
+	key := getEtcdPathForA(serviceName, namespace, serviceSubDomain)
 	values := ec.Get(key)
 	//require.True(t, exists)
 	require.True(t, len(values) > 0, "entry not found.")
 	actualHostPort, err := getHostPortFromString(values[0])
 	require.NoError(t, err)
 	assert.Equal(t, expectedHostPort.Host, actualHostPort.Host)
+}
+
+func assertDnsPodEntryInEtcd(t *testing.T, ec *fakeEtcdClient, podIP, namespace string) {
+	key := getEtcdPathForA(podIP, namespace, podSubDomain)
+	values := ec.Get(key)
+	//require.True(t, exists)
+	require.True(t, len(values) > 0, "entry not found.")
+}
+
+func assertDnsPodEntryNotInEtcd(t *testing.T, ec *fakeEtcdClient, podIP, namespace string) {
+	key := getEtcdPathForA(podIP, namespace, podSubDomain)
+	values := ec.Get(key)
+	//require.True(t, exists)
+	require.True(t, len(values) == 0, "entry found.")
 }
 
 func assertSRVEntryInEtcd(t *testing.T, ec *fakeEtcdClient, portName, protocol, serviceName, namespace string, expectedPortNumber, expectedEntriesCount int) {
@@ -171,6 +186,20 @@ func newService(namespace, serviceName, clusterIP, portName string, portNumber i
 		},
 	}
 	return service
+}
+
+func newPod(namespace, podName, podIP string) kapi.Pod {
+	pod := kapi.Pod{
+		ObjectMeta: kapi.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+		},
+		Status: kapi.PodStatus{
+			PodIP: podIP,
+		},
+	}
+
+	return pod
 }
 
 func newSubset() kapi.EndpointSubset {
@@ -392,4 +421,47 @@ func TestBuildDNSName(t *testing.T) {
 	assert.Equal(t, expectedDNSName, buildDNSNameString("local.", "cluster", "svc", "ns", "name"))
 	newExpectedDNSName := "00.name.ns.svc.cluster.local."
 	assert.Equal(t, newExpectedDNSName, buildDNSNameString(expectedDNSName, "00"))
+}
+
+func TestPodDns(t *testing.T) {
+	const (
+		testPodIP      = "1.2.3.4"
+		sanitizedPodIP = "1-2-3-4"
+		testNamespace  = "default"
+		testPodName    = "testPod"
+	)
+	ec := &fakeEtcdClient{make(map[string]string)}
+	k2s := newKube2Sky(ec)
+
+	// create pod without ip address yet
+	pod := newPod(testNamespace, testPodName, "")
+	k2s.handlePodCreate(&pod)
+	assert.Empty(t, ec.writes)
+
+	// create pod
+	pod = newPod(testNamespace, testPodName, testPodIP)
+	k2s.handlePodCreate(&pod)
+	assertDnsPodEntryInEtcd(t, ec, sanitizedPodIP, testNamespace)
+
+	// update pod with same ip
+	newPod := pod
+	newPod.Status.PodIP = testPodIP
+	k2s.handlePodUpdate(&pod, &newPod)
+	assertDnsPodEntryInEtcd(t, ec, sanitizedPodIP, testNamespace)
+
+	// update pod with different ip's
+	newPod = pod
+	newPod.Status.PodIP = "4.3.2.1"
+	k2s.handlePodUpdate(&pod, &newPod)
+	assertDnsPodEntryInEtcd(t, ec, "4-3-2-1", testNamespace)
+	assertDnsPodEntryNotInEtcd(t, ec, "1-2-3-4", testNamespace)
+
+	// Delete the pod
+	k2s.handlePodDelete(&newPod)
+	assert.Empty(t, ec.writes)
+}
+
+func TestSanitizeIP(t *testing.T) {
+	expectedIP := "1-2-3-4"
+	assert.Equal(t, expectedIP, santizeIP("1.2.3.4"))
 }
