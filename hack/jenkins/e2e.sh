@@ -69,9 +69,6 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
-  : ${MASTER_SIZE:="n1-standard-2"}
-  : ${MINION_SIZE:="n1-standard-2"}
-  : ${NUM_MINIONS:="3"}
   : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
 fi
 
