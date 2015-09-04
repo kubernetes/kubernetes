@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -24,19 +25,40 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/controller/resourcequota"
 )
 
-func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
-	res := api.ResourceRequirements{}
-	res.Limits = api.ResourceList{}
+func getResourceList(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
 	if cpu != "" {
-		res.Limits[api.ResourceCPU] = resource.MustParse(cpu)
+		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
 	if memory != "" {
-		res.Limits[api.ResourceMemory] = resource.MustParse(memory)
+		res[api.ResourceMemory] = resource.MustParse(memory)
 	}
-
 	return res
+}
+
+func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+	res := api.ResourceRequirements{}
+	res.Requests = requests
+	res.Limits = limits
+	return res
+}
+
+func validPod(name string, numContainers int, resources api.ResourceRequirements) *api.Pod {
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		Spec:       api.PodSpec{},
+	}
+	pod.Spec.Containers = make([]api.Container, 0, numContainers)
+	for i := 0; i < numContainers; i++ {
+		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
+			Image:     "foo:V" + strconv.Itoa(i),
+			Resources: resources,
+		})
+	}
+	return pod
 }
 
 func TestAdmissionIgnoresDelete(t *testing.T) {
@@ -64,38 +86,118 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 
 	indexer.Add(quota)
 
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: quota.Namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "2Gi")}},
-		}}
-
-	err := handler.Admit(admission.NewAttributesRecord(newPod, "Pod", newPod.Namespace, "123", "pods", "", admission.Create, nil))
+	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, "Pod", newPod.Namespace, newPod.Name, "pods", "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(newPod, "Pod", newPod.Namespace, "123", "pods", "subresource", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(newPod, "Pod", newPod.Namespace, newPod.Name, "pods", "subresource", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the action went to a subresource: %v", err)
 	}
 
 }
 
-func TestIncrementUsagePods(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
+func TestIncrementUsagePodResources(t *testing.T) {
+	type testCase struct {
+		testName      string
+		existing      *api.Pod
+		input         *api.Pod
+		resourceName  api.ResourceName
+		hard          resource.Quantity
+		expectedUsage resource.Quantity
+		expectedError bool
+	}
+	testCases := []testCase{
+		{
+			testName:      "memory-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			resourceName:  api.ResourceMemory,
+			hard:          resource.MustParse("500Mi"),
+			expectedUsage: resource.MustParse("200Mi"),
+			expectedError: false,
 		},
-	})
+		{
+			testName:      "memory-not-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
+			resourceName:  api.ResourceMemory,
+			hard:          resource.MustParse("500Mi"),
+			expectedError: true,
+		},
+		{
+			testName:      "memory-no-request",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName:  api.ResourceMemory,
+			hard:          resource.MustParse("500Mi"),
+			expectedError: true,
+		},
+		{
+			testName:      "cpu-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			resourceName:  api.ResourceCPU,
+			hard:          resource.MustParse("2"),
+			expectedUsage: resource.MustParse("2"),
+			expectedError: false,
+		},
+		{
+			testName:      "cpu-not-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("600m", ""), getResourceList("", ""))),
+			resourceName:  api.ResourceCPU,
+			hard:          resource.MustParse("1500m"),
+			expectedError: true,
+		},
+		{
+			testName:      "cpu-no-request",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName:  api.ResourceCPU,
+			hard:          resource.MustParse("1500m"),
+			expectedError: true,
+		},
+	}
+	for _, item := range testCases {
+		podList := &api.PodList{Items: []api.Pod{*item.existing}}
+		client := testclient.NewSimpleFake(podList)
+		status := &api.ResourceQuotaStatus{
+			Hard: api.ResourceList{},
+			Used: api.ResourceList{},
+		}
+		used, err := resourcequotacontroller.PodRequests(item.existing, item.resourceName)
+		if err != nil {
+			t.Errorf("Test %s, unexpected error %v", item.testName, err)
+		}
+		status.Hard[item.resourceName] = item.hard
+		status.Used[item.resourceName] = *used
+
+		dirty, err := IncrementUsage(admission.NewAttributesRecord(item.input, "Pod", item.input.Namespace, item.input.Name, "pods", "", admission.Create, nil), status, client)
+		if err == nil && item.expectedError {
+			t.Errorf("Test %s, expected error", item.testName)
+		}
+		if err != nil && !item.expectedError {
+			t.Errorf("Test %s, unexpected error", err)
+		}
+		if !item.expectedError {
+			if !dirty {
+				t.Errorf("Test %s, expected the quota to be dirty", item.testName)
+			}
+			quantity := status.Used[item.resourceName]
+			if quantity.String() != item.expectedUsage.String() {
+				t.Errorf("Test %s, expected usage %s, actual usage %s", item.testName, item.expectedUsage.String(), quantity.String())
+			}
+		}
+	}
+}
+
+func TestIncrementUsagePods(t *testing.T) {
+	pod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
+	podList := &api.PodList{Items: []api.Pod{*pod}}
+	client := testclient.NewSimpleFake(podList)
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -103,7 +205,7 @@ func TestIncrementUsagePods(t *testing.T) {
 	r := api.ResourcePods
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, "Pod", pod.Namespace, "new-pod", "pods", "", admission.Create, nil), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -116,233 +218,10 @@ func TestIncrementUsagePods(t *testing.T) {
 	}
 }
 
-func TestIncrementUsageMemory(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceMemory
-	status.Hard[r] = resource.MustParse("2Gi")
-	status.Used[r] = resource.MustParse("1Gi")
-
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-		}}
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if !dirty {
-		t.Errorf("Expected the status to get incremented, therefore should have been dirty")
-	}
-	expectedVal := resource.MustParse("2Gi")
-	quantity := status.Used[r]
-	if quantity.Value() != expectedVal.Value() {
-		t.Errorf("Expected %v was %v", expectedVal.Value(), quantity.Value())
-	}
-}
-
-func TestExceedUsageMemory(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceMemory
-	status.Hard[r] = resource.MustParse("2Gi")
-	status.Used[r] = resource.MustParse("1Gi")
-
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "3Gi")}},
-		}}
-	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected memory usage exceeded error")
-	}
-}
-
-func TestIncrementUsageCPU(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceCPU
-	status.Hard[r] = resource.MustParse("200m")
-	status.Used[r] = resource.MustParse("100m")
-
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-		}}
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if !dirty {
-		t.Errorf("Expected the status to get incremented, therefore should have been dirty")
-	}
-	expectedVal := resource.MustParse("200m")
-	quantity := status.Used[r]
-	if quantity.Value() != expectedVal.Value() {
-		t.Errorf("Expected %v was %v", expectedVal.Value(), quantity.Value())
-	}
-}
-
-func TestUnboundedCPU(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceCPU
-	status.Hard[r] = resource.MustParse("200m")
-	status.Used[r] = resource.MustParse("100m")
-
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0m", "1Gi")}},
-		}}
-	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected CPU unbounded usage error")
-	}
-}
-
-func TestUnboundedMemory(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceMemory
-	status.Hard[r] = resource.MustParse("10Gi")
-	status.Used[r] = resource.MustParse("1Gi")
-
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("250m", "0")}},
-		}}
-	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected memory unbounded usage error")
-	}
-}
-
-func TestExceedUsageCPU(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceCPU
-	status.Hard[r] = resource.MustParse("200m")
-	status.Used[r] = resource.MustParse("100m")
-
-	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("500m", "1Gi")}},
-		}}
-	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, newPod.Name, "pods", "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected CPU usage exceeded error")
-	}
-}
-
 func TestExceedUsagePods(t *testing.T) {
-	namespace := "default"
-	client := testclient.NewSimpleFake(&api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-				},
-			},
-		},
-	})
+	pod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
+	podList := &api.PodList{Items: []api.Pod{*pod}}
+	client := testclient.NewSimpleFake(podList)
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -350,7 +229,7 @@ func TestExceedUsagePods(t *testing.T) {
 	r := api.ResourcePods
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, "Pod", namespace, "name", "pods", "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, "Pod", pod.Namespace, "name", "pods", "", admission.Create, nil), status, client)
 	if err == nil {
 		t.Errorf("Expected error because this would exceed your quota")
 	}
