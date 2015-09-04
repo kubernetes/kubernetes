@@ -19,6 +19,7 @@ package gce_cloud
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util"
@@ -59,6 +60,7 @@ func init() {
 type altTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
+	tokenBody   string
 	throttle    util.RateLimiter
 }
 
@@ -73,7 +75,7 @@ func (a *altTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (a *altTokenSource) token() (*oauth2.Token, error) {
-	req, err := http.NewRequest("GET", a.tokenURL, nil)
+	req, err := http.NewRequest("POST", a.tokenURL, strings.NewReader(a.tokenBody))
 	if err != nil {
 		return nil, err
 	}
@@ -86,23 +88,24 @@ func (a *altTokenSource) token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	var tok struct {
-		AccessToken       string `json:"accessToken"`
-		ExpiryTimeSeconds int64  `json:"expiryTimeSeconds,string"`
+		AccessToken string    `json:"accessToken"`
+		ExpireTime  time.Time `json:"expireTime"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&tok); err != nil {
 		return nil, err
 	}
 	return &oauth2.Token{
 		AccessToken: tok.AccessToken,
-		Expiry:      time.Unix(tok.ExpiryTimeSeconds, 0),
+		Expiry:      tok.ExpireTime,
 	}, nil
 }
 
-func newAltTokenSource(tokenURL string) oauth2.TokenSource {
+func newAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
 	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
 	a := &altTokenSource{
 		oauthClient: client,
 		tokenURL:    tokenURL,
+		tokenBody:   tokenBody,
 		throttle:    util.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
 	}
 	return oauth2.ReuseTokenSource(nil, a)
