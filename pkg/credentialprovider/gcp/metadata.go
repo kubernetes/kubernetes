@@ -27,15 +27,14 @@ import (
 )
 
 const (
-	metadataUrl              = "http://metadata.google.internal./computeMetadata/v1/"
-	metadataAttributes       = metadataUrl + "instance/attributes/"
-	dockerConfigKey          = metadataAttributes + "google-dockercfg"
-	dockerConfigUrlKey       = metadataAttributes + "google-dockercfg-url"
-	metadataScopes           = metadataUrl + "instance/service-accounts/default/scopes"
-	metadataToken            = metadataUrl + "instance/service-accounts/default/token"
-	metadataEmail            = metadataUrl + "instance/service-accounts/default/email"
-	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
-	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
+	metadataUrl        = "http://metadata.google.internal./computeMetadata/v1/"
+	metadataAttributes = metadataUrl + "instance/attributes/"
+	dockerConfigKey    = metadataAttributes + "google-dockercfg"
+	dockerConfigUrlKey = metadataAttributes + "google-dockercfg-url"
+	metadataScopes     = metadataUrl + "instance/service-accounts/default/scopes"
+	metadataToken      = metadataUrl + "instance/service-accounts/default/token"
+	metadataEmail      = metadataUrl + "instance/service-accounts/default/email"
+	storageScopePrefix = "https://www.googleapis.com/auth/devstorage"
 )
 
 // For these urls, the parts of the host name can be glob, for example '*.gcr.io" will match
@@ -151,8 +150,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 
 	for _, v := range scopes {
-		// cloudPlatformScope implies storage scope.
-		if strings.HasPrefix(v, storageScopePrefix) || strings.HasPrefix(v, cloudPlatformScopePrefix) {
+		if strings.HasPrefix(v, storageScopePrefix) {
 			return true
 		}
 	}
