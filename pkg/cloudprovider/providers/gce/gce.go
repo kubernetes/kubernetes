@@ -61,7 +61,6 @@ type GCECloud struct {
 type Config struct {
 	Global struct {
 		TokenURL    string `gcfg:"token-url"`
-		TokenBody   string `gcfg:"token-body"`
 		ProjectID   string `gcfg:"project-id"`
 		NetworkName string `gcfg:"network-name"`
 	}
@@ -160,7 +159,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			}
 		}
 		if cfg.Global.TokenURL != "" {
-			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
+			tokenSource = newAltTokenSource(cfg.Global.TokenURL)
 		}
 	}
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
