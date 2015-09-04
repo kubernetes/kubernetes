@@ -1,35 +1,9 @@
 package aws
 
 import (
-	"fmt"
 	"io"
-	"time"
+	"sync"
 )
-
-// String converts a Go string into a string pointer.
-func String(v string) *string {
-	return &v
-}
-
-// Boolean converts a Go bool into a boolean pointer.
-func Boolean(v bool) *bool {
-	return &v
-}
-
-// Long converts a Go int64 into a long pointer.
-func Long(v int64) *int64 {
-	return &v
-}
-
-// Double converts a Go float64 into a double pointer.
-func Double(v float64) *float64 {
-	return &v
-}
-
-// Time converts a Go Time into a Time pointer
-func Time(t time.Time) *time.Time {
-	return &t
-}
 
 // ReadSeekCloser wraps a io.Reader returning a ReaderSeakerCloser
 func ReadSeekCloser(r io.Reader) ReaderSeekerCloser {
@@ -81,51 +55,34 @@ func (r ReaderSeekerCloser) Close() error {
 	return nil
 }
 
-// A SettableBool provides a boolean value which includes the state if
-// the value was set or unset.  The set state is in addition to the value's
-// value(true|false)
-type SettableBool struct {
-	value bool
-	set   bool
+// A WriteAtBuffer provides a in memory buffer supporting the io.WriterAt interface
+// Can be used with the s3manager.Downloader to download content to a buffer
+// in memory. Safe to use concurrently.
+type WriteAtBuffer struct {
+	buf []byte
+	m   sync.Mutex
 }
 
-// SetBool returns a SettableBool with a value set
-func SetBool(value bool) SettableBool {
-	return SettableBool{value: value, set: true}
-}
+// WriteAt writes a slice of bytes to a buffer starting at the position provided
+// The number of bytes written will be returned, or error. Can overwrite previous
+// written slices if the write ats overlap.
+func (b *WriteAtBuffer) WriteAt(p []byte, pos int64) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
 
-// Get returns the value. Will always be false if the SettableBool was not set.
-func (b *SettableBool) Get() bool {
-	if !b.set {
-		return false
+	expLen := pos + int64(len(p))
+	if int64(len(b.buf)) < expLen {
+		newBuf := make([]byte, expLen)
+		copy(newBuf, b.buf)
+		b.buf = newBuf
 	}
-	return b.value
+	copy(b.buf[pos:], p)
+	return len(p), nil
 }
 
-// Set sets the value and updates the state that the value has been set.
-func (b *SettableBool) Set(value bool) {
-	b.value = value
-	b.set = true
-}
-
-// IsSet returns if the value has been set
-func (b *SettableBool) IsSet() bool {
-	return b.set
-}
-
-// Reset resets the state and value of the SettableBool to its initial default
-// state of not set and zero value.
-func (b *SettableBool) Reset() {
-	b.value = false
-	b.set = false
-}
-
-// String returns the string representation of the value if set. Zero if not set.
-func (b *SettableBool) String() string {
-	return fmt.Sprintf("%t", b.Get())
-}
-
-// GoString returns the string representation of the SettableBool value and state
-func (b *SettableBool) GoString() string {
-	return fmt.Sprintf("Bool{value:%t, set:%t}", b.value, b.set)
+// Bytes returns a slice of bytes written to the buffer.
+func (b *WriteAtBuffer) Bytes() []byte {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.buf[:len(b.buf):len(b.buf)]
 }

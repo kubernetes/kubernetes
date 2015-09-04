@@ -3,15 +3,15 @@ package credentials
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/internal/apierr"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestChainProviderGet(t *testing.T) {
 	p := &ChainProvider{
 		Providers: []Provider{
-			&stubProvider{err: apierr.New("FirstError", "first provider error", nil)},
-			&stubProvider{err: apierr.New("SecondError", "second provider error", nil)},
+			&stubProvider{err: awserr.New("FirstError", "first provider error", nil)},
+			&stubProvider{err: awserr.New("SecondError", "second provider error", nil)},
 			&stubProvider{
 				creds: Value{
 					AccessKeyID:     "AKID",
@@ -62,8 +62,8 @@ func TestChainProviderWithNoProvider(t *testing.T) {
 func TestChainProviderWithNoValidProvider(t *testing.T) {
 	p := &ChainProvider{
 		Providers: []Provider{
-			&stubProvider{err: apierr.New("FirstError", "first provider error", nil)},
-			&stubProvider{err: apierr.New("SecondError", "second provider error", nil)},
+			&stubProvider{err: awserr.New("FirstError", "first provider error", nil)},
+			&stubProvider{err: awserr.New("SecondError", "second provider error", nil)},
 		},
 	}
 
