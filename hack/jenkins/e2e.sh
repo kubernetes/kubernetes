@@ -133,7 +133,6 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Elasticsearch"
     "PD"
     "ServiceAccounts"
-    "Service\sendpoints\slatency"
     "Services.*change\sthe\stype"
     "Services.*functioning\sexternal\sload\sbalancer"
     "Services.*identically\snamed"
