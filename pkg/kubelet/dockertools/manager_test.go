@@ -449,7 +449,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 				},
 				{Name: "bar"}}},
 	}
-	podString, err := testapi.Codec().Encode(pod)
+	podString, err := testapi.Default.Codec().Encode(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2348,7 +2348,7 @@ func TestPodDependsOnPodIP(t *testing.T) {
 				Name: "POD_IP",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Version(),
+						APIVersion: testapi.Default.Version(),
 						FieldPath:  "status.podIP",
 					},
 				},
@@ -2369,7 +2369,7 @@ func TestPodDependsOnPodIP(t *testing.T) {
 				Name: "POD_NAME",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Version(),
+						APIVersion: testapi.Default.Version(),
 						FieldPath:  "metadata.name",
 					},
 				},

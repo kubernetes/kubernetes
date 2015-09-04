@@ -41,23 +41,23 @@ type FakeRESTClient struct {
 }
 
 func (c *FakeRESTClient) Get() *Request {
-	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
+	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
 func (c *FakeRESTClient) Put() *Request {
-	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
+	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
 func (c *FakeRESTClient) Patch(_ api.PatchType) *Request {
-	return NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
+	return NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
 func (c *FakeRESTClient) Post() *Request {
-	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
+	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
 func (c *FakeRESTClient) Delete() *Request {
-	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
+	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
 func (c *FakeRESTClient) Do(req *http.Request) (*http.Response, error) {

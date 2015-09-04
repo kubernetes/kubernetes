@@ -52,11 +52,11 @@ func expectHTTP(url string, code int, t *testing.T) {
 }
 
 func getPath(resource, namespace, name string) string {
-	return testapi.ResourcePath(resource, namespace, name)
+	return testapi.Default.ResourcePath(resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
 }
 
 func TestMaxInFlight(t *testing.T) {
@@ -231,15 +231,15 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// fully-qualified paths
-		{"GET", getPath("pods", "other", ""), "list", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "other", "foo"), "get", testapi.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", getPath("pods", "", ""), "list", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"POST", getPath("pods", "", ""), "create", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "", "foo"), "get", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("redirect", "pods", "", ""), "redirect", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("watch", "pods", "other", ""), "watch", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "other", ""), "list", testapi.Default.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "other", "foo"), "get", testapi.Default.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", getPath("pods", "", ""), "list", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"POST", getPath("pods", "", ""), "create", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "", "foo"), "get", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithPrefix("redirect", "pods", "", ""), "redirect", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithPrefix("watch", "pods", "other", ""), "watch", testapi.Default.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},

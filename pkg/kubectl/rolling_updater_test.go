@@ -1008,7 +1008,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 }
 
 func TestUpdateWithRetries(t *testing.T) {
-	codec := testapi.Codec()
+	codec := testapi.Default.Codec()
 	grace := int64(30)
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "rc",
@@ -1055,7 +1055,7 @@ func TestUpdateWithRetries(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
+			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
 				update := updates[0]
 				updates = updates[1:]
 				// We should always get an update with a valid rc even when the get fails. The rc should always
@@ -1068,7 +1068,7 @@ func TestUpdateWithRetries(t *testing.T) {
 					delete(c.Spec.Selector, "baz")
 				}
 				return update, nil
-			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
+			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
 				get := gets[0]
 				gets = gets[1:]
 				return get, nil
@@ -1078,7 +1078,7 @@ func TestUpdateWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{Version: testapi.Version()}
+	clientConfig := &client.Config{Version: testapi.Default.Version()}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
@@ -1115,7 +1115,7 @@ func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 
 func TestAddDeploymentHash(t *testing.T) {
 	buf := &bytes.Buffer{}
-	codec := testapi.Codec()
+	codec := testapi.Default.Codec()
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "rc"},
 		Spec: api.ReplicationControllerSpec{
@@ -1146,27 +1146,27 @@ func TestAddDeploymentHash(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == testapi.ResourcePath("pods", "default", "") && m == "GET":
+			case p == testapi.Default.ResourcePath("pods", "default", "") && m == "GET":
 				if req.URL.RawQuery != "labelSelector=foo%3Dbar" {
 					t.Errorf("Unexpected query string: %s", req.URL.RawQuery)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, podList)}, nil
-			case p == testapi.ResourcePath("pods", "default", "foo") && m == "PUT":
+			case p == testapi.Default.ResourcePath("pods", "default", "foo") && m == "PUT":
 				seen.Insert("foo")
 				obj := readOrDie(t, req, codec)
 				podList.Items[0] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[0])}, nil
-			case p == testapi.ResourcePath("pods", "default", "bar") && m == "PUT":
+			case p == testapi.Default.ResourcePath("pods", "default", "bar") && m == "PUT":
 				seen.Insert("bar")
 				obj := readOrDie(t, req, codec)
 				podList.Items[1] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[1])}, nil
-			case p == testapi.ResourcePath("pods", "default", "baz") && m == "PUT":
+			case p == testapi.Default.ResourcePath("pods", "default", "baz") && m == "PUT":
 				seen.Insert("baz")
 				obj := readOrDie(t, req, codec)
 				podList.Items[2] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[2])}, nil
-			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
+			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
 				updatedRc = true
 				return &http.Response{StatusCode: 200, Body: objBody(codec, rc)}, nil
 			default:
@@ -1175,7 +1175,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{Version: testapi.Version()}
+	clientConfig := &client.Config{Version: testapi.Default.Version()}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 

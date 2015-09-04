@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/record"
@@ -69,8 +70,6 @@ import (
 
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
-	// API version that should be used by the client to talk to the server.
-	apiVersion string
 	// Limit the number of concurrent tests.
 	maxConcurrency int
 )
@@ -93,7 +92,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (string, string) {
+func startComponents(firstManifestURL, secondManifestURL string) (string, string) {
 	// Setup
 	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -126,13 +125,17 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Default.Version()})
 
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
+	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
+	// We will fix this by supporting multiple group versions in Config
+	cl.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Experimental.Version()})
+
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, testapi.Experimental.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
@@ -891,7 +894,6 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&apiVersion, "api-version", latest.Version, "API version that should be used by the client for communicating with the server")
 	fs.IntVar(
 		&maxConcurrency, "max-concurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
 }
@@ -911,18 +913,21 @@ func main() {
 		glog.Fatalf("This test has timed out.")
 	}()
 
-	glog.Infof("Running tests for APIVersion: %s", apiVersion)
+	glog.Infof("Running tests for APIVersion: %s", os.Getenv("KUBE_TEST_API"))
 
 	firstManifestURL := ServeCachedManifestFile(testPodSpecFile)
 	secondManifestURL := ServeCachedManifestFile(testPodSpecFile)
-	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL, apiVersion)
+	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: apiVersion})
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Default.Version()})
+	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
+	// We will fix this by supporting multiple group versions in Config
+	kubeClient.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServerURL, Version: testapi.Experimental.Version()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

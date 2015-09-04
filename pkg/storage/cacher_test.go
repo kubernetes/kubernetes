@@ -43,7 +43,7 @@ func newTestCacher(client tools.EtcdClient) *storage.Cacher {
 	config := storage.CacherConfig{
 		CacheCapacity:  10,
 		Versioner:      etcdstorage.APIObjectVersioner{},
-		Storage:        etcdstorage.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix()),
+		Storage:        etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix()),
 		Type:           &api.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
@@ -94,7 +94,7 @@ func TestListFromMemory(t *testing.T) {
 		{
 			Action: "create",
 			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+				Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 				CreatedIndex:  1,
 				ModifiedIndex: 1,
 			},
@@ -102,7 +102,7 @@ func TestListFromMemory(t *testing.T) {
 		{
 			Action: "create",
 			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBar)),
+				Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podBar)),
 				CreatedIndex:  2,
 				ModifiedIndex: 2,
 			},
@@ -110,7 +110,7 @@ func TestListFromMemory(t *testing.T) {
 		{
 			Action: "create",
 			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBaz)),
+				Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podBaz)),
 				CreatedIndex:  3,
 				ModifiedIndex: 3,
 			},
@@ -118,12 +118,12 @@ func TestListFromMemory(t *testing.T) {
 		{
 			Action: "set",
 			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooPrime)),
+				Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFooPrime)),
 				CreatedIndex:  1,
 				ModifiedIndex: 4,
 			},
 			PrevNode: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+				Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 				CreatedIndex:  1,
 				ModifiedIndex: 1,
 			},
@@ -135,7 +135,7 @@ func TestListFromMemory(t *testing.T) {
 				ModifiedIndex: 5,
 			},
 			PrevNode: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBar)),
+				Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podBar)),
 				CreatedIndex:  1,
 				ModifiedIndex: 1,
 			},
@@ -210,7 +210,7 @@ func TestWatch(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "create",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 1,
 				},
@@ -223,7 +223,7 @@ func TestWatch(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "create",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBar)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podBar)),
 					CreatedIndex:  2,
 					ModifiedIndex: 2,
 				},
@@ -236,12 +236,12 @@ func TestWatch(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "set",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 3,
 				},
 				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 1,
 				},
@@ -326,7 +326,7 @@ func TestFiltering(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "create",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 1,
 				},
@@ -339,12 +339,12 @@ func TestFiltering(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "set",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooFiltered)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFooFiltered)),
 					CreatedIndex:  1,
 					ModifiedIndex: 2,
 				},
 				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 1,
 				},
@@ -358,12 +358,12 @@ func TestFiltering(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "set",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 3,
 				},
 				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooFiltered)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFooFiltered)),
 					CreatedIndex:  1,
 					ModifiedIndex: 2,
 				},
@@ -377,12 +377,12 @@ func TestFiltering(t *testing.T) {
 			etcdResponse: &etcd.Response{
 				Action: "set",
 				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 4,
 				},
 				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 3,
 				},
@@ -399,7 +399,7 @@ func TestFiltering(t *testing.T) {
 					ModifiedIndex: 5,
 				},
 				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 					CreatedIndex:  1,
 					ModifiedIndex: 4,
 				},
@@ -462,7 +462,7 @@ func TestStorageError(t *testing.T) {
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "create",
 		Node: &etcd.Node{
-			Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+			Value:         string(runtime.EncodeOrDie(testapi.Default.Codec(), podFoo)),
 			CreatedIndex:  1,
 			ModifiedIndex: 1,
 		},
