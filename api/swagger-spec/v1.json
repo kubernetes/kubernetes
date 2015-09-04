@@ -11879,6 +11879,9 @@
    "v1.PersistentVolumeClaimList": {
     "id": "v1.PersistentVolumeClaimList",
     "description": "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
+    "required": [
+     "items"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -11990,6 +11993,9 @@
    "v1.PersistentVolumeList": {
     "id": "v1.PersistentVolumeList",
     "description": "PersistentVolumeList is a list of PersistentVolume items.",
+    "required": [
+     "items"
+    ],
     "properties": {
      "kind": {
       "type": "string",

@@ -419,7 +419,7 @@ type PersistentVolumeList struct {
 	ListMeta `json:"metadata,omitempty"`
 	// List of persistent volumes.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
-	Items []PersistentVolume `json:"items,omitempty"`
+	Items []PersistentVolume `json:"items"`
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -447,7 +447,7 @@ type PersistentVolumeClaimList struct {
 	ListMeta `json:"metadata,omitempty"`
 	// A list of persistent volume claims.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
-	Items []PersistentVolumeClaim `json:"items,omitempty"`
+	Items []PersistentVolumeClaim `json:"items"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
