@@ -822,6 +822,7 @@ _kubectl_label()
     flags_completion=()
 
     flags+=("--all")
+    flags+=("--dry-run")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
     flags_completion+=("__handle_filename_extension_flag json|stdin|yaml|yml")
