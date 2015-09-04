@@ -32,7 +32,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	storage, statusStorage := NewREST(etcdStorage)
 	return storage, statusStorage, fakeClient
 }
@@ -148,7 +148,7 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvStart := validNewPersistentVolume("foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), pvStart), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), pvStart), 0)
 
 	pvIn := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{

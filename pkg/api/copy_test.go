@@ -28,7 +28,7 @@ import (
 
 func TestDeepCopyApiObjects(t *testing.T) {
 	for i := 0; i < *fuzzIters; i++ {
-		for _, version := range []string{"", testapi.Version()} {
+		for _, version := range []string{"", testapi.Default.Version()} {
 			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
 			for kind := range api.Scheme.KnownTypes(version) {
 				item, err := api.Scheme.New(version, kind)

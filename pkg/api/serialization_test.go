@@ -90,10 +90,10 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := util.NewStringSet(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
-	version := testapi.Version()
+	version := testapi.Default.Version()
 	if !set.Has(version) {
 		fuzzInternalObject(t, version, item, seed)
-		roundTrip(t, testapi.Codec(), item)
+		roundTrip(t, testapi.Default.Codec(), item)
 	}
 }
 

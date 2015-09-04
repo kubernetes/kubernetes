@@ -1227,7 +1227,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Version(),
+								APIVersion: testapi.Default.Version(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1236,7 +1236,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAMESPACE",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Version(),
+								APIVersion: testapi.Default.Version(),
 								FieldPath:  "metadata.namespace",
 							},
 						},
@@ -1245,7 +1245,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_IP",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Version(),
+								APIVersion: testapi.Default.Version(),
 								FieldPath:  "status.podIP",
 							},
 						},
@@ -1273,7 +1273,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Version(),
+								APIVersion: testapi.Default.Version(),
 								FieldPath:  "metadata.name",
 							},
 						},

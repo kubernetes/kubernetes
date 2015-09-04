@@ -27,7 +27,7 @@ import (
 func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
@@ -42,24 +42,24 @@ func TestListEndpoints(t *testing.T) {
 			},
 		},
 	}
-	receivedEndpointsList, err := c.Setup().Endpoints(ns).List(labels.Everything())
+	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(labels.Everything())
 	c.Validate(t, receivedEndpointsList, err)
 }
 
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
-	response, err := c.Setup().Endpoints(ns).Get("endpoint-1")
+	response, err := c.Setup(t).Endpoints(ns).Get("endpoint-1")
 	c.Validate(t, response, err)
 }
 
 func TestGetEndpointWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{Error: true}
-	receivedPod, err := c.Setup().Endpoints(ns).Get("")
+	receivedPod, err := c.Setup(t).Endpoints(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}

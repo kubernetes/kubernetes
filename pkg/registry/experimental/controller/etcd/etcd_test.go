@@ -30,7 +30,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*ScaleREST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "experimental")
 	return NewStorage(etcdStorage).Scale, fakeClient
 }
 
@@ -82,7 +82,7 @@ func TestGet(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0); err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validController), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestUpdate(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0); err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validController), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
@@ -122,7 +122,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	var controller api.ReplicationController
-	testapi.Codec().DecodeInto([]byte(response.Node.Value), &controller)
+	testapi.Experimental.Codec().DecodeInto([]byte(response.Node.Value), &controller)
 	if controller.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, controller.Spec.Replicas)
 	}

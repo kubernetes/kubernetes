@@ -30,7 +30,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*Etcd, *tools.FakeEtcdClient, allocator.Interface) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
 	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", etcdStorage)
 	return etcd, fakeClient, mem
@@ -57,7 +57,7 @@ func TestEmpty(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	storage, fakeClient, backing := newStorage(t)
-	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Codec(), validNewRangeAllocation()), 0); err != nil {
+	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

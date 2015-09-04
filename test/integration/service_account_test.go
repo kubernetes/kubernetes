@@ -341,7 +341,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	deleteAllEtcdKeys()
 
 	// Etcd
-	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -353,9 +353,9 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	}))
 
 	// Anonymous client config
-	clientConfig := client.Config{Host: apiServer.URL, Version: testapi.Version()}
+	clientConfig := client.Config{Host: apiServer.URL, Version: testapi.Default.Version()}
 	// Root client
-	rootClient := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version(), BearerToken: rootToken})
+	rootClient := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Default.Version(), BearerToken: rootToken})
 
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user

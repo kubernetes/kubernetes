@@ -117,11 +117,11 @@ func TestReadPodsFromFile(t *testing.T) {
 	for _, testCase := range testCases {
 		func() {
 			var versionedPod runtime.Object
-			err := testapi.Converter().Convert(&testCase.pod, &versionedPod)
+			err := testapi.Default.Converter().Convert(&testCase.pod, &versionedPod)
 			if err != nil {
 				t.Fatalf("%s: error in versioning the pod: %v", testCase.desc, err)
 			}
-			fileContents, err := testapi.Codec().Encode(versionedPod)
+			fileContents, err := testapi.Default.Codec().Encode(versionedPod)
 			if err != nil {
 				t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 			}

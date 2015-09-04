@@ -49,14 +49,14 @@ func TestPersistentVolumeCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", ""),
 			Query:  buildQueryValues(nil),
 			Body:   pv,
 		},
 		Response: Response{StatusCode: 200, Body: pv},
 	}
 
-	response, err := c.Setup().PersistentVolumes().Create(pv)
+	response, err := c.Setup(t).PersistentVolumes().Create(pv)
 	c.Validate(t, response, err)
 }
 
@@ -78,14 +78,14 @@ func TestPersistentVolumeGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", "abc"),
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "abc"),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: persistentVolume},
 	}
 
-	response, err := c.Setup().PersistentVolumes().Get("abc")
+	response, err := c.Setup(t).PersistentVolumes().Get("abc")
 	c.Validate(t, response, err)
 }
 
@@ -100,13 +100,13 @@ func TestPersistentVolumeList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", ""),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: persistentVolumeList},
 	}
-	response, err := c.Setup().PersistentVolumes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).PersistentVolumes().List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 
@@ -126,10 +126,10 @@ func TestPersistentVolumeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPersistentVolumesResoureName(), "", "abc"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: persistentVolume},
 	}
-	response, err := c.Setup().PersistentVolumes().Update(persistentVolume)
+	response, err := c.Setup(t).PersistentVolumes().Update(persistentVolume)
 	c.Validate(t, response, err)
 }
 
@@ -155,20 +155,20 @@ func TestPersistentVolumeStatusUpdate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", "abc") + "/status",
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "abc") + "/status",
 			Query:  buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: persistentVolume},
 	}
-	response, err := c.Setup().PersistentVolumes().UpdateStatus(persistentVolume)
+	response, err := c.Setup(t).PersistentVolumes().UpdateStatus(persistentVolume)
 	c.Validate(t, response, err)
 }
 
 func TestPersistentVolumeDelete(t *testing.T) {
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPersistentVolumesResoureName(), "", "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().PersistentVolumes().Delete("foo")
+	err := c.Setup(t).PersistentVolumes().Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -176,10 +176,10 @@ func TestPersistentVolumeWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePathWithPrefix("watch", getPersistentVolumesResoureName(), "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", getPersistentVolumesResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }
