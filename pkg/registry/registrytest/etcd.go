@@ -75,6 +75,11 @@ func (t *Tester) GeneratesName() *Tester {
 	return t
 }
 
+func (t *Tester) ReturnDeletedObject() *Tester {
+	t.tester = t.tester.ReturnDeletedObject()
+	return t
+}
+
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.tester.TestCreate(
 		valid,
@@ -96,6 +101,24 @@ func (t *Tester) TestUpdate(valid runtime.Object, validUpdateFunc UpdateFunc, in
 		t.getObject,
 		resttest.UpdateFunc(validUpdateFunc),
 		invalidFuncs...,
+	)
+}
+
+func (t *Tester) TestDelete(valid runtime.Object) {
+	t.tester.TestDelete(
+		valid,
+		t.setObject,
+		t.getObject,
+		isNotFoundEtcdError,
+	)
+}
+
+func (t *Tester) TestDeleteGraceful(valid runtime.Object, expectedGrace int64) {
+	t.tester.TestDeleteGraceful(
+		valid,
+		t.setObject,
+		t.getObject,
+		expectedGrace,
 	)
 }
 
@@ -218,4 +241,12 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 		PrevNode: prevNode,
 	}
 	return nil
+}
+
+func isNotFoundEtcdError(err error) bool {
+	etcdError, ok := err.(*etcd.EtcdError)
+	if !ok {
+		return false
+	}
+	return etcdError.ErrorCode == tools.EtcdErrorCodeNotFound
 }

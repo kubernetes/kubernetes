@@ -143,10 +143,11 @@ func MatchNamespace(label labels.Selector, field fields.Selector) generic.Matche
 }
 
 // NamespaceToSelectableFields returns a label set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
 func NamespaceToSelectableFields(namespace *api.Namespace) labels.Set {
 	return labels.Set{
-		"name":         namespace.Name,
-		"status.phase": string(namespace.Status.Phase),
+		"metadata.name": namespace.Name,
+		"status.phase":  string(namespace.Status.Phase),
+		// This is a bug, but we need to support it for backward compatibility.
+		"name": namespace.Name,
 	}
 }
