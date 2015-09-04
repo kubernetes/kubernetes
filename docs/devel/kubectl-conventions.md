@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 Kubectl Conventions
 ===================
 
-Updated: 8/12/2015
+Updated: 8/27/2015
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -77,6 +77,31 @@ Updated: 8/12/2015
 * Flags are all lowercase, with words separated by hyphens
 * Flag names and single-character aliases should have the same meaning across all commands
 * Command-line flags corresponding to API fields should accept API enums exactly (e.g., --restart=Always)
+* Do not reuse flags for different semantic purposes, and do not use different flag names for the same semantic purpose -- grep for `"Flags()"` before adding a new flag
+* Use short flags sparingly, only for the most frequently used options, prefer lowercase over uppercase for the most common cases, try to stick to well known conventions for UNIX commands and/or Docker, where they exist, and update this list when adding new short flags
+  * `-f`: Resource file
+    * also used for `--follow` in `logs`, but should be deprecated in favor of `-F`
+  * `-l`: Label selector
+    * also used for `--labels` in `expose`, but should be deprecated
+  * `-L`: Label columns
+  * `-c`: Container
+    * also used for `--client` in `version`, but should be deprecated
+  * `-i`: Attach stdin
+  * `-t`: Allocate TTY
+    * also used for `--template`, but deprecated
+  * `-w`: Watch (currently also used for `--www` in `proxy`, but should be deprecated)
+  * `-p`: Previous
+    * also used for `--pod` in `exec`, but deprecated
+    * also used for `--patch` in `patch`, but should be deprecated
+    * also used for `--port` in `proxy`, but should be deprecated
+  * `-P`: Static file prefix in `proxy`, but should be deprecated
+  * `-r`: Replicas
+  * `-u`: Unix socket
+  * `-v`: Verbose logging level
+* `--dry-run`: Don't modify the live state; simulate the mutation and display the output
+* `--local`: Don't contact the server; just do local read, transformation, generation, etc. and display the output
+* `--output-version=...`: Convert the output to a different API group/version
+* `--validate`: Validate the resource schema
 
 ## Output conventions
 
