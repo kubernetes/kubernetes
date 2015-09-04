@@ -326,7 +326,7 @@ type PersistentVolumeStatus struct {
 type PersistentVolumeList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
-	Items    []PersistentVolume `json:"items,omitempty"`
+	Items    []PersistentVolume `json:"items"`
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -344,7 +344,7 @@ type PersistentVolumeClaim struct {
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
-	Items    []PersistentVolumeClaim `json:"items,omitempty"`
+	Items    []PersistentVolumeClaim `json:"items"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
