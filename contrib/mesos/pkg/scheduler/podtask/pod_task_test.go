@@ -146,10 +146,10 @@ func TestEmptyOffer(t *testing.T) {
 	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
 	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
 
-	if ok := task.AcceptOffer(nil); ok {
+	if ok := DefaultPredicate(task, nil); ok {
 		t.Fatalf("accepted nil offer")
 	}
-	if ok := task.AcceptOffer(&mesos.Offer{}); ok {
+	if ok := DefaultPredicate(task, &mesos.Offer{}); ok {
 		t.Fatalf("accepted empty offer")
 	}
 }
@@ -176,7 +176,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", 0.001),
 		},
 	}
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
@@ -186,7 +186,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", t_min_mem),
 		},
 	}
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 }
@@ -203,7 +203,7 @@ func TestAcceptOfferPorts(t *testing.T) {
 			rangeResource("ports", []uint64{1, 1}),
 		},
 	}
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -218,17 +218,17 @@ func TestAcceptOfferPorts(t *testing.T) {
 	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
 	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
 
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 0
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -236,12 +236,12 @@ func TestAcceptOfferPorts(t *testing.T) {
 		mutil.NewScalarResource("cpus", t_min_cpu),
 		mutil.NewScalarResource("mem", t_min_mem),
 	}
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 }
@@ -297,7 +297,7 @@ func TestNodeSelector(t *testing.T) {
 			},
 			Attributes: ts.attrs,
 		}
-		if got, want := task.AcceptOffer(offer), ts.ok; got != want {
+		if got, want := DefaultPredicate(task, offer), ts.ok; got != want {
 			t.Fatalf("expected acceptance of offer %v for selector %v to be %v, got %v:", want, got, ts.attrs, ts.selector)
 		}
 	}
