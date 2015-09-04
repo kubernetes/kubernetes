@@ -361,3 +361,34 @@ type ThirdPartyResourceDataList struct {
 	// Items is a list of third party objects
 	Items []ThirdPartyResourceData `json:"items"`
 }
+
+// LimitCapability defines the privilege and capability limits of PodSpecs in a namespace
+type LimitCapability struct {
+	api.TypeMeta   `json",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the limits enforced
+	Spec LimitCapabilitySpec
+}
+
+// LimitCapabilitySpec is the specification of a LimitCapability
+type LimitCapabilitySpec struct {
+	// AllowHostNetwork allows PodSPecs to use the host's network
+	AllowHostNetwork bool
+	// AllowHostDir allows PodSpecs to specify HostDir volumes
+	AllowHostDir bool
+	// AllowHostPort allows containers to specify host ports
+	AllowHostPort bool
+	// AllowPrivileged allows PodSpecs to specificy Privileged mode
+	AllowPrivileged bool
+	// CapabilitesWhitelist specifies the capabilies that can be added and dropped from a container's security context
+	AllowCapabilities api.Capabilities
+}
+
+// LimitCapabilityList is a collection of LimitCapabilities
+type LimitCapabilityList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty"`
+
+	Items []LimitCapability
+}
