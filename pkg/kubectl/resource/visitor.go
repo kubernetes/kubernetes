@@ -381,7 +381,8 @@ func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, ext
 			}
 			return nil
 		}
-		if ignoreFile(path, extensions) {
+		// Don't check extension if the filepath was passed explicitly
+		if path != paths && ignoreFile(path, extensions) {
 			return nil
 		}
 
