@@ -38,7 +38,10 @@ find_files() {
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
       \) -prune \
-    \) -wholename '*pkg/api/v*/types.go'
+    \) \
+    \( -wholename '*pkg/api/v*/types.go' \
+       -o -wholename '*pkg/expapi/v*/types.go' \
+    \)
 }
 
 if [[ $# -eq 0 ]]; then
