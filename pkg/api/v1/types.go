@@ -988,6 +988,9 @@ type Container struct {
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty"`
+
+	// Optional: Docker labels
+	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values to be set as Docker labels"`
 }
 
 // Handler defines a specific action that should be taken

@@ -793,6 +793,9 @@ type Container struct {
 	// and shouldn't be used for general purpose containers.
 	Stdin bool `json:"stdin,omitempty"`
 	TTY   bool `json:"tty,omitempty"`
+
+	// Optional: Docker labels
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // Handler defines a specific action that should be taken

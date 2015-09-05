@@ -253,6 +253,14 @@ func deepCopy_v1_Container(in Container, out *Container, c *conversion.Cloner) e
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
 	return nil
 }
 
