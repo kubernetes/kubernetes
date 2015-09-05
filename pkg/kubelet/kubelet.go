@@ -1896,17 +1896,19 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 			housekeepingTimestamp = time.Now()
 		}
-		kl.syncLoopIteration(updates, handler)
+		if !kl.syncLoopIteration(updates, handler) {
+			break
+		}
 	}
 }
 
-func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) {
+func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) bool {
 	kl.syncLoopMonitor.Store(time.Now())
 	select {
-	case u, ok := <-updates:
-		if !ok {
+	case u, open := <-updates:
+		if !open {
 			glog.Errorf("Update channel is closed. Exiting the sync loop.")
-			return
+			return false
 		}
 		switch u.Op {
 		case ADD:
@@ -1928,6 +1930,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 		handler.HandlePodSyncs(kl.podManager.GetPods())
 	}
 	kl.syncLoopMonitor.Store(time.Now())
+	return true
 }
 
 func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType SyncPodType, mirrorPod *api.Pod, start time.Time) {
