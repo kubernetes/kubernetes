@@ -66,14 +66,14 @@ func TestGenerateContainerRef(t *testing.T) {
 		okPod = api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: testapi.Version(),
+				APIVersion: testapi.Default.Version(),
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				SelfLink:        "/api/" + testapi.Version() + "/pods/foo",
+				SelfLink:        "/api/" + testapi.Default.Version() + "/pods/foo",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -90,7 +90,7 @@ func TestGenerateContainerRef(t *testing.T) {
 	noSelfLinkPod.Kind = ""
 	noSelfLinkPod.APIVersion = ""
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
-	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Version() + "/pods/ok"
+	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Default.Version() + "/pods/ok"
 
 	cases := []struct {
 		name      string
@@ -107,7 +107,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -122,7 +122,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			container: &api.Container{},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -146,7 +146,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -163,7 +163,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",

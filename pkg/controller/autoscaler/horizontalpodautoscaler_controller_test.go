@@ -80,7 +80,7 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	mkHandler := func(url string, response serverResponse) *util.FakeHandler {
 		handler := util.FakeHandler{
 			StatusCode:   response.statusCode,
-			ResponseBody: runtime.EncodeOrDie(testapi.Codec(), response.obj.(runtime.Object)),
+			ResponseBody: runtime.EncodeOrDie(testapi.Experimental.Codec(), response.obj.(runtime.Object)),
 		}
 		mux.Handle(url, &handler)
 		glog.Infof("Will handle %s", url)
@@ -176,8 +176,8 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		})
 
 	defer testServer.Close()
-	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
+	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
 
 	fakeRC := fakeResourceConsumptionClient{metrics: map[api.ResourceName]expapi.ResourceConsumption{
 		api.ResourceCPU: {Resource: api.ResourceCPU, Quantity: resource.MustParse("650m")},

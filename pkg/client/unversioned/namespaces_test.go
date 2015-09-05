@@ -34,14 +34,14 @@ func TestNamespaceCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.ResourcePath("namespaces", "", ""),
+			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
 			Body:   namespace,
 		},
 		Response: Response{StatusCode: 200, Body: namespace},
 	}
 
 	// from the source ns, provision a new global namespace "foo"
-	response, err := c.Setup().Namespaces().Create(namespace)
+	response, err := c.Setup(t).Namespaces().Create(namespace)
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -59,13 +59,13 @@ func TestNamespaceGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath("namespaces", "", "foo"),
+			Path:   testapi.Default.ResourcePath("namespaces", "", "foo"),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: namespace},
 	}
 
-	response, err := c.Setup().Namespaces().Get("foo")
+	response, err := c.Setup(t).Namespaces().Get("foo")
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -87,12 +87,12 @@ func TestNamespaceList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath("namespaces", "", ""),
+			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: namespaceList},
 	}
-	response, err := c.Setup().Namespaces().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Namespaces().List(labels.Everything(), fields.Everything())
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -125,10 +125,10 @@ func TestNamespaceUpdate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.ResourcePath("namespaces", "", "foo")},
+			Path:   testapi.Default.ResourcePath("namespaces", "", "foo")},
 		Response: Response{StatusCode: 200, Body: requestNamespace},
 	}
-	receivedNamespace, err := c.Setup().Namespaces().Update(requestNamespace)
+	receivedNamespace, err := c.Setup(t).Namespaces().Update(requestNamespace)
 	c.Validate(t, receivedNamespace, err)
 }
 
@@ -149,20 +149,20 @@ func TestNamespaceFinalize(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.ResourcePath("namespaces", "", "foo") + "/finalize",
+			Path:   testapi.Default.ResourcePath("namespaces", "", "foo") + "/finalize",
 		},
 		Response: Response{StatusCode: 200, Body: requestNamespace},
 	}
-	receivedNamespace, err := c.Setup().Namespaces().Finalize(requestNamespace)
+	receivedNamespace, err := c.Setup(t).Namespaces().Finalize(requestNamespace)
 	c.Validate(t, receivedNamespace, err)
 }
 
 func TestNamespaceDelete(t *testing.T) {
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("namespaces", "", "foo")},
+		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath("namespaces", "", "foo")},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Namespaces().Delete("foo")
+	err := c.Setup(t).Namespaces().Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -170,10 +170,10 @@ func TestNamespaceWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePathWithPrefix("watch", "namespaces", "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", "namespaces", "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().Namespaces().Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).Namespaces().Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

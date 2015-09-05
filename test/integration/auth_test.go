@@ -65,22 +65,22 @@ func getTestTokenAuth() authenticator.Request {
 }
 
 func path(resource, namespace, name string) string {
-	return testapi.ResourcePath(resource, namespace, name)
+	return testapi.Default.ResourcePath(resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
 }
 
 func timeoutPath(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.ResourcePath(resource, namespace, name))
+	return addTimeoutFlag(testapi.Default.ResourcePath(resource, namespace, name))
 }
 
 // Bodies for requests used in subsequent tests.
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -98,7 +98,7 @@ var aPod string = `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -131,7 +131,7 @@ var aRC string = `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -155,7 +155,7 @@ var aService string = `
 var aNode string = `
 {
   "kind": "Node",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -167,7 +167,7 @@ var aNode string = `
 var aEvent string = `
 {
   "kind": "Event",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -183,7 +183,7 @@ var aEvent string = `
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -206,7 +206,7 @@ var emptyEndpoints string = `
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -231,7 +231,7 @@ var aEndpoints string = `
 var deleteNow string = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Version() + `",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "gracePeriodSeconds": 0%s
 }
 `

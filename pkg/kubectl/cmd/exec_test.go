@@ -129,7 +129,7 @@ func TestPodAndContainer(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	version := testapi.Version()
+	version := testapi.Default.Version()
 	tests := []struct {
 		name, version, podPath, execPath, container string
 		pod                                         *api.Pod

@@ -105,7 +105,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 }
 
 func TestAttach(t *testing.T) {
-	version := testapi.Version()
+	version := testapi.Default.Version()
 	tests := []struct {
 		name, version, podPath, attachPath, container string
 		pod                                           *api.Pod

@@ -318,7 +318,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		Updates: updates,
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
-			Version: testapi.Version(),
+			Version: testapi.Default.Version(),
 		}),
 		Kubelet: &fakeKubelet{
 			Kubelet: &kubelet.Kubelet{},
@@ -355,7 +355,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
 
 	taskInfo := podTask.BuildTaskInfo()
-	data, err := testapi.Codec().Encode(pod)
+	data, err := testapi.Default.Codec().Encode(pod)
 	assert.Equal(t, nil, err, "must be able to encode a pod's spec data")
 	taskInfo.Data = data
 	var statusUpdateCalls sync.WaitGroup
@@ -484,7 +484,7 @@ func TestExecutorStaticPods(t *testing.T) {
 		Updates: make(chan interface{}, 1), // allow kube-executor source to proceed past init
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
-			Version: testapi.Version(),
+			Version: testapi.Default.Version(),
 		}),
 		Kubelet: &kubelet.Kubelet{},
 		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
@@ -565,7 +565,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		Updates: make(chan interface{}, 1024),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
-			Version: testapi.Version(),
+			Version: testapi.Default.Version(),
 		}),
 		Kubelet: &fakeKubelet{
 			Kubelet: &kubelet.Kubelet{},
@@ -602,7 +602,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		*pod, &mesosproto.ExecutorInfo{})
 
 	taskInfo := podTask.BuildTaskInfo()
-	data, _ := testapi.Codec().Encode(pod)
+	data, _ := testapi.Default.Codec().Encode(pod)
 	taskInfo.Data = data
 
 	mockDriver.On(
@@ -660,11 +660,11 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 func NewTestPod(i int) *api.Pod {
 	name := fmt.Sprintf("pod%d", i)
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
-			SelfLink:  testapi.SelfLink("pods", string(i)),
+			SelfLink:  testapi.Default.SelfLink("pods", string(i)),
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -710,7 +710,7 @@ func NewTestServer(t *testing.T, namespace string, pods *api.PodList) *TestServe
 	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(testapi.ResourcePath("bindings", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(testapi.Default.ResourcePath("bindings", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 

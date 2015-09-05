@@ -77,7 +77,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()

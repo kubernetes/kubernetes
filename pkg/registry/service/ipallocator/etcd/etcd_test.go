@@ -33,7 +33,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*tools.FakeEtcdClient, ipallocator.Interface, allocator.Interface) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestErrors(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	fakeClient, storage, backing := newStorage(t)
-	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Codec(), validNewRangeAllocation()), 0); err != nil {
+	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

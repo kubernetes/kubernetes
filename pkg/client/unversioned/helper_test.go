@@ -401,40 +401,40 @@ func TestNegotiateVersion(t *testing.T) {
 			name:            "server supports client default",
 			version:         "version1",
 			config:          &Config{},
-			serverVersions:  []string{"version1", testapi.Version()},
-			clientVersions:  []string{"version1", testapi.Version()},
+			serverVersions:  []string{"version1", testapi.Default.Version()},
+			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "version1",
 			expectErr:       false,
 		},
 		{
 			name:            "server falls back to client supported",
-			version:         testapi.Version(),
+			version:         testapi.Default.Version(),
 			config:          &Config{},
 			serverVersions:  []string{"version1"},
-			clientVersions:  []string{"version1", testapi.Version()},
+			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "version1",
 			expectErr:       false,
 		},
 		{
 			name:            "explicit version supported",
 			version:         "",
-			config:          &Config{Version: testapi.Version()},
-			serverVersions:  []string{"version1", testapi.Version()},
-			clientVersions:  []string{"version1", testapi.Version()},
-			expectedVersion: testapi.Version(),
+			config:          &Config{Version: testapi.Default.Version()},
+			serverVersions:  []string{"version1", testapi.Default.Version()},
+			clientVersions:  []string{"version1", testapi.Default.Version()},
+			expectedVersion: testapi.Default.Version(),
 			expectErr:       false,
 		},
 		{
 			name:            "explicit version not supported",
 			version:         "",
-			config:          &Config{Version: testapi.Version()},
+			config:          &Config{Version: testapi.Default.Version()},
 			serverVersions:  []string{"version1"},
-			clientVersions:  []string{"version1", testapi.Version()},
+			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "",
 			expectErr:       true,
 		},
 	}
-	codec := testapi.Codec()
+	codec := testapi.Default.Codec()
 
 	for _, test := range tests {
 		fakeClient := &FakeRESTClient{
