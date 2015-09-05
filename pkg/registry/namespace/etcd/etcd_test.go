@@ -31,7 +31,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	storage, _, _ := NewREST(etcdStorage)
 	return storage, fakeClient
 }
@@ -140,7 +140,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), namespace), 0); err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), namespace), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, err := storage.Delete(ctx, "foo", nil); err == nil {
@@ -163,7 +163,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), namespace), 0); err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), namespace), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, err := storage.Delete(ctx, "foo", nil); err != nil {

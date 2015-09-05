@@ -67,7 +67,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -76,7 +76,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -85,7 +85,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -94,7 +94,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -252,11 +252,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	for _, testCase := range testCases {
 		var versionedPods runtime.Object
-		err := testapi.Converter().Convert(&testCase.pods, &versionedPods)
+		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods)
 		if err != nil {
 			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
-		data, err := testapi.Codec().Encode(versionedPods)
+		data, err := testapi.Default.Codec().Encode(versionedPods)
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
@@ -288,7 +288,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 func TestURLWithHeader(t *testing.T) {
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
-			APIVersion: testapi.Version(),
+			APIVersion: testapi.Default.Version(),
 			Kind:       "Pod",
 		},
 		ObjectMeta: api.ObjectMeta{

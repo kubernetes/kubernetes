@@ -35,20 +35,20 @@ func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 		},
 		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup().Nodes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Nodes().List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 
 func TestListMinionsLabels(t *testing.T) {
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Version())
+	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Default.Version())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
@@ -66,7 +66,7 @@ func TestListMinionsLabels(t *testing.T) {
 			},
 		},
 	}
-	c.Setup()
+	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
 	receivedNodeList, err := c.Nodes().List(selector, fields.Everything())
@@ -77,17 +77,17 @@ func TestGetMinion(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", "1"),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "1"),
 		},
 		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
 	}
-	response, err := c.Setup().Nodes().Get("1")
+	response, err := c.Setup(t).Nodes().Get("1")
 	c.Validate(t, response, err)
 }
 
 func TestGetMinionWithNoName(t *testing.T) {
 	c := &testClient{Error: true}
-	receivedNode, err := c.Setup().Nodes().Get("")
+	receivedNode, err := c.Setup(t).Nodes().Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}
@@ -113,14 +113,14 @@ func TestCreateMinion(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 			Body:   requestMinion},
 		Response: Response{
 			StatusCode: 200,
 			Body:       requestMinion,
 		},
 	}
-	receivedMinion, err := c.Setup().Nodes().Create(requestMinion)
+	receivedMinion, err := c.Setup(t).Nodes().Create(requestMinion)
 	c.Validate(t, receivedMinion, err)
 }
 
@@ -128,11 +128,11 @@ func TestDeleteMinion(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
 		},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Nodes().Delete("foo")
+	err := c.Setup(t).Nodes().Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -155,10 +155,10 @@ func TestUpdateMinion(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
 		},
 		Response: Response{StatusCode: 200, Body: requestMinion},
 	}
-	response, err := c.Setup().Nodes().Update(requestMinion)
+	response, err := c.Setup(t).Nodes().Update(requestMinion)
 	c.Validate(t, response, err)
 }

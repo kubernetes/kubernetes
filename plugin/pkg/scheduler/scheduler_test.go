@@ -40,7 +40,7 @@ func (fb fakeBinder) Bind(binding *api.Binding) error { return fb.b(binding) }
 
 func podWithID(id, desiredHost string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)},
+		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
 		Spec: api.PodSpec{
 			NodeName: desiredHost,
 		},

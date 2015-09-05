@@ -28,7 +28,7 @@ import (
 )
 
 func readPod(filename string) (string, error) {
-	data, err := ioutil.ReadFile("testdata/" + testapi.Version() + "/" + filename)
+	data, err := ioutil.ReadFile("testdata/" + testapi.Default.Version() + "/" + filename)
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +36,7 @@ func readPod(filename string) (string, error) {
 }
 
 func loadSchemaForTest() (Schema, error) {
-	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Version() + ".json"
+	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func TestValidateOk(t *testing.T) {
 		for _, test := range tests {
 			testObj := test.obj
 			apiObjectFuzzer.Fuzz(testObj)
-			data, err := testapi.Codec().Encode(testObj)
+			data, err := testapi.Default.Codec().Encode(testObj)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

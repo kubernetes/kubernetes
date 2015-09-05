@@ -49,7 +49,7 @@ func (ts *testStruct) IsAnAPIObject() {}
 
 func init() {
 	api.Scheme.AddKnownTypes("", &testStruct{})
-	api.Scheme.AddKnownTypes(testapi.Version(), &testStruct{})
+	api.Scheme.AddKnownTypes(testapi.Default.Version(), &testStruct{})
 }
 
 var testData = testStruct{
@@ -72,7 +72,7 @@ func TestVersionedPrinter(t *testing.T) {
 			return nil
 		}),
 		api.Scheme,
-		testapi.Version(),
+		testapi.Default.Version(),
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -110,7 +110,7 @@ func TestPrinter(t *testing.T) {
 		},
 	}
 	emptyListTest := &api.PodList{}
-	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Version())
+	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Default.Version())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,7 +183,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	poutput = testStruct{}
-	err = runtime.YAMLDecoder(testapi.Codec()).DecodeInto(buf.Bytes(), &poutput)
+	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	err = runtime.YAMLDecoder(testapi.Codec()).DecodeInto(buf.Bytes(), &objOut)
+	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &objOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +430,7 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, testapi.Version())
+	printer := NewVersionedPrinter(p, api.Scheme, testapi.Default.Version())
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}

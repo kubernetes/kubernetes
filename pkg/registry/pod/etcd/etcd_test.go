@@ -37,7 +37,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	storage := NewStorage(etcdStorage, false, nil)
 	return storage.Pod, storage.Binding, storage.Status, fakeClient
 }
@@ -256,7 +256,7 @@ func TestResourceLocation(t *testing.T) {
 		storage, _, _, fakeClient := newStorage(t)
 		key, _ := storage.KeyFunc(ctx, tc.pod.Name)
 		key = etcdtest.AddPrefix(key)
-		if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &tc.pod), 0); err != nil {
+		if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &tc.pod), 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -338,7 +338,7 @@ func TestEtcdCreate(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
-	err = testapi.Codec().DecodeInto([]byte(resp.Node.Value), &pod)
+	err = testapi.Default.Codec().DecodeInto([]byte(resp.Node.Value), &pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -424,7 +424,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
-	err = testapi.Codec().DecodeInto([]byte(resp.Node.Value), &pod)
+	err = testapi.Default.Codec().DecodeInto([]byte(resp.Node.Value), &pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -495,7 +495,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
-	err = testapi.Codec().DecodeInto([]byte(resp.Node.Value), &pod)
+	err = testapi.Default.Codec().DecodeInto([]byte(resp.Node.Value), &pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -578,7 +578,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewPod()), 1)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), validNewPod()), 1)
 
 	podIn := validChangedPod()
 	_, _, err := storage.Update(ctx, podIn)
@@ -590,7 +590,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	podOut := &api.Pod{}
-	testapi.Codec().DecodeInto([]byte(response.Node.Value), podOut)
+	testapi.Default.Codec().DecodeInto([]byte(response.Node.Value), podOut)
 	if !api.Semantic.DeepEqual(podOut, podIn) {
 		t.Errorf("objects differ: %v", util.ObjectDiff(podOut, podIn))
 	}
@@ -603,7 +603,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
@@ -655,7 +655,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	var podOut api.Pod
-	testapi.Codec().DecodeInto([]byte(response.Node.Value), &podOut)
+	testapi.Default.Codec().DecodeInto([]byte(response.Node.Value), &podOut)
 	if !api.Semantic.DeepEqual(podOut, podIn) {
 		t.Errorf("expected: %#v, got: %#v", podOut, podIn)
 	}
@@ -684,7 +684,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			},
 		},
 	}
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &podStart), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &podStart), 0)
 
 	podIn := api.Pod{
 		ObjectMeta: api.ObjectMeta{

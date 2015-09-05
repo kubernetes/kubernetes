@@ -99,7 +99,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	if c.DeleteEtcdKeys {
 		DeleteAllEtcdKeys()
 	}
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version(), QPS: c.QPS, Burst: c.Burst})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version(), QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	controllerManager := replicationcontroller.NewReplicationManager(restClient, c.Burst)
 
@@ -269,7 +269,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	etcdClient := NewEtcdClient()
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
