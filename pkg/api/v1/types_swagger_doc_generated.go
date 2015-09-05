@@ -144,6 +144,7 @@ var map_Container = map[string]string{
 	"securityContext":        "Security options the pod should run with. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md",
 	"stdin":                  "Whether this container should allocate a buffer for stdin in the container runtime. Default is false.",
 	"tty":                    "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+	"labels":                 "Optional: Allows one to define labels for Docker containers. These should follow the same labeling conventions",
 }
 
 func (Container) SwaggerDoc() map[string]string {

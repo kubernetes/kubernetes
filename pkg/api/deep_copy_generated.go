@@ -238,6 +238,14 @@ func deepCopy_api_Container(in Container, out *Container, c *conversion.Cloner) 
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
 	return nil
 }
 
