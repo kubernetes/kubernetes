@@ -49,9 +49,9 @@ func (Daemon) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonList = map[string]string{
-	"":         "DaemonList is a collection of daemon.",
+	"":         "DaemonList is a list of Daemons.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is a list of daemons.",
+	"items":    "Items is the list of Daemons.",
 }
 
 func (DaemonList) SwaggerDoc() map[string]string {
@@ -80,8 +80,10 @@ func (DaemonStatus) SwaggerDoc() map[string]string {
 }
 
 var map_Deployment = map[string]string{
-	"spec":   "Specification of the desired behavior of the Deployment.",
-	"status": "Most recently observed status of the Deployment.",
+	"":         "Deployment enables declarative updates for Pods and ReplicationControllers.",
+	"metadata": "Standard object metadata.",
+	"spec":     "Specification of the desired behavior of the Deployment.",
+	"status":   "Most recently observed status of the Deployment.",
 }
 
 func (Deployment) SwaggerDoc() map[string]string {
@@ -89,7 +91,9 @@ func (Deployment) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentList = map[string]string{
-	"items": "Items is the list of deployments.",
+	"":         "DeploymentList is a list of Deployments.",
+	"metadata": "Standard list metadata.",
+	"items":    "Items is the list of Deployments.",
 }
 
 func (DeploymentList) SwaggerDoc() map[string]string {
@@ -97,6 +101,7 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentSpec = map[string]string{
+	"":               "DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":       "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 	"selector":       "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be scaled down.",
 	"template":       "Template describes the pods that will be created.",
@@ -109,6 +114,7 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStatus = map[string]string{
+	"":                "DeploymentStatus is the most recently observed status of the Deployment.",
 	"replicas":        "Total number of ready pods targeted by this deployment (this includes both the old and new pods).",
 	"updatedReplicas": "Total number of new ready pods with the desired template spec.",
 }
@@ -118,6 +124,7 @@ func (DeploymentStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStrategy = map[string]string{
+	"":              "DeploymentStrategy describes how to replace existing pods with new ones.",
 	"type":          "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
 	"rollingUpdate": "Rolling update config params. Present only if DeploymentType = RollingUpdate.",
 }
@@ -127,9 +134,10 @@ func (DeploymentStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscaler = map[string]string{
-	"":       "HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.",
-	"spec":   "Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
-	"status": "Status represents the current information about the autoscaler.",
+	"":         "HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.",
+	"metadata": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+	"status":   "Status represents the current information about the autoscaler.",
 }
 
 func (HorizontalPodAutoscaler) SwaggerDoc() map[string]string {
@@ -137,8 +145,9 @@ func (HorizontalPodAutoscaler) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerList = map[string]string{
-	"":      "HorizontalPodAutoscaler is a collection of pod autoscalers.",
-	"items": "Items is the list of horizontal pod autoscalers.",
+	"":         "HorizontalPodAutoscalerList is a list of HorizontalPodAutoscalers.",
+	"metadata": "Standard list metadata.",
+	"items":    "Items is the list of HorizontalPodAutoscalers.",
 }
 
 func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
@@ -178,7 +187,9 @@ func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceConsumption = map[string]string{
-	"": "ResourceConsumption is an object for specifying average resource consumption of a particular resource.",
+	"":         "ResourceConsumption is an object for specifying average resource consumption of a particular resource.",
+	"resource": "Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status.",
+	"quantity": "Quantity specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status.",
 }
 
 func (ResourceConsumption) SwaggerDoc() map[string]string {
@@ -261,8 +272,9 @@ func (ThirdPartyResourceData) SwaggerDoc() map[string]string {
 }
 
 var map_ThirdPartyResourceDataList = map[string]string{
+	"":         "ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.",
 	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is a list of third party objects",
+	"items":    "Items is the list of ThirdpartyResourceData.",
 }
 
 func (ThirdPartyResourceDataList) SwaggerDoc() map[string]string {
@@ -270,8 +282,9 @@ func (ThirdPartyResourceDataList) SwaggerDoc() map[string]string {
 }
 
 var map_ThirdPartyResourceList = map[string]string{
+	"":         "ThirdPartyResourceList is a list of ThirdPartyResources.",
 	"metadata": "Standard list metadata.",
-	"items":    "Items is the list of horizontal pod autoscalers.",
+	"items":    "Items is the list of ThirdPartyResources.",
 }
 
 func (ThirdPartyResourceList) SwaggerDoc() map[string]string {
