@@ -18,6 +18,7 @@ package aws_cloud
 
 import (
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
@@ -31,8 +32,8 @@ var _ InstanceGroups = &AWSCloud{}
 func (a *AWSCloud) ResizeInstanceGroup(instanceGroupName string, size int) error {
 	request := &autoscaling.UpdateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(instanceGroupName),
-		MinSize:              aws.Long(int64(size)),
-		MaxSize:              aws.Long(int64(size)),
+		MinSize:              aws.Int64(int64(size)),
+		MaxSize:              aws.Int64(int64(size)),
 	}
 	if _, err := a.asg.UpdateAutoScalingGroup(request); err != nil {
 		return fmt.Errorf("error resizing AWS autoscaling group: %v", err)

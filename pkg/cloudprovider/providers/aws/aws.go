@@ -33,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
@@ -89,7 +90,7 @@ type EC2 interface {
 	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
 	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error)
 
-	DescribeVPCs(*ec2.DescribeVPCsInput) ([]*ec2.VPC, error)
+	DescribeVPCs(*ec2.DescribeVpcsInput) ([]*ec2.Vpc, error)
 
 	DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error)
 
@@ -209,7 +210,7 @@ type awsSDKProvider struct {
 func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 	ec2 := &awsSdkEC2{
 		ec2: ec2.New(&aws.Config{
-			Region:      regionName,
+			Region:      aws.String(regionName),
 			Credentials: p.creds,
 		}),
 	}
@@ -218,7 +219,7 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 
 func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	elbClient := elb.New(&aws.Config{
-		Region:      regionName,
+		Region:      aws.String(regionName),
 		Credentials: p.creds,
 	})
 	return elbClient, nil
@@ -226,7 +227,7 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 
 func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 	client := autoscaling.New(&aws.Config{
-		Region:      regionName,
+		Region:      aws.String(regionName),
 		Credentials: p.creds,
 	})
 	return client, nil
@@ -367,8 +368,8 @@ func (s *awsSdkEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsIn
 func (s *awsSdkEC2) AttachVolume(volumeID, instanceId, device string) (resp *ec2.VolumeAttachment, err error) {
 	request := ec2.AttachVolumeInput{
 		Device:     &device,
-		InstanceID: &instanceId,
-		VolumeID:   &volumeID,
+		InstanceId: &instanceId,
+		VolumeId:   &volumeID,
 	}
 	return s.ec2.AttachVolume(&request)
 }
@@ -406,17 +407,17 @@ func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volu
 }
 
 func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error) {
-	request := ec2.DeleteVolumeInput{VolumeID: &volumeID}
+	request := ec2.DeleteVolumeInput{VolumeId: &volumeID}
 	return s.ec2.DeleteVolume(&request)
 }
 
-func (s *awsSdkEC2) DescribeVPCs(request *ec2.DescribeVPCsInput) ([]*ec2.VPC, error) {
+func (s *awsSdkEC2) DescribeVPCs(request *ec2.DescribeVpcsInput) ([]*ec2.Vpc, error) {
 	// VPCs are not paged
-	response, err := s.ec2.DescribeVPCs(request)
+	response, err := s.ec2.DescribeVpcs(request)
 	if err != nil {
 		return nil, fmt.Errorf("error listing AWS VPCs: %v", err)
 	}
-	return response.VPCs, nil
+	return response.Vpcs, nil
 }
 
 func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
@@ -474,7 +475,7 @@ func init() {
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{
 				&credentials.EnvProvider{},
-				&credentials.EC2RoleProvider{},
+				&ec2rolecreds.EC2RoleProvider{},
 				&credentials.SharedCredentialsProvider{},
 			})
 		aws := &awsSDKProvider{creds: creds}
@@ -648,11 +649,11 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 
 	addresses := []api.NodeAddress{}
 
-	if !isNilOrEmpty(instance.PrivateIPAddress) {
-		ipAddress := *instance.PrivateIPAddress
+	if !isNilOrEmpty(instance.PrivateIpAddress) {
+		ipAddress := *instance.PrivateIpAddress
 		ip := net.ParseIP(ipAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceID), ipAddress)
+			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: ip.String()})
 
@@ -661,11 +662,11 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
-	if !isNilOrEmpty(instance.PublicIPAddress) {
-		ipAddress := *instance.PublicIPAddress
+	if !isNilOrEmpty(instance.PublicIpAddress) {
+		ipAddress := *instance.PublicIpAddress
 		ip := net.ParseIP(ipAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", orEmpty(instance.InstanceID), ipAddress)
+			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: ip.String()})
 	}
@@ -684,7 +685,7 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	if instance == nil || !isAlive(instance) {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return orEmpty(instance.InstanceID), nil
+	return orEmpty(instance.InstanceId), nil
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -696,7 +697,7 @@ func (aws *AWSCloud) InstanceID(name string) (string, error) {
 	}
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
-	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceID), nil
+	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
 }
 
 // Check if the instance is alive (running or pending)
@@ -754,14 +755,14 @@ func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
 		if orEmpty(instance.State.Name) == "pending" {
-			glog.V(2).Infof("skipping EC2 instance (pending): %s", *instance.InstanceID)
+			glog.V(2).Infof("skipping EC2 instance (pending): %s", *instance.InstanceId)
 			continue
 		}
 
-		privateDNSName := orEmpty(instance.PrivateDNSName)
+		privateDNSName := orEmpty(instance.PrivateDnsName)
 		if privateDNSName == "" {
 			glog.V(2).Infof("skipping EC2 instance (no PrivateDNSName): %s",
-				orEmpty(instance.InstanceID))
+				orEmpty(instance.InstanceId))
 			continue
 		}
 
@@ -845,7 +846,7 @@ func (self *awsInstance) getInstanceType() *awsInstanceType {
 func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	instanceID := self.awsID
 	request := &ec2.DescribeInstancesInput{
-		InstanceIDs: []*string{&instanceID},
+		InstanceIds: []*string{&instanceID},
 	}
 
 	instances, err := self.ec2.DescribeInstances(request)
@@ -890,7 +891,7 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 			if strings.HasPrefix(mountpoint, "/dev/xvd") {
 				mountpoint = mountpoint[8:]
 			}
-			deviceMappings[mountpoint] = orEmpty(blockDevice.EBS.VolumeID)
+			deviceMappings[mountpoint] = orEmpty(blockDevice.Ebs.VolumeId)
 		}
 		self.deviceMappings = deviceMappings
 	}
@@ -992,7 +993,7 @@ func (self *awsDisk) getInfo() (*ec2.Volume, error) {
 	volumeID := self.awsID
 
 	request := &ec2.DescribeVolumesInput{
-		VolumeIDs: []*string{&volumeID},
+		VolumeIds: []*string{&volumeID},
 	}
 
 	volumes, err := self.ec2.DescribeVolumes(request)
@@ -1103,7 +1104,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceID), orEmpty(instance.PrivateDNSName))
+		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName))
 	}
 
 	return awsInstance, nil
@@ -1181,8 +1182,8 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 	}
 
 	request := ec2.DetachVolumeInput{
-		InstanceID: &awsInstance.awsID,
-		VolumeID:   &disk.awsID,
+		InstanceId: &awsInstance.awsID,
+		VolumeId:   &disk.awsID,
 	}
 
 	response, err := aws.ec2.DetachVolume(&request)
@@ -1215,7 +1216,7 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 	}
 
 	az := orEmpty(response.AvailabilityZone)
-	awsID := orEmpty(response.VolumeID)
+	awsID := orEmpty(response.VolumeId)
 
 	volumeName := "aws://" + az + "/" + awsID
 
@@ -1308,8 +1309,8 @@ func (self *AWSCloud) findVPCID() (string, error) {
 }
 
 // Find the kubernetes VPC
-func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
-	request := &ec2.DescribeVPCsInput{}
+func (self *AWSCloud) findVPC() (*ec2.Vpc, error) {
+	request := &ec2.DescribeVpcsInput{}
 
 	// find by vpcID from metadata
 	vpcID, err := self.findVPCID()
@@ -1337,7 +1338,7 @@ func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 // Retrieves the specified security group from the AWS API, or returns nil if not found
 func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup, error) {
 	describeSecurityGroupsRequest := &ec2.DescribeSecurityGroupsInput{
-		GroupIDs: []*string{&securityGroupId},
+		GroupIds: []*string{&securityGroupId},
 	}
 
 	groups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
@@ -1376,34 +1377,34 @@ func isEqualStringPointer(l, r *string) bool {
 	return *l == *r
 }
 
-func isEqualIPPermission(l, r *ec2.IPPermission, compareGroupUserIDs bool) bool {
+func isEqualIPPermission(l, r *ec2.IpPermission, compareGroupUserIDs bool) bool {
 	if !isEqualIntPointer(l.FromPort, r.FromPort) {
 		return false
 	}
 	if !isEqualIntPointer(l.ToPort, r.ToPort) {
 		return false
 	}
-	if !isEqualStringPointer(l.IPProtocol, r.IPProtocol) {
+	if !isEqualStringPointer(l.IpProtocol, r.IpProtocol) {
 		return false
 	}
-	if len(l.IPRanges) != len(r.IPRanges) {
+	if len(l.IpRanges) != len(r.IpRanges) {
 		return false
 	}
-	for j := range l.IPRanges {
-		if !isEqualStringPointer(l.IPRanges[j].CIDRIP, r.IPRanges[j].CIDRIP) {
+	for j := range l.IpRanges {
+		if !isEqualStringPointer(l.IpRanges[j].CidrIp, r.IpRanges[j].CidrIp) {
 			return false
 		}
 	}
 
-	if len(l.UserIDGroupPairs) != len(r.UserIDGroupPairs) {
+	if len(l.UserIdGroupPairs) != len(r.UserIdGroupPairs) {
 		return false
 	}
-	for j := range l.UserIDGroupPairs {
-		if !isEqualStringPointer(l.UserIDGroupPairs[j].GroupID, r.UserIDGroupPairs[j].GroupID) {
+	for j := range l.UserIdGroupPairs {
+		if !isEqualStringPointer(l.UserIdGroupPairs[j].GroupId, r.UserIdGroupPairs[j].GroupId) {
 			return false
 		}
 		if compareGroupUserIDs {
-			if !isEqualStringPointer(l.UserIDGroupPairs[j].UserID, r.UserIDGroupPairs[j].UserID) {
+			if !isEqualStringPointer(l.UserIdGroupPairs[j].UserId, r.UserIdGroupPairs[j].UserId) {
 				return false
 			}
 		}
@@ -1415,7 +1416,7 @@ func isEqualIPPermission(l, r *ec2.IPPermission, compareGroupUserIDs bool) bool 
 // Makes sure the security group includes the specified permissions
 // Returns true iff changes were made
 // The security group must already exist
-func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IPPermission) (bool, error) {
+func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1426,17 +1427,17 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 		return false, fmt.Errorf("security group not found: %s", securityGroupId)
 	}
 
-	changes := []*ec2.IPPermission{}
+	changes := []*ec2.IpPermission{}
 	for _, addPermission := range addPermissions {
 		hasUserID := false
-		for i := range addPermission.UserIDGroupPairs {
-			if addPermission.UserIDGroupPairs[i].UserID != nil {
+		for i := range addPermission.UserIdGroupPairs {
+			if addPermission.UserIdGroupPairs[i].UserId != nil {
 				hasUserID = true
 			}
 		}
 
 		found := false
-		for _, groupPermission := range group.IPPermissions {
+		for _, groupPermission := range group.IpPermissions {
 			if isEqualIPPermission(addPermission, groupPermission, hasUserID) {
 				found = true
 				break
@@ -1455,8 +1456,8 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 	glog.V(2).Infof("Adding security group ingress: %s %v", securityGroupId, changes)
 
 	request := &ec2.AuthorizeSecurityGroupIngressInput{}
-	request.GroupID = &securityGroupId
-	request.IPPermissions = changes
+	request.GroupId = &securityGroupId
+	request.IpPermissions = changes
 	_, err = s.ec2.AuthorizeSecurityGroupIngress(request)
 	if err != nil {
 		glog.Warning("error authorizing security group ingress", err)
@@ -1469,7 +1470,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 // Makes sure the security group no longer includes the specified permissions
 // Returns true iff changes were made
 // If the security group no longer exists, will return (false, nil)
-func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
+func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1481,17 +1482,17 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 		return false, nil
 	}
 
-	changes := []*ec2.IPPermission{}
+	changes := []*ec2.IpPermission{}
 	for _, removePermission := range removePermissions {
 		hasUserID := false
-		for i := range removePermission.UserIDGroupPairs {
-			if removePermission.UserIDGroupPairs[i].UserID != nil {
+		for i := range removePermission.UserIdGroupPairs {
+			if removePermission.UserIdGroupPairs[i].UserId != nil {
 				hasUserID = true
 			}
 		}
 
-		var found *ec2.IPPermission
-		for _, groupPermission := range group.IPPermissions {
+		var found *ec2.IpPermission
+		for _, groupPermission := range group.IpPermissions {
 			if isEqualIPPermission(groupPermission, removePermission, hasUserID) {
 				found = groupPermission
 				break
@@ -1510,8 +1511,8 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 	glog.V(2).Infof("Removing security group ingress: %s %v", securityGroupId, changes)
 
 	request := &ec2.RevokeSecurityGroupIngressInput{}
-	request.GroupID = &securityGroupId
-	request.IPPermissions = changes
+	request.GroupId = &securityGroupId
+	request.IpPermissions = changes
 	_, err = s.ec2.RevokeSecurityGroupIngress(request)
 	if err != nil {
 		glog.Warning("error revoking security group ingress", err)
@@ -1545,11 +1546,11 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 			if len(securityGroups) > 1 {
 				glog.Warning("Found multiple security groups with name:", name)
 			}
-			return orEmpty(securityGroups[0].GroupID), nil
+			return orEmpty(securityGroups[0].GroupId), nil
 		}
 
 		createRequest := &ec2.CreateSecurityGroupInput{}
-		createRequest.VPCID = &vpcID
+		createRequest.VpcId = &vpcID
 		createRequest.GroupName = &name
 		createRequest.Description = &description
 
@@ -1569,7 +1570,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 			}
 			time.Sleep(1 * time.Second)
 		} else {
-			groupID = orEmpty(createResponse.GroupID)
+			groupID = orEmpty(createResponse.GroupId)
 			break
 		}
 	}
@@ -1659,7 +1660,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 	{
 		request := &ec2.DescribeSubnetsInput{}
 		filters := []*ec2.Filter{}
-		filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VPCID)))
+		filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VpcId)))
 		filters = s.addFilters(filters)
 		request.Filters = filters
 
@@ -1671,7 +1672,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 		//	zones := []string{}
 		for _, subnet := range subnets {
-			subnetIDs = append(subnetIDs, orEmpty(subnet.SubnetID))
+			subnetIDs = append(subnetIDs, orEmpty(subnet.SubnetId))
 			if !strings.HasPrefix(orEmpty(subnet.AvailabilityZone), region) {
 				glog.Error("found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
 				return nil, fmt.Errorf("invalid AZ for region")
@@ -1685,23 +1686,23 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 	{
 		sgName := "k8s-elb-" + name
 		sgDescription := "Security group for Kubernetes ELB " + name
-		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, orEmpty(vpc.VPCID))
+		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, orEmpty(vpc.VpcId))
 		if err != nil {
 			glog.Error("error creating load balancer security group: ", err)
 			return nil, err
 		}
 
-		permissions := []*ec2.IPPermission{}
+		permissions := []*ec2.IpPermission{}
 		for _, port := range ports {
 			portInt64 := int64(port.Port)
 			protocol := strings.ToLower(string(port.Protocol))
 			sourceIp := "0.0.0.0/0"
 
-			permission := &ec2.IPPermission{}
+			permission := &ec2.IpPermission{}
 			permission.FromPort = &portInt64
 			permission.ToPort = &portInt64
-			permission.IPRanges = []*ec2.IPRange{{CIDRIP: &sourceIp}}
-			permission.IPProtocol = &protocol
+			permission.IpRanges = []*ec2.IpRange{{CidrIp: &sourceIp}}
+			permission.IpProtocol = &protocol
 
 			permissions = append(permissions, permission)
 		}
@@ -1795,23 +1796,23 @@ func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
 func findSecurityGroupForInstance(instance *ec2.Instance) *string {
 	var securityGroupId *string
 	for _, securityGroup := range instance.SecurityGroups {
-		if securityGroup == nil || securityGroup.GroupID == nil {
+		if securityGroup == nil || securityGroup.GroupId == nil {
 			// Not expected, but avoid panic
-			glog.Warning("Unexpected empty security group for instance: ", orEmpty(instance.InstanceID))
+			glog.Warning("Unexpected empty security group for instance: ", orEmpty(instance.InstanceId))
 			continue
 		}
 
 		if securityGroupId != nil {
 			// We create instances with one SG
-			glog.Warningf("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceID), *securityGroupId)
+			glog.Warningf("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceId), *securityGroupId)
 			continue
 		} else {
-			securityGroupId = securityGroup.GroupID
+			securityGroupId = securityGroup.GroupId
 		}
 	}
 
 	if securityGroupId == nil {
-		glog.Warning("No security group found for instance ", orEmpty(instance.InstanceID))
+		glog.Warning("No security group found for instance ", orEmpty(instance.InstanceId))
 	}
 
 	return securityGroupId
@@ -1858,7 +1859,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 	for _, instance := range allInstances {
 		securityGroupId := findSecurityGroupForInstance(instance)
 		if isNilOrEmpty(securityGroupId) {
-			glog.Warning("ignoring instance without security group: ", orEmpty(instance.InstanceID))
+			glog.Warning("ignoring instance without security group: ", orEmpty(instance.InstanceId))
 			continue
 		}
 
@@ -1867,12 +1868,12 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 
 	// Compare to actual groups
 	for _, actualGroup := range actualGroups {
-		if isNilOrEmpty(actualGroup.GroupID) {
+		if isNilOrEmpty(actualGroup.GroupId) {
 			glog.Warning("ignoring group without ID: ", actualGroup)
 			continue
 		}
 
-		actualGroupID := *actualGroup.GroupID
+		actualGroupID := *actualGroup.GroupId
 
 		adding, found := instanceSecurityGroupIds[actualGroupID]
 		if found && adding {
@@ -1890,16 +1891,16 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		} else {
 			glog.V(2).Infof("Removing rule for traffic from the load balancer (%s) to instance (%s)", loadBalancerSecurityGroupId, instanceSecurityGroupId)
 		}
-		sourceGroupId := &ec2.UserIDGroupPair{}
-		sourceGroupId.GroupID = &loadBalancerSecurityGroupId
+		sourceGroupId := &ec2.UserIdGroupPair{}
+		sourceGroupId.GroupId = &loadBalancerSecurityGroupId
 
 		allProtocols := "-1"
 
-		permission := &ec2.IPPermission{}
-		permission.IPProtocol = &allProtocols
-		permission.UserIDGroupPairs = []*ec2.UserIDGroupPair{sourceGroupId}
+		permission := &ec2.IpPermission{}
+		permission.IpProtocol = &allProtocols
+		permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{sourceGroupId}
 
-		permissions := []*ec2.IPPermission{permission}
+		permissions := []*ec2.IpPermission{permission}
 
 		if add {
 			changed, err := s.ensureSecurityGroupIngress(instanceSecurityGroupId, permissions)
@@ -1982,7 +1983,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 		for {
 			for securityGroupID := range securityGroupIDs {
 				request := &ec2.DeleteSecurityGroupInput{}
-				request.GroupID = &securityGroupID
+				request.GroupId = &securityGroupID
 				_, err := s.ec2.DeleteSecurityGroup(request)
 				if err == nil {
 					delete(securityGroupIDs, securityGroupID)
@@ -2071,7 +2072,7 @@ func (a *AWSCloud) getInstancesByIds(ids []string) ([]*ec2.Instance, error) {
 // Returns the instance with the specified ID
 func (a *AWSCloud) getInstanceById(instanceID string) (*ec2.Instance, error) {
 	request := &ec2.DescribeInstancesInput{
-		InstanceIDs: []*string{&instanceID},
+		InstanceIds: []*string{&instanceID},
 	}
 
 	instances, err := a.ec2.DescribeInstances(request)
