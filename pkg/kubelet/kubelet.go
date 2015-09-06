@@ -308,6 +308,7 @@ func NewMainKubelet(
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
+		flannelServer:                  &FlannelServer{kubeClient},
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -538,6 +539,8 @@ type Kubelet struct {
 	probeManager prober.Manager
 	// Manages container health check results.
 	livenessManager proberesults.Manager
+	// Serves flannel interface over http
+	flannelServer *FlannelServer
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them
