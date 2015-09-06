@@ -132,3 +132,6 @@ OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
+# Overlay network settings
+OVERLAY_NETWORK=${OVERLAY_NETWORK:-true}
+FIREWALL_ETCD="${FIREWALL_SSH:-${NETWORK}-allow-etcd}"

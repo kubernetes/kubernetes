@@ -292,7 +292,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	if s.AllocateNodeCIDRs {
-		if cloud == nil {
+		// TODO: Pipe this as a command line flag that corresponds to overlay==true
+		if cloud == nil || true {
 			glog.Warning("allocate-node-cidrs is set, but no cloud provider specified. Will not manage routes.")
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
