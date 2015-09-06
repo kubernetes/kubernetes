@@ -13,6 +13,10 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
+    - flannel
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
+    - openvpn-client
+{% endif %}
     - helpers
     - cadvisor
     - kube-client-tools
@@ -40,6 +44,7 @@ base:
     - match: grain
     - generate-cert
     - etcd
+    - flannel
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler

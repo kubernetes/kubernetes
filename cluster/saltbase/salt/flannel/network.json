@@ -1,0 +1,8 @@
+{
+    "Network": "10.245.0.0/16",
+    "SubnetLen": 24,
+    "Backend": {
+        "Type": "vxlan",
+        "VNI": 1
+     }
+}
