@@ -22,8 +22,8 @@ import (
 	"github.com/golang/glog"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/networkprovider"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/networkprovider"
 )
 
 const (
@@ -31,9 +31,9 @@ const (
 )
 
 type RemoteNetworkPlugin struct {
-	host       network.Host
-	client 	   client.Interface
-	provider   networkprovider.Interface
+	host     network.Host
+	client   client.Interface
+	provider networkprovider.Interface
 }
 
 func NewRemoteNetworkPlugin(provider networkprovider.Interface) *RemoteNetworkPlugin {
@@ -91,14 +91,14 @@ func (plugin *RemoteNetworkPlugin) Name() string {
 // SetUpPod is the method called after the infra container of
 // the pod has been created but before the other containers of the
 // pod are launched.
-func (plugin *RemoteNetworkPlugin) SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error {
+func (plugin *RemoteNetworkPlugin) SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID, containerRuntime string) error {
 	network, err := plugin.getNetworkOfNamespace(namespace)
 	if err != nil {
 		glog.Errorf("GetNetworkOfNamespace failed: %v", err)
 		return err
 	}
 
-	err = plugin.provider.Pods().SetupPod(name, namespace, string(podInfraContainerID), network)
+	err = plugin.provider.Pods().SetupPod(name, namespace, string(podInfraContainerID), network, containerRuntime)
 	if err != nil {
 		glog.Errorf("SetupPod failed: %v", err)
 		return err
@@ -108,14 +108,14 @@ func (plugin *RemoteNetworkPlugin) SetUpPod(namespace string, name string, podIn
 }
 
 // TearDownPod is the method called before a pod's infra container will be deleted
-func (plugin *RemoteNetworkPlugin) TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error {
+func (plugin *RemoteNetworkPlugin) TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID, containerRuntime string) error {
 	network, err := plugin.getNetworkOfNamespace(namespace)
 	if err != nil {
 		glog.Errorf("GetNetworkOfNamespace failed: %v", err)
 		return err
 	}
 
-	err = plugin.provider.Pods().TeardownPod(name, namespace, string(podInfraContainerID), network)
+	err = plugin.provider.Pods().TeardownPod(name, namespace, string(podInfraContainerID), network, containerRuntime)
 	if err != nil {
 		glog.Errorf("TeardownPod failed: %v", err)
 		return err
@@ -125,14 +125,14 @@ func (plugin *RemoteNetworkPlugin) TearDownPod(namespace string, name string, po
 }
 
 // Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-func (plugin *RemoteNetworkPlugin) Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) (*network.PodNetworkStatus, error) {
+func (plugin *RemoteNetworkPlugin) Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID, containerRuntime string) (*network.PodNetworkStatus, error) {
 	networkInfo, err := plugin.getNetworkOfNamespace(namespace)
 	if err != nil {
 		glog.Errorf("GetNetworkOfNamespace failed: %v", err)
 		return nil, err
 	}
 
-	ipAddress, err := plugin.provider.Pods().PodStatus(name, namespace, string(podInfraContainerID), networkInfo)
+	ipAddress, err := plugin.provider.Pods().PodStatus(name, namespace, string(podInfraContainerID), networkInfo, containerRuntime)
 	if err != nil {
 		glog.Errorf("SetupPod failed: %v", err)
 		return nil, err

@@ -90,11 +90,11 @@ type Route struct {
 
 type Pods interface {
 	// Setup pod
-	SetupPod(podName, namespace, podInfraContainerID string, network *Network) error
+	SetupPod(podName, namespace, podInfraContainerID string, network *Network, containerRuntime string) error
 	// Teardown pod
-	TeardownPod(podName, namespace, podInfraContainerID string, network *Network) error
+	TeardownPod(podName, namespace, podInfraContainerID string, network *Network, containerRuntime string) error
 	// Status of pod
-	PodStatus(podName, namespace, podInfraContainerID string, network *Network) (string, error)
+	PodStatus(podName, namespace, podInfraContainerID string, network *Network, containerRuntime string) (string, error)
 }
 
 // Networks is an abstract, pluggable interface for network segment

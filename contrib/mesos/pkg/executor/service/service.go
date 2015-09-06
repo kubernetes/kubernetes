@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/networkprovider"
 	"k8s.io/kubernetes/pkg/util"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -184,6 +185,18 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
+	networkPluginName := s.NetworkPluginName
+	networkPlugins := app.ProbeNetworkPlugins(s.NetworkPluginDir)
+
+	app.ProbeNetworkProviders()
+	networkProvider, err := networkprovider.InitNetworkProvider(s.NetworkProvider)
+	if err != nil {
+		log.Warningf("Network provider could not be initialized: %v", err)
+	} else {
+		networkPlugins = append(networkPlugins, app.NewRemoteNetworkPlugin(networkProvider))
+		networkPluginName = "NetworkProvider"
+	}
+
 	kcfg := app.KubeletConfig{
 		Address:            s.Address,
 		AllowPrivileged:    s.AllowPrivileged,
@@ -215,8 +228,8 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		KubeClient:                     apiclient,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  app.ProbeVolumePlugins(),
-		NetworkPlugins:                 app.ProbeNetworkPlugins(s.NetworkPluginDir),
-		NetworkPluginName:              s.NetworkPluginName,
+		NetworkPlugins:                 networkPlugins,
+		NetworkPluginName:              networkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		TLSOptions:                     tlsOptions,
 		ImageGCPolicy:                  imageGCPolicy,

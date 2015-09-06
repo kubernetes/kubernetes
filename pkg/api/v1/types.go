@@ -1980,19 +1980,21 @@ const (
 
 // Subnet is a description of a subnet
 type Subnet struct {
-	CIDR    string `json:"cidr" description:"subnet cidr"`
-	Gateway string `json:"gateway" description:"subnet gateway"`
+	// CIDR of this subnet
+	CIDR string `json:"cidr"`
+	// Gateway of this subnet
+	Gateway string `json:"gateway"`
 }
 
 // NetworkSpec is a description of a network
 type NetworkSpec struct {
 	// There must be at least one subnet in a network
 	// Subnets and ProviderNetworkID must not be provided together
-	Subnets map[string]Subnet `json:"subnets,omitempty" description:"list of subnets"`
+	Subnets map[string]Subnet `json:"subnets,omitempty"`
 
 	// Network's ID of provider network
 	// ProviderNetworkID and Subnets must not be provided together
-	ProviderNetworkID string `json:"providerNetworkID,omitempty"  description:"provider network ID"`
+	ProviderNetworkID string `json:"providerNetworkID,omitempty"`
 
 	// TenantID is the tenant ID of network provider
 	TenantID string `json:"tenantID"`
@@ -2000,22 +2002,27 @@ type NetworkSpec struct {
 
 // Network describes a network
 type Network struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Network.
-	Spec NetworkSpec `json:"spec,omitempty" description:"network spec, including subnets and provider network id"`
+	Spec NetworkSpec `json:"spec,omitempty"`
 
 	// Status describes the current status of a Network
-	Status NetworkStatus `json:"status,omitempty" description:"status describes the current status of a Network"`
+	Status NetworkStatus `json:"status,omitempty"`
 }
 
 // NetworkList is a list of Networks
 type NetworkList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	ListMeta `json:"metadata,omitempty"`
 
-	Items []Network `json:"items"  description:"items is the list of Network objects in the list"`
+	// Items is the list of Network objects in the list
+	Items []Network `json:"items"`
 }
 
 // Binding ties one object to another.

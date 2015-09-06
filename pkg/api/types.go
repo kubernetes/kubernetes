@@ -1591,7 +1591,9 @@ const (
 
 // Subnet is a description of a subnet
 type Subnet struct {
-	CIDR    string `json:"cidr"`
+	// CIDR of this subnet
+	CIDR string `json:"cidr"`
+	// Gateway of this subnet
 	Gateway string `json:"gateway"`
 }
 
@@ -1611,7 +1613,9 @@ type NetworkSpec struct {
 
 // Network describes a network
 type Network struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Network.
@@ -1624,8 +1628,11 @@ type Network struct {
 // NetworkList is a list of Networks
 type NetworkList struct {
 	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	ListMeta `json:"metadata,omitempty"`
 
+	// Items is the list of Network objects in the list
 	Items []Network `json:"items"`
 }
 

@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/network"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -28,12 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	storage, _ := NewREST(etcdStorage)
 	return storage, fakeClient
 }
@@ -44,6 +41,7 @@ func validNewNetwork() *api.Network {
 			Name: "foo",
 		},
 		Spec: api.NetworkSpec{
+			TenantID: "123",
 			Subnets: map[string]api.Subnet{
 				"subnet1": {
 					CIDR:    "192.168.0.0/24",
@@ -54,15 +52,6 @@ func validNewNetwork() *api.Network {
 	}
 }
 
-func validChangedNetwork() *api.Network {
-	Network := validNewNetwork()
-	Network.ResourceVersion = "1"
-	Network.Labels = map[string]string{
-		"foo": "bar",
-	}
-	return Network
-}
-
 func TestStorage(t *testing.T) {
 	storage, _ := newStorage(t)
 	network.NewRegistry(storage)
@@ -70,18 +59,12 @@ func TestStorage(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
 	Network := validNewNetwork()
 	Network.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		Network,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Network{
 			ObjectMeta: api.ObjectMeta{Name: "bad value"},
@@ -123,70 +106,43 @@ func TestCreateSetsFields(t *testing.T) {
 	}
 }
 
-func TestNetworkDecode(t *testing.T) {
-	storage, _ := newStorage(t)
-	expected := validNewNetwork()
-	expected.Status.Phase = api.NetworkInitializing
-	body, err := testapi.Codec().Encode(expected)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	actual := storage.New()
-	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !api.Semantic.DeepEqual(expected, actual) {
-		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
-}
-
 func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	Network := validNewNetwork()
-	test.TestGet(Network)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestGet(validNewNetwork())
 }
 
 func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
-	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
-	Network := validNewNetwork()
-	test.TestList(
-		Network,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
-		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+	test := registrytest.New(t, fakeClient, storage.Etcd).ClusterScope()
+	test.TestList(validNewNetwork())
 }
 
 func TestDeleteNetwork(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
+	key := etcdtest.AddPrefix("networks/foo")
 	ctx := api.NewContext()
-	key, err := storage.Etcd.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Network{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-					},
-					Status: api.NetworkStatus{Phase: api.NetworkInitializing},
-				}),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
+	now := util.Now()
+	net := &api.Network{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			DeletionTimestamp: &now,
+		},
+		Spec: api.NetworkSpec{
+			TenantID: "123",
+			Subnets: map[string]api.Subnet{
+				"subnet1": {
+					CIDR:    "192.168.0.0/24",
+					Gateway: "192.168.0.1",
+				},
 			},
 		},
+		Status: api.NetworkStatus{Phase: api.NetworkInitializing},
 	}
-	_, err = storage.Delete(api.NewContext(), "foo", nil)
-
-	if err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), net), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := storage.Delete(ctx, "foo", nil); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

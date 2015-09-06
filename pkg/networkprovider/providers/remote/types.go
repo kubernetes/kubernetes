@@ -124,10 +124,11 @@ type DeleteLoadBalancerResponse struct {
 }
 
 type SetupPodRequest struct {
-	PodName				string	`json:"podName"`
-	Namespace   		string	`json:"namespace"`
-	PodInfraContainerID string	`json:"podInfraContainerID"`
-	Network 			*networkprovider.Network	`json:"network"`
+	PodName             string                   `json:"podName"`
+	Namespace           string                   `json:"namespace"`
+	ContainerRuntime    string                   `json:"containerRuntime"`
+	PodInfraContainerID string                   `json:"podInfraContainerID"`
+	Network             *networkprovider.Network `json:"network"`
 }
 
 type SetupPodResponse struct {
@@ -135,10 +136,11 @@ type SetupPodResponse struct {
 }
 
 type TeardownPodRequest struct {
-	PodName				string	`json:"podName"`
-	Namespace   		string	`json:"namespace"`
-	PodInfraContainerID string	`json:"podInfraContainerID"`
-	Network 			*networkprovider.Network	`json:"network"`
+	PodName             string                   `json:"podName"`
+	Namespace           string                   `json:"namespace"`
+	ContainerRuntime    string                   `json:"containerRuntime"`
+	PodInfraContainerID string                   `json:"podInfraContainerID"`
+	Network             *networkprovider.Network `json:"network"`
 }
 
 type TeardownPodResponse struct {
@@ -146,10 +148,11 @@ type TeardownPodResponse struct {
 }
 
 type PodStatusRequest struct {
-	PodName				string	`json:"podName"`
-	Namespace   		string	`json:"namespace"`
-	PodInfraContainerID string	`json:"podInfraContainerID"`
-	Network 			*networkprovider.Network	`json:"network"`
+	PodName             string                   `json:"podName"`
+	Namespace           string                   `json:"namespace"`
+	ContainerRuntime    string                   `json:"containerRuntime"`
+	PodInfraContainerID string                   `json:"podInfraContainerID"`
+	Network             *networkprovider.Network `json:"network"`
 }
 
 type PodStatusResult struct {

@@ -75,7 +75,7 @@ func (p *Plugin) Networks() networkprovider.Networks {
 }
 
 // Pods interface is self
-func (p *Plugin) Pods() networkprovider.Pods{
+func (p *Plugin) Pods() networkprovider.Pods {
 	return p
 }
 
@@ -254,13 +254,14 @@ func (p *Plugin) DeleteLoadBalancer(name string) error {
 }
 
 // Setup pod
-func (p *Plugin) SetupPod(podName, namespace, podInfraContainerID string, network *networkprovider.Network) error {
+func (p *Plugin) SetupPod(podName, namespace, podInfraContainerID string, network *networkprovider.Network, containerRuntime string) error {
 	ret := SetupPodResponse{}
 	args := SetupPodRequest{
-		PodName: podName,
-		Namespace: namespace,
+		PodName:             podName,
+		Namespace:           namespace,
+		ContainerRuntime:    containerRuntime,
 		PodInfraContainerID: podInfraContainerID,
-		Network: network,
+		Network:             network,
 	}
 	err := p.Client.Call(SetupPodMethod, args, &ret)
 	if err != nil {
@@ -277,13 +278,14 @@ func (p *Plugin) SetupPod(podName, namespace, podInfraContainerID string, networ
 }
 
 // Teardown pod
-func (p *Plugin) TeardownPod(podName, namespace, podInfraContainerID string, network *networkprovider.Network) error {
+func (p *Plugin) TeardownPod(podName, namespace, podInfraContainerID string, network *networkprovider.Network, containerRuntime string) error {
 	ret := TeardownPodResponse{}
 	args := TeardownPodRequest{
-		PodName: podName,
-		Namespace: namespace,
+		PodName:             podName,
+		Namespace:           namespace,
+		ContainerRuntime:    containerRuntime,
 		PodInfraContainerID: podInfraContainerID,
-		Network: network,
+		Network:             network,
 	}
 	err := p.Client.Call(TeardownPodMethod, args, &ret)
 	if err != nil {
@@ -300,13 +302,14 @@ func (p *Plugin) TeardownPod(podName, namespace, podInfraContainerID string, net
 }
 
 // Status of pod
-func (p *Plugin) PodStatus(podName, namespace, podInfraContainerID string, network *networkprovider.Network) (string, error) {
+func (p *Plugin) PodStatus(podName, namespace, podInfraContainerID string, network *networkprovider.Network, containerRuntime string) (string, error) {
 	ret := PodStatusResponse{}
 	args := PodStatusRequest{
-		PodName: podName,
-		Namespace: namespace,
+		PodName:             podName,
+		Namespace:           namespace,
+		ContainerRuntime:    containerRuntime,
 		PodInfraContainerID: podInfraContainerID,
-		Network: network,
+		Network:             network,
 	}
 	err := p.Client.Call(PodStatudMethod, args, &ret)
 	if err != nil {

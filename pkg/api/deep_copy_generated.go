@@ -900,7 +900,6 @@ func deepCopy_api_NamespaceSpec(in NamespaceSpec, out *NamespaceSpec, c *convers
 	} else {
 		out.Finalizers = nil
 	}
-
 	out.Network = in.Network
 	return nil
 }

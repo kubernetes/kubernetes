@@ -38,9 +38,9 @@ const (
 	DeleteLoadBalancerMethod = "DeleteLoadBalancer"
 
 	// Kubelet methods
-	SetupPodMethod			 = "SetupPod"
-	TeardownPodMethod		 = "TeardownPod"
-	PodStatudMethod			 = "PodStatus"
+	SetupPodMethod    = "SetupPod"
+	TeardownPodMethod = "TeardownPod"
+	PodStatudMethod   = "PodStatus"
 )
 
 var (
