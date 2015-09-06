@@ -53,6 +53,8 @@ $ vi cluster/saltbase/pillar/privilege.sls
 allow_privileged: true
 ```
 
+For other non-salt based provider, you can set `--allow-privileged=true` for both api-server and kubelet, and then restart these components.
+
 Rebuild the Kubernetes and spin up a cluster using your preferred KUBERNETES_PROVIDER.
 
 ### NFS server part
