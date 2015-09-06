@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -1245,6 +1246,10 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}()
 
+	// After every sync, set all the hairpins. This serves as an anti-entropy
+	// cycle as well since it fixes all interfaces.
+	defer kl.setHairpin()
+
 	// Kill pods we can't run.
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
 		if err := kl.killPod(pod, runningPod); err != nil {
@@ -2181,6 +2186,28 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 		kl.shaper = bandwidth.NewTCShaper("cbr0")
 	}
 	return kl.shaper.ReconcileInterface()
+}
+
+func (kl *Kubelet) setHairpin() {
+	const dir = "/sys/devices/virtual/net/cbr0/brif"
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		glog.Errorf("Error listing cbr0 interfaces: %s", err)
+		return
+	}
+
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+
+		path := filepath.Join(dir, file.Name(), "hairpin_mode")
+
+		err = ioutil.WriteFile(path, []byte("1"), 0644)
+		if err != nil {
+			glog.Errorf("Error setting hairpin_mode for %s: %s", file.Name(), err)
+		}
+	}
 }
 
 // updateNodeStatus updates node status to master with retries.
