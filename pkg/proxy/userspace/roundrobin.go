@@ -19,17 +19,17 @@ package userspace
 import (
 	"errors"
 	"fmt"
-	"net"
-	"reflect"
-	"strconv"
-	"sync"
-	"time"
-
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/slice"
+	"math/rand"
+	"net"
+	"reflect"
+	"strconv"
+	"sync"
+	"time"
 )
 
 var (
@@ -59,6 +59,8 @@ type LoadBalancerRR struct {
 
 // Ensure this implements LoadBalancer.
 var _ LoadBalancer = &LoadBalancerRR{}
+
+var randomIndexGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 type balancerState struct {
 	endpoints []string // a list of "ip:port" style strings
@@ -95,7 +97,7 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 	}
 
 	if _, exists := lb.services[svcPort]; !exists {
-		lb.services[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlMinutes)}
+		lb.services[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlMinutes), index: getRandomIndex(100)}
 		glog.V(4).Infof("LoadBalancerRR service %q did not exist, created", svcPort)
 	} else if affinityType != "" {
 		lb.services[svcPort].affinity.affinityType = affinityType
@@ -149,8 +151,9 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		}
 	}
 	// Take the next endpoint.
-	endpoint := state.endpoints[state.index]
-	state.index = (state.index + 1) % len(state.endpoints)
+	index := state.index % len(state.endpoints)
+	endpoint := state.endpoints[index]
+	state.index = index + 1
 
 	if sessionAffinityEnabled {
 		var affinity *affinityState
@@ -270,7 +273,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				state.endpoints = slice.ShuffleStrings(newEndpoints)
 
 				// Reset the round-robin index.
-				state.index = 0
+				state.index = getRandomIndex(len(newEndpoints))
 			}
 			registeredEndpoints[svcPort] = true
 		}
@@ -309,4 +312,8 @@ func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortNa
 			delete(state.affinity.affinityMap, ip)
 		}
 	}
+}
+
+func getRandomIndex(n int) int {
+	return randomIndexGenerator.Intn(n + 1)
 }
