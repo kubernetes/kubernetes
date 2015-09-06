@@ -96,7 +96,6 @@ Check the status half a minute later, you will see the container restart count b
 
 ```console
 $ kubectl get pods
-mwielgus@mwielgusd:~/test/k2/kubernetes/examples/liveness$ kubectl get pods
 NAME                                           READY     STATUS       RESTARTS   AGE
 [...]
 liveness-exec                                  1/1       Running      1          36s
