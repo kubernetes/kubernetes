@@ -25,6 +25,7 @@ import (
 
 func TestAddOrUpdateEventNoExisting(t *testing.T) {
 	// Arrange
+	eventCache := NewEventCache()
 	eventTime := unversioned.Now()
 	event := api.Event{
 		Reason:  "my reasons are many",
@@ -46,7 +47,7 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 	}
 
 	// Act
-	result := addOrUpdateEvent(&event)
+	result := eventCache.addOrUpdateEvent(&event)
 
 	// Assert
 	compareEventWithHistoryEntry(&event, &result, t)
@@ -54,6 +55,7 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 
 func TestAddOrUpdateEventExisting(t *testing.T) {
 	// Arrange
+	eventCache := NewEventCache()
 	event1Time := unversioned.Unix(2324, 2342)
 	event2Time := unversioned.Now()
 	event1 := api.Event{
@@ -100,9 +102,9 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 	}
 
 	// Act
-	addOrUpdateEvent(&event1)
-	result1 := addOrUpdateEvent(&event2)
-	result2 := getEvent(&event1)
+	eventCache.addOrUpdateEvent(&event1)
+	result1 := eventCache.addOrUpdateEvent(&event2)
+	result2 := eventCache.getEvent(&event1)
 
 	// Assert
 	compareEventWithHistoryEntry(&event2, &result1, t)
@@ -111,6 +113,7 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 
 func TestGetEventNoExisting(t *testing.T) {
 	// Arrange
+	eventCache := NewEventCache()
 	event := api.Event{
 		Reason:  "to be or not to be",
 		Message: "do I exist",
@@ -129,7 +132,7 @@ func TestGetEventNoExisting(t *testing.T) {
 	}
 
 	// Act
-	existingEvent := getEvent(&event)
+	existingEvent := eventCache.getEvent(&event)
 
 	// Assert
 	if existingEvent.Count != 0 {
@@ -139,6 +142,7 @@ func TestGetEventNoExisting(t *testing.T) {
 
 func TestGetEventExisting(t *testing.T) {
 	// Arrange
+	eventCache := NewEventCache()
 	eventTime := unversioned.Now()
 	event := api.Event{
 		Reason:  "do I exist",
@@ -158,10 +162,10 @@ func TestGetEventExisting(t *testing.T) {
 		FirstTimestamp: eventTime,
 		LastTimestamp:  eventTime,
 	}
-	addOrUpdateEvent(&event)
+	eventCache.addOrUpdateEvent(&event)
 
 	// Act
-	existingEvent := getEvent(&event)
+	existingEvent := eventCache.getEvent(&event)
 
 	// Assert
 	compareEventWithHistoryEntry(&event, &existingEvent, t)
