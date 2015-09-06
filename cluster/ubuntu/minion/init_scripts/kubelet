@@ -24,7 +24,7 @@ KUBELET=/opt/bin/$BASE
 KUBELET_PIDFILE=/var/run/$BASE.pid
 KUBELET_LOGFILE=/var/log/$BASE.log
 KUBELET_OPTS=""
-KUBELET_DESC="Kube-Apiserver"
+KUBELET_DESC="Kubelet"
 
 # Get lsb functions
 . /lib/lsb/init-functions
