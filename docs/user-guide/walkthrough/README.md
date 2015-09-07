@@ -165,8 +165,9 @@ spec:
     emptyDir: {}
 ```
 
-[Download example](pod-redis.yaml?raw=true)
+[Download example](pod-redis.yaml)
 <!-- END MUNGE: EXAMPLE pod-redis.yaml -->
+[Download example](pod-redis.yaml?raw=true)
 
 Notes:
 - The volume mount name is a reference to a specific empty dir volume.
