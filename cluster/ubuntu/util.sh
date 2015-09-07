@@ -409,6 +409,9 @@ function provision-masterandminion() {
 function kube-down {
   KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  
+  source "${KUBE_ROOT}/cluster/common.sh"
+  tear_down_alive_resources
 
   ii=0
   for i in ${nodes}; do

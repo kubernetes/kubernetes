@@ -117,6 +117,15 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
+
+function tear_down_alive_resources() {
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" delete rc --all
+  "${kubectl}" delete pods --all
+  "${kubectl}" delete svc --all
+  "${kubectl}" delete pvc --all
+}
+
 # Gets username, password for the current-context in kubeconfig, if they exist.
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
@@ -278,3 +287,4 @@ function tars_from_version() {
     exit 1
   fi
 }
+
