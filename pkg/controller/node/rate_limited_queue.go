@@ -136,19 +136,16 @@ func (q *UniqueQueue) Head() (TimedValue, bool) {
 type RateLimitedTimedQueue struct {
 	queue   UniqueQueue
 	limiter util.RateLimiter
-	leak    bool
 }
 
-// Creates new queue which will use given RateLimiter to oversee execution. If leak is true,
-// items which are rate limited will be leakped. Otherwise, rate limited items will be requeued.
-func NewRateLimitedTimedQueue(limiter util.RateLimiter, leak bool) *RateLimitedTimedQueue {
+// Creates new queue which will use given RateLimiter to oversee execution.
+func NewRateLimitedTimedQueue(limiter util.RateLimiter) *RateLimitedTimedQueue {
 	return &RateLimitedTimedQueue{
 		queue: UniqueQueue{
 			queue: TimedQueue{},
 			set:   util.NewStringSet(),
 		},
 		limiter: limiter,
-		leak:    leak,
 	}
 }
 
@@ -164,12 +161,9 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	val, ok := q.queue.Head()
 	for ok {
 		// rate limit the queue checking
-		if q.leak {
-			if !q.limiter.CanAccept() {
-				break
-			}
-		} else {
-			q.limiter.Accept()
+		if !q.limiter.CanAccept() {
+			// Try again later
+			break
 		}
 
 		now := now()
