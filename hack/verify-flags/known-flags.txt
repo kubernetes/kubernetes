@@ -158,6 +158,8 @@ mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file
 mesos-cgroup-prefix
+mesos-executor-cpus
+mesos-executor-mem
 mesos-master
 mesos-role
 mesos-user
