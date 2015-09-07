@@ -2050,11 +2050,11 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 
 	cStatus, found := api.GetContainerStatus(podStatus.ContainerStatuses, containerName)
 	if !found {
-		return "", fmt.Errorf("container %q not found in pod", containerName)
+		return "", fmt.Errorf("container %q not found", containerName)
 	}
 	if previous {
 		if cStatus.LastTerminationState.Terminated == nil {
-			return "", fmt.Errorf("previous terminated container %q not found in pod", containerName)
+			return "", fmt.Errorf("previous terminated container %q not found", containerName)
 		}
 		cID = cStatus.LastTerminationState.Terminated.ContainerID
 	} else {
@@ -2081,23 +2081,23 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 
 	pod, ok := kl.GetPodByName(namespace, name)
 	if !ok {
-		return fmt.Errorf("unable to get logs for container %q in pod %q: unable to find pod", containerName, podFullName)
+		return fmt.Errorf("unable to get logs for container %q in pod %q namespace %q: unable to find pod", containerName, name, namespace)
 	}
 
 	podStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
-		return fmt.Errorf("failed to get status for pod %q", podFullName)
+		return fmt.Errorf("failed to get status for pod %q in namespace %q", name, namespace)
 	}
 
 	if err := kl.validatePodPhase(&podStatus); err != nil {
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
-		return err
+		return fmt.Errorf("Pod %q in namespace %q : %v", name, namespace, err)
 	}
 	containerID, err := kl.validateContainerStatus(&podStatus, containerName, previous)
 	if err != nil {
 		// No log is available if the container status is missing or is in the
 		// waiting state.
-		return err
+		return fmt.Errorf("Pod %q in namespace %q: %v", name, namespace, err)
 	}
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, tail, follow, stdout, stderr)
 }
