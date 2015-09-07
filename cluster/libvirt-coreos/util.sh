@@ -28,6 +28,7 @@ readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
 readonly UUID=$(uuidgen)
 readonly LOCAL_ETCD_IP="192.168.10.200"
 DISCOVERY=${DISCOVERY:-""}
+ETCD_VERSION=${ETCD_VERSION:-v2.0.9}
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
@@ -142,6 +143,18 @@ function initialize-pool {
   if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
       render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
       render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
+  fi
+
+  mkdir -p "$POOL_PATH/etcd"
+  if [[ ! -f "$ROOT/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" ]]; then
+      wget -P "$ROOT" https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz
+  fi
+  if [[ "$ROOT/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" -nt "$POOL_PATH/etcd/etcd" ]]; then
+      tar -x -C "$POOL_PATH/etcd" -f "$ROOT/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" etcd-${ETCD_VERSION}-linux-amd64
+      rm -rf "$POOL_PATH/etcd/bin/*"
+      mkdir -p "$POOL_PATH/etcd/bin"
+      mv "$POOL_PATH"/etcd/etcd-${ETCD_VERSION}-linux-amd64/{etcd,etcdctl} "$POOL_PATH/etcd/bin"
+      rm -rf "$POOL_PATH/etcd/etcd-${ETCD_VERSION}-linux-amd64"
   fi
 
   virsh pool-refresh $POOL
