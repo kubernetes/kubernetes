@@ -49,7 +49,7 @@ var _ = Describe("Service endpoints latency", func() {
 			// get this much lower in the future. See issue
 			// #10436.
 			limitMedian = time.Second * 20
-			limitTail   = time.Second * 40
+			limitTail   = time.Second * 50
 
 			// Numbers chosen to make the test complete in a short amount
 			// of time. This sample size is not actually large enough to
