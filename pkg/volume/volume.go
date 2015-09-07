@@ -65,6 +65,14 @@ type Recycler interface {
 	Recycle() error
 }
 
+// Delete removes the resource from the underlying storage provider.  Calls to this method should block until
+// the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
+// A nil return indicates success.
+type Deleter interface {
+	Volume
+	Delete() error
+}
+
 func RenameDirectory(oldPath, newName string) (string, error) {
 	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
 	if err != nil {

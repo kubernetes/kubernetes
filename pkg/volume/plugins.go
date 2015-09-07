@@ -89,6 +89,15 @@ type RecyclableVolumePlugin interface {
 	NewRecycler(spec *Spec) (Recycler, error)
 }
 
+// DeletableVolumePlugin is an extended interface of VolumePlugin and is used by persistent volumes that want
+// to be deleted from the cluster after their release from a PersistentVolumeClaim.
+type DeletableVolumePlugin interface {
+	VolumePlugin
+	// NewDeleter creates a new volume.Deleter which knows how to delete this resource
+	// in accordance with the underlying storage provider after the volume's release from a claim
+	NewDeleter(spec *Spec) (Deleter, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -314,6 +323,19 @@ func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVol
 		return recyclableVolumePlugin, nil
 	}
 	return nil, fmt.Errorf("no recyclable volume plugin matched")
+}
+
+// FindDeletablePluginByName fetches a persistent volume plugin by name.  If no plugin
+// is found, returns error.
+func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if deletableVolumePlugin, ok := volumePlugin.(DeletableVolumePlugin); ok {
+		return deletableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no deletable volume plugin matched")
 }
 
 // NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler pod.  By default, a recycler pod simply runs
