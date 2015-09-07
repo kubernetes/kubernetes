@@ -18,6 +18,8 @@ package host_path
 
 import (
 	"fmt"
+	"os"
+	"regexp"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
@@ -34,6 +36,7 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 		&hostPathPlugin{
 			host:            nil,
 			newRecyclerFunc: newRecycler,
+			newDeleterFunc:  newDeleter,
 			config:          volumeConfig,
 		},
 	}
@@ -53,12 +56,15 @@ type hostPathPlugin struct {
 	host volume.VolumeHost
 	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
 	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
-	config          volume.VolumeConfig
+	// decouple creating deleters by deferring to a function.  Allows for easier testing.
+	newDeleterFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
+	config         volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
 var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
 var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
+var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"
@@ -105,6 +111,10 @@ func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, e
 	return plugin.newRecyclerFunc(spec, plugin.host, plugin.config)
 }
 
+func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterFunc(spec, plugin.host)
+}
+
 func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
@@ -116,6 +126,13 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Volume
 		config:  config,
 		timeout: volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
 	}, nil
+}
+
+func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
+	}
+	return &hostPathDeleter{spec.Name(), spec.PersistentVolume.Spec.HostPath.Path, host}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -197,4 +214,27 @@ func (r *hostPathRecycler) Recycle() error {
 		},
 	}
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(pod, r.host.GetKubeClient())
+}
+
+// hostPathDeleter deletes a hostPath PV from the cluster.
+// This deleter only works on a single host cluster and is for testing purposes only.
+type hostPathDeleter struct {
+	name string
+	path string
+	host volume.VolumeHost
+}
+
+func (r *hostPathDeleter) GetPath() string {
+	return r.path
+}
+
+// Delete for hostPath removes the local directory so long as it is beneath /tmp/*.
+// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY!  This message should scare you away from using
+// this deleter for anything other than development and testing.
+func (r *hostPathDeleter) Delete() error {
+	regexp := regexp.MustCompile("/tmp/.+")
+	if !regexp.MatchString(r.GetPath()) {
+		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
+	}
+	return os.RemoveAll(r.GetPath())
 }
