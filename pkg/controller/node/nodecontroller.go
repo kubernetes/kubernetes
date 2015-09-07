@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -88,7 +89,9 @@ type NodeController struct {
 	// to aviod the problem with time skew across the cluster.
 	nodeStatusMap map[string]nodeStatusData
 	now           func() util.Time
-	// worker that evicts pods from unresponsive nodes.
+	// Lock to access evictor workers
+	evictorLock *sync.Mutex
+	// workers that evicts pods from unresponsive nodes.
 	podEvictor         *RateLimitedTimedQueue
 	terminationEvictor *RateLimitedTimedQueue
 	podEvictionTimeout time.Duration
@@ -120,6 +123,7 @@ func NewNodeController(
 	if allocateNodeCIDRs && clusterCIDR == nil {
 		glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
 	}
+	evictorLock := sync.Mutex{}
 	return &NodeController{
 		cloud:                  cloud,
 		knownNodeSet:           make(util.StringSet),
@@ -127,8 +131,9 @@ func NewNodeController(
 		recorder:               recorder,
 		podEvictionTimeout:     podEvictionTimeout,
 		maximumGracePeriod:     5 * time.Minute,
-		podEvictor:             NewRateLimitedTimedQueue(podEvictionLimiter, false),
-		terminationEvictor:     NewRateLimitedTimedQueue(podEvictionLimiter, false),
+		evictorLock:            &evictorLock,
+		podEvictor:             NewRateLimitedTimedQueue(podEvictionLimiter),
+		terminationEvictor:     NewRateLimitedTimedQueue(podEvictionLimiter),
 		nodeStatusMap:          make(map[string]nodeStatusData),
 		nodeMonitorGracePeriod: nodeMonitorGracePeriod,
 		nodeMonitorPeriod:      nodeMonitorPeriod,
@@ -162,6 +167,8 @@ func (nc *NodeController) Run(period time.Duration) {
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
 	go util.Until(func() {
+		nc.evictorLock.Lock()
+		defer nc.evictorLock.Unlock()
 		nc.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
 			remaining, err := nc.deletePods(value.Value)
 			if err != nil {
@@ -178,6 +185,8 @@ func (nc *NodeController) Run(period time.Duration) {
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
 	go util.Until(func() {
+		nc.evictorLock.Lock()
+		defer nc.evictorLock.Unlock()
 		nc.terminationEvictor.Try(func(value TimedValue) (bool, time.Duration) {
 			completed, remaining, err := nc.terminatePods(value.Value, value.AddedAt)
 			if err != nil {
@@ -551,12 +560,17 @@ func (nc *NodeController) hasPods(nodeName string) (bool, error) {
 // evictPods queues an eviction for the provided node name, and returns false if the node is already
 // queued for eviction.
 func (nc *NodeController) evictPods(nodeName string) bool {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
 	return nc.podEvictor.Add(nodeName)
 }
 
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
 // returns true if an eviction was queued.
 func (nc *NodeController) cancelPodEviction(nodeName string) bool {
+	glog.V(2).Infof("Cancelling pod Eviction on Node: %v", nodeName)
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.podEvictor.Remove(nodeName)
 	wasTerminating := nc.terminationEvictor.Remove(nodeName)
 	return wasDeleting || wasTerminating
