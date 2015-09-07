@@ -67,7 +67,7 @@ func TestGetAccessModes(t *testing.T) {
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	pluginHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, nil, volume.VolumeConfig{}}}, pluginHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, nil, nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -141,6 +141,32 @@ func TestDeleterTempDir(t *testing.T) {
 			t.Errorf("Unexpected failure for test '%s': %v", name, err)
 		}
 	}
+}
+
+func TestCreater(t *testing.T) {
+	tempPath := "/tmp/hostpath/"
+	defer os.RemoveAll(tempPath)
+	err := os.MkdirAll(tempPath, 0750)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
+	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	creater, err := plug.NewCreater(volume.VolumeOptions{CapacityMB: 100})
+	if err != nil {
+		t.Errorf("Failed to make a new Creater: %v", err)
+	}
+	pv, err := creater.Create()
+	if err != nil {
+		t.Errorf("Unexpected error creating volume: %v", err)
+	}
+	if pv.Spec.HostPath.Path == "" {
+		t.Errorf("Expected pv.Spec.HostPath.Path to not be empty: %#v", pv)
+	}
+	os.RemoveAll(pv.Spec.HostPath.Path)
 }
 
 func TestPlugin(t *testing.T) {
