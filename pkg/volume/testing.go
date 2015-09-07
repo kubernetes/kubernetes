@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
 	"os"
 	"path"
 
@@ -125,7 +126,7 @@ func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID, mou
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
-	return &FakeRecycler{"/attributesTransferredFromSpec"}, nil
+	return &fakeRecycler{"/attributesTransferredFromSpec"}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -162,15 +163,24 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-type FakeRecycler struct {
+type fakeRecycler struct {
 	path string
 }
 
-func (fr *FakeRecycler) Recycle() error {
+func (fr *fakeRecycler) Recycle() error {
 	// nil is success, else error
 	return nil
 }
 
-func (fr *FakeRecycler) GetPath() string {
+func (fr *fakeRecycler) GetPath() string {
 	return fr.path
+}
+
+func NewFakeRecycler(spec *Spec, host VolumeHost) (Recycler, error) {
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
+		return nil, fmt.Errorf("fakeRecycler only supports spec.PersistentVolume.Spec.HostPath")
+	}
+	return &fakeRecycler{
+		path: spec.PersistentVolume.Spec.HostPath.Path,
+	}, nil
 }
