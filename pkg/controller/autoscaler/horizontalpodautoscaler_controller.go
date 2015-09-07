@@ -18,6 +18,7 @@ package autoscalercontroller
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/golang/glog"
@@ -28,6 +29,15 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+)
+
+const (
+	heapsterNamespace = "kube-system"
+	heapsterService   = "monitoring-heapster"
+
+	// Usage shoud exceed the tolerance before we start downscale or upscale the pods.
+	// TODO: make it a flag or HPA spec element.
+	tolerance = 0.1
 )
 
 type HorizontalPodAutoscalerController struct {
@@ -79,38 +89,51 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 			continue
 		}
 
-		// if the ratio is 1.2 we want to have 2 replicas
-		desiredReplicas := 1 + int((currentConsumption.Quantity.MilliValue()*int64(currentReplicas))/hpa.Spec.Target.Quantity.MilliValue())
+		usageRatio := float64(currentConsumption.Quantity.MilliValue()) / float64(hpa.Spec.Target.Quantity.MilliValue())
+		desiredReplicas := int(math.Ceil(usageRatio * float64(currentReplicas)))
 
 		if desiredReplicas < hpa.Spec.MinCount {
 			desiredReplicas = hpa.Spec.MinCount
 		}
+
+		// TODO: remove when pod ideling is done.
+		if desiredReplicas == 0 {
+			desiredReplicas = 1
+		}
+
 		if desiredReplicas > hpa.Spec.MaxCount {
 			desiredReplicas = hpa.Spec.MaxCount
 		}
 		now := time.Now()
 		rescale := false
+
 		if desiredReplicas != currentReplicas {
-			// Going down
-			if desiredReplicas < currentReplicas && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
-				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
+			// Going down only if the usageRatio dropped significantly below the target
+			// and there was no rescaling in the last downscaleForbiddenWindow.
+			if desiredReplicas < currentReplicas && usageRatio < (1-tolerance) &&
+				(hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+					hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
 				rescale = true
 			}
 
-			// Going up
-			if desiredReplicas > currentReplicas && (hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
-				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
+			// Going up only if the usage ratio increased significantly above the target
+			// and there was no rescaling in the last upscaleForbiddenWindow.
+			if desiredReplicas > currentReplicas && usageRatio > (1+tolerance) &&
+				(hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+					hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
 				rescale = true
 			}
+		}
 
-			if rescale {
-				scale.Spec.Replicas = desiredReplicas
-				_, err = a.expClient.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
-				if err != nil {
-					glog.Warningf("Failed to rescale %s: %v", reference, err)
-					continue
-				}
+		if rescale {
+			scale.Spec.Replicas = desiredReplicas
+			_, err = a.expClient.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+			if err != nil {
+				glog.Warningf("Failed to rescale %s: %v", reference, err)
+				continue
 			}
+		} else {
+			desiredReplicas = currentReplicas
 		}
 
 		status := expapi.HorizontalPodAutoscalerStatus{

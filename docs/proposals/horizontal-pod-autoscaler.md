@@ -200,16 +200,20 @@ and adjust the count of the Scale if needed to match the target
 The target number of pods will be calculated from the following formula:
 
 ```
-TargetNumOfPods = sum(CurrentPodsConsumption) / Target
+TargetNumOfPods =ceil(sum(CurrentPodsConsumption) / Target)
 ```
 
-To make scaling more stable, scale-up will happen only when the floor of ```TargetNumOfPods``` is higher than
-the current number, while scale-down will happen only when the ceiling of ```TargetNumOfPods``` is lower than
-the current number.
+Starting and stopping pods may introduce noise to the metrics (for instance starting may temporarily increase
+CPU and decrease average memory consumption) so, after each action, the autoscaler should wait some time for reliable data.
 
-The decision to scale-up will be executed instantly.
-However, we will execute scale-down only if the sufficient time has passed from the last scale-up (e.g.: 10 minutes).
-Such approach has two benefits:
+Scale-up will happen if there was no rescaling within the last 3 minutes.
+Scale-down will wait for 10 minutes from the last rescaling. Moreover any scaling will only be made if
+
+```
+avg(CurrentPodsConsumption) / Target
+```
+
+drops below 0.9 or increases above 1.1 (10% tolerance). Such approach has two benefits:
 
 * Autoscaler works in a conservative way.
   If new user load appears, it is important for us to rapidly increase the number of pods,
@@ -217,10 +221,6 @@ Such approach has two benefits:
   Lowering the number of pods is not that urgent.
 
 * Autoscaler avoids thrashing, i.e.: prevents rapid execution of conflicting decision if the load is not stable.
-
-
-As the CPU consumption of a pod immediately after start may be highly variable due to initialization/startup,
-autoscaler will skip metrics from the first minute of pod lifecycle.
 
 ## Relative vs. absolute metrics
 
