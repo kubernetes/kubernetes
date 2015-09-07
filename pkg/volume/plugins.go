@@ -33,14 +33,13 @@ import (
 )
 
 // VolumeOptions contains option information about a volume.
-//
-// Currently, this struct containers only a single field for the
-// rootcontext of the volume.  This is a temporary measure in order
-// to set the rootContext of tmpfs mounts correctly; it will be replaced
-// and expanded on by future SecurityContext work.
 type VolumeOptions struct {
 	// The rootcontext to use when performing mounts for a volume.
+	// This is a temporary measure in order to set the rootContext of tmpfs mounts correctly.
+	// it will be replaced and expanded on by future SecurityContext work.
 	RootContext string
+	// CapacityMB is the size in MB of a volume.
+	CapacityMB int
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -97,6 +96,14 @@ type DeletableVolumePlugin interface {
 	// NewDeleter creates a new volume.Deleter which knows how to delete this resource
 	// in accordance with the underlying storage provider after the volume's release from a claim
 	NewDeleter(spec *Spec) (Deleter, error)
+}
+
+// CreatableVolumePlugin is an extended interface of VolumePlugin and is used to create persistent volumes for the cluster.
+type CreatableVolumePlugin interface {
+	VolumePlugin
+	// NewCreater creates a new volume.Creater which knows how to create PersistentVolumes in accordance with
+	// the plugin's underlying storage provider
+	NewCreater(options VolumeOptions) (Creater, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -343,6 +350,19 @@ func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolum
 		return deletableVolumePlugin, nil
 	}
 	return nil, fmt.Errorf("no deletable volume plugin matched")
+}
+
+// FindCreatablePluginBySpec fetches a persistent volume plugin by name.  If no plugin
+// is found, returns error.
+func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (CreatableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if creatableVolumePlugin, ok := volumePlugin.(CreatableVolumePlugin); ok {
+		return creatableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no creatable volume plugin matched")
 }
 
 // NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler pod.  By default, a recycler pod simply runs

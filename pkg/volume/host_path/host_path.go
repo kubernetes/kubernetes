@@ -22,7 +22,9 @@ import (
 	"regexp"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -36,6 +38,7 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 			host:            nil,
 			newRecyclerFunc: newRecycler,
 			newDeleterFunc:  newDeleter,
+			newCreaterFunc:  newCreater,
 			config:          volumeConfig,
 		},
 	}
@@ -46,6 +49,7 @@ func ProbeRecyclableVolumePlugins(recyclerFunc func(spec *volume.Spec, host volu
 		&hostPathPlugin{
 			host:            nil,
 			newRecyclerFunc: recyclerFunc,
+			newCreaterFunc:  newCreater,
 			config:          volumeConfig,
 		},
 	}
@@ -53,17 +57,18 @@ func ProbeRecyclableVolumePlugins(recyclerFunc func(spec *volume.Spec, host volu
 
 type hostPathPlugin struct {
 	host volume.VolumeHost
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	// decouple creating Recyclers/Deleters/Creaters by deferring to a function.  Allows for easier testing.
 	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
-	// decouple creating deleters by deferring to a function.  Allows for easier testing.
-	newDeleterFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
-	config         volume.VolumeConfig
+	newDeleterFunc  func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
+	newCreaterFunc  func(options volume.VolumeOptions, host volume.VolumeHost) (volume.Creater, error)
+	config          volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
 var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
 var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
 var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
+var _ volume.CreatableVolumePlugin = &hostPathPlugin{}
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"
@@ -114,6 +119,10 @@ func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, err
 	return plugin.newDeleterFunc(spec, plugin.host)
 }
 
+func (plugin *hostPathPlugin) NewCreater(options volume.VolumeOptions) (volume.Creater, error) {
+	return plugin.newCreaterFunc(options, plugin.host)
+}
+
 func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
@@ -132,6 +141,10 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
 	return &hostPathDeleter{spec.Name(), spec.PersistentVolume.Spec.HostPath.Path, host}, nil
+}
+
+func newCreater(options volume.VolumeOptions, host volume.VolumeHost) (volume.Creater, error) {
+	return &hostPathCreater{options: options, host: host}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -185,8 +198,8 @@ func (c *hostPathCleaner) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 
-// hostPathRecycler scrubs a hostPath volume by running "rm -rf" on the volume in a pod
-// This recycler only works on a single host cluster and is for testing purposes only.
+// hostPathRecycler implements a dynamic provisioning Recycler for the HostPath plugin
+// This implementation is meant for testing only and only works in a single node cluster
 type hostPathRecycler struct {
 	name    string
 	path    string
@@ -213,6 +226,42 @@ func (r *hostPathRecycler) Recycle() error {
 		},
 	}
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(pod, r.host.GetKubeClient())
+}
+
+// hostPathCreater implements a dynamic provisioning Creater for the HostPath plugin
+// This implementation is meant for testing only and only works in a single node cluster.
+type hostPathCreater struct {
+	host    volume.VolumeHost
+	options volume.VolumeOptions
+}
+
+// Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
+// This Creater is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
+func (r *hostPathCreater) Create() (*api.PersistentVolume, error) {
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+	err := os.MkdirAll(fullpath, 0750)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-hostpath-",
+			Labels: map[string]string{
+				"createdby": "hostpath dynamic provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", r.options.CapacityMB)),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: fullpath,
+				},
+			},
+		},
+	}, nil
 }
 
 // hostPathDeleter deletes a hostPath PV from the cluster.
