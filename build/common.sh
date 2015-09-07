@@ -212,6 +212,8 @@ function kube::build::ensure_docker_in_path() {
 }
 
 function kube::build::ensure_docker_daemon_connectivity {
+  kube::build::has_docker || return 0
+
   if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
     {
       echo "Can't connect to 'docker' daemon.  please fix and retry."
@@ -295,7 +297,7 @@ function kube::build::prepare_output() {
 }
 
 function kube::build::has_docker() {
-  which docker &> /dev/null
+  pidof docker &> /dev/null
 }
 
 # Detect if a specific image exists
