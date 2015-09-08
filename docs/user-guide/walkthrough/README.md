@@ -165,7 +165,7 @@ spec:
     emptyDir: {}
 ```
 
-[Download example](pod-redis.yaml)
+[Download example](pod-redis.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE pod-redis.yaml -->
 
 Notes:

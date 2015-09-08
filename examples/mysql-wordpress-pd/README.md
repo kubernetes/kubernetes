@@ -131,7 +131,7 @@ spec:
         fsType: ext4
 ```
 
-[Download example](mysql.yaml)
+[Download example](mysql.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE mysql.yaml -->
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
@@ -186,7 +186,7 @@ spec:
     name: mysql
 ```
 
-[Download example](mysql-service.yaml)
+[Download example](mysql-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE mysql-service.yaml -->
 
 Start the service like this:
@@ -241,7 +241,7 @@ spec:
         fsType: ext4
 ```
 
-[Download example](wordpress.yaml)
+[Download example](wordpress.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE wordpress.yaml -->
 
 Create the pod:
@@ -282,7 +282,7 @@ spec:
   type: LoadBalancer
 ```
 
-[Download example](wordpress-service.yaml)
+[Download example](wordpress-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE wordpress-service.yaml -->
 
 Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.

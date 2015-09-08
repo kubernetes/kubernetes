@@ -73,7 +73,7 @@ spec:
            'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 ```
 
-[Download example](../../examples/blog-logging/counter-pod.yaml)
+[Download example](../../examples/blog-logging/counter-pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
 
 This pod specification has one container which runs a bash script when the container is born. This script simply writes out the value of a counter and the date once per second and runs indefinitely. Let’s create the pod in the default
@@ -192,7 +192,7 @@ spec:
       path: /var/lib/docker/containers
 ```
 
-[Download example](../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
+[Download example](../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE ../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml -->
 
 This pod specification maps the directory on the host containing the Docker log files, `/var/lib/docker/containers`, to a directory inside the container which has the same path. The pod runs one image, `gcr.io/google_containers/fluentd-gcp:1.6`, which is configured to collect the Docker log files from the logs directory and ingest them into Google Cloud Logging. One instance of this pod runs on each node of the cluster. Kubernetes will notice if this pod fails and automatically restart it.

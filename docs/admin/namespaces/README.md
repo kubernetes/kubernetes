@@ -98,7 +98,7 @@ Use the file [`namespace-dev.json`](namespace-dev.json) which describes a develo
 }
 ```
 
-[Download example](namespace-dev.json)
+[Download example](namespace-dev.json?raw=true)
 <!-- END MUNGE: EXAMPLE namespace-dev.json -->
 
 Create the development namespace using kubectl.
