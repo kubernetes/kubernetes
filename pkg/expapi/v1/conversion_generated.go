@@ -190,6 +190,8 @@ func convert_api_Container_To_v1_Container(in *api.Container, out *v1.Container,
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
 	return nil
 }
 
@@ -958,6 +960,8 @@ func convert_v1_Container_To_api_Container(in *v1.Container, out *api.Container,
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
 	return nil
 }
 

@@ -280,6 +280,8 @@ func (plugin *rbdPlugin) runInSidecarContainer(containerName string, cmd []strin
 					},
 					Command: cmd,
 					Args:    args,
+					Stdout:  true,
+					Stderr:  true,
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "sys",

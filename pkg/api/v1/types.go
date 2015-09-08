@@ -990,6 +990,12 @@ type Container struct {
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty"`
+	// Whether this container should send stdout.
+	// Default is false.
+	Stdout bool `json:"stdout,omitempty"`
+	// Whether this container should send stderr.
+	// Default is false.
+	Stderr bool `json:"stderr,omitempty"`
 }
 
 // Handler defines a specific action that should be taken

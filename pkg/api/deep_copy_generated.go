@@ -238,6 +238,8 @@ func deepCopy_api_Container(in Container, out *Container, c *conversion.Cloner) 
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
 	return nil
 }
 

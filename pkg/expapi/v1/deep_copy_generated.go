@@ -192,6 +192,8 @@ func deepCopy_v1_Container(in v1.Container, out *v1.Container, c *conversion.Clo
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
 	return nil
 }
 

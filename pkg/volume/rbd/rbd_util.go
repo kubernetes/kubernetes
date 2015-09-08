@@ -261,16 +261,15 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 	}
 	// if device is no longer used, see if can unmap
 	if cnt <= 1 {
-		// rbd unmap
-		_, err = runRBDcmd(*c.rbdBuilder, "rbd", []string{"unmap", device})
-		if err != nil {
-			return fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err)
-		}
-
 		// load ceph and image/pool info to remove fencing
 		if err := util.loadRBD(c.rbdBuilder, mntPath); err == nil {
 			// remove rbd lock
 			util.defencing(c)
+		}
+		// rbd unmap
+		_, err = runRBDcmd(*c.rbdBuilder, "rbd", []string{"unmap", device})
+		if err != nil {
+			return fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err)
 		}
 
 		glog.Infof("rbd: successfully unmap device %s", device)

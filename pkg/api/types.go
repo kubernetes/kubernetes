@@ -795,6 +795,12 @@ type Container struct {
 	// and shouldn't be used for general purpose containers.
 	Stdin bool `json:"stdin,omitempty"`
 	TTY   bool `json:"tty,omitempty"`
+	// Whether this container should send stdout.
+	// Default is false.
+	Stdout bool `json:"stdout,omitempty"`
+	// Whether this container should send stderr.
+	// Default is false.
+	Stderr bool `json:"stderr,omitempty"`
 }
 
 // Handler defines a specific action that should be taken

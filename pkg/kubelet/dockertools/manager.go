@@ -663,8 +663,10 @@ func (dm *DockerManager) runContainer(
 			WorkingDir: container.WorkingDir,
 			Labels:     labels,
 			// Interactive containers:
-			OpenStdin: container.Stdin,
-			Tty:       container.TTY,
+			OpenStdin:    container.Stdin,
+			Tty:          container.TTY,
+			AttachStdout: container.Stdout,
+			AttachStderr: container.Stderr,
 		},
 	}
 

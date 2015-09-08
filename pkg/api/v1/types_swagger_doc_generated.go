@@ -144,6 +144,8 @@ var map_Container = map[string]string{
 	"securityContext":        "Security options the pod should run with. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md",
 	"stdin":                  "Whether this container should allocate a buffer for stdin in the container runtime. Default is false.",
 	"tty":                    "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+	"stdout":                 "Whether this container should send stdout. Default is false.",
+	"stderr":                 "Whether this container should send stderr. Default is false.",
 }
 
 func (Container) SwaggerDoc() map[string]string {

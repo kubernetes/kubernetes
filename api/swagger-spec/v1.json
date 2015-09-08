@@ -12769,6 +12769,14 @@
      "tty": {
       "type": "boolean",
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false."
+     },
+     "stdout": {
+      "type": "boolean",
+      "description": "Whether this container should send stdout. Default is false."
+     },
+     "stderr": {
+      "type": "boolean",
+      "description": "Whether this container should send stderr. Default is false."
      }
     }
    },
