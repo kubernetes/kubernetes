@@ -2886,138 +2886,58 @@ func TestValidateResourceNames(t *testing.T) {
 	}
 }
 
+func getResourceList(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
+	if cpu != "" {
+		res[api.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[api.ResourceMemory] = resource.MustParse(memory)
+	}
+	return res
+}
+
 func TestValidateLimitRange(t *testing.T) {
-	spec := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("100"),
-					api.ResourceMemory: resource.MustParse("10000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("5"),
-					api.ResourceMemory: resource.MustParse("100"),
-				},
-				Default: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("50"),
-					api.ResourceMemory: resource.MustParse("500"),
-				},
-				DefaultRequest: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("10"),
-					api.ResourceMemory: resource.MustParse("200"),
-				},
-				MaxLimitRequestRatio: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("20"),
-				},
-			},
-		},
-	}
-
-	invalidSpecDuplicateType := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("100"),
-					api.ResourceMemory: resource.MustParse("10000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("0"),
-					api.ResourceMemory: resource.MustParse("100"),
-				},
-			},
-			{
-				Type: api.LimitTypePod,
-				Min: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("0"),
-					api.ResourceMemory: resource.MustParse("100"),
-				},
-			},
-		},
-	}
-
-	invalidSpecRangeMaxLessThanMin := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("10"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("1000"),
-				},
-			},
-		},
-	}
-
-	invalidSpecRangeDefaultOutsideRange := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("1000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("100"),
-				},
-				Default: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("2000"),
-				},
-			},
-		},
-	}
-
-	invalidSpecRangeDefaultRequestOutsideRange := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("1000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("100"),
-				},
-				DefaultRequest: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("2000"),
-				},
-			},
-		},
-	}
-
-	invalidSpecRangeRequestMoreThanDefaultRange := api.LimitRangeSpec{
-		Limits: []api.LimitRangeItem{
-			{
-				Type: api.LimitTypePod,
-				Max: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("1000"),
-				},
-				Min: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("100"),
-				},
-				Default: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("500"),
-				},
-				DefaultRequest: api.ResourceList{
-					api.ResourceCPU: resource.MustParse("800"),
-				},
-			},
-		},
-	}
-
-	successCases := []api.LimitRange{
+	successCases := []struct {
+		name string
+		spec api.LimitRangeSpec
+	}{
 		{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
+			name: "all-fields-valid",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypePod,
+						Max:                  getResourceList("100m", "10000Mi"),
+						Min:                  getResourceList("5m", "100Mi"),
+						Default:              getResourceList("50m", "500Mi"),
+						DefaultRequest:       getResourceList("10m", "200Mi"),
+						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+				},
 			},
-			Spec: spec,
+		},
+		{
+			name: "all-fields-valid-big-numbers",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypePod,
+						Max:                  getResourceList("100m", "10000T"),
+						Min:                  getResourceList("5m", "100Mi"),
+						Default:              getResourceList("50m", "500Mi"),
+						DefaultRequest:       getResourceList("10m", "200Mi"),
+						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+				},
+			},
 		},
 	}
 
 	for _, successCase := range successCases {
-		if errs := ValidateLimitRange(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+		limitRange := &api.LimitRange{ObjectMeta: api.ObjectMeta{Name: successCase.name, Namespace: "foo"}, Spec: successCase.spec}
+		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
+			t.Errorf("Case %v, unexpected error: %v", successCase.name, errs)
 		}
 	}
 
@@ -3025,43 +2945,92 @@ func TestValidateLimitRange(t *testing.T) {
 		R api.LimitRange
 		D string
 	}{
-		"zero-length Name": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
+		"zero-length-name": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
 			"name or generateName is required",
 		},
 		"zero-length-namespace": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: api.LimitRangeSpec{}},
 			"",
 		},
-		"invalid Name": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
+		"invalid-name": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
 			DNSSubdomainErrorMsg,
 		},
-		"invalid Namespace": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
+		"invalid-namespace": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: api.LimitRangeSpec{}},
 			DNS1123LabelErrorMsg,
 		},
-		"duplicate limit type": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecDuplicateType},
+		"duplicate-limit-type": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePod,
+						Max:  getResourceList("100m", "10000m"),
+						Min:  getResourceList("0m", "100m"),
+					},
+					{
+						Type: api.LimitTypePod,
+						Min:  getResourceList("0m", "100m"),
+					},
+				},
+			}},
 			"",
 		},
-		"min value 1k is greater than max value 10": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeMaxLessThanMin},
-			"min value 1k is greater than max value 10",
+		"min value 100m is greater than max value 10m": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePod,
+						Max:  getResourceList("10m", ""),
+						Min:  getResourceList("100m", ""),
+					},
+				},
+			}},
+			"min value 100m is greater than max value 10m",
 		},
 		"invalid spec default outside range": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultOutsideRange},
-			"default value 2k is greater than max value 1k",
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:    api.LimitTypePod,
+						Max:     getResourceList("1", ""),
+						Min:     getResourceList("100m", ""),
+						Default: getResourceList("2000m", ""),
+					},
+				},
+			}},
+			"default value 2 is greater than max value 1",
 		},
 		"invalid spec defaultrequest outside range": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultRequestOutsideRange},
-			"default request value 2k is greater than max value 1k",
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:           api.LimitTypePod,
+						Max:            getResourceList("1", ""),
+						Min:            getResourceList("100m", ""),
+						DefaultRequest: getResourceList("2000m", ""),
+					},
+				},
+			}},
+			"default request value 2 is greater than max value 1",
 		},
 		"invalid spec defaultrequest more than default": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeRequestMoreThanDefaultRange},
-			"default request value 800 is greater than default limit value 500",
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:           api.LimitTypeContainer,
+						Max:            getResourceList("2", ""),
+						Min:            getResourceList("100m", ""),
+						Default:        getResourceList("500m", ""),
+						DefaultRequest: getResourceList("800m", ""),
+					},
+				},
+			}},
+			"default request value 800m is greater than default limit value 500m",
 		},
 	}
+
 	for k, v := range errorCases {
 		errs := ValidateLimitRange(&v.R)
 		if len(errs) == 0 {
@@ -3074,6 +3043,7 @@ func TestValidateLimitRange(t *testing.T) {
 			}
 		}
 	}
+
 }
 
 func TestValidateResourceQuota(t *testing.T) {
