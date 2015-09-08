@@ -62,6 +62,42 @@ func convert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *v1.C
 	return nil
 }
 
+func convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in *api.CephFSVolumeSource, out *v1.CephFSVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.CephFSVolumeSource))(in)
+	}
+	if in.Monitors != nil {
+		out.Monitors = make([]string, len(in.Monitors))
+		for i := range in.Monitors {
+			out.Monitors[i] = in.Monitors[i]
+		}
+	} else {
+		out.Monitors = nil
+	}
+	out.User = in.User
+	out.SecretFile = in.SecretFile
+	if in.SecretRef != nil {
+		out.SecretRef = new(v1.LocalObjectReference)
+		if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderVolumeSource, out *v1.CinderVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.CinderVolumeSource))(in)
+	}
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_api_Container_To_v1_Container(in *api.Container, out *v1.Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Container))(in)
@@ -166,6 +202,34 @@ func convert_api_ContainerPort_To_v1_ContainerPort(in *api.ContainerPort, out *v
 	out.ContainerPort = in.ContainerPort
 	out.Protocol = v1.Protocol(in.Protocol)
 	out.HostIP = in.HostIP
+	return nil
+}
+
+func convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.DownwardAPIVolumeFile, out *v1.DownwardAPIVolumeFile, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.DownwardAPIVolumeFile))(in)
+	}
+	out.Path = in.Path
+	if err := convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *api.DownwardAPIVolumeSource, out *v1.DownwardAPIVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.DownwardAPIVolumeSource))(in)
+	}
+	if in.Items != nil {
+		out.Items = make([]v1.DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -704,6 +768,30 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *v1.V
 	} else {
 		out.RBD = nil
 	}
+	if in.Cinder != nil {
+		out.Cinder = new(v1.CinderVolumeSource)
+		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
+	}
+	if in.CephFS != nil {
+		out.CephFS = new(v1.CephFSVolumeSource)
+		if err := convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in.CephFS, out.CephFS, s); err != nil {
+			return err
+		}
+	} else {
+		out.CephFS = nil
+	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(v1.DownwardAPIVolumeSource)
+		if err := convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in.DownwardAPI, out.DownwardAPI, s); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -738,6 +826,42 @@ func convert_v1_Capabilities_To_api_Capabilities(in *v1.Capabilities, out *api.C
 	} else {
 		out.Drop = nil
 	}
+	return nil
+}
+
+func convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource(in *v1.CephFSVolumeSource, out *api.CephFSVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.CephFSVolumeSource))(in)
+	}
+	if in.Monitors != nil {
+		out.Monitors = make([]string, len(in.Monitors))
+		for i := range in.Monitors {
+			out.Monitors[i] = in.Monitors[i]
+		}
+	} else {
+		out.Monitors = nil
+	}
+	out.User = in.User
+	out.SecretFile = in.SecretFile
+	if in.SecretRef != nil {
+		out.SecretRef = new(api.LocalObjectReference)
+		if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in *v1.CinderVolumeSource, out *api.CinderVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.CinderVolumeSource))(in)
+	}
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -845,6 +969,34 @@ func convert_v1_ContainerPort_To_api_ContainerPort(in *v1.ContainerPort, out *ap
 	out.ContainerPort = in.ContainerPort
 	out.Protocol = api.Protocol(in.Protocol)
 	out.HostIP = in.HostIP
+	return nil
+}
+
+func convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *v1.DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.DownwardAPIVolumeFile))(in)
+	}
+	out.Path = in.Path
+	if err := convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in *v1.DownwardAPIVolumeSource, out *api.DownwardAPIVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.DownwardAPIVolumeSource))(in)
+	}
+	if in.Items != nil {
+		out.Items = make([]api.DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1383,6 +1535,30 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *api.V
 	} else {
 		out.RBD = nil
 	}
+	if in.Cinder != nil {
+		out.Cinder = new(api.CinderVolumeSource)
+		if err := convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
+	}
+	if in.CephFS != nil {
+		out.CephFS = new(api.CephFSVolumeSource)
+		if err := convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource(in.CephFS, out.CephFS, s); err != nil {
+			return err
+		}
+	} else {
+		out.CephFS = nil
+	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(api.DownwardAPIVolumeSource)
+		if err := convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in.DownwardAPI, out.DownwardAPI, s); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -1521,22 +1697,6 @@ func convert_expapi_DeploymentStatus_To_v1alpha1_DeploymentStatus(in *expapi.Dep
 	return nil
 }
 
-func convert_expapi_DeploymentStrategy_To_v1alpha1_DeploymentStrategy(in *expapi.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.DeploymentStrategy))(in)
-	}
-	out.Type = DeploymentType(in.Type)
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(RollingUpdateDeployment)
-		if err := convert_expapi_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
-	return nil
-}
-
 func convert_expapi_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodAutoscaler(in *expapi.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.HorizontalPodAutoscaler))(in)
@@ -1649,20 +1809,6 @@ func convert_expapi_ResourceConsumption_To_v1alpha1_ResourceConsumption(in *expa
 	return nil
 }
 
-func convert_expapi_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment(in *expapi.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.RollingUpdateDeployment))(in)
-	}
-	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.MaxSurge, &out.MaxSurge, 0); err != nil {
-		return err
-	}
-	out.MinReadySeconds = in.MinReadySeconds
-	return nil
-}
-
 func convert_expapi_Scale_To_v1alpha1_Scale(in *expapi.Scale, out *Scale, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.Scale))(in)
@@ -1738,6 +1884,45 @@ func convert_expapi_ThirdPartyResource_To_v1alpha1_ThirdPartyResource(in *expapi
 		}
 	} else {
 		out.Versions = nil
+	}
+	return nil
+}
+
+func convert_expapi_ThirdPartyResourceData_To_v1alpha1_ThirdPartyResourceData(in *expapi.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.ThirdPartyResourceData))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_expapi_ThirdPartyResourceDataList_To_v1alpha1_ThirdPartyResourceDataList(in *expapi.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.ThirdPartyResourceDataList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResourceData, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_ThirdPartyResourceData_To_v1alpha1_ThirdPartyResourceData(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -2012,20 +2197,6 @@ func convert_v1alpha1_ResourceConsumption_To_expapi_ResourceConsumption(in *Reso
 	return nil
 }
 
-func convert_v1alpha1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment(in *RollingUpdateDeployment, out *expapi.RollingUpdateDeployment, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RollingUpdateDeployment))(in)
-	}
-	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.MaxSurge, &out.MaxSurge, 0); err != nil {
-		return err
-	}
-	out.MinReadySeconds = in.MinReadySeconds
-	return nil
-}
-
 func convert_v1alpha1_Scale_To_expapi_Scale(in *Scale, out *expapi.Scale, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Scale))(in)
@@ -2105,6 +2276,45 @@ func convert_v1alpha1_ThirdPartyResource_To_expapi_ThirdPartyResource(in *ThirdP
 	return nil
 }
 
+func convert_v1alpha1_ThirdPartyResourceData_To_expapi_ThirdPartyResourceData(in *ThirdPartyResourceData, out *expapi.ThirdPartyResourceData, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ThirdPartyResourceData))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1alpha1_ThirdPartyResourceDataList_To_expapi_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *expapi.ThirdPartyResourceDataList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ThirdPartyResourceDataList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.ThirdPartyResourceData, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1alpha1_ThirdPartyResourceData_To_expapi_ThirdPartyResourceData(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func convert_v1alpha1_ThirdPartyResourceList_To_expapi_ThirdPartyResourceList(in *ThirdPartyResourceList, out *expapi.ThirdPartyResourceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceList))(in)
@@ -2132,8 +2342,12 @@ func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		convert_api_Capabilities_To_v1_Capabilities,
+		convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
+		convert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
 		convert_api_ContainerPort_To_v1_ContainerPort,
 		convert_api_Container_To_v1_Container,
+		convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
+		convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource,
 		convert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource,
 		convert_api_EnvVarSource_To_v1_EnvVarSource,
 		convert_api_EnvVar_To_v1_EnvVar,
@@ -2171,7 +2385,6 @@ func init() {
 		convert_expapi_Daemon_To_v1alpha1_Daemon,
 		convert_expapi_DeploymentList_To_v1alpha1_DeploymentList,
 		convert_expapi_DeploymentStatus_To_v1alpha1_DeploymentStatus,
-		convert_expapi_DeploymentStrategy_To_v1alpha1_DeploymentStrategy,
 		convert_expapi_Deployment_To_v1alpha1_Deployment,
 		convert_expapi_HorizontalPodAutoscalerList_To_v1alpha1_HorizontalPodAutoscalerList,
 		convert_expapi_HorizontalPodAutoscalerSpec_To_v1alpha1_HorizontalPodAutoscalerSpec,
@@ -2179,17 +2392,22 @@ func init() {
 		convert_expapi_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodAutoscaler,
 		convert_expapi_ReplicationControllerDummy_To_v1alpha1_ReplicationControllerDummy,
 		convert_expapi_ResourceConsumption_To_v1alpha1_ResourceConsumption,
-		convert_expapi_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment,
 		convert_expapi_ScaleSpec_To_v1alpha1_ScaleSpec,
 		convert_expapi_ScaleStatus_To_v1alpha1_ScaleStatus,
 		convert_expapi_Scale_To_v1alpha1_Scale,
 		convert_expapi_SubresourceReference_To_v1alpha1_SubresourceReference,
+		convert_expapi_ThirdPartyResourceDataList_To_v1alpha1_ThirdPartyResourceDataList,
+		convert_expapi_ThirdPartyResourceData_To_v1alpha1_ThirdPartyResourceData,
 		convert_expapi_ThirdPartyResourceList_To_v1alpha1_ThirdPartyResourceList,
 		convert_expapi_ThirdPartyResource_To_v1alpha1_ThirdPartyResource,
 		convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		convert_v1_Capabilities_To_api_Capabilities,
+		convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
+		convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		convert_v1_ContainerPort_To_api_ContainerPort,
 		convert_v1_Container_To_api_Container,
+		convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
+		convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource,
 		convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource,
 		convert_v1_EnvVarSource_To_api_EnvVarSource,
 		convert_v1_EnvVar_To_api_EnvVar,
@@ -2234,11 +2452,12 @@ func init() {
 		convert_v1alpha1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler,
 		convert_v1alpha1_ReplicationControllerDummy_To_expapi_ReplicationControllerDummy,
 		convert_v1alpha1_ResourceConsumption_To_expapi_ResourceConsumption,
-		convert_v1alpha1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment,
 		convert_v1alpha1_ScaleSpec_To_expapi_ScaleSpec,
 		convert_v1alpha1_ScaleStatus_To_expapi_ScaleStatus,
 		convert_v1alpha1_Scale_To_expapi_Scale,
 		convert_v1alpha1_SubresourceReference_To_expapi_SubresourceReference,
+		convert_v1alpha1_ThirdPartyResourceDataList_To_expapi_ThirdPartyResourceDataList,
+		convert_v1alpha1_ThirdPartyResourceData_To_expapi_ThirdPartyResourceData,
 		convert_v1alpha1_ThirdPartyResourceList_To_expapi_ThirdPartyResourceList,
 		convert_v1alpha1_ThirdPartyResource_To_expapi_ThirdPartyResource,
 	)

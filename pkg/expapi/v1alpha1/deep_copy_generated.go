@@ -73,6 +73,36 @@ func deepCopy_v1_Capabilities(in v1.Capabilities, out *v1.Capabilities, c *conve
 	return nil
 }
 
+func deepCopy_v1_CephFSVolumeSource(in v1.CephFSVolumeSource, out *v1.CephFSVolumeSource, c *conversion.Cloner) error {
+	if in.Monitors != nil {
+		out.Monitors = make([]string, len(in.Monitors))
+		for i := range in.Monitors {
+			out.Monitors[i] = in.Monitors[i]
+		}
+	} else {
+		out.Monitors = nil
+	}
+	out.User = in.User
+	out.SecretFile = in.SecretFile
+	if in.SecretRef != nil {
+		out.SecretRef = new(v1.LocalObjectReference)
+		if err := deepCopy_v1_LocalObjectReference(*in.SecretRef, out.SecretRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func deepCopy_v1_CinderVolumeSource(in v1.CinderVolumeSource, out *v1.CinderVolumeSource, c *conversion.Cloner) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func deepCopy_v1_Container(in v1.Container, out *v1.Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -171,6 +201,28 @@ func deepCopy_v1_ContainerPort(in v1.ContainerPort, out *v1.ContainerPort, c *co
 	out.ContainerPort = in.ContainerPort
 	out.Protocol = in.Protocol
 	out.HostIP = in.HostIP
+	return nil
+}
+
+func deepCopy_v1_DownwardAPIVolumeFile(in v1.DownwardAPIVolumeFile, out *v1.DownwardAPIVolumeFile, c *conversion.Cloner) error {
+	out.Path = in.Path
+	if err := deepCopy_v1_ObjectFieldSelector(in.FieldRef, &out.FieldRef, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_DownwardAPIVolumeSource(in v1.DownwardAPIVolumeSource, out *v1.DownwardAPIVolumeSource, c *conversion.Cloner) error {
+	if in.Items != nil {
+		out.Items = make([]v1.DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_DownwardAPIVolumeFile(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -680,6 +732,30 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 	} else {
 		out.RBD = nil
 	}
+	if in.Cinder != nil {
+		out.Cinder = new(v1.CinderVolumeSource)
+		if err := deepCopy_v1_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
+	}
+	if in.CephFS != nil {
+		out.CephFS = new(v1.CephFSVolumeSource)
+		if err := deepCopy_v1_CephFSVolumeSource(*in.CephFS, out.CephFS, c); err != nil {
+			return err
+		}
+	} else {
+		out.CephFS = nil
+	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(v1.DownwardAPIVolumeSource)
+		if err := deepCopy_v1_DownwardAPIVolumeSource(*in.DownwardAPI, out.DownwardAPI, c); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -938,11 +1014,21 @@ func deepCopy_v1alpha1_ResourceConsumption(in ResourceConsumption, out *Resource
 }
 
 func deepCopy_v1alpha1_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
-	if err := deepCopy_util_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
-		return err
+	if in.MaxUnavailable != nil {
+		out.MaxUnavailable = new(util.IntOrString)
+		if err := deepCopy_util_IntOrString(*in.MaxUnavailable, out.MaxUnavailable, c); err != nil {
+			return err
+		}
+	} else {
+		out.MaxUnavailable = nil
 	}
-	if err := deepCopy_util_IntOrString(in.MaxSurge, &out.MaxSurge, c); err != nil {
-		return err
+	if in.MaxSurge != nil {
+		out.MaxSurge = new(util.IntOrString)
+		if err := deepCopy_util_IntOrString(*in.MaxSurge, out.MaxSurge, c); err != nil {
+			return err
+		}
+	} else {
+		out.MaxSurge = nil
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	return nil
@@ -1012,6 +1098,44 @@ func deepCopy_v1alpha1_ThirdPartyResource(in ThirdPartyResource, out *ThirdParty
 	return nil
 }
 
+func deepCopy_v1alpha1_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make([]uint8, len(in.Data))
+		for i := range in.Data {
+			out.Data[i] = in.Data[i]
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResourceData, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1alpha1_ThirdPartyResourceData(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_v1alpha1_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1053,8 +1177,12 @@ func init() {
 		deepCopy_resource_Quantity,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		deepCopy_v1_Capabilities,
+		deepCopy_v1_CephFSVolumeSource,
+		deepCopy_v1_CinderVolumeSource,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerPort,
+		deepCopy_v1_DownwardAPIVolumeFile,
+		deepCopy_v1_DownwardAPIVolumeSource,
 		deepCopy_v1_EmptyDirVolumeSource,
 		deepCopy_v1_EnvVar,
 		deepCopy_v1_EnvVarSource,
@@ -1108,6 +1236,8 @@ func init() {
 		deepCopy_v1alpha1_ScaleStatus,
 		deepCopy_v1alpha1_SubresourceReference,
 		deepCopy_v1alpha1_ThirdPartyResource,
+		deepCopy_v1alpha1_ThirdPartyResourceData,
+		deepCopy_v1alpha1_ThirdPartyResourceDataList,
 		deepCopy_v1alpha1_ThirdPartyResourceList,
 		deepCopy_util_IntOrString,
 		deepCopy_util_Time,
