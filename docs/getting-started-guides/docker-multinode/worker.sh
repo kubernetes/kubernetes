@@ -134,8 +134,31 @@ start_k8s() {
     sleep 5
     
     # Start kubelet & proxy in container
-    sudo docker run --net=host --privileged --restart=always -d -v /sys:/sys:ro -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=$(hostname -i) --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
-    sudo docker run -d --net=host --privileged --restart=always gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
+    docker run \
+        --net=host \
+        --privileged \
+        --restart=always \
+        -d \
+        -v /sys:/sys:ro \
+        -v /var/run:/var/run:rw  \
+        -v /dev:/dev \
+        -v /var/lib/docker/:/var/lib/docker:ro \
+        -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 \
+        --v=2 --address=0.0.0.0 --enable-server \
+        --hostname-override=$(hostname -i) \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local
+    
+    docker run \
+        -d \
+        --net=host \
+        --privileged \
+        --restart=always \
+        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        /hyperkube proxy --master=http://${MASTER_IP}:8080 \
+        --v=2
 }
 
 echo "Detecting your OS distro ..."
