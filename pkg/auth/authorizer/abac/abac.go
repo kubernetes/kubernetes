@@ -51,9 +51,10 @@ type policy struct {
 	// the API, we don't have to add lots of policy?
 
 	// TODO: make this a proper REST object with its own registry.
-	Readonly  bool   `json:"readonly,omitempty"`
-	Resource  string `json:"resource,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
+	Readonly        bool   `json:"readonly,omitempty"`
+	Resource        string `json:"resource,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+	NonResourcePath string `json:"nonResourcePath,omitempty"`
 
 	// TODO: "expires" string in RFC3339 format.
 
@@ -100,13 +101,20 @@ func NewFromFile(path string) (policyList, error) {
 func (p policy) matches(a authorizer.Attributes) bool {
 	if p.subjectMatches(a) {
 		if p.Readonly == false || (p.Readonly == a.IsReadOnly()) {
-			if p.Resource == "" || (p.Resource == a.GetResource()) {
+			switch {
+			case p.NonResourcePath != "":
+				if p.NonResourcePath == a.GetNonResourcePath() {
+					return true
+				}
+			// When the path is a non-resource path it cannot match.
+			case len(a.GetNonResourcePath()) == 0 && (p.Resource == "" || (p.Resource == a.GetResource())):
 				if p.Namespace == "" || (p.Namespace == a.GetNamespace()) {
 					return true
 				}
 			}
 		}
 	}
+
 	return false
 }
 
