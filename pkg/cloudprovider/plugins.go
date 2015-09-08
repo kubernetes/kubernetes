@@ -65,15 +65,16 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 // InitCloudProvider creates an instance of the named cloud provider.
 func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	var cloud Interface
+	var err error
 
 	if name == "" {
 		glog.Info("No cloud provider specified.")
 		return nil, nil
 	}
 
-	var err error
 	if configFilePath != "" {
-		config, err := os.Open(configFilePath)
+		var config *os.File
+		config, err = os.Open(configFilePath)
 		if err != nil {
 			glog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
 				configFilePath, err)
