@@ -69,7 +69,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj2) {
-		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v\nFinal: %#v", name, util.ObjectGoPrintDiff(item, obj2), codec, string(data), printer.Sprintf("%#v", item), printer.Sprintf("%#v", obj2))
+		t.Errorf("1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, util.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), string(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
@@ -103,12 +103,7 @@ func TestSpecificKind(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "PodList"
-	item, err := api.Scheme.New("", kind)
-	if err != nil {
-		t.Errorf("Couldn't make a %v? %v", kind, err)
-		return
-	}
-	roundTripSame(t, item)
+	doRoundTripTest(kind, t)
 }
 
 func TestList(t *testing.T) {
@@ -138,18 +133,22 @@ func TestRoundTripTypes(t *testing.T) {
 		}
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
-			item, err := api.Scheme.New("", kind)
-			if err != nil {
-				t.Fatalf("Couldn't make a %v? %v", kind, err)
-			}
-			if _, err := meta.TypeAccessor(item); err != nil {
-				t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
-			}
-			roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
-			if !nonInternalRoundTrippableTypes.Has(kind) {
-				roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
-			}
+			doRoundTripTest(kind, t)
 		}
+	}
+}
+
+func doRoundTripTest(kind string, t *testing.T) {
+	item, err := api.Scheme.New("", kind)
+	if err != nil {
+		t.Fatalf("Couldn't make a %v? %v", kind, err)
+	}
+	if _, err := meta.TypeAccessor(item); err != nil {
+		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
+	}
+	roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
+	if !nonInternalRoundTrippableTypes.Has(kind) {
+		roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
 	}
 }
 
