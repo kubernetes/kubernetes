@@ -137,20 +137,25 @@ $ kubectl config view
 produces this output
 
 ```yaml
+apiVersion: v1
 clusters:
-  local-server:
+- cluster:
     server: http://localhost:8080
+  name: local-server
 contexts:
-  default-context:
+- context:
     cluster: local-server
     namespace: the-right-prefix
     user: myself
+  name: default-context
 current-context: default-context
+kind: Config
 preferences: {}
 users:
-  myself:
-    username: admin
+- name: myself
+  user:
     password: secret
+    username: admin
 ```
 
 and a kubeconfig file that looks like this
@@ -173,8 +178,8 @@ preferences: {}
 users:
 - name: myself
   user:
-    username: admin
     password: secret
+    username: admin
 ```
 
 #### Commands for the example file
