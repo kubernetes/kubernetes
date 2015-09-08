@@ -387,6 +387,9 @@ func TestShorthand(t *testing.T) {
 	} else if f.Args()[1] != notaflag {
 		t.Errorf("expected argument %q got %q", notaflag, f.Args()[1])
 	}
+	if f.ArgsLenAtDash() != 1 {
+		t.Errorf("expected argsLenAtDash %d got %d", f.ArgsLenAtDash(), 1)
+	}
 }
 
 func TestParse(t *testing.T) {
@@ -423,6 +426,9 @@ func TestChangedHelper(t *testing.T) {
 	}
 	if f.Changed("invalid") {
 		t.Errorf("--invalid was changed!")
+	}
+	if f.ArgsLenAtDash() != -1 {
+		t.Errorf("Expected argsLenAtDash: %d but got %d", -1, f.ArgsLenAtDash())
 	}
 }
 
@@ -713,6 +719,9 @@ func TestTermination(t *testing.T) {
 	if f.Args()[1] != arg2 {
 		t.Errorf("expected argument %q got %q", arg2, f.Args()[1])
 	}
+	if f.ArgsLenAtDash() != 0 {
+		t.Errorf("expected argsLenAtDash %d got %d", 0, f.ArgsLenAtDash())
+	}
 }
 
 func TestDeprecatedFlagInDocs(t *testing.T) {
@@ -829,5 +838,37 @@ func TestMultipleNormalizeFlagNameInvocations(t *testing.T) {
 
 	if normalizeFlagNameInvocations != 1 {
 		t.Fatal("Expected normalizeFlagNameInvocations to be 1; got ", normalizeFlagNameInvocations)
+	}
+}
+
+//
+func TestHiddenFlagInUsage(t *testing.T) {
+	f := NewFlagSet("bob", ContinueOnError)
+	f.Bool("secretFlag", true, "shhh")
+	f.MarkHidden("secretFlag")
+
+	out := new(bytes.Buffer)
+	f.SetOutput(out)
+	f.PrintDefaults()
+
+	if strings.Contains(out.String(), "secretFlag") {
+		t.Errorf("found hidden flag in usage!")
+	}
+}
+
+//
+func TestHiddenFlagUsage(t *testing.T) {
+	f := NewFlagSet("bob", ContinueOnError)
+	f.Bool("secretFlag", true, "shhh")
+	f.MarkHidden("secretFlag")
+
+	args := []string{"--secretFlag"}
+	out, err := parseReturnStderr(t, f, args)
+	if err != nil {
+		t.Fatal("expected no error; got ", err)
+	}
+
+	if strings.Contains(out, "shhh") {
+		t.Errorf("usage message printed when using a hidden flag!")
 	}
 }
