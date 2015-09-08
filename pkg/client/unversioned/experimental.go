@@ -34,7 +34,7 @@ type ExperimentalInterface interface {
 	VersionInterface
 	HorizontalPodAutoscalersNamespacer
 	ScaleNamespacer
-	DaemonsNamespacer
+	DaemonSetsNamespacer
 	DeploymentsNamespacer
 }
 
@@ -82,8 +82,8 @@ func (c *ExperimentalClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
 }
 
-func (c *ExperimentalClient) Daemons(namespace string) DaemonInterface {
-	return newDaemons(c, namespace)
+func (c *ExperimentalClient) DaemonSets(namespace string) DaemonSetInterface {
+	return newDaemonSets(c, namespace)
 }
 
 func (c *ExperimentalClient) Deployments(namespace string) DeploymentInterface {

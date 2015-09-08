@@ -21,29 +21,28 @@ import (
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/daemon"
+	"k8s.io/kubernetes/pkg/registry/daemonset"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for daemons against etcd
+// rest implements a RESTStorage for DaemonSets against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// daemonPrefix is the location for daemons in etcd, only exposed
-// for testing
-var daemonPrefix = "/daemons"
+// daemonPrefix is the location for daemons in etcd
+var daemonPrefix = "/daemonsets"
 
-// NewREST returns a RESTStorage object that will work against daemons.
+// NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(s storage.Interface) *REST {
 	store := &etcdgeneric.Etcd{
-		NewFunc: func() runtime.Object { return &expapi.Daemon{} },
+		NewFunc: func() runtime.Object { return &expapi.DaemonSet{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &expapi.DaemonList{} },
+		NewListFunc: func() runtime.Object { return &expapi.DaemonSetList{} },
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -54,21 +53,21 @@ func NewREST(s storage.Interface) *REST {
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return etcdgeneric.NamespaceKeyFunc(ctx, daemonPrefix, name)
 		},
-		// Retrieve the name field of a daemon
+		// Retrieve the name field of a daemon set
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*expapi.Daemon).Name, nil
+			return obj.(*expapi.DaemonSet).Name, nil
 		},
 		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return daemon.MatchDaemon(label, field)
+			return daemonset.MatchDaemonSet(label, field)
 		},
-		EndpointName: "daemons",
+		EndpointName: "daemonsets",
 
-		// Used to validate daemon creation
-		CreateStrategy: daemon.Strategy,
+		// Used to validate daemon set creation
+		CreateStrategy: daemonset.Strategy,
 
-		// Used to validate daemon updates
-		UpdateStrategy: daemon.Strategy,
+		// Used to validate daemon set updates
+		UpdateStrategy: daemonset.Strategy,
 
 		Storage: s,
 	}

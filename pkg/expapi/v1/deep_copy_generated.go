@@ -765,23 +765,23 @@ func deepCopy_v1_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner
 	return nil
 }
 
-func deepCopy_v1_Daemon(in Daemon, out *Daemon, c *conversion.Cloner) error {
+func deepCopy_v1_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_v1_DaemonSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_v1_DaemonSetSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_v1_DaemonStatus(in.Status, &out.Status, c); err != nil {
+	if err := deepCopy_v1_DaemonSetStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_v1_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cloner) error {
+func deepCopy_v1_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -789,9 +789,9 @@ func deepCopy_v1_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cloner
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]Daemon, len(in.Items))
+		out.Items = make([]DaemonSet, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_v1_Daemon(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_v1_DaemonSet(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -801,7 +801,7 @@ func deepCopy_v1_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cloner
 	return nil
 }
 
-func deepCopy_v1_DaemonSpec(in DaemonSpec, out *DaemonSpec, c *conversion.Cloner) error {
+func deepCopy_v1_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -821,7 +821,7 @@ func deepCopy_v1_DaemonSpec(in DaemonSpec, out *DaemonSpec, c *conversion.Cloner
 	return nil
 }
 
-func deepCopy_v1_DaemonStatus(in DaemonStatus, out *DaemonStatus, c *conversion.Cloner) error {
+func deepCopy_v1_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatus, c *conversion.Cloner) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -1215,10 +1215,10 @@ func init() {
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,
 		deepCopy_v1_APIVersion,
-		deepCopy_v1_Daemon,
-		deepCopy_v1_DaemonList,
-		deepCopy_v1_DaemonSpec,
-		deepCopy_v1_DaemonStatus,
+		deepCopy_v1_DaemonSet,
+		deepCopy_v1_DaemonSetList,
+		deepCopy_v1_DaemonSetSpec,
+		deepCopy_v1_DaemonSetStatus,
 		deepCopy_v1_Deployment,
 		deepCopy_v1_DeploymentList,
 		deepCopy_v1_DeploymentSpec,

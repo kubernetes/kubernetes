@@ -37,46 +37,46 @@ func (APIVersion) SwaggerDoc() map[string]string {
 	return map_APIVersion
 }
 
-var map_Daemon = map[string]string{
-	"":         "Daemon represents the configuration of a daemon.",
+var map_DaemonSet = map[string]string{
+	"":         "DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec defines the desired behavior of this daemon. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is the current status of this daemon. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"spec":     "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 }
 
-func (Daemon) SwaggerDoc() map[string]string {
-	return map_Daemon
+func (DaemonSet) SwaggerDoc() map[string]string {
+	return map_DaemonSet
 }
 
-var map_DaemonList = map[string]string{
-	"":         "DaemonList is a list of Daemons.",
+var map_DaemonSetList = map[string]string{
+	"":         "DaemonSetList is a collection of daemon sets.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is the list of Daemons.",
+	"items":    "Items is a list of daemon sets.",
 }
 
-func (DaemonList) SwaggerDoc() map[string]string {
-	return map_DaemonList
+func (DaemonSetList) SwaggerDoc() map[string]string {
+	return map_DaemonSetList
 }
 
-var map_DaemonSpec = map[string]string{
-	"":         "DaemonSpec is the specification of a daemon.",
-	"selector": "Selector is a label query over pods that are managed by the daemon. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
-	"template": "Template is the object that describes the pod that will be created. The Daemon will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template",
+var map_DaemonSetSpec = map[string]string{
+	"":         "DaemonSetSpec is the specification of a daemon set.",
+	"selector": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+	"template": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template",
 }
 
-func (DaemonSpec) SwaggerDoc() map[string]string {
-	return map_DaemonSpec
+func (DaemonSetSpec) SwaggerDoc() map[string]string {
+	return map_DaemonSetSpec
 }
 
-var map_DaemonStatus = map[string]string{
-	"": "DaemonStatus represents the current status of a daemon.",
-	"currentNumberScheduled": "CurrentNumberScheduled is the number of nodes that are running exactly 1 copy of the daemon and are supposed to run the daemon.",
-	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon, but are not supposed to run the daemon.",
-	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon (including nodes correctly running the daemon).",
+var map_DaemonSetStatus = map[string]string{
+	"": "DaemonSetStatus represents the current status of a daemon set.",
+	"currentNumberScheduled": "CurrentNumberScheduled is the number of nodes that are running exactly 1 daemon pod and are supposed to run the daemon pod.",
+	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod.",
+	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod).",
 }
 
-func (DaemonStatus) SwaggerDoc() map[string]string {
-	return map_DaemonStatus
+func (DaemonSetStatus) SwaggerDoc() map[string]string {
+	return map_DaemonSetStatus
 }
 
 var map_Deployment = map[string]string{

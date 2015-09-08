@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package daemon
+package daemonset
 
 import (
 	"fmt"
@@ -30,32 +30,32 @@ import (
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
-// daemonStrategy implements verification logic for daemons.
-type daemonStrategy struct {
+// daemonSetStrategy implements verification logic for daemon sets.
+type daemonSetStrategy struct {
 	runtime.ObjectTyper
 	api.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating Daemon objects.
-var Strategy = daemonStrategy{api.Scheme, api.SimpleNameGenerator}
+// Strategy is the default logic that applies when creating and updating DaemonSet objects.
+var Strategy = daemonSetStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all Daemons need to be within a namespace.
-func (daemonStrategy) NamespaceScoped() bool {
+// NamespaceScoped returns true because all DaemonSets need to be within a namespace.
+func (daemonSetStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears the status of a daemon before creation.
-func (daemonStrategy) PrepareForCreate(obj runtime.Object) {
-	daemon := obj.(*expapi.Daemon)
-	daemon.Status = expapi.DaemonStatus{}
+// PrepareForCreate clears the status of a daemon set before creation.
+func (daemonSetStrategy) PrepareForCreate(obj runtime.Object) {
+	daemonSet := obj.(*expapi.DaemonSet)
+	daemonSet.Status = expapi.DaemonSetStatus{}
 
-	daemon.Generation = 1
+	daemonSet.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (daemonStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newDaemon := obj.(*expapi.Daemon)
-	oldDaemon := old.(*expapi.Daemon)
+func (daemonSetStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newDaemonSet := obj.(*expapi.DaemonSet)
+	oldDaemonSet := old.(*expapi.DaemonSet)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -64,59 +64,59 @@ func (daemonStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	// we can at first -- since obj contains spec -- but in the future we will probably make
 	// status its own object, and even if we don't, writes may be the result of a
 	// read-update-write loop, so the contents of spec may not actually be the spec that
-	// the controller has *seen*.
+	// the manager has *seen*.
 	//
 	// TODO: Any changes to a part of the object that represents desired state (labels,
 	// annotations etc) should also increment the generation.
-	if !reflect.DeepEqual(oldDaemon.Spec, newDaemon.Spec) {
-		newDaemon.Generation = oldDaemon.Generation + 1
+	if !reflect.DeepEqual(oldDaemonSet.Spec, newDaemonSet.Spec) {
+		newDaemonSet.Generation = oldDaemonSet.Generation + 1
 	}
 }
 
-// Validate validates a new daemon.
-func (daemonStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	daemon := obj.(*expapi.Daemon)
-	return validation.ValidateDaemon(daemon)
+// Validate validates a new daemon set.
+func (daemonSetStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+	daemonSet := obj.(*expapi.DaemonSet)
+	return validation.ValidateDaemonSet(daemonSet)
 }
 
-// AllowCreateOnUpdate is false for daemon; this means a POST is
+// AllowCreateOnUpdate is false for daemon set; this means a POST is
 // needed to create one
-func (daemonStrategy) AllowCreateOnUpdate() bool {
+func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (daemonStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateDaemon(obj.(*expapi.Daemon))
-	updateErrorList := validation.ValidateDaemonUpdate(old.(*expapi.Daemon), obj.(*expapi.Daemon))
+func (daemonSetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	validationErrorList := validation.ValidateDaemonSet(obj.(*expapi.DaemonSet))
+	updateErrorList := validation.ValidateDaemonSetUpdate(old.(*expapi.DaemonSet), obj.(*expapi.DaemonSet))
 	return append(validationErrorList, updateErrorList...)
 }
 
-// AllowUnconditionalUpdate is the default update policy for daemon objects.
-func (daemonStrategy) AllowUnconditionalUpdate() bool {
+// AllowUnconditionalUpdate is the default update policy for daemon set objects.
+func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// DaemonToSelectableFields returns a field set that represents the object.
-func DaemonToSelectableFields(daemon *expapi.Daemon) fields.Set {
+// DaemonSetToSelectableFields returns a field set that represents the object.
+func DaemonSetToSelectableFields(daemon *expapi.DaemonSet) fields.Set {
 	return fields.Set{
 		"metadata.name": daemon.Name,
 	}
 }
 
-// MatchDaemon is the filter used by the generic etcd backend to route
+// MatchSetDaemon is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchDaemon(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchDaemonSet(label labels.Selector, field fields.Selector) generic.Matcher {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			daemon, ok := obj.(*expapi.Daemon)
+			ds, ok := obj.(*expapi.DaemonSet)
 			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a daemon.")
+				return nil, nil, fmt.Errorf("given object is not a ds.")
 			}
-			return labels.Set(daemon.ObjectMeta.Labels), DaemonToSelectableFields(daemon), nil
+			return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), nil
 		},
 	}
 }
