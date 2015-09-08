@@ -219,7 +219,7 @@ appropriate backend without the clients knowing anything about Kubernetes or
 
 ![Services overview diagram](services-overview.png)
 
-By default, the choice of backend is random.  Client-IP based session affinity
+By default, the choice of backend is round robin.  Client-IP based session affinity
 can be selected by setting `service.spec.sessionAffinity` to `"ClientIP"` (the
 default is `"None"`).
 
