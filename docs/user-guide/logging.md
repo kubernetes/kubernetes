@@ -58,7 +58,7 @@ spec:
            'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 ```
 
-[Download example](../../examples/blog-logging/counter-pod.yaml)
+[Download example](../../examples/blog-logging/counter-pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
 
 we can run the pod:
