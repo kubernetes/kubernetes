@@ -246,8 +246,8 @@ type FakeExperimental struct {
 	*Fake
 }
 
-func (c *FakeExperimental) Daemons(namespace string) client.DaemonInterface {
-	return &FakeDaemons{Fake: c, Namespace: namespace}
+func (c *FakeExperimental) DaemonSets(namespace string) client.DaemonSetInterface {
+	return &FakeDaemonSets{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {

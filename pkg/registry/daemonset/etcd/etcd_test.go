@@ -33,13 +33,13 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewDaemon() *expapi.Daemon {
-	return &expapi.Daemon{
+func newValidDaemonSet() *expapi.DaemonSet {
+	return &expapi.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: expapi.DaemonSpec{
+		Spec: expapi.DaemonSetSpec{
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -61,21 +61,21 @@ func validNewDaemon() *expapi.Daemon {
 	}
 }
 
-var validDaemon = validNewDaemon()
+var validDaemonSet = newValidDaemonSet()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	daemon := validNewDaemon()
-	daemon.ObjectMeta = api.ObjectMeta{}
+	ds := newValidDaemonSet()
+	ds.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		daemon,
+		ds,
 		// invalid (invalid selector)
-		&expapi.Daemon{
-			Spec: expapi.DaemonSpec{
+		&expapi.DaemonSet{
+			Spec: expapi.DaemonSetSpec{
 				Selector: map[string]string{},
-				Template: validDaemon.Spec.Template,
+				Template: validDaemonSet.Spec.Template,
 			},
 		},
 	)
@@ -86,31 +86,31 @@ func TestUpdate(t *testing.T) {
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
-		validNewDaemon(),
+		newValidDaemonSet(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Daemon)
+			object := obj.(*expapi.DaemonSet)
 			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Daemon)
+			object := obj.(*expapi.DaemonSet)
 			object.UID = "newUID"
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Daemon)
+			object := obj.(*expapi.DaemonSet)
 			object.Name = ""
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Daemon)
+			object := obj.(*expapi.DaemonSet)
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Daemon)
+			object := obj.(*expapi.DaemonSet)
 			object.Spec.Selector = map[string]string{}
 			return object
 		},
@@ -120,26 +120,26 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	test.TestDelete(validNewDaemon())
+	test.TestDelete(newValidDaemonSet())
 }
 
 func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	test.TestGet(validNewDaemon())
+	test.TestGet(newValidDaemonSet())
 }
 
 func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	test.TestList(validNewDaemon())
+	test.TestList(newValidDaemonSet())
 }
 
 func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
-		validDaemon,
+		validDaemonSet,
 		// matching labels
 		[]labels.Set{
 			{"a": "b"},

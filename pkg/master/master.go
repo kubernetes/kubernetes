@@ -80,7 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 
-	daemonetcd "k8s.io/kubernetes/pkg/registry/daemon/etcd"
+	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
 	"github.com/emicklei/go-restful"
@@ -824,7 +824,7 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 	controllerStorage := expcontrolleretcd.NewStorage(c.ExpDatabaseStorage)
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
-	daemonStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
+	daemonSetStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
 	deploymentStorage := deploymentetcd.NewREST(c.ExpDatabaseStorage)
 
 	storage := map[string]rest.Storage{
@@ -832,7 +832,7 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
 		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
 		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
-		strings.ToLower("daemons"):                      daemonStorage,
+		strings.ToLower("daemonsets"):                   daemonSetStorage,
 		strings.ToLower("deployments"):                  deploymentStorage,
 	}
 
