@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -31,8 +31,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Daemon", func() {
-	f := &Framework{BaseName: "daemons"}
+var _ = Describe("Daemon set", func() {
+	f := &Framework{BaseName: "daemonsets"}
 
 	BeforeEach(func() {
 		f.beforeEach()
@@ -47,7 +47,7 @@ var _ = Describe("Daemon", func() {
 	})
 
 	It("should launch a daemon pod on every node of the cluster", func() {
-		testDaemons(f)
+		testDaemonSets(f)
 	})
 })
 
@@ -72,17 +72,13 @@ func clearNodeLabels(c *client.Client) error {
 }
 
 func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames []string) func() (bool, error) {
-	// Don't return an error, because returning an error will abort wait.Poll, but
-	// if there's an error, we want to try getting the daemon again.
 	return func() (bool, error) {
-		// Get list of pods satisfying selector.
 		podList, err := f.Client.Pods(f.Namespace.Name).List(labels.Set(selector).AsSelector(), fields.Everything())
 		if err != nil {
 			return false, nil
 		}
 		pods := podList.Items
 
-		// Get a map of node names to number of daemon pods running on the node.
 		nodesToPodCount := make(map[string]int)
 		for _, pod := range pods {
 			nodesToPodCount[pod.Spec.NodeName] += 1
@@ -103,8 +99,6 @@ func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames [
 }
 
 func checkRunningOnAllNodes(f *Framework, selector map[string]string) func() (bool, error) {
-	// Don't return an error, because returning an error will abort wait.Poll, but
-	// if there's an error, we want to try getting the daemon again.
 	return func() (bool, error) {
 		nodeList, err := f.Client.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
@@ -122,21 +116,21 @@ func checkRunningOnNoNodes(f *Framework, selector map[string]string) func() (boo
 	return checkDaemonPodOnNodes(f, selector, make([]string, 0))
 }
 
-func testDaemons(f *Framework) {
+func testDaemonSets(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
-	simpleDaemonName := "simple-daemon"
+	simpleDSName := "simple-daemon-set"
 	image := "gcr.io/google_containers/serve_hostname:1.1"
-	label := map[string]string{"name": simpleDaemonName}
+	label := map[string]string{"name": simpleDSName}
 	retryTimeout := 1 * time.Minute
 	retryInterval := 5 * time.Second
 
-	By(fmt.Sprintf("Creating simple daemon %s", simpleDaemonName))
-	_, err := c.Daemons(ns).Create(&expapi.DaemonSet{
+	By(fmt.Sprintf("Creating simple daemon set %s", simpleDSName))
+	_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
-			Name: simpleDaemonName,
+			Name: simpleDSName,
 		},
-		Spec: expapi.DaemonSetSpec{
+		Spec: experimental.DaemonSetSpec{
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: label,
@@ -144,7 +138,7 @@ func testDaemons(f *Framework) {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:  simpleDaemonName,
+							Name:  simpleDSName,
 							Image: image,
 							Ports: []api.ContainerPort{{ContainerPort: 9376}},
 						},
@@ -172,15 +166,15 @@ func testDaemons(f *Framework) {
 	err = wait.Poll(retryInterval, retryTimeout, checkRunningOnAllNodes(f, label))
 	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 
-	complexDaemonName := "complex-daemon"
-	complexLabel := map[string]string{"name": complexDaemonName}
+	complexDSName := "complex-daemon-set"
+	complexLabel := map[string]string{"name": complexDSName}
 	nodeSelector := map[string]string{"color": "blue"}
-	By(fmt.Sprintf("Creating daemon with a node selector %s", complexDaemonName))
-	_, err = c.Daemons(ns).Create(&expapi.DaemonSet{
+	By(fmt.Sprintf("Creating daemon with a node selector %s", complexDSName))
+	_, err = c.DaemonSets(ns).Create(&experimental.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
-			Name: complexDaemonName,
+			Name: complexDSName,
 		},
-		Spec: expapi.DaemonSetSpec{
+		Spec: experimental.DaemonSetSpec{
 			Selector: complexLabel,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -190,7 +184,7 @@ func testDaemons(f *Framework) {
 					NodeSelector: nodeSelector,
 					Containers: []api.Container{
 						{
-							Name:  complexDaemonName,
+							Name:  complexDSName,
 							Image: image,
 							Ports: []api.ContainerPort{{ContainerPort: 9376}},
 						},

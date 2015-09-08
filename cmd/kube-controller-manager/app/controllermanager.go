@@ -64,7 +64,7 @@ type CMServer struct {
 	CloudConfigFile                   string
 	ConcurrentEndpointSyncs           int
 	ConcurrentRCSyncs                 int
-	ConcurrentDCSyncs                 int
+	ConcurrentDSCSyncs                int
 	ServiceSyncPeriod                 time.Duration
 	NodeSyncPeriod                    time.Duration
 	ResourceQuotaSyncPeriod           time.Duration
@@ -100,7 +100,7 @@ func NewCMServer() *CMServer {
 		Address:                           net.ParseIP("127.0.0.1"),
 		ConcurrentEndpointSyncs:           5,
 		ConcurrentRCSyncs:                 5,
-		ConcurrentDCSyncs:                 2,
+		ConcurrentDSCSyncs:                2,
 		ServiceSyncPeriod:                 5 * time.Minute,
 		NodeSyncPeriod:                    10 * time.Second,
 		ResourceQuotaSyncPeriod:           10 * time.Second,
@@ -216,8 +216,8 @@ func (s *CMServer) Run(_ []string) error {
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient, replicationControllerPkg.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
-	daemonManager := daemon.NewDaemonManager(kubeClient)
-	go daemonManager.Run(s.ConcurrentDCSyncs, util.NeverStop)
+	go daemon.NewDaemonSetsController(kubeClient).
+		Run(s.ConcurrentDSCSyncs, util.NeverStop)
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {

@@ -47,6 +47,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 )
 
 // CMServer is the main context object for the controller manager.
@@ -112,6 +113,9 @@ func (s *CMServer) Run(_ []string) error {
 
 	controllerManager := replicationcontroller.NewReplicationManager(kubeClient, replicationcontroller.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
+
+	go daemon.NewDaemonSetsController(kubeClient).
+		Run(s.ConcurrentDSCSyncs, util.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
 	if s.CloudProvider != mesos.ProviderName {
