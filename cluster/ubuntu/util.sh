@@ -435,9 +435,91 @@ function kube-down {
   done
 }
 
+
+# Perform common upgrade setup tasks
+function prepare-push() {
+  #Not yet support upgrading by using local binaries.
+  if [[ $KUBE_VERSION == "" ]]; then
+     echo "Upgrading nodes to local binaries is not yet supported.Please specify the version"
+     exit 1
+  fi
+  # Run build.sh to get the latest release
+  source "${KUBE_ROOT}/cluster/ubuntu/build.sh"    
+}
+
+# Update a kubernetes master with latest release
+function push-master {
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  setClusterInfo
+  ii=0
+  for i in ${nodes}; do
+    if [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
+      echo "Cleaning on master ${i#*@}"
+      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop' || true
+      provision-master
+    elif [[ "${roles[${ii}]}" == "i" ]]; then
+      continue
+    else
+      echo "unsupported role for ${i}. please check"
+      exit 1
+    fi
+    ((ii=ii+1))
+  done
+  verify-cluster
+}
+
+# Update a kubernetes node with latest release
+function push-node() {
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  node=${1}
+  setClusterInfo
+  ii=0
+  for i in ${nodes}; do
+    if [[ "${roles[${ii}]}" == "i" || "${roles[${ii}]}" == "ai" && $i == *$node ]]; then
+    echo "Cleaning on node ${i#*@}"
+      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop' || true
+      provision-minion $i
+    else
+      echo "unsupported role for ${i}, or nodes ${i} don't exist. please check"
+      exit 1
+    fi
+    ((ii=ii+1))
+  done
+  verify-cluster
+}
+
 # Update a kubernetes cluster with latest source
 function kube-push {
-  echo "not implemented"
+  prepare-push
+  #stop all the kube's process & etcd 
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  for i in ${nodes}; do
+    echo "Cleaning on node ${i#*@}"
+    ssh -t $i 'sudo -p "[sudo] stop all process: " service etcd stop' || true
+    ssh -t $i 'rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; rm -rf ~/kube' || true
+  done
+  #Update all nodes with the lasted release
+  if [[ ! -f "ubuntu/binaries/master/kube-apiserver" ]]; then
+    echo "There is no latest release of kubernetes,please check first"
+    exit 1
+  fi
+  #provision all nodes,include master&nodes
+  setClusterInfo
+  ii=0
+  for i in ${nodes}; do
+    if [[ "${roles[${ii}]}" == "a" ]]; then
+      provision-master
+    elif [[ "${roles[${ii}]}" == "i" ]]; then
+      provision-minion $i
+    elif [[ "${roles[${ii}]}" == "ai" ]]; then
+      provision-masterandminion
+    else
+      echo "unsupported role for ${i}. please check"
+      exit 1
+    fi
+    ((ii=ii+1))
+  done
+  verify-cluster
 }
 
 # Perform preparations required to run e2e tests
