@@ -66,3 +66,7 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
+
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
+OPENCONTRAIL_KUBERNTES_TAG="${OPENCONTRAIL_KUBERNTES_TAG:-master}"
+OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
