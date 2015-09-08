@@ -167,7 +167,7 @@ restrictions around nodes: pods from several namespaces may run on the same node
 
 ## Example
 
-See a [detailed example for how to use resource quota](../user-guide/resourcequota/).
+See a [detailed example for how to use resource quota](resourcequota/)..
 
 ## Read More
 
