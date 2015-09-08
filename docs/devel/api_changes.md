@@ -399,6 +399,10 @@ The conversion code resides with each versioned API. There are two files:
      functions
    - `pkg/api/<version>/conversion_generated.go` containing auto-generated
      conversion functions
+   - `pkg/expapi/<version>/conversion.go` containing manually written conversion
+     functions
+   - `pkg/expapi/<version>/conversion_generated.go` containing auto-generated
+     conversion functions
 
 Since auto-generated conversion functions are using manually written ones,
 those manually written should be named with a defined convention, i.e. a function
@@ -433,6 +437,7 @@ of your versioned api objects.
 
 The deep copy code resides with each versioned API:
    - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
+   - `pkg/expapi/<version>/deep_copy_generated.go` containing auto-generated copy functions
 
 To regenerate them:
    - run
