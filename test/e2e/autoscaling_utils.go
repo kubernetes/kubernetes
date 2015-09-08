@@ -54,7 +54,7 @@ type ResourceConsumer struct {
 }
 
 // NewResourceConsumer creates new ResourceConsumer
-// cpu argument is in milicores
+// cpu argument is in millicores
 func NewResourceConsumer(name string, replicas int, cpu int, framework *Framework) *ResourceConsumer {
 	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas)
 	rc := &ResourceConsumer{
@@ -69,8 +69,8 @@ func NewResourceConsumer(name string, replicas int, cpu int, framework *Framewor
 }
 
 // ConsumeCPU consumes given number of CPU
-func (rc *ResourceConsumer) ConsumeCPU(milicores int) {
-	rc.channel <- milicores
+func (rc *ResourceConsumer) ConsumeCPU(millicores int) {
+	rc.channel <- millicores
 }
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
@@ -79,9 +79,9 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	var rest int
 	for {
 		select {
-		case milicores := <-rc.channel:
-			count = milicores / requestSizeInMilicores
-			rest = milicores - count*requestSizeInMilicores
+		case millicores := <-rc.channel:
+			count = millicores / requestSizeInMilicores
+			rest = millicores - count*requestSizeInMilicores
 		case <-time.After(sleepTime):
 			if count > 0 {
 				rc.sendConsumeCPUrequests(count, requestSizeInMilicores, consumptionTimeInSeconds)
@@ -95,21 +95,21 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	}
 }
 
-func (rc *ResourceConsumer) sendConsumeCPUrequests(requests, milicores, durationSec int) {
+func (rc *ResourceConsumer) sendConsumeCPUrequests(requests, millicores, durationSec int) {
 	for i := 0; i < requests; i++ {
-		go rc.sendOneConsumeCPUrequest(milicores, durationSec)
+		go rc.sendOneConsumeCPUrequest(millicores, durationSec)
 	}
 }
 
 // sendOneConsumeCPUrequest sends POST request for cpu consumption
-func (rc *ResourceConsumer) sendOneConsumeCPUrequest(milicores int, durationSec int) {
+func (rc *ResourceConsumer) sendOneConsumeCPUrequest(millicores int, durationSec int) {
 	_, err := rc.framework.Client.Post().
 		Prefix("proxy").
 		Namespace(rc.framework.Namespace.Name).
 		Resource("services").
 		Name(rc.name).
 		Suffix("ConsumeCPU").
-		Param("milicores", strconv.Itoa(milicores)).
+		Param("millicores", strconv.Itoa(millicores)).
 		Param("durationSec", strconv.Itoa(durationSec)).
 		Do().
 		Raw()
