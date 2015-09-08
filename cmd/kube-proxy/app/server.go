@@ -200,7 +200,7 @@ func (s *ProxyServer) Run(_ []string) error {
 		ipt := utiliptables.New(execer, protocol)
 		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, ipt, s.PortRange, s.SyncPeriod)
 		if err != nil {
-			glog.Fatalf("Unable to create proxer: %v", err)
+			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
