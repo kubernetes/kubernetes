@@ -620,6 +620,9 @@ func (dm *DockerManager) runContainer(
 	labels := map[string]string{
 		kubernetesNameLabel: namespacedName.String(),
 	}
+	for k, v := range container.Labels {
+		labels[k] = v
+	}
 	if pod.Spec.TerminationGracePeriodSeconds != nil {
 		labels[kubernetesTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
 	}

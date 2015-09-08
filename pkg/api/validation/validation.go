@@ -963,6 +963,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validatePullPolicy(&ctr).Prefix("imagePullPolicy")...)
 		cErrs = append(cErrs, ValidateResourceRequirements(&ctr.Resources).Prefix("resources")...)
 		cErrs = append(cErrs, ValidateSecurityContext(ctr.SecurityContext).Prefix("securityContext")...)
+		cErrs = append(cErrs, ValidateLabels(ctr.Labels, "labels")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
