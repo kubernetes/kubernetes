@@ -199,8 +199,9 @@ func (ContainerStateTerminated) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerStateWaiting = map[string]string{
-	"":       "ContainerStateWaiting is a waiting state of a container.",
-	"reason": "(brief) reason the container is not yet running, such as pulling its image.",
+	"":        "ContainerStateWaiting is a waiting state of a container.",
+	"reason":  "(brief) reason the container is not yet running.",
+	"message": "Message regarding why the container is not yet running.",
 }
 
 func (ContainerStateWaiting) SwaggerDoc() map[string]string {

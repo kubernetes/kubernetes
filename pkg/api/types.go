@@ -835,8 +835,10 @@ const (
 )
 
 type ContainerStateWaiting struct {
-	// Reason could be pulling image,
+	// A brief CamelCase string indicating details about why the container is in waiting state.
 	Reason string `json:"reason,omitempty"`
+	// A human-readable message indicating details about why the container is in waiting state.
+	Message string `json:"message,omitempty"`
 }
 
 type ContainerStateRunning struct {

@@ -1036,8 +1036,10 @@ const (
 
 // ContainerStateWaiting is a waiting state of a container.
 type ContainerStateWaiting struct {
-	// (brief) reason the container is not yet running, such as pulling its image.
+	// (brief) reason the container is not yet running.
 	Reason string `json:"reason,omitempty"`
+	// Message regarding why the container is not yet running.
+	Message string `json:"message,omitempty"`
 }
 
 // ContainerStateRunning is a running state of a container.
