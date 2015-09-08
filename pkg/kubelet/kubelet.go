@@ -310,6 +310,11 @@ func NewMainKubelet(
 		daemonEndpoints:                daemonEndpoints,
 		flannelServer:                  &FlannelServer{kubeClient},
 	}
+	// TODO: Pipe as cmd line arg, don't hardcode flannel, don't cast interface etc
+	useDefaultOverlay := true
+	if useDefaultOverlay {
+		klet.flannelServer = NewFlannelServer(kubeClient.(*client.Client))
+	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
