@@ -64,11 +64,11 @@ func (puller *imagePuller) reportImagePull(ref *api.ObjectReference, event strin
 
 	switch event {
 	case "pulling":
-		puller.recorder.Eventf(ref, "pulling", "Pulling image %q", image)
+		puller.recorder.Eventf(ref, "Pulling", "Pulling image %q", image)
 	case "pulled":
-		puller.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", image)
+		puller.recorder.Eventf(ref, "Pulled", "Successfully pulled image %q", image)
 	case "failed":
-		puller.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", image, pullError)
+		puller.recorder.Eventf(ref, "Failed", "Failed to pull image %q: %v", image, pullError)
 	}
 }
 
@@ -82,14 +82,14 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
 		if ref != nil {
-			puller.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
+			puller.recorder.Eventf(ref, "Failed", "Failed to inspect image %q: %v", container.Image, err)
 		}
 		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
 	}
 
 	if !shouldPullImage(container, present) {
 		if present && ref != nil {
-			puller.recorder.Eventf(ref, "pulled", "Container image %q already present on machine", container.Image)
+			puller.recorder.Eventf(ref, "Pulled", "Container image %q already present on machine", container.Image)
 		}
 		return nil
 	}
