@@ -41,6 +41,8 @@ Currently, the cloudproviders are designed so that they get directly compiled in
 
 The user should specify a config file in JSON format. The **clientURL** field is required which specifies the URL and port of the cloud provider.
 
+Instances are grouped by locale (region or zone which is depended on Cloudproviders' supports). When this module is init'ed, it call GetZones() to get the its locale and is used for subsequent calls
+
 ##### Example Config File:
 
 ```json
@@ -51,7 +53,7 @@ The user should specify a config file in JSON format. The **clientURL** field is
 
 First the API checks for which interfaces in [cloud.go](../pkg/cloudprovider/cloud.go) are implemented.
 
-A OPTIONS request for /cloudprovider/v1aplha1/{Interface} will return whether the interface is supported (200 Response Code) or not (501 Not Implemented Response Code).
+A OPTIONS request for /cloudprovider/v1alpha1/{Interface} will return whether the interface is supported (200 Response Code) or not (501 Not Implemented Response Code).
 
 The following methods must be implemented by the HTTP cloudprovider.
 
@@ -60,7 +62,7 @@ If you encounter an error in processing the request, return an HTTP 404 with a r
 
 ## Provider Name
 
-#### GET /cloudprovider/v1aplha1/providerName
+#### GET /cloudprovider/v1alpha1/providerName
 
 Returns the cloud provider name.
 
@@ -79,11 +81,11 @@ Example
 
 ## Instances
 
-The instances interface allows the kubernetes platform to query the cloud provider about the instances currently within the cloud provider system.
+The instances interface allows the kubernetes platform to query the cloud provider about the instances currently within the cloud provider system. Instances are grouped by locale (Some cloudproviders support 'region' others support 'zone')
 
 ### Methods
 
-#### OPTIONS /cloudprovider/v1aplha1/instances
+#### OPTIONS /cloudprovider/v1alpha1/instances
 
 Returns whether the Instance interface is supported or not.
 
@@ -92,108 +94,106 @@ Returns whether the Instance interface is supported or not.
 Empty 200 Response if supported else 501 Response
 
 
-#### GET /cloudprovider/v1aplha1/instances/{instanceName}/nodeAddresses
+#### GET /cloudprovider/v1alpha1/locales/{locale}/instances/{instanceName}
+Returns an instance for the given instance name.
 
-Returns all node addresses for the given instance.
+##### Parameters
 
-##### Expected return value:
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|PathParameter|name|name of the instance|true|string
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|nodeAddresses|List of node adress objects.||
-|nodeAddresses:type|The IP type relate to the node address. The types of addresses are restricted to the list below.|"InternalIP"|
-|nodeAddresses:address|The actual node's address.|"127.0.0.1"|
+##### Responses
 
-Address Types
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|Instance|
 
-|Name|Description|
-|----|-----------|
-|InternalIP|The node's Internal IP address.|
-|ExternalIP|The node's External IP address.|
-|Hostname|The hostname of the node.|
-|LegacyHostIP|The node's Host IP address.|
 Example
 
 ```json
 {
-    "nodeAddresses": [
-        {
-            "type": "InternalIP",
-            "address": "127.0.0.1"
-        }
-    ]
+    "metadata": {
+        "name": "instance-1",
+    },
+    "spec": {
+        "instanceID":"instanceID01",
+        "nodeAddress":[
+            {
+                "type": "InternalIP",
+                "address": "127.0.0.1",
+            },
+        ]
+    }
 }
 ```
 
-#### GET /cloudprovider/v1aplha1/instances/{instanceName}/ID
-
-Returns the Instance ID for the given instance.
-
-##### Expected return value:
-
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|instanceID|ID of the cloud provider.|"my-cloud-name1"|
-Example
-
-```json
-{
-    "instanceID": "my-cloud-name1"
-}
-```
-
-#### GET /cloudprovider/v1aplha1/instances/{FQDN}
+#### GET /cloudprovider/v1alpha1/locales/{locale}/instances/{FQDN}
 
 Returns all instances where the name matches the word FQDN. FQDN is a go regular expression.
 
 ##### Expected return value:
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|instances|List of all instances matching the FQDN.||
-|instances:instanceName|Name of the instance.|"cloud-1"|
-Example
+##### Parameters
+
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|InstanceList|
 
 ```json
 {
-    "instances": [
+    "items": [
         {
-            "instanceName": "cloud-1"
-        }
+            "metadata": {
+                "name": "instance-1",
+            },
+            "spec": {
+                "instanceID":"instanceID01",
+                "nodeAddress":[
+                    {
+                        "type": "InternalIP",
+                        "address": "127.0.0.1"
+                    },
+                ]
+            },
+        },
     ]
 }
 ```
 
-
-#### GET /cloudprovider/v1aplha1/instances/node/{hostName}
+#### GET /cloudprovider/v1alpha1/locales/{locale}/hostnames/{hostName}
 
 Returns the name of the node which is related to the specific host.
 
-##### Expected return value:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|nodeName|The name of the node in the host|"my-node"|
-Example
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
 
-```json
-{
-    "nodeName": "my-node"
-}
-```
+##### Responses
 
-#### POST /cloudprovider/v1aplha1/instances/sshKey
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|Instance|
+
+
+#### POST /cloudprovider/v1alpha1/locales/{locale}/SSHKeyToAll
 
 Adds the SSH Key provided to all the instances. Returns whether the key was added or not.
 
-##### Sender body:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|user|The user's whose SSH key needs to be added.|"name"|
-|keydata|The actual ssh key. Any format allowed not restricted to strings.|"zPjoihsswRTGIUHKLHIHO345@435"|
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|BodyParameter|body|SSH Key schema|true|InstanceSSHKey
+
 Example
-
+keydata: The actual ssh key. Any format allowed not restricted to strings.
 ```json
 {
     "user": "name",
@@ -201,18 +201,12 @@ Example
 }
 ```
 
-##### Expected Return Value:
+##### Responses
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|SSHKeyAdded|Boolean value regarding whether the SSH Key was added or not.|false|
-Example
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|api.Status|
 
-```json
-{
-    "SSHKeyAdded": false
-}
-```
 
 ## TCPLoadBalancers
 
@@ -220,7 +214,7 @@ The TCPLoadBalancers interface allows the kubernetes platform to query the cloud
 
 ### Methods
 
-#### OPTIONS /cloudprovider/v1aplha1/tcpLoadBalancers
+#### OPTIONS /cloudprovider/v1alpha1/tcpLoadBalancers
 
 Know whether the interface is supported or not.
 
@@ -228,131 +222,104 @@ Know whether the interface is supported or not.
 
 Empty 200 Response if supported else 501 Response
 
-#### GET /cloudprovider/v1aplha1/tcpLoadBalancers/{region}/{name}
+#### GET /cloudprovider/v1alpha1/locale/{locale}/tcpLoadBalancers/{name}
 
 Returns the TCP Load Balancer Status if it exists in the region with the particular name.
 
-##### Expected return value:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|ingress|List of ingress points for the load balancer.||
-|ingress:ip|The IP address of the ingress point. This is a optional field as only one of IP or hostname is required.|"127.0.0.1"|
-|ingress:hostname|The hostname of the ingress point. This is a optional field as only one of IP or hostname is required.|"my-cloud-host1"|
-|exists|Whether the TCP Load Balancer exists or not.|true|
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|PathParameter|name|name of the tcpLoadBalancer|true|string
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|TCPLoadBalancer|
+
 Example
 
 ```json
 {
-    "ingress": [
-        {
-            "ip":"127.0.0.1",
-            "hostname":"my-cloud-host1"
-        }
-    ],
-    "exists":true
+    "metadata": {
+        "name": "tcploadbalancer-1",
+    },
+    "spec":{
+        "region": "west",
+        "externalIP": "1.2.3.4",
+        "ports": [ 
+            {
+                "name":"SMTP",
+                "protocol":"TCP",
+                "port":1234,
+                "targetPort":1234,
+                "nodePort":1234
+            },
+        ],
+        "hosts": [ "host1", "host2"  ],
+        "sessionAffinity":"None"
+    },
+    "status": {
+        "ingress": [
+            {
+                "ip": "127.0.0.1",
+                "hostname": "my-cloud-host1",
+            },
+        ],
+        "exists": true
+    }
 }
 ```
 
-#### POST /cloudprovider/v1aplha1/tcpLoadBalancers
+#### POST /cloudprovider/v1alpha1/locales/{locale}/tcpLoadBalancers
 
 Creates a new tcp load balancer and return the status of the balancer.
 
-##### Sender body:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|loadBalancerName|The name of the TCP load balancer.|"my-tcp-balancer"|
-|region|The location of the load balancer.|"USA"|
-|externalIP|The external IP of the load balancer.|"127.0.0.1"|
-|ports|List of all the service port objects.||
-|ports:name|Name of the port. If only one port is present then this field is **optional**.|"SMTP"|
-|ports:protocol|The protocol the port works on. The value can only be either "UDP" or "TCP".|"TCP"|
-|ports:port|The port that will be exposed on the service.|1234|
-|ports:targetPort|The target port on pods selected by this service. This field is optional. It can be **string** or **int** type. If not provided, will use **ports:port** value.|1234|
-|ports:nodePort|The port on each node on which this service is exposed.|1234|
-|hosts|A list of all host names.||
-|hosts:hostname|A host name.|"my-cloud-host1"|
-|sessionAffinity|The session affinity. The value can only be either "None" or "ClientIP".|"None"|
-Example
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|BodyParameter|name|a TCPLoadBalancer schema|true|TCPLoadBalancer
 
-```json
-{
-    "loadBalancerName":"my-tcp-balancer",
-    "region":"USA",
-    "externalIP":"127.0.0.1",
-    "ports":[
-        {
-            "name":"SMTP",
-            "protocol":"TCP",
-            "port":1234,
-            "targetPort":1234,
-            "nodePort":1234
-        }
-    ],
-    "hosts":[
-        {
-            "hostname":"my-cloud-host1"
-        }
-    ],
-    "sessionAffinity":"None"
-}
-```
+##### Responses
 
-##### Expected return value:
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|TCPLoadBalancer|
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|ingress|List of ingress points for the load balancer.||
-|ingress:ip|The IP address of the ingress point. This is a optional field as only one of IP or hostname is required.|"127.0.0.1"|
-|ingress:hostname|The hostname of the ingress point. This is a optional field as only one of IP or hostname is required.|"my-cloud-host1"|
-|exists|Whether the TCP Load Balancer exists or not.|true|
-Example
+#### PUT /cloudprovider/v1alpha1/locales/{locale}/tcpLoadBalancers/{name}
 
-```json
-{
-    "ingress": [
-        {
-            "ip":"127.0.0.1",
-            "hostname":"my-cloud-host1"
-        }
-    ]
-}
-```
+Update hosts under the specified tcp load balancer
 
-#### PUT /cloudprovider/v1aplha1/tcpLoadBalancers/{region}/{name}
+##### Parameters
 
-Updates the hosts given in the Load Balancer specified.
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|PathParameter|name|a TCPLoadBalancer schema|true|TCPLoadBalancer
 
-##### Sender body:
+##### Responses
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|hosts|A list of all host names.||
-|hosts:hostname|A host name.|"my-cloud-host1"|
-Example
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|api.Status|
 
-```json
-{
-    "hosts":[
-        {
-            "hostname":"my-cloud-host1"
-        }
-    ]
-}
-```
-
-##### Expected return body:
-
-Send back an empty 204 response if the object was updated successfully.
-
-#### DELETE /cloudprovider/v1aplha1/tcpLoadBalancers/{region}/{name}
+#### DELETE /cloudprovider/v1alpha1/locales/{locale}/tcpLoadBalancers/{name}
 
 Deletes the specified Load Balancer.
 
-##### Expected return value:
+##### Parameters
 
-Send back an empty 204 response if the object was deleted successfully or it didn't exist before.
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|PathParameter|name|name of the tcpLoadBalancer|true|string
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|api.Status|
+
 
 ## Zones
 
@@ -360,7 +327,7 @@ The Zones interface allows the kubernetes platform to query the cloud provider a
 
 ### Methods
 
-#### OPTIONS /cloudprovider/v1aplha1/zones
+#### OPTIONS /cloudprovider/v1alpha1/zones
 
 Know whether the interface is supported or not.
 
@@ -368,22 +335,32 @@ Know whether the interface is supported or not.
 
 Empty 200 Response if supported else 501 Response
 
-#### GET /cloudprovider/v1aplha1/zones
+#### GET /cloudprovider/v1alpha1/zones
 
 Returns the Zone containing the current failure zone and locality region that the program is running in.
 
-##### Expected return value:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|failureDomain|The failure zone.|"my-zone-2"|
-|region|Locality region that the program is running in.|"USA"|
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|Zone|
+
 Example
 
 ```json
 {
-    "failureDomain":"my-zone-2",
-    "region":"USA"
+    "metadata": {
+        "name": "zone-west",
+    },
+    "spec": {
+        "failureDomain":"my-zone-2",
+        "region": "west",
+    },
 }
 ```
 
@@ -393,7 +370,7 @@ The clusters interface allows the kubernetes platform to query information about
 
 ### Methods
 
-#### OPTIONS /cloudprovider/v1aplha1/clusters
+#### OPTIONS /cloudprovider/v1alpha1/clusters
 
 Know whether the interface is supported or not.
 
@@ -401,42 +378,64 @@ Know whether the interface is supported or not.
 
 Empty 200 Response if supported else 501 Response
 
-#### GET /cloudprovider/v1aplha1/clusters
+#### GET /cloudprovider/v1alpha1/locales/{locale}/clusters
 
 Returns a list of all clusters.
 
-##### Expected return value:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|clusters|The list of all cluster objects.||
-|clusters:clusterName|The name of the cluster.|"my-cluster"|
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|ClusterList|
+
 Example
 
 ```json
 {
-    "clusters": [
+    "items": [
         {
-            "clusterName":"my-cluster"
-        }
-    ]
+            "metadata": {
+                "name": "my-cluster",
+            },
+            "spec": {
+                "masterAddress": "1.2.3.4"
+            },
+        },
+    ],
 }
 ```
 
-#### GET /cloudprovider/v1aplha1/clusters/{clusterName}/master
+#### GET /cloudprovider/v1alpha1/locales/{locale}/clusters/{clusterName}
 
 Returns the address of the master of the cluster provided.
 
-##### Expected return value:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|masterAddress|The address of the master in the cluster. Can be a DNS Hostname or an IP Address.|"127.0.0.1"|
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|PathParameter|name|a cluster name|true|string
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|Cluster|
+
 Example
 
 ```json
 {
-    "masterAddress":"127.0.0.1"
+    "metadata": {
+        "name": "my-cluster",
+    },
+    "spec": {
+        "masterAddress": "1.2.3.4"
+    },
 }
 ```
 
@@ -446,7 +445,7 @@ The routes interface allows the kubernetes platform to query information about t
 
 ### Methods
 
-#### OPTIONS /cloudprovider/v1aplha1/routes
+#### OPTIONS /cloudprovider/v1alpha1/routes
 
 Know whether the interface is supported or not.
 
@@ -454,81 +453,72 @@ Know whether the interface is supported or not.
 
 Empty 200 Response if supported else 501 Response
 
-#### GET /cloudprovider/v1aplha1/routes/{clusterName}
+#### GET /cloudprovider/v1alpha1/locales/{locale}/clusterNames/{clusterName}/routes
 
 Returns a list of all the routes belonging to the specified cluster.
 
-##### Expected return value:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|routes|The list of route objects.||
-|routes:routeName|The name of the routing rule.|"abc"|
-|routes:targetInstance|The name of the instance as specified in routing rules for the cloud-provider.|"a1-small"|
-|routes:destinationCIDR|The CIDR format IP range that this routing rule applies to.|"192.168.1.0/24"|
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|RouteList|
+
 Example
 
 ```json
 {
-    "routes": [
+    "items": [
         {
-            "routeName":"abc",
-            "targetInstance":"a1-small",
-            "destinationCIDR":"192.168.1.0/24"
-        }
-    ]
+            "metadata": {
+                "name": "route-01",
+            },
+            "spec": {
+                "nameHint": "a hint"
+                "targetInstance": "a1-small",
+                "destinationCIDR": "192.168.1.0/24"
+            },
+        },
+    ],
 }
 ```
 
-#### POST /cloudprovider/v1aplha1/routes
+#### POST /cloudprovider/v1alpha1/locales/{locale}/clusterNames/{clusterName}/routes
 
 Creates a route inside the cloud provider and returns whether the route was created or not.
 
-##### Sender Body:
+##### Parameters
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|clusterName|The name of the cluster in which the route needs to be created.|"my-cluster"|
-|nameHint|A more meaningful use of the route name created.|"hint"|
-|route|The route object which needs to be created||
-|route:routeName|The name of the routing rule.|"abc"|
-|route:targetInstance|The name of the instance as specified in routing rules for the cloud-provider.|"a1-small"|
-|route:destinationCIDR|The CIDR format IP range that this routing rule applies to.|"192.168.1.0/24"|
-Example
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|BodyParameter|name|a Route schema|true|Route
 
-```json
-{
-    "clusterName":"my-cluster",
-    "nameHint":"hint",
-    "route":
-    {
-        "routeName":"abc",
-        "targetInstance":"a1-small",
-        "destinationCIDR":"192.168.1.0/24"
-    }
-}
-```
+##### Responses
 
-##### Expected Return Body:
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|api.Status|
 
-|Name|Description|Example Value|
-|----|-----------|-------------|
-|routeCreated|Whether the route was created or not.|true|
-Example
 
-```json
-{
-    "routeCreated":true
-}
-```
-
-#### DELETE /cloudprovider/v1aplha1/routes/{clusterName}/{routeName}
+#### DELETE /cloudprovider/v1alpha1/locales/{locale}/clusterNames/{clusterName}/routes/{routeName}
 
 Delete the requested route within the specified cluster.
 
-##### Expected return value:
+##### Parameters
 
-Send back an empty 204 response if the object was deleted successfully
+|Type|Name|Description|Required|Schema|Default
+|----|----|-----------|--------|------|-------
+|PathParameter|name|name of the route|true|string
+
+##### Responses
+
+|HTTP Code|Description|Schema|
+|---------|-----------|------|
+|200|success|api.Status|
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

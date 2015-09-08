@@ -25,17 +25,35 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"path"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+)
+
+const (
+	HTTPProviderTimeout          = 90 * time.Second
+	CloudProviderPath            = "/cloudprovider/v1alpha1"
+	LocalePath                   = CloudProviderPath + "/locales"
+	CloudProviderName            = "providername"
+	InstanceName                 = "instances"
+	SSHKeyToAllName              = "SSHKeyToAll"
+	HostName                     = "hostnames"
+	ClusterName                  = "clusters"
+	RouterName                   = "routers"
+	ZoneName                     = "zones"
+	TCPLoadBalancerName          = "tcploadbalancernames"
 )
 
 type httpCloud struct {
 	clientURL string
+
+	// A cloud instance running this program must be in some 'region' or 'zone'    
+	locale    string
 }
 
 // The current provider name
@@ -43,106 +61,141 @@ type ProviderName struct {
 	Name string `json:"providerName"`
 }
 
-type InstanceResources struct {
-	Resources []NodeResource `json:"resources"`
+type InstanceSpec struct {
+	ID        string            `json:"instanceID"`
+	Addresses []api.NodeAddress `json:"nodeAddresses"`
 }
 
-type NodeResource struct {
-	ResourceName string           `json:"resourceName"`
-	Quantity     ResourceQuantity `json:"quantity"`
-}
+type Instance struct {
+	Type api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	Object api.ObjectMeta `json:"metadata,omitempty"`
 
-type ResourceQuantity struct {
-	Amount int64  `json:"amount"`
-	Format string `json:"format"`
-}
-
-type InstanceNodeAddress struct {
-	Node []api.NodeAddress `json:"nodeAddresses"`
-}
-
-type InstanceID struct {
-	ID string `json:"instanceID"`
+	// Spec defines the behavior of a node.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec InstanceSpec `json:"spec,omitempty"`
 }
 
 type InstanceList struct {
-	List []InstanceName `json:"instances"`
+	Type api.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	List api.ListMeta `json:"metadata,omitempty"`
+
+	// List of nodes
+	Items []Instance `json:"items"`
 }
 
-type InstanceName struct {
-	Name string `json:"instanceName"`
-}
-
-type InstanceSSHKey struct {
-	User string `json:"user"`
-	Key  []byte `json:"keyData"`
-}
-
-type InstanceNodeName struct {
-	Name string `json:"nodeName"`
-}
-
-type InstanceSSHKeyResponse struct {
-	KeyAdded bool `json:"SSHKeyAdded"`
-}
-
-type Zone struct {
+// Zone
+type ZoneSpec struct {
 	Domain string `json:"failureDomain"`
 	Region string `json:"region"`
 }
 
+type Zone struct {
+	Type api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	Object api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of a node.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec ZoneSpec `json:"spec,omitempty"`
+}
+
+// Cluster
+type ClusterSpec struct {
+	MasterAddr string `json:"masterAddress"`
+}
+
+type Cluster struct {
+	//Name string `json:"clusterName"`
+	Type api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	Object api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of a node.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec ClusterSpec `json:"spec,omitempty"`
+}
+
 type ClusterList struct {
-	ClusterNames []ClusterName `json:"clusters"`
+	//ClusterNames []ClusterName `json:"clusters"`
+	Type api.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	List api.ListMeta `json:"metadata,omitempty"`
+
+	// List of nodes
+	Items []Cluster `json:"items"`
 }
 
-type ClusterName struct {
-	Name string `json:"clusterName"`
-}
-
-type ClusterMaster struct {
-	Address string `json:"masterAddress"`
-}
-
-type RouteList struct {
-	List []Route `json:"routes"`
-}
-
-type CreateRoute struct {
-	ClusterName string `json:"clusterName"`
-	NameHint    string `json:"nameHint"`
-	NewRoute    Route  `json:"route"`
-}
-
-type Route struct {
-	Name            string `json:"routeName"`
+// Route
+type RouteSpec struct {
+	NameHint        string `json:"nameHint"`
 	Target          string `json:"targetInstance"`
 	DestinationCIDR string `json:"destinationCIDR"`
 }
 
-type RouteCreatedStatus struct {
-	RouteCreated bool `json:"routeCreated"`
+type Route struct {
+	Type api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	Object api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of a node.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec RouteSpec `json:"spec,omitempty"`
 }
 
+type RouteList struct {
+	Type api.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	List api.ListMeta `json:"metadata,omitempty"`
+
+	// List of nodes
+	Items []Route `json:"items"`
+}
+
+// TCPLoadBalancer
 type TCPLoadBalancerStatus struct {
 	Ingress []api.LoadBalancerIngress `json:"ingress"`
 	Exists  bool                      `json:"exists"`
 }
 
-type TCPLoadBalancer struct {
-	Name            string            `json:"loadBalancerName"`
+type TCPLoadBalancerSpec struct {
 	Region          string            `json:"region"`
-	IP              string            `json:"externalIP"`
+	ExternalIP      string            `json:"externalIP"`
 	Ports           []api.ServicePort `json:"ports"`
-	Hosts           []Hostnames       `json:"hosts"`
+	Hosts           []string          `json:"hosts"`
 	ServiceAffinity string            `json:"sessionAffinity"`
+}
+
+type TCPLoadBalancer struct {
+	Type api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	Object api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of a node.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec TCPLoadBalancerSpec `json:"spec,omitempty"`
+	
+	Status TCPLoadBalancerStatus `json:"status,omitempty"`
+}
+
+// This does not need to have object name, because we don't delete it
+// In addition, a user might have multiple keys
+type InstanceSSHKey struct {
+	User string `json:"user"`
+	Key  []byte `json:"keyData"`
 }
 
 type Hostnames struct {
 	Name string `json:"hostname"`
-}
-
-type HostTCPLoadBalancer struct {
-	Hosts []Hostnames `json:"hosts"`
 }
 
 type Config struct {
@@ -169,16 +222,26 @@ func newHTTPCloud(config io.Reader) (*httpCloud, error) {
 		}
 		// Handle Trailing slashes
 		urlAddress = strings.TrimRight(urlAddress, "/")
-		return &httpCloud{
+	
+		hc := &httpCloud{
 			clientURL: urlAddress,
-		}, nil
+		}
+		
+		// A cloud instance running this program must be in some 'region' or 'zone'	
+		zone, err := hc.GetZone();
+		if err != nil {
+			return nil, err
+		}
+		
+		hc.locale = zone.Region
+		return hc, nil
 	}
 	return nil, fmt.Errorf("Config file is empty or is not provided")
 }
 
 // Returns the cloud provider ID.
 func (h *httpCloud) ProviderName() string {
-	path := "/cloudprovider/v1aplha1/providerName"
+	path := path.Join(CloudProviderPath, CloudProviderName)
 	var resp ProviderName
 
 	if err := h.get(path, &resp); err != nil {
@@ -190,7 +253,7 @@ func (h *httpCloud) ProviderName() string {
 
 // Returns an implementation of Instances for HTTP cloud.
 func (h *httpCloud) Instances() (cloudprovider.Instances, bool) {
-	if h.supported("instances") {
+	if h.supported(InstanceName) {
 		return h, true
 	}
 	return nil, false
@@ -198,7 +261,7 @@ func (h *httpCloud) Instances() (cloudprovider.Instances, bool) {
 
 // Returns an implementation of Clusters for HTTP cloud.
 func (h *httpCloud) Clusters() (cloudprovider.Clusters, bool) {
-	if h.supported("clusters") {
+	if h.supported(ClusterName) {
 		return h, true
 	}
 	return nil, false
@@ -206,7 +269,7 @@ func (h *httpCloud) Clusters() (cloudprovider.Clusters, bool) {
 
 // Returns an implementation of TCPLoadBalancer for HTTP cloud.
 func (h *httpCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
-	if h.supported("tcpLoadBalancers") {
+	if h.supported(TCPLoadBalancerName) {
 		return h, true
 	}
 	return nil, false
@@ -214,7 +277,7 @@ func (h *httpCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 
 // Returns an implementation of Zones for HTTP cloud.
 func (h *httpCloud) Zones() (cloudprovider.Zones, bool) {
-	if h.supported("zones") {
+	if h.supported(ZoneName) {
 		return h, true
 	}
 	return nil, false
@@ -222,23 +285,35 @@ func (h *httpCloud) Zones() (cloudprovider.Zones, bool) {
 
 // Returns an implementation of Routes for HTTP cloud.
 func (h *httpCloud) Routes() (cloudprovider.Routes, bool) {
-	if h.supported("routes") {
+	if h.supported(RouterName) {
 		return h, true
 	}
 	return nil, false
 }
 
 // Returns the NodeAddresses of a particular machine instance.
-func (h *httpCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
-	path := "/cloudprovider/v1aplha1/instances/" + instance + "/nodeAddresses"
-	var resp InstanceNodeAddress
+func (h *httpCloud) Instance(instance string) (*Instance, error) {
+	path := path.Join(LocalePath, h.locale, InstanceName, instance)
+	var resp Instance
 	if err := h.get(path, &resp); err != nil {
 		return nil, err
 	}
-	if ok, err := checkNodeAddressesValid(resp.Node); !ok {
+	return &resp, nil
+}
+
+// Returns the NodeAddresses of a particular machine instance.
+func (h *httpCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
+
+	instObj, err := h.Instance(instance)
+	if err != nil {
 		return nil, err
 	}
-	return resp.Node, nil
+
+	if ok, err := checkNodeAddressesValid(instObj.Spec.Addresses); !ok {
+		return nil, err
+	}
+	
+	return instObj.Spec.Addresses, nil
 }
 
 // Returns the cloud provider ID of the specified instance (deprecated).
@@ -248,30 +323,32 @@ func (h *httpCloud) ExternalID(instance string) (string, error) {
 
 // Returns the cloud provider ID of the specified instance.
 func (h *httpCloud) InstanceID(instance string) (string, error) {
-	path := "/cloudprovider/v1aplha1/instances/" + instance + "/ID"
-	var resp InstanceID
-	if err := h.get(path, &resp); err != nil {
+	
+	instObj, err := h.Instance(instance)
+	if err != nil {
 		return "", err
 	}
-	if resp.ID == "" {
+	
+	if instObj.Spec.ID == "" {
 		return "", fmt.Errorf("Instance ID field is required and cannot be empty")
 	}
-	return resp.ID, nil
+	return instObj.Spec.ID, nil
 }
 
 // Enumerates the set of minions instances known by the cloud provider.
 func (h *httpCloud) List(filter string) ([]string, error) {
-	path := "/cloudprovider/v1aplha1/instances/" + filter
+	path := path.Join(LocalePath, h.locale, InstanceName, filter)
 	var resp InstanceList
 	if err := h.get(path, &resp); err != nil {
 		return nil, err
 	}
+	
 	var result []string
-	for _, instance := range resp.List {
-		if instance.Name == "" {
+	for _, instance := range resp.Items {
+		if instance.Object.Name == "" {
 			return nil, fmt.Errorf("Instance Name field is required and cannot be empty")
 		}
-		result = append(result, instance.Name)
+		result = append(result, instance.Object.Name)
 	}
 	return result, nil
 }
@@ -279,7 +356,7 @@ func (h *httpCloud) List(filter string) ([]string, error) {
 // Adds an SSH public key as a legal identity for all instances.
 // Expected format for the key is standard ssh-keygen format: <protocol> <blob>.
 func (h *httpCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	path := "/cloudprovider/v1aplha1/instances/sshKey"
+	path := path.Join(LocalePath, h.locale, SSHKeyToAllName)
 	requestType := "POST"
 	key := &InstanceSSHKey{
 		User: user,
@@ -291,95 +368,99 @@ func (h *httpCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	if err != nil {
 		return fmt.Errorf("HTTP request to cloudprovider failed: %v", err)
 	}
-	var resp InstanceSSHKeyResponse
+
+	var resp api.Status
 	if err := json.Unmarshal(JSONResp, &resp); err != nil {
-		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, body)
+		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, resp)
 	}
-	// If key is not added for the particular user, then return an error or else return nil.
-	if !resp.KeyAdded {
-		return fmt.Errorf("Error in adding SSH Key:%s for User:%s", keyData, user)
+
+	if resp.Status != api.StatusSuccess {
+		return fmt.Errorf("Error %s in adding SSH Key:%s for User:%s", resp.Reason, keyData, user)
 	}
 	return nil
 }
 
 // Returns the name of the node we are currently running on given the hostname.
 func (h *httpCloud) CurrentNodeName(hostname string) (string, error) {
-	path := "/cloudprovider/v1aplha1/instances/node/" + hostname
-	var resp InstanceNodeName
+	path := path.Join(LocalePath, h.locale, HostName, hostname)
+	var resp Instance
 	if err := h.get(path, &resp); err != nil {
 		return "", err
 	}
-	if resp.Name == "" {
+	if resp.Object.Name == "" {
 		return "", fmt.Errorf("Node Name field is required and cannot be empty")
 	}
-	return resp.Name, nil
+	return resp.Object.Name, nil
 }
 
 // Returns the Zone containing the current failure zone and locality region that the program is running in.
 func (h *httpCloud) GetZone() (cloudprovider.Zone, error) {
-	path := "/cloudprovider/v1aplha1/zones"
+	path := path.Join(CloudProviderPath, ZoneName)
 	var resp Zone
 	if err := h.get(path, &resp); err != nil {
 		return cloudprovider.Zone{}, err
 	}
-	if resp.Domain == "" {
+	if resp.Spec.Domain == "" {
 		return cloudprovider.Zone{}, fmt.Errorf("zone:failureDomain field is required and should not be empty")
 	}
-	if resp.Region == "" {
+	if resp.Spec.Region == "" {
 		return cloudprovider.Zone{}, fmt.Errorf("zone:region field is required and should not be empty")
 	}
 	return cloudprovider.Zone{
-		FailureDomain: resp.Domain,
-		Region:        resp.Region,
+		FailureDomain: resp.Spec.Domain,
+		Region:        resp.Spec.Region,
 	}, nil
 }
 
 // Returns a list of clusters currently running.
 func (h *httpCloud) ListClusters() ([]string, error) {
-	path := "/cloudprovider/v1aplha1/clusters"
+	path := path.Join(LocalePath, h.locale, ClusterName)
 	var resp ClusterList
 	if err := h.get(path, &resp); err != nil {
 		return nil, err
 	}
-	if len(resp.ClusterNames) == 0 {
+	if len(resp.Items) == 0 {
 		return nil, fmt.Errorf("No cluster names provided")
 	}
 	var result []string
-	for _, cluster := range resp.ClusterNames {
-		if cluster.Name == "" {
+	for _, cluster := range resp.Items {
+		if cluster.Object.Name == "" {
 			return nil, fmt.Errorf("Cluster name is requiread and cannot be empty")
 		}
-		result = append(result, cluster.Name)
+		result = append(result, cluster.Object.Name)
 	}
 	return result, nil
 }
 
 // Returns the address of the master of the cluster.
 func (h *httpCloud) Master(clusterName string) (string, error) {
-	path := "/cloudprovider/v1aplha1/clusters/" + clusterName + "/master"
-	var resp ClusterMaster
+	path := path.Join(LocalePath, h.locale, ClusterName, clusterName)
+	var resp Cluster
 	if err := h.get(path, &resp); err != nil {
 		return "", err
 	}
-	if resp.Address == "" {
+	if resp.Spec.MasterAddr == "" {
 		return "", fmt.Errorf("Master address value is required and cannot be empty")
 	}
-	return resp.Address, nil
+	return resp.Spec.MasterAddr, nil
 }
 
 // Returns a list of all the routes that belong to the specific clusterName.
 func (h *httpCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
-	path := "/cloudprovider/v1aplha1/routes/" + clusterName
+	path := path.Join(LocalePath, h.locale, ClusterName, clusterName, RouterName)
 	var resp RouteList
 	if err := h.get(path, &resp); err != nil {
 		return nil, err
 	}
-	if ok, err := checkRouteValid(resp.List); !ok {
+	if ok, err := checkRouteValid(resp.Items); !ok {
 		return nil, err
 	}
 	var routes []*cloudprovider.Route
-	for _, route := range resp.List {
-		routes = append(routes, &cloudprovider.Route{route.Name, route.Target, route.DestinationCIDR})
+	for _, route := range resp.Items {
+		routes = append(routes, &cloudprovider.Route{
+								Name: route.Object.Name,
+								TargetInstance: route.Spec.Target,
+								DestinationCIDR: route.Spec.DestinationCIDR})
 	}
 
 	return routes, nil
@@ -387,127 +468,172 @@ func (h *httpCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, erro
 
 // Creates a route inside the cloud provider and returns whether the route was created or not.
 func (h *httpCloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
-	path := "/cloudprovider/v1aplha1/routes"
+	path := path.Join(LocalePath, h.locale, ClusterName, clusterName, RouterName)
 	requestType := "POST"
-	routeCreated := &CreateRoute{
-		ClusterName: clusterName,
-		NameHint:    nameHint,
-		NewRoute: Route{
-			Name:            route.Name,
+	routeCreated := &Route{
+		Object: api.ObjectMeta{
+			Name: route.Name,
+		},
+		Spec: RouteSpec{
+			NameHint:        nameHint,
 			Target:          route.TargetInstance,
 			DestinationCIDR: route.DestinationCIDR,
 		},
 	}
+
 	Body, _ := json.Marshal(routeCreated)
 	body := bytes.NewReader(Body)
 	JSONResp, err := h.sendHTTPRequest(requestType, path, body)
 	if err != nil {
 		return fmt.Errorf("HTTP request to cloudprovider failed: %v", err)
 	}
-	var resp RouteCreatedStatus
+
+	var resp api.Status
 	if err := json.Unmarshal(JSONResp, &resp); err != nil {
-		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, body)
+		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, resp)
 	}
-	// If key is not added for the particular user, then return an error or else return nil.
-	if !resp.RouteCreated {
-		return fmt.Errorf("Error in creating route: %s", route.Name)
+
+	if resp.Status != api.StatusSuccess {
+		return fmt.Errorf("Error %s in creating route: %s", resp.Reason, route.Name)
 	}
 	return nil
 }
 
 // Delete the requested route.
 func (h *httpCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
-	path := "/cloudprovider/v1aplha1/routes/" + clusterName + "/" + route.Name
+	path := path.Join(LocalePath, h.locale, ClusterName, clusterName, RouterName, route.Name)
 	requestType := "DELETE"
-	_, err := h.sendHTTPRequest(requestType, path, nil)
+	JSONResp, err := h.sendHTTPRequest(requestType, path, nil)
 	if err != nil {
 		return fmt.Errorf("HTTP request to cloudprovider failed: %v", err)
+	}
+
+	var resp api.Status
+	if err := json.Unmarshal(JSONResp, &resp); err != nil {
+		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, resp)
+	}
+
+	if resp.Status != api.StatusSuccess {
+		return fmt.Errorf("Error %s in deleting route: %s", resp.Reason, route.Name)
 	}
 	return nil
 }
 
 // Returns the TCP Load Balancer Status if it exists in the region with the particular name.
 func (h *httpCloud) GetTCPLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error) {
-	path := "/cloudprovider/v1aplha1/tcpLoadBalancers/" + region + "/" + name
-	var resp TCPLoadBalancerStatus
+	path := path.Join(LocalePath, region, TCPLoadBalancerName, name)
+	var resp TCPLoadBalancer
 	if err := h.get(path, &resp); err != nil {
 		return nil, false, err
 	}
-	if resp.Exists {
-		for _, ingress := range resp.Ingress {
+	if resp.Status.Exists {
+		for _, ingress := range resp.Status.Ingress {
 			if ingress.Hostname == "" && ingress.IP == "" {
 				return nil, false, fmt.Errorf("Either ingress:IP or ingress:hostname is required and cannot be empty")
 			}
 		}
-		return &api.LoadBalancerStatus{Ingress: resp.Ingress}, true, nil
+		return &api.LoadBalancerStatus{Ingress: resp.Status.Ingress}, true, nil
 	}
 	return nil, false, nil
 }
 
 // Creates a new tcp load balancer and return the status of the balancer.
 func (h *httpCloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	path := "/cloudprovider/v1aplha1/tcpLoadBalancers"
+	path := path.Join(LocalePath, region, TCPLoadBalancerName)
 	requestType := "POST"
+	
 	var Ports []api.ServicePort
 	for _, servicePort := range ports {
 		Ports = append(Ports, *servicePort)
 	}
-	var Hosts []Hostnames
-	for _, host := range hosts {
-		Hosts = append(Hosts, Hostnames{Name: host})
-	}
+	
 	balancer := &TCPLoadBalancer{
-		Name: name, Region: region, IP: string(externalIP), Ports: Ports, Hosts: Hosts, ServiceAffinity: string(affinityType),
+		Object: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: TCPLoadBalancerSpec{
+			Region: region, 
+			ExternalIP: string(externalIP), 
+			Ports: Ports,
+			Hosts: hosts, 
+			ServiceAffinity: string(affinityType),
+		},
 	}
+	
 	Body, _ := json.Marshal(balancer)
 	body := bytes.NewReader(Body)
 	JSONResp, err := h.sendHTTPRequest(requestType, path, body)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request to cloudprovider failed: %v", err)
 	}
-	var resp api.LoadBalancerStatus
+	
+	var resp TCPLoadBalancer
 	if err := json.Unmarshal(JSONResp, &resp); err != nil {
 		return nil, fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, body)
 	}
-	for _, ingress := range resp.Ingress {
+	
+	for _, ingress := range resp.Status.Ingress {
 		if ingress.Hostname == "" && ingress.IP == "" {
 			return nil, fmt.Errorf("Either ingress:IP or ingress:hostname is required and cannot be empty")
 		}
 	}
-	return &api.LoadBalancerStatus{Ingress: resp.Ingress}, nil
+	
+	return &api.LoadBalancerStatus{Ingress: resp.Status.Ingress}, nil
 }
 
 // Updates the hosts given in the Load Balancer specified.
+// Since we do partial update, we have to get, modify, and put it back
 func (h *httpCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
-	path := "/cloudprovider/v1aplha1/tcpLoadBalancers/" + region + "/" + name
-	requestType := "PUT"
-	var TCPHosts HostTCPLoadBalancer
-	for _, host := range hosts {
-		TCPHosts.Hosts = append(TCPHosts.Hosts, Hostnames{Name: host})
+	path := path.Join(LocalePath, region, TCPLoadBalancerName, name)
+	var resp TCPLoadBalancer
+	if err := h.get(path, &resp); err != nil {
+		return fmt.Errorf("HTTP get to cloudprovider failed: %v", err)
 	}
-	Body, _ := json.Marshal(TCPHosts)
+	resp.Spec.Hosts = hosts
+	requestType := "PUT"
+	Body, _ := json.Marshal(resp)
 	body := bytes.NewReader(Body)
-	_, err := h.sendHTTPRequest(requestType, path, body)
+	JSONResp, err := h.sendHTTPRequest(requestType, path, body)
 	if err != nil {
 		return fmt.Errorf("HTTP request to cloudprovider failed: %v", err)
 	}
+
+	var resp_status api.Status
+	if err := json.Unmarshal(JSONResp, &resp_status); err != nil {
+		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, resp)
+	}
+
+	if resp_status.Status != api.StatusSuccess {
+		return fmt.Errorf("Error %s in update hosts for tcploadbalancer: %s", resp_status.Reason, name)
+	}
+
 	return nil
 }
 
 // Deletes the specified Load Balancer.
 func (h *httpCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
-	path := "/cloudprovider/v1aplha1/tcpLoadBalancers/" + region + "/" + name
+	path := path.Join(LocalePath, region, TCPLoadBalancerName, name)
 	requestType := "DELETE"
-	_, err := h.sendHTTPRequest(requestType, path, nil)
+	JSONResp, err := h.sendHTTPRequest(requestType, path, nil)
 	if err != nil {
 		return fmt.Errorf("HTTP request to cloudprovider failed: %v", err)
 	}
+
+	var resp api.Status
+	if err := json.Unmarshal(JSONResp, &resp); err != nil {
+		return fmt.Errorf("Error in reading JSON response from the cloudprovider for %s %s: %v The response was: %s", requestType, path, err, resp)
+	}
+
+	if resp.Status != api.StatusSuccess {
+		return fmt.Errorf("Error %s in deleting tcploadbalancer: %s", resp.Reason, name)
+	}
+
 	return nil
 }
 
 // Sends HTTP requests for all interfaces support methods.
 func (h *httpCloud) supported(iface string) bool {
-	path := "/cloudprovider/v1aplha1/" + iface
+	path := path.Join(CloudProviderPath, iface)
 	requestType := "OPTIONS"
 	_, err := h.sendHTTPRequest(requestType, path, nil)
 	if err != nil {
@@ -526,7 +652,9 @@ func (h *httpCloud) sendHTTPRequest(requestType string, requestPath string, requ
 		return nil, err
 	}
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout:   HTTPProviderTimeout,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -589,61 +717,20 @@ func checkNodeAddressesValid(Nodes []api.NodeAddress) (bool, error) {
 	return true, nil
 }
 
-// Checks whether the NodeResource struct has all the valid values or not.
-func checkResourcesValid(Resources []NodeResource) (bool, error) {
-	formats := []string{"DecimalExponent", "BinarySI", "DecimalSI"}
-	resources := []string{"cpu", "memory", "storage", "pods", "services", "replicationcontrollers", "resourcequotas", "secrets", "persistentvolumeclaims"}
-	for _, Resource := range Resources {
-		if Resource.Quantity.Amount == 0.0 {
-			return false, fmt.Errorf("resources:quantity:format value is required and cannot be 0.")
-		}
-		match := false
-		for _, Format := range formats {
-			if string(Resource.Quantity.Format) == Format {
-				match = true
-			}
-		}
-		if !match {
-			return false, fmt.Errorf("resources:quantity:format expected to be either DecimalExponent, BinarySI or DecimalSI. Got %s", Resource.Quantity.Format)
-		}
-		match = false
-		for _, Name := range resources {
-			if Resource.ResourceName == Name {
-				match = true
-			}
-		}
-		if !match {
-			return false, fmt.Errorf("resources:resourceName expected to be either cpu, memory, storage, pods, services, replicationcontrollers, resourcequotas, secrets or persistentvolumeclaims. Got %s", Resource.Quantity.Format)
-		}
-	}
-	return true, nil
-}
-
 // Checks whether the RouteList struct has valid values or not.
 func checkRouteValid(RouteList []Route) (bool, error) {
 	for _, route := range RouteList {
-		if route.Name == "" {
+		if route.Object.Name == "" {
 			return false, fmt.Errorf("routeName is required and cannot be empty.")
 		}
-		if route.Target == "" {
+		if route.Spec.Target == "" {
 			return false, fmt.Errorf("targetInstance is required and cannot be empty.")
 		}
-		if route.DestinationCIDR == "" {
+		if route.Spec.DestinationCIDR == "" {
 			return false, fmt.Errorf("destinationCIDR is required and cannot be empty.")
 		}
 	}
 	return true, nil
-}
-
-// Creates the api.NodeResources Struct from a NodeResource struct which is received from a JSON response.
-func makeNodeResources(Resources []NodeResource) *api.NodeResources {
-	resourceList := api.ResourceList{}
-	for _, Resource := range Resources {
-		resourceList[api.ResourceName(Resource.ResourceName)] = *resource.NewQuantity(Resource.Quantity.Amount, resource.Format(Resource.Quantity.Format))
-	}
-	return &api.NodeResources{
-		Capacity: resourceList,
-	}
 }
 
 // Coverts the io.Reader stream to bytes
