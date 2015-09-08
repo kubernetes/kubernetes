@@ -177,6 +177,11 @@ func (v *OVirtCloud) ExternalID(name string) (string, error) {
 	return instance.UUID, nil
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (v *OVirtCloud) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (v *OVirtCloud) InstanceID(name string) (string, error) {
 	instance, err := v.fetchInstance(name)

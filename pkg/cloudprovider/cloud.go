@@ -113,6 +113,8 @@ type Instances interface {
 	// Returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(hostname string) (string, error)
+	// Labels returns cloud provider node labels of the specified instance.
+	Labels(name string) (map[string]string, error)
 }
 
 // Route is a representation of an advanced routing rule.
