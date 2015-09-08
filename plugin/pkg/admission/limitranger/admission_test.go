@@ -404,3 +404,20 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	}
 
 }
+
+func TestLimitRequestRatioConstraint(t *testing.T) {
+	limitType := api.LimitTypeContainer
+	resourceName := api.ResourceCPU
+	enforced := resource.MustParse("10")
+	request := getResourceList("100m", "")
+	limit := getResourceList("1100m", "")
+	err := limitRequestRatioConstraint(limitType, resourceName, enforced, request, limit)
+	if err == nil {
+		t.Errorf("Expected an error because the ratio of limit/request exceeds 10")
+	}
+	enforced = resource.MustParse("11")
+	err = limitRequestRatioConstraint(limitType, resourceName, enforced, request, limit)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+}
