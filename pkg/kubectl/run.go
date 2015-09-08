@@ -19,9 +19,11 @@ package kubectl
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type BasicReplicationController struct{}
@@ -39,6 +41,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"tty", false},
 		{"command", false},
 		{"args", false},
+		{"env", false},
 	}
 }
 
@@ -77,6 +80,23 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		}
 		delete(genericParams, "args")
 	}
+
+	// TODO: abstract this logic so that multiple generators can handle env in the same way. Same for parse envs.
+	var envs []api.EnvVar
+	envStrings, found := genericParams["env"]
+	if found {
+		if envStringArray, isArray := envStrings.([]string); isArray {
+			var err error
+			envs, err = parseEnvs(envStringArray)
+			if err != nil {
+				return nil, err
+			}
+			delete(genericParams, "env")
+		} else {
+			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
+		}
+	}
+
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -125,6 +145,10 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		} else {
 			podSpec.Containers[0].Args = args
 		}
+	}
+
+	if len(envs) > 0 {
+		podSpec.Containers[0].Env = envs
 	}
 
 	controller := api.ReplicationController{
@@ -198,6 +222,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"restart", false},
 		{"command", false},
 		{"args", false},
+		{"env", false},
 	}
 }
 
@@ -212,6 +237,22 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		}
 		delete(genericParams, "args")
 	}
+	// TODO: abstract this logic so that multiple generators can handle env in the same way. Same for parse envs.
+	var envs []api.EnvVar
+	envStrings, found := genericParams["env"]
+	if found {
+		if envStringArray, isArray := envStrings.([]string); isArray {
+			var err error
+			envs, err = parseEnvs(envStringArray)
+			if err != nil {
+				return nil, err
+			}
+			delete(genericParams, "env")
+		} else {
+			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
+		}
+	}
+
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -281,8 +322,26 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			pod.Spec.Containers[0].Args = args
 		}
 	}
+
+	if len(envs) > 0 {
+		pod.Spec.Containers[0].Env = envs
+	}
+
 	if err := updatePodPorts(params, &pod.Spec); err != nil {
 		return nil, err
 	}
 	return &pod, nil
+}
+
+func parseEnvs(envArray []string) ([]api.EnvVar, error) {
+	envs := []api.EnvVar{}
+	for _, env := range envArray {
+		parts := strings.Split(env, "=")
+		if len(parts) != 2 || !util.IsCIdentifier(parts[0]) || len(parts[1]) == 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		envVar := api.EnvVar{Name: parts[0], Value: parts[1]}
+		envs = append(envs, envVar)
+	}
+	return envs, nil
 }

@@ -17,10 +17,12 @@ limitations under the License.
 package cmd
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -76,5 +78,22 @@ func TestGetRestartPolicy(t *testing.T) {
 		if !test.expectErr && policy != test.expected {
 			t.Errorf("expected: %s, saw: %s (%s:%v)", test.expected, policy, test.input, test.interactive)
 		}
+	}
+}
+
+func TestGetEnv(t *testing.T) {
+	test := struct {
+		input    []string
+		expected []string
+	}{
+		input:    []string{"a=b", "c=d"},
+		expected: []string{"a=b", "c=d"},
+	}
+	cmd := &cobra.Command{}
+	cmd.Flags().StringSlice("env", test.input, "")
+
+	envStrings := cmdutil.GetFlagStringSlice(cmd, "env")
+	if len(envStrings) != 2 || !reflect.DeepEqual(envStrings, test.expected) {
+		t.Errorf("expected: %s, saw: %s", test.expected, envStrings)
 	}
 }

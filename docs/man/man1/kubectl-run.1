@@ -31,6 +31,10 @@ Creates a replication controller to manage the created container(s).
     If true, only print the object that would be sent, without sending it.
 
 .PP
+\fB\-\-env\fP=[]
+    Environment variables to set in the container
+
+.PP
 \fB\-\-generator\fP=""
     The name of the API generator to use.  Default is 'run/v1' if \-\-restart=Always, otherwise the default is 'run\-pod/v1'.
 
@@ -199,6 +203,12 @@ Creates a replication controller to manage the created container(s).
 .nf
 # Start a single instance of nginx.
 $ kubectl run nginx \-\-image=nginx
+
+# Start a single instance of hazelcast and let the container expose port 5701 .
+$ kubectl run hazelcast \-\-image=hazelcast \-\-port=5701
+
+# Start a single instance of hazelcast and set environment variables "DNS\_DOMAIN=cluster" and "POD\_NAMESPACE=default" in the container.
+$ kubectl run hazelcast \-\-image=hazelcast \-\-env="DNS\_DOMAIN=local" \-\-env="POD\_NAMESPACE=default"
 
 # Start a replicated instance of nginx.
 $ kubectl run nginx \-\-image=nginx \-\-replicas=5
