@@ -199,6 +199,9 @@ function verify-cluster {
   local machine="master"
   local -a required_daemon=("salt-master" "salt-minion" "kubelet")
   local validated="1"
+  # This is a hack, but sometimes the salt-minion gets stuck on the master, so we just restart it
+  # to ensure that users never wait forever
+  vagrant ssh "$machine" -c "sudo systemctl restart salt-minion"
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
