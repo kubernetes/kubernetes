@@ -201,9 +201,9 @@ kubectl is modified to support the **ResourceQuota** resource.
 For example,
 
 ```console
-$ kubectl create -f docs/user-guide/resourcequota/namespace.yaml
+$ kubectl create -f docs/admin/resourcequota/namespace.yaml
 namespace "quota-example" created
-$ kubectl create -f docs/user-guide/resourcequota/quota.yaml --namespace=quota-example
+$ kubectl create -f docs/admin/resourcequota/quota.yaml --namespace=quota-example
 resourcequota "quota" created
 $ kubectl describe quota quota --namespace=quota-example
 Name:                    quota
@@ -222,8 +222,7 @@ services                 0         5
 
 ## More information
 
-See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
-
+See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../admin/resourcequota/) for more information.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
