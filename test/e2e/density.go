@@ -250,7 +250,7 @@ var _ = Describe("Density", func() {
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
 
 			if itArg.runLatencyTest {
-				Logf("Schedling additional Pods to measure startup latencies")
+				Logf("Scheduling additional Pods to measure startup latencies")
 
 				createTimes := make(map[string]util.Time, 0)
 				nodes := make(map[string]string, 0)
@@ -280,7 +280,7 @@ var _ = Describe("Density", func() {
 							if startTime != util.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
-								Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
+								Failf("Pod %v is reported to be running, but none of its containers are", p.Name)
 							}
 						}
 					}
