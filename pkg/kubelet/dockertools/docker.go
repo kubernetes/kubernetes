@@ -55,6 +55,16 @@ const (
 	quotaPeriod = 100000
 )
 
+// Docker's remote API provides the option of filtering containers based on
+// status (created|restarting|running|paused|exited).
+const (
+	DockerExited     = "exited"
+	DockerCreated    = "created"
+	DockerRestarting = "restarting"
+	DockerPaused     = "paused"
+	DockerRunning    = "running"
+)
+
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
@@ -348,13 +358,40 @@ func milliCPUToShares(milliCPU int64) int64 {
 
 // GetKubeletDockerContainers lists all container or just the running ones.
 // Returns a map of docker containers that we manage, keyed by container ID.
-// TODO: Move this function with dockerCache to DockerManager.
+// TODO: Replace this function with GetKubeletManagedContainers directly.
 func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (DockerContainers, error) {
-	result := make(DockerContainers)
-	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
-	if err != nil {
-		return nil, err
+	if allContainers {
+		return GetKubeletManagedContainers(client, listAll)
+	} else {
+		return GetKubeletManagedContainers(client, listRunning)
 	}
+}
+
+type listContainersType string
+
+const (
+	listAll     listContainersType = "all"
+	listRunning listContainersType = "running"
+	listExited  listContainersType = "exited"
+)
+
+func getContainers(client DockerInterface, ctype listContainersType) ([]docker.APIContainers, error) {
+	switch ctype {
+	case listAll:
+		return client.ListContainers(docker.ListContainersOptions{All: true})
+	case listRunning:
+		return client.ListContainers(docker.ListContainersOptions{All: false})
+	case listExited:
+		return client.ListContainers(docker.ListContainersOptions{
+			All:     true,
+			Filters: map[string][]string{"status": {DockerExited}}})
+	default:
+		return nil, fmt.Errorf("unknown container type: %q", ctype)
+	}
+}
+
+func filterKubeletContainers(containers []docker.APIContainers) DockerContainers {
+	result := make(DockerContainers)
 	for i := range containers {
 		container := &containers[i]
 		if len(container.Names) == 0 {
@@ -370,5 +407,15 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 		}
 		result[kubeletTypes.DockerID(container.ID)] = container
 	}
-	return result, nil
+	return result
+}
+
+// GetKubeletManagedContainers returns a map of all docker containers that we
+// manage, keyed by container ID.
+func GetKubeletManagedContainers(client DockerInterface, status listContainersType) (DockerContainers, error) {
+	containers, err := getContainers(client, status)
+	if err != nil {
+		return nil, err
+	}
+	return filterKubeletContainers(containers), nil
 }

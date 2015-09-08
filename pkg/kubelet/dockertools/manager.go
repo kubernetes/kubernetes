@@ -1919,3 +1919,32 @@ func getPidMode(pod *api.Pod) string {
 	}
 	return pidMode
 }
+
+func (dm *DockerManager) getContainers(listType listContainersType) ([]*kubecontainer.Container, error) {
+	containers, err := GetKubeletManagedContainers(dm.client, listType)
+	if err != nil {
+		return nil, err
+	}
+	runtimeContainers := []*kubecontainer.Container{}
+	for _, c := range containers {
+		converted, err := toRuntimeContainer(c)
+		if err != nil {
+			glog.Errorf("Error examining the container: %v", err)
+			continue
+		}
+		runtimeContainers = append(runtimeContainers, converted)
+	}
+	return runtimeContainers, nil
+}
+
+func (dm *DockerManager) GetRunningContainers() ([]*kubecontainer.Container, error) {
+	return dm.getContainers(listRunning)
+}
+
+func (dm *DockerManager) GetTerminatedContainers() ([]*kubecontainer.Container, error) {
+	return dm.getContainers(listExited)
+}
+
+func (dm *DockerManager) GetAllContainers() ([]*kubecontainer.Container, error) {
+	return dm.getContainers(listAll)
+}
