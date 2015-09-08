@@ -71,7 +71,9 @@ type SubresourceReference struct {
 
 // ResourceConsumption is an object for specifying average resource consumption of a particular resource.
 type ResourceConsumption struct {
-	Resource v1.ResourceName   `json:"resource,omitempty"`
+	// Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status.
+	Resource v1.ResourceName `json:"resource,omitempty"`
+	// Quantity specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status.
 	Quantity resource.Quantity `json:"quantity,omitempty"`
 }
 
@@ -109,7 +111,8 @@ type HorizontalPodAutoscalerStatus struct {
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
-	v1.TypeMeta   `json:",inline"`
+	v1.TypeMeta `json:",inline"`
+	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
@@ -119,12 +122,13 @@ type HorizontalPodAutoscaler struct {
 	Status *HorizontalPodAutoscalerStatus `json:"status,omitempty"`
 }
 
-// HorizontalPodAutoscaler is a collection of pod autoscalers.
+// HorizontalPodAutoscalerList is a list of HorizontalPodAutoscalers.
 type HorizontalPodAutoscalerList struct {
 	v1.TypeMeta `json:",inline"`
+	// Standard list metadata.
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of horizontal pod autoscalers.
+	// Items is the list of HorizontalPodAutoscalers.
 	Items []HorizontalPodAutoscaler `json:"items"`
 }
 
@@ -143,13 +147,14 @@ type ThirdPartyResource struct {
 	Versions []APIVersion `json:"versions,omitempty"`
 }
 
+// ThirdPartyResourceList is a list of ThirdPartyResources.
 type ThirdPartyResourceList struct {
 	v1.TypeMeta `json:",inline"`
 
 	// Standard list metadata.
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of horizontal pod autoscalers.
+	// Items is the list of ThirdPartyResources.
 	Items []ThirdPartyResource `json:"items"`
 }
 
@@ -172,8 +177,10 @@ type ThirdPartyResourceData struct {
 	Data []byte `json:"name,omitempty"`
 }
 
+// Deployment enables declarative updates for Pods and ReplicationControllers.
 type Deployment struct {
-	v1.TypeMeta   `json:",inline"`
+	v1.TypeMeta `json:",inline"`
+	// Standard object metadata.
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the Deployment.
@@ -183,6 +190,7 @@ type Deployment struct {
 	Status DeploymentStatus `json:"status,omitempty"`
 }
 
+// DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
@@ -209,6 +217,7 @@ type DeploymentSpec struct {
 	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
 }
 
+// DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	Type DeploymentType `json:"type,omitempty"`
@@ -263,6 +272,7 @@ type RollingUpdateDeployment struct {
 	MinReadySeconds int `json:"minReadySeconds,omitempty"`
 }
 
+// DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
 	// Total number of ready pods targeted by this deployment (this
 	// includes both the old and new pods).
@@ -272,11 +282,13 @@ type DeploymentStatus struct {
 	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
 }
 
+// DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	v1.TypeMeta `json:",inline"`
+	// Standard list metadata.
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of deployments.
+	// Items is the list of Deployments.
 	Items []Deployment `json:"items"`
 }
 
@@ -330,23 +342,24 @@ type Daemon struct {
 	Status DaemonStatus `json:"status,omitempty"`
 }
 
-// DaemonList is a collection of daemon.
+// DaemonList is a list of Daemons.
 type DaemonList struct {
 	v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is a list of daemons.
+	// Items is the list of Daemons.
 	Items []Daemon `json:"items"`
 }
 
+// ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
 type ThirdPartyResourceDataList struct {
 	v1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	v1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is a list of third party objects
+	// Items is the list of ThirdpartyResourceData.
 	Items []ThirdPartyResourceData `json:"items"`
 }
