@@ -301,3 +301,35 @@ func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 		samples = append(samples, v...)
 	}
 }
+
+// logSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
+// If latencyDataLag is nil then it will be populated from latencyData
+func logSuspiciousLatency(latencyData []podLatencyData, latencyDataLag []podLatencyData, nodeCount int, c *client.Client) {
+	if latencyDataLag == nil {
+		latencyDataLag = latencyData
+	}
+	for _, l := range latencyData {
+		if l.Latency > NodeStartupThreshold {
+			HighLatencyKubeletOperations(c, 1*time.Second, l.Node)
+		}
+	}
+	Logf("Approx throughput: %v pods/min",
+		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
+}
+
+// testMaximumLatencyValue verifies the highest latency value is less than or equal to
+// the given time.Duration. Since the arrays are sorted we are looking at the last
+// element which will always be the highest. If the latency is higher than the max Failf
+// is called.
+func testMaximumLatencyValue(latencies []podLatencyData, max time.Duration, name string) {
+	highestLatency := latencies[len(latencies)-1]
+	if !(highestLatency.Latency <= max) {
+		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
+	}
+}
+
+func printLatencies(latencies []podLatencyData, header string) {
+	metrics := extractLatencyMetrics(latencies)
+	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
+	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+}
