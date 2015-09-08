@@ -27,8 +27,8 @@ fi
 
 # Make sure k8s version env is properly set
 if [ -z ${K8S_VERSION} ]; then
-    echo "Please export K8S_VERSION in your env"
-    exit 1
+    K8S_VERSION="1.0.3"
+    echo "K8S_VERSION is not set, using default: ${K8S_VERSION}"
 else
     echo "k8s version is set to: ${K8S_VERSION}"
 fi
