@@ -38,10 +38,13 @@ import (
 )
 
 const (
-	namespace       = "test-namespace"
-	podName         = "pod1"
-	podListHandler  = "podlisthandler"
-	heapsterHandler = "heapsterhandler"
+	namespace          = "test-namespace"
+	podName            = "pod1"
+	podListHandler     = "podlisthandler"
+	heapsterCpuHandler = "heapstercpuhandler"
+	heapsterMemHandler = "heapstermemhandler"
+	cpu                = 650
+	memory             = 20000000
 )
 
 type serverResponse struct {
@@ -50,7 +53,6 @@ type serverResponse struct {
 }
 
 func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httptest.Server, map[string]*util.FakeHandler) {
-
 	handlers := map[string]*util.FakeHandler{}
 	mux := http.NewServeMux()
 
@@ -78,10 +80,16 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 		handlers[podListHandler] = mkHandler(fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace), *responses[podListHandler])
 	}
 
-	if responses[heapsterHandler] != nil {
-		handlers[heapsterHandler] = mkRawHandler(
+	if responses[heapsterCpuHandler] != nil {
+		handlers[heapsterCpuHandler] = mkRawHandler(
 			fmt.Sprintf("/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster/api/v1/model/namespaces/%s/pod-list/%s/metrics/cpu-usage",
-				namespace, podName), *responses[heapsterHandler])
+				namespace, podName), *responses[heapsterCpuHandler])
+	}
+
+	if responses[heapsterMemHandler] != nil {
+		handlers[heapsterMemHandler] = mkRawHandler(
+			fmt.Sprintf("/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster/api/v1/model/namespaces/%s/pod-list/%s/metrics/memory-usage",
+				namespace, podName), *responses[heapsterMemHandler])
 	}
 
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
@@ -92,7 +100,6 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 }
 
 func TestHeapsterResourceConsumptionGet(t *testing.T) {
-
 	podListResponse := serverResponse{http.StatusOK, &api.PodList{
 		Items: []api.Pod{
 			{
@@ -103,19 +110,29 @@ func TestHeapsterResourceConsumptionGet(t *testing.T) {
 			}}}}
 
 	timestamp := time.Now()
-	metrics := heapster.MetricResultList{
+	metricsCpu := heapster.MetricResultList{
 		Items: []heapster.MetricResult{{
-			Metrics:         []heapster.MetricPoint{{timestamp, 650}},
+			Metrics:         []heapster.MetricPoint{{timestamp, cpu}},
 			LatestTimestamp: timestamp,
 		}}}
-	heapsterRawResponse, _ := json.Marshal(&metrics)
-	heapsterStrResponse := string(heapsterRawResponse)
-	heapsterResponse := serverResponse{http.StatusOK, &heapsterStrResponse}
+	heapsterRawCpuResponse, _ := json.Marshal(&metricsCpu)
+	heapsterStrCpuResponse := string(heapsterRawCpuResponse)
+	heapsterCpuResponse := serverResponse{http.StatusOK, &heapsterStrCpuResponse}
+
+	metricsMem := heapster.MetricResultList{
+		Items: []heapster.MetricResult{{
+			Metrics:         []heapster.MetricPoint{{timestamp, memory}},
+			LatestTimestamp: timestamp,
+		}}}
+	heapsterRawMemResponse, _ := json.Marshal(&metricsMem)
+	heapsterStrMemResponse := string(heapsterRawMemResponse)
+	heapsterMemResponse := serverResponse{http.StatusOK, &heapsterStrMemResponse}
 
 	testServer, _ := makeTestServer(t,
 		map[string]*serverResponse{
-			heapsterHandler: &heapsterResponse,
-			podListHandler:  &podListResponse,
+			heapsterCpuHandler: &heapsterCpuResponse,
+			heapsterMemHandler: &heapsterMemResponse,
+			podListHandler:     &podListResponse,
 		})
 
 	defer testServer.Close()
@@ -127,5 +144,11 @@ func TestHeapsterResourceConsumptionGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error while getting consumption: %v", err)
 	}
-	assert.Equal(t, int64(650), val.Quantity.MilliValue())
+	assert.Equal(t, int64(cpu), val.Quantity.MilliValue())
+
+	val, err = metricsClient.ResourceConsumption(namespace).Get(api.ResourceMemory, map[string]string{"app": "test"})
+	if err != nil {
+		t.Fatalf("Error while getting consumption: %v", err)
+	}
+	assert.Equal(t, int64(memory), val.Quantity.Value())
 }

@@ -75,7 +75,6 @@ func NewHeapsterMetricsClient(client client.Interface) *HeapsterMetricsClient {
 }
 
 var heapsterMetricDefinitions = map[api.ResourceName]metricDefinition{
-	//TODO: add memory
 	api.ResourceCPU: {"cpu-usage",
 		func(metrics heapster.MetricResultList) (expapi.ResourceConsumption, int) {
 			sum, count := calculateSumFromLatestSample(metrics)
@@ -85,6 +84,15 @@ var heapsterMetricDefinitions = map[api.ResourceName]metricDefinition{
 				value = fmt.Sprintf("%dm", sum/uint64(count))
 			}
 			return expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(value)}, count
+		}},
+	api.ResourceMemory: {"memory-usage",
+		func(metrics heapster.MetricResultList) (expapi.ResourceConsumption, int) {
+			sum, count := calculateSumFromLatestSample(metrics)
+			value := int64(0)
+			if count > 0 {
+				value = int64(sum) / int64(count)
+			}
+			return expapi.ResourceConsumption{Resource: api.ResourceMemory, Quantity: *resource.NewQuantity(value, resource.DecimalSI)}, count
 		}},
 }
 
@@ -111,7 +119,6 @@ func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, s
 }
 
 func (h *HeapsterResourceConsumptionClient) getForPods(resourceName api.ResourceName, podNames []string) (*expapi.ResourceConsumption, error) {
-
 	metricSpec, metricDefined := h.resourceDefinitions[resourceName]
 	if !metricDefined {
 		return nil, fmt.Errorf("heapster metric not defined for %v", resourceName)
