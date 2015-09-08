@@ -148,7 +148,6 @@ var _ = Describe("Density", func() {
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
-		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
@@ -385,6 +384,16 @@ var _ = Describe("Density", func() {
 				printLatencies(watchLag, "worst watch latencies")
 				printLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
 				printLatencies(e2eLag, "worst e2e total latencies")
+
+				// Test whether e2e pod startup time is acceptable.
+				// TODO: Switch it to 5 seconds once we are sure our tests are passing.
+				podStartupThreshold := 8 * time.Second
+				e2ePodStartupTime50perc := e2eLag[len(e2eLag)/2].Latency
+				e2ePodStartupTime90perc := e2eLag[len(e2eLag)*9/10].Latency
+				e2ePodStartupTime99perc := e2eLag[len(e2eLag)*99/100].Latency
+				Expect(e2ePodStartupTime50perc < podStartupThreshold).To(Equal(true), "Too high pod startup time 50th percentile")
+				Expect(e2ePodStartupTime90perc < podStartupThreshold).To(Equal(true), "Too high pod startup time 90th percentile")
+				Expect(e2ePodStartupTime99perc < podStartupThreshold).To(Equal(true), "Too high pod startup time 99th percentile")
 
 				// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
 				for _, l := range startupLag {
