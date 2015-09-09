@@ -18,14 +18,15 @@ pip install -r $CHARM_DIR/python_requirements.txt
 # Create the necessary kubernetes group.
 groupadd --force kubernetes
 
-if ! grep "^kubernetes:" /etc/passwd > /dev/null 2>&1; then
+if grep -q "^kubernetes:" /etc/passwd; then
+    echo "The kubernetes user already exists!"
+else
+    # Create the user when kubernetes does not exist.
     useradd -d /var/lib/kubernetes \
         -g kubernetes \
         -s /sbin/nologin \
         --system \
         kubernetes
-else
-    echo "The kubernetes user already exists!"
 fi
 
 install -d -m 0744 -o kubernetes -g kubernetes /var/lib/kubernetes
