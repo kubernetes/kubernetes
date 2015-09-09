@@ -204,7 +204,11 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	configFilePath := makeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.15"}
-	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, "localhost", testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil, kubecontainer.FakeOS{})
+	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, "localhost", testRootDir, firstManifestURL, "127.0.0.1",
+		10250 /* KubeletPort */, 0 /* ReadOnlyPort */, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil,
+		cadvisorInterface, configFilePath, nil, kubecontainer.FakeOS{}, 1*time.Second, /* FileCheckFrequency */
+		1*time.Second /* HTTPCheckFrequency */, 10*time.Second /* MinimumGCAge */, 3*time.Second, /* NodeStatusUpdateFrequency */
+		10*time.Second /* SyncFrequency */)
 	kubeletapp.RunKubelet(kcfg, nil)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
@@ -212,7 +216,11 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.15"}
-	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, "127.0.0.1", testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.FakeOS{})
+	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, "127.0.0.1", testRootDir, secondManifestURL, "127.0.0.1",
+		10251 /* KubeletPort */, 0 /* ReadOnlyPort */, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil,
+		cadvisorInterface, "", nil, kubecontainer.FakeOS{}, 1*time.Second, /* FileCheckFrequency */
+		1*time.Second /* HTTPCheckFrequency */, 10*time.Second /* MinimumGCAge */, 3*time.Second, /* NodeStatusUpdateFrequency */
+		10*time.Second /* SyncFrequency */)
 	kubeletapp.RunKubelet(kcfg, nil)
 	return apiServer.URL, configFilePath
 }
