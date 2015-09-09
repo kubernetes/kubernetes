@@ -29,17 +29,32 @@ func TestMassageJSONPath(t *testing.T) {
 	tests := []struct {
 		input          string
 		expectedOutput string
+		expectErr      bool
 	}{
 		{input: "foo.bar", expectedOutput: "{.foo.bar}"},
 		{input: "{foo.bar}", expectedOutput: "{.foo.bar}"},
 		{input: ".foo.bar", expectedOutput: "{.foo.bar}"},
 		{input: "{.foo.bar}", expectedOutput: "{.foo.bar}"},
 		{input: "", expectedOutput: ""},
+		{input: "{foo.bar", expectErr: true},
+		{input: "foo.bar}", expectErr: true},
+		{input: "{foo.bar}}", expectErr: true},
+		{input: "{{foo.bar}", expectErr: true},
 	}
 	for _, test := range tests {
-		output := massageJSONPath(test.input)
+		output, err := massageJSONPath(test.input)
+		if err != nil && !test.expectErr {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if test.expectErr {
+			if err == nil {
+				t.Error("unexpected non-error")
+			}
+			continue
+		}
 		if output != test.expectedOutput {
-			t.Errorf("expected: %s, saw: %s", test.expectedOutput, output)
+			t.Errorf("input: %s, expected: %s, saw: %s", test.input, test.expectedOutput, output)
 		}
 	}
 }
