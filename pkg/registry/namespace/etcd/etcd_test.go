@@ -140,7 +140,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), namespace), 0); err != nil {
+	if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), namespace), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, err := storage.Delete(ctx, "foo", nil); err == nil {
@@ -163,7 +163,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), namespace), 0); err != nil {
+	if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), namespace), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, err := storage.Delete(ctx, "foo", nil); err != nil {

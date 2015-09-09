@@ -24,16 +24,16 @@ import (
 	"flag"
 	"fmt"
 	"hash/fnv"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	etcd "github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	skymsg "github.com/skynetservices/skydns/msg"
+	"golang.org/x/net/context"
 	kapi "k8s.io/kubernetes/pkg/api"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
@@ -65,12 +65,6 @@ const (
 	podSubdomain = "pod"
 )
 
-type etcdClient interface {
-	Set(path, value string, ttl uint64) (*etcd.Response, error)
-	RawGet(key string, sort, recursive bool) (*etcd.RawResponse, error)
-	Delete(path string, recursive bool) (*etcd.Response, error)
-}
-
 type nameNamespace struct {
 	name      string
 	namespace string
@@ -78,7 +72,7 @@ type nameNamespace struct {
 
 type kube2sky struct {
 	// Etcd client.
-	etcdClient etcdClient
+	etcdClient etcd.KeysAPI
 	// DNS domain name.
 	domain string
 	// Etcd mutation timeout.
@@ -94,21 +88,16 @@ type kube2sky struct {
 // Removes 'subdomain' from etcd.
 func (ks *kube2sky) removeDNS(subdomain string) error {
 	glog.V(2).Infof("Removing %s from DNS", subdomain)
-	resp, err := ks.etcdClient.RawGet(skymsg.Path(subdomain), false, true)
-	if err != nil {
-		return err
+	opts := etcd.DeleteOptions{
+		Recursive: true,
 	}
-	if resp.StatusCode == http.StatusNotFound {
-		glog.V(2).Infof("Subdomain %q does not exist in etcd", subdomain)
-		return nil
-	}
-	_, err = ks.etcdClient.Delete(skymsg.Path(subdomain), true)
+	_, err := ks.etcdClient.Delete(context.TODO(), skymsg.Path(subdomain), &opts)
 	return err
 }
 
 func (ks *kube2sky) writeSkyRecord(subdomain string, data string) error {
 	// Set with no TTL, and hope that kubernetes events are accurate.
-	_, err := ks.etcdClient.Set(skymsg.Path(subdomain), data, uint64(0))
+	_, err := ks.etcdClient.Set(context.TODO(), skymsg.Path(subdomain), data, nil)
 	return err
 }
 
@@ -412,9 +401,10 @@ func (ks *kube2sky) updateService(oldObj, newObj interface{}) {
 	ks.newService(newObj)
 }
 
-func newEtcdClient(etcdServer string) (*etcd.Client, error) {
+func newEtcdClient(etcdServer string) (etcd.KeysAPI, error) {
 	var (
-		client *etcd.Client
+		client etcd.Client
+		kAPI   etcd.KeysAPI
 		err    error
 	)
 	for attempt := 1; attempt <= maxConnectAttempts; attempt++ {
@@ -435,19 +425,27 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 	// loop until we have > 0 machines && machines[0] != ""
 	poll, timeout := 1*time.Second, 10*time.Second
 	if err := wait.Poll(poll, timeout, func() (bool, error) {
-		if client = etcd.NewClient([]string{etcdServer}); client == nil {
-			return false, fmt.Errorf("etcd.NewClient returned nil")
+		cfg := etcd.Config{
+			Endpoints: []string{etcdServer},
 		}
-		client.SyncCluster()
-		machines := client.GetCluster()
-		if len(machines) == 0 || len(machines[0]) == 0 {
-			return false, nil
+		if client, err = etcd.New(cfg); client == nil {
+			return false, fmt.Errorf("etcd.New returned nil Error: %v", err)
 		}
+		// TODO: I Don't see why this is needed at all.
+		// ctx := context.TODO()
+		// client.Sync(ctx)
+		// membersAPI := etcd.NewMembersAPI(client)
+		// members, _ := membersAPI.List(ctx)
+		// if len(members) == 0 {
+		//	return false, nil
+		// }
 		return true, nil
 	}); err != nil {
 		return nil, fmt.Errorf("Timed out after %s waiting for at least 1 synchronized etcd server in the cluster. Error: %v", timeout, err)
 	}
-	return client, nil
+	kAPI = etcd.NewKeysAPI(client)
+
+	return kAPI, nil
 }
 
 func expandKubeMasterURL() (string, error) {

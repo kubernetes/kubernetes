@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -79,7 +80,7 @@ func TestErrors(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	fakeClient, storage, backing := newStorage(t)
-	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
+	if _, err := fakeClient.Set(context.TODO(), key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

@@ -70,15 +70,19 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	ns := "test-service-account-creation"
 
 	// Create namespace
+	fmt.Printf("****************** OK We are creating Namespaces ***\n")
 	_, err := c.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
+	time.Sleep(10)
 	// Get service account
+	fmt.Printf("**************** OK We are getting service accounts ***\n")
 	defaultUser, err := getServiceAccount(c, ns, "default", true)
 	if err != nil {
 		t.Fatalf("Default serviceaccount not created: %v", err)
+		panic("WERE FUCKED")
 	}
 
 	// Delete service account
@@ -110,6 +114,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
+	time.Sleep(10)
 	// Create service account
 	serviceAccount, err := c.ServiceAccounts(ns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: name}})
 	if err != nil {
@@ -204,6 +209,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
+	time.Sleep(10)
 	// Get default token
 	defaultTokenName, _, err := getReferencedServiceAccountToken(c, ns, serviceaccountadmission.DefaultServiceAccountName, true)
 	if err != nil {
@@ -323,6 +329,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	doServiceAccountAPIRequests(t, rwClient, myns, true, true, true)
 	doServiceAccountAPIRequests(t, rwClient, otherns, true, false, false)
 
+	time.Sleep(10)
 	// Get default user and token which should have been automatically created
 	_, defaultToken, err := getReferencedServiceAccountToken(c, myns, "default", true)
 	if err != nil {

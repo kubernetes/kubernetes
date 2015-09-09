@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"golang.org/x/net/context"
 )
 
 // If you need to start an etcd instance by hand, you also need to insert a key
@@ -36,8 +37,15 @@ func init() {
 	RequireEtcd()
 }
 
-func NewEtcdClient() *etcd.Client {
-	return etcd.NewClient([]string{})
+func NewEtcdClient() etcd.Client {
+	cfg := etcd.Config {
+		Endpoints: []string{"http://127.0.0.1:4001"},
+	}
+	client,err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("unable to connect to etcd for testing: %v", err)
+	}
+	return client
 }
 
 func NewEtcdStorage() (storage.Interface, error) {
@@ -45,14 +53,14 @@ func NewEtcdStorage() (storage.Interface, error) {
 }
 
 func RequireEtcd() {
-	if _, err := NewEtcdClient().Get("/", false, false); err != nil {
+	if _, err := etcd.NewKeysAPI(NewEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)
 	}
 }
 
 func WithEtcdKey(f func(string)) {
 	prefix := fmt.Sprintf("/test-%d", rand.Int63())
-	defer NewEtcdClient().Delete(prefix, true)
+	defer etcd.NewKeysAPI(NewEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
 	f(prefix)
 }
 
@@ -63,12 +71,13 @@ func WithEtcdKey(f func(string)) {
 func DeleteAllEtcdKeys() {
 	glog.Infof("Deleting all etcd keys")
 	client := NewEtcdClient()
-	keys, err := client.Get("/", false, false)
+	kAPI := etcd.NewKeysAPI(client)
+	keys, err := kAPI.Get(context.TODO(), "/", nil)
 	if err != nil {
 		glog.Fatalf("Unable to list root etcd keys: %v", err)
 	}
 	for _, node := range keys.Node.Nodes {
-		if _, err := client.Delete(node.Key, true); err != nil {
+		if _, err := kAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
 			glog.Fatalf("Unable delete key: %v", err)
 		}
 	}

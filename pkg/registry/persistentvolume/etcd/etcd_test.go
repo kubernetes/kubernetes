@@ -148,7 +148,7 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvStart := validNewPersistentVolume("foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), pvStart), 0)
+	fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), pvStart), nil)
 
 	pvIn := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{

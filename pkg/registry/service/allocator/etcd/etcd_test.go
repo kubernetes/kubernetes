@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -57,7 +58,7 @@ func TestEmpty(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	storage, fakeClient, backing := newStorage(t)
-	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
+	if _, err := fakeClient.Set(context.TODO(), key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -84,7 +85,7 @@ func TestStore(t *testing.T) {
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
-	if err := storage.storage.Get(key(), allocation, false); err != nil {
+	if err := storage.storage.Get(context.TODO(), key(), allocation, false); err != nil {
 		t.Fatal(err)
 	}
 	if allocation.ResourceVersion != "2" {

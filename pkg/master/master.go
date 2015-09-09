@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	etcd "github.com/coreos/etcd/client"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -78,7 +79,6 @@ import (
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -90,6 +90,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
@@ -254,12 +255,13 @@ type Master struct {
 
 // NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdStorage(client tools.EtcdClient, interfacesFunc meta.VersionInterfacesFunc, version, prefix string) (etcdStorage storage.Interface, err error) {
+func NewEtcdStorage(client etcd.Client, interfacesFunc meta.VersionInterfacesFunc, version, prefix string) (etcdStorage storage.Interface, err error) {
 	versionInterfaces, err := interfacesFunc(version)
 	if err != nil {
 		return etcdStorage, err
 	}
-	return etcdstorage.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
+	kAPI := etcd.NewKeysAPI(client)
+	return etcdstorage.NewEtcdStorage(client, kAPI, versionInterfaces.Codec, prefix), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -752,7 +754,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
-	for ix, machine := range c.DatabaseStorage.Backends() {
+	for ix, machine := range c.DatabaseStorage.Backends(context.TODO()) {
 		etcdUrl, err := url.Parse(machine)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)

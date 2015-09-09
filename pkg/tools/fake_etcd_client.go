@@ -17,12 +17,13 @@ limitations under the License.
 package tools
 
 import (
-	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 )
 
 type EtcdResponseWithError struct {
@@ -47,7 +48,6 @@ type FakeEtcdClient struct {
 	expectNotFoundGetSet map[string]struct{}
 	sync.Mutex
 	Err         error
-	CasErr      error
 	t           TestLogger
 	Ix          int
 	TestIndex   bool
@@ -62,10 +62,30 @@ type FakeEtcdClient struct {
 	WatchResponse chan *etcd.Response
 	WatchIndex    uint64
 	// Write to this to prematurely stop a Watch that is running in a goroutine.
-	WatchInjectError chan<- error
-	WatchStop        chan<- bool
+	WatchInjectError chan error
 	// If non-nil, will be returned immediately when Watch is called.
 	WatchImmediateError error
+}
+
+type FakeWatcher struct {
+	Opts   etcd.WatcherOptions
+	Key    string
+	Client FakeEtcdClient
+}
+
+func (f *FakeWatcher) Next(ctx context.Context) (*etcd.Response, error) {
+	if f.Client.WatchImmediateError != nil {
+		return nil, f.Client.WatchImmediateError
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, EtcdErrWatchStoppedByUser
+	case err := <-f.Client.WatchInjectError:
+		return nil, err
+	case resp := <-f.Client.WatchResponse:
+		return resp, nil
+	}
 }
 
 func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
@@ -77,15 +97,16 @@ func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	// There are three publicly accessible channels in FakeEtcdClient:
 	//  - WatchResponse
 	//  - WatchInjectError
-	//  - WatchStop
 	// They are only available when Watch() is called.  If users of
 	// FakeEtcdClient want to use any of these channels, they have to call
 	// WaitForWatchCompletion before any operation on these channels.
 	// Internally, FakeEtcdClient use watchCompletedChan to indicate if the
 	// Watch() method has been called. WaitForWatchCompletion() will wait
 	// on this channel. WaitForWatchCompletion() will return only when
-	// WatchResponse, WatchInjectError and WatchStop are ready to read/write.
+	// WatchResponse, WatchInjectError are ready to read/write.
 	ret.watchCompletedChan = make(chan bool)
+	ret.WatchResponse = make(chan *etcd.Response)
+	ret.WatchInjectError = make(chan error)
 	return ret
 }
 
@@ -101,10 +122,10 @@ func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {
 	f.expectNotFoundGetSet[key] = struct{}{}
 }
 
-func (f *FakeEtcdClient) NewError(code int) *etcd.EtcdError {
-	return &etcd.EtcdError{
-		ErrorCode: code,
-		Index:     f.ChangeIndex,
+func (f *FakeEtcdClient) NewError(code int) etcd.Error {
+	return etcd.Error{
+		Code:  code,
+		Index: f.ChangeIndex,
 	}
 }
 
@@ -127,7 +148,7 @@ func (f *FakeEtcdClient) updateResponse(key string) {
 	f.Data[key] = *resp.N
 }
 
-func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
+func (f *FakeEtcdClient) Get(ctx context.Context, key string, opts *etcd.GetOptions) (*etcd.Response, error) {
 	if f.Err != nil {
 		return nil, f.Err
 	}
@@ -146,16 +167,17 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
 
 	// Sort response, note this will alter result.R.
-	if result.R.Node != nil && result.R.Node.Nodes != nil && sort {
-		f.sortResponse(result.R.Node.Nodes)
+	if result.R.Node != nil && result.R.Node.Nodes != nil && opts.Sort {
+		f.sortResponse(result.R.Node)
 	}
 	return result.R, result.E
 }
 
-func (f *FakeEtcdClient) sortResponse(nodes etcd.Nodes) {
+func (f *FakeEtcdClient) sortResponse(node *etcd.Node) {
+	nodes := node.Nodes
 	for i := range nodes {
 		if nodes[i].Dir {
-			f.sortResponse(nodes[i].Nodes)
+			f.sortResponse(nodes[i])
 		}
 	}
 	sort.Sort(nodes)
@@ -198,7 +220,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 		return result.R, nil
 	}
 
-	f.t.Logf("creating %v, index %v (ttl: %d)", key, i, ttl)
+	f.t.Logf("creating %v, index %v, value %v (ttl: %d)", key, i, value, ttl)
 	result := EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -213,58 +235,65 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 	return result.R, nil
 }
 
-func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
-	f.Mutex.Lock()
-	defer f.Mutex.Unlock()
-	defer f.updateResponse(key)
-
-	return f.setLocked(key, value, ttl)
-}
-
-func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
-	if f.Err != nil {
-		f.t.Logf("c&s: returning err %v", f.Err)
-		return nil, f.Err
-	}
-	if f.CasErr != nil {
-		f.t.Logf("c&s: returning err %v", f.CasErr)
-		return nil, f.CasErr
-	}
-
-	if !f.TestIndex {
-		f.t.Errorf("Enable TestIndex for test involving CompareAndSwap")
-		return nil, errors.New("Enable TestIndex for test involving CompareAndSwap")
-	}
-
-	if prevValue == "" && prevIndex == 0 {
-		return nil, errors.New("Either prevValue or prevIndex must be specified.")
-	}
+// NOTE: Compare and Swap behavior is now behind the options, but follow on PR's should remove this interface
+//       entirely for the purposes of data hiding behind the storage layer.
+func (f *FakeEtcdClient) Set(ctx context.Context, key, value string, opts *etcd.SetOptions) (*etcd.Response, error) {
+	var ttl uint64
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
 	defer f.updateResponse(key)
 
-	if !f.nodeExists(key) {
-		f.t.Logf("c&s: node doesn't exist")
-		return nil, EtcdErrorNotFound
-	}
+	ttl = 0
+	if opts != nil {
 
-	prevNode := f.Data[key].R.Node
+		exists := f.nodeExists(key)
+		ttl = uint64(opts.TTL/time.Second)
 
-	if prevValue != "" && prevValue != prevNode.Value {
-		f.t.Logf("body didn't match")
-		return nil, EtcdErrorTestFailed
-	}
+		// check for create only condition
+		if opts.PrevExist == etcd.PrevNoExist && exists {
+			f.t.Logf("Node already exists")
+			return nil, EtcdErrorNodeExist
+		}
 
-	if prevIndex != 0 && prevIndex != prevNode.ModifiedIndex {
-		f.t.Logf("got index %v but needed %v", prevIndex, prevNode.ModifiedIndex)
-		return nil, EtcdErrorTestFailed
+		// check if previous value is specified
+		if len(opts.PrevValue)!=0 {
+			if exists {
+				if opts.PrevValue != f.Data[key].R.Node.Value {
+					f.t.Logf("body didn't match")
+					return nil, EtcdErrorTestFailed
+				} 
+			} else {
+				f.t.Logf("previous value specified but node does not exist")
+				return nil, EtcdErrorNotFound
+			}
+		}
+		
+
+		// check if a previous index is specified
+		if opts.PrevIndex != 0 {
+			if exists {
+				if opts.PrevIndex != f.Data[key].R.Node.ModifiedIndex {
+					f.t.Logf("got index %v but needed %v", f.Data[key].R.Node.ModifiedIndex, opts.PrevIndex )
+					return nil, EtcdErrorTestFailed
+				} 
+			} else {
+				f.t.Logf("previous index specified but node does not exist")
+				return nil, EtcdErrorNotFound
+			}
+		}
+		
 	}
 
 	return f.setLocked(key, value, ttl)
 }
 
-func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
+//NOTE: This is unused and will be ripped out in follow on PRs
+func (f *FakeEtcdClient) Update(ctx context.Context, key, value string) (*etcd.Response, error) {
+	return f.Set(ctx, key, value, nil)
+}
+
+func (f *FakeEtcdClient) Create(ctx context.Context, key, value string) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
 	defer f.updateResponse(key)
@@ -273,41 +302,72 @@ func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, 
 		return nil, EtcdErrorNodeExist
 	}
 
+	return f.setLocked(key, value, 0)
+
+}
+
+func (f *FakeEtcdClient) CreateInOrder(ctx context.Context, key, value string, opts *etcd.CreateInOrderOptions) (*etcd.Response, error) {
+	var ttl uint64
+
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
+	ttl = 0
+	if opts != nil {
+		ttl = uint64(opts.TTL/time.Second)
+	}
+
+	if f.nodeExists(key) {
+		return nil, EtcdErrorNodeExist
+	}
+
 	return f.setLocked(key, value, ttl)
 }
 
-func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
+func (f *FakeEtcdClient) Delete(ctx context.Context, key string, opts *etcd.DeleteOptions) (*etcd.Response, error) {
 	if f.Err != nil {
 		return nil, f.Err
 	}
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+
+	if opts != nil {
+		// NOTE: this only exists for kube2sky tests, whose behavior I completely question
+		// The entire kube2sky client imho is suspect
+		for p := range f.Data {
+			if (opts.Recursive && strings.HasPrefix(p, key)) || (!opts.Recursive && p == key) {
+				f.DeletedKeys = append(f.DeletedKeys, key)
+			}
+		}
+		return nil, nil
+	}
+
 	existing, ok := f.Data[key]
 	if !ok {
-		return &etcd.Response{}, &etcd.EtcdError{
-			ErrorCode: EtcdErrorCodeNotFound,
-			Index:     f.ChangeIndex,
+		return &etcd.Response{}, etcd.Error{
+			Code:  EtcdErrorCodeNotFound,
+			Index: f.ChangeIndex,
 		}
 	}
-	etcdError, ok := existing.E.(*etcd.EtcdError)
-	if ok && etcdError != nil && etcdError.ErrorCode == EtcdErrorCodeNotFound {
+	etcdError, ok := existing.E.(etcd.Error)
+	if ok && etcdError.Code == EtcdErrorCodeNotFound {
 		f.DeletedKeys = append(f.DeletedKeys, key)
 		return existing.R, existing.E
 	}
 	index := f.generateIndex()
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{},
-		E: &etcd.EtcdError{
-			ErrorCode: EtcdErrorCodeNotFound,
-			Index:     index,
+		E: etcd.Error{
+			Code:  EtcdErrorCodeNotFound,
+			Index: index,
 		},
 	}
 	res := &etcd.Response{
-		Action:    "delete",
-		Node:      nil,
-		PrevNode:  nil,
-		EtcdIndex: index,
+		Action:   "delete",
+		Node:     nil,
+		PrevNode: nil,
+		Index:    index,
 	}
 	if existing.R != nil && existing.R.Node != nil {
 		res.PrevNode = existing.R.Node
@@ -318,35 +378,22 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 }
 
 func (f *FakeEtcdClient) WaitForWatchCompletion() {
-	<-f.watchCompletedChan
+	// This client really needs to get thrown out.
+	// There is broken behavior that the tests rely on 
+	// and it no longer applies.
 }
 
-func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
-	f.Mutex.Lock()
-	if f.WatchImmediateError != nil {
-		return nil, f.WatchImmediateError
-	}
-	f.WatchResponse = receiver
-	f.WatchStop = stop
-	f.WatchIndex = waitIndex
-	injectedError := make(chan error)
+func (f *FakeEtcdClient) Watcher(key string, opts *etcd.WatcherOptions) etcd.Watcher {
 
-	defer close(injectedError)
-	f.WatchInjectError = injectedError
-
-	f.Mutex.Unlock()
-	if receiver == nil {
-		return f.Get(prefix, false, recursive)
-	} else {
-		// Emulate etcd's behavior. (I think.)
-		defer close(receiver)
+	if opts != nil {
+		f.WatchIndex = opts.AfterIndex
 	}
 
-	f.watchCompletedChan <- true
-	select {
-	case <-stop:
-		return nil, etcd.ErrWatchStoppedByUser
-	case err := <-injectedError:
-		return nil, err
+	watcher := FakeWatcher{
+		Key:    key,
+		Opts:   *opts,
+		Client: *f,
 	}
+
+	return &watcher
 }

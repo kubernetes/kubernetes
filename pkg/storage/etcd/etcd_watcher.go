@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,8 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 // Etcd watch event actions
@@ -66,12 +68,12 @@ type etcdWatcher struct {
 
 	etcdIncoming  chan *etcd.Response
 	etcdError     chan error
-	etcdStop      chan bool
+	ctx           context.Context
+	cancel        context.CancelFunc
 	etcdCallEnded chan struct{}
 
 	outgoing chan watch.Event
 	userStop chan struct{}
-	stopped  bool
 	stopLock sync.Mutex
 
 	// Injectable for testing. Send the event down the outgoing channel.
@@ -105,10 +107,11 @@ func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, e
 		// monitor how much of this buffer is actually used.
 		etcdIncoming: make(chan *etcd.Response, 100),
 		etcdError:    make(chan error, 1),
-		etcdStop:     make(chan bool),
 		outgoing:     make(chan watch.Event),
 		userStop:     make(chan struct{}),
 		cache:        cache,
+		ctx:          nil,
+		cancel:       nil,
 	}
 	w.emit = func(e watch.Event) { w.outgoing <- e }
 	go w.translate()
@@ -117,26 +120,51 @@ func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, e
 
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
-func (w *etcdWatcher) etcdWatch(client tools.EtcdClient, key string, resourceVersion uint64) {
+func (w *etcdWatcher) etcdWatch(ctx context.Context, client tools.EtcdClient, key string, resourceVersion uint64) {
 	defer util.HandleCrash()
 	defer close(w.etcdError)
+	defer close(w.etcdIncoming)
 	if resourceVersion == 0 {
-		latest, err := etcdGetInitialWatchState(client, key, w.list, w.etcdIncoming)
+		latest, err := etcdGetInitialWatchState(ctx, client, key, w.list, w.etcdIncoming)
 		if err != nil {
 			w.etcdError <- err
 			return
 		}
-		resourceVersion = latest + 1
+		resourceVersion = latest
 	}
-	_, err := client.Watch(key, resourceVersion, w.list, w.etcdIncoming, w.etcdStop)
-	if err != nil && err != etcd.ErrWatchStoppedByUser {
-		w.etcdError <- err
+
+	opts := etcd.WatcherOptions{
+		Recursive:  w.list,
+		AfterIndex: resourceVersion,
 	}
+
+	fmt.Printf("STARTING ACTUAL WATCH ok key=%v with opts=%v\n", key, opts)
+	watcher := client.Watcher(key, &opts)
+	w.ctx, w.cancel = context.WithCancel(ctx)
+
+	for {
+		resp, err := watcher.Next(w.ctx)
+		fmt.Printf("Got watch response=%v err=%v\n", resp, err)
+		if resp != nil {
+			w.etcdIncoming <- resp
+		}
+		if err != nil {
+			w.etcdError <- err
+			return
+		}
+	}
+
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(client tools.EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
-	resp, err := client.Get(key, false, recursive)
+func etcdGetInitialWatchState(ctx context.Context, client tools.EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+
+	opts := etcd.GetOptions{
+		Recursive: recursive,
+		Sort:      false,
+	}
+
+	resp, err := client.Get(ctx, key, &opts)
 	if err != nil {
 		if !IsEtcdNotFound(err) {
 			glog.Errorf("watch was unable to retrieve the current index for the provided key (%q): %v", key, err)
@@ -147,7 +175,7 @@ func etcdGetInitialWatchState(client tools.EtcdClient, key string, recursive boo
 		}
 		return resourceVersion, nil
 	}
-	resourceVersion = resp.EtcdIndex
+	resourceVersion = resp.Index
 	convertRecursiveResponse(resp.Node, resp, incoming)
 	return
 }
@@ -191,7 +219,6 @@ func (w *etcdWatcher) translate() {
 			}
 			return
 		case <-w.userStop:
-			w.etcdStop <- true
 			return
 		case res, ok := <-w.etcdIncoming:
 			if ok {
@@ -371,8 +398,10 @@ func (w *etcdWatcher) Stop() {
 	w.stopLock.Lock()
 	defer w.stopLock.Unlock()
 	// Prevent double channel closes.
-	if !w.stopped {
-		w.stopped = true
-		close(w.userStop)
+	if w.cancel != nil {
+		w.cancel()
+		w.cancel = nil
 	}
+
+	close(w.userStop)
 }

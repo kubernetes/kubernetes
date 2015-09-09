@@ -152,7 +152,7 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	resourcequotaStart := validNewResourceQuota()
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), resourcequotaStart), 0)
+	fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), resourcequotaStart), nil)
 
 	resourcequotaIn := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{

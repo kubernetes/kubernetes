@@ -19,7 +19,8 @@ package election
 import (
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -27,7 +28,7 @@ import (
 func TestEtcdMasterOther(t *testing.T) {
 	path := "foo"
 	etcd := tools.NewFakeEtcdClient(t)
-	etcd.Set(path, "baz", 0)
+	etcd.Set(context.TODO(), path, "baz", nil)
 	master := NewEtcdMasterElector(etcd)
 	w := master.Elect(path, "bar")
 	result := <-w.ResultChan()
@@ -45,8 +46,8 @@ func TestEtcdMasterNoOther(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{
-			ErrorCode: tools.EtcdErrorCodeNotFound,
+		E: etcd.Error{
+			Code: tools.EtcdErrorCodeNotFound,
 		},
 	}
 	master := NewEtcdMasterElector(e)
@@ -70,14 +71,14 @@ func TestEtcdMasterNoOtherThenConflict(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{
-			ErrorCode: tools.EtcdErrorCodeNotFound,
+		E: etcd.Error{
+			Code: tools.EtcdErrorCodeNotFound,
 		},
 	}
 	empty.N = &tools.EtcdResponseWithError{
 		R: &etcd.Response{},
-		E: &etcd.EtcdError{
-			ErrorCode: tools.EtcdErrorCodeNodeExist,
+		E: etcd.Error{
+			Code: tools.EtcdErrorCodeNodeExist,
 		},
 	}
 	empty.N.N = &tools.EtcdResponseWithError{
