@@ -40,7 +40,7 @@ find_files() {
       \) -prune \
     \) \
     \( -wholename '*pkg/api/v*/types.go' \
-       -o -wholename '*pkg/expapi/v*/types.go' \
+       -o -wholename '*pkg/apis/*/v*/types.go' \
     \)
 }
 
@@ -61,7 +61,7 @@ for file in $versioned_api_files; do
   fi
 done
 
-internal_types_files="${KUBE_ROOT}/pkg/api/types.go ${KUBE_ROOT}/pkg/expapi/types.go"
+internal_types_files="${KUBE_ROOT}/pkg/api/types.go ${KUBE_ROOT}/pkg/apis/experimental/types.go"
 for internal_types_file in $internal_types_files; do
   if grep json: "${internal_types_file}" | grep -v // | grep description: ; then
     echo "Internal API types should not contain descriptions"
