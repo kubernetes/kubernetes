@@ -32,7 +32,6 @@ mkdir -p binaries/minion
 # flannel
 echo "Download flannel release ..."
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.4.0"}
-echo "Flannel version is $FLANNEL_VERSION"
 if [ ! -f flannel.tar.gz ] ; then
   curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz
   tar xzf flannel.tar.gz
@@ -54,10 +53,10 @@ cp $ETCD/etcd $ETCD/etcdctl binaries/master
 
 # k8s
 echo "Download kubernetes release ..."
-K8S_VERSION=${K8S_VERSION:-"1.0.3"}
+KUBE_VERSION=${KUBE_VERSION:-"1.0.3"}
 
 if [ ! -f kubernetes.tar.gz ] ; then
-  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${K8S_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
+  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
 fi
 pushd kubernetes/server
