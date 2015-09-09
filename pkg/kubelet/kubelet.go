@@ -206,7 +206,11 @@ func NewMainKubelet(
 		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
+				obj, err := kubeClient.Nodes().Get(nodeName)
+				if err != nil {
+					return nil, err
+				}
+				return &api.NodeList{Items: []api.Node{*obj}}, nil
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
@@ -713,17 +717,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
 		return nil, errors.New("no node entry for kubelet in standalone mode")
 	}
-	l, err := kl.nodeLister.List()
-	if err != nil {
-		return nil, errors.New("cannot list nodes")
-	}
-	nodeName := kl.nodeName
-	for _, n := range l.Items {
-		if n.Name == nodeName {
-			return &n, nil
-		}
-	}
-	return nil, fmt.Errorf("node %v not found", nodeName)
+	return kl.nodeLister.GetNodeInfo(kl.nodeName)
 }
 
 // Starts garbage collection threads.
