@@ -123,7 +123,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 KUBE_API_ARGS=""
 ```
 
-* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused"
+* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused".Note that Fedora 22 uses etcd 2.0, One of the changes in etcd 2.0 is that now uses port 2379 and 2380 (as opposed to etcd 0.46 which userd 4001 and 7001).
 
 ```sh
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
