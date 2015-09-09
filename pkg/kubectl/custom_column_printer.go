@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -37,6 +38,8 @@ const (
 	flags             = 0
 )
 
+var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
+
 // MassageJSONPath attempts to be flexible with JSONPath expressions, it accepts:
 //   * metadata.name (no leading '.' or curly brances '{...}'
 //   * {metadata.name} (no leading '.')
@@ -44,23 +47,24 @@ const (
 //   * {.metadata.name} (complete expression)
 // And transforms them all into a valid jsonpat expression:
 //   {.metadata.name}
-func massageJSONPath(pathExpression string) string {
+func massageJSONPath(pathExpression string) (string, error) {
 	if len(pathExpression) == 0 {
-		return pathExpression
+		return pathExpression, nil
 	}
-	if pathExpression[0] != '{' {
-		if pathExpression[0] == '.' {
-			return fmt.Sprintf("{%s}", pathExpression)
-		} else {
-			return fmt.Sprintf("{.%s}", pathExpression)
-		}
+	submatches := jsonRegexp.FindStringSubmatch(pathExpression)
+	if submatches == nil {
+		return "", fmt.Errorf("unexpected path string, expected a 'name1.name2' or '.name1.name2' or '{name1.name2}' or '{.name1.name2}'")
+	}
+	if len(submatches) != 3 {
+		return "", fmt.Errorf("unexpected submatch list: %v", submatches)
+	}
+	var fieldSpec string
+	if len(submatches[1]) != 0 {
+		fieldSpec = submatches[1]
 	} else {
-		if pathExpression[1] == '.' {
-			return pathExpression
-		} else {
-			return fmt.Sprintf("{.%s}", pathExpression[1:len(pathExpression)-1])
-		}
+		fieldSpec = submatches[2]
 	}
+	return fmt.Sprintf("{.%s}", fieldSpec), nil
 }
 
 // NewCustomColumnsPrinterFromSpec creates a custom columns printer from a comma separated list of <header>:<jsonpath-field-spec> pairs.
@@ -79,7 +83,11 @@ func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error)
 		if len(colSpec) != 2 {
 			return nil, fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", parts[ix])
 		}
-		columns[ix] = Column{Header: colSpec[0], FieldSpec: massageJSONPath(colSpec[1])}
+		spec, err := massageJSONPath(colSpec[1])
+		if err != nil {
+			return nil, err
+		}
+		columns[ix] = Column{Header: colSpec[0], FieldSpec: spec}
 	}
 	return &CustomColumnsPrinter{Columns: columns}, nil
 }
@@ -102,15 +110,14 @@ func splitOnWhitespace(line string) []string {
 func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColumnsPrinter, error) {
 	scanner := bufio.NewScanner(templateReader)
 	if !scanner.Scan() {
-		return nil, fmt.Errorf("invalid template, missing header line")
+		return nil, fmt.Errorf("invalid template, missing header line. Expected format is one line of space separated headers, one line of space separated column specs.")
 	}
 	headers := splitOnWhitespace(scanner.Text())
 
 	if !scanner.Scan() {
-		return nil, fmt.Errorf("invalid template, missing spec line")
+		return nil, fmt.Errorf("invalid template, missing spec line. Expected format is one line of space separated headers, one line of space separated column specs.")
 	}
 	specs := splitOnWhitespace(scanner.Text())
-	fmt.Printf("SPECS: %v", specs)
 
 	if len(headers) != len(specs) {
 		return nil, fmt.Errorf("number of headers (%d) and field specifications (%d) don't match", len(headers), len(specs))
@@ -118,9 +125,13 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColum
 
 	columns := make([]Column, len(headers))
 	for ix := range headers {
+		spec, err := massageJSONPath(specs[ix])
+		if err != nil {
+			return nil, err
+		}
 		columns[ix] = Column{
 			Header:    headers[ix],
-			FieldSpec: massageJSONPath(specs[ix]),
+			FieldSpec: spec,
 		}
 	}
 	return &CustomColumnsPrinter{Columns: columns}, nil

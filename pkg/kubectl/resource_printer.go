@@ -99,7 +99,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer, err = NewJSONPathPrinter(string(data))
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
-                }
+		}
 	case "custom-columns":
 		var err error
 		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument); err != nil {
