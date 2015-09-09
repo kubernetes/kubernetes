@@ -37,7 +37,7 @@ var (
 	plugins      = make(map[string]Factory)
 )
 
-// GetPlugins enumerates the
+// GetPlugins enumerates the names of all registered plugins.
 func GetPlugins() []string {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
@@ -48,7 +48,7 @@ func GetPlugins() []string {
 	return keys
 }
 
-// RegisterPlugin registers a plugin Factory by name.  This
+// RegisterPlugin registers a plugin Factory by name. This
 // is expected to happen during app startup.
 func RegisterPlugin(name string, plugin Factory) {
 	pluginsMutex.Lock()
@@ -61,11 +61,10 @@ func RegisterPlugin(name string, plugin Factory) {
 	plugins[name] = plugin
 }
 
-// GetPlugin creates an instance of the named plugin, or nil if
-// the name is not known.  The error return is only used if the named provider
-// was known but failed to initialize. The config parameter specifies the
-// io.Reader handler of the configuration file for the cloud provider, or nil
-// for no configuration.
+// GetPlugin creates an instance of the named plugin, or nil if the name is not
+// known. The error is returned only when the named provider was known but failed
+// to initialize. The config parameter specifies the io.Reader handler of the
+// configuration file for the cloud provider, or nil for no configuration.
 func GetPlugin(name string, client client.Interface, config io.Reader) (Interface, error) {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
