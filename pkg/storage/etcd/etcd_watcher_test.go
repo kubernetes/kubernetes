@@ -24,6 +24,7 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
@@ -231,14 +232,14 @@ func TestWatchEtcdError(t *testing.T) {
 	if got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
-	status, ok := got.Object.(*api.Status)
+	status, ok := got.Object.(*unversioned.Status)
 	if !ok {
 		t.Fatalf("Unexpected non-error object type")
 	}
 	if status.Message != "immediate error" {
 		t.Errorf("Unexpected wrong error")
 	}
-	if status.Status != api.StatusFailure {
+	if status.Status != unversioned.StatusFailure {
 		t.Errorf("Unexpected wrong error status")
 	}
 }
@@ -289,7 +290,7 @@ func TestWatch(t *testing.T) {
 		if e, a := watch.Error, errEvent.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
-		if e, a := "Injected error", errEvent.Object.(*api.Status).Message; e != a {
+		if e, a := "Injected error", errEvent.Object.(*unversioned.Status).Message; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
@@ -690,7 +691,7 @@ func TestWatchFromOtherError(t *testing.T) {
 	if e, a := watch.Error, errEvent.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-	if e, a := "101:  () [2]", errEvent.Object.(*api.Status).Message; e != a {
+	if e, a := "101:  () [2]", errEvent.Object.(*unversioned.Status).Message; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 

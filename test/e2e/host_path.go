@@ -18,11 +18,13 @@ package e2e
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"os"
 	"path"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -121,7 +123,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 	podName := "pod-host-path-test"
 
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: latest.GroupOrDie("").Version,
 		},

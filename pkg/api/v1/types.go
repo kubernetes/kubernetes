@@ -18,6 +18,7 @@ package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -61,41 +62,6 @@ import (
 //      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
 //      Hypens ('-') cannot be leading or trailing character of the string
 //      and cannot be adjacent to other hyphens.
-
-// TypeMeta describes an individual object in an API response or request
-// with strings representing the type of the object and its API schema version.
-// Structures that are versioned or persisted should inline TypeMeta.
-type TypeMeta struct {
-	// A string value representing the REST resource this object represents.
-	// Servers may infer this from the endpoint the client submits requests to.
-	// Cannot be updated.
-	// In CamelCase.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	Kind string `json:"kind,omitempty"`
-
-	// APIVersion defines the version of the schema of an object.
-	// Servers should convert recognized schemas to the latest internal value, and
-	// may reject unrecognized values.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
-	APIVersion string `json:"apiVersion,omitempty"`
-}
-
-// ListMeta describes metadata that synthetic resources must have, including lists and
-// various status objects.
-type ListMeta struct {
-	// SelfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	SelfLink string `json:"selfLink,omitempty"`
-
-	// String that identifies the server's internal version of this object that
-	// can be used by clients to determine when objects have changed.
-	// Value must be treated as opaque by clients and passed unmodified back to the server.
-	// Populated by the system.
-	// Read-only.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-}
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
 // users must create.
@@ -342,7 +308,7 @@ type PersistentVolumeSource struct {
 // It is analogous to a node.
 // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
 type PersistentVolume struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -410,10 +376,10 @@ type PersistentVolumeStatus struct {
 
 // PersistentVolumeList is a list of PersistentVolume items.
 type PersistentVolumeList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 	// List of persistent volumes.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
 	Items []PersistentVolume `json:"items"`
@@ -421,7 +387,7 @@ type PersistentVolumeList struct {
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -438,10 +404,10 @@ type PersistentVolumeClaim struct {
 
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 type PersistentVolumeClaimList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 	// A list of persistent volume claims.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	Items []PersistentVolumeClaim `json:"items"`
@@ -1271,7 +1237,7 @@ type PodStatus struct {
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 type PodStatusResult struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1286,7 +1252,7 @@ type PodStatusResult struct {
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
 type Pod struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1305,10 +1271,10 @@ type Pod struct {
 
 // PodList is a list of Pods.
 type PodList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of pods.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pods.md
@@ -1328,7 +1294,7 @@ type PodTemplateSpec struct {
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1340,10 +1306,10 @@ type PodTemplate struct {
 
 // PodTemplateList is a list of PodTemplates.
 type PodTemplateList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of pod templates
 	Items []PodTemplate `json:"items"`
@@ -1388,7 +1354,7 @@ type ReplicationControllerStatus struct {
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// If the Labels of a ReplicationController are empty, they are defaulted to
 	// be the same as the Pod(s) that the replication controller manages.
@@ -1409,10 +1375,10 @@ type ReplicationController struct {
 
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of replication controllers.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md
@@ -1556,7 +1522,7 @@ type ServicePort struct {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1580,10 +1546,10 @@ const (
 
 // ServiceList holds a list of services.
 type ServiceList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of services
 	Items []Service `json:"items"`
@@ -1594,7 +1560,7 @@ type ServiceList struct {
 // * a principal that can be authenticated and authorized
 // * a set of secrets
 type ServiceAccount struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1612,10 +1578,10 @@ type ServiceAccount struct {
 
 // ServiceAccountList is a list of ServiceAccount objects
 type ServiceAccountList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of ServiceAccounts.
 	// More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md#service-accounts
@@ -1635,7 +1601,7 @@ type ServiceAccountList struct {
 //     },
 //  ]
 type Endpoints struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1702,10 +1668,10 @@ type EndpointPort struct {
 
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of endpoints.
 	Items []Endpoints `json:"items"`
@@ -1852,7 +1818,7 @@ type ResourceList map[ResourceName]resource.Quantity
 // Node is a worker node in Kubernetes, formerly known as minion.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 type Node struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1870,10 +1836,10 @@ type Node struct {
 
 // NodeList is the whole list of all Nodes which have been registered with master.
 type NodeList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of nodes
 	Items []Node `json:"items"`
@@ -1913,7 +1879,7 @@ const (
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
 type Namespace struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1929,10 +1895,10 @@ type Namespace struct {
 
 // NamespaceList is a list of Namespaces.
 type NamespaceList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Namespace objects in the list.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md
@@ -1942,7 +1908,7 @@ type NamespaceList struct {
 // Binding ties one object to another.
 // For example, a pod is bound to a node by a scheduler.
 type Binding struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1953,7 +1919,7 @@ type Binding struct {
 
 // DeleteOptions may be provided when deleting an API object
 type DeleteOptions struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// The duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
@@ -1964,7 +1930,7 @@ type DeleteOptions struct {
 
 // ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// A selector to restrict the list of returned objects by their labels.
 	// Defaults to everything.
@@ -1982,7 +1948,7 @@ type ListOptions struct {
 
 // PodLogOptions is the query options for a Pod's logs REST call.
 type PodLogOptions struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// The container for which to stream logs. Defaults to only container if there is one container in the pod.
 	Container string `json:"container,omitempty"`
@@ -2001,7 +1967,7 @@ type PodLogOptions struct {
 // TODO: merge w/ PodExecOptions below for stdin, stdout, etc
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 type PodAttachOptions struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Stdin if true, redirects the standard input stream of the pod for this call.
 	// Defaults to false.
@@ -2031,7 +1997,7 @@ type PodAttachOptions struct {
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 type PodExecOptions struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Redirect the standard input stream of the pod for this call.
 	// Defaults to false.
@@ -2059,169 +2025,11 @@ type PodExecOptions struct {
 
 // PodProxyOptions is the query options to a Pod's proxy call.
 type PodProxyOptions struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Path is the URL path to use for the current proxy request to pod.
 	Path string `json:"path,omitempty"`
 }
-
-// Status is a return value for calls that don't return other objects.
-type Status struct {
-	TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
-
-	// Status of the operation.
-	// One of: "Success" or "Failure".
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	Status string `json:"status,omitempty"`
-	// A human-readable description of the status of this operation.
-	Message string `json:"message,omitempty"`
-	// A machine-readable description of why this operation is in the
-	// "Failure" status. If this value is empty there
-	// is no information available. A Reason clarifies an HTTP status
-	// code but does not override it.
-	Reason StatusReason `json:"reason,omitempty"`
-	// Extended data associated with the reason. Each reason may define its
-	// own extended details. This field is optional and the data returned
-	// is not guaranteed to conform to any schema except that defined by
-	// the reason type.
-	Details *StatusDetails `json:"details,omitempty"`
-	// Suggested HTTP return code for this status, 0 if not set.
-	Code int `json:"code,omitempty"`
-}
-
-// StatusDetails is a set of additional properties that MAY be set by the
-// server to provide additional information about a response. The Reason
-// field of a Status object defines what attributes will be set. Clients
-// must ignore fields that do not match the defined type of each attribute,
-// and should assume that any attribute may be empty, invalid, or under
-// defined.
-type StatusDetails struct {
-	// The name attribute of the resource associated with the status StatusReason
-	// (when there is a single name which can be described).
-	Name string `json:"name,omitempty"`
-	// The kind attribute of the resource associated with the status StatusReason.
-	// On some operations may differ from the requested resource Kind.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	Kind string `json:"kind,omitempty"`
-	// The Causes array includes more details associated with the StatusReason
-	// failure. Not all StatusReasons may provide detailed causes.
-	Causes []StatusCause `json:"causes,omitempty"`
-	// If specified, the time in seconds before the operation should be retried.
-	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
-}
-
-// Values of Status.Status
-const (
-	StatusSuccess = "Success"
-	StatusFailure = "Failure"
-)
-
-// StatusReason is an enumeration of possible failure causes. Each StatusReason
-// must map to a single HTTP status code, but multiple reasons may map
-// to the same HTTP status code.
-// TODO: move to apiserver
-type StatusReason string
-
-const (
-	// StatusReasonUnknown means the server has declined to indicate a specific reason.
-	// The details field may contain other information about this error.
-	// Status code 500.
-	StatusReasonUnknown StatusReason = ""
-
-	// StatusReasonNotFound means one or more resources required for this operation
-	// could not be found.
-	// Details (optional):
-	//   "kind" string - the kind attribute of the missing resource
-	//                   on some operations may differ from the requested
-	//                   resource.
-	//   "id"   string - the identifier of the missing resource
-	// Status code 404
-	StatusReasonNotFound StatusReason = "NotFound"
-
-	// StatusReasonAlreadyExists means the resource you are creating already exists.
-	// Details (optional):
-	//   "kind" string - the kind attribute of the conflicting resource
-	//   "id"   string - the identifier of the conflicting resource
-	// Status code 409
-	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
-
-	// StatusReasonConflict means the requested update operation cannot be completed
-	// due to a conflict in the operation. The client may need to alter the request.
-	// Each resource may define custom details that indicate the nature of the
-	// conflict.
-	// Status code 409
-	StatusReasonConflict StatusReason = "Conflict"
-
-	// StatusReasonInvalid means the requested create or update operation cannot be
-	// completed due to invalid data provided as part of the request. The client may
-	// need to alter the request. When set, the client may use the StatusDetails
-	// message field as a summary of the issues encountered.
-	// Details (optional):
-	//   "kind" string - the kind attribute of the invalid resource
-	//   "id"   string - the identifier of the invalid resource
-	//   "causes"      - one or more StatusCause entries indicating the data in the
-	//                   provided resource that was invalid. The code, message, and
-	//                   field attributes will be set.
-	// Status code 422
-	StatusReasonInvalid StatusReason = "Invalid"
-
-	// StatusReasonServerTimeout means the server can be reached and understood the request,
-	// but cannot complete the action in a reasonable time. The client should retry the request.
-	// This is may be due to temporary server load or a transient communication issue with
-	// another server. Status code 500 is used because the HTTP spec provides no suitable
-	// server-requested client retry and the 5xx class represents actionable errors.
-	// Details (optional):
-	//   "kind" string - the kind attribute of the resource being acted on.
-	//   "id"   string - the operation that is being attempted.
-	// Status code 500
-	StatusReasonServerTimeout StatusReason = "ServerTimeout"
-)
-
-// StatusCause provides more information about an api.Status failure, including
-// cases when multiple errors are encountered.
-type StatusCause struct {
-	// A machine-readable description of the cause of the error. If this value is
-	// empty there is no information available.
-	Type CauseType `json:"reason,omitempty"`
-	// A human-readable description of the cause of the error. This field may be
-	// presented as-is to a reader.
-	Message string `json:"message,omitempty"`
-	// The field of the resource that has caused this error, as named by its JSON
-	// serialization. May include dot and postfix notation for nested attributes.
-	// Arrays are zero-indexed. Fields may appear more than once in an array of
-	// causes due to fields having multiple errors.
-	//
-	// Examples:
-	//   "name" - the field "name" on the current resource
-	//   "items[0].name" - the field "name" on the first array entry in "items"
-	Field string `json:"field,omitempty"`
-}
-
-// CauseType is a machine readable value providing more detail about what
-// occurred in a status response. An operation may have multiple causes for a
-// status (whether Failure or Success).
-type CauseType string
-
-const (
-	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
-	// (e.g. looking up an ID).
-	CauseTypeFieldValueNotFound CauseType = "FieldValueNotFound"
-	// CauseTypeFieldValueRequired is used to report required values that are not
-	// provided (e.g. empty strings, null values, or empty arrays).
-	CauseTypeFieldValueRequired CauseType = "FieldValueRequired"
-	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be
-	// unique (e.g. unique IDs).
-	CauseTypeFieldValueDuplicate CauseType = "FieldValueDuplicate"
-	// CauseTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
-	// match).
-	CauseTypeFieldValueInvalid CauseType = "FieldValueInvalid"
-	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
-	// values that can not be handled (e.g. an enumerated string).
-	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
-)
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
@@ -2265,7 +2073,7 @@ type LocalObjectReference struct {
 
 // SerializedReference is a reference to serialized object.
 type SerializedReference struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// The reference to an object in the system.
 	Reference ObjectReference `json:"reference,omitempty"`
 }
@@ -2281,7 +2089,7 @@ type EventSource struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata"`
@@ -2313,10 +2121,10 @@ type Event struct {
 
 // EventList is a list of events.
 type EventList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of events
 	Items []Event `json:"items"`
@@ -2324,10 +2132,10 @@ type EventList struct {
 
 // List holds a list of objects, which may not be known by the server.
 type List struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of objects
 	Items []runtime.RawExtension `json:"items"`
@@ -2367,7 +2175,7 @@ type LimitRangeSpec struct {
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
 type LimitRange struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2379,10 +2187,10 @@ type LimitRange struct {
 
 // LimitRangeList is a list of LimitRange items.
 type LimitRangeList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of LimitRange objects.
 	// More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
@@ -2423,7 +2231,7 @@ type ResourceQuotaStatus struct {
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2439,10 +2247,10 @@ type ResourceQuota struct {
 
 // ResourceQuotaList is a list of ResourceQuota items.
 type ResourceQuotaList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of ResourceQuota objects.
 	// More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
@@ -2452,7 +2260,7 @@ type ResourceQuotaList struct {
 // Secret holds secret data of a certain type. The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2507,10 +2315,10 @@ const (
 
 // SecretList is a list of Secret.
 type SecretList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of secret objects.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/secrets.md
@@ -2543,7 +2351,7 @@ type ComponentCondition struct {
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2554,10 +2362,10 @@ type ComponentStatus struct {
 
 // Status of all the conditions for the component as a list of ComponentStatus objects.
 type ComponentStatusList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of ComponentStatus objects.
 	Items []ComponentStatus `json:"items"`
@@ -2627,7 +2435,7 @@ type SELinuxOptions struct {
 
 // RangeAllocation is not a public type.
 type RangeAllocation struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2641,7 +2449,7 @@ type RangeAllocation struct {
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
 type ThirdPartyResource struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2655,10 +2463,10 @@ type ThirdPartyResource struct {
 
 // ThirdPartyResourceList is a list of ThirdPartyResource.
 type ThirdPartyResourceList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of schema objects.
 	Items []ThirdPartyResource `json:"items"`
@@ -2675,7 +2483,7 @@ type APIVersion struct {
 
 // An internal object, used for versioned storage in etcd. Not exposed to the end user.
 type ThirdPartyResourceData struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
@@ -48,7 +49,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	go r.ListAndWatch(util.NeverStop)
@@ -74,7 +75,7 @@ func TestRunUntil(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	r.RunUntil(stopCh)
@@ -234,7 +235,7 @@ func TestReflector_ListAndWatch(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
@@ -277,7 +278,7 @@ func TestReflector_ListAndWatchWithErrors(t *testing.T) {
 		return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv string, pods ...*api.Pod) *api.PodList {
-		list := &api.PodList{ListMeta: api.ListMeta{ResourceVersion: rv}}
+		list := &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: rv}}
 		for _, pod := range pods {
 			list.Items = append(list.Items, *pod)
 		}

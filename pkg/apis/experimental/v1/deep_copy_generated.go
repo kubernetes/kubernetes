@@ -23,6 +23,7 @@ import (
 
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	util "k8s.io/kubernetes/pkg/util"
@@ -362,7 +363,7 @@ func deepCopy_v1_Lifecycle(in v1.Lifecycle, out *v1.Lifecycle, c *conversion.Clo
 	return nil
 }
 
-func deepCopy_v1_ListMeta(in v1.ListMeta, out *v1.ListMeta, c *conversion.Cloner) error {
+func deepCopy_v1_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
 	return nil
@@ -623,7 +624,7 @@ func deepCopy_v1_TCPSocketAction(in v1.TCPSocketAction, out *v1.TCPSocketAction,
 	return nil
 }
 
-func deepCopy_v1_TypeMeta(in v1.TypeMeta, out *v1.TypeMeta, c *conversion.Cloner) error {
+func deepCopy_v1_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
 	return nil
