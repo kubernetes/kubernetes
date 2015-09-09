@@ -118,38 +118,3 @@ var (
 	_ = Matcher(&SelectionPredicate{})
 	_ = Matcher(matcherFunc(nil))
 )
-
-// DecoratorFunc can mutate the provided object prior to being returned.
-type DecoratorFunc func(obj runtime.Object) error
-
-// FilterList filters any list object that conforms to the api conventions,
-// provided that 'm' works with the concrete type of list. d is an optional
-// decorator for the returned functions. Only matching items are decorated.
-func FilterList(list runtime.Object, m Matcher, d DecoratorFunc) (filtered runtime.Object, err error) {
-	// TODO: push a matcher down into tools.etcdHelper to avoid all this
-	// nonsense. This is a lot of unnecessary copies.
-	items, err := runtime.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-	var filteredItems []runtime.Object
-	for _, obj := range items {
-		match, err := m.Matches(obj)
-		if err != nil {
-			return nil, err
-		}
-		if match {
-			if d != nil {
-				if err := d(obj); err != nil {
-					return nil, err
-				}
-			}
-			filteredItems = append(filteredItems, obj)
-		}
-	}
-	err = runtime.SetList(list, filteredItems)
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
-}
