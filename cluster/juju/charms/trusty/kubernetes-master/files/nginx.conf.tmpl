@@ -1,30 +1,4 @@
-# HTTP server
-server {
-    listen 80;
-    server_name localhost;
-
-    root html;
-    index index.html index.htm;
-
-    location / {
-        # Proxy settings
-        # disable buffering so that watch works
-        proxy_buffering off;
-        proxy_pass %(api_http_uri)s;
-        proxy_connect_timeout 159s;
-        proxy_send_timeout   600s;
-        proxy_read_timeout   600s;
-
-        # Disable retry
-        proxy_next_upstream off;
-
-        # Support web sockets
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-# HTTPS server
+# Proxy HTTPS from the public address to the kube-apiserver running at 6443.
 server {
     listen 443;
     server_name localhost;
@@ -33,9 +7,8 @@ server {
     index index.html index.htm;
 
     ssl on;
-    ssl_certificate      /srv/kubernetes/apiserver.crt;
-    ssl_certificate_key  /srv/kubernetes/apiserver.key;
-
+    ssl_certificate /srv/kubernetes/apiserver.crt;
+    ssl_certificate_key /srv/kubernetes/apiserver.key;
     ssl_session_timeout 5m;
 
     # don't use SSLv3 because of POODLE
@@ -44,23 +17,11 @@ server {
     ssl_prefer_server_ciphers on;
 
     location / {
-        #auth_basic            "Restricted";
-        #auth_basic_user_file  /usr/share/nginx/htpasswd;
-
-        # Proxy settings
-        # disable buffering so that watch works
         proxy_buffering off;
         proxy_pass %(api_https_uri)s;
         proxy_connect_timeout 159s;
         proxy_send_timeout   600s;
         proxy_read_timeout   600s;
-
-        # Disable retry
-        proxy_next_upstream off;
-
-        # Support web sockets
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_redirect off;
     }
 }
