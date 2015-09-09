@@ -132,8 +132,6 @@ func createMesosClient(
 		defer client.masterLock.Unlock()
 		if info == nil {
 			client.master = ""
-		} else if host := info.GetHostname(); host != "" {
-			client.master = host
 		} else {
 			client.master = unpackIPv4(info.GetIp())
 		}
