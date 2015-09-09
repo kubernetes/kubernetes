@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -100,7 +100,7 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *experimental.ThirdPartyRes
 }
 
 func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *experimental.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
-	typeMeta := api.TypeMeta{}
+	typeMeta := unversioned.TypeMeta{}
 	if err := json.Unmarshal(data, &typeMeta); err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, e
 		}
 		fmt.Fprintf(buff, template, t.kind+"List", strings.Join(dataStrings, ","))
 		return buff.Bytes(), nil
-	case *api.Status:
+	case *unversioned.Status:
 		return t.delegate.Encode(obj)
 	default:
 		return nil, fmt.Errorf("unexpected object to encode: %#v", obj)

@@ -23,6 +23,7 @@ import (
 
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	util "k8s.io/kubernetes/pkg/util"
@@ -790,7 +791,7 @@ func deepCopy_v1_List(in List, out *List, c *conversion.Cloner) error {
 	return nil
 }
 
-func deepCopy_v1_ListMeta(in ListMeta, out *ListMeta, c *conversion.Cloner) error {
+func deepCopy_v1_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
 	return nil
@@ -2030,7 +2031,7 @@ func deepCopy_v1_ServiceStatus(in ServiceStatus, out *ServiceStatus, c *conversi
 	return nil
 }
 
-func deepCopy_v1_Status(in Status, out *Status, c *conversion.Cloner) error {
+func deepCopy_v1_Status(in unversioned.Status, out *unversioned.Status, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -2041,7 +2042,7 @@ func deepCopy_v1_Status(in Status, out *Status, c *conversion.Cloner) error {
 	out.Message = in.Message
 	out.Reason = in.Reason
 	if in.Details != nil {
-		out.Details = new(StatusDetails)
+		out.Details = new(unversioned.StatusDetails)
 		if err := deepCopy_v1_StatusDetails(*in.Details, out.Details, c); err != nil {
 			return err
 		}
@@ -2052,18 +2053,18 @@ func deepCopy_v1_Status(in Status, out *Status, c *conversion.Cloner) error {
 	return nil
 }
 
-func deepCopy_v1_StatusCause(in StatusCause, out *StatusCause, c *conversion.Cloner) error {
+func deepCopy_v1_StatusCause(in unversioned.StatusCause, out *unversioned.StatusCause, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Message = in.Message
 	out.Field = in.Field
 	return nil
 }
 
-func deepCopy_v1_StatusDetails(in StatusDetails, out *StatusDetails, c *conversion.Cloner) error {
+func deepCopy_v1_StatusDetails(in unversioned.StatusDetails, out *unversioned.StatusDetails, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Kind = in.Kind
 	if in.Causes != nil {
-		out.Causes = make([]StatusCause, len(in.Causes))
+		out.Causes = make([]unversioned.StatusCause, len(in.Causes))
 		for i := range in.Causes {
 			if err := deepCopy_v1_StatusCause(in.Causes[i], &out.Causes[i], c); err != nil {
 				return err
@@ -2083,7 +2084,7 @@ func deepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *co
 	return nil
 }
 
-func deepCopy_v1_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
+func deepCopy_v1_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
 	return nil

@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
@@ -183,8 +183,8 @@ func (w *etcdWatcher) translate() {
 			if err != nil {
 				w.emit(watch.Event{
 					Type: watch.Error,
-					Object: &api.Status{
-						Status:  api.StatusFailure,
+					Object: &unversioned.Status{
+						Status:  unversioned.StatusFailure,
 						Message: err.Error(),
 					},
 				})

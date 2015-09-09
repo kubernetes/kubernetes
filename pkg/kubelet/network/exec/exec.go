@@ -65,7 +65,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -154,7 +154,7 @@ func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubele
 		return nil, nil
 	}
 	findVersion := struct {
-		api.TypeMeta `json:",inline"`
+		unversioned.TypeMeta `json:",inline"`
 	}{}
 	err = json.Unmarshal(out, &findVersion)
 	if err != nil {

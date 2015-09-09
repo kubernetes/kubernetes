@@ -22,6 +22,7 @@ import (
 
 	internal "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -34,7 +35,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Errorf("unexpected version %v", version)
 	}
 
-	podList := internal.PodList{ListMeta: internal.ListMeta{ResourceVersion: "10"}}
+	podList := internal.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
 	version, err = accessor.ResourceVersion(&podList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
