@@ -41,6 +41,7 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes
     - [Test it out](#test-it-out)
     - [Deploy addons](#deploy-addons)
     - [Trouble shooting](#trouble-shooting)
+- [Upgrading a Cluster](#upgrading-a-cluster)
 
 ## Introduction
 
@@ -245,6 +246,51 @@ the latter one could start it again.
 
 4. You can also customize your own settings in `/etc/default/{component_name}`.
 
+
+### Upgrading a Cluster
+
+If you already have a kubernetes cluster, and want to upgrade to a new version,
+you can use following command in cluster/ directory to update the whole cluster or a specified node to a new version.
+
+```console
+$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh [-m|-n <node id>] <version>
+```
+
+It can be done for all components (by default), master(`-m`) or specified node(`-n`).
+If the version is not specified, the script will try to use local binaries.You should ensure all the binaries are well prepared in path `cluster/ubuntu/binaries`.
+
+```console
+$ tree cluster/ubuntu/binaries
+binaries/
+├── kubectl
+├── master
+│   ├── etcd
+│   ├── etcdctl
+│   ├── flanneld
+│   ├── kube-apiserver
+│   ├── kube-controller-manager
+│   └── kube-scheduler
+└── minion
+    ├── flanneld
+    ├── kubelet
+    └── kube-proxy
+```
+
+Upgrading single node is experimental now. You can use following command to get a help.
+
+```console
+$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -h
+```
+
+Some examples are as follows:
+
+* upgrade master to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -m 1.0.5`
+* upgrade node 10.10.103.223 to version 1.0.5 : `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -n 10.10.103.223 1.0.5`
+* upgrade master and all nodes to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh 1.0.5`
+
+The script will not delete any resources of your cluster, it just replaces the binaries.
+You can use `kubectl` command to check if the newly upgraded k8s is working correctly.
+For example, use `$ kubectl get nodes` to see if all of your nodes are ready.Or refer to [test-it-out](ubuntu.md#test-it-out)
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu.md?pixel)]()
