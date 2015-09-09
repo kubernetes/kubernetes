@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package minion provides Registry interface and implementation for storing Minions.
-package minion
+// Package node provides Registry interface and implementation for storing Nodes.
+package node

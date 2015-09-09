@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // Package nodecontroller contains code for syncing cloud instances with
-// minion registry
+// node registry
 package nodecontroller

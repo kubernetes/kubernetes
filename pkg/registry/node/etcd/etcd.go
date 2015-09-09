@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
-	"k8s.io/kubernetes/pkg/registry/minion"
+	"k8s.io/kubernetes/pkg/registry/node"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -79,17 +79,17 @@ func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionIn
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc: minion.MatchNode,
+		PredicateFunc: node.MatchNode,
 		EndpointName:  "node",
 
-		CreateStrategy: minion.Strategy,
-		UpdateStrategy: minion.Strategy,
+		CreateStrategy: node.Strategy,
+		UpdateStrategy: node.Strategy,
 
 		Storage: storageInterface,
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = minion.StatusStrategy
+	statusStore.UpdateStrategy = node.StatusStrategy
 
 	return &REST{store, connection}, &StatusREST{store: &statusStore}
 }
@@ -97,7 +97,7 @@ func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionIn
 // Implement Redirector.
 var _ = rest.Redirector(&REST{})
 
-// ResourceLocation returns a URL to which one can send traffic for the specified minion.
+// ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return minion.ResourceLocation(r, r.connection, ctx, id)
+	return node.ResourceLocation(r, r.connection, ctx, id)
 }
