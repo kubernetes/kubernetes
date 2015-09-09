@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -966,7 +965,12 @@ type testNodeLister struct {
 }
 
 func (ls testNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	return nil, errors.New("not implemented")
+	for _, node := range ls.nodes {
+		if node.Name == id {
+			return &node, nil
+		}
+	}
+	return nil, fmt.Errorf("Node with name: %s does not exist", id)
 }
 
 func (ls testNodeLister) List() (api.NodeList, error) {
