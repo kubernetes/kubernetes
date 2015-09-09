@@ -159,9 +159,6 @@ func (s *ProxyServer) Run(_ []string) error {
 		Namespace: "",
 	}
 
-	// Birth Cry
-	s.birthCry()
-
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
 
@@ -207,6 +204,9 @@ func (s *ProxyServer) Run(_ []string) error {
 		glog.V(2).Info("Tearing down pure-iptables proxy rules. Errors here are acceptable.")
 		iptables.CleanupLeftovers(ipt)
 	}
+
+	// Birth Cry after the birth is successful
+	s.birthCry()
 
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
