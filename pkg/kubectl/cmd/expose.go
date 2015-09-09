@@ -129,14 +129,18 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	params["default-name"] = info.Name
-	if s, found := params["selector"]; !found || kubectl.IsZero(s) || cmdutil.GetFlagInt(cmd, "port") < 1 {
-		if kubectl.IsZero(s) {
-			s, err := f.PodSelectorForObject(inputObject)
-			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
-			}
-			params["selector"] = s
+
+	// For objects that need a pod selector, derive it from the exposed object in case a user
+	// didn't explicitly specify one via --selector
+	if s, found := params["selector"]; found && kubectl.IsZero(s) {
+		s, err := f.PodSelectorForObject(inputObject)
+		if err != nil {
+			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
 		}
+		params["selector"] = s
+	}
+
+	if cmdutil.GetFlagInt(cmd, "port") < 1 {
 		noPorts := true
 		for _, param := range names {
 			if param.Name == "port" {
