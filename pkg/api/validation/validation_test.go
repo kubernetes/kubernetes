@@ -2951,6 +2951,20 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 	}
 
+	invalidSpecRangeMaxLessThanMinInSmallerUnit := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("100m"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("900m"),
+				},
+			},
+		},
+	}
+
 	invalidSpecRangeDefaultOutsideRange := api.LimitRangeSpec{
 		Limits: []api.LimitRangeItem{
 			{
@@ -3005,6 +3019,26 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 	}
 
+	invalidSpecRangeRequestMoreThanDefaultRangeInSmallerUnit := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("500m"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("100m"),
+				},
+				Default: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("300m"),
+				},
+				DefaultRequest: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("400m"),
+				},
+			},
+		},
+	}
+
 	successCases := []api.LimitRange{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -3045,9 +3079,13 @@ func TestValidateLimitRange(t *testing.T) {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecDuplicateType},
 			"",
 		},
-		"min value 1k is greater than max value 10": {
+		"invalid spec range max less than min": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeMaxLessThanMin},
 			"min value 1k is greater than max value 10",
+		},
+		"invalid spec range max less than min in smaller unit": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeMaxLessThanMinInSmallerUnit},
+			"min value 900m is greater than max value 100m",
 		},
 		"invalid spec default outside range": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultOutsideRange},
@@ -3060,6 +3098,10 @@ func TestValidateLimitRange(t *testing.T) {
 		"invalid spec defaultrequest more than default": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeRequestMoreThanDefaultRange},
 			"default request value 800 is greater than default limit value 500",
+		},
+		"invalid spec defaultrequest more than default in smaller unit": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeRequestMoreThanDefaultRangeInSmallerUnit},
+			"default request value 400m is greater than default limit value 300m",
 		},
 	}
 	for k, v := range errorCases {
