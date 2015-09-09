@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -42,7 +43,49 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"command", false},
 		{"args", false},
 		{"env", false},
+		{"requests", false},
+		{"limits", false},
 	}
+}
+
+// populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
+func populateResourceList(spec string) (api.ResourceList, error) {
+	// empty input gets a nil response to preserve generator test expected behaviors
+	if spec == "" {
+		return nil, nil
+	}
+
+	result := api.ResourceList{}
+	resourceStatements := strings.Split(spec, ",")
+	for _, resourceStatement := range resourceStatements {
+		parts := strings.Split(resourceStatement, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
+		}
+		resourceName := api.ResourceName(parts[0])
+		resourceQuantity, err := resource.ParseQuantity(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		result[resourceName] = *resourceQuantity
+	}
+	return result, nil
+}
+
+// HandleResourceRequirements parses the limits and requests parameters if specified
+func HandleResourceRequirements(params map[string]string) (api.ResourceRequirements, error) {
+	result := api.ResourceRequirements{}
+	limits, err := populateResourceList(params["limits"])
+	if err != nil {
+		return result, err
+	}
+	result.Limits = limits
+	requests, err := populateResourceList(params["requests"])
+	if err != nil {
+		return result, err
+	}
+	result.Requests = requests
+	return result, nil
 }
 
 func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
@@ -56,13 +99,19 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 		return nil, err
 	}
 
+	resourceRequirements, err := HandleResourceRequirements(params)
+	if err != nil {
+		return nil, err
+	}
+
 	spec := api.PodSpec{
 		Containers: []api.Container{
 			{
-				Name:  name,
-				Image: params["image"],
-				Stdin: stdin,
-				TTY:   tty,
+				Name:      name,
+				Image:     params["image"],
+				Stdin:     stdin,
+				TTY:       tty,
+				Resources: resourceRequirements,
 			},
 		},
 	}
@@ -223,6 +272,8 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"command", false},
 		{"args", false},
 		{"env", false},
+		{"requests", false},
+		{"limits", false},
 	}
 }
 
@@ -288,6 +339,11 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		return nil, err
 	}
 
+	resourceRequirements, err := HandleResourceRequirements(params)
+	if err != nil {
+		return nil, err
+	}
+
 	restartPolicy := api.RestartPolicy(params["restart"])
 	if len(restartPolicy) == 0 {
 		restartPolicy = api.RestartPolicyAlways
@@ -305,6 +361,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 					ImagePullPolicy: api.PullIfNotPresent,
 					Stdin:           stdin,
 					TTY:             tty,
+					Resources:       resourceRequirements,
 				},
 			},
 			DNSPolicy:     api.DNSClusterFirst,
