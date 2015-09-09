@@ -9,7 +9,9 @@ algorithm-provider
 all-namespaces
 allocate-node-cidrs
 allow-privileged
+api-burst
 api-prefix
+api-rate
 api-servers
 api-token
 api-version
@@ -71,6 +73,8 @@ etcd-config
 etcd-prefix
 etcd-server
 etcd-servers
+event-burst
+event-qps
 event-ttl
 executor-bindall
 executor-logv

@@ -301,6 +301,8 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
+		kc.EventRecordQPS,
+		kc.EventBurst,
 		gcPolicy,
 		pc.SeenAllSources,
 		kc.RegisterNode,
