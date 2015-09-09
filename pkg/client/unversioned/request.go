@@ -39,13 +39,14 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
 
 // specialParams lists parameters that are handled specially and which users of Request
 // are therefore not allowed to set manually.
-var specialParams = util.NewStringSet("timeout")
+var specialParams = sets.NewString("timeout")
 
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {

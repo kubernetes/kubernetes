@@ -22,12 +22,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestStoreToMinionLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
-	ids := util.NewStringSet("foo", "bar", "baz")
+	ids := sets.NewString("foo", "bar", "baz")
 	for id := range ids {
 		store.Add(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
@@ -52,7 +52,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 	testCases := []struct {
 		inRCs      []*api.ReplicationController
 		list       func() ([]api.ReplicationController, error)
-		outRCNames util.StringSet
+		outRCNames sets.String
 		expectErr  bool
 	}{
 		// Basic listing with all labels and no selectors
@@ -63,7 +63,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			list: func() ([]api.ReplicationController, error) {
 				return lister.List()
 			},
-			outRCNames: util.NewStringSet("basic"),
+			outRCNames: sets.NewString("basic"),
 		},
 		// No pod labels
 		{
@@ -81,7 +81,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: util.NewStringSet(),
+			outRCNames: sets.NewString(),
 			expectErr:  true,
 		},
 		// No RC selectors
@@ -101,7 +101,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: util.NewStringSet(),
+			outRCNames: sets.NewString(),
 			expectErr:  true,
 		},
 		// Matching labels to selectors and namespace
@@ -130,7 +130,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: util.NewStringSet("bar"),
+			outRCNames: sets.NewString("bar"),
 		},
 	}
 	for _, c := range testCases {
@@ -162,7 +162,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 	testCases := []struct {
 		inDSs             []*expapi.DaemonSet
 		list              func() ([]expapi.DaemonSet, error)
-		outDaemonSetNames util.StringSet
+		outDaemonSetNames sets.String
 		expectErr         bool
 	}{
 		// Basic listing
@@ -173,7 +173,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 			list: func() ([]expapi.DaemonSet, error) {
 				return lister.List()
 			},
-			outDaemonSetNames: util.NewStringSet("basic"),
+			outDaemonSetNames: sets.NewString("basic"),
 		},
 		// Listing multiple daemon sets
 		{
@@ -185,7 +185,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 			list: func() ([]expapi.DaemonSet, error) {
 				return lister.List()
 			},
-			outDaemonSetNames: util.NewStringSet("basic", "complex", "complex2"),
+			outDaemonSetNames: sets.NewString("basic", "complex", "complex2"),
 		},
 		// No pod labels
 		{
@@ -203,7 +203,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
-			outDaemonSetNames: util.NewStringSet(),
+			outDaemonSetNames: sets.NewString(),
 			expectErr:         true,
 		},
 		// No DS selectors
@@ -223,7 +223,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
-			outDaemonSetNames: util.NewStringSet(),
+			outDaemonSetNames: sets.NewString(),
 			expectErr:         true,
 		},
 		// Matching labels to selectors and namespace
@@ -252,7 +252,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
-			outDaemonSetNames: util.NewStringSet("bar"),
+			outDaemonSetNames: sets.NewString("bar"),
 		},
 	}
 	for _, c := range testCases {

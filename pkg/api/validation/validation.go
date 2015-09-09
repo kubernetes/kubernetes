@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -307,10 +308,10 @@ func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList
 	return allErrs
 }
 
-func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationErrorList) {
+func validateVolumes(volumes []api.Volume) (sets.String, errs.ValidationErrorList) {
 	allErrs := errs.ValidationErrorList{}
 
-	allNames := util.StringSet{}
+	allNames := sets.String{}
 	for i, vol := range volumes {
 		el := validateSource(&vol.VolumeSource).Prefix("source")
 		if len(vol.Name) == 0 {
@@ -497,7 +498,7 @@ func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource) errs.ValidationErro
 	return allErrs
 }
 
-var validDownwardAPIFieldPathExpressions = util.NewStringSet("metadata.name", "metadata.namespace", "metadata.labels", "metadata.annotations")
+var validDownwardAPIFieldPathExpressions = sets.NewString("metadata.name", "metadata.namespace", "metadata.labels", "metadata.annotations")
 
 func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -688,12 +689,12 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 	return allErrs
 }
 
-var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
+var supportedPortProtocols = sets.NewString(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
 func validatePorts(ports []api.ContainerPort) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	allNames := util.StringSet{}
+	allNames := sets.String{}
 	for i, port := range ports {
 		pErrs := errs.ValidationErrorList{}
 		if len(port.Name) > 0 {
@@ -739,7 +740,7 @@ func validateEnv(vars []api.EnvVar) errs.ValidationErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = util.NewStringSet("metadata.name", "metadata.namespace", "status.podIP")
+var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "status.podIP")
 
 func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -763,7 +764,7 @@ func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *util.StringSet) errs.ValidationErrorList {
+func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if fs.APIVersion == "" {
@@ -782,7 +783,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *util.
 	return allErrs
 }
 
-func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs.ValidationErrorList {
+func validateVolumeMounts(mounts []api.VolumeMount, volumes sets.String) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	for i, mnt := range mounts {
@@ -818,7 +819,7 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 
 // AccumulateUniqueHostPorts extracts each HostPort of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniqueHostPorts(containers []api.Container, accumulator *util.StringSet) errs.ValidationErrorList {
+func AccumulateUniqueHostPorts(containers []api.Container, accumulator *sets.String) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	for ci, ctr := range containers {
@@ -843,7 +844,7 @@ func AccumulateUniqueHostPorts(containers []api.Container, accumulator *util.Str
 // checkHostPortConflicts checks for colliding Port.HostPort values across
 // a slice of containers.
 func checkHostPortConflicts(containers []api.Container) errs.ValidationErrorList {
-	allPorts := util.StringSet{}
+	allPorts := sets.String{}
 	return AccumulateUniqueHostPorts(containers, &allPorts)
 }
 
@@ -865,7 +866,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	} else if http.Port.Kind == util.IntstrString && !util.IsValidPortName(http.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port.StrVal, portNameErrorMsg))
 	}
-	supportedSchemes := util.NewStringSet(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
+	supportedSchemes := sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
 	if !supportedSchemes.Has(string(http.Scheme)) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("scheme", http.Scheme, fmt.Sprintf("must be one of %v", supportedSchemes.List())))
 	}
@@ -930,14 +931,14 @@ func validatePullPolicy(ctr *api.Container) errs.ValidationErrorList {
 	return allErrors
 }
 
-func validateContainers(containers []api.Container, volumes util.StringSet) errs.ValidationErrorList {
+func validateContainers(containers []api.Container, volumes sets.String) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if len(containers) == 0 {
 		return append(allErrs, errs.NewFieldRequired(""))
 	}
 
-	allNames := util.StringSet{}
+	allNames := sets.String{}
 	for i, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
 		if len(ctr.Name) == 0 {
@@ -1130,8 +1131,8 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 	return allErrs
 }
 
-var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
-var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
+var supportedSessionAffinityType = sets.NewString(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
+var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
 	string(api.ServiceTypeLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
@@ -1150,7 +1151,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 			}
 		}
 	}
-	allPortNames := util.StringSet{}
+	allPortNames := sets.String{}
 	for i := range service.Spec.Ports {
 		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
 	}
@@ -1220,7 +1221,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *api.ServicePort, requireName bool, allNames *util.StringSet) errs.ValidationErrorList {
+func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.String) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if requireName && sp.Name == "" {
@@ -1441,7 +1442,7 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 		}
 		limitTypeSet[limit.Type] = true
 
-		keys := util.StringSet{}
+		keys := sets.String{}
 		min := map[string]resource.Quantity{}
 		max := map[string]resource.Quantity{}
 		defaults := map[string]resource.Quantity{}
@@ -1884,7 +1885,7 @@ func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErro
 	if len(obj.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
 	}
-	versions := util.StringSet{}
+	versions := sets.String{}
 	for ix := range obj.Versions {
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {

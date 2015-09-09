@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // GetPrinter takes a format type, an optional format argument. It will return true
@@ -435,7 +436,7 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 }
 
 // Pass ports=nil for all ports.
-func formatEndpoints(endpoints *api.Endpoints, ports util.StringSet) string {
+func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	if len(endpoints.Subsets) == 0 {
 		return "<none>"
 	}

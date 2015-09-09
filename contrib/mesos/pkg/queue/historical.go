@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type entry struct {
@@ -177,13 +177,13 @@ func (f *HistoricalFIFO) ListKeys() []string {
 	return list
 }
 
-// ContainedIDs returns a util.StringSet containing all IDs of the stored items.
+// ContainedIDs returns a stringset.StringSet containing all IDs of the stored items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (c *HistoricalFIFO) ContainedIDs() util.StringSet {
+func (c *HistoricalFIFO) ContainedIDs() sets.String {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	set := util.StringSet{}
+	set := sets.String{}
 	for id, entry := range c.items {
 		if entry.Is(DELETE_EVENT | POP_EVENT) {
 			continue

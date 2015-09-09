@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestFinalized(t *testing.T) {
@@ -90,7 +91,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
 	// TODO: Reuse the constants for all these strings from testclient
-	expectedActionSet := util.NewStringSet(
+	expectedActionSet := sets.NewString(
 		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
 		strings.Join([]string{"list", "services", ""}, "-"),
 		strings.Join([]string{"list", "pods", ""}, "-"),
@@ -112,7 +113,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 		)
 	}
 
-	actionSet := util.NewStringSet()
+	actionSet := sets.NewString()
 	for _, action := range mockClient.Actions() {
 		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
 	}

@@ -30,7 +30,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/expapi"
 	_ "k8s.io/kubernetes/pkg/expapi/v1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -80,7 +80,7 @@ func main() {
 	}
 
 	versionPath := path.Join(pkgBase, group, version)
-	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, util.NewStringSet("k8s.io/kubernetes"))
+	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
 	if len(*overwrites) > 0 {

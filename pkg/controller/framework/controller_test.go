@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/google/gofuzz"
 )
@@ -104,7 +104,7 @@ func Example() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := util.StringSet{}
+	outputSet := sets.String{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -161,7 +161,7 @@ func ExampleInformer() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := util.StringSet{}
+	outputSet := sets.String{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -235,7 +235,7 @@ func TestHammerController(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Let's add a few objects to the source.
-			currentNames := util.StringSet{}
+			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			r := rand.New(rs) // Mustn't use r and f concurrently!

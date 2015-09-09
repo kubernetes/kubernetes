@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Manages lifecycle of all images.
@@ -141,14 +142,14 @@ func (im *realImageManager) detectImages(detected time.Time) error {
 	}
 
 	// Make a set of images in use by containers.
-	imagesInUse := util.NewStringSet()
+	imagesInUse := sets.NewString()
 	for _, container := range containers {
 		imagesInUse.Insert(container.Image)
 	}
 
 	// Add new images and record those being used.
 	now := time.Now()
-	currentImages := util.NewStringSet()
+	currentImages := sets.NewString()
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 	for _, image := range images {
@@ -286,7 +287,7 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 	}
 }
 
-func isImageUsed(image *docker.APIImages, imagesInUse util.StringSet) bool {
+func isImageUsed(image *docker.APIImages, imagesInUse sets.String) bool {
 	// Check the image ID and all the RepoTags.
 	if _, ok := imagesInUse[image.ID]; ok {
 		return true

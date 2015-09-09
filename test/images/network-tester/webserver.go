@@ -45,7 +45,7 @@ import (
 	"time"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var (
@@ -235,7 +235,7 @@ func contactOthers(state *State) {
 			time.Sleep(time.Duration(1+rand.Intn(10)) * time.Second)
 		}
 
-		eps := util.StringSet{}
+		eps := sets.String{}
 		for _, ss := range endpoints.Subsets {
 			for _, a := range ss.Addresses {
 				for _, p := range ss.Ports {

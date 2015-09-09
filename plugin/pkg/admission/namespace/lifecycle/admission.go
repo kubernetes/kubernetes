@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -46,7 +46,7 @@ type lifecycle struct {
 	*admission.Handler
 	client             client.Interface
 	store              cache.Store
-	immortalNamespaces util.StringSet
+	immortalNamespaces sets.String
 }
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
@@ -120,6 +120,6 @@ func NewLifecycle(c client.Interface) admission.Interface {
 		Handler:            admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		client:             c,
 		store:              store,
-		immortalNamespaces: util.NewStringSet(api.NamespaceDefault),
+		immortalNamespaces: sets.NewString(api.NamespaceDefault),
 	}
 }

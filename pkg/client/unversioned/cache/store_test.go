@@ -19,7 +19,7 @@ package cache
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Test public interface
@@ -54,7 +54,7 @@ func doTestStore(t *testing.T, store Store) {
 	store.Add(mkObj("c", "d"))
 	store.Add(mkObj("e", "e"))
 	{
-		found := util.StringSet{}
+		found := sets.String{}
 		for _, item := range store.List() {
 			found.Insert(item.(testStoreObject).val)
 		}
@@ -73,7 +73,7 @@ func doTestStore(t *testing.T, store Store) {
 	}, "0")
 
 	{
-		found := util.StringSet{}
+		found := sets.String{}
 		for _, item := range store.List() {
 			found.Insert(item.(testStoreObject).val)
 		}
@@ -93,17 +93,17 @@ func doTestIndex(t *testing.T, indexer Indexer) {
 	}
 
 	// Test Index
-	expected := map[string]util.StringSet{}
-	expected["b"] = util.NewStringSet("a", "c")
-	expected["f"] = util.NewStringSet("e")
-	expected["h"] = util.NewStringSet("g")
+	expected := map[string]sets.String{}
+	expected["b"] = sets.NewString("a", "c")
+	expected["f"] = sets.NewString("e")
+	expected["h"] = sets.NewString("g")
 	indexer.Add(mkObj("a", "b"))
 	indexer.Add(mkObj("c", "b"))
 	indexer.Add(mkObj("e", "f"))
 	indexer.Add(mkObj("g", "h"))
 	{
 		for k, v := range expected {
-			found := util.StringSet{}
+			found := sets.String{}
 			indexResults, err := indexer.Index("by_val", mkObj("", k))
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)

@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeFlagSet struct {
 	t   *testing.T
-	set util.StringSet
+	set sets.String
 }
 
 func (f *fakeFlagSet) StringVar(p *string, name, value, usage string) {

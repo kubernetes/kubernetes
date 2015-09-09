@@ -30,6 +30,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func expectPrefix(t *testing.T, prefix string, errs fielderrors.ValidationErrorList) {
@@ -769,7 +770,7 @@ func TestValidateEnv(t *testing.T) {
 }
 
 func TestValidateVolumeMounts(t *testing.T) {
-	volumes := util.NewStringSet("abc", "123", "abc-123")
+	volumes := sets.NewString("abc", "123", "abc-123")
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
@@ -896,7 +897,7 @@ func getResourceLimits(cpu, memory string) api.ResourceList {
 }
 
 func TestValidateContainers(t *testing.T) {
-	volumes := util.StringSet{}
+	volumes := sets.String{}
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})

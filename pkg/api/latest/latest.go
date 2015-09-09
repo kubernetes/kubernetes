@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Version is the string that represents the current external default version.
@@ -79,7 +79,7 @@ func init() {
 
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := util.NewStringSet(
+	rootScoped := sets.NewString(
 		"Node",
 		"Minion",
 		"Namespace",
@@ -87,7 +87,7 @@ func init() {
 	)
 
 	// these kinds should be excluded from the list of resources
-	ignoredKinds := util.NewStringSet(
+	ignoredKinds := sets.NewString(
 		"ListOptions",
 		"DeleteOptions",
 		"Status",
