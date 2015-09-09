@@ -8,13 +8,10 @@ limit nofile 20000 20000
 kill timeout 30 # wait 30s between SIGTERM and SIGKILL.
 
 exec /usr/local/bin/apiserver \
-     --address=%(api_bind_address)s \
+     --basic-auth-file=/srv/kubernetes/basic-auth.csv \
+     --bind-address=%(api_public_address)s \
+     --cert-dir=/srv/kubernetes/ \
      --etcd-servers=%(etcd_servers)s \
+     --insecure-bind-address=%(api_private_address)s \
      --logtostderr=true \
      --service-cluster-ip-range=10.244.240.0/20
-
-
-
-
-
-
