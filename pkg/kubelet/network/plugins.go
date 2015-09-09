@@ -81,7 +81,6 @@ type Host interface {
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
 func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host) (NetworkPlugin, error) {
-	glog.Infof("(kubelet:InitNetworkPlugin) initializing plugin %v with host %+v", networkPluginName, host)
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &noopNetworkPlugin{}
@@ -128,12 +127,10 @@ type noopNetworkPlugin struct {
 }
 
 func (plugin *noopNetworkPlugin) Init(host Host) error {
-	glog.Infof("(kubelet:noopNetworkPlugin) init with host %+v", host)
 	return nil
 }
 
 func (plugin *noopNetworkPlugin) Name() string {
-	glog.Infof("(kubelet:noopNetworkPlugin:Name) Name %+v", DefaultPluginName)
 	return DefaultPluginName
 }
 

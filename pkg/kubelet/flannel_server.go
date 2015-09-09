@@ -6,14 +6,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
-
-	//"k8s.io/kubernetes/pkg/api"
-	//"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	//"k8s.io/kubernetes/pkg/controller/framework"
-	//"k8s.io/kubernetes/pkg/fields"
-	//"k8s.io/kubernetes/pkg/runtime"
-	//"k8s.io/kubernetes/pkg/watch"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
@@ -25,7 +20,13 @@ import (
 const (
 	flannelBackendDataAnnotation = "kubernetes.io/flannel.BackendData"
 	day                          = 24 * time.Hour
+	flannelPort                  = 8081
 	networkType                  = "vxlan"
+	dockerOptsFile               = "/etc/default/docker"
+	flannelSubnetKey             = "FLANNEL_SUBNET"
+	flannelMtuKey                = "FLANNEL_MTU"
+	dockerOptsKey                = "DOCKER_OPS"
+	flannelSubnetFile            = "/var/run/flannel/subnet.env"
 )
 
 type handler func(http.ResponseWriter, *http.Request)
@@ -145,14 +146,14 @@ func (f *FlannelServer) handleWatch(w http.ResponseWriter, r *http.Request) {
 	checkNetwork(r)
 
 	rv := getResourceVersion(r.URL)
-	glog.Infof("Retrieved resource version %v", rv)
+	glog.Infof("(flannel) Retrieved resource version %v", rv)
 
 	wr, err := f.WatchLeases(rv)
 	if err != nil {
 		badResponse(w, err)
 		return
 	}
-	glog.Infof("Received watch response %+v", wr)
+	glog.Infof("(flannel) Received watch response %+v", wr)
 	jsonResponse(w, http.StatusOK, wr)
 }
 
@@ -164,13 +165,16 @@ func (f *FlannelServer) handle(rw http.ResponseWriter, req *http.Request) {
 
 type FlannelServer struct {
 	*KubeFlannelClient
+	port       int
+	subnetFile string
 }
 
 func NewFlannelServer(client *client.Client) *FlannelServer {
-	return &FlannelServer{NewKubeFlannelClient(client)}
+	return &FlannelServer{NewKubeFlannelClient(client), flannelPort, flannelSubnetFile}
 }
 
-func (f *FlannelServer) Run(stopCh <-chan struct{}) {
+func (f *FlannelServer) RunServer(stopCh <-chan struct{}) {
+	glog.Infof("(flannel) Starting flannel server")
 	r := mux.NewRouter()
 	r.HandleFunc("/v1/{network}/config", bindHandler("config GET", f.handleGetNetworkConfig)).Methods("GET")
 	r.HandleFunc("/v1/{network}/leases", bindHandler("leases POST", f.handleAcquireLease)).Methods("POST")
@@ -180,5 +184,92 @@ func (f *FlannelServer) Run(stopCh <-chan struct{}) {
 
 	// TODO: Clean shutdown server on stop signal
 	glog.V(1).Infof("serving on :8081")
-	http.ListenAndServe(":8081", r)
+	http.ListenAndServe(fmt.Sprintf(":%v", f.port), r)
+}
+
+func (f *FlannelServer) Handshake() (podCIDR string, err error) {
+	// Flannel daemon will hang till the server comes up, kubelet will hang until
+	// flannel daemon has written subnet env variables. This is the kubelet handshake.
+	// To improve performance, we could defer just the configuration of the container
+	// bridge till after subnet.env is written. Keeping it local is clearer for now.
+	// TODO: Using a file to communicate is brittle
+	if _, err = os.Stat(f.subnetFile); err != nil {
+		return "", fmt.Errorf("Waiting for subnet file %v", f.subnetFile)
+	}
+	glog.Infof("(flannel) Found flannel subnet file %v", f.subnetFile)
+
+	// TODO: Rest of this function is a hack.
+	config, err := parseKVConfig(f.subnetFile)
+	if err != nil {
+		return "", err
+	}
+	if err = writeDockerOptsFromFlannelConfig(config); err != nil {
+		return "", err
+	}
+	podCIDR, ok := config[flannelSubnetKey]
+	if !ok {
+		return "", fmt.Errorf("No flannel subnet, config %+v", config)
+	}
+	return podCIDR, nil
+}
+
+// Take env variables from flannel subnet env and write to /etc/docker/defaults.
+func writeDockerOptsFromFlannelConfig(flannelConfig map[string]string) error {
+	// TODO: Write dockeropts to unit file on systemd machines
+	// https://github.com/docker/docker/issues/9889
+	mtu, ok := flannelConfig[flannelMtuKey]
+	if !ok {
+		return fmt.Errorf("No flannel mtu, flannel config %+v", flannelConfig)
+	}
+	dockerOpts, err := parseKVConfig(dockerOptsFile)
+	if err != nil {
+		return err
+	}
+	opts, ok := dockerOpts[dockerOptsKey]
+	if !ok {
+		glog.Errorf("(flannel) Did not find docker opts, writing them")
+		opts = fmt.Sprintf(
+			" --bridge=cbr0 --iptables=false --ip-masq=false")
+	}
+	dockerOpts[dockerOptsKey] = fmt.Sprintf("%v --mtu=%v", opts, mtu)
+	if err = writeKVConfig(dockerOptsFile, dockerOpts); err != nil {
+		return err
+	}
+	return nil
+}
+
+// parseKVConfig takes a file with key-value env variables and returns a dictionary mapping the same.
+func parseKVConfig(filename string) (map[string]string, error) {
+	config := map[string]string{}
+	if _, err := os.Stat(filename); err != nil {
+		return config, err
+	}
+	buff, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return config, err
+	}
+	str := string(buff)
+	glog.Infof("(flannel) Read kv options %+v from %v", str, filename)
+	for _, line := range strings.Split(str, "\n") {
+		kv := strings.Split(line, "=")
+		if len(kv) != 2 {
+			glog.Infof("(flannel) Ignoring non key-value pair %v", kv)
+			continue
+		}
+		config[string(kv[0])] = string(kv[1])
+	}
+	return config, nil
+}
+
+// writeKVConfig writes a kv map as env variables into the given file.
+func writeKVConfig(filename string, kv map[string]string) error {
+	if _, err := os.Stat(filename); err != nil {
+		return err
+	}
+	content := ""
+	for k, v := range kv {
+		content += fmt.Sprintf("%v=\"%v\"\n", k, v)
+	}
+	glog.Infof("(flannel) Writing kv options %+v to %v", content, filename)
+	return ioutil.WriteFile(filename, []byte(content), 0644)
 }

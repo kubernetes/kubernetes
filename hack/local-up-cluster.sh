@@ -311,6 +311,7 @@ function start_controller_manager {
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
+      #--pod-cidr="${POD_CIDR}" \
       sudo -E "${GO_OUT}/kubelet" ${priv_arg}\
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
@@ -319,7 +320,6 @@ function start_kubelet {
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
         --address="${HOST_ADDRESS}" \
-        --pod-cidr="${POD_CIDR}" \
         --configure-cbr0="${CONFIGURE_CBR0}" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
