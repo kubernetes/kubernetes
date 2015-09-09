@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -30,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"sync/atomic"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 	// of expectations, without it the controller could stay asleep forever. This should
 	// be set based on the expected latency of watch events.
 	//
-	// Currently an controller can service (create *and* observe the watch events for said
+	// Currently a controller can service (create *and* observe the watch events for said
 	// creation) about 10-20 pods a second, so it takes about 1 min to service
 	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
 	// latency/pod at the scale of 3000 pods over 100 nodes.

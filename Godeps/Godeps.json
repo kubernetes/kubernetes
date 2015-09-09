@@ -236,7 +236,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
+			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
 			"ImportPath": "github.com/godbus/dbus",
