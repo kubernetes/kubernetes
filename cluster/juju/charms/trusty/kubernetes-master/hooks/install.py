@@ -18,10 +18,11 @@ import setup
 setup.pre_install()
 import subprocess
 
-from charmhelpers.core import hookenv
 from charmhelpers import fetch
+from charmhelpers.core import hookenv
+from charmhelpers.contrib import ssl
 from charmhelpers.fetch import archiveurl
-from path import path
+from path import Path
 
 
 def install():
@@ -30,7 +31,6 @@ def install():
     download_go()
 
     hookenv.log('Adding kubernetes and go to the path')
-
     strings = [
         'export GOROOT=/usr/local/go\n',
         'export PATH=$PATH:$GOROOT/bin\n',
@@ -41,9 +41,15 @@ def install():
     hookenv.log('Downloading kubernetes code')
     clone_repository()
 
+    srv = Path('/srv/kubernetes')
+    if not srv.isdir():
+        srv.makedirs_p()
+
     hookenv.open_port(8080)
+    hookenv.open_port(443)
 
     hookenv.log('Install complete')
+
 
 def download_go():
     """
@@ -59,12 +65,12 @@ def download_go():
 
 def clone_repository():
     """
-    Clone the upstream repository into /opt/kubernetes for deployment compilation
-    of kubernetes. Subsequently used during upgrades.
+    Clone the upstream repository into /opt/kubernetes for deployment
+    compilation of kubernetes. Subsequently used during upgrades.
     """
 
     repository = 'https://github.com/kubernetes/kubernetes.git'
-    kubernetes_directory = path('/opt/kubernetes')
+    kubernetes_directory = Path('/opt/kubernetes')
     # Since we can not clone twice, check for the directory and remove it.
     if kubernetes_directory.isdir():
         kubernetes_directory.rmtree_p()
@@ -75,7 +81,6 @@ def clone_repository():
     print(output)
 
 
-
 def install_packages():
     """
     Install required packages to build the k8s source, and syndicate between
@@ -83,9 +88,13 @@ def install_packages():
     """
     hookenv.log('Installing Debian packages')
     # Create the list of packages to install.
-    apt_packages = ['build-essential', 'git', 'make', 'nginx', 'python-pip']
+    apt_packages = ['apache2-utils',
+                    'build-essential',
+                    'git',
+                    'make',
+                    'nginx',
+                    'python-pip', ]
     fetch.apt_install(fetch.filter_installed_packages(apt_packages))
-
 
 
 def update_rc_files(strings):
@@ -93,14 +102,13 @@ def update_rc_files(strings):
     Preseed the bash environment for ubuntu and root with K8's env vars to
     make interfacing with the api easier. (see: kubectrl docs)
     """
-    rc_files = [path('/home/ubuntu/.bashrc'), path('/root/.bashrc')]
+    rc_files = [Path('/home/ubuntu/.bashrc'), Path('/root/.bashrc')]
     for rc_file in rc_files:
         lines = rc_file.lines()
         for string in strings:
             if string not in lines:
                 lines.append(string)
         rc_file.write_lines(lines)
-
 
 
 if __name__ == "__main__":
