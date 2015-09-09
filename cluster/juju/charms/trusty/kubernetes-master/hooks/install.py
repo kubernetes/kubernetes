@@ -20,7 +20,6 @@ import subprocess
 
 from charmhelpers import fetch
 from charmhelpers.core import hookenv
-from charmhelpers.contrib import ssl
 from charmhelpers.fetch import archiveurl
 from path import Path
 
@@ -41,11 +40,13 @@ def install():
     hookenv.log('Downloading kubernetes code')
     clone_repository()
 
+    # Create the directory to store the keys and auth files.
     srv = Path('/srv/kubernetes')
     if not srv.isdir():
         srv.makedirs_p()
 
     hookenv.open_port(8080)
+    hookenv.open_port(6443)
     hookenv.open_port(443)
 
     hookenv.log('Install complete')
