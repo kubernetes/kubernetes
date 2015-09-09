@@ -57,9 +57,10 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	mux := http.NewServeMux()
 
 	mkHandler := func(url string, response serverResponse) *util.FakeHandler {
+		codec, _ := getCodec(response.obj.(runtime.Object))
 		handler := util.FakeHandler{
 			StatusCode:   response.statusCode,
-			ResponseBody: runtime.EncodeOrDie(testapi.Experimental.Codec(), response.obj.(runtime.Object)),
+			ResponseBody: runtime.EncodeOrDie(codec, response.obj.(runtime.Object)),
 		}
 		mux.Handle(url, &handler)
 		glog.Infof("Will handle %s", url)
@@ -136,7 +137,7 @@ func TestHeapsterResourceConsumptionGet(t *testing.T) {
 		})
 
 	defer testServer.Close()
-	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
+	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.GroupAndVersion()})
 
 	metricsClient := NewHeapsterMetricsClient(kubeClient)
 
@@ -151,4 +152,26 @@ func TestHeapsterResourceConsumptionGet(t *testing.T) {
 		t.Fatalf("Error while getting consumption: %v", err)
 	}
 	assert.Equal(t, int64(memory), val.Quantity.Value())
+}
+
+// get codec based on runtime.Object
+func getCodec(obj runtime.Object) (runtime.Codec, error) {
+	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected encoding error: %v", err)
+	}
+	// TODO: caesarxuchao: we should detect which group an object belongs to
+	// by using the version returned by Schem.ObjectVersionAndKind() once we
+	// split the schemes for internal objects.
+	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
+
+	var codec runtime.Codec
+	if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+		codec = testapi.Default.Codec()
+	} else if api.Scheme.Recognizes(testapi.Experimental.GroupAndVersion(), kind) {
+		codec = testapi.Experimental.Codec()
+	} else {
+		return nil, fmt.Errorf("unexpected kind: %v", kind)
+	}
+	return codec, nil
 }

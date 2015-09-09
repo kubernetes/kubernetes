@@ -116,7 +116,6 @@ type Config struct {
 	EnableProfiling       bool
 	EnableWatchCache      bool
 	APIPrefix             string
-	ExpAPIPrefix          string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -194,7 +193,6 @@ type Master struct {
 	enableProfiling       bool
 	enableWatchCache      bool
 	apiPrefix             string
-	expAPIPrefix          string
 	corsAllowedOriginList []string
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
@@ -353,7 +351,6 @@ func New(c *Config) *Master {
 		enableProfiling:       c.EnableProfiling,
 		enableWatchCache:      c.EnableWatchCache,
 		apiPrefix:             c.APIPrefix,
-		expAPIPrefix:          c.ExpAPIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
@@ -564,7 +561,7 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
+	apiserver.AddApiWebService(m.handlerContainer, m.apiPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
@@ -574,9 +571,26 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
+		apiserver.AddApiWebService(m.handlerContainer, m.apiPrefix+"/"+explatest.Group, explatest.Versions)
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.GroupVersion})
+
+		api := &expapi.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo.company.com",
+			},
+			Versions: []expapi.APIVersion{
+				{
+					APIGroup: "group",
+					Name:     "v3",
+				},
+			},
+		}
+
+		if err := m.InstallThirdPartyAPI(api); err != nil {
+			panic(fmt.Sprintf("unexpected error: %v", err))
+		}
+
 	}
 
 	// Register root handler.
@@ -767,8 +781,9 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 		storage[strings.ToLower(k)] = v
 	}
 	version := m.defaultAPIGroupVersion()
+	version.Root = m.apiPrefix
 	version.Storage = storage
-	version.Version = "v1"
+	version.GroupVersion = latest.GroupVersion
 	version.Codec = v1.Codec
 	return version
 }
@@ -785,14 +800,14 @@ func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
 	thirdPartyPrefix := "/thirdparty/" + group + "/"
 	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
 	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.GroupVersion})
 	return nil
 }
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := "/thirdparty/" + group + "/"
+	apiRoot := "/thirdparty/"
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
@@ -801,15 +816,16 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	return &apiserver.APIGroupVersion{
 		Root: apiRoot,
 
-		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
+		Creater:   thirdpartyresourcedata.NewObjectCreator(group+"/"+version, latest.GroupVersion, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
-		Storage: storage,
-		Version: version,
+		Mapper:        thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, group+"/"+version),
+		Codec:         explatest.Codec,
+		Linker:        explatest.SelfLinker,
+		Storage:       storage,
+		GroupVersion:  group + "/" + version,
+		ServerVersion: latest.GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -835,19 +851,19 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("daemons"):                      daemonStorage,
 		strings.ToLower("deployments"):                  deploymentStorage,
 	}
-
 	return &apiserver.APIGroupVersion{
-		Root: m.expAPIPrefix,
+		Root: m.apiPrefix,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  explatest.RESTMapper,
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
-		Storage: storage,
-		Version: explatest.Version,
+		Mapper:        explatest.RESTMapper,
+		Codec:         explatest.Codec,
+		Linker:        explatest.SelfLinker,
+		Storage:       storage,
+		GroupVersion:  explatest.GroupVersion,
+		ServerVersion: latest.GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

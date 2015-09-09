@@ -133,7 +133,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			switch group {
-			case "api":
+			case "":
 				return client.RESTClient, nil
 			case "experimental":
 				return client.ExperimentalClient.RESTClient, nil
@@ -283,6 +283,7 @@ func getSchemaAndValidate(c *client.RESTClient, data []byte, group, version stri
 		AbsPath("/swaggerapi", group, version).
 		Do().
 		Raw()
+
 	if err != nil {
 		return err
 	}
@@ -299,7 +300,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return err
 	}
 	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredGroupVersions)
 	}
 	// First try stable api, if we can't validate using that, try experimental.
 	// If experimental fails, return error from stable api.
@@ -307,7 +308,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	//       instead of trying everything.
 	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version)
 	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version)
+		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "api", version)
 		if errExp == nil {
 			return nil
 		}

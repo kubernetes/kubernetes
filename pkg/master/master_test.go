@@ -19,6 +19,7 @@ package master
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -223,8 +224,10 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		t.FailNow()
 		return
 	}
-
 	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
+	fmt.Println("resp: ", resp)
+	fmt.Println("err: ", err)
+	resp, err = http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -260,7 +263,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		},
 		TypeMeta: api.TypeMeta{
 			Kind:       "Foo",
-			APIVersion: version,
+			APIVersion: "company.com" + "/" + version,
 		},
 		SomeField:  "test field",
 		OtherField: 10,

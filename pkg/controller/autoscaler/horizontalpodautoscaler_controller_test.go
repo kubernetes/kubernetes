@@ -88,16 +88,16 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	}
 
 	if responses[hpaListHandler] != nil {
-		handlers[hpaListHandler] = mkHandler("/experimental/v1/horizontalpodautoscalers", *responses[hpaListHandler])
+		handlers[hpaListHandler] = mkHandler("/api/"+testapi.Experimental.GroupAndVersion()+"/horizontalpodautoscalers", *responses[hpaListHandler])
 	}
 
 	if responses[scaleHandler] != nil {
 		handlers[scaleHandler] = mkHandler(
-			fmt.Sprintf("/experimental/v1/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
+			fmt.Sprintf("/api/"+testapi.Experimental.GroupAndVersion()+"/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
 	}
 
 	if responses[updateHpaHandler] != nil {
-		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/experimental/v1/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
+		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/api/"+testapi.Experimental.GroupAndVersion()+"/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
 			*responses[updateHpaHandler])
 	}
 
@@ -176,8 +176,8 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		})
 
 	defer testServer.Close()
-	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
-	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
+	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.GroupAndVersion()})
+	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.GroupAndVersion()})
 
 	fakeRC := fakeResourceConsumptionClient{metrics: map[api.ResourceName]expapi.ResourceConsumption{
 		api.ResourceCPU: {Resource: api.ResourceCPU, Quantity: resource.MustParse("650m")},

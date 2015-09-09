@@ -19,7 +19,10 @@ package meta
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
+
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 )
 
 // Implements RESTScope interface
@@ -211,6 +214,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		}
 	}
 	if len(version) == 0 {
+		debug.PrintStack()
 		return nil, fmt.Errorf("no kind named %q is registered in versions %q", kind, versions)
 	}
 
@@ -235,7 +239,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", version, kind)
 	}
 
-	interfaces, err := m.interfacesFunc(version)
+	interfaces, err := m.interfacesFunc(apiutil.GetVersion(version))
 	if err != nil {
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", version)
 	}
