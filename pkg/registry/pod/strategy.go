@@ -220,7 +220,7 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 	return loc, nil, nil
 }
 
-// LogLocation returns a the log URL for a pod container. If opts.Container is blank
+// LogLocation returns the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
@@ -347,7 +347,7 @@ func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter,
 	return loc, nodeTransport, nil
 }
 
-// PortForwardLocation returns a the port-forward URL for a pod.
+// PortForwardLocation returns the port-forward URL for a pod.
 func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
