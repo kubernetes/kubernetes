@@ -68,8 +68,6 @@ type APIServer struct {
 	AdvertiseAddress           net.IP
 	SecurePort                 int
 	ExternalHost               string
-	APIRate                    float32
-	APIBurst                   int
 	TLSCertFile                string
 	TLSPrivateKeyFile          string
 	CertDirectory              string
@@ -123,8 +121,6 @@ func NewAPIServer() *APIServer {
 		InsecureBindAddress:    net.ParseIP("127.0.0.1"),
 		BindAddress:            net.ParseIP("0.0.0.0"),
 		SecurePort:             6443,
-		APIRate:                10.0,
-		APIBurst:               200,
 		APIPrefix:              "/api",
 		ExpAPIPrefix:           "/experimental",
 		EventTTL:               1 * time.Hour,
@@ -177,8 +173,6 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
-	fs.Float32Var(&s.APIRate, "api-rate", s.APIRate, "API rate limit as QPS for the read only port")
-	fs.IntVar(&s.APIBurst, "api-burst", s.APIBurst, "API burst amount for the read only port")
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, "+
