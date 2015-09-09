@@ -9,9 +9,7 @@ algorithm-provider
 all-namespaces
 allocate-node-cidrs
 allow-privileged
-api-burst
 api-prefix
-api-rate
 api-servers
 api-token
 api-version
