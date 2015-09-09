@@ -63,7 +63,8 @@ func TestGetAccessModes(t *testing.T) {
 
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, newMockRecycler}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	volumeHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler}}, volumeHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -80,26 +81,6 @@ func TestRecycler(t *testing.T) {
 	if err := recycler.Recycle(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
-}
-
-func newMockRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
-	return &mockRecycler{
-		path: spec.PersistentVolume.Spec.HostPath.Path,
-	}, nil
-}
-
-type mockRecycler struct {
-	path string
-	host volume.VolumeHost
-}
-
-func (r *mockRecycler) GetPath() string {
-	return r.path
-}
-
-func (r *mockRecycler) Recycle() error {
-	// return nil means recycle passed
-	return nil
 }
 
 func TestPlugin(t *testing.T) {
