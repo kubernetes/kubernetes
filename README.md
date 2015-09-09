@@ -114,7 +114,7 @@ You can also view recordings of past events and presentations on our [Media page
 For Q&A, our threads are at:
 
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
- * [BotBot.me (IRC)](https://botbot.me/freenode/google-containers/)
+ * [Slack](/docs/troubleshooting.md#slack)
 
 #### Want to do more than just 'discuss' Kubernetes?
 

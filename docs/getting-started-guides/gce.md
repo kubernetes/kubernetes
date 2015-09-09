@@ -100,7 +100,7 @@ cluster/kube-up.sh
 If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
-[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on [Slack](../troubleshooting.md#slack).
 
 The next few steps will show you:
 
