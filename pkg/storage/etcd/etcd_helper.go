@@ -243,7 +243,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GetToList(key string, listObj runtime.Object) error {
+func (h *etcdHelper) GetToList(key string, filter storage.FilterFunc, listObj runtime.Object) error {
 	trace := util.NewTrace("GetToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
@@ -265,7 +265,7 @@ func (h *etcdHelper) GetToList(key string, listObj runtime.Object) error {
 	nodes := make([]*etcd.Node, 0)
 	nodes = append(nodes, response.Node)
 
-	if err := h.decodeNodeList(nodes, listPtr); err != nil {
+	if err := h.decodeNodeList(nodes, filter, listPtr); err != nil {
 		return err
 	}
 	trace.Step("Object decoded")
@@ -278,7 +278,7 @@ func (h *etcdHelper) GetToList(key string, listObj runtime.Object) error {
 }
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
-func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
+func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFunc, slicePtr interface{}) error {
 	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
 	defer trace.LogIfLong(500 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
@@ -289,14 +289,16 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 	for _, node := range nodes {
 		if node.Dir {
 			trace.Step("Decoding dir " + node.Key + " START")
-			if err := h.decodeNodeList(node.Nodes, slicePtr); err != nil {
+			if err := h.decodeNodeList(node.Nodes, filter, slicePtr); err != nil {
 				return err
 			}
 			trace.Step("Decoding dir " + node.Key + " END")
 			continue
 		}
 		if obj, found := h.getFromCache(node.ModifiedIndex); found {
-			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+			if filter(obj) {
+				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+			}
 		} else {
 			obj := reflect.New(v.Type().Elem())
 			if err := h.codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
@@ -306,7 +308,9 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 				// being unable to set the version does not prevent the object from being extracted
 				_ = h.versioner.UpdateObject(obj.Interface().(runtime.Object), node.Expiration, node.ModifiedIndex)
 			}
-			v.Set(reflect.Append(v, obj.Elem()))
+			if filter(obj.Interface().(runtime.Object)) {
+				v.Set(reflect.Append(v, obj.Elem()))
+			}
 			if node.ModifiedIndex != 0 {
 				h.addToCache(node.ModifiedIndex, obj.Interface().(runtime.Object))
 			}
@@ -317,7 +321,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) List(key string, listObj runtime.Object) error {
+func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime.Object) error {
 	trace := util.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
@@ -333,7 +337,7 @@ func (h *etcdHelper) List(key string, listObj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	if err := h.decodeNodeList(nodes, listPtr); err != nil {
+	if err := h.decodeNodeList(nodes, filter, listPtr); err != nil {
 		return err
 	}
 	trace.Step("Node list decoded")
