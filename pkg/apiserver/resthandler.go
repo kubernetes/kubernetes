@@ -275,6 +275,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		fmt.Println("CAHO: 0")
 		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
@@ -293,7 +294,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
-
+		fmt.Println("CAHO: 0.2")
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
@@ -302,14 +303,14 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
-
+		fmt.Println("CAHO: 0.3")
 		obj := r.New()
 		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.APIVersion, scope.Codec, w)
 			return
 		}
-
+		fmt.Println("CAHO: 0.4")
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
 

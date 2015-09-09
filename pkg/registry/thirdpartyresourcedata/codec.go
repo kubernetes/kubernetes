@@ -49,7 +49,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, versions ...stri
 	if kind != "ThirdPartyResourceData" {
 		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
 	}
-	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.Version)
+	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -192,6 +192,7 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 	if err := json.Unmarshal(data, &dataObj); err != nil {
 		return err
 	}
+
 	mapObj, ok := dataObj.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("unexpcted object: %#v", dataObj)
@@ -218,7 +219,6 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 			return fmt.Errorf("version doesn't match, expecting: %s, got %s", version, versionStr)
 		}
 	}
-
 	if err := t.populate(thirdParty, data); err != nil {
 		return err
 	}
@@ -250,17 +250,18 @@ func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, e
 	}
 }
 
-func NewObjectCreator(version string, delegate runtime.ObjectCreater) runtime.ObjectCreater {
-	return &thirdPartyResourceDataCreator{version, delegate}
+func NewObjectCreator(version, serverVersion string, delegate runtime.ObjectCreater) runtime.ObjectCreater {
+	return &thirdPartyResourceDataCreator{version, serverVersion, delegate}
 }
 
 type thirdPartyResourceDataCreator struct {
-	version  string
-	delegate runtime.ObjectCreater
+	version       string
+	serverVersion string
+	delegate      runtime.ObjectCreater
 }
 
 func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.Object, err error) {
-	if t.version != version {
+	if t.version != version && t.serverVersion != version {
 		return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
 	}
 	switch kind {
@@ -269,6 +270,6 @@ func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.O
 	case "ThirdPartyResourceDataList":
 		return &expapi.ThirdPartyResourceDataList{}, nil
 	default:
-		return t.delegate.New(latest.Version, kind)
+		return t.delegate.New(version, kind)
 	}
 }

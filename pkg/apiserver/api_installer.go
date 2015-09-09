@@ -76,6 +76,7 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 		paths[i] = path
 		i++
 	}
+
 	sort.Strings(paths)
 	for _, path := range paths {
 		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler); err != nil {

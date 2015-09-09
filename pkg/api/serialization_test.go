@@ -18,6 +18,7 @@ package api_test
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"math/rand"
 	"reflect"
@@ -90,10 +91,14 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := util.NewStringSet(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
+	codec, err := getCodec(item)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	version := testapi.Default.Version()
 	if !set.Has(version) {
 		fuzzInternalObject(t, version, item, seed)
-		roundTrip(t, testapi.Default.Codec(), item)
+		roundTrip(t, codec, item)
 	}
 }
 
@@ -246,4 +251,26 @@ func BenchmarkDecodeJSON(b *testing.B) {
 		obj := api.Pod{}
 		json.Unmarshal(data, &obj)
 	}
+}
+
+// get codec based on runtime.Object
+func getCodec(obj runtime.Object) (runtime.Codec, error) {
+	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected encoding error: %v", err)
+	}
+	// TODO: caesarxuchao: we should detect which group an object belongs to
+	// by using the version returned by Schem.ObjectVersionAndKind() once we
+	// split the schemes for internal objects.
+	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
+
+	var codec runtime.Codec
+	if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+		codec = testapi.Default.Codec()
+	} else if api.Scheme.Recognizes(testapi.Experimental.GroupAndVersion(), kind) {
+		codec = testapi.Experimental.Codec()
+	} else {
+		return nil, fmt.Errorf("unexpected kind: %v", kind)
+	}
+	return codec, nil
 }

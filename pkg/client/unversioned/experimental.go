@@ -124,9 +124,12 @@ func setExperimentalDefaults(config *Config) error {
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if config.Version == "" {
-		config.Version = explatest.GroupVersion
-	}
+	// TODO: because we share the config file of v1 client, config.Version is set
+	// to "v1". Here we force the experimental client to use its latest version.
+	// A proper fix is fixing the config.
+	//	if config.Version == "" {
+	config.Version = explatest.GroupVersion
+	//	}
 	versionInterfaces, err := explatest.InterfacesFor(apiutil.GetVersion(config.Version))
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",

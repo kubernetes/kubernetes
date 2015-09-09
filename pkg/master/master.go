@@ -574,6 +574,23 @@ func (m *Master) init(c *Config) {
 		apiserver.AddApiWebService(m.handlerContainer, m.apiPrefix+"/"+explatest.Group, explatest.Versions)
 		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.GroupVersion})
+
+		api := &expapi.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo.company.com",
+			},
+			Versions: []expapi.APIVersion{
+				{
+					APIGroup: "group",
+					Name:     "v3",
+				},
+			},
+		}
+
+		if err := m.InstallThirdPartyAPI(api); err != nil {
+			panic(fmt.Sprintf("unexpected error: %v", err))
+		}
+
 	}
 
 	// Register root handler.
@@ -783,14 +800,14 @@ func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
 	thirdPartyPrefix := "/thirdparty/" + group + "/"
 	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
 	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.GroupVersion})
 	return nil
 }
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := "/thirdparty/" + group + "/"
+	apiRoot := "/thirdparty/"
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
@@ -799,15 +816,16 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	return &apiserver.APIGroupVersion{
 		Root: apiRoot,
 
-		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
+		Creater:   thirdpartyresourcedata.NewObjectCreator(group+"/"+version, latest.GroupVersion, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
-		Storage: storage,
-		Version: version,
+		Mapper:        thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, group+"/"+version),
+		Codec:         explatest.Codec,
+		Linker:        explatest.SelfLinker,
+		Storage:       storage,
+		GroupVersion:  group + "/" + version,
+		ServerVersion: latest.GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

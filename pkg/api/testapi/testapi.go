@@ -64,7 +64,7 @@ func init() {
 		Groups[""] = TestGroup{"", latest.Version, latest.Version}
 	}
 	if _, ok := Groups["experimental"]; !ok {
-		Groups["experimental"] = TestGroup{"experimental", explatest.Version, explatest.Version}
+		Groups["experimental"] = TestGroup{"experimental", explatest.Version, explatest.GroupVersion}
 	}
 
 	Default = Groups[""]
@@ -176,7 +176,7 @@ func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name stri
 	} else {
 		// TODO: switch back once we have proper multiple group support
 		// path = "/apis/" + g.Group + "/" + Version(group...)
-		path = "/" + g.Group + "/" + g.Version()
+		path = "/api/" + g.Group + "/" + g.Version()
 	}
 
 	if prefix != "" {

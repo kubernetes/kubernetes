@@ -18,6 +18,7 @@ package tools
 
 import (
 	"errors"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"time"
@@ -139,6 +140,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		if _, ok := f.expectNotFoundGetSet[key]; !ok {
+			debug.PrintStack()
 			f.t.Logf("data for %s was not defined prior to invoking Get", key)
 		}
 		return &etcd.Response{}, f.NewError(EtcdErrorCodeNotFound)
