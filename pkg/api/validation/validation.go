@@ -1451,25 +1451,25 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].max[%s]", i, k))...)
 			keys.Insert(string(k))
 			q := limit.Max[k]
-			max[string(k)] = q.Value()
+			max[string(k)] = q.MilliValue()
 		}
 		for k := range limit.Min {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].min[%s]", i, k))...)
 			keys.Insert(string(k))
 			q := limit.Min[k]
-			min[string(k)] = q.Value()
+			min[string(k)] = q.MilliValue()
 		}
 		for k := range limit.Default {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].default[%s]", i, k))...)
 			keys.Insert(string(k))
 			q := limit.Default[k]
-			defaults[string(k)] = q.Value()
+			defaults[string(k)] = q.MilliValue()
 		}
 		for k := range limit.DefaultRequest {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k))...)
 			keys.Insert(string(k))
 			q := limit.DefaultRequest[k]
-			defaultRequests[string(k)] = q.Value()
+			defaultRequests[string(k)] = q.MilliValue()
 		}
 		for k := range limit.MaxLimitRequestRatio {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].maxLimitRequestRatio[%s]", i, k))...)
