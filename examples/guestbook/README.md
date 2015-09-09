@@ -413,7 +413,7 @@ spec:
     spec:
       containers:
       - name: php-redis
-        image: gcr.io/google_samples/gb-frontend:v2
+        image: gcr.io/google_samples/gb-frontend:v3
         env:
         - name: GET_HOSTS_FROM
           value: dns
@@ -441,7 +441,7 @@ Then, list all your replication controllers:
 ```console
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
-frontend                               php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
+frontend                               php-redis               kubernetes/example-guestbook-php-redis:v3  name=frontend                3
 redis-master                           master                  redis                                      name=redis-master            1
 redis-slave                            slave                   kubernetes/redis-slave:v2                  name=redis-slave             2
 ```
