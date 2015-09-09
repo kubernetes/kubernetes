@@ -345,7 +345,168 @@ func TestValidatePersistentVolumes(t *testing.T) {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
+}
 
+func testPersistentVolumeSet(name, namespace string, spec api.PersistentVolumeSetSpec) *api.PersistentVolumeSet {
+	controller := &api.PersistentVolumeSet{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: spec,
+	}
+	return controller
+}
+
+func TestValidatePersistentVolumeSets(t *testing.T) {
+
+	validControllerSpec := api.PersistentVolumeSetSpec{
+		MinimumReplicas: 5,
+		MaximumReplicas: 10,
+		Selector: map[string]string{
+			"foo": "bar",
+		},
+		Template: &api.PersistentVolumeTemplateSpec{
+			ObjectMeta: api.ObjectMeta{
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+				},
+			},
+		},
+	}
+
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		pvctrl            *api.PersistentVolumeSet
+	}{
+		"good-pv-controller": {
+			isExpectedFailure: false,
+			pvctrl:            testPersistentVolumeSet("foo", "", validControllerSpec),
+		},
+		"invalid-name": {
+			isExpectedFailure: true,
+			pvctrl: &api.PersistentVolumeSet{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo=(*&",
+				},
+				Spec: validControllerSpec,
+			},
+		},
+		"unexpected-namespace": {
+			isExpectedFailure: true,
+			pvctrl: &api.PersistentVolumeSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: validControllerSpec,
+			},
+		},
+		"negative-numbers": {
+			isExpectedFailure: true,
+			pvctrl: testPersistentVolumeSet("foo", "", api.PersistentVolumeSetSpec{
+				MinimumReplicas: -1,
+				MaximumReplicas: -2,
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+				Template: &api.PersistentVolumeTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+					Spec: api.PersistentVolumeSpec{
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						PersistentVolumeSource: api.PersistentVolumeSource{
+							HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+						},
+					},
+				},
+			}),
+		},
+		"missing-labels": {
+			isExpectedFailure: true,
+			pvctrl: testPersistentVolumeSet("foo", "", api.PersistentVolumeSetSpec{
+				MinimumReplicas: 5,
+				MaximumReplicas: 10,
+				Template: &api.PersistentVolumeTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{
+							"foo": "biz",
+						},
+					},
+					Spec: api.PersistentVolumeSpec{
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						PersistentVolumeSource: api.PersistentVolumeSource{
+							HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+						},
+					},
+				},
+			}),
+		},
+		"mismatched-labels": {
+			isExpectedFailure: true,
+			pvctrl: testPersistentVolumeSet("foo", "", api.PersistentVolumeSetSpec{
+				MinimumReplicas: 5,
+				MaximumReplicas: 10,
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+				Template: &api.PersistentVolumeTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{
+							"foo": "biz",
+						},
+					},
+					Spec: api.PersistentVolumeSpec{
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						PersistentVolumeSource: api.PersistentVolumeSource{
+							HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+						},
+					},
+				},
+			}),
+		},
+		"missing-template": {
+			isExpectedFailure: true,
+			pvctrl: testPersistentVolumeSet("foo", "", api.PersistentVolumeSetSpec{
+				MinimumReplicas: 5,
+				MaximumReplicas: 10,
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+			}),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeSet(scenario.pvctrl)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {

@@ -187,6 +187,10 @@ func (c *Fake) PersistentVolumes() client.PersistentVolumeInterface {
 	return &FakePersistentVolumes{Fake: c}
 }
 
+func (c *Fake) PersistentVolumeSets() client.PersistentVolumeSetInterface {
+	return &FakePersistentVolumeSets{Fake: c}
+}
+
 func (c *Fake) PersistentVolumeClaims(namespace string) client.PersistentVolumeClaimInterface {
 	return &FakePersistentVolumeClaims{Fake: c, Namespace: namespace}
 }

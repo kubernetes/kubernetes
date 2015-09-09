@@ -1172,6 +1172,70 @@ func deepCopy_v1_PersistentVolumeList(in PersistentVolumeList, out *PersistentVo
 	return nil
 }
 
+func deepCopy_v1_PersistentVolumeSet(in PersistentVolumeSet, out *PersistentVolumeSet, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_PersistentVolumeSetSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_PersistentVolumeSetStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_PersistentVolumeSetList(in PersistentVolumeSetList, out *PersistentVolumeSetList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]PersistentVolumeSet, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_PersistentVolumeSet(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_PersistentVolumeSetSpec(in PersistentVolumeSetSpec, out *PersistentVolumeSetSpec, c *conversion.Cloner) error {
+	out.MinimumReplicas = in.MinimumReplicas
+	out.MaximumReplicas = in.MaximumReplicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(PersistentVolumeTemplateSpec)
+		if err := deepCopy_v1_PersistentVolumeTemplateSpec(*in.Template, out.Template, c); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_PersistentVolumeSetStatus(in PersistentVolumeSetStatus, out *PersistentVolumeSetStatus, c *conversion.Cloner) error {
+	out.BoundReplicas = in.BoundReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	return nil
+}
+
 func deepCopy_v1_PersistentVolumeSource(in PersistentVolumeSource, out *PersistentVolumeSource, c *conversion.Cloner) error {
 	if in.GCEPersistentDisk != nil {
 		out.GCEPersistentDisk = new(GCEPersistentDiskVolumeSource)
@@ -1288,6 +1352,16 @@ func deepCopy_v1_PersistentVolumeStatus(in PersistentVolumeStatus, out *Persiste
 	out.Phase = in.Phase
 	out.Message = in.Message
 	out.Reason = in.Reason
+	return nil
+}
+
+func deepCopy_v1_PersistentVolumeTemplateSpec(in PersistentVolumeTemplateSpec, out *PersistentVolumeTemplateSpec, c *conversion.Cloner) error {
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_PersistentVolumeSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -2293,9 +2367,14 @@ func init() {
 		deepCopy_v1_PersistentVolumeClaimStatus,
 		deepCopy_v1_PersistentVolumeClaimVolumeSource,
 		deepCopy_v1_PersistentVolumeList,
+		deepCopy_v1_PersistentVolumeSet,
+		deepCopy_v1_PersistentVolumeSetList,
+		deepCopy_v1_PersistentVolumeSetSpec,
+		deepCopy_v1_PersistentVolumeSetStatus,
 		deepCopy_v1_PersistentVolumeSource,
 		deepCopy_v1_PersistentVolumeSpec,
 		deepCopy_v1_PersistentVolumeStatus,
+		deepCopy_v1_PersistentVolumeTemplateSpec,
 		deepCopy_v1_Pod,
 		deepCopy_v1_PodAttachOptions,
 		deepCopy_v1_PodCondition,

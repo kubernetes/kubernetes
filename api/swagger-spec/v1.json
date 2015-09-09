@@ -4610,6 +4610,483 @@
     ]
    },
    {
+    "path": "/api/v1/persistentvolumesets",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.PersistentVolumeSetList",
+      "method": "GET",
+      "summary": "list or watch objects of kind PersistentVolumeSet",
+      "nickname": "listNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeSetList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.PersistentVolumeSet",
+      "method": "POST",
+      "summary": "create a PersistentVolumeSet",
+      "nickname": "createNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.PersistentVolumeSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeSet"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/persistentvolumesets",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of PersistentVolumeSet",
+      "nickname": "watchNamespacedPersistentVolumeSetList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/persistentvolumesets/{name}",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.PersistentVolumeSet",
+      "method": "GET",
+      "summary": "read the specified PersistentVolumeSet",
+      "nickname": "readNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeSet"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.PersistentVolumeSet",
+      "method": "PUT",
+      "summary": "replace the specified PersistentVolumeSet",
+      "nickname": "replaceNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.PersistentVolumeSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeSet"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.PersistentVolumeSet",
+      "method": "PATCH",
+      "summary": "partially update the specified PersistentVolumeSet",
+      "nickname": "patchNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeSet"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete a PersistentVolumeSet",
+      "nickname": "deleteNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/persistentvolumesets/{name}",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind PersistentVolumeSet",
+      "nickname": "watchNamespacedPersistentVolumeSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/persistentvolumesets/{name}/status",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.PersistentVolumeSet",
+      "method": "PUT",
+      "summary": "replace status of the specified PersistentVolumeSet",
+      "nickname": "replaceNamespacedPersistentVolumeSetStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.PersistentVolumeSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeSet"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/pods",
     "description": "API at /api/v1 version v1",
     "operations": [
@@ -12376,6 +12853,120 @@
      "reason": {
       "type": "string",
       "description": "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI."
+     }
+    }
+   },
+   "v1.PersistentVolumeSetList": {
+    "id": "v1.PersistentVolumeSetList",
+    "description": "PersistentVolumeSetList is a list of PersistentVolumeSet items.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeSet"
+      },
+      "description": "Items is a list of persistent volume claims. More info: see http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md"
+     }
+    }
+   },
+   "v1.PersistentVolumeSet": {
+    "id": "v1.PersistentVolumeSet",
+    "description": "PersistentVolumeSet maintains a pool of one type of PersistentVolume",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "A string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the version of the schema of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1.PersistentVolumeSetSpec",
+      "description": "Spec defines a specification of a persistent volume set owned by the cluster. Provisioned by an administrator. More info: http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md"
+     },
+     "status": {
+      "$ref": "v1.PersistentVolumeSetStatus",
+      "description": "Status is the current status of this PV controller. ReadOnly. More info: http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md"
+     }
+    }
+   },
+   "v1.PersistentVolumeSetSpec": {
+    "id": "v1.PersistentVolumeSetSpec",
+    "description": "PersistentVolumeSetSpec is the specification of a PersistentVolumeSet.",
+    "required": [
+     "minimumReplicas",
+     "maximumReplicas",
+     "selector"
+    ],
+    "properties": {
+     "minimumReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "MinimumReplicas is the minimum number of unbound (available) persistent volumes of this type to keep in the set"
+     },
+     "maximumReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "MaximumReplicas is the maximum total number of persistent volumes desired in the set"
+     },
+     "selector": {
+      "type": "any",
+      "description": "Selector is a label query over persistent volumes which are part of the set"
+     },
+     "template": {
+      "$ref": "v1.PersistentVolumeTemplateSpec",
+      "description": "Template is the description of a PersistentVolume to create new replicas from"
+     }
+    }
+   },
+   "v1.PersistentVolumeTemplateSpec": {
+    "id": "v1.PersistentVolumeTemplateSpec",
+    "description": "PersistentVolumeTemplateSpec describes the persistent volume created by this controller",
+    "properties": {
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Metadata of the pods created from this template. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1.PersistentVolumeSpec",
+      "description": "Spec is the specification of the persistent volume from which replicas are made More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status\""
+     }
+    }
+   },
+   "v1.PersistentVolumeSetStatus": {
+    "id": "v1.PersistentVolumeSetStatus",
+    "description": "PersistentVolumeSetStatus represents the current status of a PersistentVolumeSet",
+    "required": [
+     "boundReplicas",
+     "availableReplicas"
+    ],
+    "properties": {
+     "boundReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "BoundReplicas is the number of volumes in the set that are currently bound to persistent volume claims"
+     },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "AvailableReplicas is the number of volumes in the set that are current unbound and available for new claims"
      }
     }
    },

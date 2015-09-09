@@ -44,6 +44,7 @@ type Interface interface {
 	SecretsNamespacer
 	NamespacesInterface
 	PersistentVolumesInterface
+	PersistentVolumeSetsInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
 	Experimental() ExperimentalInterface
@@ -98,6 +99,10 @@ func (c *Client) Namespaces() NamespaceInterface {
 
 func (c *Client) PersistentVolumes() PersistentVolumeInterface {
 	return newPersistentVolumes(c)
+}
+
+func (c *Client) PersistentVolumeSets() PersistentVolumeSetInterface {
+	return newPersistentVolumeSets(c)
 }
 
 func (c *Client) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {

@@ -55,6 +55,8 @@ func init() {
 		&SecretList{},
 		&PersistentVolume{},
 		&PersistentVolumeList{},
+		&PersistentVolumeSet{},
+		&PersistentVolumeSetList{},
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
@@ -108,6 +110,8 @@ func (*PersistentVolume) IsAnAPIObject()          {}
 func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
+func (*PersistentVolumeSet) IsAnAPIObject()       {}
+func (*PersistentVolumeSetList) IsAnAPIObject()   {}
 func (*DeleteOptions) IsAnAPIObject()             {}
 func (*ListOptions) IsAnAPIObject()               {}
 func (*PodAttachOptions) IsAnAPIObject()          {}

@@ -234,3 +234,28 @@ func containsAccessMode(modes []PersistentVolumeAccessMode, mode PersistentVolum
 	}
 	return false
 }
+
+func PersistentVolumeAsString(pv PersistentVolumeSpec) string {
+	var vol string
+	switch {
+	case pv.AWSElasticBlockStore != nil:
+		vol = "AWSElasticBlockStore"
+	case pv.GCEPersistentDisk != nil:
+		vol = "GCEPersistentDisk"
+	case pv.Glusterfs != nil:
+		vol = "Glusterfs"
+	case pv.NFS != nil:
+		vol = "NFS"
+	case pv.RBD != nil:
+		vol = "CephRBD"
+	case pv.ISCSI != nil:
+		vol = "ISCSI"
+	case pv.HostPath != nil:
+		vol = "HostPath"
+	default:
+		vol = ""
+	}
+
+	size := pv.Capacity[ResourceStorage]
+	return fmt.Sprintf("%s, %s", vol, size.String())
+}

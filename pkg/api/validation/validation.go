@@ -562,68 +562,73 @@ func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
 func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&pv.Spec).Prefix("spec")...)
+	return allErrs
+}
 
-	if len(pv.Spec.AccessModes) == 0 {
+func ValidatePersistentVolumeSpec(spec *api.PersistentVolumeSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(spec.AccessModes) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.AccessModes"))
 	}
 
-	for _, mode := range pv.Spec.AccessModes {
+	for _, mode := range spec.AccessModes {
 		if mode != api.ReadWriteOnce && mode != api.ReadOnlyMany && mode != api.ReadWriteMany {
 			allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolume.Spec.AccessModes", mode, fmt.Sprintf("only %s, %s, and %s are valid", api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany)))
 		}
 	}
 
-	if len(pv.Spec.Capacity) == 0 {
+	if len(spec.Capacity) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
 	}
 
-	if _, ok := pv.Spec.Capacity[api.ResourceStorage]; !ok || len(pv.Spec.Capacity) > 1 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.Capacity, fmt.Sprintf("only %s is expected", api.ResourceStorage)))
+	if _, ok := spec.Capacity[api.ResourceStorage]; !ok || len(spec.Capacity) > 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("", spec.Capacity, fmt.Sprintf("only %s is expected", api.ResourceStorage)))
 	}
 
-	for _, qty := range pv.Spec.Capacity {
+	for _, qty := range spec.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty)...)
 	}
 
 	numVolumes := 0
-	if pv.Spec.HostPath != nil {
+	if spec.HostPath != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateHostPathVolumeSource(pv.Spec.HostPath).Prefix("hostPath")...)
+		allErrs = append(allErrs, validateHostPathVolumeSource(spec.HostPath).Prefix("hostPath")...)
 	}
-	if pv.Spec.GCEPersistentDisk != nil {
+	if spec.GCEPersistentDisk != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk).Prefix("persistentDisk")...)
+		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(spec.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
-	if pv.Spec.AWSElasticBlockStore != nil {
+	if spec.AWSElasticBlockStore != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
+		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(spec.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
 	}
-	if pv.Spec.Glusterfs != nil {
+	if spec.Glusterfs != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateGlusterfs(pv.Spec.Glusterfs).Prefix("glusterfs")...)
+		allErrs = append(allErrs, validateGlusterfs(spec.Glusterfs).Prefix("glusterfs")...)
 	}
-	if pv.Spec.NFS != nil {
+	if spec.NFS != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateNFS(pv.Spec.NFS).Prefix("nfs")...)
+		allErrs = append(allErrs, validateNFS(spec.NFS).Prefix("nfs")...)
 	}
-	if pv.Spec.RBD != nil {
+	if spec.RBD != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateRBD(pv.Spec.RBD).Prefix("rbd")...)
+		allErrs = append(allErrs, validateRBD(spec.RBD).Prefix("rbd")...)
 	}
-	if pv.Spec.CephFS != nil {
+	if spec.CephFS != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateCephFS(pv.Spec.CephFS).Prefix("cephfs")...)
+		allErrs = append(allErrs, validateCephFS(spec.CephFS).Prefix("cephfs")...)
 	}
-	if pv.Spec.ISCSI != nil {
+	if spec.ISCSI != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateISCSIVolumeSource(pv.Spec.ISCSI).Prefix("iscsi")...)
+		allErrs = append(allErrs, validateISCSIVolumeSource(spec.ISCSI).Prefix("iscsi")...)
 	}
-	if pv.Spec.Cinder != nil {
+	if spec.Cinder != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateCinderVolumeSource(pv.Spec.Cinder).Prefix("cinder")...)
+		allErrs = append(allErrs, validateCinderVolumeSource(spec.Cinder).Prefix("cinder")...)
 	}
 	if numVolumes != 1 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("", spec.PersistentVolumeSource, "exactly 1 volume type is required"))
 	}
 	return allErrs
 }
@@ -646,6 +651,63 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *api.PersistentVolume) er
 		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
 	}
 	newPv.Spec = oldPv.Spec
+	return allErrs
+}
+
+func ValidatePersistentVolumeSet(controller *api.PersistentVolumeSet) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, false, ValidatePersistentVolumeName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidatePersistentVolumeSetSpec(&controller.Spec).Prefix("spec")...)
+	return allErrs
+
+}
+
+func ValidatePersistentVolumeSetSpec(spec *api.PersistentVolumeSetSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	selector := labels.Set(spec.Selector).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
+	}
+	if spec.MinimumReplicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minimumReplicas", spec.MinimumReplicas, isNegativeErrorMsg))
+	}
+	if spec.MaximumReplicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maximumReplicas", spec.MaximumReplicas, isNegativeErrorMsg))
+	}
+	if spec.Template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("template"))
+	} else {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
+		}
+		allErrs = append(allErrs, ValidatePersistentVolumeTemplateSpec(spec.Template).Prefix("template")...)
+	}
+	return allErrs
+}
+
+func ValidatePersistentVolumeTemplateSpec(template *api.PersistentVolumeTemplateSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateLabels(template.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateAnnotations(template.Annotations, "annotations")...)
+	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&template.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidatePersistentVolumeSetUpdate(newPvctrl, oldPvctrl *api.PersistentVolumeSet) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = ValidatePersistentVolumeSet(newPvctrl)
+	newPvctrl.Status = oldPvctrl.Status
+	return allErrs
+}
+
+func ValidatePersistentVolumeSetStatusUpdate(newPvctrl, oldPvctrl *api.PersistentVolumeSet) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newPvctrl.ObjectMeta, &oldPvctrl.ObjectMeta).Prefix("metadata")...)
+	if newPvctrl.ResourceVersion == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
+	}
+	newPvctrl.Spec = oldPvctrl.Spec
 	return allErrs
 }
 

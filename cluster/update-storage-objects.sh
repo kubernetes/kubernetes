@@ -41,6 +41,7 @@ declare -a resources=(
     "nodes"
     "pods"
     "persistentvolumes"
+    "persistentvolumesets"
     "persistentvolumeclaims"
     "replicationcontrollers"
     "resourcequotas"
