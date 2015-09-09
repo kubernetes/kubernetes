@@ -48,22 +48,43 @@ func TestNewFactoryNoFlagBindings(t *testing.T) {
 func TestPodSelectorForObject(t *testing.T) {
 	f := NewFactory(nil)
 
-	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"foo": "bar",
+	tests := []struct {
+		name        string
+		obj         runtime.Object
+		expected    string
+		expectedErr error
+	}{
+		{
+			name: "internal service",
+			obj: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+				},
 			},
+			expected: "foo=bar",
+		},
+		{
+			name: "external service",
+			obj: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "ext", Namespace: "test"},
+			},
+			expected: "",
 		},
 	}
 
-	expected := "foo=bar"
-	got, err := f.PodSelectorForObject(svc)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if expected != got {
-		t.Fatalf("Selector mismatch! Expected %s, got %s", expected, got)
+	for _, test := range tests {
+		got, err := f.PodSelectorForObject(test.obj)
+		if err != test.expectedErr {
+			t.Errorf("%s: Error mismatch! Expected %v, got: %v", test.name, test.expectedErr, err)
+			continue
+		}
+		if test.expected != got {
+			t.Errorf("%s: Selector mismatch! Expected %s, got %s", test.name, test.expected, got)
+			continue
+		}
 	}
 }
 

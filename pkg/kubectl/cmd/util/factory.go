@@ -169,7 +169,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return kubectl.MakeLabels(t.Labels), nil
 			case *api.Service:
 				if t.Spec.Selector == nil {
-					return "", fmt.Errorf("the service has no pod selector set")
+					// External services should be exposable; this is not an error
+					return "", nil
 				}
 				return kubectl.MakeLabels(t.Spec.Selector), nil
 			default:
