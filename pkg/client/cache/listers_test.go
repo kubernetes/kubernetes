@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -160,44 +160,44 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	lister := StoreToDaemonSetLister{store}
 	testCases := []struct {
-		inDSs             []*expapi.DaemonSet
-		list              func() ([]expapi.DaemonSet, error)
+		inDSs             []*experimental.DaemonSet
+		list              func() ([]experimental.DaemonSet, error)
 		outDaemonSetNames sets.String
 		expectErr         bool
 	}{
 		// Basic listing
 		{
-			inDSs: []*expapi.DaemonSet{
+			inDSs: []*experimental.DaemonSet{
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
-			list: func() ([]expapi.DaemonSet, error) {
+			list: func() ([]experimental.DaemonSet, error) {
 				return lister.List()
 			},
 			outDaemonSetNames: sets.NewString("basic"),
 		},
 		// Listing multiple daemon sets
 		{
-			inDSs: []*expapi.DaemonSet{
+			inDSs: []*experimental.DaemonSet{
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
 				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
 			},
-			list: func() ([]expapi.DaemonSet, error) {
+			list: func() ([]experimental.DaemonSet, error) {
 				return lister.List()
 			},
 			outDaemonSetNames: sets.NewString("basic", "complex", "complex2"),
 		},
 		// No pod labels
 		{
-			inDSs: []*expapi.DaemonSet{
+			inDSs: []*experimental.DaemonSet{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
-					Spec: expapi.DaemonSetSpec{
+					Spec: experimental.DaemonSetSpec{
 						Selector: map[string]string{"foo": "baz"},
 					},
 				},
 			},
-			list: func() ([]expapi.DaemonSet, error) {
+			list: func() ([]experimental.DaemonSet, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
@@ -208,12 +208,12 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		},
 		// No DS selectors
 		{
-			inDSs: []*expapi.DaemonSet{
+			inDSs: []*experimental.DaemonSet{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func() ([]expapi.DaemonSet, error) {
+			list: func() ([]experimental.DaemonSet, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -228,21 +228,21 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		},
 		// Matching labels to selectors and namespace
 		{
-			inDSs: []*expapi.DaemonSet{
+			inDSs: []*experimental.DaemonSet{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Spec: expapi.DaemonSetSpec{
+					Spec: experimental.DaemonSetSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
-					Spec: expapi.DaemonSetSpec{
+					Spec: experimental.DaemonSetSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 			},
-			list: func() ([]expapi.DaemonSet, error) {
+			list: func() ([]experimental.DaemonSet, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",

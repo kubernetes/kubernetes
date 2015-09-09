@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -66,12 +66,12 @@ var validController = api.ReplicationController{
 	Spec:       validControllerSpec,
 }
 
-var validScale = expapi.Scale{
+var validScale = experimental.Scale{
 	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-	Spec: expapi.ScaleSpec{
+	Spec: experimental.ScaleSpec{
 		Replicas: validReplicas,
 	},
-	Status: expapi.ScaleStatus{
+	Status: experimental.ScaleStatus{
 		Replicas: 0,
 		Selector: validPodTemplate.Template.Labels,
 	},
@@ -88,7 +88,7 @@ func TestGet(t *testing.T) {
 
 	expect := &validScale
 	obj, err := storage.Get(ctx, "foo")
-	scale := obj.(*expapi.Scale)
+	scale := obj.(*experimental.Scale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -106,9 +106,9 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
-	update := expapi.Scale{
+	update := experimental.Scale{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-		Spec: expapi.ScaleSpec{
+		Spec: experimental.ScaleSpec{
 			Replicas: replicas,
 		},
 	}

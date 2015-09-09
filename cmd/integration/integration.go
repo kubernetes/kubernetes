@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/node"
 	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"

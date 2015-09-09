@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
-	// Ensure that expapi/v1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	// Ensure that experimental/v1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -35,15 +35,15 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewJob() *expapi.Job {
+func validNewJob() *experimental.Job {
 	completions := 1
 	parallelism := 1
-	return &expapi.Job{
+	return &experimental.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: expapi.JobSpec{
+		Spec: experimental.JobSpec{
 			Completions: &completions,
 			Parallelism: &parallelism,
 			Selector:    map[string]string{"a": "b"},
@@ -76,8 +76,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		validJob,
 		// invalid (empty selector)
-		&expapi.Job{
-			Spec: expapi.JobSpec{
+		&experimental.Job{
+			Spec: experimental.JobSpec{
 				Completions: validJob.Spec.Completions,
 				Selector:    map[string]string{},
 				Template:    validJob.Spec.Template,
@@ -95,13 +95,13 @@ func TestUpdate(t *testing.T) {
 		validNewJob(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Job)
+			object := obj.(*experimental.Job)
 			object.Spec.Completions = &completions
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Job)
+			object := obj.(*experimental.Job)
 			object.Spec.Selector = map[string]string{}
 			return object
 		},

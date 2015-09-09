@@ -21,9 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/expapi"
-	// Ensure that expapi/v1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	// Ensure that experimental/v1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -36,19 +36,19 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewHorizontalPodAutoscaler(name string) *expapi.HorizontalPodAutoscaler {
-	return &expapi.HorizontalPodAutoscaler{
+func validNewHorizontalPodAutoscaler(name string) *experimental.HorizontalPodAutoscaler {
+	return &experimental.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: expapi.HorizontalPodAutoscalerSpec{
-			ScaleRef: &expapi.SubresourceReference{
+		Spec: experimental.HorizontalPodAutoscalerSpec{
+			ScaleRef: &experimental.SubresourceReference{
 				Subresource: "scale",
 			},
 			MinCount: 1,
 			MaxCount: 5,
-			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+			Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 		},
 	}
 }
@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		autoscaler,
 		// invalid
-		&expapi.HorizontalPodAutoscaler{},
+		&experimental.HorizontalPodAutoscaler{},
 	)
 }
 
@@ -74,7 +74,7 @@ func TestUpdate(t *testing.T) {
 		validNewHorizontalPodAutoscaler("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.HorizontalPodAutoscaler)
+			object := obj.(*experimental.HorizontalPodAutoscaler)
 			object.Spec.MaxCount = object.Spec.MaxCount + 1
 			return object
 		},

@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/expapi"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
@@ -280,7 +280,7 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
-	expAPIGroup := master.expapi(&config)
+	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.expAPIPrefix)
 	assert.Equal(expAPIGroup.Mapper, explatest.RESTMapper)
 	assert.Equal(expAPIGroup.Codec, explatest.Codec)
@@ -442,11 +442,11 @@ type FooList struct {
 func initThirdParty(t *testing.T, version string) (*tools.FakeEtcdClient, *httptest.Server, *assert.Assertions) {
 	master, _, assert := setUp(t)
 
-	api := &expapi.ThirdPartyResource{
+	api := &experimental.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo.company.com",
 		},
-		Versions: []expapi.APIVersion{
+		Versions: []experimental.APIVersion{
 			{
 				APIGroup: "group",
 				Name:     version,
@@ -502,7 +502,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	thirdPartyData := expapi.ThirdPartyResourceData{
+	thirdPartyData := experimental.ThirdPartyResourceData{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
@@ -631,7 +631,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 	obj, err := explatest.Codec.Decode([]byte(etcdResp.Node.Value))
 	assert.NoError(err)
 
-	thirdPartyObj, ok := obj.(*expapi.ThirdPartyResourceData)
+	thirdPartyObj, ok := obj.(*experimental.ThirdPartyResourceData)
 	if !assert.True(ok) {
 		t.Errorf("unexpected object: %v", obj)
 	}

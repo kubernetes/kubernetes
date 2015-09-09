@@ -18,7 +18,7 @@ package testclient
 
 import (
 	kClientLib "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -34,40 +34,40 @@ type FakeDaemonSets struct {
 // Ensure statically that FakeDaemonSets implements DaemonInterface.
 var _ kClientLib.DaemonSetInterface = &FakeDaemonSets{}
 
-func (c *FakeDaemonSets) Get(name string) (*expapi.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("daemonsets", c.Namespace, name), &expapi.DaemonSet{})
+func (c *FakeDaemonSets) Get(name string) (*experimental.DaemonSet, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("daemonsets", c.Namespace, name), &experimental.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*expapi.DaemonSet), err
+	return obj.(*experimental.DaemonSet), err
 }
 
-func (c *FakeDaemonSets) List(label labels.Selector) (*expapi.DaemonSetList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, label, nil), &expapi.DaemonSetList{})
+func (c *FakeDaemonSets) List(label labels.Selector) (*experimental.DaemonSetList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, label, nil), &experimental.DaemonSetList{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*expapi.DaemonSetList), err
+	return obj.(*experimental.DaemonSetList), err
 }
 
-func (c *FakeDaemonSets) Create(daemon *expapi.DaemonSet) (*expapi.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("daemonsets", c.Namespace, daemon), &expapi.DaemonSet{})
+func (c *FakeDaemonSets) Create(daemon *experimental.DaemonSet) (*experimental.DaemonSet, error) {
+	obj, err := c.Fake.Invokes(NewCreateAction("daemonsets", c.Namespace, daemon), &experimental.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*expapi.DaemonSet), err
+	return obj.(*experimental.DaemonSet), err
 }
 
-func (c *FakeDaemonSets) Update(daemon *expapi.DaemonSet) (*expapi.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("daemonsets", c.Namespace, daemon), &expapi.DaemonSet{})
+func (c *FakeDaemonSets) Update(daemon *experimental.DaemonSet) (*experimental.DaemonSet, error) {
+	obj, err := c.Fake.Invokes(NewUpdateAction("daemonsets", c.Namespace, daemon), &experimental.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*expapi.DaemonSet), err
+	return obj.(*experimental.DaemonSet), err
 }
 
 func (c *FakeDaemonSets) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("daemonsets", c.Namespace, name), &expapi.DaemonSet{})
+	_, err := c.Fake.Invokes(NewDeleteAction("daemonsets", c.Namespace, name), &experimental.DaemonSet{})
 	return err
 }
 

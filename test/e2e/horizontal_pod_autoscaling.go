@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -101,13 +101,13 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 })
 
 func createHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
-	hpa := &expapi.HorizontalPodAutoscaler{
+	hpa := &experimental.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.framework.Namespace.Name,
 		},
-		Spec: expapi.HorizontalPodAutoscalerSpec{
-			ScaleRef: &expapi.SubresourceReference{
+		Spec: experimental.HorizontalPodAutoscalerSpec{
+			ScaleRef: &experimental.SubresourceReference{
 				Kind:        "replicationController",
 				Name:        rc.name,
 				Namespace:   rc.framework.Namespace.Name,
@@ -115,7 +115,7 @@ func createHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
 			},
 			MinCount: 1,
 			MaxCount: 5,
-			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
+			Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
 		},
 	}
 	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)

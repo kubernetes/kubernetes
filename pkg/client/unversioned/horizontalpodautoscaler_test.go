@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -33,7 +33,7 @@ func getHorizontalPodAutoscalersResoureName() string {
 
 func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := expapi.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := experimental.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -58,7 +58,7 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 
 func TestHorizontalPodAutoscalerGet(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := &expapi.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -80,8 +80,8 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 
 func TestHorizontalPodAutoscalerList(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscalerList := &expapi.HorizontalPodAutoscalerList{
-		Items: []expapi.HorizontalPodAutoscaler{
+	horizontalPodAutoscalerList := &experimental.HorizontalPodAutoscalerList{
+		Items: []experimental.HorizontalPodAutoscaler{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
@@ -105,7 +105,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 
 func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := &expapi.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,

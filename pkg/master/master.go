@@ -42,8 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/expapi"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/labels"
@@ -572,7 +572,7 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	if m.exp {
-		expVersion := m.expapi(c)
+		expVersion := m.experimental(c)
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
@@ -775,7 +775,7 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	return version
 }
 
-func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
+func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) error {
 	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return err
@@ -821,8 +821,8 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 }
 
-// expapi returns the resources and codec for the experimental api
-func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
+// experimental returns the resources and codec for the experimental api
+func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	controllerStorage := expcontrolleretcd.NewStorage(c.ExpDatabaseStorage)
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 /*
-This file (together with pkg/expapi/v1/types.go) contain the experimental
+This file (together with pkg/apis/experimental/v1/types.go) contain the experimental
 types in kubernetes. These API objects are experimental, meaning that the
 APIs may be broken at any time by the kubernetes team.
 
@@ -26,7 +26,7 @@ beyond registration differences. In other words, experimental API group
 support is experimental.
 */
 
-package expapi
+package experimental
 
 import (
 	"k8s.io/kubernetes/pkg/api"

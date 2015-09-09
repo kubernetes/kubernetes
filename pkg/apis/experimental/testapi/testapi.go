@@ -19,7 +19,7 @@ package testapi
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/apis/experimental/latest"
 )
 
 // Returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
