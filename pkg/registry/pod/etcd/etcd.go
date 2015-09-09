@@ -241,10 +241,11 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 		return nil, err
 	}
 	return &genericrest.LocationStreamer{
-		Location:    location,
-		Transport:   transport,
-		ContentType: "text/plain",
-		Flush:       logOpts.Follow,
+		Location:        location,
+		Transport:       transport,
+		ContentType:     "text/plain",
+		Flush:           logOpts.Follow,
+		ResponseChecker: genericrest.NewGenericHttpResponseChecker("Pod", name),
 	}, nil
 }
 
