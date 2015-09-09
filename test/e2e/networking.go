@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -55,7 +56,7 @@ var _ = Describe("Networking", func() {
 		podName := "wget-test"
 		contName := "wget-test-container"
 		pod := &api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{

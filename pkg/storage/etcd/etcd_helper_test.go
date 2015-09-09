@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -44,9 +45,9 @@ import (
 const validEtcdVersion = "etcd 2.0.9"
 
 type TestResource struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata"`
-	Value          int `json:"value"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata"`
+	Value                int `json:"value"`
 }
 
 func (*TestResource) IsAnAPIObject() {}
@@ -125,7 +126,7 @@ func TestList(t *testing.T) {
 	}
 	grace := int64(30)
 	expect := api.PodList{
-		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		ListMeta: unversioned.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
@@ -198,7 +199,7 @@ func TestListFiltered(t *testing.T) {
 	}
 	grace := int64(30)
 	expect := api.PodList{
-		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		ListMeta: unversioned.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
@@ -274,7 +275,7 @@ func TestListAcrossDirectories(t *testing.T) {
 	}
 	grace := int64(30)
 	expect := api.PodList{
-		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		ListMeta: unversioned.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			// We expect list to be sorted by directory (e.g. namespace) first, then by name.
 			{
@@ -350,7 +351,7 @@ func TestListExcludesDirectories(t *testing.T) {
 	}
 	grace := int64(30)
 	expect := api.PodList{
-		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		ListMeta: unversioned.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},

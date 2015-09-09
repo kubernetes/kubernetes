@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -60,14 +61,14 @@ func TestHelperDelete(t *testing.T) {
 		{
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
-				Body:       objBody(&api.Status{Status: api.StatusFailure}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusFailure}),
 			},
 			Err: true,
 		},
 		{
 			Resp: &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       objBody(&api.Status{Status: api.StatusSuccess}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusSuccess}),
 			},
 			Req: func(req *http.Request) bool {
 				if req.Method != "DELETE" {
@@ -147,14 +148,14 @@ func TestHelperCreate(t *testing.T) {
 		{
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
-				Body:       objBody(&api.Status{Status: api.StatusFailure}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusFailure}),
 			},
 			Err: true,
 		},
 		{
 			Resp: &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       objBody(&api.Status{Status: api.StatusSuccess}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusSuccess}),
 			},
 			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
@@ -164,7 +165,7 @@ func TestHelperCreate(t *testing.T) {
 			Modify:       false,
 			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
+			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})},
 			Req:          expectPost,
 		},
 		{
@@ -178,7 +179,7 @@ func TestHelperCreate(t *testing.T) {
 					TerminationGracePeriodSeconds: &grace,
 				},
 			},
-			Resp: &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
+			Resp: &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})},
 			Req:  expectPost,
 		},
 	}
@@ -241,7 +242,7 @@ func TestHelperGet(t *testing.T) {
 		{
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
-				Body:       objBody(&api.Status{Status: api.StatusFailure}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusFailure}),
 			},
 			Err: true,
 		},
@@ -308,7 +309,7 @@ func TestHelperList(t *testing.T) {
 		{
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
-				Body:       objBody(&api.Status{Status: api.StatusFailure}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusFailure}),
 			},
 			Err: true,
 		},
@@ -403,7 +404,7 @@ func TestHelperReplace(t *testing.T) {
 			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
-				Body:       objBody(&api.Status{Status: api.StatusFailure}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusFailure}),
 			},
 			Err: true,
 		},
@@ -412,7 +413,7 @@ func TestHelperReplace(t *testing.T) {
 			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			Resp: &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       objBody(&api.Status{Status: api.StatusSuccess}),
+				Body:       objBody(&unversioned.Status{Status: unversioned.StatusSuccess}),
 			},
 			Req: expectPut,
 		},
@@ -429,7 +430,7 @@ func TestHelperReplace(t *testing.T) {
 			Overwrite: true,
 			RespFunc: func(req *http.Request) (*http.Response, error) {
 				if req.Method == "PUT" {
-					return &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})}, nil
+					return &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})}, nil
 				}
 				return &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
 			},
@@ -438,7 +439,7 @@ func TestHelperReplace(t *testing.T) {
 		{
 			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
+			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})},
 			Req:          expectPut,
 		},
 	}

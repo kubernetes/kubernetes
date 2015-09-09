@@ -16,12 +16,10 @@ limitations under the License.
 
 package api
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-)
+import "k8s.io/kubernetes/pkg/api/unversioned"
 
 type Policy struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions
 	Predicates []PredicatePolicy `json:"predicates"`
 	// Holds the information to configure the priority functions
