@@ -23,6 +23,7 @@ import socket
 import subprocess
 import sys
 from charmhelpers.core import hookenv, host
+from charmhelpers.contrib import ssl
 from kubernetes_installer import KubernetesInstaller
 from path import Path
 
@@ -59,6 +60,10 @@ def config_changed():
     config = hookenv.config()
     # Get the version of kubernetes to install.
     version = config['version']
+    username = config['username']
+    password = config['password']
+    certificate = config['apiserver-cert']
+    key = config['apiserver-key']
 
     if version == 'master':
         # The 'master' branch of kuberentes is used when master is configured.
@@ -70,6 +75,20 @@ def config_changed():
         # Create a branch to a tag to get the release version.
         branch = 'tags/{0}'.format(version)
 
+    cert_file = '/srv/kubernetes/apiserver.crt'
+    key_file = '/srv/kubernetes/apiserver.key'
+    # When the cert or key changes we need to restart the apiserver.
+    if config.changed('apiserver-cert') or config.changed('apiserver-key'):
+        if not certificate or not key:
+            generate_cert(key=key_file, cert=cert_file)
+        else:
+            with open(key_file, 'w') as file:
+                file.write(key)
+            with open(cert_file, 'w') as file:
+                file.write(certificate)
+        if host.service_running('apiserver'):
+            host.service_restart('apiserver')
+
     if config.changed('username') or config.changed('password'):
         basic_auth(config['username'], config['username'], config['password'])
         if host.service_running('apiserver'):
@@ -80,7 +99,7 @@ def config_changed():
 
     if not branch:
         output_path = charm_dir / 'files/output'
-        installer = KubernetesInstaller(arch, version, output_path)
+        kube_installer = KubernetesInstaller(arch, version, output_path)
     else:
 
         # Build the kuberentes binaries from source on the units.
@@ -88,7 +107,7 @@ def config_changed():
 
         # Construct the path to the binaries using the arch.
         output_path = kubernetes_dir / '_output/local/bin/linux' / arch
-        installer = KubernetesInstaller(arch, version, output_path)
+        kube_installer = KubernetesInstaller(arch, version, output_path)
 
         if not kubernetes_dir.exists():
             message = 'The kubernetes source directory {0} does not exist. ' \
@@ -110,12 +129,12 @@ def config_changed():
                 print('Last build failed: ', last_build_failed)
                 # Rebuild if current version is different or last build failed.
                 if current_branch != version or last_build_failed:
-                    installer.build(branch)
+                    kube_installer.build(branch)
             if not output_path.isdir():
                 broken_build.touch()
 
     # Create the symoblic links to the right directories.
-    installer.install()
+    kube_installer.install()
 
     relation_changed()
 
@@ -177,12 +196,13 @@ def notify_minions():
 def basic_auth(name, id, pwd=None, file='/srv/kubernetes/basic-auth.csv'):
     """
     Create a basic authentication file for kubernetes. The file is a csv file
-    with 3 columns: password, user name, user id.
+    with 3 columns: password, user name, user id. From the Kubernetes docs:
     The basic auth credentials last indefinitely, and the password cannot be
     changed without restarting apiserver.
     """
     if not pwd:
-        import random, string
+        import random
+        import string
         alphanumeric = string.ascii_letters + string.digits
         pwd = ''.join(random.choice(alphanumeric) for _ in range(16))
     lines = []
@@ -196,6 +216,23 @@ def basic_auth(name, id, pwd=None, file='/srv/kubernetes/basic-auth.csv'):
     auth_line = '{0},{1},{2}'.format(pwd, name, id)
     lines.append(auth_line)
     auth_file.write_lines(lines)
+
+
+def generate_cert(common_name=None,
+                  key='/srv/kubernetes/apiserver.key',
+                  cert='/srv/kubernetes/apiserver.crt'):
+    """
+    Create the certificate and key for the Kubernetes tls enablement.
+    """
+    hookenv.log('Generating new self signed certificate and key', 'INFO')
+    if not common_name:
+        common_name = hookenv.unit_get('public-address')
+    if os.path.isfile(key) or os.path.isfile(cert):
+        hookenv.log('Overwriting the existing certificate or key', 'WARNING')
+    hookenv.log('Generating certificate for {0}'.format(common_name), 'INFO')
+    # Generate the self signed certificate with the public address as CN.
+    # https://pythonhosted.org/charmhelpers/api/charmhelpers.contrib.ssl.html
+    ssl.generate_selfsigned(key, cert, cn=common_name)
 
 
 def get_template_data():
