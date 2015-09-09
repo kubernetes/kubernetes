@@ -25,6 +25,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
@@ -51,5 +52,18 @@ func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin
 
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
+	return allPlugins
+}
+
+// ProbeControllerPlugins collects all compiled-in plugins into an easy to use list.
+func ProbeControllerPlugins(flags ControllerConfigFlags) []controller.Plugin {
+	allPlugins := []controller.Plugin{}
+
+	_ = controller.ControllerConfig{
+		SyncPeriod: flags.ResourceQuotaSyncPeriod,
+	}
+
+	// allPlugins = append(allPlugins, resourcequota.ProbeControllerPlugins(config)...)
+
 	return allPlugins
 }
