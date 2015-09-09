@@ -139,6 +139,8 @@ func NewMainKubelet(
 	resyncInterval time.Duration,
 	pullQPS float32,
 	pullBurst int,
+	eventQPS float32,
+	eventBurst int,
 	containerGCPolicy ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	registerNode bool,

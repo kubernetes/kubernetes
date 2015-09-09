@@ -84,6 +84,8 @@ type KubeletServer struct {
 	HostNetworkSources             string
 	RegistryPullQPS                float64
 	RegistryBurst                  int
+	EventRecordQPS                 float32
+	EventBurst                     int
 	RunOnce                        bool
 	EnableDebuggingHandlers        bool
 	MinimumGCAge                   time.Duration
@@ -220,6 +222,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	fs.IntVar(&s.RegistryBurst, "registry-burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0")
+	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited. [default=0.0]")
+	fs.IntVar(&s.EventBurst, "event-burst", s.EventBurst, "Maximum size of a bursty event records, temporarily allows event records to burst to this number, while still not exceeding event-qps. Only used if --event-qps > 0")
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server")
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable-debugging-handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.DurationVar(&s.MinimumGCAge, "minimum-container-ttl-duration", s.MinimumGCAge, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
@@ -327,6 +331,8 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		SyncFrequency:                  s.SyncFrequency,
 		RegistryPullQPS:                s.RegistryPullQPS,
 		RegistryBurst:                  s.RegistryBurst,
+		EventRecordQPS:                 s.EventRecordQPS,
+		EventBurst:                     s.EventBurst,
 		MinimumGCAge:                   s.MinimumGCAge,
 		MaxPerPodContainerCount:        s.MaxPerPodContainerCount,
 		MaxContainerCount:              s.MaxContainerCount,
@@ -646,7 +652,13 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.KubeClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(kcfg.KubeClient.Events(""))
+		if kcfg.EventRecordQPS == 0.0 {
+			eventBroadcaster.StartRecordingToSink(kcfg.KubeClient.Events(""))
+		} else {
+			eventClient := *kcfg.KubeClient
+			eventClient.Throttle = util.NewTokenBucketRateLimiter(kcfg.EventRecordQPS, kcfg.EventBurst)
+			eventBroadcaster.StartRecordingToSink(eventClient.Events(""))
+		}
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
@@ -742,6 +754,8 @@ type KubeletConfig struct {
 	SyncFrequency                  time.Duration
 	RegistryPullQPS                float64
 	RegistryBurst                  int
+	EventRecordQPS                 float32
+	EventBurst                     int
 	MinimumGCAge                   time.Duration
 	MaxPerPodContainerCount        int
 	MaxContainerCount              int
@@ -809,6 +823,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
+		kc.EventRecordQPS,
+		kc.EventBurst,
 		gcPolicy,
 		pc.SeenAllSources,
 		kc.RegisterNode,
