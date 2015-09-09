@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -128,7 +129,7 @@ func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namesp
 	namespaceFinalize := api.Namespace{}
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
-	finalizerSet := util.NewStringSet()
+	finalizerSet := sets.NewString()
 	for i := range namespace.Spec.Finalizers {
 		if namespace.Spec.Finalizers[i] != api.FinalizerKubernetes {
 			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))

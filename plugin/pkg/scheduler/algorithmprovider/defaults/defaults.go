@@ -18,7 +18,7 @@ limitations under the License.
 package defaults
 
 import (
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -48,8 +48,8 @@ func init() {
 	)
 }
 
-func defaultPredicates() util.StringSet {
-	return util.NewStringSet(
+func defaultPredicates() sets.String {
+	return sets.NewString(
 		// Fit is defined based on the absence of port conflicts.
 		factory.RegisterFitPredicate("PodFitsPorts", predicates.PodFitsPorts),
 		// Fit is determined by resource availability.
@@ -73,8 +73,8 @@ func defaultPredicates() util.StringSet {
 	)
 }
 
-func defaultPriorities() util.StringSet {
-	return util.NewStringSet(
+func defaultPriorities() sets.String {
+	return sets.NewString(
 		// Prioritize nodes by least requested utilization.
 		factory.RegisterPriorityFunction("LeastRequestedPriority", priorities.LeastRequestedPriority, 1),
 		// Prioritizes nodes to help achieve balanced resource usage

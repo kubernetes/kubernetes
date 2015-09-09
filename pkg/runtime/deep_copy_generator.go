@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // TODO(wojtek-t): As suggested in #8320, we should consider the strategy
@@ -69,7 +69,7 @@ type DeepCopyGenerator interface {
 	OverwritePackage(pkg, overwrite string)
 }
 
-func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include util.StringSet) DeepCopyGenerator {
+func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include sets.String) DeepCopyGenerator {
 	g := &deepCopyGenerator{
 		scheme:        scheme,
 		targetPkg:     targetPkg,
@@ -100,7 +100,7 @@ type deepCopyGenerator struct {
 	shortImports  map[string]string
 	pkgOverwrites map[string]string
 	replace       map[pkgPathNamePair]reflect.Type
-	include       util.StringSet
+	include       sets.String
 }
 
 func (g *deepCopyGenerator) addImportByPath(pkg string) string {

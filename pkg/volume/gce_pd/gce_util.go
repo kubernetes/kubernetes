@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/operationmanager"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -62,7 +63,7 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 	if err != nil {
 		glog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
 	}
-	sdBeforeSet := util.NewStringSet(sdBefore...)
+	sdBeforeSet := sets.NewString(sdBefore...)
 
 	devicePath, err := attachDiskAndVerify(b, sdBeforeSet)
 	if err != nil {
@@ -120,7 +121,7 @@ func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskCleaner) error {
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
-func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet util.StringSet) (string, error) {
+func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (string, error) {
 	devicePaths := getDiskByIdPaths(b.gcePersistentDisk)
 	var gce cloudprovider.Interface
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
@@ -287,7 +288,7 @@ func pathExists(path string) (bool, error) {
 
 // Calls "udevadm trigger --action=change" for newly created "/dev/sd*" drives (exist only in after set).
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToNewDrives(sdBeforeSet util.StringSet) error {
+func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 	sdAfter, err := filepath.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)

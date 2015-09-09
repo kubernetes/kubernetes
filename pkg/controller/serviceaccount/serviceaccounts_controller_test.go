@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type serverResponse struct {
@@ -101,7 +102,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		"new active namespace missing serviceaccounts": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{},
 			AddedNamespace:               activeNS,
-			ExpectCreatedServiceAccounts: util.NewStringSet(defaultName, managedName).List(),
+			ExpectCreatedServiceAccounts: sets.NewString(defaultName, managedName).List(),
 		},
 		"new active namespace missing serviceaccount": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{managedServiceAccount},
@@ -123,7 +124,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		"updated active namespace missing serviceaccounts": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{},
 			UpdatedNamespace:             activeNS,
-			ExpectCreatedServiceAccounts: util.NewStringSet(defaultName, managedName).List(),
+			ExpectCreatedServiceAccounts: sets.NewString(defaultName, managedName).List(),
 		},
 		"updated active namespace missing serviceaccount": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{defaultServiceAccount},
@@ -170,7 +171,7 @@ func TestServiceAccountCreation(t *testing.T) {
 	for k, tc := range testcases {
 		client := testclient.NewSimpleFake(defaultServiceAccount, managedServiceAccount)
 		options := DefaultServiceAccountsControllerOptions()
-		options.Names = util.NewStringSet(defaultName, managedName)
+		options.Names = sets.NewString(defaultName, managedName)
 		controller := NewServiceAccountsController(client, options)
 
 		if tc.ExistingNamespace != nil {

@@ -29,10 +29,10 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // PodConfigNotificationMode describes how changes are sent to the update channel.
@@ -61,7 +61,7 @@ type PodConfig struct {
 
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
-	sources     util.StringSet
+	sources     sets.String
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -73,7 +73,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 		pods:    storage,
 		mux:     config.NewMux(storage),
 		updates: updates,
-		sources: util.StringSet{},
+		sources: sets.String{},
 	}
 	return podConfig
 }
@@ -124,7 +124,7 @@ type podStorage struct {
 
 	// contains the set of all sources that have sent at least one SET
 	sourcesSeenLock sync.Mutex
-	sourcesSeen     util.StringSet
+	sourcesSeen     sets.String
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
@@ -138,7 +138,7 @@ func newPodStorage(updates chan<- kubelet.PodUpdate, mode PodConfigNotificationM
 		pods:        make(map[string]map[string]*api.Pod),
 		mode:        mode,
 		updates:     updates,
-		sourcesSeen: util.StringSet{},
+		sourcesSeen: sets.String{},
 		recorder:    recorder,
 	}
 }
@@ -306,7 +306,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 }
 
 func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
-	names := util.StringSet{}
+	names := sets.String{}
 	for i, pod := range pods {
 		var errlist []error
 		if errs := validation.ValidatePod(pod); len(errs) != 0 {

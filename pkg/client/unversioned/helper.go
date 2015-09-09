@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -187,7 +188,7 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 			return "", err
 		}
 	}
-	clientVersions := util.StringSet{}
+	clientVersions := sets.String{}
 	for _, v := range clientRegisteredVersions {
 		clientVersions.Insert(v)
 	}
@@ -195,7 +196,7 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 	if err != nil {
 		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
-	serverVersions := util.StringSet{}
+	serverVersions := sets.String{}
 	for _, v := range apiVersions.Versions {
 		serverVersions.Insert(v)
 	}

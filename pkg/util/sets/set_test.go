@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package sets
 
 import (
 	"reflect"
@@ -22,8 +22,8 @@ import (
 )
 
 func TestStringSet(t *testing.T) {
-	s := StringSet{}
-	s2 := StringSet{}
+	s := String{}
+	s2 := String{}
 	if len(s) != 0 {
 		t.Errorf("Expected len=0: %d", len(s))
 	}
@@ -60,7 +60,7 @@ func TestStringSet(t *testing.T) {
 }
 
 func TestStringSetDeleteMultiples(t *testing.T) {
-	s := StringSet{}
+	s := String{}
 	s.Insert("a", "b", "c")
 	if len(s) != 3 {
 		t.Errorf("Expected len=3: %d", len(s))
@@ -83,7 +83,7 @@ func TestStringSetDeleteMultiples(t *testing.T) {
 }
 
 func TestNewStringSet(t *testing.T) {
-	s := NewStringSet("a", "b", "c")
+	s := NewString("a", "b", "c")
 	if len(s) != 3 {
 		t.Errorf("Expected len=3: %d", len(s))
 	}
@@ -93,15 +93,15 @@ func TestNewStringSet(t *testing.T) {
 }
 
 func TestStringSetList(t *testing.T) {
-	s := NewStringSet("z", "y", "x", "a")
+	s := NewString("z", "y", "x", "a")
 	if !reflect.DeepEqual(s.List(), []string{"a", "x", "y", "z"}) {
 		t.Errorf("List gave unexpected result: %#v", s.List())
 	}
 }
 
 func TestStringSetDifference(t *testing.T) {
-	a := NewStringSet("1", "2", "3")
-	b := NewStringSet("1", "2", "4", "5")
+	a := NewString("1", "2", "3")
+	b := NewString("1", "2", "4", "5")
 	c := a.Difference(b)
 	d := b.Difference(a)
 	if len(c) != 1 {
@@ -119,7 +119,7 @@ func TestStringSetDifference(t *testing.T) {
 }
 
 func TestStringSetHasAny(t *testing.T) {
-	a := NewStringSet("1", "2", "3")
+	a := NewString("1", "2", "3")
 
 	if !a.HasAny("1", "4") {
 		t.Errorf("expected true, got false")
@@ -132,37 +132,37 @@ func TestStringSetHasAny(t *testing.T) {
 
 func TestStringSetEquals(t *testing.T) {
 	// Simple case (order doesn't matter)
-	a := NewStringSet("1", "2")
-	b := NewStringSet("2", "1")
+	a := NewString("1", "2")
+	b := NewString("2", "1")
 	if !a.Equal(b) {
 		t.Errorf("Expected to be equal: %v vs %v", a, b)
 	}
 
 	// It is a set; duplicates are ignored
-	b = NewStringSet("2", "2", "1")
+	b = NewString("2", "2", "1")
 	if !a.Equal(b) {
 		t.Errorf("Expected to be equal: %v vs %v", a, b)
 	}
 
 	// Edge cases around empty sets / empty strings
-	a = NewStringSet()
-	b = NewStringSet()
+	a = NewString()
+	b = NewString()
 	if !a.Equal(b) {
 		t.Errorf("Expected to be equal: %v vs %v", a, b)
 	}
 
-	b = NewStringSet("1", "2", "3")
+	b = NewString("1", "2", "3")
 	if a.Equal(b) {
 		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
 	}
 
-	b = NewStringSet("1", "2", "")
+	b = NewString("1", "2", "")
 	if a.Equal(b) {
 		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
 	}
 
 	// Check for equality after mutation
-	a = NewStringSet()
+	a = NewString()
 	a.Insert("1")
 	if a.Equal(b) {
 		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
