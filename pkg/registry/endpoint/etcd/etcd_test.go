@@ -20,19 +20,15 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	return NewREST(etcdStorage, false), fakeClient
 }
 
@@ -93,31 +89,9 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-
-	endpoints := validChangedEndpoints()
-	key, _ := storage.KeyFunc(ctx, endpoints.Name)
-	key = etcdtest.AddPrefix(key)
-	createFn := func() runtime.Object {
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), endpoints),
-					ModifiedIndex: 1,
-				},
-			},
-		}
-		return endpoints
-	}
-	gracefulSetFn := func() bool {
-		if fakeClient.Data[key].R.Node == nil {
-			return false
-		}
-		return fakeClient.Data[key].R.Node.TTL == 30
-	}
-	test.TestDelete(createFn, gracefulSetFn)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestDelete(validNewEndpoints())
 }
 
 func TestGet(t *testing.T) {
@@ -132,43 +106,25 @@ func TestList(t *testing.T) {
 	test.TestList(validNewEndpoints())
 }
 
-func TestEndpointsDecode(t *testing.T) {
-	storage, _ := newStorage(t)
-	expected := validNewEndpoints()
-	body, err := testapi.Codec().Encode(expected)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	actual := storage.New()
-	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !api.Semantic.DeepEqual(expected, actual) {
-		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
-}
-
-func TestDeleteEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
+func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	endpoints := validNewEndpoints()
-	name := endpoints.Name
-	key, _ := storage.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.ChangeIndex = 1
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), endpoints),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestWatch(
+		validNewEndpoints(),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
 		},
-	}
-	_, err := storage.Delete(ctx, name, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+	)
 }

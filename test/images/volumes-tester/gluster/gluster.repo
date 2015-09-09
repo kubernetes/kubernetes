@@ -1,0 +1,50 @@
+[epel]
+name=Extra Packages for Enterprise Linux 7 - $basearch
+#baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch
+mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-7&arch=$basearch
+failovermethod=priority
+enabled=1
+gpgcheck=1
+gpgkey=https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-7
+
+[epel-debuginfo]
+name=Extra Packages for Enterprise Linux 7 - $basearch - Debug
+#baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch/debug
+mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-debug-7&arch=$basearch
+failovermethod=priority
+enabled=0
+gpgcheck=1
+gpgkey=https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-7
+
+[epel-source]
+name=Extra Packages for Enterprise Linux 7 - $basearch - Source
+#baseurl=http://download.fedoraproject.org/pub/epel/7/SRPMS
+mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-source-7&arch=$basearch
+failovermethod=priority
+enabled=0
+gpgcheck=1
+gpgkey=https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-7
+
+[glusterfs-epel]
+name=GlusterFS is a clustered file-system capable of scaling to several petabytes.
+baseurl=http://download.gluster.org/pub/gluster/glusterfs/LATEST/EPEL.repo/epel-$releasever/$basearch/
+enabled=1
+skip_if_unavailable=1
+gpgcheck=1
+gpgkey=http://download.gluster.org/pub/gluster/glusterfs/LATEST/EPEL.repo/pub.key
+
+[glusterfs-noarch-epel]
+name=GlusterFS is a clustered file-system capable of scaling to several petabytes.
+baseurl=http://download.gluster.org/pub/gluster/glusterfs/LATEST/EPEL.repo/epel-$releasever/noarch
+enabled=1
+skip_if_unavailable=1
+gpgcheck=1
+gpgkey=http://download.gluster.org/pub/gluster/glusterfs/LATEST/EPEL.repo/pub.key
+
+[glusterfs-source-epel]
+name=GlusterFS is a clustered file-system capable of scaling to several petabytes. - Source
+baseurl=http://download.gluster.org/pub/gluster/glusterfs/LATEST/EPEL.repo/epel-$releasever/SRPMS
+enabled=0
+skip_if_unavailable=1
+gpgcheck=1
+gpgkey=http://download.gluster.org/pub/gluster/glusterfs/LATEST/EPEL.repo/pub.key

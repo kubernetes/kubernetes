@@ -168,7 +168,8 @@ func NewMainKubelet(
 	podCIDR string,
 	pods int,
 	dockerExecHandler dockertools.ExecHandler,
-	resolverConfig string) (*Kubelet, error) {
+	resolverConfig string,
+	cpuCFSQuota bool) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -285,6 +286,7 @@ func NewMainKubelet(
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
+		cpuCFSQuota:                    cpuCFSQuota,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -321,7 +323,8 @@ func NewMainKubelet(
 			klet.httpClient,
 			dockerExecHandler,
 			oomAdjuster,
-			procFs)
+			procFs,
+			klet.cpuCFSQuota)
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -560,6 +563,9 @@ type Kubelet struct {
 
 	// Optionally shape the bandwidth of a pod
 	shaper bandwidth.BandwidthShaper
+
+	// True if container cpu limits should be enforced via cgroup CFS quota
+	cpuCFSQuota bool
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1890,17 +1896,19 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 			housekeepingTimestamp = time.Now()
 		}
-		kl.syncLoopIteration(updates, handler)
+		if !kl.syncLoopIteration(updates, handler) {
+			break
+		}
 	}
 }
 
-func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) {
+func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) bool {
 	kl.syncLoopMonitor.Store(time.Now())
 	select {
-	case u, ok := <-updates:
-		if !ok {
+	case u, open := <-updates:
+		if !open {
 			glog.Errorf("Update channel is closed. Exiting the sync loop.")
-			return
+			return false
 		}
 		switch u.Op {
 		case ADD:
@@ -1922,6 +1930,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 		handler.HandlePodSyncs(kl.podManager.GetPods())
 	}
 	kl.syncLoopMonitor.Store(time.Now())
+	return true
 }
 
 func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType SyncPodType, mirrorPod *api.Pod, start time.Time) {
@@ -2041,11 +2050,11 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 
 	cStatus, found := api.GetContainerStatus(podStatus.ContainerStatuses, containerName)
 	if !found {
-		return "", fmt.Errorf("container %q not found in pod", containerName)
+		return "", fmt.Errorf("container %q not found", containerName)
 	}
 	if previous {
 		if cStatus.LastTerminationState.Terminated == nil {
-			return "", fmt.Errorf("previous terminated container %q not found in pod", containerName)
+			return "", fmt.Errorf("previous terminated container %q not found", containerName)
 		}
 		cID = cStatus.LastTerminationState.Terminated.ContainerID
 	} else {
@@ -2072,23 +2081,23 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 
 	pod, ok := kl.GetPodByName(namespace, name)
 	if !ok {
-		return fmt.Errorf("unable to get logs for container %q in pod %q: unable to find pod", containerName, podFullName)
+		return fmt.Errorf("unable to get logs for container %q in pod %q namespace %q: unable to find pod", containerName, name, namespace)
 	}
 
 	podStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
-		return fmt.Errorf("failed to get status for pod %q", podFullName)
+		return fmt.Errorf("failed to get status for pod %q in namespace %q", name, namespace)
 	}
 
 	if err := kl.validatePodPhase(&podStatus); err != nil {
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
-		return err
+		return fmt.Errorf("Pod %q in namespace %q : %v", name, namespace, err)
 	}
 	containerID, err := kl.validateContainerStatus(&podStatus, containerName, previous)
 	if err != nil {
 		// No log is available if the container status is missing or is in the
 		// waiting state.
-		return err
+		return fmt.Errorf("Pod %q in namespace %q: %v", name, namespace, err)
 	}
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, tail, follow, stdout, stderr)
 }

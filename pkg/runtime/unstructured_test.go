@@ -26,7 +26,7 @@ import (
 )
 
 func TestDecodeUnstructured(t *testing.T) {
-	version := testapi.Version()
+	version := testapi.Default.Version()
 	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, version)
 	pl := &api.List{
 		Items: []runtime.Object{

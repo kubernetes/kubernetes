@@ -142,3 +142,36 @@ func TestAddToNodeAddresses(t *testing.T) {
 		}
 	}
 }
+
+func TestGetAccessModesFromString(t *testing.T) {
+	modes := GetAccessModesFromString("ROX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+
+	modes = GetAccessModesFromString("ROX,RWX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+	if !containsAccessMode(modes, ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadWriteMany, modes)
+	}
+
+	modes = GetAccessModesFromString("RWO,ROX,RWX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+	if !containsAccessMode(modes, ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadWriteMany, modes)
+	}
+}
+
+func TestRemoveDuplicateAccessModes(t *testing.T) {
+	modes := []PersistentVolumeAccessMode{
+		ReadWriteOnce, ReadOnlyMany, ReadOnlyMany, ReadOnlyMany,
+	}
+	modes = removeDuplicateAccessModes(modes)
+	if len(modes) != 2 {
+		t.Errorf("Expected 2 distinct modes in set but found %v", len(modes))
+	}
+}

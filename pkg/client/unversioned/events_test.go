@@ -32,24 +32,24 @@ func TestEventSearch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath("events", "baz", ""),
+			Path:   testapi.Default.ResourcePath("events", "baz", ""),
 			Query: url.Values{
-				api.FieldSelectorQueryParam(testapi.Version()): []string{
-					getInvolvedObjectNameFieldLabel(testapi.Version()) + "=foo,",
+				api.FieldSelectorQueryParam(testapi.Default.Version()): []string{
+					getInvolvedObjectNameFieldLabel(testapi.Default.Version()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
-				api.LabelSelectorQueryParam(testapi.Version()): []string{},
+				api.LabelSelectorQueryParam(testapi.Default.Version()): []string{},
 			},
 		},
 		Response: Response{StatusCode: 200, Body: &api.EventList{}},
 	}
-	eventList, err := c.Setup().Events("baz").Search(
+	eventList, err := c.Setup(t).Events("baz").Search(
 		&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "foo",
 				Namespace: "baz",
-				SelfLink:  testapi.SelfLink("pods", ""),
+				SelfLink:  testapi.Default.SelfLink("pods", ""),
 			},
 		},
 	)
@@ -78,13 +78,13 @@ func TestEventCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.ResourcePath("events", api.NamespaceDefault, ""),
+			Path:   testapi.Default.ResourcePath("events", api.NamespaceDefault, ""),
 			Body:   event,
 		},
 		Response: Response{StatusCode: 200, Body: event},
 	}
 
-	response, err := c.Setup().Events(api.NamespaceDefault).Create(event)
+	response, err := c.Setup(t).Events(api.NamespaceDefault).Create(event)
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -117,13 +117,13 @@ func TestEventGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath("events", "other", "1"),
+			Path:   testapi.Default.ResourcePath("events", "other", "1"),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: event},
 	}
 
-	response, err := c.Setup().Events("other").Get("1")
+	response, err := c.Setup(t).Events("other").Get("1")
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -158,12 +158,12 @@ func TestEventList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath("events", ns, ""),
+			Path:   testapi.Default.ResourcePath("events", ns, ""),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: eventList},
 	}
-	response, err := c.Setup().Events(ns).List(labels.Everything(),
+	response, err := c.Setup(t).Events(ns).List(labels.Everything(),
 		fields.Everything())
 
 	if err != nil {
@@ -186,10 +186,10 @@ func TestEventDelete(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.ResourcePath("events", ns, "foo"),
+			Path:   testapi.Default.ResourcePath("events", ns, "foo"),
 		},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Events(ns).Delete("foo")
+	err := c.Setup(t).Events(ns).Delete("foo")
 	c.Validate(t, nil, err)
 }

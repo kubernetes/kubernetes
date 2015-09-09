@@ -17,45 +17,59 @@ limitations under the License.
 package autoscalercontroller
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/autoscaler/metrics"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
-
-	heapster "k8s.io/heapster/api/v1/types"
 )
 
 const (
 	namespace    = api.NamespaceDefault
 	rcName       = "app-rc"
 	podNameLabel = "app"
-	podName      = "p1"
 	hpaName      = "foo"
 
 	hpaListHandler   = "HpaList"
 	scaleHandler     = "Scale"
-	podListHandler   = "PodList"
-	heapsterHandler  = "Heapster"
 	updateHpaHandler = "HpaUpdate"
 )
 
 type serverResponse struct {
 	statusCode int
 	obj        interface{}
+}
+
+type fakeMetricsClient struct {
+	consumption metrics.ResourceConsumptionClient
+}
+
+type fakeResourceConsumptionClient struct {
+	metrics map[api.ResourceName]expapi.ResourceConsumption
+}
+
+func (f *fakeMetricsClient) ResourceConsumption(namespace string) metrics.ResourceConsumptionClient {
+	return f.consumption
+}
+
+func (f *fakeResourceConsumptionClient) Get(resource api.ResourceName, selector map[string]string) (*expapi.ResourceConsumption, error) {
+	consumption, found := f.metrics[resource]
+	if !found {
+		return nil, fmt.Errorf("resource not found: %v", resource)
+	}
+	return &consumption, nil
 }
 
 func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httptest.Server, map[string]*util.FakeHandler) {
@@ -66,17 +80,7 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	mkHandler := func(url string, response serverResponse) *util.FakeHandler {
 		handler := util.FakeHandler{
 			StatusCode:   response.statusCode,
-			ResponseBody: runtime.EncodeOrDie(testapi.Codec(), response.obj.(runtime.Object)),
-		}
-		mux.Handle(url, &handler)
-		glog.Infof("Will handle %s", url)
-		return &handler
-	}
-
-	mkRawHandler := func(url string, response serverResponse) *util.FakeHandler {
-		handler := util.FakeHandler{
-			StatusCode:   response.statusCode,
-			ResponseBody: *response.obj.(*string),
+			ResponseBody: runtime.EncodeOrDie(testapi.Experimental.Codec(), response.obj.(runtime.Object)),
 		}
 		mux.Handle(url, &handler)
 		glog.Infof("Will handle %s", url)
@@ -90,16 +94,6 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	if responses[scaleHandler] != nil {
 		handlers[scaleHandler] = mkHandler(
 			fmt.Sprintf("/experimental/v1/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
-	}
-
-	if responses[podListHandler] != nil {
-		handlers[podListHandler] = mkHandler(fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace), *responses[podListHandler])
-	}
-
-	if responses[heapsterHandler] != nil {
-		handlers[heapsterHandler] = mkRawHandler(
-			fmt.Sprintf("/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster/api/v1/model/namespaces/%s/pod-list/%s/metrics/cpu-usage",
-				namespace, podName), *responses[heapsterHandler])
 	}
 
 	if responses[updateHpaHandler] != nil {
@@ -150,21 +144,6 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		},
 	}}
 
-	podListResponse := serverResponse{http.StatusOK, &api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: api.ObjectMeta{
-					Name:      podName,
-					Namespace: namespace,
-				},
-			}}}}
-	timestamp := time.Now()
-	metrics := heapster.MetricResultList{
-		Items: []heapster.MetricResult{{
-			Metrics:         []heapster.MetricPoint{{timestamp, 650}},
-			LatestTimestamp: timestamp,
-		}}}
-
 	status := expapi.HorizontalPodAutoscalerStatus{
 		CurrentReplicas: 1,
 		DesiredReplicas: 3,
@@ -189,24 +168,24 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		Status: &status,
 	}}
 
-	heapsterRawResponse, _ := json.Marshal(&metrics)
-	heapsterStrResponse := string(heapsterRawResponse)
-	heapsterResponse := serverResponse{http.StatusOK, &heapsterStrResponse}
-
 	testServer, handlers := makeTestServer(t,
 		map[string]*serverResponse{
 			hpaListHandler:   &hpaResponse,
 			scaleHandler:     &scaleResponse,
-			podListHandler:   &podListResponse,
-			heapsterHandler:  &heapsterResponse,
 			updateHpaHandler: &updateHpaResponse,
 		})
 
 	defer testServer.Close()
-	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
+	expClient := client.NewExperimentalOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
 
-	hpaController := New(kubeClient, expClient)
+	fakeRC := fakeResourceConsumptionClient{metrics: map[api.ResourceName]expapi.ResourceConsumption{
+		api.ResourceCPU: {Resource: api.ResourceCPU, Quantity: resource.MustParse("650m")},
+	}}
+	fake := fakeMetricsClient{consumption: &fakeRC}
+
+	hpaController := New(kubeClient, expClient, &fake)
+
 	err := hpaController.reconcileAutoscalers()
 	if err != nil {
 		t.Fatal("Failed to reconcile: %v", err)

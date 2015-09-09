@@ -52,9 +52,7 @@ cluster's shared state through which all other components interact.
       --admission-control-config-file="": File with admission control configuration.
       --advertise-address=<nil>: The IP address on which to advertise the apiserver to members of the cluster. This address must be reachable by the rest of the cluster. If blank, the --bind-address will be used. If --bind-address is unspecified, the host's default interface will be used.
       --allow-privileged=false: If true, allow privileged containers.
-      --api-burst=0: API burst amount for the read only port
       --api-prefix="": The prefix for API requests on the server. Default '/api'.
-      --api-rate=0: API rate limit as QPS for the read only port
       --authorization-mode="": Selects how to do authorization on the secure port.  One of: AlwaysAllow,AlwaysDeny,ABAC
       --authorization-policy-file="": File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.
       --basic-auth-file="": If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.

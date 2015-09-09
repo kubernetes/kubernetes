@@ -195,7 +195,7 @@ function wait-cluster-readiness {
 
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_minions=$("${kubectl}" get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
     if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
         return 0
@@ -294,7 +294,7 @@ function upload-server-tars {
   tar -x -C "$POOL_PATH/kubernetes" -f "$SERVER_BINARY_TAR" kubernetes
   rm -rf "$POOL_PATH/kubernetes/bin"
   mv "$POOL_PATH/kubernetes/kubernetes/server/bin" "$POOL_PATH/kubernetes/bin"
-  rmdir "$POOL_PATH/kubernetes/kubernetes/server" "$POOL_PATH/kubernetes/kubernetes"
+  rm -fr "$POOL_PATH/kubernetes/kubernetes"
 }
 
 # Update a kubernetes cluster with latest source

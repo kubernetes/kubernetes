@@ -449,7 +449,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 				},
 				{Name: "bar"}}},
 	}
-	podString, err := testapi.Codec().Encode(pod)
+	podString, err := testapi.Default.Codec().Encode(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2333,63 +2333,4 @@ func TestGetUidFromUser(t *testing.T) {
 			t.Errorf("%s failed.  Expected %s but got %s", k, v.expect, actual)
 		}
 	}
-}
-
-func TestPodDependsOnPodIP(t *testing.T) {
-	tests := []struct {
-		name     string
-		expected bool
-		env      api.EnvVar
-	}{
-		{
-			name:     "depends on pod IP",
-			expected: true,
-			env: api.EnvVar{
-				Name: "POD_IP",
-				ValueFrom: &api.EnvVarSource{
-					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Version(),
-						FieldPath:  "status.podIP",
-					},
-				},
-			},
-		},
-		{
-			name:     "literal value",
-			expected: false,
-			env: api.EnvVar{
-				Name:  "SOME_VAR",
-				Value: "foo",
-			},
-		},
-		{
-			name:     "other downward api field",
-			expected: false,
-			env: api.EnvVar{
-				Name: "POD_NAME",
-				ValueFrom: &api.EnvVarSource{
-					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Version(),
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		pod := &api.Pod{
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Env: []api.EnvVar{tc.env}},
-				},
-			},
-		}
-
-		result := podDependsOnPodIP(pod)
-		if e, a := tc.expected, result; e != a {
-			t.Errorf("%v: Unexpected result; expected %v, got %v", tc.name, e, a)
-		}
-	}
-
 }

@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
@@ -74,9 +75,8 @@ const (
 	defaultReconcileInterval = 300    // 5m default task reconciliation interval
 	defaultReconcileCooldown = 15 * time.Second
 	defaultFrameworkName     = "Kubernetes"
-
-	executorCPUs = mresource.CPUShares(0.25) // initial CPU allocated for executor
-	executorMem  = mresource.MegaBytes(64.0) // initial memory allocated for executor
+	defaultExecutorCPUs      = mresource.CPUShares(0.25)  // initial CPU allocated for executor
+	defaultExecutorMem       = mresource.MegaBytes(128.0) // initial memory allocated for executor
 )
 
 type SchedulerServer struct {
@@ -96,6 +96,8 @@ type SchedulerServer struct {
 	MesosAuthPrincipal  string
 	MesosAuthSecretFile string
 	MesosCgroupPrefix   string
+	MesosExecutorCPUs   mresource.CPUShares
+	MesosExecutorMem    mresource.MegaBytes
 	Checkpoint          bool
 	FailoverTimeout     float64
 
@@ -139,6 +141,8 @@ type SchedulerServer struct {
 	KubeletNetworkPluginName      string
 	StaticPodsConfigPath          string
 	DockerCfgPath                 string
+	ContainPodResources           bool
+	AccountForPodResources        bool
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -170,18 +174,22 @@ func NewSchedulerServer() *SchedulerServer {
 		MinionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
 		MinionLogMaxAgeInDays: minioncfg.DefaultLogMaxAgeInDays,
 
-		MesosAuthProvider:    sasl.ProviderName,
-		MesosCgroupPrefix:    minioncfg.DefaultCgroupPrefix,
-		MesosMaster:          defaultMesosMaster,
-		MesosUser:            defaultMesosUser,
-		ReconcileInterval:    defaultReconcileInterval,
-		ReconcileCooldown:    defaultReconcileCooldown,
-		Checkpoint:           true,
-		FrameworkName:        defaultFrameworkName,
-		HA:                   false,
-		mux:                  http.NewServeMux(),
-		KubeletCadvisorPort:  4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
-		KubeletSyncFrequency: 10 * time.Second,
+		MesosAuthProvider:      sasl.ProviderName,
+		MesosCgroupPrefix:      minioncfg.DefaultCgroupPrefix,
+		MesosMaster:            defaultMesosMaster,
+		MesosUser:              defaultMesosUser,
+		MesosExecutorCPUs:      defaultExecutorCPUs,
+		MesosExecutorMem:       defaultExecutorMem,
+		ReconcileInterval:      defaultReconcileInterval,
+		ReconcileCooldown:      defaultReconcileCooldown,
+		Checkpoint:             true,
+		FrameworkName:          defaultFrameworkName,
+		HA:                     false,
+		mux:                    http.NewServeMux(),
+		KubeletCadvisorPort:    4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		KubeletSyncFrequency:   10 * time.Second,
+		ContainPodResources:    true,
+		AccountForPodResources: true,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -216,6 +224,8 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.MesosAuthProvider, "mesos-authentication-provider", s.MesosAuthProvider, fmt.Sprintf("Authentication provider to use, default is SASL that supports mechanisms: %+v", mech.ListSupported()))
 	fs.StringVar(&s.DockerCfgPath, "dockercfg-path", s.DockerCfgPath, "Path to a dockercfg file that will be used by the docker instance of the minions.")
 	fs.StringVar(&s.MesosCgroupPrefix, "mesos-cgroup-prefix", s.MesosCgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
+	fs.Var(&s.MesosExecutorCPUs, "mesos-executor-cpus", "Initial CPU shares to allocate for each Mesos executor container.")
+	fs.Var(&s.MesosExecutorMem, "mesos-executor-mem", "Initial memory (MB) to allocate for each Mesos executor container.")
 	fs.BoolVar(&s.Checkpoint, "checkpoint", s.Checkpoint, "Enable/disable checkpointing for the kubernetes-mesos framework.")
 	fs.Float64Var(&s.FailoverTimeout, "failover-timeout", s.FailoverTimeout, fmt.Sprintf("Framework failover timeout, in sec."))
 	fs.UintVar(&s.DriverPort, "driver-port", s.DriverPort, "Port that the Mesos scheduler driver process should listen on.")
@@ -231,6 +241,8 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.ServiceAddress, "service-address", s.ServiceAddress, "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
 	fs.Var(&s.DefaultContainerCPULimit, "default-container-cpu-limit", "Containers without a CPU resource limit are admitted this much CPU shares")
 	fs.Var(&s.DefaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
+	fs.BoolVar(&s.ContainPodResources, "contain-pod-resources", s.ContainPodResources, "Reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
+	fs.BoolVar(&s.AccountForPodResources, "account-for-pod-resources", s.AccountForPodResources, "Allocate pod CPU and memory resources from offers (Default: true)")
 
 	fs.IntVar(&s.ExecutorLogV, "executor-logv", s.ExecutorLogV, "Logging verbosity of spawned minion and executor processes.")
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
@@ -367,6 +379,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--mesos-cgroup-prefix=%v", s.MesosCgroupPrefix))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.KubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.KubeletSyncFrequency))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.ContainPodResources))
 
 	if s.AuthPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
@@ -444,8 +457,8 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	}
 
 	execInfo.Resources = []*mesos.Resource{
-		mutil.NewScalarResource("cpus", float64(executorCPUs)+staticPodCPUs),
-		mutil.NewScalarResource("mem", float64(executorMem)+staticPodMem),
+		mutil.NewScalarResource("cpus", float64(s.MesosExecutorCPUs)+staticPodCPUs),
+		mutil.NewScalarResource("mem", float64(s.MesosExecutorMem)+staticPodMem),
 	}
 
 	// calculate ExecutorInfo hash to be used for validating compatibility
@@ -651,17 +664,27 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("misconfigured etcd: %v", err)
 	}
 
+	as := scheduler.NewAllocationStrategy(
+		podtask.DefaultPredicate,
+		podtask.NewDefaultProcurement(s.DefaultContainerCPULimit, s.DefaultContainerMemLimit))
+
+	// downgrade allocation strategy if user disables "account-for-pod-resources"
+	if !s.AccountForPodResources {
+		as = scheduler.NewAllocationStrategy(
+			podtask.DefaultMinimalPredicate,
+			podtask.DefaultMinimalProcurement)
+	}
+
+	fcfs := scheduler.NewFCFSPodScheduler(as)
 	mesosPodScheduler := scheduler.New(scheduler.Config{
-		Schedcfg:                 *sc,
-		Executor:                 executor,
-		ScheduleFunc:             scheduler.FCFSScheduleFunc,
-		Client:                   client,
-		EtcdClient:               etcdClient,
-		FailoverTimeout:          s.FailoverTimeout,
-		ReconcileInterval:        s.ReconcileInterval,
-		ReconcileCooldown:        s.ReconcileCooldown,
-		DefaultContainerCPULimit: s.DefaultContainerCPULimit,
-		DefaultContainerMemLimit: s.DefaultContainerMemLimit,
+		Schedcfg:          *sc,
+		Executor:          executor,
+		Scheduler:         fcfs,
+		Client:            client,
+		EtcdClient:        etcdClient,
+		FailoverTimeout:   s.FailoverTimeout,
+		ReconcileInterval: s.ReconcileInterval,
+		ReconcileCooldown: s.ReconcileCooldown,
 	})
 
 	masterUri := s.MesosMaster

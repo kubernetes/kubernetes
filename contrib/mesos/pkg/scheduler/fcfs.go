@@ -24,8 +24,42 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
+type allocationStrategy struct {
+	fitPredicate podtask.FitPredicate
+	procurement  podtask.Procurement
+}
+
+func (a *allocationStrategy) FitPredicate() podtask.FitPredicate {
+	return a.fitPredicate
+}
+
+func (a *allocationStrategy) Procurement() podtask.Procurement {
+	return a.procurement
+}
+
+func NewAllocationStrategy(fitPredicate podtask.FitPredicate, procurement podtask.Procurement) AllocationStrategy {
+	if fitPredicate == nil {
+		panic("fitPredicate is required")
+	}
+	if procurement == nil {
+		panic("procurement is required")
+	}
+	return &allocationStrategy{
+		fitPredicate: fitPredicate,
+		procurement:  procurement,
+	}
+}
+
+type fcfsPodScheduler struct {
+	AllocationStrategy
+}
+
+func NewFCFSPodScheduler(as AllocationStrategy) PodScheduler {
+	return &fcfsPodScheduler{as}
+}
+
 // A first-come-first-serve scheduler: acquires the first offer that can support the task
-func FCFSScheduleFunc(r offers.Registry, unused SlaveIndex, task *podtask.T) (offers.Perishable, error) {
+func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, unused SlaveIndex, task *podtask.T) (offers.Perishable, error) {
 	podName := fmt.Sprintf("%s/%s", task.Pod.Namespace, task.Pod.Name)
 	var acceptedOffer offers.Perishable
 	err := r.Walk(func(p offers.Perishable) (bool, error) {
@@ -33,7 +67,7 @@ func FCFSScheduleFunc(r offers.Registry, unused SlaveIndex, task *podtask.T) (of
 		if offer == nil {
 			return false, fmt.Errorf("nil offer while scheduling task %v", task.ID)
 		}
-		if task.AcceptOffer(offer) {
+		if fps.FitPredicate()(task, offer) {
 			if p.Acquire() {
 				acceptedOffer = p
 				log.V(3).Infof("Pod %s accepted offer %v", podName, offer.Id.GetValue())

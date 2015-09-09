@@ -395,7 +395,7 @@ func (r *RollingUpdater) pollForReadyPods(interval, timeout time.Duration, oldRc
 // Existing controllers are validated to ensure their sourceIdAnnotation
 // matches sourceId; if there's a mismatch, an error is returned.
 func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error) {
-	existing, err := r.c.ReplicationControllers(controller.Namespace).Get(controller.Name)
+	existingRc, err := r.existingController(controller)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			// There was an error trying to find the controller; don't assume we
@@ -416,13 +416,23 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.R
 		return newRc, false, err
 	}
 	// Validate and use the existing controller.
-	annotations := existing.Annotations
+	annotations := existingRc.Annotations
 	source := annotations[sourceIdAnnotation]
 	_, ok := annotations[desiredReplicasAnnotation]
 	if source != sourceId || !ok {
 		return nil, false, fmt.Errorf("Missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceId, annotations)
 	}
-	return existing, true, nil
+	return existingRc, true, nil
+}
+
+// existingController verifies if the controller already exists
+func (r *RollingUpdater) existingController(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	// without rc name but generate name, there's no existing rc
+	if len(controller.Name) == 0 && len(controller.GenerateName) > 0 {
+		return nil, errors.NewNotFound("ReplicationController", controller.Name)
+	}
+	// controller name is required to get rc back
+	return r.c.ReplicationControllers(controller.Namespace).Get(controller.Name)
 }
 
 // cleanupWithClients performs cleanup tasks after the rolling update. Update

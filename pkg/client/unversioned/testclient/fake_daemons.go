@@ -27,7 +27,7 @@ import (
 // FakeDaemons implements DaemonInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeDaemons struct {
-	Fake      *Fake
+	Fake      *FakeExperimental
 	Namespace string
 }
 

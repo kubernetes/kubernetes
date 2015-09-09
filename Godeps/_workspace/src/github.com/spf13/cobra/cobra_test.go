@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/spf13/pflag"
 )
@@ -970,4 +971,21 @@ func TestFlagOnPflagCommandLine(t *testing.T) {
 	r := fullSetupTest("--help")
 
 	checkResultContains(t, r, flagName)
+}
+
+func TestAddTemplateFunctions(t *testing.T) {
+	AddTemplateFunc("t", func() bool { return true })
+	AddTemplateFuncs(template.FuncMap{
+		"f": func() bool { return false }, 
+		"h": func() string { return "Hello," }, 
+		"w": func() string { return "world." }})
+
+	const usage = "Hello, world."
+	
+	c := &Command{}
+	c.SetUsageTemplate(`{{if t}}{{h}}{{end}}{{if f}}{{h}}{{end}} {{w}}`)
+	
+	if us := c.UsageString(); us != usage {
+		t.Errorf("c.UsageString() != \"%s\", is \"%s\"", usage, us)
+	}
 }

@@ -5,9 +5,11 @@
 package testing
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -624,8 +626,8 @@ func TestStartContainerAlreadyRunning(t *testing.T) {
 	path := fmt.Sprintf("/containers/%s/start", server.containers[0].ID)
 	request, _ := http.NewRequest("POST", path, bytes.NewBuffer([]byte("null")))
 	server.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest {
-		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusBadRequest, recorder.Code)
+	if recorder.Code != http.StatusNotModified {
+		t.Errorf("StartContainer: wrong status code. Want %d. Got %d.", http.StatusNotModified, recorder.Code)
 	}
 }
 
@@ -845,22 +847,41 @@ func TestWaitContainerNotFound(t *testing.T) {
 	}
 }
 
+type HijackableResponseRecorder struct {
+	httptest.ResponseRecorder
+	readCh chan []byte
+}
+
+func (r *HijackableResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	myConn, otherConn := net.Pipe()
+	r.readCh = make(chan []byte)
+	go func() {
+		data, _ := ioutil.ReadAll(myConn)
+		r.readCh <- data
+	}()
+	return otherConn, nil, nil
+}
+
+func (r *HijackableResponseRecorder) HijackBuffer() string {
+	return string(<-r.readCh)
+}
+
 func TestAttachContainer(t *testing.T) {
 	server := DockerServer{}
 	addContainers(&server, 1)
 	server.containers[0].State.Running = true
 	server.buildMuxer()
-	recorder := httptest.NewRecorder()
+	recorder := &HijackableResponseRecorder{}
 	path := fmt.Sprintf("/containers/%s/attach?logs=1", server.containers[0].ID)
 	request, _ := http.NewRequest("POST", path, nil)
 	server.ServeHTTP(recorder, request)
 	lines := []string{
-		fmt.Sprintf("\x01\x00\x00\x00\x03\x00\x00\x00Container %q is running", server.containers[0].ID),
-		"What happened?",
-		"Something happened",
+		"\x01\x00\x00\x00\x00\x00\x00\x15Container is running",
+		"\x01\x00\x00\x00\x00\x00\x00\x0fWhat happened?",
+		"\x01\x00\x00\x00\x00\x00\x00\x13Something happened",
 	}
 	expected := strings.Join(lines, "\n") + "\n"
-	if body := recorder.Body.String(); body == expected {
+	if body := recorder.HijackBuffer(); body != expected {
 		t.Errorf("AttachContainer: wrong body. Want %q. Got %q.", expected, body)
 	}
 }
@@ -868,12 +889,50 @@ func TestAttachContainer(t *testing.T) {
 func TestAttachContainerNotFound(t *testing.T) {
 	server := DockerServer{}
 	server.buildMuxer()
-	recorder := httptest.NewRecorder()
+	recorder := &HijackableResponseRecorder{}
 	path := "/containers/abc123/attach?logs=1"
 	request, _ := http.NewRequest("POST", path, nil)
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("AttachContainer: wrong status. Want %d. Got %d.", http.StatusNotFound, recorder.Code)
+	}
+}
+
+func TestAttachContainerWithStreamBlocks(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 1)
+	server.containers[0].State.Running = true
+	server.buildMuxer()
+	path := fmt.Sprintf("/containers/%s/attach?logs=1&stdout=1&stream=1", server.containers[0].ID)
+	request, _ := http.NewRequest("POST", path, nil)
+	done := make(chan string)
+	go func() {
+		recorder := &HijackableResponseRecorder{}
+		server.ServeHTTP(recorder, request)
+		done <- recorder.HijackBuffer()
+	}()
+	select {
+	case <-done:
+		t.Fatalf("attach stream returned before container is stopped")
+	case <-time.After(500 * time.Millisecond):
+	}
+	server.cMut.Lock()
+	server.containers[0].State.Running = false
+	server.cMut.Unlock()
+	var body string
+	select {
+	case body = <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for attach to finish")
+	}
+	lines := []string{
+		"\x01\x00\x00\x00\x00\x00\x00\x15Container is running",
+		"\x01\x00\x00\x00\x00\x00\x00\x0fWhat happened?",
+		"\x01\x00\x00\x00\x00\x00\x00\x13Something happened",
+	}
+	expected := strings.Join(lines, "\n") + "\n"
+	if body != expected {
+		t.Errorf("AttachContainer: wrong body. Want %q. Got %q.", expected, body)
 	}
 }
 
@@ -1690,7 +1749,7 @@ func addNetworks(server *DockerServer, n int) {
 			ID:   fmt.Sprintf("%x", rand.Int()%10000),
 			Type: "bridge",
 			Endpoints: []*docker.Endpoint{
-				&docker.Endpoint{
+				{
 					Name:    "blah",
 					ID:      fmt.Sprintf("%x", rand.Int()%10000),
 					Network: netid,

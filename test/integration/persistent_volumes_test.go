@@ -40,7 +40,7 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	defer s.Close()
 
 	deleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 
 	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(client, 1*time.Second)
 	binder.Run()

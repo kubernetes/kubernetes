@@ -62,9 +62,9 @@ You may also find the Stack Overflow topics relevant:
 
 Someone else from the community may have already asked a similar question or may be able to help with your problem. The Kubernetes team will also monitor [posts tagged kubernetes](http://stackoverflow.com/questions/tagged/kubernetes). If there aren't any existing questions that help, please [ask a new one](http://stackoverflow.com/questions/ask?tags=kubernetes)!
 
-## IRC
+## <a name="slack"></a>Slack
 
-The Kubernetes team hangs out on IRC at [`#google-containers`](https://botbot.me/freenode/google-containers/) on freenode.  Feel free to come and ask any and all questions there.
+The Kubernetes team hangs out on Slack in the `#kubernetes-users` channel.  You can participate in the Kubernetes team [here](https://kubernetes.slack.com).  Slack requires registration, but the Kubernetes team is open invitation to anyone to register [here](http://slack.kubernetes.io).  Feel free to come and ask any and all questions.
 
 ## Mailing List
 
@@ -76,7 +76,10 @@ If you have what looks like a bug, or you would like to make a feature request, 
 
 Before you file an issue, please search existing issues to see if your issue is already covered.
 
-If filing a bug, please include detailed information about how to reproduce the problem.
+If filing a bug, please include detailed information about how to reproduce the problem, such as:
+* Kubernetes version: `kubectl version`
+* Cloud provider, OS distro, network configuration, and Docker version
+* Steps to reproduce the problem
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/troubleshooting.md?pixel)]()

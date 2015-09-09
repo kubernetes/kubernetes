@@ -90,6 +90,8 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+
 	return cmd
 }
 
@@ -219,23 +221,31 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err != nil {
 			return err
 		}
-		obj, err := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
-			err := labelFunc(obj, overwrite, resourceVersion, lbls, remove)
+
+		var outputObj runtime.Object
+		if cmdutil.GetFlagBool(cmd, "dry-run") {
+			err = labelFunc(info.Object, overwrite, resourceVersion, lbls, remove)
 			if err != nil {
 				return err
 			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-
-		outputFormat := cmdutil.GetFlagString(cmd, "output")
-		if outputFormat == "" {
-			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "labeled")
+			outputObj = info.Object
 		} else {
-			f.PrintObject(cmd, obj, out)
+			outputObj, err = cmdutil.UpdateObject(info, func(obj runtime.Object) error {
+				err := labelFunc(obj, overwrite, resourceVersion, lbls, remove)
+				if err != nil {
+					return err
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
 		}
+		outputFormat := cmdutil.GetFlagString(cmd, "output")
+		if outputFormat != "" {
+			return f.PrintObject(cmd, outputObj, out)
+		}
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "labeled")
 		return nil
 	})
 }

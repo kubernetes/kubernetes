@@ -70,7 +70,7 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
+	s := etcdstorage.NewEtcdStorage(f, testapi.Default.Codec(), etcdtest.PathPrefix())
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 	podPrefix := "/pods"
 	return f, &Etcd{
@@ -135,14 +135,14 @@ func TestEtcdList(t *testing.T) {
 
 	singleElemListResp := &etcd.Response{
 		Node: &etcd.Node{
-			Value: runtime.EncodeOrDie(testapi.Codec(), podA),
+			Value: runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 		},
 	}
 	normalListResp := &etcd.Response{
 		Node: &etcd.Node{
 			Nodes: []*etcd.Node{
-				{Value: runtime.EncodeOrDie(testapi.Codec(), podA)},
-				{Value: runtime.EncodeOrDie(testapi.Codec(), podB)},
+				{Value: runtime.EncodeOrDie(testapi.Default.Codec(), podA)},
+				{Value: runtime.EncodeOrDie(testapi.Default.Codec(), podB)},
 			},
 		},
 	}
@@ -243,7 +243,7 @@ func TestEtcdCreate(t *testing.T) {
 	nodeWithPodA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -323,7 +323,7 @@ func TestEtcdUpdate(t *testing.T) {
 	nodeWithPodA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -334,7 +334,7 @@ func TestEtcdUpdate(t *testing.T) {
 	newerNodeWithPodA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 2,
 				CreatedIndex:  1,
 			},
@@ -345,7 +345,7 @@ func TestEtcdUpdate(t *testing.T) {
 	nodeWithPodB := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podB),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podB),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -356,7 +356,7 @@ func TestEtcdUpdate(t *testing.T) {
 	nodeWithPodAWithResourceVersion := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podAWithResourceVersion),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podAWithResourceVersion),
 				ModifiedIndex: 3,
 				CreatedIndex:  1,
 			},
@@ -452,7 +452,7 @@ func TestEtcdGet(t *testing.T) {
 	nodeWithPodA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -508,7 +508,7 @@ func TestEtcdDelete(t *testing.T) {
 	nodeWithPodA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -576,7 +576,7 @@ func TestEtcdWatch(t *testing.T) {
 		respWithPodA := &etcd.Response{
 			Node: &etcd.Node{
 				Key:           "/registry/pods/default/foo",
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},

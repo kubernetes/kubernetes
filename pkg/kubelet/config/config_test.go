@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
@@ -55,10 +56,9 @@ func (s sortedPods) Less(i, j int) bool {
 func CreateValidPod(name, namespace, source string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         types.UID(name), // for the purpose of testing, this is unique enough
-			Name:        name,
-			Namespace:   namespace,
-			Annotations: map[string]string{kubelet.ConfigSourceAnnotationKey: source},
+			UID:       types.UID(name), // for the purpose of testing, this is unique enough
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
@@ -95,9 +95,11 @@ func expectPodUpdate(t *testing.T, ch <-chan kubelet.PodUpdate, expected ...kube
 		// TODO: consider mock out recordFirstSeen in config.go
 		for _, pod := range update.Pods {
 			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)
+			delete(pod.Annotations, kubelet.ConfigSourceAnnotationKey)
 		}
 		for _, pod := range expected[i].Pods {
 			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)
+			delete(pod.Annotations, kubelet.ConfigSourceAnnotationKey)
 		}
 		if !api.Semantic.DeepEqual(expected[i], update) {
 			t.Fatalf("Expected %#v, Got %#v", expected[i], update)
@@ -258,4 +260,36 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 		CreatePodUpdate(kubelet.REMOVE, NoneSource, CreateValidPod("foo", "new", "test")),
 		CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo4", "new", "test")),
 		CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+}
+
+func TestPodUpdateAnnotations(t *testing.T) {
+	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
+
+	pod := CreateValidPod("foo2", "new", "test")
+	pod.Annotations = make(map[string]string, 0)
+	pod.Annotations["kubernetes.io/blah"] = "blah"
+
+	clone, err := conversion.NewCloner().DeepCopy(pod)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	podUpdate := CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new", "test"), clone.(*api.Pod), CreateValidPod("foo3", "new", "test"))
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo1", "new", "test"), pod, CreateValidPod("foo3", "new", "test")))
+
+	pod.Annotations["kubenetes.io/blah"] = "superblah"
+	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new", "test"), pod, CreateValidPod("foo3", "new", "test"))
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+
+	pod.Annotations["kubernetes.io/otherblah"] = "doh"
+	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new", "test"), pod, CreateValidPod("foo3", "new", "test"))
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+
+	delete(pod.Annotations, "kubernetes.io/blah")
+	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new", "test"), pod, CreateValidPod("foo3", "new", "test"))
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
 }

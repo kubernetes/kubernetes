@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 // GetPrinter takes a format type, an optional format argument. It will return true
@@ -58,7 +57,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer = &YAMLPrinter{}
 	case "name":
 		printer = &NamePrinter{}
-	case "template":
+	case "template", "go-template":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
 		}
@@ -67,7 +66,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", formatArgument, err)
 		}
-	case "templatefile":
+	case "templatefile", "go-template-file":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
 		}
@@ -81,12 +80,24 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		}
 	case "jsonpath":
 		if len(formatArgument) == 0 {
-			return nil, false, fmt.Errorf("jsonpath format specified but no jsonpath template given")
+			return nil, false, fmt.Errorf("jsonpath template format specified but no template given")
 		}
 		var err error
 		printer, err = NewJSONPathPrinter(formatArgument)
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing jsonpath %s, %v\n", formatArgument, err)
+		}
+	case "jsonpath-file":
+		if len(formatArgument) == 0 {
+			return nil, false, fmt.Errorf("jsonpath file format specified but no template file file given")
+		}
+		data, err := ioutil.ReadFile(formatArgument)
+		if err != nil {
+			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
+		}
+		printer, err = NewJSONPathPrinter(string(data))
+		if err != nil {
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
 	case "wide":
 		fallthrough
@@ -367,6 +378,7 @@ var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODE
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
+var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
 
@@ -406,6 +418,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
 	h.Handler(deploymentColumns, printDeployment)
 	h.Handler(deploymentColumns, printDeploymentList)
+	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscaler)
+	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscalerList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -902,7 +916,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 		claimRefUID += pv.Spec.ClaimRef.Name
 	}
 
-	modesStr := volume.GetAccessModesAsString(pv.Spec.AccessModes)
+	modesStr := api.GetAccessModesAsString(pv.Spec.AccessModes)
 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.String()
@@ -947,7 +961,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, wit
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
-		accessModes = volume.GetAccessModesAsString(pvc.Status.AccessModes)
+		accessModes = api.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
@@ -1145,6 +1159,52 @@ func printDeployment(deployment *expapi.Deployment, w io.Writer, withNamespace b
 func printDeploymentList(list *expapi.DeploymentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printDeployment(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printHorizontalPodAutoscaler(hpa *expapi.HorizontalPodAutoscaler, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	namespace := hpa.Namespace
+	name := hpa.Name
+	reference := fmt.Sprintf("%s/%s/%s/%s",
+		hpa.Spec.ScaleRef.Kind,
+		hpa.Spec.ScaleRef.Namespace,
+		hpa.Spec.ScaleRef.Name,
+		hpa.Spec.ScaleRef.Subresource)
+	target := fmt.Sprintf("%s %v", hpa.Spec.Target.Quantity.String(), hpa.Spec.Target.Resource)
+
+	current := "<waiting>"
+	if hpa.Status != nil && hpa.Status.CurrentConsumption != nil {
+		current = fmt.Sprintf("%s %v", hpa.Status.CurrentConsumption.Quantity.String(), hpa.Status.CurrentConsumption.Resource)
+	}
+	minPods := hpa.Spec.MinCount
+	maxPods := hpa.Spec.MaxCount
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s",
+		name,
+		reference,
+		target,
+		current,
+		minPods,
+		maxPods,
+		translateTimestamp(hpa.CreationTimestamp),
+	); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(hpa.Labels, columnLabels))
+	return err
+}
+
+func printHorizontalPodAutoscalerList(list *expapi.HorizontalPodAutoscalerList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for i := range list.Items {
+		if err := printHorizontalPodAutoscaler(&list.Items[i], w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

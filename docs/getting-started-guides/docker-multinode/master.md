@@ -193,7 +193,7 @@ NAME        LABELS                             STATUS
 ```
 
 If the status of the node is `NotReady` or `Unknown` please check that all of the containers you created are successfully running.
-If all else fails, ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers).
+If all else fails, ask questions on [Slack](../../troubleshooting.md#slack).
 
 
 ### Next steps

@@ -20,32 +20,26 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*Etcd, *tools.FakeEtcdClient, allocator.Interface) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
+	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", etcdStorage)
+	return etcd, fakeClient, mem
 }
 
-func newStorage(t *testing.T) (*Etcd, allocator.Interface, *tools.FakeEtcdClient) {
-	fakeEtcdClient, s := newEtcdStorage(t)
-
-	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
-	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", s)
-
-	return etcd, mem, fakeEtcdClient
+func validNewRangeAllocation() *api.RangeAllocation {
+	return &api.RangeAllocation{
+		Range: "rangeSpecValue",
+	}
 }
 
 func key() string {
@@ -54,31 +48,18 @@ func key() string {
 }
 
 func TestEmpty(t *testing.T) {
-	storage, _, ecli := newStorage(t)
-	ecli.ExpectNotFoundGet(key())
+	storage, fakeClient, _ := newStorage(t)
+	fakeClient.ExpectNotFoundGet(key())
 	if _, err := storage.Allocate(1); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
 		t.Fatal(err)
 	}
 }
 
-func initialObject(ecli *tools.FakeEtcdClient) {
-	ecli.Data[key()] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				CreatedIndex:  1,
-				ModifiedIndex: 2,
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.RangeAllocation{
-					Range: "rangeSpecValue",
-				}),
-			},
-		},
-		E: nil,
-	}
-}
-
 func TestStore(t *testing.T) {
-	storage, backing, ecli := newStorage(t)
-	initialObject(ecli)
+	storage, fakeClient, backing := newStorage(t)
+	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if _, err := storage.Allocate(2); err != nil {
 		t.Fatal(err)
@@ -94,7 +75,7 @@ func TestStore(t *testing.T) {
 		t.Fatal("Expected allocation to fail")
 	}
 
-	obj := ecli.Data[key()]
+	obj := fakeClient.Data[key()]
 	if obj.R == nil || obj.R.Node == nil {
 		t.Fatalf("%s is empty: %#v", key(), obj)
 	}
@@ -106,7 +87,7 @@ func TestStore(t *testing.T) {
 	if err := storage.storage.Get(key(), allocation, false); err != nil {
 		t.Fatal(err)
 	}
-	if allocation.ResourceVersion != "1" {
+	if allocation.ResourceVersion != "2" {
 		t.Fatalf("%#v", allocation)
 	}
 	if allocation.Range != "rangeSpecValue" {

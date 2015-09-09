@@ -14,4 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-redis-server --slaveof redis-master 6379
+if [[ ${GET_HOSTS_FROM:-dns} == "env" ]]; then
+  redis-server --slaveof ${REDIS_MASTER_SERVICE_HOST} 6379
+else
+  redis-server --slaveof redis-master 6379
+fi

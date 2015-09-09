@@ -17,6 +17,7 @@ limitations under the License.
 package registrytest
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -34,10 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-func NewEtcdStorage(t *testing.T) (storage.Interface, *tools.FakeEtcdClient) {
+func NewEtcdStorage(t *testing.T, group string) (storage.Interface, *tools.FakeEtcdClient) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Groups[group].Codec(), etcdtest.PathPrefix())
 	return etcdStorage, fakeClient
 }
 
@@ -75,6 +76,11 @@ func (t *Tester) GeneratesName() *Tester {
 	return t
 }
 
+func (t *Tester) ReturnDeletedObject() *Tester {
+	t.tester = t.tester.ReturnDeletedObject()
+	return t
+}
+
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.tester.TestCreate(
 		valid,
@@ -96,6 +102,24 @@ func (t *Tester) TestUpdate(valid runtime.Object, validUpdateFunc UpdateFunc, in
 		t.getObject,
 		resttest.UpdateFunc(validUpdateFunc),
 		invalidFuncs...,
+	)
+}
+
+func (t *Tester) TestDelete(valid runtime.Object) {
+	t.tester.TestDelete(
+		valid,
+		t.setObject,
+		t.getObject,
+		isNotFoundEtcdError,
+	)
+}
+
+func (t *Tester) TestDeleteGraceful(valid runtime.Object, expectedGrace int64) {
+	t.tester.TestDeleteGraceful(
+		valid,
+		t.setObject,
+		t.getObject,
+		expectedGrace,
 	)
 }
 
@@ -126,6 +150,27 @@ func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels
 }
 
 // =============================================================================
+// get codec based on runtime.Object
+func getCodec(obj runtime.Object) (runtime.Codec, error) {
+	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected encoding error: %v", err)
+	}
+	// TODO: caesarxuchao: we should detect which group an object belongs to
+	// by using the version returned by Schem.ObjectVersionAndKind() once we
+	// split the schemes for internal objects.
+	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
+	var codec runtime.Codec
+	if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+		codec = testapi.Default.Codec()
+	} else if api.Scheme.Recognizes(testapi.Experimental.GroupAndVersion(), kind) {
+		codec = testapi.Experimental.Codec()
+	} else {
+		return nil, fmt.Errorf("unexpected kind: %v", kind)
+	}
+	return codec, nil
+}
+
 // Helper functions
 
 func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
@@ -143,7 +188,12 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 		return nil, err
 	}
 	result := t.storage.NewFunc()
-	if err := testapi.Codec().DecodeInto([]byte(resp.Node.Value), result); err != nil {
+
+	codec, err := getCodec(obj)
+	if err != nil {
+		return nil, err
+	}
+	if err := codec.DecodeInto([]byte(resp.Node.Value), result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -159,7 +209,12 @@ func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
 		return err
 	}
 	key = etcdtest.AddPrefix(key)
-	_, err = t.fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), obj), 0)
+
+	codec, err := getCodec(obj)
+	if err != nil {
+		return err
+	}
+	_, err = t.fakeClient.Set(key, runtime.EncodeOrDie(codec, obj), 0)
 	return err
 }
 
@@ -170,8 +225,9 @@ func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
 	if len(objects) > 0 {
 		nodes := make([]*etcd.Node, len(objects))
 		for i, obj := range objects {
-			encoded := runtime.EncodeOrDie(testapi.Codec(), obj)
-			decoded, _ := testapi.Codec().Decode([]byte(encoded))
+			codec, _ := getCodec(obj)
+			encoded := runtime.EncodeOrDie(codec, obj)
+			decoded, _ := codec.Decode([]byte(encoded))
 			nodes[i] = &etcd.Node{Value: encoded}
 			result[i] = decoded
 		}
@@ -201,7 +257,11 @@ func (t *Tester) injectWatchError(err error) {
 }
 
 func (t *Tester) emitObject(obj runtime.Object, action string) error {
-	encoded, err := testapi.Codec().Encode(obj)
+	codec, err := getCodec(obj)
+	if err != nil {
+		return err
+	}
+	encoded, err := codec.Encode(obj)
 	if err != nil {
 		return err
 	}
@@ -218,4 +278,12 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 		PrevNode: prevNode,
 	}
 	return nil
+}
+
+func isNotFoundEtcdError(err error) bool {
+	etcdError, ok := err.(*etcd.EtcdError)
+	if !ok {
+		return false
+	}
+	return etcdError.ErrorCode == tools.EtcdErrorCodeNotFound
 }

@@ -20,36 +20,19 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/v1"
+	// Ensure that expapi/v1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
-var scheme *runtime.Scheme
-var codec runtime.Codec
-
-func init() {
-	// Ensure that expapi/v1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
-	_ = v1.ThirdPartyResourceData{}
-}
-
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	storage := NewREST(etcdStorage, "foo", "bar")
-	return storage, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "experimental")
+	return NewREST(etcdStorage, "foo", "bar"), fakeClient
 }
 
 func validNewThirdPartyResourceData(name string) *expapi.ThirdPartyResourceData {
@@ -63,8 +46,8 @@ func validNewThirdPartyResourceData(name string) *expapi.ThirdPartyResourceData 
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := registrytest.New(t, fakeEtcdClient, storage.Etcd)
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	rsrc := validNewThirdPartyResourceData("foo")
 	rsrc.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -76,7 +59,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeClient, _ := newStorage(t)
+	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
@@ -90,75 +73,41 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
-func TestGet(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	rsrc := validNewThirdPartyResourceData("foo")
-	test.TestGet(rsrc)
+func TestDelete(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestDelete(validNewThirdPartyResourceData("foo"))
 }
 
-func TestEmptyList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-	rsrcList, err := registry.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(rsrcList.(*expapi.ThirdPartyResourceDataList).Items) != 0 {
-		t.Errorf("Unexpected non-zero autoscaler list: %#v", rsrcList)
-	}
-	if rsrcList.(*expapi.ThirdPartyResourceDataList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", rsrcList)
-	}
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewThirdPartyResourceData("foo"))
 }
 
 func TestList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.ThirdPartyResourceData{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.ThirdPartyResourceData{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
-		},
-	}
-	obj, err := registry.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	rsrcList := obj.(*expapi.ThirdPartyResourceDataList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewThirdPartyResourceData("foo"))
+}
 
-	if len(rsrcList.Items) != 2 {
-		t.Errorf("Unexpected ThirdPartyResourceData list: %#v", rsrcList)
-	}
-	if rsrcList.Items[0].Name != "foo" {
-		t.Errorf("Unexpected ThirdPartyResourceData: %#v", rsrcList.Items[0])
-	}
-	if rsrcList.Items[1].Name != "bar" {
-		t.Errorf("Unexpected ThirdPartyResourceData: %#v", rsrcList.Items[1])
-	}
+func TestWatch(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestWatch(
+		validNewThirdPartyResourceData("foo"),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{},
+		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+	)
 }

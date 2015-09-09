@@ -176,14 +176,14 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			rcVersion:       latest.Version, // see expected behavior 3b
 		},
 		"handles common version": {
-			outputVersion:   testapi.Version(),
-			listVersion:     testapi.Version(),
+			outputVersion:   testapi.Default.Version(),
+			listVersion:     testapi.Default.Version(),
 			testtypeVersion: "unlikelyversion",
-			rcVersion:       testapi.Version(),
+			rcVersion:       testapi.Default.Version(),
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, testapi.Version())
+		apiCodec := runtime.CodecFor(api.Scheme, testapi.Default.Version())
 		regularClient := &client.FakeRESTClient{
 			Codec: apiCodec,
 			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
@@ -440,7 +440,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: testapi.Version()}
+	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -488,7 +488,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Client = &client.FakeRESTClient{
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Version())) != "a=b" {
+			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -624,7 +624,7 @@ func TestWatchSelector(t *testing.T) {
 	tf.Client = &client.FakeRESTClient{
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Version())) != "a=b" {
+			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {

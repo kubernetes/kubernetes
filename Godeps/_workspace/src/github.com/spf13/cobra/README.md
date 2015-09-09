@@ -422,6 +422,10 @@ func main() {
 
 Cobra can generate a markdown formatted document based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Markdown Docs](md_docs.md)
 
+## Generating man pages for your command
+
+Cobra can generate a man page based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Man Docs](man_docs.md)
+
 ## Generating bash completions for your command
 
 Cobra can generate a bash completions file. If you add more information to your command these completions can be amazingly powerful and flexible.  Read more about [Bash Completions](bash_completions.md)

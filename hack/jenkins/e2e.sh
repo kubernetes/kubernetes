@@ -69,9 +69,6 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
-  : ${MASTER_SIZE:="n1-standard-2"}
-  : ${MINION_SIZE:="n1-standard-2"}
-  : ${NUM_MINIONS:="3"}
   : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
 fi
 
@@ -119,7 +116,6 @@ GCE_SLOW_TESTS=(
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
-    ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}}
     "Etcd"
     "NetworkingNew"
     "Nodes\sNetwork"
@@ -137,11 +133,11 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Elasticsearch"
     "PD"
     "ServiceAccounts"
-    "Service\sendpoints\slatency"
     "Services.*change\sthe\stype"
     "Services.*functioning\sexternal\sload\sbalancer"
     "Services.*identically\snamed"
     "Services.*release.*load\sbalancer"
+    "Services.*endpoint"
     )
 
 # Tests that should not run on soak cluster.
@@ -229,9 +225,10 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel.
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
@@ -248,8 +245,8 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
     : ${PROJECT:="kubernetes-jenkins"}
@@ -265,6 +262,7 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     # Override AWS defaults.
@@ -280,6 +278,7 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ) --ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}

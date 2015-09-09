@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 )
 
+var FileExtensions = []string{".json", ".stdin", ".yaml", ".yml"}
+
 // Builder provides convenience functions for taking arguments and parameters
 // from the command line and converting them to a list of resources to iterate
 // over using the Visitor interface.
@@ -164,7 +166,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			continue
 		}
 
-		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, []string{".json", ".stdin", ".yaml", ".yml"}, b.schema)
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, FileExtensions, b.schema)
 		if err != nil {
 			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}
@@ -646,7 +648,7 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{singular: singular, visitor: visitors, sources: b.paths}
 	}
 
-	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename")}
+	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename (%s)", strings.Join(FileExtensions, "|"))}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.
