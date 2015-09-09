@@ -98,6 +98,11 @@ func (plugin *RemoteNetworkPlugin) SetUpPod(namespace string, name string, podIn
 		return err
 	}
 
+	if network == nil {
+		glog.V(4).Infof("Network of namespace %s is nil, do nothing", namespace)
+		return nil
+	}
+
 	err = plugin.provider.Pods().SetupPod(name, namespace, string(podInfraContainerID), network, containerRuntime)
 	if err != nil {
 		glog.Errorf("SetupPod failed: %v", err)
@@ -115,6 +120,11 @@ func (plugin *RemoteNetworkPlugin) TearDownPod(namespace string, name string, po
 		return err
 	}
 
+	if network == nil {
+		glog.V(4).Infof("Network of namespace %s is nil, do nothing", namespace)
+		return nil
+	}
+
 	err = plugin.provider.Pods().TeardownPod(name, namespace, string(podInfraContainerID), network, containerRuntime)
 	if err != nil {
 		glog.Errorf("TeardownPod failed: %v", err)
@@ -130,6 +140,11 @@ func (plugin *RemoteNetworkPlugin) Status(namespace string, name string, podInfr
 	if err != nil {
 		glog.Errorf("GetNetworkOfNamespace failed: %v", err)
 		return nil, err
+	}
+
+	if networkInfo == nil {
+		glog.V(4).Infof("Network of namespace %s is nil, do nothing", namespace)
+		return nil, nil
 	}
 
 	ipAddress, err := plugin.provider.Pods().PodStatus(name, namespace, string(podInfraContainerID), networkInfo, containerRuntime)

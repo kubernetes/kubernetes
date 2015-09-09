@@ -754,6 +754,8 @@ func getServiceExternalIP(svc *api.Service) string {
 			return strings.Join(svc.Spec.ExternalIPs, ",")
 		}
 		return "nodes"
+	case api.ServiceTypeNetworkProvider:
+		fallthrough
 	case api.ServiceTypeLoadBalancer:
 		ingress := svc.Status.LoadBalancer.Ingress
 		result := []string{}

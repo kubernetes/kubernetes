@@ -338,7 +338,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 			}
 			// override the above if a network plugin exists
 			if dm.networkPlugin.Name() != network.DefaultPluginName {
-				netStatus, err := dm.networkPlugin.Status(pod.Namespace, pod.Name, kubeletTypes.DockerID(dockerID))
+				netStatus, err := dm.networkPlugin.Status(pod.Namespace, pod.Name, kubeletTypes.DockerID(dockerID), "docker")
 				if err != nil {
 					glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), pod.Name, err)
 				} else if netStatus != nil {

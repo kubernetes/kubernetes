@@ -369,18 +369,29 @@ func (e *NetworkController) syncService(key string) {
 	}
 
 	// check if loadbalancer already created
+	loadBalanerShouldExist := !(len(service.Spec.ExternalIPs) == 0)
 	var status *api.LoadBalancerStatus
 	loadBalancerFullName := networkprovider.BuildLoadBalancerName(service.Name, service.Namespace)
 	loadBalancer, err := e.netProvider.LoadBalancers().GetLoadBalancer(loadBalancerFullName)
 	if err != nil && err.Error() == networkprovider.ErrNotFound.Error() {
-		// create new loadbalancer
-		status, _ = e.createLoadBalancer(service)
+		if loadBalanerShouldExist {
+			// create new loadbalancer
+			status, _ = e.createLoadBalancer(service)
+		}
 	} else if err != nil {
 		glog.Errorf("NetworkController: couldn't get loadbalancer from networkprovider: %v", err)
 		return
 	} else {
-		// update loadbalancer
-		status, _ = e.updateLoadBalancer(service, loadBalancer)
+		if loadBalanerShouldExist {
+			// update loadbalancer
+			status, _ = e.updateLoadBalancer(service, loadBalancer)
+		} else {
+			// delete loadbalancer
+			deleteError := e.netProvider.LoadBalancers().DeleteLoadBalancer(loadBalancerFullName)
+			if deleteError != nil {
+				glog.Errorf("NetworkController: delete loadbalancer %s failed: %v", loadBalancerFullName, err)
+			}
+		}
 	}
 
 	if status != nil {
@@ -551,10 +562,6 @@ func (e *NetworkController) createLoadBalancer(service *api.Service) (*api.LoadB
 		Subnets:     networkInfo.Subnets,
 		Hosts:       newHosts,
 		ExternalIPs: service.Spec.ExternalIPs,
-	}
-
-	if service.Spec.ClusterIP != "" {
-		providerLoadBalancer.Vip = service.Spec.ClusterIP
 	}
 
 	vip, err := e.netProvider.LoadBalancers().CreateLoadBalancer(&providerLoadBalancer, service.Spec.SessionAffinity)
