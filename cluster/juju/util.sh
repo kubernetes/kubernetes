@@ -18,7 +18,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
+#set -o xtrace
 
 UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE}")
 JUJU_PATH=$(dirname ${UTIL_SCRIPT})
