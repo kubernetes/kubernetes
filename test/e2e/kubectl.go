@@ -771,7 +771,7 @@ func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (str
 		Namespace(ns).
 		Resource("services").
 		Name("frontend").
-		Suffix("/index.php").
+		Suffix("/guestbook.php").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).
