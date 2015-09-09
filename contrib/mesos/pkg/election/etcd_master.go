@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -46,7 +47,9 @@ type empty struct{}
 
 // internal implementation struct
 type etcdMasterElector struct {
-	etcd   tools.EtcdClient
+	// TODO: This should really use an abstracted storage interface or remove deps
+	// on internal interfaces which should be removed
+	etcd   etcd.KeysAPI
 	done   chan empty
 	events chan watch.Event
 }
@@ -90,7 +93,12 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 	// Uses compare and swap, so that if we TTL out in the meantime, the write will fail.
 	// We don't handle the TTL delete w/o a write case here, it's handled in the next loop
 	// iteration.
-	_, err := e.etcd.CompareAndSwap(path, id, ttl, "", res.Node.ModifiedIndex)
+	opts := etcd.SetOptions{
+		TTL:       time.Duration(ttl),
+		PrevValue: "",
+		PrevIndex: res.Node.ModifiedIndex,
+	}
+	_, err := e.etcd.Set(context.Background(), path, id, &opts)
 	if err != nil && !etcdstorage.IsEtcdTestFailed(err) {
 		return "", err
 	}
@@ -105,7 +113,10 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 // returns id, nil if the attempt succeeded
 // returns "", err if an error occurred
 func (e *etcdMasterElector) becomeMaster(path, id string, ttl uint64) (string, error) {
-	_, err := e.etcd.Create(path, id, ttl)
+	opts := etcd.CreateInOrderOptions{
+		TTL: time.Duration(ttl),
+	}
+	_, err := e.etcd.CreateInOrder(context.Background(), path, id, &opts)
 	if err != nil && !etcdstorage.IsEtcdNodeExist(err) {
 		// unexpected error
 		return "", err
@@ -122,7 +133,8 @@ func (e *etcdMasterElector) becomeMaster(path, id string, ttl uint64) (string, e
 // in situations where you should try again due to concurrent state changes (e.g. another actor simultaneously acquiring the lock)
 // it returns "", nil
 func (e *etcdMasterElector) handleMaster(path, id string, ttl uint64) (string, error) {
-	res, err := e.etcd.Get(path, false, false)
+
+	res, err := e.etcd.Get(context.Background(), path, nil)
 
 	// Unexpected error, bail out
 	if err != nil && !etcdstorage.IsEtcdNotFound(err) {

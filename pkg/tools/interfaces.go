@@ -17,7 +17,9 @@ limitations under the License.
 package tools
 
 import (
-	"github.com/coreos/go-etcd/etcd"
+	"errors"
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -28,21 +30,27 @@ const (
 )
 
 var (
-	EtcdErrorNotFound      = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNotFound}
-	EtcdErrorTestFailed    = &etcd.EtcdError{ErrorCode: EtcdErrorCodeTestFailed}
-	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
-	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
+	EtcdErrorNotFound         = &etcd.Error{Code: EtcdErrorCodeNotFound}
+	EtcdErrorTestFailed       = &etcd.Error{Code: EtcdErrorCodeTestFailed}
+	EtcdErrorNodeExist        = &etcd.Error{Code: EtcdErrorCodeNodeExist}
+	EtcdErrorValueRequired    = &etcd.Error{Code: EtcdErrorCodeValueRequired}
+	EtcdErrWatchStoppedByUser = errors.New("Watch stopped by the user via stop channel")
 )
 
-// EtcdClient is an injectable interface for testing.
+//TODO: Eliminate this entirely through data hiding ~= pImpl idiom on storage layer.
+//      At this point it's only used for the mock testing environment, and is eliminated
+//      in the mainline code.  However, it needs to be cleaned in contrib modules.
+type EtcdWatcher interface {
+	Next(context.Context) (*etcd.Response, error)
+}
+
 type EtcdClient interface {
-	GetCluster() []string
-	Get(key string, sort, recursive bool) (*etcd.Response, error)
-	Set(key, value string, ttl uint64) (*etcd.Response, error)
-	Create(key, value string, ttl uint64) (*etcd.Response, error)
-	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
-	Delete(key string, recursive bool) (*etcd.Response, error)
-	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
-	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
-	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
+	Get(ctx context.Context, key string, opts *etcd.GetOptions) (*etcd.Response, error)
+	Set(ctx context.Context, key, value string, opts *etcd.SetOptions) (*etcd.Response, error)
+	Create(ctx context.Context, key, value string) (*etcd.Response, error)
+	CreateInOrder(ctx context.Context, key, value string, opts *etcd.CreateInOrderOptions) (*etcd.Response, error)
+	Update(ctx context.Context, key, value string) (*etcd.Response, error)
+	Delete(ctx context.Context, key string, opts *etcd.DeleteOptions) (*etcd.Response, error)
+	Watcher(key string, opts *etcd.WatcherOptions) etcd.Watcher
+	// Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }

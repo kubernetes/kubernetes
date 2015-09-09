@@ -93,9 +93,19 @@
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
-			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v2.0.0-13-g4cceaf7",
-			"Rev": "4cceaf7283b76f27c4a732b20730dcdb61053bf5"
+			"ImportPath": "github.com/coreos/etcd/client",
+			"Comment": "v2.2.0-28-g40e0a33",
+			"Rev": "40e0a33fcda61faca3a342128a1e7b1e53b81e6d"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
+			"Comment": "v2.2.0-28-g40e0a33",
+			"Rev": "40e0a33fcda61faca3a342128a1e7b1e53b81e6d"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.2.0-28-g40e0a33",
+			"Rev": "40e0a33fcda61faca3a342128a1e7b1e53b81e6d"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/http",

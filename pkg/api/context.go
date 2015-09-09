@@ -18,6 +18,7 @@ package api
 
 import (
 	stderrs "errors"
+	"time"
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -26,6 +27,9 @@ import (
 // Context carries values across API boundaries.
 type Context interface {
 	Value(key interface{}) interface{}
+	Deadline() (deadline time.Time, ok bool)
+	Done() <-chan struct{}
+	Err() error
 }
 
 // The key type is unexported to prevent collisions

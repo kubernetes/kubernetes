@@ -30,8 +30,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -69,7 +70,7 @@ func init() {
 }
 
 func newEtcdHelper(client tools.EtcdClient, codec runtime.Codec, prefix string) etcdHelper {
-	return *NewEtcdStorage(client, codec, prefix).(*etcdHelper)
+	return *NewEtcdStorage(nil, client, codec, prefix).(*etcdHelper)
 }
 
 func TestIsEtcdNotFound(t *testing.T) {
@@ -79,7 +80,7 @@ func TestIsEtcdNotFound(t *testing.T) {
 		}
 	}
 	try(tools.EtcdErrorNotFound, true)
-	try(&etcd.EtcdError{ErrorCode: 101}, false)
+	try(&etcd.Error{Code: 101}, false)
 	try(nil, false)
 	try(fmt.Errorf("some other kind of error"), false)
 }
@@ -98,7 +99,7 @@ func TestList(t *testing.T) {
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
-			EtcdIndex: 10,
+			Index: 10,
 			Node: &etcd.Node{
 				Dir: true,
 				Nodes: []*etcd.Node{
@@ -156,7 +157,7 @@ func TestList(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.List("/some/key", storage.Everything, &got)
+	err := helper.List(context.Background(), "/some/key", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -171,7 +172,7 @@ func TestListFiltered(t *testing.T) {
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
-			EtcdIndex: 10,
+			Index: 10,
 			Node: &etcd.Node{
 				Dir: true,
 				Nodes: []*etcd.Node{
@@ -218,7 +219,7 @@ func TestListFiltered(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.List("/some/key", filter, &got)
+	err := helper.List(context.Background(), "/some/key", filter, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -234,7 +235,7 @@ func TestListAcrossDirectories(t *testing.T) {
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
-			EtcdIndex: 10,
+			Index: 10,
 			Node: &etcd.Node{
 				Dir: true,
 				Nodes: []*etcd.Node{
@@ -306,7 +307,7 @@ func TestListAcrossDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.List("/some/key", storage.Everything, &got)
+	err := helper.List(context.Background(), "/some/key", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -321,7 +322,7 @@ func TestListExcludesDirectories(t *testing.T) {
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
-			EtcdIndex: 10,
+			Index: 10,
 			Node: &etcd.Node{
 				Dir: true,
 				Nodes: []*etcd.Node{
@@ -381,7 +382,7 @@ func TestListExcludesDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.List("/some/key", storage.Everything, &got)
+	err := helper.List(context.Background(), "/some/key", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -403,9 +404,9 @@ func TestGet(t *testing.T) {
 			TerminationGracePeriodSeconds: &grace,
 		},
 	}
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &expect), 0)
+	fakeClient.Set(context.Background(), key, runtime.EncodeOrDie(testapi.Default.Codec(), &expect), nil)
 	var got api.Pod
-	err := helper.Get("/some/key", &got, false)
+	err := helper.Get(context.Background(), "/some/key", &got, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -422,8 +423,8 @@ func TestGetNotFoundErr(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{
-			ErrorCode: 100,
+		E: &etcd.Error{
+			Code: 100,
 		},
 	}
 	key2 := etcdtest.AddPrefix("/some/key2")
@@ -442,11 +443,11 @@ func TestGetNotFoundErr(t *testing.T) {
 	}
 	try := func(key string) {
 		var got api.Pod
-		err := helper.Get(key, &got, false)
+		err := helper.Get(context.Background(), key, &got, false)
 		if err == nil {
 			t.Errorf("%s: wanted error but didn't get one", key)
 		}
-		err = helper.Get(key, &got, true)
+		err = helper.Get(context.Background(), key, &got, true)
 		if err != nil {
 			t.Errorf("%s: didn't want error but got %#v", key, err)
 		}
@@ -462,7 +463,7 @@ func TestCreate(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
-	err := helper.Create("/some/key", obj, returnedObj, 5)
+	err := helper.Create(context.Background(), "/some/key", obj, returnedObj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -487,7 +488,7 @@ func TestCreateNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := tools.NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
-	err := helper.Create("/some/key", obj, nil, 5)
+	err := helper.Create(context.Background(), "/some/key", obj, nil, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -498,7 +499,7 @@ func TestSet(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
-	err := helper.Set("/some/key", obj, returnedObj, 5)
+	err := helper.Set(context.Background(), "/some/key", obj, returnedObj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -520,17 +521,6 @@ func TestSet(t *testing.T) {
 	}
 }
 
-func TestSetFailCAS(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
-	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.CasErr = fakeClient.NewError(123)
-	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
-	err := helper.Set("/some/key", obj, nil, 5)
-	if err == nil {
-		t.Errorf("Expecting error.")
-	}
-}
-
 func TestSetWithVersion(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := tools.NewFakeEtcdClient(t)
@@ -547,7 +537,7 @@ func TestSetWithVersion(t *testing.T) {
 	}
 
 	returnedObj := &api.Pod{}
-	err := helper.Set("/some/key", obj, returnedObj, 7)
+	err := helper.Set(context.Background(), "/some/key", obj, returnedObj, 7)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -574,7 +564,7 @@ func TestSetWithoutResourceVersioner(t *testing.T) {
 	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	helper.versioner = nil
 	returnedObj := &api.Pod{}
-	err := helper.Set("/some/key", obj, returnedObj, 3)
+	err := helper.Set(context.Background(), "/some/key", obj, returnedObj, 3)
 	key := etcdtest.AddPrefix("/some/key")
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -601,7 +591,7 @@ func TestSetNilOutParam(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	helper.versioner = nil
-	err := helper.Set("/some/key", obj, nil, 3)
+	err := helper.Set(context.Background(), "/some/key", obj, nil, 3)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -616,7 +606,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	err := helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
 	if err != nil {
@@ -635,7 +625,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	// Update an existing node.
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	err = helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
 		if in.(*TestResource).Value != 1 {
@@ -671,7 +661,7 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	err := helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		if res.TTL != 0 {
 			t.Fatalf("unexpected response meta: %#v", res)
 		}
@@ -697,7 +687,7 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 	// Update an existing node.
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	err = helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		if res.TTL != 10 {
 			t.Fatalf("unexpected response meta: %#v", res)
 		}
@@ -729,7 +719,7 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 	// Update an existing node and change ttl
 	callbackCalled = false
 	objUpdate = &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 3}
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	err = helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		if res.TTL != 10 {
 			t.Fatalf("unexpected response meta: %#v", res)
 		}
@@ -772,7 +762,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	err := helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
 	if err != nil {
@@ -782,7 +772,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	// Update an existing node with the same data
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	err = helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		fakeClient.Err = errors.New("should not be called")
 		callbackCalled = true
 		return objUpdate, nil
@@ -810,13 +800,13 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	})
 
 	ignoreNotFound := false
-	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
+	err := helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, ignoreNotFound, f)
 	if err == nil {
 		t.Errorf("Expected error for key not found.")
 	}
 
 	ignoreNotFound = true
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
+	err = helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, ignoreNotFound, f)
 	if err != nil {
 		t.Errorf("Unexpected error %v.", err)
 	}
@@ -842,7 +832,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 			defer wgDone.Done()
 
 			firstCall := true
-			err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+			err := helper.GuaranteedUpdate(context.Background(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 				defer func() { firstCall = false }()
 
 				if firstCall {

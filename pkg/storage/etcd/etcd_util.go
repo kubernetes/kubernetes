@@ -25,8 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/tools"
 
-	goetcd "github.com/coreos/go-etcd/etcd"
-	"github.com/golang/glog"
+	etcd "github.com/coreos/etcd/client"
 )
 
 // IsEtcdNotFound returns true if and only if err is an etcd not found error.
@@ -46,19 +45,19 @@ func IsEtcdTestFailed(err error) bool {
 
 // IsEtcdWatchStoppedByUser returns true if and only if err is a client triggered stop.
 func IsEtcdWatchStoppedByUser(err error) bool {
-	return goetcd.ErrWatchStoppedByUser == err
+	return tools.EtcdErrWatchStoppedByUser == err
 }
 
 // isEtcdErrorNum returns true if and only if err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
-	etcdError, ok := err.(*goetcd.EtcdError)
-	return ok && etcdError != nil && etcdError.ErrorCode == errorCode
+	etcdError, ok := err.(*etcd.Error)
+	return ok && etcdError != nil && etcdError.Code == errorCode
 }
 
 // etcdErrorIndex returns the index associated with the error message and whether the
 // index was available.
 func etcdErrorIndex(err error) (uint64, bool) {
-	if etcdError, ok := err.(*goetcd.EtcdError); ok {
+	if etcdError, ok := err.(*etcd.Error); ok {
 		return etcdError.Index, true
 	}
 	return 0, false
@@ -89,20 +88,6 @@ func startEtcd() (*exec.Cmd, error) {
 		return nil, err
 	}
 	return cmd, nil
-}
-
-func NewEtcdClientStartServerIfNecessary(server string) (tools.EtcdClient, error) {
-	_, err := GetEtcdVersion(server)
-	if err != nil {
-		glog.Infof("Failed to find etcd, attempting to start.")
-		_, err := startEtcd()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	servers := []string{server}
-	return goetcd.NewClient(servers), nil
 }
 
 type etcdHealth struct {

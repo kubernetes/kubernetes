@@ -64,9 +64,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/e2e"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -100,12 +101,21 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	handler := delegateHandler{}
 	apiServer := httptest.NewServer(&handler)
+	cfg := etcd.Config{
+		Endpoints: servers,
+		Transport: etcd.DefaultTransport,
+	}
 
-	etcdClient := etcd.NewClient(servers)
+	etcdClient, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("Error creating etcd client: %v", err)
+	}
+
+	kAPI := etcd.NewKeysAPI(etcdClient)
 	sleep := 4 * time.Second
 	ok := false
 	for i := 0; i < 3; i++ {
-		keys, err := etcdClient.Get("/", false, false)
+		keys, err := kAPI.Get(context.Background(), "/", nil)
 		if err != nil {
 			glog.Warningf("Unable to list root etcd keys: %v", err)
 			if i < 2 {
@@ -115,7 +125,10 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 			continue
 		}
 		for _, node := range keys.Node.Nodes {
-			if _, err := etcdClient.Delete(node.Key, true); err != nil {
+			opts := etcd.DeleteOptions{
+				Recursive: true,
+			}
+			if _, err := kAPI.Delete(context.Background(), node.Key, &opts); err != nil {
 				glog.Fatalf("Unable delete key: %v", err)
 			}
 		}

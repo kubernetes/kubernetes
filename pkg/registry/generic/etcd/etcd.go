@@ -156,7 +156,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 	if name, ok := m.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			trace.Step("About to read single object")
-			err := e.Storage.GetToList(key, filterFunc, list)
+			err := e.Storage.GetToList(ctx, key, filterFunc, list)
 			trace.Step("Object extracted")
 			if err != nil {
 				return nil, err
@@ -167,7 +167,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 	}
 
 	trace.Step("About to list directory")
-	err := e.Storage.List(e.KeyRootFunc(ctx), filterFunc, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), filterFunc, list)
 	trace.Step("List extracted")
 	if err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	}
 	trace.Step("About to create object")
 	out := e.NewFunc()
-	if err := e.Storage.Create(key, obj, out, ttl); err != nil {
+	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
 		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
@@ -232,7 +232,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
 	// then we populate it with the latest version.
 	// Else, we check that the version specified by the user matches the version of latest etcd object.
-	resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+	resourceVersion, err := e.Storage.Versioner(ctx).ObjectResourceVersion(obj)
 	if err != nil {
 		return nil, false, err
 	}
@@ -240,8 +240,8 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Storage.GuaranteedUpdate(key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
+	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		version, err := e.Storage.Versioner(ctx).ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -263,13 +263,13 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		creating = false
 		if doUnconditionalUpdate {
 			// Update the object's resource version to match the latest etcd object's resource version.
-			err = e.Storage.Versioner().UpdateObject(obj, res.Expiration, res.ResourceVersion)
+			err = e.Storage.Versioner(ctx).UpdateObject(obj, res.Expiration, res.ResourceVersion)
 			if err != nil {
 				return nil, nil, err
 			}
 		} else {
 			// Check if the object's resource version matches the latest resource version.
-			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+			newVersion, err := e.Storage.Versioner(ctx).ObjectResourceVersion(obj)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -330,7 +330,7 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 		return nil, err
 	}
 	trace.Step("About to read object")
-	if err := e.Storage.Get(key, obj, false); err != nil {
+	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
 	}
 	trace.Step("Object read")
@@ -358,7 +358,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	trace := util.NewTrace("Delete " + reflect.TypeOf(obj).String())
 	defer trace.LogIfLong(time.Second)
 	trace.Step("About to read object")
-	if err := e.Storage.Get(key, obj, false); err != nil {
+	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 
@@ -378,7 +378,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		out := e.NewFunc()
 		lastGraceful := int64(0)
 		err := e.Storage.GuaranteedUpdate(
-			key, out, false,
+			ctx, key, out, false,
 			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 				graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 				if err != nil {
@@ -413,7 +413,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
 	trace.Step("About to delete object")
-	if err := e.Storage.Delete(key, out); err != nil {
+	if err := e.Storage.Delete(ctx, key, out); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 	return e.finalizeDelete(out, true)
@@ -457,12 +457,12 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 			if err != nil {
 				return nil, err
 			}
-			return e.Storage.Watch(key, version, filterFunc)
+			return e.Storage.Watch(ctx, key, version, filterFunc)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	return e.Storage.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
+	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), version, filterFunc)
 }
 
 func (e *Etcd) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {

@@ -396,6 +396,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	}))
 	defer s.Close()
 
+	fmt.Printf("creating a new master")
 	m = master.New(&master.Config{
 		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
@@ -409,6 +410,8 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
+
+	fmt.Printf("creating a new master - DONE ")
 	transport := http.DefaultTransport
 	previousResourceVersion := make(map[string]float64)
 

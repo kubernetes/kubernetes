@@ -82,7 +82,7 @@ func TestGet(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &validController), 0); err != nil {
+	if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &validController), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestUpdate(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &validController), 0); err != nil {
+	if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &validController), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
@@ -116,7 +116,7 @@ func TestUpdate(t *testing.T) {
 	if _, _, err := storage.Update(ctx, &update); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	response, err := fakeClient.Get(key, false, false)
+	response, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

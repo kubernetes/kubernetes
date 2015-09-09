@@ -25,10 +25,12 @@ import (
 	"sync"
 	"time"
 
+	etcd "github.com/coreos/etcd/client"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	"golang.org/x/net/context"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
@@ -48,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -79,7 +80,7 @@ type KubernetesScheduler struct {
 	executor          *mesos.ExecutorInfo
 	executorGroup     uint64
 	client            *client.Client
-	etcdClient        tools.EtcdClient
+	etcdClient        etcd.Client
 	failoverTimeout   float64 // in seconds
 	reconcileInterval int64
 
@@ -112,7 +113,7 @@ type Config struct {
 	Executor          *mesos.ExecutorInfo
 	Scheduler         PodScheduler
 	Client            *client.Client
-	EtcdClient        tools.EtcdClient
+	EtcdClient        etcd.Client
 	FailoverTimeout   float64
 	ReconcileInterval int64
 	ReconcileCooldown time.Duration
@@ -259,7 +260,11 @@ func (k *KubernetesScheduler) Registered(drv bindings.SchedulerDriver, fid *meso
 
 func (k *KubernetesScheduler) storeFrameworkId() {
 	// TODO(jdef): port FrameworkId store to generic Kubernetes config store as soon as available
-	_, err := k.etcdClient.Set(meta.FrameworkIDKey, k.frameworkId.GetValue(), uint64(k.failoverTimeout))
+	kAPI := etcd.NewKeysAPI(k.etcdClient)
+	opts := etcd.SetOptions{
+		TTL: time.Duration(k.failoverTimeout),
+	}
+	_, err := kAPI.Set(context.Background(), meta.FrameworkIDKey, k.frameworkId.GetValue(), &opts)
 	if err != nil {
 		log.Errorf("failed to renew frameworkId TTL: %v", err)
 	}
