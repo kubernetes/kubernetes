@@ -307,6 +307,12 @@ Once in beta we will preserve forward compatibility, but may introduce new versi
 
 v1 must be backward-compatible for an extended length of time.
 
+#### Experimental API FAQ
+
+1. What version do I specify in the json of new experimental resource: If you resource is under expapi/v1, you should just specify v1.
+2. My apiserver doesn't have a /experimental endpoint: Start the apiserver with `--runtime-config=experimental/v1=true` to expose v1 experimental resources on the `/experimental/v1` endpoint.
+3. What kubectl commands do I use to access experimental objects: kubectl provides a consistent UI across experimental and non-experimental resources. As long as you've implemented a [resource_printer](../../pkg/kubectl/resource_printer.go#L386) for your api object, kubectl will work as it always does.
+
 ## Changing versioned APIs
 
 For most changes, you will probably find it easiest to change the versioned
@@ -517,7 +523,6 @@ The API spec changes should be in a commit separate from your other changes.
 ## Adding new REST objects
 
 TODO(smarterclayton): write this.
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()
