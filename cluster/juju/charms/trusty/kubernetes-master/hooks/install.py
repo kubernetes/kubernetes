@@ -30,11 +30,11 @@ def install():
     download_go()
 
     hookenv.log('Adding kubernetes and go to the path')
+    address = hookenv.unit_private_ip()
     strings = [
         'export GOROOT=/usr/local/go\n',
         'export PATH=$PATH:$GOROOT/bin\n',
-        'export KUBE_MASTER_IP=0.0.0.0\n',
-        'export KUBERNETES_MASTER=http://$KUBE_MASTER_IP\n',
+        'export KUBERNETES_MASTER=http://{0}:8080\n'.format(address),
         ]
     update_rc_files(strings)
     hookenv.log('Downloading kubernetes code')
