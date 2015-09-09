@@ -50,6 +50,7 @@ Code conventions
         - so pkg/controllers/autoscaler/foo.go should say `package autoscaler` not `package autoscalercontroller`.
         - Unless there's a good reason, the `package foo` line should match the name of the directory in which the .go file exists.
         - Importers can use a different name if they need to disambiguate.
+      - Locks should be called `lock` and should never be embedded (always `lock sync.Mutex`). When multiple locks are present, give each lock a distinct name following Go conventions - `stateLock`, `mapLock` etc.
     - API conventions
       - [API changes](api_changes.md)
       - [API conventions](api-conventions.md)
