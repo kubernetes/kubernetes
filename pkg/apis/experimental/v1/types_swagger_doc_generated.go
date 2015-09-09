@@ -178,6 +178,67 @@ func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscalerStatus
 }
 
+var map_Job = map[string]string{
+	"":         "Job represents the configuration of a single job.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (Job) SwaggerDoc() map[string]string {
+	return map_Job
+}
+
+var map_JobCondition = map[string]string{
+	"":                   "JobCondition describes current state of a job.",
+	"type":               "Type of job condition, currently only Complete.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastProbeTime":      "Last time the condition was checked.",
+	"lastTransitionTime": "Last time the condition transit from one status to another.",
+	"reason":             "(brief) reason for the condition's last transition.",
+	"message":            "Human readable message indicating details about last transition.",
+}
+
+func (JobCondition) SwaggerDoc() map[string]string {
+	return map_JobCondition
+}
+
+var map_JobList = map[string]string{
+	"":         "JobList is a collection of jobs.",
+	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is the list of Job.",
+}
+
+func (JobList) SwaggerDoc() map[string]string {
+	return map_JobList
+}
+
+var map_JobSpec = map[string]string{
+	"":            "JobSpec describes how the job execution will look like.",
+	"parallelism": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism.",
+	"completions": "Completions specifies the desired number of successfully finished pods the job should be run with. Defaults to 1.",
+	"selector":    "Selector is a label query over pods that should match the pod count.",
+	"template":    "Template is the object that describes the pod that will be created when executing a job.",
+}
+
+func (JobSpec) SwaggerDoc() map[string]string {
+	return map_JobSpec
+}
+
+var map_JobStatus = map[string]string{
+	"":               "JobStatus represents the current state of a Job.",
+	"conditions":     "Conditions represent the latest available observations of an object's current state.",
+	"startTime":      "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+	"completionTime": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+	"active":         "Active is the number of actively running pods.",
+	"successful":     "Successful is the number of pods which reached Phase Succeeded.",
+	"unsuccessful":   "Unsuccessful is the number of pods failures, this applies only to jobs created with RestartPolicyNever, otherwise this value will always be 0.",
+}
+
+func (JobStatus) SwaggerDoc() map[string]string {
+	return map_JobStatus
+}
+
 var map_ReplicationControllerDummy = map[string]string{
 	"": "Dummy definition",
 }
