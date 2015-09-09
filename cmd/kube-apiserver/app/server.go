@@ -57,7 +57,7 @@ const (
 	// Set to a value larger than the timeouts in each watch server.
 	ReadWriteTimeout = time.Minute * 60
 	//TODO: This can be tightened up. It still matches objects named watch or proxy.
-	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs|portforward|exec)/?$)"
+	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
 )
 
 // APIServer runs a kubernetes api server.
