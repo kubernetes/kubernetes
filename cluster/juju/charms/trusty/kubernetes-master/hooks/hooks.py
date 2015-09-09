@@ -79,17 +79,25 @@ def config_changed():
     key_file = '/srv/kubernetes/apiserver.key'
     # When the cert or key changes we need to restart the apiserver.
     if config.changed('apiserver-cert') or config.changed('apiserver-key'):
+        hookenv.log('Certificate or key has changed.')
         if not certificate or not key:
+            hookenv.log('Generating new self signed certificate.')
             generate_cert(key=key_file, cert=cert_file)
         else:
+            hookenv.log('Writing new certificate and key to server.')
             with open(key_file, 'w') as file:
                 file.write(key)
             with open(cert_file, 'w') as file:
                 file.write(certificate)
+        # Restart apiserver as the certificate or key has changed.
         if host.service_running('apiserver'):
             host.service_restart('apiserver')
+        # Reload nginx because it proxies https to apiserver.
+        if host.service_running('nginx'):
+            host.service_reload('nginx')
 
     if config.changed('username') or config.changed('password'):
+        hookenv.log('Username or password has changed, creating authentication')
         basic_auth(config['username'], config['username'], config['password'])
         if host.service_running('apiserver'):
             host.service_restart('apiserver')
