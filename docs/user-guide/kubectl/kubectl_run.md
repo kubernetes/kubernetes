@@ -87,12 +87,14 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
       --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s).
+      --limits="": The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
       --output-version="": Output the formatted object with the given version (default api-version).
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that this container exposes.
   -r, --replicas=1: Number of replicas to create for this container. Default is 1.
+      --requests="": The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'
       --restart="Always": The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and --replicas must be 1.  Default 'Always'
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
