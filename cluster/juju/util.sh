@@ -56,7 +56,6 @@ function detect-master() {
     # Capturing a newline, and my awk-fu was weak - pipe through tr -d
     kubestatus=$(juju status --format=oneline kubernetes-master | grep kubernetes-master/0 | awk '{print $3}' | tr -d "\n")
     export KUBE_MASTER_IP=${kubestatus}
-    export KUBERNETES_MASTER=http://${KUBE_MASTER_IP}:8080
     export KUBE_SERVER=http://${KUBE_MASTER_IP}:8080
 }
 
@@ -77,8 +76,6 @@ function detect-minions() {
 }
 
 function get-password() {
-  # Call the common function get-kubeconfig-basicauth to get the auth if set.
-  get-kubeconfig-basicauth
   if [[ -z "${KUBE_USER}" ]]; then
     export KUBE_USER=admin
   fi
@@ -109,7 +106,7 @@ function kube-up() {
     export KUBE_CERT="/tmp/${prefix}-kubecfg.crt"
     export KUBE_KEY="/tmp/${prefix}-kubecfg.key"
     export CA_CERT="/tmp/${prefix}-kubecfg.ca"
-    export CONTEXT="juju_kubernetes"
+    export CONTEXT="juju"
 
     # Copy the cert and key to this machine.
     (
@@ -160,7 +157,7 @@ function sleep-status() {
 
     # sleep because we cannot get the status back of where the minions are in the deploy phase
     # thanks to a generic "started" state and our service not actually coming online until the
-    # minions have recieved the binary from the master distribution hub during relations
+    # minions have received the binary from the master distribution hub during relations
     echo "Sleeping an additional minute to allow the cluster to settle" 1>&2
     sleep 60
 }
