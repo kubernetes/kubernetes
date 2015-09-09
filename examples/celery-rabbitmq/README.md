@@ -81,7 +81,7 @@ spec:
     component: rabbitmq
 ```
 
-[Download example](rabbitmq-service.yaml)
+[Download example](rabbitmq-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE rabbitmq-service.yaml -->
 
 To start the service, run:
@@ -126,7 +126,7 @@ spec:
             cpu: 100m
 ```
 
-[Download example](rabbitmq-controller.yaml)
+[Download example](rabbitmq-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE rabbitmq-controller.yaml -->
 
 Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
@@ -167,7 +167,7 @@ spec:
             cpu: 100m
 ```
 
-[Download example](celery-controller.yaml)
+[Download example](celery-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE celery-controller.yaml -->
 
 There are several things to point out here...
@@ -238,7 +238,7 @@ spec:
   type: LoadBalancer
 ```
 
-[Download example](flower-service.yaml)
+[Download example](flower-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE flower-service.yaml -->
 
 It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
@@ -279,7 +279,7 @@ spec:
             cpu: 100m
 ```
 
-[Download example](flower-controller.yaml)
+[Download example](flower-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE flower-controller.yaml -->
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:

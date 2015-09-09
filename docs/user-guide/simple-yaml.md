@@ -64,7 +64,7 @@ spec:
     - containerPort: 80
 ```
 
-[Download example](pod.yaml)
+[Download example](pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE pod.yaml -->
 
 You can see your cluster's pods:
@@ -116,7 +116,7 @@ spec:
         - containerPort: 80
 ```
 
-[Download example](replication.yaml)
+[Download example](replication.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE replication.yaml -->
 
 To delete the replication controller (and the pods it created):
