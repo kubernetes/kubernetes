@@ -757,29 +757,29 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
-func deepCopy_expapi_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
+func deepCopy_experimental_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.APIGroup = in.APIGroup
 	return nil
 }
 
-func deepCopy_expapi_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
+func deepCopy_experimental_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_DaemonSetSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_experimental_DaemonSetSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_DaemonSetStatus(in.Status, &out.Status, c); err != nil {
+	if err := deepCopy_experimental_DaemonSetStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conversion.Cloner) error {
+func deepCopy_experimental_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -789,7 +789,7 @@ func deepCopy_expapi_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conv
 	if in.Items != nil {
 		out.Items = make([]DaemonSet, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_DaemonSet(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_experimental_DaemonSet(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -799,7 +799,7 @@ func deepCopy_expapi_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conv
 	return nil
 }
 
-func deepCopy_expapi_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
+func deepCopy_experimental_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -819,30 +819,30 @@ func deepCopy_expapi_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conv
 	return nil
 }
 
-func deepCopy_expapi_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatus, c *conversion.Cloner) error {
+func deepCopy_experimental_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatus, c *conversion.Cloner) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
 	return nil
 }
 
-func deepCopy_expapi_Deployment(in Deployment, out *Deployment, c *conversion.Cloner) error {
+func deepCopy_experimental_Deployment(in Deployment, out *Deployment, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_DeploymentSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_experimental_DeploymentSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_DeploymentStatus(in.Status, &out.Status, c); err != nil {
+	if err := deepCopy_experimental_DeploymentStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_DeploymentList(in DeploymentList, out *DeploymentList, c *conversion.Cloner) error {
+func deepCopy_experimental_DeploymentList(in DeploymentList, out *DeploymentList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -852,7 +852,7 @@ func deepCopy_expapi_DeploymentList(in DeploymentList, out *DeploymentList, c *c
 	if in.Items != nil {
 		out.Items = make([]Deployment, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_Deployment(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_experimental_Deployment(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -862,7 +862,7 @@ func deepCopy_expapi_DeploymentList(in DeploymentList, out *DeploymentList, c *c
 	return nil
 }
 
-func deepCopy_expapi_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
+func deepCopy_experimental_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
@@ -880,24 +880,24 @@ func deepCopy_expapi_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *c
 	} else {
 		out.Template = nil
 	}
-	if err := deepCopy_expapi_DeploymentStrategy(in.Strategy, &out.Strategy, c); err != nil {
+	if err := deepCopy_experimental_DeploymentStrategy(in.Strategy, &out.Strategy, c); err != nil {
 		return err
 	}
 	out.UniqueLabelKey = in.UniqueLabelKey
 	return nil
 }
 
-func deepCopy_expapi_DeploymentStatus(in DeploymentStatus, out *DeploymentStatus, c *conversion.Cloner) error {
+func deepCopy_experimental_DeploymentStatus(in DeploymentStatus, out *DeploymentStatus, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	return nil
 }
 
-func deepCopy_expapi_DeploymentStrategy(in DeploymentStrategy, out *DeploymentStrategy, c *conversion.Cloner) error {
+func deepCopy_experimental_DeploymentStrategy(in DeploymentStrategy, out *DeploymentStrategy, c *conversion.Cloner) error {
 	out.Type = in.Type
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(RollingUpdateDeployment)
-		if err := deepCopy_expapi_RollingUpdateDeployment(*in.RollingUpdate, out.RollingUpdate, c); err != nil {
+		if err := deepCopy_experimental_RollingUpdateDeployment(*in.RollingUpdate, out.RollingUpdate, c); err != nil {
 			return err
 		}
 	} else {
@@ -906,19 +906,19 @@ func deepCopy_expapi_DeploymentStrategy(in DeploymentStrategy, out *DeploymentSt
 	return nil
 }
 
-func deepCopy_expapi_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
+func deepCopy_experimental_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_experimental_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
 	if in.Status != nil {
 		out.Status = new(HorizontalPodAutoscalerStatus)
-		if err := deepCopy_expapi_HorizontalPodAutoscalerStatus(*in.Status, out.Status, c); err != nil {
+		if err := deepCopy_experimental_HorizontalPodAutoscalerStatus(*in.Status, out.Status, c); err != nil {
 			return err
 		}
 	} else {
@@ -927,7 +927,7 @@ func deepCopy_expapi_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *Ho
 	return nil
 }
 
-func deepCopy_expapi_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, c *conversion.Cloner) error {
+func deepCopy_experimental_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -937,7 +937,7 @@ func deepCopy_expapi_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList,
 	if in.Items != nil {
 		out.Items = make([]HorizontalPodAutoscaler, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_HorizontalPodAutoscaler(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_experimental_HorizontalPodAutoscaler(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -947,10 +947,10 @@ func deepCopy_expapi_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList,
 	return nil
 }
 
-func deepCopy_expapi_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
+func deepCopy_experimental_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
 	if in.ScaleRef != nil {
 		out.ScaleRef = new(SubresourceReference)
-		if err := deepCopy_expapi_SubresourceReference(*in.ScaleRef, out.ScaleRef, c); err != nil {
+		if err := deepCopy_experimental_SubresourceReference(*in.ScaleRef, out.ScaleRef, c); err != nil {
 			return err
 		}
 	} else {
@@ -958,18 +958,18 @@ func deepCopy_expapi_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec,
 	}
 	out.MinCount = in.MinCount
 	out.MaxCount = in.MaxCount
-	if err := deepCopy_expapi_ResourceConsumption(in.Target, &out.Target, c); err != nil {
+	if err := deepCopy_experimental_ResourceConsumption(in.Target, &out.Target, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
+func deepCopy_experimental_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentConsumption != nil {
 		out.CurrentConsumption = new(ResourceConsumption)
-		if err := deepCopy_expapi_ResourceConsumption(*in.CurrentConsumption, out.CurrentConsumption, c); err != nil {
+		if err := deepCopy_experimental_ResourceConsumption(*in.CurrentConsumption, out.CurrentConsumption, c); err != nil {
 			return err
 		}
 	} else {
@@ -986,23 +986,23 @@ func deepCopy_expapi_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerSta
 	return nil
 }
 
-func deepCopy_expapi_Job(in Job, out *Job, c *conversion.Cloner) error {
+func deepCopy_experimental_Job(in Job, out *Job, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_JobSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_experimental_JobSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_JobStatus(in.Status, &out.Status, c); err != nil {
+	if err := deepCopy_experimental_JobStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_JobCondition(in JobCondition, out *JobCondition, c *conversion.Cloner) error {
+func deepCopy_experimental_JobCondition(in JobCondition, out *JobCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
 	if err := deepCopy_util_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
@@ -1016,7 +1016,7 @@ func deepCopy_expapi_JobCondition(in JobCondition, out *JobCondition, c *convers
 	return nil
 }
 
-func deepCopy_expapi_JobList(in JobList, out *JobList, c *conversion.Cloner) error {
+func deepCopy_experimental_JobList(in JobList, out *JobList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -1026,7 +1026,7 @@ func deepCopy_expapi_JobList(in JobList, out *JobList, c *conversion.Cloner) err
 	if in.Items != nil {
 		out.Items = make([]Job, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_Job(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_experimental_Job(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -1036,7 +1036,7 @@ func deepCopy_expapi_JobList(in JobList, out *JobList, c *conversion.Cloner) err
 	return nil
 }
 
-func deepCopy_expapi_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
+func deepCopy_experimental_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
 	if in.Parallelism != nil {
 		out.Parallelism = new(int)
 		*out.Parallelism = *in.Parallelism
@@ -1068,11 +1068,11 @@ func deepCopy_expapi_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) err
 	return nil
 }
 
-func deepCopy_expapi_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) error {
+func deepCopy_experimental_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) error {
 	if in.Conditions != nil {
 		out.Conditions = make([]JobCondition, len(in.Conditions))
 		for i := range in.Conditions {
-			if err := deepCopy_expapi_JobCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
+			if err := deepCopy_experimental_JobCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
 				return err
 			}
 		}
@@ -1101,14 +1101,14 @@ func deepCopy_expapi_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clone
 	return nil
 }
 
-func deepCopy_expapi_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
+func deepCopy_experimental_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_ResourceConsumption(in ResourceConsumption, out *ResourceConsumption, c *conversion.Cloner) error {
+func deepCopy_experimental_ResourceConsumption(in ResourceConsumption, out *ResourceConsumption, c *conversion.Cloner) error {
 	out.Resource = in.Resource
 	if err := deepCopy_resource_Quantity(in.Quantity, &out.Quantity, c); err != nil {
 		return err
@@ -1116,7 +1116,7 @@ func deepCopy_expapi_ResourceConsumption(in ResourceConsumption, out *ResourceCo
 	return nil
 }
 
-func deepCopy_expapi_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
+func deepCopy_experimental_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
 	if err := deepCopy_util_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
 		return err
 	}
@@ -1127,28 +1127,28 @@ func deepCopy_expapi_RollingUpdateDeployment(in RollingUpdateDeployment, out *Ro
 	return nil
 }
 
-func deepCopy_expapi_Scale(in Scale, out *Scale, c *conversion.Cloner) error {
+func deepCopy_experimental_Scale(in Scale, out *Scale, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_ScaleSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_experimental_ScaleSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_ScaleStatus(in.Status, &out.Status, c); err != nil {
+	if err := deepCopy_experimental_ScaleStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_ScaleSpec(in ScaleSpec, out *ScaleSpec, c *conversion.Cloner) error {
+func deepCopy_experimental_ScaleSpec(in ScaleSpec, out *ScaleSpec, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	return nil
 }
 
-func deepCopy_expapi_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion.Cloner) error {
+func deepCopy_experimental_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
@@ -1161,7 +1161,7 @@ func deepCopy_expapi_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion
 	return nil
 }
 
-func deepCopy_expapi_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
+func deepCopy_experimental_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.Namespace = in.Namespace
 	out.Name = in.Name
@@ -1170,7 +1170,7 @@ func deepCopy_expapi_SubresourceReference(in SubresourceReference, out *Subresou
 	return nil
 }
 
-func deepCopy_expapi_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
+func deepCopy_experimental_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -1181,7 +1181,7 @@ func deepCopy_expapi_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyRe
 	if in.Versions != nil {
 		out.Versions = make([]APIVersion, len(in.Versions))
 		for i := range in.Versions {
-			if err := deepCopy_expapi_APIVersion(in.Versions[i], &out.Versions[i], c); err != nil {
+			if err := deepCopy_experimental_APIVersion(in.Versions[i], &out.Versions[i], c); err != nil {
 				return err
 			}
 		}
@@ -1191,7 +1191,7 @@ func deepCopy_expapi_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyRe
 	return nil
 }
 
-func deepCopy_expapi_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
+func deepCopy_experimental_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -1209,7 +1209,7 @@ func deepCopy_expapi_ThirdPartyResourceData(in ThirdPartyResourceData, out *Thir
 	return nil
 }
 
-func deepCopy_expapi_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, c *conversion.Cloner) error {
+func deepCopy_experimental_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -1219,7 +1219,7 @@ func deepCopy_expapi_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, o
 	if in.Items != nil {
 		out.Items = make([]ThirdPartyResourceData, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_ThirdPartyResourceData(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_experimental_ThirdPartyResourceData(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -1229,7 +1229,7 @@ func deepCopy_expapi_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, o
 	return nil
 }
 
-func deepCopy_expapi_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
+func deepCopy_experimental_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -1239,7 +1239,7 @@ func deepCopy_expapi_ThirdPartyResourceList(in ThirdPartyResourceList, out *Thir
 	if in.Items != nil {
 		out.Items = make([]ThirdPartyResource, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_ThirdPartyResource(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_experimental_ThirdPartyResource(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -1307,36 +1307,36 @@ func init() {
 		deepCopy_api_VolumeMount,
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
-		deepCopy_expapi_APIVersion,
-		deepCopy_expapi_DaemonSet,
-		deepCopy_expapi_DaemonSetList,
-		deepCopy_expapi_DaemonSetSpec,
-		deepCopy_expapi_DaemonSetStatus,
-		deepCopy_expapi_Deployment,
-		deepCopy_expapi_DeploymentList,
-		deepCopy_expapi_DeploymentSpec,
-		deepCopy_expapi_DeploymentStatus,
-		deepCopy_expapi_DeploymentStrategy,
-		deepCopy_expapi_HorizontalPodAutoscaler,
-		deepCopy_expapi_HorizontalPodAutoscalerList,
-		deepCopy_expapi_HorizontalPodAutoscalerSpec,
-		deepCopy_expapi_HorizontalPodAutoscalerStatus,
-		deepCopy_expapi_Job,
-		deepCopy_expapi_JobCondition,
-		deepCopy_expapi_JobList,
-		deepCopy_expapi_JobSpec,
-		deepCopy_expapi_JobStatus,
-		deepCopy_expapi_ReplicationControllerDummy,
-		deepCopy_expapi_ResourceConsumption,
-		deepCopy_expapi_RollingUpdateDeployment,
-		deepCopy_expapi_Scale,
-		deepCopy_expapi_ScaleSpec,
-		deepCopy_expapi_ScaleStatus,
-		deepCopy_expapi_SubresourceReference,
-		deepCopy_expapi_ThirdPartyResource,
-		deepCopy_expapi_ThirdPartyResourceData,
-		deepCopy_expapi_ThirdPartyResourceDataList,
-		deepCopy_expapi_ThirdPartyResourceList,
+		deepCopy_experimental_APIVersion,
+		deepCopy_experimental_DaemonSet,
+		deepCopy_experimental_DaemonSetList,
+		deepCopy_experimental_DaemonSetSpec,
+		deepCopy_experimental_DaemonSetStatus,
+		deepCopy_experimental_Deployment,
+		deepCopy_experimental_DeploymentList,
+		deepCopy_experimental_DeploymentSpec,
+		deepCopy_experimental_DeploymentStatus,
+		deepCopy_experimental_DeploymentStrategy,
+		deepCopy_experimental_HorizontalPodAutoscaler,
+		deepCopy_experimental_HorizontalPodAutoscalerList,
+		deepCopy_experimental_HorizontalPodAutoscalerSpec,
+		deepCopy_experimental_HorizontalPodAutoscalerStatus,
+		deepCopy_experimental_Job,
+		deepCopy_experimental_JobCondition,
+		deepCopy_experimental_JobList,
+		deepCopy_experimental_JobSpec,
+		deepCopy_experimental_JobStatus,
+		deepCopy_experimental_ReplicationControllerDummy,
+		deepCopy_experimental_ResourceConsumption,
+		deepCopy_experimental_RollingUpdateDeployment,
+		deepCopy_experimental_Scale,
+		deepCopy_experimental_ScaleSpec,
+		deepCopy_experimental_ScaleStatus,
+		deepCopy_experimental_SubresourceReference,
+		deepCopy_experimental_ThirdPartyResource,
+		deepCopy_experimental_ThirdPartyResourceData,
+		deepCopy_experimental_ThirdPartyResourceDataList,
+		deepCopy_experimental_ThirdPartyResourceList,
 		deepCopy_util_IntOrString,
 		deepCopy_util_Time,
 	)
