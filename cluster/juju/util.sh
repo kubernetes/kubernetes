@@ -76,9 +76,7 @@ function detect-minions() {
 }
 
 function get-password() {
-  if [[ -z "${KUBE_USER}" ]]; then
-    export KUBE_USER=admin
-  fi
+  export KUBE_USER=admin
   # Get the password from the basic-auth.csv file on kubernetes-master.
   export KUBE_PASSWORD=$(juju run --unit kubernetes-master/0 "cat /srv/kubernetes/basic-auth.csv" | grep ${KUBE_USER} | cut -d, -f1)
 }

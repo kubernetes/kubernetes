@@ -81,7 +81,6 @@ def config_changed():
     if config.changed('apiserver-cert') or config.changed('apiserver-key'):
         hookenv.log('Certificate or key has changed.')
         if not certificate or not key:
-            hookenv.log('Generating new self signed certificate.')
             generate_cert(key=key_file, cert=cert_file)
         else:
             hookenv.log('Writing new certificate and key to server.')
