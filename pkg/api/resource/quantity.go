@@ -309,6 +309,14 @@ func (q *Quantity) Add(y Quantity) error {
 	return nil
 }
 
+func (q *Quantity) Sub(y Quantity) error {
+	if q.Format != y.Format {
+		return fmt.Errorf("format mismatch: %v vs. %v", q.Format, y.Format)
+	}
+	q.Amount.Sub(q.Amount, y.Amount)
+	return nil
+}
+
 // MarshalJSON implements the json.Marshaller interface.
 func (q Quantity) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + q.String() + `"`), nil

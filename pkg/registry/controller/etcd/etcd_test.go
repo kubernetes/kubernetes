@@ -19,20 +19,16 @@ package etcd
 import (
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	return NewREST(etcdStorage), fakeClient
 }
 
@@ -127,6 +123,12 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
+func TestDelete(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestDelete(validNewController())
+}
+
 func TestGenerationNumber(t *testing.T) {
 	storage, _ := newStorage(t)
 	modifiedSno := *validNewController()
@@ -217,60 +219,4 @@ func TestWatch(t *testing.T) {
 			{"status.replicas": "0", "metadata.name": "bar"},
 		},
 	)
-}
-
-func TestEtcdDeleteController(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	key, _ := storage.KeyFunc(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validController), 0)
-	obj, err := storage.Delete(ctx, validController.Name, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if status, ok := obj.(*api.Status); !ok {
-		t.Errorf("Expected status of delete, got %#v", status)
-	} else if status.Status != api.StatusSuccess {
-		t.Errorf("Expected success, got %#v", status.Status)
-	}
-	if len(fakeClient.DeletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
-	}
-	if fakeClient.DeletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-}
-
-func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key, _ := storage.KeyFunc(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-
-	createFn := func() runtime.Object {
-		rc := *validNewController()
-		rc.ResourceVersion = "1"
-		fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), &rc),
-					ModifiedIndex: 1,
-				},
-			},
-		}
-		return &rc
-	}
-	gracefulSetFn := func() bool {
-		// If the controller is still around after trying to delete either the delete
-		// failed, or we're deleting it gracefully.
-		if fakeClient.Data[key].R.Node != nil {
-			return true
-		}
-		return false
-	}
-
-	test.TestDelete(createFn, gracefulSetFn)
 }

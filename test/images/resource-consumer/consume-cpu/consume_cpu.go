@@ -34,20 +34,20 @@ func doSomething() {
 }
 
 var (
-	milicores   = flag.Int("milicores", 0, "milicores number")
+	millicores  = flag.Int("millicores", 0, "millicores number")
 	durationSec = flag.Int("duration-sec", 0, "duration time in seconds")
 )
 
 func main() {
 	flag.Parse()
-	// converte milicores to percentage
-	milicoresPct := float64(*milicores) / float64(10)
+	// convert millicores to percentage
+	millicoresPct := float64(*millicores) / float64(10)
 	duration := time.Duration(*durationSec) * time.Second
 	start := time.Now()
 	first := systemstat.GetProcCPUSample()
 	for time.Now().Sub(start) < duration {
 		cpu := systemstat.GetProcCPUAverage(first, systemstat.GetProcCPUSample(), systemstat.GetUptime().Uptime)
-		if cpu.TotalPct < milicoresPct {
+		if cpu.TotalPct < millicoresPct {
 			doSomething()
 		} else {
 			time.Sleep(sleep)

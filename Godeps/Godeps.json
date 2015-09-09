@@ -215,8 +215,8 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.1.3-76-gbfd6ff2",
-			"Rev": "bfd6ff29d2961031cec64346a92bae4cde96c868"
+			"Comment": "v1.1.3-98-g1f9a0ee",
+			"Rev": "1f9a0ee00ff93717a275e15b30cf7df356255877"
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
@@ -224,7 +224,7 @@
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Rev": "42d06e2b125654477366c320dcea99107a86e9c2"
+			"Rev": "76fd6c68cf24c48ee6a2b25def997182a29f940e"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
@@ -512,7 +512,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "db0518444643a7b170abb78164bbeaf5a2bb816f"
+			"Rev": "68f5a81a722d56241bd70faf6860ceb05eb27d64"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",

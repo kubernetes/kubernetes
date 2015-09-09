@@ -47,10 +47,6 @@ re\-use the labels from the resource it exposes.
     The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for expose
-
-.PP
 \fB\-l\fP, \fB\-\-labels\fP=""
     Labels to apply to the service created by this call.
 
@@ -64,7 +60,9 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide|jsonpath|name.
+    Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -104,9 +102,8 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template, \-o=templatefile or \-o=jsonpath.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]. The jsonpath template is composed of jsonpath expressions enclosed by {} [
-\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]]
+    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
 .PP
 \fB\-\-type\fP=""

@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type Foo struct {
@@ -58,6 +60,16 @@ func TestCodec(t *testing.T) {
 		{
 			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"}, TypeMeta: api.TypeMeta{Kind: "Foo"}},
 			name: "resource version",
+		},
+		{
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "bar",
+					CreationTimestamp: util.Time{time.Unix(100, 0)},
+				},
+				TypeMeta: api.TypeMeta{Kind: "Foo"},
+			},
+			name: "creation time",
 		},
 		{
 			obj: &Foo{

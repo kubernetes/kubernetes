@@ -61,7 +61,7 @@ HorizontalPodAutoscaler object will be bound with exactly one Scale subresource 
 autoscaling associated replication controller/deployment through it.
 The main advantage of such approach is that whenever we introduce another type we want to auto-scale,
 we just need to implement Scale subresource for it (w/o modifying autoscaler code or API).
-The wider discussion regarding Scale took place in [#1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629).
+The wider discussion regarding Scale took place in [#1629](https://github.com/kubernetes/kubernetes/issues/1629).
 
 Scale subresource will be present in API for replication controller or deployment under the following paths:
 
@@ -192,7 +192,7 @@ The autoscaler will be implemented as a control loop.
 It will periodically (e.g.: every 1 minute) query pods described by ```Status.PodSelector``` of Scale subresource,
 and check their average CPU or memory usage from the last 1 minute
 (there will be API on master for this purpose, see
-[#11951](https://github.com/GoogleCloudPlatform/kubernetes/issues/11951).
+[#11951](https://github.com/kubernetes/kubernetes/issues/11951).
 Then, it will compare the current CPU or memory consumption with the Target,
 and adjust the count of the Scale if needed to match the target
 (preserving condition: MinCount <= Count <= MaxCount).
@@ -200,16 +200,20 @@ and adjust the count of the Scale if needed to match the target
 The target number of pods will be calculated from the following formula:
 
 ```
-TargetNumOfPods = sum(CurrentPodsConsumption) / Target
+TargetNumOfPods =ceil(sum(CurrentPodsConsumption) / Target)
 ```
 
-To make scaling more stable, scale-up will happen only when the floor of ```TargetNumOfPods``` is higher than
-the current number, while scale-down will happen only when the ceiling of ```TargetNumOfPods``` is lower than
-the current number.
+Starting and stopping pods may introduce noise to the metrics (for instance starting may temporarily increase
+CPU and decrease average memory consumption) so, after each action, the autoscaler should wait some time for reliable data.
 
-The decision to scale-up will be executed instantly.
-However, we will execute scale-down only if the sufficient time has passed from the last scale-up (e.g.: 10 minutes).
-Such approach has two benefits:
+Scale-up will happen if there was no rescaling within the last 3 minutes.
+Scale-down will wait for 10 minutes from the last rescaling. Moreover any scaling will only be made if
+
+```
+avg(CurrentPodsConsumption) / Target
+```
+
+drops below 0.9 or increases above 1.1 (10% tolerance). Such approach has two benefits:
 
 * Autoscaler works in a conservative way.
   If new user load appears, it is important for us to rapidly increase the number of pods,
@@ -217,10 +221,6 @@ Such approach has two benefits:
   Lowering the number of pods is not that urgent.
 
 * Autoscaler avoids thrashing, i.e.: prevents rapid execution of conflicting decision if the load is not stable.
-
-
-As the CPU consumption of a pod immediately after start may be highly variable due to initialization/startup,
-autoscaler will skip metrics from the first minute of pod lifecycle.
 
 ## Relative vs. absolute metrics
 
@@ -265,9 +265,9 @@ Our design is in general compatible with them.
   and then turned-on when there is a demand for them.
   When a request to service with no pods arrives, kube-proxy will generate an event for autoscaler
   to create a new pod.
-  Discussed in [#3247](https://github.com/GoogleCloudPlatform/kubernetes/issues/3247).
+  Discussed in [#3247](https://github.com/kubernetes/kubernetes/issues/3247).
 * When scaling down, make more educated decision which pods to kill (e.g.: if two or more pods are on the same node, kill one of them).
-  Discussed in [#4301](https://github.com/GoogleCloudPlatform/kubernetes/issues/4301).
+  Discussed in [#4301](https://github.com/kubernetes/kubernetes/issues/4301).
 * Allow rule based autoscaling: instead of specifying the target value for metric,
   specify a rule, e.g.: “if average CPU consumption of pod is higher than 80% add two more replicas”.
   This approach was initially suggested in

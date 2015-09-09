@@ -47,6 +47,7 @@ The number and meanings of `PodPhase` values are tightly guarded.  Other than wh
 * Running: The pod has been bound to a node, and all of the containers have been created.  At least one container is still running, or is in the process of starting or restarting.
 * Succeeded: All containers in the pod have terminated in success, and will not be restarted.
 * Failed: All containers in the pod have terminated, at least one container has terminated in failure (exited with non-zero exit status or was terminated by the system).
+* Unknown: For some reason the state of the pod could not be obtained, typically due to an error in communicating with the host of the pod.
 
 ## Pod Conditions
 

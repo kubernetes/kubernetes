@@ -36,6 +36,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/autoscaler"
+	"k8s.io/kubernetes/pkg/controller/autoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -291,7 +292,8 @@ func (s *CMServer) Run(_ []string) error {
 		if err != nil {
 			glog.Fatalf("Invalid API configuration: %v", err)
 		}
-		horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient)
+		horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient,
+			metrics.NewHeapsterMetricsClient(kubeClient))
 		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
 	}
 

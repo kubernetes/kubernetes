@@ -50,6 +50,9 @@ const (
 	minShares     = 2
 	sharesPerCPU  = 1024
 	milliCPUToCPU = 1000
+
+	// 100000 is equivalent to 100ms
+	quotaPeriod = 100000
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
@@ -304,6 +307,28 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
 	return client
+}
+
+// milliCPUToQuota converts milliCPU to CFS quota and period values
+func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
+	// CFS quota is measured in two values:
+	//  - cfs_period_us=100ms (the amount of time to measure usage across)
+	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
+	// so in the above example, you are limited to 20% of a single CPU
+	// for multi-cpu environments, you just scale equivalent amounts
+
+	if milliCPU == 0 {
+		// take the default behavior from docker
+		return
+	}
+
+	// we set the period to 100ms by default
+	period = quotaPeriod
+
+	// we then convert your milliCPU to a value normalized over a period
+	quota = (milliCPU * quotaPeriod) / milliCPUToCPU
+
+	return
 }
 
 func milliCPUToShares(milliCPU int64) int64 {

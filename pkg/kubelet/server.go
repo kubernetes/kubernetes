@@ -543,7 +543,6 @@ WaitForStreams:
 			switch streamType {
 			case api.StreamTypeError:
 				errorStream = stream
-				defer errorStream.Reset()
 				receivedStreams++
 			case api.StreamTypeStdin:
 				stdinStream = stream
@@ -566,11 +565,6 @@ WaitForStreams:
 			glog.Error("Timed out waiting for client to create streams")
 			return nil, nil, nil, nil, nil, false, false
 		}
-	}
-
-	if stdinStream != nil {
-		// close our half of the input stream, since we won't be writing to it
-		stdinStream.Close()
 	}
 
 	return stdinStream, stdoutStream, stderrStream, errorStream, conn, tty, true

@@ -21,29 +21,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	allocator_etcd "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
-}
-
-func newStorage(t *testing.T) (ipallocator.Interface, allocator.Interface, *tools.FakeEtcdClient) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+func newStorage(t *testing.T) (*tools.FakeEtcdClient, ipallocator.Interface, allocator.Interface) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +47,14 @@ func newStorage(t *testing.T) (ipallocator.Interface, allocator.Interface, *tool
 		return etcd
 	})
 
-	return storage, backing, fakeEtcdClient
+	return fakeClient, storage, backing
+}
+
+func validNewRangeAllocation() *api.RangeAllocation {
+	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
+	return &api.RangeAllocation{
+		Range: cidr.String(),
+	}
 }
 
 func key() string {
@@ -66,44 +63,30 @@ func key() string {
 }
 
 func TestEmpty(t *testing.T) {
-	storage, _, ecli := newStorage(t)
-	ecli.ExpectNotFoundGet(key())
+	fakeClient, storage, _ := newStorage(t)
+	fakeClient.ExpectNotFoundGet(key())
 	if err := storage.Allocate(net.ParseIP("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
 		t.Fatal(err)
 	}
 }
 
 func TestErrors(t *testing.T) {
-	storage, _, _ := newStorage(t)
+	_, storage, _ := newStorage(t)
 	if err := storage.Allocate(net.ParseIP("192.168.0.0")); err != ipallocator.ErrNotInRange {
 		t.Fatal(err)
 	}
 }
 
-func initialObject(ecli *tools.FakeEtcdClient) {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	ecli.Data[key()] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				CreatedIndex:  1,
-				ModifiedIndex: 2,
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.RangeAllocation{
-					Range: cidr.String(),
-				}),
-			},
-		},
-		E: nil,
-	}
-}
-
 func TestStore(t *testing.T) {
-	storage, r, ecli := newStorage(t)
-	initialObject(ecli)
+	fakeClient, storage, backing := newStorage(t)
+	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != nil {
 		t.Fatal(err)
 	}
-	ok, err := r.Allocate(1)
+	ok, err := backing.Allocate(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +97,7 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	obj := ecli.Data[key()]
+	obj := fakeClient.Data[key()]
 	if obj.R == nil || obj.R.Node == nil {
 		t.Fatalf("%s is empty: %#v", key(), obj)
 	}

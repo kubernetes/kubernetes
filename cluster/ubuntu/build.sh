@@ -51,7 +51,6 @@ if [ ! -f etcd.tar.gz ] ; then
   tar xzf etcd.tar.gz
 fi
 cp $ETCD/etcd $ETCD/etcdctl binaries/master
-cp $ETCD/etcd $ETCD/etcdctl binaries/minion
 
 # k8s
 echo "Download kubernetes release ..."

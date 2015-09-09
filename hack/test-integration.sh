@@ -24,8 +24,12 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-# Comma separated list of API Versions that should be tested.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1"}
+# Lists of API Versions of each groups that should be tested, groups are
+# separated by comma, lists are separated by semicolon. e.g.,
+# "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
+# TODO: It's going to be:
+# KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1"}
 
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
@@ -48,8 +52,8 @@ runTests() {
 
   kube::log::status "Running integration test scenario"
 
- KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} --api-version="$1" \
-  --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
+  KUBE_API_VERSIONS="v1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+    --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
 }
@@ -60,7 +64,7 @@ KUBE_API_VERSIONS="v1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 trap cleanup EXIT
 
 # Convert the CSV to an array of API versions to test
-IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
   runTests "${apiVersion}"
 done

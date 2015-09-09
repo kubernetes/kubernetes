@@ -29,7 +29,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	return NewREST(etcdStorage), fakeClient
 }
 
@@ -104,6 +104,12 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 	)
+}
+
+func TestDelete(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestDelete(validService())
 }
 
 func TestGet(t *testing.T) {

@@ -40,8 +40,8 @@ for managing pod(s) that require running once to completion even if the machine
 the pod is running on fails, in contrast to what ReplicationController currently offers.
 
 Several existing issues and PRs were already created regarding that particular subject:
-* Job Controller [#1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)
-* New Job resource [#7380](https://github.com/GoogleCloudPlatform/kubernetes/pull/7380)
+* Job Controller [#1624](https://github.com/kubernetes/kubernetes/issues/1624)
+* New Job resource [#7380](https://github.com/kubernetes/kubernetes/pull/7380)
 
 
 ## Use Cases
@@ -181,7 +181,7 @@ Below are the possible future extensions to the Job controller:
 * Be able to limit the execution time for a job, similarly to ActiveDeadlineSeconds for Pods.
 * Be able to create a chain of jobs dependent one on another.
 * Be able to specify the work each of the workers should execute (see type 1 from
-  [this comment](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624#issuecomment-97622142))
+  [this comment](https://github.com/kubernetes/kubernetes/issues/1624#issuecomment-97622142))
 * Be able to inspect Pods running a Job, especially after a Job has finished, e.g.
   by providing pointers to Pods in the JobStatus ([see comment](https://github.com/kubernetes/kubernetes/pull/11746/files#r37142628)).
 

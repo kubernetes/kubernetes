@@ -159,9 +159,6 @@ func (s *ProxyServer) Run(_ []string) error {
 		Namespace: "",
 	}
 
-	// Birth Cry
-	s.birthCry()
-
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
 
@@ -200,13 +197,16 @@ func (s *ProxyServer) Run(_ []string) error {
 		ipt := utiliptables.New(execer, protocol)
 		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, ipt, s.PortRange, s.SyncPeriod)
 		if err != nil {
-			glog.Fatalf("Unable to create proxer: %v", err)
+			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
 		glog.V(2).Info("Tearing down pure-iptables proxy rules. Errors here are acceptable.")
 		iptables.CleanupLeftovers(ipt)
 	}
+
+	// Birth Cry after the birth is successful
+	s.birthCry()
 
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)

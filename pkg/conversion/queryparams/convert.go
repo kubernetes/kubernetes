@@ -50,6 +50,14 @@ func formatValue(value interface{}) string {
 	return fmt.Sprintf("%v", value)
 }
 
+func isPointerKind(kind reflect.Kind) bool {
+	return kind == reflect.Ptr
+}
+
+func isStructKind(kind reflect.Kind) bool {
+	return kind == reflect.Struct
+}
+
 func isValueKind(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16,
@@ -70,7 +78,13 @@ func addParam(values url.Values, tag string, omitempty bool, value reflect.Value
 	if omitempty && zeroValue(value) {
 		return
 	}
-	values.Add(tag, fmt.Sprintf("%v", value.Interface()))
+	val := ""
+	iValue := fmt.Sprintf("%v", value.Interface())
+
+	if iValue != "<nil>" {
+		val = iValue
+	}
+	values.Add(tag, val)
 }
 
 func addListOfParams(values url.Values, tag string, omitempty bool, list reflect.Value) {
@@ -92,12 +106,20 @@ func Convert(obj runtime.Object) (url.Values, error) {
 	case reflect.Ptr, reflect.Interface:
 		sv = reflect.ValueOf(obj).Elem()
 	default:
-		return nil, fmt.Errorf("Expecting a pointer or interface")
+		return nil, fmt.Errorf("expecting a pointer or interface")
 	}
 	st := sv.Type()
-	if st.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("Expecting a pointer to a struct")
+	if !isStructKind(st.Kind()) {
+		return nil, fmt.Errorf("expecting a pointer to a struct")
 	}
+
+	// Check all object fields
+	convertStruct(result, st, sv)
+
+	return result, nil
+}
+
+func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 	for i := 0; i < st.NumField(); i++ {
 		field := sv.Field(i)
 		tag, omitempty := jsonTag(st.Field(i))
@@ -105,14 +127,24 @@ func Convert(obj runtime.Object) (url.Values, error) {
 			continue
 		}
 		ft := field.Type()
+
+		kind := ft.Kind()
+		if isPointerKind(kind) {
+			kind = ft.Elem().Kind()
+			if !field.IsNil() {
+				field = reflect.Indirect(field)
+			}
+		}
+
 		switch {
-		case isValueKind(ft.Kind()):
+		case isValueKind(kind):
 			addParam(result, tag, omitempty, field)
-		case ft.Kind() == reflect.Array || ft.Kind() == reflect.Slice:
+		case kind == reflect.Array || kind == reflect.Slice:
 			if isValueKind(ft.Elem().Kind()) {
 				addListOfParams(result, tag, omitempty, field)
 			}
+		case isStructKind(kind) && !(zeroValue(field) && omitempty):
+			convertStruct(result, ft, field)
 		}
 	}
-	return result, nil
 }

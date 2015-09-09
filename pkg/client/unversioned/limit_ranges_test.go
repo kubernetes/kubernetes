@@ -56,14 +56,14 @@ func TestLimitRangeCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, ""),
 			Query:  buildQueryValues(nil),
 			Body:   limitRange,
 		},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
 
-	response, err := c.Setup().LimitRanges(ns).Create(limitRange)
+	response, err := c.Setup(t).LimitRanges(ns).Create(limitRange)
 	c.Validate(t, response, err)
 }
 
@@ -92,14 +92,14 @@ func TestLimitRangeGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"),
+			Path:   testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "abc"),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
 
-	response, err := c.Setup().LimitRanges(ns).Get("abc")
+	response, err := c.Setup(t).LimitRanges(ns).Get("abc")
 	c.Validate(t, response, err)
 }
 
@@ -116,13 +116,13 @@ func TestLimitRangeList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, ""),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: limitRangeList},
 	}
-	response, err := c.Setup().LimitRanges(ns).List(labels.Everything())
+	response, err := c.Setup(t).LimitRanges(ns).List(labels.Everything())
 	c.Validate(t, response, err)
 }
 
@@ -150,10 +150,10 @@ func TestLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
-	response, err := c.Setup().LimitRanges(ns).Update(limitRange)
+	response, err := c.Setup(t).LimitRanges(ns).Update(limitRange)
 	c.Validate(t, response, err)
 }
 
@@ -180,10 +180,10 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
-	_, err := c.Setup().LimitRanges(ns).Update(limitRange)
+	_, err := c.Setup(t).LimitRanges(ns).Update(limitRange)
 	if err == nil {
 		t.Errorf("Expected an error due to missing ResourceVersion")
 	}
@@ -192,10 +192,10 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 func TestLimitRangeDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().LimitRanges(ns).Delete("foo")
+	err := c.Setup(t).LimitRanges(ns).Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -203,10 +203,10 @@ func TestLimitRangeWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.ResourcePathWithPrefix("watch", getLimitRangesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", getLimitRangesResourceName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

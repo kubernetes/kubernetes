@@ -34,7 +34,7 @@ import (
 
 func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
@@ -44,7 +44,7 @@ func TestSet(t *testing.T) {
 		if err != nil || resp.Node == nil {
 			t.Fatalf("unexpected error: %v %v", err, resp)
 		}
-		decoded, err := testapi.Codec().Decode([]byte(resp.Node.Value))
+		decoded, err := testapi.Default.Codec().Decode([]byte(resp.Node.Value))
 		if err != nil {
 			t.Fatalf("unexpected response: %#v", resp.Node)
 		}
@@ -57,10 +57,10 @@ func TestSet(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		coded, err := testapi.Codec().Encode(&testObject)
+		coded, err := testapi.Default.Codec().Encode(&testObject)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -82,7 +82,7 @@ func TestGet(t *testing.T) {
 
 func TestWriteTTL(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
@@ -135,10 +135,10 @@ func TestWriteTTL(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
-		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

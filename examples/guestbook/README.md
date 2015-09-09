@@ -136,6 +136,12 @@ redis-master-dz33o                             1/1       Running   0          2h
 
 (Note that an initial `docker pull` to grab a container image may take a few minutes, depending on network conditions. A pod will be reported as `Pending` while its image is being downloaded.)
 
+`kubectl get pods` will show only the pods in the default [namespace](../../docs/user-guide/namespaces.md).  To see pods in all namespaces, run:
+
+```
+kubectl get pods -o wide --all-namespaces=true
+```
+
 #### Optional Interlude
 
 You can get information about a pod, including the machine that it is running on, via `kubectl describe pods/<pod_name>`.  E.g., for the redis master, you should see something like the following (your pod name will be different):
@@ -256,9 +262,15 @@ Kubernetes supports two primary modes of finding a service— environment variab
 The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](../../docs/user-guide/services.md#environment-variables).
 
 An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
-We'll use the DNS service for this example.  E.g., you can see the service name, `redis-master`, accessed as a `host` value in the PHP script in [Step 5](#step-five-create-the-frontend-replicated-pods).
 
-**Note**: **If your cluster does not have the DNS service enabled, then this example will not work out of the box.** You will need to edit `examples/guestbook/php-redis/index.php` to use environment variables for service discovery instead, then rebuild the container image from the `Dockerfile` in that directory.  (However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services.)
+This example has been configured to use the DNS service by default.
+
+If your cluster does not have the DNS service enabled, then you can use environment variables by setting the
+`GET_HOSTS_FROM` env value in both
+`examples/guestbook/redis-slave-controller.yaml` and `examples/guestbook/frontend-controller.yaml`
+from `dns` to `env` before you start up the app.
+(However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services by
+running `kubectl --namespace=kube-system get rc`, and looking for a controller prefixed `kube-dns`.)
 
 
 ### Step Three: Fire up the replicated slave pods
@@ -291,7 +303,15 @@ spec:
     spec:
       containers:
       - name: worker
-        image: kubernetes/redis-slave:v2
+        image: gcr.io/google_samples/gb-redisslave:v1
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+          # If your cluster config does not include a dns service, then to
+          # instead access an environment variable to find the master
+          # service's host, comment out the 'value: dns' line above, and
+          # uncomment the line below.
+          # value: env
         ports:
         - containerPort: 6379
 ```
@@ -393,7 +413,15 @@ spec:
     spec:
       containers:
       - name: php-redis
-        image: gcr.io/google_containers/example-guestbook-php-redis:v3
+        image: gcr.io/google_samples/gb-frontend:v2
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+          # If your cluster config does not include a dns service, then to
+          # instead access environment variables to find service host
+          # info, comment out the 'value: dns' line above, and uncomment the
+          # line below.
+          # value: env
         ports:
         - containerPort: 80
 ```
@@ -435,33 +463,43 @@ redis-slave-iqkhy                              1/1       Running   0          2h
 
 You should see a single redis master pod, two redis slaves, and three frontend pods.
 
-The code for the PHP server that the frontends are running looks like this:
+The code for the PHP server that the frontends are running is in `guestbook/php-redis/guestbook.php`.  It looks like this:
 
 ```php
 <?
 
-set_include_path('.:/usr/share/php:/usr/share/pear:/vendor/predis');
+set_include_path('.:/usr/local/lib/php');
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require 'predis/autoload.php';
+require 'Predis/Autoloader.php';
+
+Predis\Autoloader::register();
 
 if (isset($_GET['cmd']) === true) {
+  $host = 'redis-master';
+  if (getenv('GET_HOSTS_FROM') == 'env') {
+    $host = getenv('REDIS_MASTER_SERVICE_HOST');
+  }
   header('Content-Type: application/json');
   if ($_GET['cmd'] == 'set') {
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => 'redis-master',
+      'host'   => $host,
       'port'   => 6379,
     ]);
 
     $client->set($_GET['key'], $_GET['value']);
     print('{"message": "Updated"}');
   } else {
+    $host = 'redis-slave';
+    if (getenv('GET_HOSTS_FROM') == 'env') {
+      $host = getenv('REDIS_SLAVE_SERVICE_HOST');
+    }
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => 'redis-slave',
+      'host'   => $host,
       'port'   => 6379,
     ]);
 

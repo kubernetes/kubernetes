@@ -31,38 +31,6 @@ import (
 	"github.com/golang/glog"
 )
 
-func GetAccessModesAsString(modes []api.PersistentVolumeAccessMode) string {
-	modesAsString := ""
-
-	if contains(modes, api.ReadWriteOnce) {
-		appendAccessMode(&modesAsString, "RWO")
-	}
-	if contains(modes, api.ReadOnlyMany) {
-		appendAccessMode(&modesAsString, "ROX")
-	}
-	if contains(modes, api.ReadWriteMany) {
-		appendAccessMode(&modesAsString, "RWX")
-	}
-
-	return modesAsString
-}
-
-func appendAccessMode(modes *string, mode string) {
-	if *modes != "" {
-		*modes += ","
-	}
-	*modes += mode
-}
-
-func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
-}
-
 // ScrubPodVolumeAndWatchUntilCompletion is intended for use with volume Recyclers.  This function will
 // save the given Pod to the API and watch it until it completes, fails, or the pod's ActiveDeadlineSeconds is exceeded, whichever comes first.
 // An attempt to delete a scrubber pod is always attempted before returning.

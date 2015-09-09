@@ -55,8 +55,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	gomegatypes "github.com/onsi/gomega/types"
 )
 
 const (
@@ -853,7 +851,7 @@ func cleanup(filePath string, ns string, selectors ...string) {
 		if resources != "" {
 			Failf("Resources left running after stop:\n%s", resources)
 		}
-		pods := runKubectl("get", "pods", "-l", selector, nsArg, "-t", "{{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+		pods := runKubectl("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
 		if pods != "" {
 			Failf("Pods left unterminated after stop:\n%s", pods)
 		}
@@ -977,6 +975,11 @@ func (b kubectlBuilder) withStdinData(data string) *kubectlBuilder {
 	return &b
 }
 
+func (b kubectlBuilder) withStdinReader(reader io.Reader) *kubectlBuilder {
+	b.cmd.Stdin = reader
+	return &b
+}
+
 func (b kubectlBuilder) exec() string {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
@@ -1019,29 +1022,9 @@ func tryKill(cmd *exec.Cmd) {
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a substring matcher.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
-	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, ContainSubstring)
-}
-
-// testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a regexp matcher.
-func testContainerOutputRegexp(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
-	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, MatchRegexp)
-}
-
-// testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using the given matcher.
-func testContainerOutputMatcher(scenarioName string,
-	c *client.Client,
-	pod *api.Pod,
-	containerIndex int,
-	expectedOutput []string, ns string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
-
+// for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
+// the exact container log and searches for lines of expected output.
+func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name, api.NewDeleteOptions(0))
@@ -1097,7 +1080,7 @@ func testContainerOutputMatcher(scenarioName string,
 	}
 
 	for _, m := range expectedOutput {
-		Expect(string(logs)).To(matcher(m), "%q in container output", m)
+		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
 	}
 }
 
