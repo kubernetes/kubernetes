@@ -43,7 +43,7 @@ Getting started on Microsoft Azure
 
 ## Prerequisites
 
-** Azure Prerequisites**
+**Azure Prerequisites**
 
 1. You need an Azure account. Visit http://azure.microsoft.com/ to get started.
 2. Install and configure the Azure cross-platform command-line interface. http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
