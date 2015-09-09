@@ -237,9 +237,10 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 	if err := decodeResponse(resp, &item); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
+	// Fill in data that the apiserver injects
+	expectedObj.SelfLink = item.SelfLink
 	if !reflect.DeepEqual(item, expectedObj) {
-		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
+		t.Errorf("expected:\n%#v\nsaw:\n%#v\n", expectedObj, item)
 	}
 }
 
@@ -285,8 +286,14 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(item, inputObj) {
-		t.Errorf("expected:\n%v\nsaw:\n%v\n", inputObj, item)
+	// fill in fields set by the apiserver
+	expectedObj := inputObj
+	expectedObj.SelfLink = item.SelfLink
+	expectedObj.Namespace = item.Namespace
+	expectedObj.UID = item.UID
+	expectedObj.CreationTimestamp = item.CreationTimestamp
+	if !reflect.DeepEqual(item, expectedObj) {
+		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
 	etcdResp, err := fakeClient.Get(etcdtest.PathPrefix()+"/ThirdPartyResourceData/company.com/foos/default/test", false, false)
@@ -324,7 +331,8 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 
 	expectedObj := Foo{
 		ObjectMeta: api.ObjectMeta{
-			Name: "test",
+			Name:      "test",
+			Namespace: "default",
 		},
 		TypeMeta: api.TypeMeta{
 			Kind: "Foo",
@@ -353,6 +361,9 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	// Fill in fields set by the apiserver
+	expectedObj.SelfLink = item.SelfLink
+	expectedObj.Namespace = item.Namespace
 	if !reflect.DeepEqual(item, expectedObj) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
