@@ -17,7 +17,11 @@ base:
     - cadvisor
     - kube-client-tools
     - kubelet
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-minion
+{% else %}
     - kube-proxy
+{% endif %}
 {% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
   {% if pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
@@ -33,9 +37,6 @@ base:
     - supervisor
 {% else %}
     - monit
-{% endif %}
-{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
-    - opencontrail-networking-minion
 {% endif %}
 
   'roles:kubernetes-master':
