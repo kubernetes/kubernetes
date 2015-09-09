@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -30,15 +30,15 @@ import (
 // Registry is an interface for things that know how to store Jobs.
 type Registry interface {
 	// ListJobs obtains a list of Jobs having labels and fields which match selector.
-	ListJobs(ctx api.Context, label labels.Selector, field fields.Selector) (*expapi.JobList, error)
+	ListJobs(ctx api.Context, label labels.Selector, field fields.Selector) (*experimental.JobList, error)
 	// WatchJobs watch for new/changed/deleted Jobs.
 	WatchJobs(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	// GetJobs gets a specific Job.
-	GetJob(ctx api.Context, name string) (*expapi.Job, error)
+	GetJob(ctx api.Context, name string) (*experimental.Job, error)
 	// CreateJob creates a Job based on a specification.
-	CreateJob(ctx api.Context, job *expapi.Job) (*expapi.Job, error)
+	CreateJob(ctx api.Context, job *experimental.Job) (*experimental.Job, error)
 	// UpdateJob updates an existing Job.
-	UpdateJob(ctx api.Context, job *expapi.Job) (*expapi.Job, error)
+	UpdateJob(ctx api.Context, job *experimental.Job) (*experimental.Job, error)
 	// DeleteJob deletes an existing Job.
 	DeleteJob(ctx api.Context, name string) error
 }
@@ -54,7 +54,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListJobs(ctx api.Context, label labels.Selector, field fields.Selector) (*expapi.JobList, error) {
+func (s *storage) ListJobs(ctx api.Context, label labels.Selector, field fields.Selector) (*experimental.JobList, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -62,35 +62,35 @@ func (s *storage) ListJobs(ctx api.Context, label labels.Selector, field fields.
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*expapi.JobList), err
+	return obj.(*experimental.JobList), err
 }
 
 func (s *storage) WatchJobs(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetJob(ctx api.Context, name string) (*expapi.Job, error) {
+func (s *storage) GetJob(ctx api.Context, name string) (*experimental.Job, error) {
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*expapi.Job), nil
+	return obj.(*experimental.Job), nil
 }
 
-func (s *storage) CreateJob(ctx api.Context, job *expapi.Job) (*expapi.Job, error) {
+func (s *storage) CreateJob(ctx api.Context, job *experimental.Job) (*experimental.Job, error) {
 	obj, err := s.Create(ctx, job)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*expapi.Job), nil
+	return obj.(*experimental.Job), nil
 }
 
-func (s *storage) UpdateJob(ctx api.Context, job *expapi.Job) (*expapi.Job, error) {
+func (s *storage) UpdateJob(ctx api.Context, job *experimental.Job) (*experimental.Job, error) {
 	obj, _, err := s.Update(ctx, job)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*expapi.Job), nil
+	return obj.(*experimental.Job), nil
 }
 
 func (s *storage) DeleteJob(ctx api.Context, name string) error {

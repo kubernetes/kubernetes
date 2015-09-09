@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -57,14 +57,14 @@ type fakeMetricsClient struct {
 }
 
 type fakeResourceConsumptionClient struct {
-	metrics map[api.ResourceName]expapi.ResourceConsumption
+	metrics map[api.ResourceName]experimental.ResourceConsumption
 }
 
 func (f *fakeMetricsClient) ResourceConsumption(namespace string) metrics.ResourceConsumptionClient {
 	return f.consumption
 }
 
-func (f *fakeResourceConsumptionClient) Get(resource api.ResourceName, selector map[string]string) (*expapi.ResourceConsumption, error) {
+func (f *fakeResourceConsumptionClient) Get(resource api.ResourceName, selector map[string]string) (*experimental.ResourceConsumption, error) {
 	consumption, found := f.metrics[resource]
 	if !found {
 		return nil, fmt.Errorf("resource not found: %v", resource)
@@ -110,15 +110,15 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 
 func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 
-	hpaResponse := serverResponse{http.StatusOK, &expapi.HorizontalPodAutoscalerList{
-		Items: []expapi.HorizontalPodAutoscaler{
+	hpaResponse := serverResponse{http.StatusOK, &experimental.HorizontalPodAutoscalerList{
+		Items: []experimental.HorizontalPodAutoscaler{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      hpaName,
 					Namespace: namespace,
 				},
-				Spec: expapi.HorizontalPodAutoscalerSpec{
-					ScaleRef: &expapi.SubresourceReference{
+				Spec: experimental.HorizontalPodAutoscalerSpec{
+					ScaleRef: &experimental.SubresourceReference{
 						Kind:        "replicationController",
 						Name:        rcName,
 						Namespace:   namespace,
@@ -126,36 +126,36 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 					},
 					MinCount: 1,
 					MaxCount: 5,
-					Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.3")},
+					Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.3")},
 				},
 			}}}}
 
-	scaleResponse := serverResponse{http.StatusOK, &expapi.Scale{
+	scaleResponse := serverResponse{http.StatusOK, &experimental.Scale{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rcName,
 			Namespace: namespace,
 		},
-		Spec: expapi.ScaleSpec{
+		Spec: experimental.ScaleSpec{
 			Replicas: 1,
 		},
-		Status: expapi.ScaleStatus{
+		Status: experimental.ScaleStatus{
 			Replicas: 1,
 			Selector: map[string]string{"name": podNameLabel},
 		},
 	}}
 
-	status := expapi.HorizontalPodAutoscalerStatus{
+	status := experimental.HorizontalPodAutoscalerStatus{
 		CurrentReplicas: 1,
 		DesiredReplicas: 3,
 	}
-	updateHpaResponse := serverResponse{http.StatusOK, &expapi.HorizontalPodAutoscaler{
+	updateHpaResponse := serverResponse{http.StatusOK, &experimental.HorizontalPodAutoscaler{
 
 		ObjectMeta: api.ObjectMeta{
 			Name:      hpaName,
 			Namespace: namespace,
 		},
-		Spec: expapi.HorizontalPodAutoscalerSpec{
-			ScaleRef: &expapi.SubresourceReference{
+		Spec: experimental.HorizontalPodAutoscalerSpec{
+			ScaleRef: &experimental.SubresourceReference{
 				Kind:        "replicationController",
 				Name:        rcName,
 				Namespace:   namespace,
@@ -163,7 +163,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 			},
 			MinCount: 1,
 			MaxCount: 5,
-			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.3")},
+			Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.3")},
 		},
 		Status: &status,
 	}}
@@ -177,7 +177,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 
 	defer testServer.Close()
 	kubeClient := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Experimental.Version()})
-	fakeRC := fakeResourceConsumptionClient{metrics: map[api.ResourceName]expapi.ResourceConsumption{
+	fakeRC := fakeResourceConsumptionClient{metrics: map[api.ResourceName]experimental.ResourceConsumption{
 		api.ResourceCPU: {Resource: api.ResourceCPU, Quantity: resource.MustParse("650m")},
 	}}
 	fake := fakeMetricsClient{consumption: &fakeRC}
@@ -195,7 +195,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to decode: %v %v", err)
 	}
-	hpa, _ := obj.(*expapi.HorizontalPodAutoscaler)
+	hpa, _ := obj.(*experimental.HorizontalPodAutoscaler)
 
 	assert.Equal(t, 3, hpa.Status.DesiredReplicas)
 	assert.Equal(t, int64(650), hpa.Status.CurrentConsumption.Quantity.MilliValue())

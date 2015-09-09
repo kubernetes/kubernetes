@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,11 +31,11 @@ type DeploymentsNamespacer interface {
 
 // DeploymentInterface has methods to work with Deployment resources.
 type DeploymentInterface interface {
-	List(label labels.Selector, field fields.Selector) (*expapi.DeploymentList, error)
-	Get(name string) (*expapi.Deployment, error)
+	List(label labels.Selector, field fields.Selector) (*experimental.DeploymentList, error)
+	Get(name string) (*experimental.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Create(Deployment *expapi.Deployment) (*expapi.Deployment, error)
-	Update(Deployment *expapi.Deployment) (*expapi.Deployment, error)
+	Create(Deployment *experimental.Deployment) (*experimental.Deployment, error)
+	Update(Deployment *experimental.Deployment) (*experimental.Deployment, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -54,15 +54,15 @@ func newDeployments(c *ExperimentalClient, namespace string) *deployments {
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(label labels.Selector, field fields.Selector) (result *expapi.DeploymentList, err error) {
-	result = &expapi.DeploymentList{}
+func (c *deployments) List(label labels.Selector, field fields.Selector) (result *experimental.DeploymentList, err error) {
+	result = &experimental.DeploymentList{}
 	err = c.client.Get().Namespace(c.ns).Resource("deployments").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *deployments) Get(name string) (result *expapi.Deployment, err error) {
-	result = &expapi.Deployment{}
+func (c *deployments) Get(name string) (result *experimental.Deployment, err error) {
+	result = &experimental.Deployment{}
 	err = c.client.Get().Namespace(c.ns).Resource("deployments").Name(name).Do().Into(result)
 	return
 }
@@ -80,15 +80,15 @@ func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Create(deployment *expapi.Deployment) (result *expapi.Deployment, err error) {
-	result = &expapi.Deployment{}
+func (c *deployments) Create(deployment *experimental.Deployment) (result *experimental.Deployment, err error) {
+	result = &experimental.Deployment{}
 	err = c.client.Post().Namespace(c.ns).Resource("deployments").Body(deployment).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Update(deployment *expapi.Deployment) (result *expapi.Deployment, err error) {
-	result = &expapi.Deployment{}
+func (c *deployments) Update(deployment *experimental.Deployment) (result *experimental.Deployment, err error) {
+	result = &experimental.Deployment{}
 	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(deployment).Do().Into(result)
 	return
 }

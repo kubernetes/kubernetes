@@ -22,25 +22,25 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
 func TestValidateHorizontalPodAutoscaler(t *testing.T) {
-	successCases := []expapi.HorizontalPodAutoscaler{
+	successCases := []experimental.HorizontalPodAutoscaler{
 		{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.HorizontalPodAutoscalerSpec{
-				ScaleRef: &expapi.SubresourceReference{
+			Spec: experimental.HorizontalPodAutoscalerSpec{
+				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -50,19 +50,19 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]expapi.HorizontalPodAutoscaler{
+	errorCases := map[string]experimental.HorizontalPodAutoscaler{
 		"must be non-negative": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.HorizontalPodAutoscalerSpec{
-				ScaleRef: &expapi.SubresourceReference{
+			Spec: experimental.HorizontalPodAutoscalerSpec{
+				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
 				MinCount: -1,
 				MaxCount: 5,
-				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"must be bigger or equal to minCount": {
@@ -70,13 +70,13 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.HorizontalPodAutoscalerSpec{
-				ScaleRef: &expapi.SubresourceReference{
+			Spec: experimental.HorizontalPodAutoscalerSpec{
+				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
 				MinCount: 7,
 				MaxCount: 5,
-				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"invalid value": {
@@ -84,13 +84,13 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.HorizontalPodAutoscalerSpec{
-				ScaleRef: &expapi.SubresourceReference{
+			Spec: experimental.HorizontalPodAutoscalerSpec{
+				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
+				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
 			},
 		},
 		"resource not supported": {
@@ -98,13 +98,13 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.HorizontalPodAutoscalerSpec{
-				ScaleRef: &expapi.SubresourceReference{
+			Spec: experimental.HorizontalPodAutoscalerSpec{
+				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
+				Target:   experimental.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"required value": {
@@ -112,10 +112,10 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.HorizontalPodAutoscalerSpec{
+			Spec: experimental.HorizontalPodAutoscalerSpec{
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -212,53 +212,53 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 
 	type dsUpdateTest struct {
-		old    expapi.DaemonSet
-		update expapi.DaemonSet
+		old    experimental.DaemonSet
+		update experimental.DaemonSet
 	}
 	successCases := []dsUpdateTest{
 		{
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
 		},
 		{
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector2,
 					Template: &validPodTemplateAbc2.Template,
 				},
 			},
 		},
 		{
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateNodeSelector.Template,
 				},
@@ -274,80 +274,80 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	errorCases := map[string]dsUpdateTest{
 		"change daemon name": {
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
 		},
 		"invalid selector": {
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: invalidSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
 		},
 		"invalid pod": {
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &invalidPodTemplate.Template,
 				},
 			},
 		},
 		"change container image": {
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateDef.Template,
 				},
 			},
 		},
 		"read-write volume": {
-			old: expapi.DaemonSet{
+			old: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.DaemonSet{
+			update: experimental.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSetSpec{
+				Spec: experimental.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &readWriteVolumePodTemplate.Template,
 				},
@@ -387,17 +387,17 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 		},
 	}
-	successCases := []expapi.DaemonSet{
+	successCases := []experimental.DaemonSet{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -409,37 +409,37 @@ func TestValidateDaemonSet(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]expapi.DaemonSet{
+	errorCases := map[string]experimental.DaemonSet{
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: map[string]string{"foo": "bar"},
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 			},
 		},
@@ -451,7 +451,7 @@ func TestValidateDaemonSet(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -464,7 +464,7 @@ func TestValidateDaemonSet(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Template: &invalidPodTemplate.Template,
 			},
 		},
@@ -476,7 +476,7 @@ func TestValidateDaemonSet(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -486,7 +486,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -505,7 +505,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.DaemonSetSpec{
+			Spec: experimental.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -542,13 +542,13 @@ func TestValidateDaemonSet(t *testing.T) {
 	}
 }
 
-func validDeployment() *expapi.Deployment {
-	return &expapi.Deployment{
+func validDeployment() *experimental.Deployment {
+	return &experimental.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: expapi.DeploymentSpec{
+		Spec: experimental.DeploymentSpec{
 			Selector: map[string]string{
 				"name": "abc",
 			},
@@ -578,7 +578,7 @@ func validDeployment() *expapi.Deployment {
 }
 
 func TestValidateDeployment(t *testing.T) {
-	successCases := []*expapi.Deployment{
+	successCases := []*experimental.Deployment{
 		validDeployment(),
 	}
 	for _, successCase := range successCases {
@@ -587,8 +587,8 @@ func TestValidateDeployment(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]*expapi.Deployment{}
-	errorCases["metadata.name: required value"] = &expapi.Deployment{
+	errorCases := map[string]*experimental.Deployment{}
+	errorCases["metadata.name: required value"] = &experimental.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 		},
@@ -612,17 +612,17 @@ func TestValidateDeployment(t *testing.T) {
 
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()
-	invalidRecreateDeployment.Spec.Strategy = expapi.DeploymentStrategy{
-		Type:          expapi.DeploymentRecreate,
-		RollingUpdate: &expapi.RollingUpdateDeployment{},
+	invalidRecreateDeployment.Spec.Strategy = experimental.DeploymentStrategy{
+		Type:          experimental.DeploymentRecreate,
+		RollingUpdate: &experimental.RollingUpdateDeployment{},
 	}
 	errorCases["rollingUpdate should be nil when strategy type is Recreate"] = invalidRecreateDeployment
 
 	// MaxSurge should be in the form of 20%.
 	invalidMaxSurgeDeployment := validDeployment()
-	invalidMaxSurgeDeployment.Spec.Strategy = expapi.DeploymentStrategy{
-		Type: expapi.DeploymentRollingUpdate,
-		RollingUpdate: &expapi.RollingUpdateDeployment{
+	invalidMaxSurgeDeployment.Spec.Strategy = experimental.DeploymentStrategy{
+		Type: experimental.DeploymentRollingUpdate,
+		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxSurge: util.NewIntOrStringFromString("20Percent"),
 		},
 	}
@@ -630,9 +630,9 @@ func TestValidateDeployment(t *testing.T) {
 
 	// MaxSurge and MaxUnavailable cannot both be zero.
 	invalidRollingUpdateDeployment := validDeployment()
-	invalidRollingUpdateDeployment.Spec.Strategy = expapi.DeploymentStrategy{
-		Type: expapi.DeploymentRollingUpdate,
-		RollingUpdate: &expapi.RollingUpdateDeployment{
+	invalidRollingUpdateDeployment.Spec.Strategy = experimental.DeploymentStrategy{
+		Type: experimental.DeploymentRollingUpdate,
+		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxSurge:       util.NewIntOrStringFromString("0%"),
 			MaxUnavailable: util.NewIntOrStringFromInt(0),
 		},
@@ -641,9 +641,9 @@ func TestValidateDeployment(t *testing.T) {
 
 	// MaxUnavailable should not be more than 100%.
 	invalidMaxUnavailableDeployment := validDeployment()
-	invalidMaxUnavailableDeployment.Spec.Strategy = expapi.DeploymentStrategy{
-		Type: expapi.DeploymentRollingUpdate,
-		RollingUpdate: &expapi.RollingUpdateDeployment{
+	invalidMaxUnavailableDeployment.Spec.Strategy = experimental.DeploymentStrategy{
+		Type: experimental.DeploymentRollingUpdate,
+		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxUnavailable: util.NewIntOrStringFromString("110%"),
 		},
 	}
@@ -671,13 +671,13 @@ func TestValidateJob(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	successCases := []expapi.Job{
+	successCases := []experimental.Job{
 		{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Selector: validSelector,
 				Template: &validPodTemplateSpec,
 			},
@@ -689,13 +689,13 @@ func TestValidateJob(t *testing.T) {
 		}
 	}
 	negative := -1
-	errorCases := map[string]expapi.Job{
+	errorCases := map[string]experimental.Job{
 		"spec.parallelism:must be non-negative": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Parallelism: &negative,
 				Selector:    validSelector,
 				Template:    &validPodTemplateSpec,
@@ -706,7 +706,7 @@ func TestValidateJob(t *testing.T) {
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Completions: &negative,
 				Selector:    validSelector,
 				Template:    &validPodTemplateSpec,
@@ -717,7 +717,7 @@ func TestValidateJob(t *testing.T) {
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Selector: map[string]string{},
 				Template: &validPodTemplateSpec,
 			},
@@ -727,7 +727,7 @@ func TestValidateJob(t *testing.T) {
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Selector: validSelector,
 			},
 		},
@@ -736,7 +736,7 @@ func TestValidateJob(t *testing.T) {
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
@@ -755,7 +755,7 @@ func TestValidateJob(t *testing.T) {
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.JobSpec{
+			Spec: experimental.JobSpec{
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{

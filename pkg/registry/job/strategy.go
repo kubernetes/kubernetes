@@ -21,8 +21,8 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/validation"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/experimental/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -46,20 +46,20 @@ func (jobStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(obj runtime.Object) {
-	job := obj.(*expapi.Job)
-	job.Status = expapi.JobStatus{}
+	job := obj.(*experimental.Job)
+	job.Status = experimental.JobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newJob := obj.(*expapi.Job)
-	oldJob := old.(*expapi.Job)
+	newJob := obj.(*experimental.Job)
+	oldJob := old.(*experimental.Job)
 	newJob.Status = oldJob.Status
 }
 
 // Validate validates a new job.
 func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	job := obj.(*expapi.Job)
+	job := obj.(*experimental.Job)
 	return validation.ValidateJob(job)
 }
 
@@ -74,13 +74,13 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateJob(obj.(*expapi.Job))
-	updateErrorList := validation.ValidateJobUpdate(old.(*expapi.Job), obj.(*expapi.Job))
+	validationErrorList := validation.ValidateJob(obj.(*experimental.Job))
+	updateErrorList := validation.ValidateJobUpdate(old.(*experimental.Job), obj.(*experimental.Job))
 	return append(validationErrorList, updateErrorList...)
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.
-func JobToSelectableFields(job *expapi.Job) fields.Set {
+func JobToSelectableFields(job *experimental.Job) fields.Set {
 	return fields.Set{
 		"metadata.name":     job.Name,
 		"status.successful": strconv.Itoa(job.Status.Successful),
@@ -95,7 +95,7 @@ func MatchJob(label labels.Selector, field fields.Selector) generic.Matcher {
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			job, ok := obj.(*expapi.Job)
+			job, ok := obj.(*experimental.Job)
 			if !ok {
 				return nil, nil, fmt.Errorf("Given object is not a job.")
 			}

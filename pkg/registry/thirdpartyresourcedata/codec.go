@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -86,7 +86,7 @@ func NewCodec(codec runtime.Codec, kind string) runtime.Codec {
 	return &thirdPartyResourceDataCodec{codec, kind}
 }
 
-func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceData, data []byte) error {
+func (t *thirdPartyResourceDataCodec) populate(objIn *experimental.ThirdPartyResourceData, data []byte) error {
 	var obj interface{}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		fmt.Printf("Invalid JSON:\n%s\n", string(data))
@@ -99,7 +99,7 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceD
 	return t.populateFromObject(objIn, mapObj, data)
 }
 
-func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *expapi.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
+func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *experimental.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
 	typeMeta := api.TypeMeta{}
 	if err := json.Unmarshal(data, &typeMeta); err != nil {
 		return err
@@ -127,7 +127,7 @@ func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *expapi.ThirdPart
 }
 
 func (t *thirdPartyResourceDataCodec) Decode(data []byte) (runtime.Object, error) {
-	result := &expapi.ThirdPartyResourceData{}
+	result := &experimental.ThirdPartyResourceData{}
 	if err := t.populate(result, data); err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, version strin
 }
 
 func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object) error {
-	thirdParty, ok := obj.(*expapi.ThirdPartyResourceData)
+	thirdParty, ok := obj.(*experimental.ThirdPartyResourceData)
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
@@ -156,7 +156,7 @@ func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object
 }
 
 func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, version, kind string) error {
-	thirdParty, ok := obj.(*expapi.ThirdPartyResourceData)
+	thirdParty, ok := obj.(*experimental.ThirdPartyResourceData)
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
@@ -207,7 +207,7 @@ const template = `{
   "items": [ %s ]
 }`
 
-func encodeToJSON(obj *expapi.ThirdPartyResourceData) ([]byte, error) {
+func encodeToJSON(obj *experimental.ThirdPartyResourceData) ([]byte, error) {
 	var objOut interface{}
 	if err := json.Unmarshal(obj.Data, &objOut); err != nil {
 		return nil, err
@@ -222,9 +222,9 @@ func encodeToJSON(obj *expapi.ThirdPartyResourceData) ([]byte, error) {
 
 func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, err error) {
 	switch obj := obj.(type) {
-	case *expapi.ThirdPartyResourceData:
+	case *experimental.ThirdPartyResourceData:
 		return encodeToJSON(obj)
-	case *expapi.ThirdPartyResourceDataList:
+	case *experimental.ThirdPartyResourceDataList:
 		// TODO: There must be a better way to do this...
 		buff := &bytes.Buffer{}
 		dataStrings := make([]string, len(obj.Items))
@@ -259,9 +259,9 @@ func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.O
 	}
 	switch kind {
 	case "ThirdPartyResourceData":
-		return &expapi.ThirdPartyResourceData{}, nil
+		return &experimental.ThirdPartyResourceData{}, nil
 	case "ThirdPartyResourceDataList":
-		return &expapi.ThirdPartyResourceDataList{}, nil
+		return &experimental.ThirdPartyResourceDataList{}, nil
 	default:
 		return t.delegate.New(latest.Version, kind)
 	}
