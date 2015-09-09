@@ -325,6 +325,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.RktPath,
+		kc.RktStage1Image,
 		kc.Mounter,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,

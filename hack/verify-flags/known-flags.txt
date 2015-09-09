@@ -222,6 +222,7 @@ resource-container
 resource-quota-sync-period
 resource-version
 rkt-path
+rkt-stage1-imag
 root-ca-file
 root-dir
 run-proxy
