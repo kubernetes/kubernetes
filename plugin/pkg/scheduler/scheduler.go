@@ -63,18 +63,18 @@ type SystemModeler interface {
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
-// minions that they fit on and writes bindings back to the api server.
+// nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
 	config *Config
 }
 
 type Config struct {
 	// It is expected that changes made via modeler will be observed
-	// by MinionLister and Algorithm.
-	Modeler      SystemModeler
-	MinionLister algorithm.MinionLister
-	Algorithm    algorithm.ScheduleAlgorithm
-	Binder       Binder
+	// by NodeLister and Algorithm.
+	Modeler    SystemModeler
+	NodeLister algorithm.NodeLister
+	Algorithm  algorithm.ScheduleAlgorithm
+	Binder     Binder
 
 	// Rate at which we can create pods
 	BindPodsRateLimiter util.RateLimiter
@@ -121,7 +121,7 @@ func (s *Scheduler) scheduleOne() {
 	defer func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
+	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %+v", pod)
