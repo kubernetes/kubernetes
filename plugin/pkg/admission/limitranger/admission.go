@@ -240,7 +240,11 @@ func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
 	req, reqExists := request[resourceName]
 	lim, limExists := limit[resourceName]
-	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
+	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
+
+	// the enforced value for ratio is normalized as a number and should not be converted to millivalue units
+	// so for example, 1 is 1 and not 1000
+	enforcedValue := enforced.Value()
 
 	if !reqExists || (observedReqValue == int64(0)) {
 		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no request is specified or request is 0.", resourceName, limitType, enforced.String())
