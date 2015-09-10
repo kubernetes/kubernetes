@@ -212,7 +212,7 @@ function start_apiserver {
     fi
     runtime_config=""
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
-      runtime_config="--runtime-config=\"${RUNTIME_CONFIG}\""
+      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log
