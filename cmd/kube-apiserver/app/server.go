@@ -499,23 +499,24 @@ func (s *APIServer) Run(_ []string) error {
 		}
 
 		glog.Infof("Serving securely on %s", secureLocation)
+		if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
+			s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
+			s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
+			// TODO (cjcullen): Is PublicAddress the right address to sign a cert with?
+			alternateIPs := []net.IP{config.ServiceReadWriteIP}
+			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
+			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+			if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
+				glog.Errorf("Unable to generate self signed cert: %v", err)
+			} else {
+				glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
+			}
+		}
+
 		go func() {
 			defer util.HandleCrash()
 			for {
-				if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-					s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
-					s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
-					// TODO (cjcullen): Is PublicAddress the right address to sign a cert with?
-					alternateIPs := []net.IP{config.ServiceReadWriteIP}
-					alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
-					// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-					// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
-						glog.Errorf("Unable to generate self signed cert: %v", err)
-					} else {
-						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
-					}
-				}
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
 					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
