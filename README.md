@@ -101,6 +101,10 @@ Do you want to help "shape the evolution of technologies that are container pack
 
 You should consider joining the [Cloud Native Computing Foundation](https://cncf.io/about). For details about who's involved and how Kubernetes plays a role, read [their announcement](https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container).
 
+### Code of conduct
+
+Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
+
 #### Are you ready to add to the discussion?
 
 We have presence on:
