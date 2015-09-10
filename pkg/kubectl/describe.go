@@ -1128,7 +1128,9 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 		if len(node.Spec.ExternalID) > 0 {
 			fmt.Fprintf(out, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
-		describeNodeResource(pods, node, out)
+		if err := describeNodeResource(pods, node, out); err != nil {
+			return err
+		}
 
 		if events != nil {
 			DescribeEvents(events, out)
@@ -1186,52 +1188,38 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 	})
 }
 
-func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) {
+func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error {
 	nonTerminatedPods := filterTerminatedPods(pods)
 	fmt.Fprintf(out, "Non-terminated Pods:\t(%d in total)\n", len(nonTerminatedPods))
 	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ─────────\t────\t\t────────────\t──────────\t───────────────\t─────────────\n")
-	totalMilliCPUReq := int64(0)
-	totalMemoryReq := int64(0)
-	fractionPodCPUReq := float64(0)
-	fractionPodMemoryReq := float64(0)
-	fractionTotalCPUReq := float64(0)
-	fractionTotalMemoryReq := float64(0)
-	totalMilliCPULimit := int64(0)
-	totalMemoryLimit := int64(0)
-	fractionPodCPULimit := float64(0)
-	fractionPodMemoryLimit := float64(0)
-	for _, pod := range pods {
-		podTotalMilliCPUReq := int64(0)
-		podTotalMemoryReq := int64(0)
-		podTotalMilliCPULimit := int64(0)
-		podTotalMemoryLimit := int64(0)
-
-		for ix := range pod.Spec.Containers {
-			requests := pod.Spec.Containers[ix].Resources.Requests
-			podTotalMilliCPUReq += requests.Cpu().MilliValue()
-			podTotalMemoryReq += requests.Memory().Value()
-
-			limits := pod.Spec.Containers[ix].Resources.Limits
-			podTotalMilliCPULimit += limits.Cpu().MilliValue()
-			podTotalMemoryLimit += limits.Memory().Value()
+	for _, pod := range nonTerminatedPods {
+		req, limit, err := getSinglePodTotalRequestsAndLimits(pod)
+		if err != nil {
+			return err
 		}
-		totalMilliCPUReq += podTotalMilliCPUReq
-		totalMemoryReq += podTotalMemoryReq
-		totalMilliCPULimit += podTotalMilliCPULimit
-		totalMemoryLimit += podTotalMemoryLimit
-		fractionPodCPUReq = float64(podTotalMilliCPUReq) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
-		fractionPodMemoryReq = float64(podTotalMemoryReq) / float64(node.Status.Capacity.Memory().Value()) * 100
-		fractionPodCPULimit = float64(podTotalMilliCPULimit) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
-		fractionPodMemoryLimit = float64(podTotalMemoryLimit) / float64(node.Status.Capacity.Memory().Value()) * 100
-		fmt.Fprintf(out, "  %s\t%s\t\t%dm (%d%%)\t%dKi (%d%%)\t%dm (%d%%)\t%dKi (%d%%)\n", pod.Namespace, pod.Name,
-			podTotalMilliCPUReq, int64(fractionPodCPUReq), podTotalMilliCPULimit, int64(fractionPodCPULimit), podTotalMemoryReq/1000, int64(fractionPodMemoryReq), podTotalMemoryLimit/1000, int64(fractionPodMemoryLimit))
+		cpuReq, cpuLimit, memoryReq, memoryLimit := req[api.ResourceCPU], limit[api.ResourceCPU], req[api.ResourceMemory], limit[api.ResourceMemory]
+		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+		fractionMemoryReq := float64(memoryReq.MilliValue()) / float64(node.Status.Capacity.Memory().MilliValue()) * 100
+		fractionMemoryLimit := float64(memoryLimit.MilliValue()) / float64(node.Status.Capacity.Memory().MilliValue()) * 100
+		fmt.Fprintf(out, "  %s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n", pod.Namespace, pod.Name,
+			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
+			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
+
 	fmt.Fprint(out, "Allocated resources:\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ────────────\t──────────\t───────────────\t─────────────\n")
-	fractionTotalCPUReq = float64(totalMilliCPUReq) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
-	fractionTotalMemoryReq = float64(totalMemoryReq) / float64(node.Status.Capacity.Memory().Value()) * 100
-	fmt.Fprintf(out, "  %dm (%d%%)\t%dm\t%dKi (%d%%)\t%dKi\n", totalMilliCPUReq, int64(fractionTotalCPUReq), totalMilliCPULimit, totalMemoryReq/1000, int64(fractionTotalMemoryReq), totalMemoryLimit/1000)
+	reqs, limits, err := getPodsTotalRequestsAndLimits(nonTerminatedPods)
+	if err != nil {
+		return err
+	}
+	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
+	fractionCpuReqs := float64(cpuReqs.MilliValue()) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+	fractionMemoryReqs := float64(memoryReqs.MilliValue()) / float64(node.Status.Capacity.Memory().MilliValue()) * 100
+	fmt.Fprintf(out, "  %s (%d%%)\t%s\t%s (%d%%)\t%s\n",
+		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String())
+	return nil
 }
 
 func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
@@ -1248,36 +1236,50 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 	return result
 }
 
-func getPodsTotalRequests(pods []*api.Pod) (map[api.ResourceName]resource.Quantity, error) {
-	reqs := map[api.ResourceName]resource.Quantity{}
+func getPodsTotalRequestsAndLimits(pods []*api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
+	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, pod := range pods {
-		podReqs, err := getSinglePodTotalRequests(pod)
+		podReqs, podLimits, err := getSinglePodTotalRequestsAndLimits(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
-				reqs[podReqName] = podReqValue
+				reqs[podReqName] = *podReqValue.Copy()
 			} else if err = value.Add(podReqValue); err != nil {
-				return nil, err
+				return nil, nil, err
+			}
+		}
+		for podLimitName, podLimitValue := range podLimits {
+			if value, ok := limits[podLimitName]; !ok {
+				limits[podLimitName] = *podLimitValue.Copy()
+			} else if err = value.Add(podLimitValue); err != nil {
+				return nil, nil, err
 			}
 		}
 	}
-	return reqs, nil
+	return
 }
 
-func getSinglePodTotalRequests(pod *api.Pod) (map[api.ResourceName]resource.Quantity, error) {
-	reqs := map[api.ResourceName]resource.Quantity{}
+func getSinglePodTotalRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
+	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {
 			if value, ok := reqs[name]; !ok {
-				reqs[name] = quantity
-			} else if err := value.Add(quantity); err != nil {
-				return nil, err
+				reqs[name] = *quantity.Copy()
+			} else if err = value.Add(quantity); err != nil {
+				return nil, nil, err
+			}
+		}
+		for name, quantity := range container.Resources.Limits {
+			if value, ok := limits[name]; !ok {
+				limits[name] = *quantity.Copy()
+			} else if err = value.Add(quantity); err != nil {
+				return nil, nil, err
 			}
 		}
 	}
-	return reqs, nil
+	return
 }
 
 func DescribeEvents(el *api.EventList, w io.Writer) {
