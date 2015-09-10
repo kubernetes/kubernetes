@@ -1317,8 +1317,9 @@ type Endpoints struct {
 //     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
 //     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
 type EndpointSubset struct {
-	Addresses []EndpointAddress
-	Ports     []EndpointPort
+	Addresses         []EndpointAddress
+	NotReadyAddresses []EndpointAddress
+	Ports             []EndpointPort
 }
 
 // EndpointAddress is a tuple that describes single IP address.

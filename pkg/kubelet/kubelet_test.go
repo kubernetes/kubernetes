@@ -1757,7 +1757,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 		Type:   api.PodReady,
 		Status: api.ConditionTrue,
 	}}
-	unready := []api.PodCondition{{
+	notReady := []api.PodCondition{{
 		Type:   api.PodReady,
 		Status: api.ConditionFalse,
 	}}
@@ -1769,7 +1769,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 		{
 			spec:     nil,
 			info:     nil,
-			expected: unready,
+			expected: notReady,
 		},
 		{
 			spec:     &api.PodSpec{},
@@ -1783,7 +1783,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 				},
 			},
 			info:     []api.ContainerStatus{},
-			expected: unready,
+			expected: notReady,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1819,7 +1819,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 			info: []api.ContainerStatus{
 				getReadyStatus("1234"),
 			},
-			expected: unready,
+			expected: notReady,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1832,7 +1832,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 				getReadyStatus("1234"),
 				getNotReadyStatus("5678"),
 			},
-			expected: unready,
+			expected: notReady,
 		},
 	}
 
