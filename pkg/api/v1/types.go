@@ -1979,14 +1979,30 @@ type PodLogOptions struct {
 
 	// The container for which to stream logs. Defaults to only container if there is one container in the pod.
 	Container string `json:"container,omitempty"`
-
-	// Follow the log stream of the pod.
-	// Defaults to false.
+	// Follow the log stream of the pod. Defaults to false.
 	Follow bool `json:"follow,omitempty"`
-
-	// Return previous terminated container logs.
-	// Defaults to false.
+	// Return previous terminated container logs. Defaults to false.
 	Previous bool `json:"previous,omitempty"`
+	// A relative time in seconds before the current time from which to show logs. If this value
+	// precedes the time a pod was started, only logs since the pod start will be returned.
+	// If this value is in the future, no logs will be returned.
+	// Only one of sinceSeconds or sinceTime may be specified.
+	SinceSeconds *int64 `json:"sinceSeconds,omitempty"`
+	// An RFC3339 timestamp from which to show logs. If this value
+	// preceeds the time a pod was started, only logs since the pod start will be returned.
+	// If this value is in the future, no logs will be returned.
+	// Only one of sinceSeconds or sinceTime may be specified.
+	SinceTime *unversioned.Time `json:"sinceTime,omitempty"`
+	// If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
+	// of log output. Defaults to false.
+	Timestamps bool `json:"timestamps,omitempty"`
+	// If set, the number of lines from the end of the logs to show. If not specified,
+	// logs are shown from the creation of the container or sinceSeconds or sinceTime
+	TailLines *int64 `json:"tailLines,omitempty"`
+	// If set, the number of bytes to read from the server before terminating the
+	// log output. This may not display a complete final line of logging, and may return
+	// slightly more or slightly less than the specified limit.
+	LimitBytes *int64 `json:"limitBytes,omitempty"`
 }
 
 // PodAttachOptions is the query options to a Pod's remote attach call.

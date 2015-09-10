@@ -1950,3 +1950,23 @@ func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErro
 func ValidateSchemaUpdate(oldResource, newResource *api.ThirdPartyResource) errs.ValidationErrorList {
 	return errs.ValidationErrorList{fmt.Errorf("Schema update is not supported.")}
 }
+
+func ValidatePodLogOptions(opts *api.PodLogOptions) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if opts.TailLines != nil && *opts.TailLines < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("tailLines", *opts.TailLines, "tailLines must be a non-negative integer or nil"))
+	}
+	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("limitBytes", *opts.LimitBytes, "limitBytes must be a positive integer or nil"))
+	}
+	switch {
+	case opts.SinceSeconds != nil && opts.SinceTime != nil:
+		allErrs = append(allErrs, errs.NewFieldInvalid("sinceSeconds", *opts.SinceSeconds, "only one of sinceTime or sinceSeconds can be provided"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("sinceTime", *opts.SinceTime, "only one of sinceTime or sinceSeconds can be provided"))
+	case opts.SinceSeconds != nil:
+		if *opts.SinceSeconds < 1 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("sinceSeconds", *opts.SinceSeconds, "sinceSeconds must be a positive integer"))
+		}
+	}
+	return allErrs
+}
