@@ -23,5 +23,5 @@ rc=0
 ip link show docker0 >/dev/null 2>&1 || rc="$?"
 if [[ "$rc" -eq "0" ]]; then
   ip link set dev docker0 down
-  /opt/kubernetes/bin/brctl delbr docker0
+  ip link delete docker0
 fi

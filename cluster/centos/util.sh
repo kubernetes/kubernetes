@@ -264,14 +264,14 @@ function provision-minion() {
   ensure-setup-dir ${minion}
 
   # scp -r ${SSH_OPTS} minion config-default.sh copy-files.sh util.sh "${minion_ip}:${KUBE_TEMP}" 
-  kube-scp ${minion} "${ROOT}/binaries/minion ${ROOT}/minion ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
+  kube-scp ${minion} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
   kube-ssh "${minion}" " \
-    sudo cp -r ${KUBE_TEMP}/minion/bin /opt/kubernetes; \
+    sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
-    sudo bash ${KUBE_TEMP}/minion/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
-    sudo bash ${KUBE_TEMP}/minion/scripts/docker.sh \"${DOCKER_OPTS}\"; \
-    sudo bash ${KUBE_TEMP}/minion/scripts/kubelet.sh ${master_ip} ${minion_ip}; \
-    sudo bash ${KUBE_TEMP}/minion/scripts/proxy.sh ${master_ip}"
+    sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
+    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${minion_ip}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${master_ip}"
 }
 
 # Create dirs that'll be used during setup on target machine.

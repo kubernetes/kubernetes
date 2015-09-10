@@ -54,28 +54,18 @@ function download-releases() {
 
   echo "Download docker-latest ..."
   curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest -o ${RELEASES_DIR}/docker
-
-  echo "Download bridge-utils from yum repo ..."
-  sudo yum --downloadonly --downloaddir=${RELEASES_DIR} install bridge-utils
-
-  mkdir -p ${RELEASES_DIR}/brctl-tmp
-  local rpm_file=$(ls ${RELEASES_DIR}/bridge-utils-*.rpm)
-  pushd ${RELEASES_DIR}/brctl-tmp >/dev/null 2>&1
-  rpm2cpio ${rpm_file} | cpio -id
-  popd >/dev/null 2>&1
-  cp ${RELEASES_DIR}/brctl-tmp/usr/sbin/brctl ${RELEASES_DIR}
 }
 
 function unpack-releases() {
   rm -rf ${BINARY_DIR}
   mkdir -p ${BINARY_DIR}/master/bin
-  mkdir -p ${BINARY_DIR}/minion/bin
+  mkdir -p ${BINARY_DIR}/node/bin
 
   # flannel
   if [[ -f ${RELEASES_DIR}/flannel.tar.gz ]] ; then
     tar xzf ${RELEASES_DIR}/flannel.tar.gz -C ${RELEASES_DIR}
     cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/minion/bin
+    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/node/bin
   fi
 
   # ectd
@@ -85,7 +75,7 @@ function unpack-releases() {
     cp ${RELEASES_DIR}/$ETCD/etcd \
        ${RELEASES_DIR}/$ETCD/etcdctl ${BINARY_DIR}/master/bin
     cp ${RELEASES_DIR}/$ETCD/etcd \
-       ${RELEASES_DIR}/$ETCD/etcdctl ${BINARY_DIR}/minion/bin
+       ${RELEASES_DIR}/$ETCD/etcdctl ${BINARY_DIR}/node/bin
   fi
 
   # k8s
@@ -100,17 +90,13 @@ function unpack-releases() {
        ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-scheduler ${BINARY_DIR}/master/bin
 
     cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kubelet \
-       ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-proxy ${BINARY_DIR}/minion/bin
+       ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-proxy ${BINARY_DIR}/node/bin
 
     cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kubectl ${BINARY_DIR}
   fi
 
   if [[ -f ${RELEASES_DIR}/docker ]]; then
-    cp ${RELEASES_DIR}/docker ${BINARY_DIR}/minion/bin
-  fi
-
-  if [[ -f ${RELEASES_DIR}/brctl ]]; then
-    cp ${RELEASES_DIR}/brctl ${BINARY_DIR}/minion/bin
+    cp ${RELEASES_DIR}/docker ${BINARY_DIR}/node/bin
   fi
 
   chmod -R +x ${BINARY_DIR}
