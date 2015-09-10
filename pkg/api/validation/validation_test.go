@@ -4039,6 +4039,90 @@ func TestValidateDockerConfigSecret(t *testing.T) {
 	}
 }
 
+func TestValidateBasicAuthSecret(t *testing.T) {
+	validBasicAuthSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				api.BasicAuthUsernameKey: []byte("username"),
+				api.BasicAuthPasswordKey: []byte("password"),
+			},
+		}
+	}
+
+	var (
+		missingBasicAuthUsernamePasswordKeys = validBasicAuthSecret()
+		// invalidBasicAuthUsernamePasswordKey  = validBasicAuthSecret()
+		// emptyBasicAuthUsernameKey            = validBasicAuthSecret()
+		// emptyBasicAuthPasswordKey            = validBasicAuthSecret()
+	)
+
+	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthUsernameKey)
+	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthPasswordKey)
+
+	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthUsernameKey] = []byte("bad")
+	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthPasswordKey] = []byte("bad")
+
+	// emptyBasicAuthUsernameKey.Data[api.BasicAuthUsernameKey] = []byte("")
+	// emptyBasicAuthPasswordKey.Data[api.BasicAuthPasswordKey] = []byte("")
+
+	tests := map[string]struct {
+		secret api.Secret
+		valid  bool
+	}{
+		"valid": {validBasicAuthSecret(), true},
+		"missing username and password": {missingBasicAuthUsernamePasswordKeys, false},
+		// "invalid username and password": {invalidBasicAuthUsernamePasswordKey, false},
+		// "empty username":   {emptyBasicAuthUsernameKey, false},
+		// "empty password":   {emptyBasicAuthPasswordKey, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateSecret(&tc.secret)
+		if tc.valid && len(errs) > 0 {
+			t.Errorf("%v: Unexpected error: %v", name, errs)
+		}
+		if !tc.valid && len(errs) == 0 {
+			t.Errorf("%v: Unexpected non-error", name)
+		}
+	}
+}
+
+func TestValidateSSHAuthSecret(t *testing.T) {
+	validSSHAuthSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeSSHAuth,
+			Data: map[string][]byte{
+				api.SSHAuthPrivateKey: []byte("foo-bar-baz"),
+			},
+		}
+	}
+
+	missingSSHAuthPrivateKey := validSSHAuthSecret()
+
+	delete(missingSSHAuthPrivateKey.Data, api.SSHAuthPrivateKey)
+
+	tests := map[string]struct {
+		secret api.Secret
+		valid  bool
+	}{
+		"valid":               {validSSHAuthSecret(), true},
+		"missing private key": {missingSSHAuthPrivateKey, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateSecret(&tc.secret)
+		if tc.valid && len(errs) > 0 {
+			t.Errorf("%v: Unexpected error: %v", name, errs)
+		}
+		if !tc.valid && len(errs) == 0 {
+			t.Errorf("%v: Unexpected non-error", name)
+		}
+	}
+}
+
 func TestValidateEndpoints(t *testing.T) {
 	successCases := map[string]api.Endpoints{
 		"simple endpoint": {
