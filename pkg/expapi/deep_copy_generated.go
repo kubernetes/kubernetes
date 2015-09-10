@@ -763,23 +763,23 @@ func deepCopy_expapi_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cl
 	return nil
 }
 
-func deepCopy_expapi_Daemon(in Daemon, out *Daemon, c *conversion.Cloner) error {
+func deepCopy_expapi_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_DaemonSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := deepCopy_expapi_DaemonSetSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := deepCopy_expapi_DaemonStatus(in.Status, &out.Status, c); err != nil {
+	if err := deepCopy_expapi_DaemonSetStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deepCopy_expapi_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cloner) error {
+func deepCopy_expapi_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -787,9 +787,9 @@ func deepCopy_expapi_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cl
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]Daemon, len(in.Items))
+		out.Items = make([]DaemonSet, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_expapi_Daemon(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_expapi_DaemonSet(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -799,7 +799,7 @@ func deepCopy_expapi_DaemonList(in DaemonList, out *DaemonList, c *conversion.Cl
 	return nil
 }
 
-func deepCopy_expapi_DaemonSpec(in DaemonSpec, out *DaemonSpec, c *conversion.Cloner) error {
+func deepCopy_expapi_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -819,7 +819,7 @@ func deepCopy_expapi_DaemonSpec(in DaemonSpec, out *DaemonSpec, c *conversion.Cl
 	return nil
 }
 
-func deepCopy_expapi_DaemonStatus(in DaemonStatus, out *DaemonStatus, c *conversion.Cloner) error {
+func deepCopy_expapi_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatus, c *conversion.Cloner) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -1193,10 +1193,10 @@ func init() {
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
 		deepCopy_expapi_APIVersion,
-		deepCopy_expapi_Daemon,
-		deepCopy_expapi_DaemonList,
-		deepCopy_expapi_DaemonSpec,
-		deepCopy_expapi_DaemonStatus,
+		deepCopy_expapi_DaemonSet,
+		deepCopy_expapi_DaemonSetList,
+		deepCopy_expapi_DaemonSetSpec,
+		deepCopy_expapi_DaemonSetStatus,
 		deepCopy_expapi_Deployment,
 		deepCopy_expapi_DeploymentList,
 		deepCopy_expapi_DeploymentSpec,

@@ -40,8 +40,8 @@ func addKnownTypes() {
 		&Scale{},
 		&ThirdPartyResource{},
 		&ThirdPartyResourceList{},
-		&DaemonList{},
-		&Daemon{},
+		&DaemonSetList{},
+		&DaemonSet{},
 		&ThirdPartyResourceData{},
 		&ThirdPartyResourceDataList{},
 	)
@@ -55,7 +55,7 @@ func (*ReplicationControllerDummy) IsAnAPIObject()  {}
 func (*Scale) IsAnAPIObject()                       {}
 func (*ThirdPartyResource) IsAnAPIObject()          {}
 func (*ThirdPartyResourceList) IsAnAPIObject()      {}
-func (*Daemon) IsAnAPIObject()                      {}
-func (*DaemonList) IsAnAPIObject()                  {}
+func (*DaemonSet) IsAnAPIObject()                   {}
+func (*DaemonSetList) IsAnAPIObject()               {}
 func (*ThirdPartyResourceData) IsAnAPIObject()      {}
 func (*ThirdPartyResourceDataList) IsAnAPIObject()  {}

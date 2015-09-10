@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package daemon provides Registry interface and its RESTStorage
-// implementation for storing Daemon api objects.
-package daemon
+// Package daemonset provides Registry interface and its RESTStorage
+// implementation for storing DaemonSet api objects.
+package daemonset

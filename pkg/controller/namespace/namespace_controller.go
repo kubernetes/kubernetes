@@ -419,12 +419,12 @@ func deleteHorizontalPodAutoscalers(expClient client.ExperimentalInterface, ns s
 }
 
 func deleteDaemons(expClient client.ExperimentalInterface, ns string) error {
-	items, err := expClient.Daemons(ns).List(labels.Everything())
+	items, err := expClient.DaemonSets(ns).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := expClient.Daemons(ns).Delete(items.Items[i].Name)
+		err := expClient.DaemonSets(ns).Delete(items.Items[i].Name)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

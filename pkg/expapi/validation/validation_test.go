@@ -130,7 +130,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
-func TestValidateDaemonUpdate(t *testing.T) {
+func TestValidateDaemonSetUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validSelector2 := map[string]string{"c": "d"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
@@ -211,54 +211,54 @@ func TestValidateDaemonUpdate(t *testing.T) {
 		},
 	}
 
-	type dcUpdateTest struct {
-		old    expapi.Daemon
-		update expapi.Daemon
+	type dsUpdateTest struct {
+		old    expapi.DaemonSet
+		update expapi.DaemonSet
 	}
-	successCases := []dcUpdateTest{
+	successCases := []dsUpdateTest{
 		{
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
 		},
 		{
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector2,
 					Template: &validPodTemplateAbc2.Template,
 				},
 			},
 		},
 		{
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateNodeSelector.Template,
 				},
@@ -268,86 +268,86 @@ func TestValidateDaemonUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateDaemonUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
+		if errs := ValidateDaemonSetUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
-	errorCases := map[string]dcUpdateTest{
+	errorCases := map[string]dsUpdateTest{
 		"change daemon name": {
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
 		},
 		"invalid selector": {
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: invalidSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
 		},
 		"invalid pod": {
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &invalidPodTemplate.Template,
 				},
 			},
 		},
 		"change container image": {
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateDef.Template,
 				},
 			},
 		},
 		"read-write volume": {
-			old: expapi.Daemon{
+			old: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &validPodTemplateAbc.Template,
 				},
 			},
-			update: expapi.Daemon{
+			update: expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Selector: validSelector,
 					Template: &readWriteVolumePodTemplate.Template,
 				},
@@ -355,13 +355,13 @@ func TestValidateDaemonUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateDaemonUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
+		if errs := ValidateDaemonSetUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
 }
 
-func TestValidateDaemon(t *testing.T) {
+func TestValidateDaemonSet(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -387,59 +387,59 @@ func TestValidateDaemon(t *testing.T) {
 			},
 		},
 	}
-	successCases := []expapi.Daemon{
+	successCases := []expapi.DaemonSet{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateDaemon(&successCase); len(errs) != 0 {
+		if errs := ValidateDaemonSet(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := map[string]expapi.Daemon{
+	errorCases := map[string]expapi.DaemonSet{
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: map[string]string{"foo": "bar"},
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 			},
 		},
@@ -451,7 +451,7 @@ func TestValidateDaemon(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -464,7 +464,7 @@ func TestValidateDaemon(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Template: &invalidPodTemplate.Template,
 			},
 		},
@@ -476,7 +476,7 @@ func TestValidateDaemon(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -486,7 +486,7 @@ func TestValidateDaemon(t *testing.T) {
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -505,7 +505,7 @@ func TestValidateDaemon(t *testing.T) {
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: expapi.DaemonSpec{
+			Spec: expapi.DaemonSetSpec{
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -521,7 +521,7 @@ func TestValidateDaemon(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateDaemon(&v)
+		errs := ValidateDaemonSet(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
