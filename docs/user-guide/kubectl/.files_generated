@@ -1,4 +1,5 @@
 kubectl.md
+kubectl_apply.md
 kubectl_annotate.md
 kubectl_api-versions.md
 kubectl_attach.md
