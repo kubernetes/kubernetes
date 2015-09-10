@@ -583,7 +583,12 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 			return nil
 		}
 		dv.Set(reflect.New(dt.Elem()))
-		return c.convert(sv.Elem(), dv.Elem(), scope)
+		switch st.Kind() {
+		case reflect.Ptr, reflect.Interface:
+			return c.convert(sv.Elem(), dv.Elem(), scope)
+		default:
+			return c.convert(sv, dv.Elem(), scope)
+		}
 	case reflect.Map:
 		if sv.IsNil() {
 			// Don't copy a nil ptr!
