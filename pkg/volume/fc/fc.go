@@ -54,7 +54,7 @@ func (plugin *fcPlugin) Name() string {
 }
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.FC == nil && spec.PersistentVolumeSource.FC == nil {
+	if (spec.Volume != nil && spec.Volume.FC == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC == nil) {
 		return false
 	}
 	// TODO:  turn this into a func so CanSupport can be unit tested without
@@ -85,11 +85,11 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 	// fc volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	var readOnly bool
 	var fc *api.FCVolumeSource
-	if spec.VolumeSource.FC != nil {
-		fc = spec.VolumeSource.FC
+	if spec.Volume != nil && spec.Volume.FC != nil {
+		fc = spec.Volume.FC
 		readOnly = fc.ReadOnly
 	} else {
-		fc = spec.PersistentVolumeSource.FC
+		fc = spec.PersistentVolume.Spec.FC
 		readOnly = spec.ReadOnly
 	}
 
@@ -98,7 +98,7 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 	return &fcDiskBuilder{
 		fcDisk: &fcDisk{
 			podUID:  podUID,
-			volName: spec.Name,
+			volName: spec.Name(),
 			wwns:    fc.TargetWWNs,
 			lun:     lun,
 			manager: manager,
