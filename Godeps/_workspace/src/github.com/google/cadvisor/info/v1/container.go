@@ -61,6 +61,9 @@ type ContainerSpec struct {
 
 	HasCustomMetrics bool         `json:"has_custom_metrics"`
 	CustomMetrics    []MetricSpec `json:"custom_metrics,omitempty"`
+
+	// Image name used for this container.
+	Image string `json:"image,omitempty"`
 }
 
 // Container reference contains enough information to uniquely identify a container
