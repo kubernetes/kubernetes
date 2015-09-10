@@ -39,7 +39,7 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 	}
 
 	fakeClient := &Fake{}
-	fakeClient.AddReactor("*", "*", ObjectReaction(o, latest.RESTMapper))
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, latest.GroupOrDie("").RESTMapper))
 
 	return fakeClient
 }

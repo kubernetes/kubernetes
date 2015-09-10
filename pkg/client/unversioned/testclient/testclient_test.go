@@ -32,7 +32,7 @@ func TestNewClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := &Fake{}
-	client.AddReactor("*", "*", ObjectReaction(o, latest.RESTMapper))
+	client.AddReactor("*", "*", ObjectReaction(o, latest.GroupOrDie("").RESTMapper))
 	list, err := client.Services("test").List(labels.Everything())
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestErrors(t *testing.T) {
 		},
 	})
 	client := &Fake{}
-	client.AddReactor("*", "*", ObjectReaction(o, latest.RESTMapper))
+	client.AddReactor("*", "*", ObjectReaction(o, latest.GroupOrDie("").RESTMapper))
 	_, err := client.Services("test").List(labels.Everything())
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error: %v", err)

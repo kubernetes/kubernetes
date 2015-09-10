@@ -26,7 +26,7 @@ import (
 // For example, this is of the form:
 // /experimental/v1/watch/namespaces/foo/pods/pod0 for v1.
 func ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
-	path := "/experimental/" + latest.Version
+	path := "/experimental/" + latest.GroupOrDie("").Version
 	if prefix != "" {
 		path = path + "/" + prefix
 	}

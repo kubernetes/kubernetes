@@ -340,11 +340,11 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.InterfacesFor, latest.Version, s.StorageVersion, s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
-	expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, explatest.InterfacesFor, explatest.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
+	expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, s.ExpStorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 	}

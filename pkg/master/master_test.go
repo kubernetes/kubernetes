@@ -58,7 +58,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.Codec, etcdtest.PathPrefix())
+	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.GroupOrDie("").Codec, etcdtest.PathPrefix())
 	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
 
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
@@ -506,7 +506,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return latest.Codec.Encode(&thirdPartyData)
+	return latest.GroupOrDie("").Codec.Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {

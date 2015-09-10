@@ -46,7 +46,7 @@ func (f *fakeEtcdCache) addToCache(index uint64, obj runtime.Object) {
 var _ etcdCache = &fakeEtcdCache{}
 
 func TestWatchInterpretations(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	// Declare some pods to make the test cases compact.
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
@@ -215,7 +215,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 }
 
 func TestWatchEtcdError(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.ExpectNotFoundGet("/some/key")
 	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
@@ -244,7 +244,7 @@ func TestWatchEtcdError(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key := "/some/key"
 	prefixedKey := etcdtest.AddPrefix(key)
@@ -315,7 +315,7 @@ func makeSubsets(ip string, port int) []api.EndpointSubset {
 }
 
 func TestWatchEtcdState(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	baseKey := "/somekey/foo"
 	prefixedKey := etcdtest.AddPrefix(baseKey)
 	type T struct {
@@ -453,7 +453,7 @@ func TestWatchEtcdState(t *testing.T) {
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	testCases := map[string]struct {
@@ -531,7 +531,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	key := "/some/key"
 	prefixedKey := etcdtest.AddPrefix(key)
@@ -593,7 +593,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	key := "/some/key"
 	prefixedKey := etcdtest.AddPrefix(key)

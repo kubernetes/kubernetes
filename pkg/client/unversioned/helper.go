@@ -290,9 +290,9 @@ func SetKubernetesDefaults(config *Config) error {
 		config.Version = defaultVersionFor(config)
 	}
 	version := config.Version
-	versionInterfaces, err := latest.InterfacesFor(version)
+	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(version)
 	if err != nil {
-		return fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
+		return fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.GroupOrDie("").Versions, ", "))
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
@@ -543,7 +543,7 @@ func defaultVersionFor(config *Config) string {
 	if version == "" {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
-		version = latest.Version
+		version = latest.GroupOrDie("").Version
 	}
 	return version
 }

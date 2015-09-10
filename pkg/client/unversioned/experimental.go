@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -124,12 +124,12 @@ func setExperimentalDefaults(config *Config) error {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
 	if config.Version == "" {
-		config.Version = explatest.Version
+		config.Version = latest.GroupOrDie("experimental").Version
 	}
-	versionInterfaces, err := explatest.InterfacesFor(config.Version)
+	versionInterfaces, err := latest.GroupOrDie("experimental").InterfacesFor(config.Version)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(explatest.Versions, ", "))
+			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
