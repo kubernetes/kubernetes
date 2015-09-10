@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
@@ -170,7 +170,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Wait for tokens to be deleted
-	tokensToCleanup := util.NewStringSet(token1Name, token2Name, token3Name)
+	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
 		secrets, err := c.Secrets(ns).List(labels.Everything(), fields.Everything())

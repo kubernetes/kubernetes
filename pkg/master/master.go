@@ -79,6 +79,7 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
@@ -566,7 +567,7 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
-	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
+	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	if m.exp {
@@ -575,7 +576,7 @@ func (m *Master) init(c *Config) {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
 		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
 
@@ -784,7 +785,7 @@ func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
 	}
 	thirdPartyPrefix := "/thirdparty/" + group + "/"
 	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
-	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
+	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
 	return nil
 }

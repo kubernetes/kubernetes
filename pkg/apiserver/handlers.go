@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
@@ -351,7 +352,7 @@ type requestAttributeGetter struct {
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
 func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
+	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{sets.NewString(apiRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
@@ -417,7 +418,7 @@ type APIRequestInfo struct {
 }
 
 type APIRequestInfoResolver struct {
-	APIPrefixes util.StringSet
+	APIPrefixes sets.String
 	RestMapper  meta.RESTMapper
 }
 

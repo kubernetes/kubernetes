@@ -11,7 +11,7 @@ spec:
       limits:
         cpu: 100m
     args:
-    - -qq
+    - -q
     volumeMounts:
     - name: varlog
       mountPath: /var/log

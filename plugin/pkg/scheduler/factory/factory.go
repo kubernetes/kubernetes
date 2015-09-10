@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -137,13 +138,13 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		return nil, err
 	}
 
-	predicateKeys := util.NewStringSet()
+	predicateKeys := sets.NewString()
 	for _, predicate := range policy.Predicates {
 		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
 		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
 	}
 
-	priorityKeys := util.NewStringSet()
+	priorityKeys := sets.NewString()
 	for _, priority := range policy.Priorities {
 		glog.V(2).Infof("Registering priority: %s", priority.Name)
 		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
@@ -153,7 +154,7 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
+func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 	pluginArgs := PluginFactoryArgs{
 		PodLister:        f.PodLister,

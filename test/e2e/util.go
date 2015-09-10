@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -1096,7 +1097,7 @@ type podInfo struct {
 type PodDiff map[string]*podInfo
 
 // Print formats and prints the give PodDiff.
-func (p PodDiff) Print(ignorePhases util.StringSet) {
+func (p PodDiff) Print(ignorePhases sets.String) {
 	for name, info := range p {
 		if ignorePhases.Has(info.phase) {
 			continue
@@ -1258,7 +1259,7 @@ func RunRC(config RCConfig) error {
 		unknown := 0
 		inactive := 0
 		failedContainers := 0
-		containerRestartNodes := util.NewStringSet()
+		containerRestartNodes := sets.NewString()
 
 		pods := podStore.List()
 		created := []*api.Pod{}
@@ -1312,7 +1313,7 @@ func RunRC(config RCConfig) error {
 			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
 			errorStr := fmt.Sprintf("Number of reported pods changed: %d vs %d", len(pods), len(oldPods))
 			Logf("%v, pods that changed since the last iteration:", errorStr)
-			Diff(oldPods, pods).Print(util.NewStringSet())
+			Diff(oldPods, pods).Print(sets.NewString())
 			return fmt.Errorf(errorStr)
 		}
 
@@ -1342,7 +1343,7 @@ func RunRC(config RCConfig) error {
 }
 
 func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
-	badNodes := util.NewStringSet()
+	badNodes := sets.NewString()
 	for _, p := range pods {
 		if p.Status.Phase != api.PodRunning {
 			if p.Spec.NodeName != "" {
@@ -1851,8 +1852,8 @@ func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 
 // Prints summary metrics for request types with latency above threshold
 // and returns number of such request types.
-func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResources util.StringSet) (int, error) {
-	ignoredVerbs := util.NewStringSet("WATCHLIST", "PROXY")
+func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResources sets.String) (int, error) {
+	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
 
 	metrics, err := ReadLatencyMetrics(c)
 	if err != nil {

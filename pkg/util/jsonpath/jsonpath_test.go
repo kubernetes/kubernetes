@@ -162,7 +162,7 @@ func TestStructInput(t *testing.T) {
 	failStoreTests := []jsonpathTest{
 		{"invalid identfier", "{hello}", storeData, "unrecongnized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
-		{"invalid array", "{.Labels[0]}", storeData, "<map[string]int Value> is not array or slice"},
+		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
 		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end"},
 	}

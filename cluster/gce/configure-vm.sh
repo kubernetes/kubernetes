@@ -277,7 +277,6 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
-enable_horizontal_pod_autoscaler: '$(echo "$ENABLE_HORIZONTAL_POD_AUTOSCALER" | sed -e "s/'/''/g")'
 network_provider: '$(echo "$NETWORK_PROVIDER")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
@@ -576,11 +575,6 @@ EOF
     # CIDR range.
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cbr-cidr: ${MASTER_IP_RANGE}
-EOF
-  fi
-  if [[ ! -z "${RUNTIME_CONFIG:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
   fi
 }

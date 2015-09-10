@@ -65,6 +65,8 @@ $ kubectl label pods foo bar-`
 
 func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
+
+	// retrieve a list of handled resources from printer as valid args
 	validArgs := []string{}
 	p, err := f.Printer(nil, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)

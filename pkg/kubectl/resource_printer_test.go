@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/ghodss/yaml"
 )
@@ -484,9 +485,9 @@ func TestPrinters(t *testing.T) {
 			}}},
 	}
 	// map of printer name to set of objects it should fail on.
-	expectedErrors := map[string]util.StringSet{
-		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
-		"jsonpath":  util.NewStringSet("emptyPodList", "nonEmptyPodList", "endpoints"),
+	expectedErrors := map[string]sets.String{
+		"template2": sets.NewString("pod", "emptyPodList", "endpoints"),
+		"jsonpath":  sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {

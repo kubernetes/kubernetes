@@ -27,7 +27,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
@@ -45,7 +45,7 @@ type FakeDockerClient struct {
 	pulled              []string
 	Created             []string
 	Removed             []string
-	RemovedImages       util.StringSet
+	RemovedImages       sets.String
 	VersionInfo         docker.Env
 	Information         docker.Env
 	ExecInspect         *docker.ExecInspect

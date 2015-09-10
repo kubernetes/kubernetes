@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -319,7 +319,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		return nil
 	}
 
-	keySet := make(util.StringSet, len(list))
+	keySet := make(sets.String, len(list))
 	for _, item := range list {
 		key, err := f.KeyOf(item)
 		if err != nil {

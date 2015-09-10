@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var RESTMapper meta.RESTMapper
@@ -34,7 +34,7 @@ func RegisterRESTMapper(m meta.RESTMapper) {
 }
 
 func NewDefaultRESTMapper(group string, versions []string, interfacesFunc meta.VersionInterfacesFunc,
-	importPathPrefix string, ignoredKinds, rootScoped util.StringSet) *meta.DefaultRESTMapper {
+	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {
 
 	mapper := meta.NewDefaultRESTMapper(group, versions, interfacesFunc)
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
