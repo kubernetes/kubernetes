@@ -102,16 +102,13 @@ readonly KUBE_CLIENT_PLATFORMS=(
   linux/amd64
   linux/386
   linux/arm
-  darwin/amd64
-  darwin/386
-  windows/amd64
 )
 
 # Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
 #
-# If you are using boot2docker, the following seems to work (note 
+# If you are using boot2docker, the following seems to work (note
 # that 12000 rounds to 11G):
 #   boot2docker down
 #   VBoxManage modifyvm boot2docker-vm --memory 12000
