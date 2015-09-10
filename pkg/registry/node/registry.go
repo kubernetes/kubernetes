@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package minion
+package node
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -26,12 +26,12 @@ import (
 
 // Registry is an interface for things that know how to store node.
 type Registry interface {
-	ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error)
-	CreateMinion(ctx api.Context, minion *api.Node) error
-	UpdateMinion(ctx api.Context, minion *api.Node) error
-	GetMinion(ctx api.Context, minionID string) (*api.Node, error)
-	DeleteMinion(ctx api.Context, minionID string) error
-	WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	ListNodes(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error)
+	CreateNode(ctx api.Context, node *api.Node) error
+	UpdateNode(ctx api.Context, node *api.Node) error
+	GetNode(ctx api.Context, nodeID string) (*api.Node, error)
+	DeleteNode(ctx api.Context, nodeID string) error
+	WatchNodes(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -45,7 +45,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+func (s *storage) ListNodes(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	obj, err := s.List(ctx, label, field)
 	if err != nil {
 		return nil, err
@@ -54,21 +54,21 @@ func (s *storage) ListMinions(ctx api.Context, label labels.Selector, field fiel
 	return obj.(*api.NodeList), nil
 }
 
-func (s *storage) CreateMinion(ctx api.Context, node *api.Node) error {
+func (s *storage) CreateNode(ctx api.Context, node *api.Node) error {
 	_, err := s.Create(ctx, node)
 	return err
 }
 
-func (s *storage) UpdateMinion(ctx api.Context, node *api.Node) error {
+func (s *storage) UpdateNode(ctx api.Context, node *api.Node) error {
 	_, _, err := s.Update(ctx, node)
 	return err
 }
 
-func (s *storage) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *storage) WatchNodes(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetMinion(ctx api.Context, name string) (*api.Node, error) {
+func (s *storage) GetNode(ctx api.Context, name string) (*api.Node, error) {
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (s *storage) GetMinion(ctx api.Context, name string) (*api.Node, error) {
 	return obj.(*api.Node), nil
 }
 
-func (s *storage) DeleteMinion(ctx api.Context, name string) error {
+func (s *storage) DeleteNode(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

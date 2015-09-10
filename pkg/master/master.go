@@ -56,10 +56,10 @@ import (
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
-	"k8s.io/kubernetes/pkg/registry/minion"
-	nodeetcd "k8s.io/kubernetes/pkg/registry/minion/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
+	"k8s.io/kubernetes/pkg/registry/node"
+	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
@@ -100,7 +100,7 @@ type Config struct {
 	DatabaseStorage    storage.Interface
 	ExpDatabaseStorage storage.Interface
 	EventTTL           time.Duration
-	MinionRegexp       string
+	NodeRegexp         string
 	KubeletClient      client.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
@@ -219,7 +219,7 @@ type Master struct {
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
-	nodeRegistry              minion.Registry
+	nodeRegistry              node.Registry
 	namespaceRegistry         namespace.Registry
 	serviceRegistry           service.Registry
 	endpointRegistry          endpoint.Registry
@@ -446,7 +446,7 @@ func (m *Master) init(c *Config) {
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
 	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, c.EnableWatchCache, c.KubeletClient)
-	m.nodeRegistry = minion.NewRegistry(nodeStorage)
+	m.nodeRegistry = node.NewRegistry(nodeStorage)
 
 	serviceStorage := serviceetcd.NewREST(c.DatabaseStorage)
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
@@ -911,7 +911,7 @@ func (m *Master) needToReplaceTunnels(addrs []string) bool {
 }
 
 func (m *Master) getNodeAddresses() ([]string, error) {
-	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
+	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
 	}
