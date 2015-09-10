@@ -217,7 +217,7 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 
 		value, isNil := template.Indirect(value)
 		if isNil || (value.Kind() != reflect.Array && value.Kind() != reflect.Slice) {
-			return input, fmt.Errorf("%v is not array or slice", value)
+			return input, fmt.Errorf("%v is not array or slice", value.Type())
 		}
 		params := node.Params
 		if !params[0].Known {

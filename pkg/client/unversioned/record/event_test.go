@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -271,39 +272,41 @@ func TestEventf(t *testing.T) {
 	}
 
 	for _, item := range table {
-		called := make(chan struct{})
+		var wg sync.WaitGroup
+		// We expect only one callback
+		wg.Add(1)
 		testEvents := testEventSink{
 			OnCreate: func(event *api.Event) (*api.Event, error) {
+				defer wg.Done()
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if item.expectUpdate {
 					t.Errorf("Expected event update(), got event create()")
 				}
-				called <- struct{}{}
 				return returnEvent, nil
 			},
 			OnUpdate: func(event *api.Event) (*api.Event, error) {
+				defer wg.Done()
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if !item.expectUpdate {
 					t.Errorf("Expected event create(), got event update()")
 				}
-				called <- struct{}{}
 				return returnEvent, nil
 			},
 		}
 		eventBroadcaster := NewBroadcaster()
 		sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
+		wg.Add(1)
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+			defer wg.Done()
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			called <- struct{}{}
 		})
 		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
-		<-called
-		<-called
+		wg.Wait()
 		sinkWatcher.Stop()
 		logWatcher1.Stop()
 		logWatcher2.Stop()
@@ -316,17 +319,17 @@ func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.
 	if actualEvent.FirstTimestamp.IsZero() || actualEvent.LastTimestamp.IsZero() {
 		t.Errorf("timestamp wasn't set: %#v", *actualEvent)
 	}
-	if actualEvent.FirstTimestamp.Equal(actualEvent.LastTimestamp) {
-		if expectCompression {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", actualEvent.FirstTimestamp, actualEvent.LastTimestamp, *actualEvent)
-		}
-	} else {
-		if !expectCompression {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", actualEvent.FirstTimestamp, actualEvent.LastTimestamp, *actualEvent)
-		}
-	}
 	actualFirstTimestamp := actualEvent.FirstTimestamp
 	actualLastTimestamp := actualEvent.LastTimestamp
+	if actualFirstTimestamp.Equal(actualLastTimestamp) {
+		if expectCompression {
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, *actualEvent)
+		}
+	} else {
+		if expectedEvent.Count == 1 {
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, *actualEvent)
+		}
+	}
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
 	actualEvent.FirstTimestamp = expectedEvent.FirstTimestamp
 	actualEvent.LastTimestamp = expectedEvent.LastTimestamp

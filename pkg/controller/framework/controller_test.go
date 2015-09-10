@@ -335,10 +335,6 @@ func TestUpdate(t *testing.T) {
 		},
 	)
 
-	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	go controller.Run(stop)
-
 	pod := func(name, check string) *api.Pod {
 		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -371,11 +367,18 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	// run every test a few times, in parallel
 	const threads = 3
+	testDoneWG.Add(threads * len(tests))
+
+	// Run the controller and run it until we close stop.
+	// Once Run() is called, calls to testDoneWG.Done() might start, so
+	// all testDoneWG.Add() calls must happen before this point
+	stop := make(chan struct{})
+	go controller.Run(stop)
+
+	// run every test a few times, in parallel
 	var wg sync.WaitGroup
 	wg.Add(threads * len(tests))
-	testDoneWG.Add(threads * len(tests))
 	for i := 0; i < threads; i++ {
 		for j, f := range tests {
 			go func(name string, f func(string)) {
