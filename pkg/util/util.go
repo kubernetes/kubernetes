@@ -31,10 +31,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/google/gofuzz"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // For testing, bypass HandleCrash.
@@ -518,4 +520,82 @@ func FileExists(filename string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// borrowed from os.RemoveAll
+// RemoveAllSkipMountPoints removes path and any children it contains.
+// It removes everything that is not a mountpoint it can
+// but returns the first error it encounters.
+// If the path does not exist, RemoveAll returns nil (no error).
+func RemoveAllSkipMountPoints(path string) error {
+	mounter := &mount.Mounter{}
+	if notMnt, err := mounter.IsLikelyNotMountPoint(path); err == nil {
+		if !notMnt {
+			return nil
+		}
+	}
+	// Simple case: if Remove works, we're done.
+	err := os.Remove(path)
+	if err == nil || os.IsNotExist(err) {
+		return nil
+	}
+
+	// Otherwise, is this a directory we need to recurse into?
+	dir, serr := os.Lstat(path)
+	if serr != nil {
+		if serr, ok := serr.(*os.PathError); ok && (os.IsNotExist(serr.Err) || serr.Err == syscall.ENOTDIR) {
+			return nil
+		}
+		return serr
+	}
+	if !dir.IsDir() {
+		// Not a directory; return the error from Remove.
+		return err
+	}
+
+	// Directory.
+	fd, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Race. It was deleted between the Lstat and Open.
+			// Return nil per RemoveAllSkipMountPoints's docs.
+			return nil
+		}
+		return err
+	}
+
+	// Remove contents & return first error.
+	err = nil
+	for {
+		names, err1 := fd.Readdirnames(100)
+		for _, name := range names {
+			err1 := RemoveAllSkipMountPoints(path + string(os.PathSeparator) + name)
+			if err == nil {
+				err = err1
+			}
+		}
+		if err1 == io.EOF {
+			break
+		}
+		// If Readdirnames returned an error, use it.
+		if err == nil {
+			err = err1
+		}
+		if len(names) == 0 {
+			break
+		}
+	}
+
+	// Close directory, because windows won't remove opened directory.
+	fd.Close()
+
+	// Remove directory.
+	err1 := os.Remove(path)
+	if err1 == nil || os.IsNotExist(err1) {
+		return nil
+	}
+	if err == nil {
+		err = err1
+	}
+	return err
 }
