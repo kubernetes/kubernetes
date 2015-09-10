@@ -18,105 +18,87 @@ package latest
 
 import (
 	"fmt"
-	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// Version is the string that represents the current external default version.
-var Version string
+var (
+	allGroups     = GroupMetaMap{}
+	Group         = allGroups.Group
+	RegisterGroup = allGroups.RegisterGroup
+	GroupOrDie    = allGroups.GroupOrDie
+)
 
-// OldestVersion is the string that represents the oldest server version supported,
-// for client code that wants to hardcode the lowest common denominator.
-var OldestVersion string
+type GroupMetaMap map[string]*GroupMeta
 
-// Versions is the list of versions that are recognized in code. The order provided
-// may be assumed to be least feature rich to most feature rich, and clients may
-// choose to prefer the latter items in the list over the former items when presented
-// with a set of versions to choose.
-var Versions []string
-
-// Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
-// disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
-var Codec runtime.Codec
-
-// accessor is the shared static metadata accessor for the API.
-var accessor = meta.NewAccessor()
-
-// SelfLinker can set or get the SelfLink field of all API types.
-// TODO: when versioning changes, make this part of each API definition.
-// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
-// to go through the InterfacesFor method below.
-var SelfLinker = runtime.SelfLinker(accessor)
-
-// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
-// Kubernetes versions.
-var RESTMapper meta.RESTMapper
-
-// userResources is a group of resources mostly used by a kubectl user
-var userResources = []string{"rc", "svc", "pods", "pvc"}
-
-const importPrefix = "k8s.io/kubernetes/pkg/api"
-
-func init() {
-	// Use the first API version in the list of registered versions as the latest.
-	Version = registered.RegisteredVersions[0]
-	OldestVersion = registered.RegisteredVersions[len(registered.RegisteredVersions)-1]
-	Codec = runtime.CodecFor(api.Scheme, Version)
-	// Put the registered versions in Versions in reverse order.
-	versions := registered.RegisteredVersions
-	Versions = []string{}
-	for i := len(versions) - 1; i >= 0; i-- {
-		Versions = append(Versions, versions[i])
+func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
+	_, found := g[group]
+	if found {
+		return nil, fmt.Errorf("group %v is already registered", g)
 	}
-
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString(
-		"Node",
-		"Minion",
-		"Namespace",
-		"PersistentVolume",
-	)
-
-	// these kinds should be excluded from the list of resources
-	ignoredKinds := sets.NewString(
-		"ListOptions",
-		"DeleteOptions",
-		"Status",
-		"PodLogOptions",
-		"PodExecOptions",
-		"PodAttachOptions",
-		"PodProxyOptions",
-		"ThirdPartyResource",
-		"ThirdPartyResourceData",
-		"ThirdPartyResourceList")
-
-	mapper := api.NewDefaultRESTMapper("api", versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
-	// setup aliases for groups of resources
-	mapper.AddResourceAlias("all", userResources...)
-	RESTMapper = mapper
-	api.RegisterRESTMapper(RESTMapper)
+	if len(registered.GroupVersionsForGroup(group)) == 0 {
+		return nil, fmt.Errorf("No version is registered for %v", g)
+	}
+	g[group] = &GroupMeta{}
+	return g[group], nil
 }
 
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case "v1":
-		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
+func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
+	groupMeta, found := g[group]
+	if !found {
+		return nil, fmt.Errorf("no version is registered for group %v", group)
 	}
+	return groupMeta, nil
+}
+
+// TODO: This is an expedient function, because we don't check if a Group is
+// supported throughout the code base. We will abandon this function and
+// checking the error returned by the Group() function.
+func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
+	groupMeta, found := g[group]
+	if !found {
+		panic(fmt.Sprintf("no version is registered for group %v", group))
+	}
+	return groupMeta
+}
+
+// GroupMeta stores the metadata of a group, such as the latest supported version.
+type GroupMeta struct {
+	// GroupVersion represents the current external default version of the group. It
+	// is in the form of "group/version".
+	GroupVersion string
+
+	// Version represents the current external default version of the group.
+	// It equals to the "version" part of GroupVersion.
+	Version string
+
+	// Group represents the name of the group
+	Group string
+
+	// Versions is the list of versions that are recognized in code. The order
+	// provided is assumed to be from the oldest to the newest, e.g.,
+	// Versions[0] == oldest and Versions[N-1] == newest.
+	// Clients may choose to prefer the latter items in the list over the former
+	// items when presented with a set of versions to choose.
+	Versions []string
+
+	// Codec is the default codec for serializing output that should use
+	// the latest supported version.  Use this Codec when writing to
+	// disk, a data store that is not dynamically versioned, or in tests.
+	// This codec can decode any object that Kubernetes is aware of.
+	Codec runtime.Codec
+
+	// SelfLinker can set or get the SelfLink field of all API types.
+	// TODO: when versioning changes, make this part of each API definition.
+	// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
+	// to go through the InterfacesFor method below.
+	SelfLinker runtime.SelfLinker
+
+	// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
+	// Kubernetes versions.
+	RESTMapper meta.RESTMapper
+
+	InterfacesFor func(version string) (*meta.VersionInterfaces, error)
 }
