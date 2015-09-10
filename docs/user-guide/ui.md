@@ -18,7 +18,7 @@ kubectl create -f cluster/addons/kube-ui/kube-ui-rc.yaml --namespace=kube-system
 kubectl create -f cluster/addons/kube-ui/kube-ui-svc.yaml --namespace=kube-system
 ```
 
-Normally, this should be taken care of automatically by the [`kube-addons.sh`](http://releases.k8s.io/v1.0.5/cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
+Normally, this should be taken care of automatically by the [`kube-addons.sh`](http://releases.k8s.io/v1.0.6/cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
 
 ## Using the UI
 
@@ -51,7 +51,7 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 
 ## More Information 
 
-For more information, see the [Kubernetes UI development document](http://releases.k8s.io/v1.0.5/www/README.md) in the www directory.
+For more information, see the [Kubernetes UI development document](http://releases.k8s.io/v1.0.6/www/README.md) in the www directory.
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
