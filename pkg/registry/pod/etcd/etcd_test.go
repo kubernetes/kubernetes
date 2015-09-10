@@ -734,3 +734,21 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, podOut))
 	}
 }
+
+func TestPodLogValidates(t *testing.T) {
+	etcdStorage, _ := registrytest.NewEtcdStorage(t, "")
+	storage := NewStorage(etcdStorage, false, nil)
+
+	negativeOne := int64(-1)
+	testCases := []*api.PodLogOptions{
+		{SinceSeconds: &negativeOne},
+		{TailLines: &negativeOne},
+	}
+
+	for _, tc := range testCases {
+		_, err := storage.Log.Get(api.NewDefaultContext(), "test", tc)
+		if !errors.IsInvalid(err) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+}

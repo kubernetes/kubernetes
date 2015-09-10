@@ -464,18 +464,57 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl logs", func() {
-		It("should find a string in pod logs", func() {
+		var rcPath string
+		var nsFlag string
+		containerName := "redis-master"
+		BeforeEach(func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			controllerJson := mkpath("redis-master-controller.json")
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			By("creating Redis RC")
-			runKubectl("create", "-f", controllerJson, nsFlag)
-			By("checking logs")
+			rcPath = mkpath("redis-master-controller.json")
+			By("creating an rc")
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			runKubectl("create", "-f", rcPath, nsFlag)
+		})
+		AfterEach(func() {
+			cleanup(rcPath, ns, simplePodSelector)
+		})
+
+		It("should be able to retrieve and filter logs", func() {
 			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
-				_, err := lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
+				By("checking for a matching strings")
+				_, err := lookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", podStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
+
+				By("limiting log lines")
+				out := runKubectl("log", pod.Name, containerName, nsFlag, "--tail=1")
+				Expect(len(out)).NotTo(BeZero())
+				Expect(len(strings.Split(out, "\n"))).To(Equal(1))
+
+				By("limiting log bytes")
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--limit-bytes=1")
+				Expect(len(strings.Split(out, "\n"))).To(Equal(1))
+				Expect(len(out)).To(Equal(1))
+
+				By("exposing timestamps")
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--tail=1", "--timestamps")
+				lines := strings.Split(out, "\n")
+				Expect(len(lines)).To(Equal(1))
+				words := strings.Split(lines[0], " ")
+				Expect(len(words)).To(BeNumerically(">", 1))
+				if _, err := time.Parse(time.RFC3339Nano, words[0]); err != nil {
+					if _, err := time.Parse(time.RFC3339, words[0]); err != nil {
+						Failf("expected %q to be RFC3339 or RFC3339Nano", words[0])
+					}
+				}
+
+				By("restricting to a time range")
+				time.Sleep(1500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--since=1s")
+				recent := len(strings.Split(out, "\n"))
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--since=24h")
+				older := len(strings.Split(out, "\n"))
+				Expect(recent).To(BeNumerically("<", older))
 			})
 		})
 	})

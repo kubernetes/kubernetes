@@ -291,7 +291,7 @@ func handleAttachPod(c *client.Client, pod *api.Pod, opts *AttachOptions) error 
 		return err
 	}
 	if status == api.PodSucceeded || status == api.PodFailed {
-		return handleLog(c, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, false, false, opts.Out)
+		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: pod.Spec.Containers[0].Name}, opts.Out)
 	}
 	opts.Client = c
 	opts.PodName = pod.Name

@@ -259,20 +259,29 @@ func (sc *reasonInfoCache) Get(uid types.UID, name string) (reasonInfo, bool) {
 // stream the log. Set 'follow' to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
 // TODO: Make 'RawTerminal' option  flagable.
-func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
+	var since int64
+	if logOptions.SinceSeconds != nil {
+		t := unversioned.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		since = t.Unix()
+	}
+	if logOptions.SinceTime != nil {
+		since = logOptions.SinceTime.Unix()
+	}
 	opts := docker.LogsOptions{
 		Container:    containerID,
 		Stdout:       true,
 		Stderr:       true,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
-		Timestamps:   false,
+		Timestamps:   logOptions.Timestamps,
+		Since:        since,
+		Follow:       logOptions.Follow,
 		RawTerminal:  false,
-		Follow:       follow,
 	}
 
-	if !follow {
-		opts.Tail = tail
+	if !logOptions.Follow && logOptions.TailLines != nil {
+		opts.Tail = strconv.FormatInt(*logOptions.TailLines, 10)
 	}
 
 	err = dm.client.Logs(opts)
