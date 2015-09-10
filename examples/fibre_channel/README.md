@@ -39,16 +39,6 @@ On your FC SAN Zone manager, allocate and mask LUNs so Kubernetes hosts can acce
 
 Once you have installed Fibre Channel initiator and new Kubernetes, you can create a pod based on my example [fc.yaml](fc.yaml). In the pod JSON, you need to provide *targetWWNs* (array of Fibre Channel target's World Wide Names), *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean.
 
-**Note:** If you have followed the instructions in the links above you
-may have partitioned the device, the Fibre Channel volume plugin does not
-currently support partitions so format the device as one partition.
-Make sure you have the correct device name then run the following as
-root to format it:
-
-```console
-mkfs.ext4 /dev/<name of device>
-```
-
 Once your pod is created, run it on the Kubernetes master:
 
 ```console
