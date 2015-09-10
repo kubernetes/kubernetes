@@ -1208,7 +1208,7 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	fmt.Fprint(out, "Allocated resources:\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ────────────\t──────────\t───────────────\t─────────────\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nonTerminatedPods)
 	if err != nil {
@@ -1216,9 +1216,12 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 	}
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
 	fractionCpuReqs := float64(cpuReqs.MilliValue()) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+	fractionCpuLimits := float64(cpuLimits.MilliValue()) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
 	fractionMemoryReqs := float64(memoryReqs.MilliValue()) / float64(node.Status.Capacity.Memory().MilliValue()) * 100
-	fmt.Fprintf(out, "  %s (%d%%)\t%s\t%s (%d%%)\t%s\n",
-		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String())
+	fractionMemoryLimits := float64(memoryLimits.MilliValue()) / float64(node.Status.Capacity.Memory().MilliValue()) * 100
+	fmt.Fprintf(out, "  %s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
+		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits),
+		memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
 	return nil
 }
 
