@@ -45,9 +45,6 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.245.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 MINION_SCOPES="${MINION_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
-RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
-ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
-
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
@@ -95,18 +92,12 @@ CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Create autoscaler for cluster's nodes.
+# NOT WORKING YET!
 ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
 if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
   AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
-fi
-
-# Optional: Enable feature for autoscaling number of pods
-# Experimental feature, not ready for production use.
-ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
-if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
-  ENABLE_EXPERIMENTAL_API=true
 fi
 
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
