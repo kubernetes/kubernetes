@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // RequestInfo keeps track of information about a request/response combination
@@ -75,7 +75,7 @@ func (r RequestInfo) ToCurl() string {
 type DebuggingRoundTripper struct {
 	delegatedRoundTripper http.RoundTripper
 
-	Levels util.StringSet
+	Levels sets.String
 }
 
 const (
@@ -88,7 +88,7 @@ const (
 )
 
 func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...string) *DebuggingRoundTripper {
-	return &DebuggingRoundTripper{rt, util.NewStringSet(levels...)}
+	return &DebuggingRoundTripper{rt, sets.NewString(levels...)}
 }
 
 func (rt *DebuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

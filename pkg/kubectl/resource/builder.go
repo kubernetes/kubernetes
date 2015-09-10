@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var FileExtensions = []string{".json", ".stdin", ".yaml", ".yml"}
@@ -685,7 +685,7 @@ func (b *Builder) Do() *Result {
 // strings in the original order.
 func SplitResourceArgument(arg string) []string {
 	out := []string{}
-	set := util.NewStringSet()
+	set := sets.NewString()
 	for _, s := range strings.Split(arg, ",") {
 		if set.Has(s) {
 			continue

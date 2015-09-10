@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Indexer is a storage interface that lets you list objects using multiple indexing functions
@@ -63,7 +63,7 @@ func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // Index maps the indexed value to a set of keys in the store that match on that value
-type Index map[string]util.StringSet
+type Index map[string]sets.String
 
 // Indexers maps a name to a IndexFunc
 type Indexers map[string]IndexFunc

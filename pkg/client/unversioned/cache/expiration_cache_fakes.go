@@ -18,6 +18,7 @@ package cache
 
 import (
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeThreadSafeMap struct {
@@ -32,7 +33,7 @@ func (c *fakeThreadSafeMap) Delete(key string) {
 }
 
 type FakeExpirationPolicy struct {
-	NeverExpire     util.StringSet
+	NeverExpire     sets.String
 	RetrieveKeyFunc KeyFunc
 }
 

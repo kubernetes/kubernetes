@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	libutil "k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -42,7 +42,7 @@ $ kubectl logs -f 123456-7890 ruby-container`
 
 func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
 	fmt.Fprintf(out, "Please select a container:\n")
-	options := libutil.StringSet{}
+	options := sets.String{}
 	for ix := range pod.Spec.Containers {
 		fmt.Fprintf(out, "[%d] %s\n", ix+1, pod.Spec.Containers[ix].Name)
 		options.Insert(pod.Spec.Containers[ix].Name)

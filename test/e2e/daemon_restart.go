@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -140,7 +141,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	pods, err := c.Pods(ns).List(labelSelector, fields.Everything())
 	expectNoError(err)
 	failedContainers := 0
-	containerRestartNodes := util.NewStringSet()
+	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
 		for _, v := range FailedContainers(&p) {
 			failedContainers = failedContainers + v.restarts
@@ -224,8 +225,8 @@ var _ = Describe("DaemonRestart", func() {
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
-		existingKeys := util.NewStringSet()
-		newKeys := util.NewStringSet()
+		existingKeys := sets.NewString()
+		newKeys := sets.NewString()
 		for _, k := range existingPods.ListKeys() {
 			existingKeys.Insert(k)
 		}

@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a
@@ -90,7 +90,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		}
 	}
 
-	eliminateDupes := util.NewStringSet(dk.index...)
+	eliminateDupes := sets.NewString(dk.index...)
 	dk.index = eliminateDupes.List()
 
 	// Update the index used to identify which credentials to use for a given

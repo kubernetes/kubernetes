@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestTTLExpirationBasic(t *testing.T) {
@@ -30,7 +31,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 	ttlStore := NewFakeExpirationStore(
 		testStoreKeyFunc, deleteChan,
 		&FakeExpirationPolicy{
-			NeverExpire: util.NewStringSet(),
+			NeverExpire: sets.NewString(),
 			RetrieveKeyFunc: func(obj interface{}) (string, error) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
@@ -66,14 +67,14 @@ func TestTTLList(t *testing.T) {
 		{id: "foo1", val: "bar1"},
 		{id: "foo2", val: "bar2"},
 	}
-	expireKeys := util.NewStringSet(testObjs[0].id, testObjs[2].id)
+	expireKeys := sets.NewString(testObjs[0].id, testObjs[2].id)
 	deleteChan := make(chan string)
 	defer close(deleteChan)
 
 	ttlStore := NewFakeExpirationStore(
 		testStoreKeyFunc, deleteChan,
 		&FakeExpirationPolicy{
-			NeverExpire: util.NewStringSet(testObjs[1].id),
+			NeverExpire: sets.NewString(testObjs[1].id),
 			RetrieveKeyFunc: func(obj interface{}) (string, error) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
