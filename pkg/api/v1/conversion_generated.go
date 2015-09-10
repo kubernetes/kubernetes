@@ -23,7 +23,6 @@ import (
 
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -42,7 +41,7 @@ func convert_api_Binding_To_v1_Binding(in *api.Binding, out *Binding, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Binding))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -128,7 +127,7 @@ func convert_api_ComponentStatus_To_v1_ComponentStatus(in *api.ComponentStatus, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ComponentStatus))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -151,10 +150,10 @@ func convert_api_ComponentStatusList_To_v1_ComponentStatusList(in *api.Component
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ComponentStatusList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -376,7 +375,7 @@ func convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *D
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.DeleteOptions))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if in.GracePeriodSeconds != nil {
@@ -491,7 +490,7 @@ func convert_api_Endpoints_To_v1_Endpoints(in *api.Endpoints, out *Endpoints, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Endpoints))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -514,10 +513,10 @@ func convert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *E
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.EndpointsList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -569,7 +568,7 @@ func convert_api_Event_To_v1_Event(in *api.Event, out *Event, s conversion.Scope
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Event))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -597,10 +596,10 @@ func convert_api_EventList_To_v1_EventList(in *api.EventList, out *EventList, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.EventList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -761,7 +760,7 @@ func convert_api_LimitRange_To_v1_LimitRange(in *api.LimitRange, out *LimitRange
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LimitRange))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -845,10 +844,10 @@ func convert_api_LimitRangeList_To_v1_LimitRangeList(in *api.LimitRangeList, out
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LimitRangeList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -885,10 +884,10 @@ func convert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope) er
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.List))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
@@ -897,20 +896,11 @@ func convert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope) er
 	return nil
 }
 
-func convert_api_ListMeta_To_v1_ListMeta(in *unversioned.ListMeta, out *unversioned.ListMeta, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.ListMeta))(in)
-	}
-	out.SelfLink = in.SelfLink
-	out.ResourceVersion = in.ResourceVersion
-	return nil
-}
-
 func convert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ListOptions))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
@@ -972,7 +962,7 @@ func convert_api_Namespace_To_v1_Namespace(in *api.Namespace, out *Namespace, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Namespace))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -991,10 +981,10 @@ func convert_api_NamespaceList_To_v1_NamespaceList(in *api.NamespaceList, out *N
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NamespaceList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1037,7 +1027,7 @@ func convert_api_Node_To_v1_Node(in *api.Node, out *Node, s conversion.Scope) er
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Node))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1092,10 +1082,10 @@ func convert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s conv
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NodeList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1256,7 +1246,7 @@ func convert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolum
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PersistentVolume))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1275,7 +1265,7 @@ func convert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.Persi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PersistentVolumeClaim))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1294,10 +1284,10 @@ func convert_api_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *a
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PersistentVolumeClaimList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1373,10 +1363,10 @@ func convert_api_PersistentVolumeList_To_v1_PersistentVolumeList(in *api.Persist
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PersistentVolumeList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1524,7 +1514,7 @@ func convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Pod))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1543,7 +1533,7 @@ func convert_api_PodAttachOptions_To_v1_PodAttachOptions(in *api.PodAttachOption
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodAttachOptions))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Stdin = in.Stdin
@@ -1567,7 +1557,7 @@ func convert_api_PodExecOptions_To_v1_PodExecOptions(in *api.PodExecOptions, out
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodExecOptions))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Stdin = in.Stdin
@@ -1590,10 +1580,10 @@ func convert_api_PodList_To_v1_PodList(in *api.PodList, out *PodList, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1613,7 +1603,7 @@ func convert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, out *P
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodLogOptions))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Container = in.Container
@@ -1626,7 +1616,7 @@ func convert_api_PodProxyOptions_To_v1_PodProxyOptions(in *api.PodProxyOptions, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodProxyOptions))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Path = in.Path
@@ -1676,7 +1666,7 @@ func convert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodStatusResult))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1692,7 +1682,7 @@ func convert_api_PodTemplate_To_v1_PodTemplate(in *api.PodTemplate, out *PodTemp
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodTemplate))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1708,10 +1698,10 @@ func convert_api_PodTemplateList_To_v1_PodTemplateList(in *api.PodTemplateList, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodTemplateList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1785,7 +1775,7 @@ func convert_api_RangeAllocation_To_v1_RangeAllocation(in *api.RangeAllocation, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.RangeAllocation))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1802,7 +1792,7 @@ func convert_api_ReplicationController_To_v1_ReplicationController(in *api.Repli
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationController))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1821,10 +1811,10 @@ func convert_api_ReplicationControllerList_To_v1_ReplicationControllerList(in *a
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1853,7 +1843,7 @@ func convert_api_ResourceQuota_To_v1_ResourceQuota(in *api.ResourceQuota, out *R
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ResourceQuota))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1872,10 +1862,10 @@ func convert_api_ResourceQuotaList_To_v1_ResourceQuotaList(in *api.ResourceQuota
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ResourceQuotaList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1987,7 +1977,7 @@ func convert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.S
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Secret))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2013,10 +2003,10 @@ func convert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *SecretList
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.SecretList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2080,7 +2070,7 @@ func convert_api_SerializedReference_To_v1_SerializedReference(in *api.Serialize
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.SerializedReference))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectReference_To_v1_ObjectReference(&in.Reference, &out.Reference, s); err != nil {
@@ -2093,7 +2083,7 @@ func convert_api_Service_To_v1_Service(in *api.Service, out *Service, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Service))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2112,7 +2102,7 @@ func convert_api_ServiceAccount_To_v1_ServiceAccount(in *api.ServiceAccount, out
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceAccount))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2145,10 +2135,10 @@ func convert_api_ServiceAccountList_To_v1_ServiceAccountList(in *api.ServiceAcco
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceAccountList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2168,10 +2158,10 @@ func convert_api_ServiceList_To_v1_ServiceList(in *api.ServiceList, out *Service
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2248,61 +2238,6 @@ func convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *S
 	return nil
 }
 
-func convert_api_Status_To_v1_Status(in *unversioned.Status, out *unversioned.Status, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.Status))(in)
-	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	out.Status = in.Status
-	out.Message = in.Message
-	out.Reason = unversioned.StatusReason(in.Reason)
-	if in.Details != nil {
-		out.Details = new(unversioned.StatusDetails)
-		if err := convert_api_StatusDetails_To_v1_StatusDetails(in.Details, out.Details, s); err != nil {
-			return err
-		}
-	} else {
-		out.Details = nil
-	}
-	out.Code = in.Code
-	return nil
-}
-
-func convert_api_StatusCause_To_v1_StatusCause(in *unversioned.StatusCause, out *unversioned.StatusCause, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.StatusCause))(in)
-	}
-	out.Type = unversioned.CauseType(in.Type)
-	out.Message = in.Message
-	out.Field = in.Field
-	return nil
-}
-
-func convert_api_StatusDetails_To_v1_StatusDetails(in *unversioned.StatusDetails, out *unversioned.StatusDetails, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.StatusDetails))(in)
-	}
-	out.Name = in.Name
-	out.Kind = in.Kind
-	if in.Causes != nil {
-		out.Causes = make([]unversioned.StatusCause, len(in.Causes))
-		for i := range in.Causes {
-			if err := convert_api_StatusCause_To_v1_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Causes = nil
-	}
-	out.RetryAfterSeconds = in.RetryAfterSeconds
-	return nil
-}
-
 func convert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, out *TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.TCPSocketAction))(in)
@@ -2310,15 +2245,6 @@ func convert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, 
 	if err := s.Convert(&in.Port, &out.Port, 0); err != nil {
 		return err
 	}
-	return nil
-}
-
-func convert_api_TypeMeta_To_v1_TypeMeta(in *unversioned.TypeMeta, out *unversioned.TypeMeta, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.TypeMeta))(in)
-	}
-	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
 	return nil
 }
 
@@ -2477,7 +2403,7 @@ func convert_v1_Binding_To_api_Binding(in *Binding, out *api.Binding, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Binding))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2563,7 +2489,7 @@ func convert_v1_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentStatus))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2586,10 +2512,10 @@ func convert_v1_ComponentStatusList_To_api_ComponentStatusList(in *ComponentStat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentStatusList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2811,7 +2737,7 @@ func convert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *api.D
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeleteOptions))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if in.GracePeriodSeconds != nil {
@@ -2926,7 +2852,7 @@ func convert_v1_Endpoints_To_api_Endpoints(in *Endpoints, out *api.Endpoints, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Endpoints))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2949,10 +2875,10 @@ func convert_v1_EndpointsList_To_api_EndpointsList(in *EndpointsList, out *api.E
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EndpointsList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3004,7 +2930,7 @@ func convert_v1_Event_To_api_Event(in *Event, out *api.Event, s conversion.Scope
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Event))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3032,10 +2958,10 @@ func convert_v1_EventList_To_api_EventList(in *EventList, out *api.EventList, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EventList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3196,7 +3122,7 @@ func convert_v1_LimitRange_To_api_LimitRange(in *LimitRange, out *api.LimitRange
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LimitRange))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3280,10 +3206,10 @@ func convert_v1_LimitRangeList_To_api_LimitRangeList(in *LimitRangeList, out *ap
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LimitRangeList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3320,10 +3246,10 @@ func convert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope) er
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*List))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
@@ -3332,20 +3258,11 @@ func convert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope) er
 	return nil
 }
 
-func convert_v1_ListMeta_To_api_ListMeta(in *unversioned.ListMeta, out *unversioned.ListMeta, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.ListMeta))(in)
-	}
-	out.SelfLink = in.SelfLink
-	out.ResourceVersion = in.ResourceVersion
-	return nil
-}
-
 func convert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ListOptions))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
@@ -3407,7 +3324,7 @@ func convert_v1_Namespace_To_api_Namespace(in *Namespace, out *api.Namespace, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Namespace))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3426,10 +3343,10 @@ func convert_v1_NamespaceList_To_api_NamespaceList(in *NamespaceList, out *api.N
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NamespaceList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3472,7 +3389,7 @@ func convert_v1_Node_To_api_Node(in *Node, out *api.Node, s conversion.Scope) er
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Node))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3527,10 +3444,10 @@ func convert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s conv
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3691,7 +3608,7 @@ func convert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, o
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolume))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3710,7 +3627,7 @@ func convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *Persisten
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaim))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3729,10 +3646,10 @@ func convert_v1_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *P
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaimList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3808,10 +3725,10 @@ func convert_v1_PersistentVolumeList_To_api_PersistentVolumeList(in *PersistentV
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -3959,7 +3876,7 @@ func convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Pod))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -3978,7 +3895,7 @@ func convert_v1_PodAttachOptions_To_api_PodAttachOptions(in *PodAttachOptions, o
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodAttachOptions))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Stdin = in.Stdin
@@ -4002,7 +3919,7 @@ func convert_v1_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, out *ap
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodExecOptions))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Stdin = in.Stdin
@@ -4025,10 +3942,10 @@ func convert_v1_PodList_To_api_PodList(in *PodList, out *api.PodList, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4048,7 +3965,7 @@ func convert_v1_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *api.P
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodLogOptions))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Container = in.Container
@@ -4061,7 +3978,7 @@ func convert_v1_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodProxyOptions))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	out.Path = in.Path
@@ -4111,7 +4028,7 @@ func convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodStatusResult))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4127,7 +4044,7 @@ func convert_v1_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *api.PodTemp
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodTemplate))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4143,10 +4060,10 @@ func convert_v1_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodTemplateList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4220,7 +4137,7 @@ func convert_v1_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RangeAllocation))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4237,7 +4154,7 @@ func convert_v1_ReplicationController_To_api_ReplicationController(in *Replicati
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationController))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4256,10 +4173,10 @@ func convert_v1_ReplicationControllerList_To_api_ReplicationControllerList(in *R
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4288,7 +4205,7 @@ func convert_v1_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *api.R
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceQuota))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4307,10 +4224,10 @@ func convert_v1_ResourceQuotaList_To_api_ResourceQuotaList(in *ResourceQuotaList
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceQuotaList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4422,7 +4339,7 @@ func convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.S
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Secret))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4448,10 +4365,10 @@ func convert_v1_SecretList_To_api_SecretList(in *SecretList, out *api.SecretList
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SecretList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4515,7 +4432,7 @@ func convert_v1_SerializedReference_To_api_SerializedReference(in *SerializedRef
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SerializedReference))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectReference_To_api_ObjectReference(&in.Reference, &out.Reference, s); err != nil {
@@ -4528,7 +4445,7 @@ func convert_v1_Service_To_api_Service(in *Service, out *api.Service, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Service))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4547,7 +4464,7 @@ func convert_v1_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *ap
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceAccount))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4580,10 +4497,10 @@ func convert_v1_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAccountL
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceAccountList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4603,10 +4520,10 @@ func convert_v1_ServiceList_To_api_ServiceList(in *ServiceList, out *api.Service
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4683,61 +4600,6 @@ func convert_v1_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.S
 	return nil
 }
 
-func convert_v1_Status_To_api_Status(in *unversioned.Status, out *unversioned.Status, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.Status))(in)
-	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	out.Status = in.Status
-	out.Message = in.Message
-	out.Reason = unversioned.StatusReason(in.Reason)
-	if in.Details != nil {
-		out.Details = new(unversioned.StatusDetails)
-		if err := convert_v1_StatusDetails_To_api_StatusDetails(in.Details, out.Details, s); err != nil {
-			return err
-		}
-	} else {
-		out.Details = nil
-	}
-	out.Code = in.Code
-	return nil
-}
-
-func convert_v1_StatusCause_To_api_StatusCause(in *unversioned.StatusCause, out *unversioned.StatusCause, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.StatusCause))(in)
-	}
-	out.Type = unversioned.CauseType(in.Type)
-	out.Message = in.Message
-	out.Field = in.Field
-	return nil
-}
-
-func convert_v1_StatusDetails_To_api_StatusDetails(in *unversioned.StatusDetails, out *unversioned.StatusDetails, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.StatusDetails))(in)
-	}
-	out.Name = in.Name
-	out.Kind = in.Kind
-	if in.Causes != nil {
-		out.Causes = make([]unversioned.StatusCause, len(in.Causes))
-		for i := range in.Causes {
-			if err := convert_v1_StatusCause_To_api_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Causes = nil
-	}
-	out.RetryAfterSeconds = in.RetryAfterSeconds
-	return nil
-}
-
 func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*TCPSocketAction))(in)
@@ -4745,15 +4607,6 @@ func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out 
 	if err := s.Convert(&in.Port, &out.Port, 0); err != nil {
 		return err
 	}
-	return nil
-}
-
-func convert_v1_TypeMeta_To_api_TypeMeta(in *unversioned.TypeMeta, out *unversioned.TypeMeta, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.TypeMeta))(in)
-	}
-	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
 	return nil
 }
 
@@ -4942,7 +4795,6 @@ func init() {
 		convert_api_LimitRangeList_To_v1_LimitRangeList,
 		convert_api_LimitRangeSpec_To_v1_LimitRangeSpec,
 		convert_api_LimitRange_To_v1_LimitRange,
-		convert_api_ListMeta_To_v1_ListMeta,
 		convert_api_ListOptions_To_v1_ListOptions,
 		convert_api_List_To_v1_List,
 		convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
@@ -5010,11 +4862,7 @@ func init() {
 		convert_api_ServiceSpec_To_v1_ServiceSpec,
 		convert_api_ServiceStatus_To_v1_ServiceStatus,
 		convert_api_Service_To_v1_Service,
-		convert_api_StatusCause_To_v1_StatusCause,
-		convert_api_StatusDetails_To_v1_StatusDetails,
-		convert_api_Status_To_v1_Status,
 		convert_api_TCPSocketAction_To_v1_TCPSocketAction,
-		convert_api_TypeMeta_To_v1_TypeMeta,
 		convert_api_VolumeMount_To_v1_VolumeMount,
 		convert_api_VolumeSource_To_v1_VolumeSource,
 		convert_api_Volume_To_v1_Volume,
@@ -5061,7 +4909,6 @@ func init() {
 		convert_v1_LimitRangeList_To_api_LimitRangeList,
 		convert_v1_LimitRangeSpec_To_api_LimitRangeSpec,
 		convert_v1_LimitRange_To_api_LimitRange,
-		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_ListOptions_To_api_ListOptions,
 		convert_v1_List_To_api_List,
 		convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
@@ -5129,11 +4976,7 @@ func init() {
 		convert_v1_ServiceSpec_To_api_ServiceSpec,
 		convert_v1_ServiceStatus_To_api_ServiceStatus,
 		convert_v1_Service_To_api_Service,
-		convert_v1_StatusCause_To_api_StatusCause,
-		convert_v1_StatusDetails_To_api_StatusDetails,
-		convert_v1_Status_To_api_Status,
 		convert_v1_TCPSocketAction_To_api_TCPSocketAction,
-		convert_v1_TypeMeta_To_api_TypeMeta,
 		convert_v1_VolumeMount_To_api_VolumeMount,
 		convert_v1_VolumeSource_To_api_VolumeSource,
 		convert_v1_Volume_To_api_Volume,
