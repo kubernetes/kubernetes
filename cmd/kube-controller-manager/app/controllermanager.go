@@ -35,12 +35,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/autoscaler"
-	"k8s.io/kubernetes/pkg/controller/autoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/controller/persistentvolume"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/controller/route"
@@ -248,7 +248,7 @@ func (s *CMServer) Run(_ []string) error {
 	namespaceController.Run()
 
 	if s.EnableHorizontalPodAutoscaler {
-		horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient))
+		horizontalPodAutoscalerController := podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient))
 		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
 	}
 
