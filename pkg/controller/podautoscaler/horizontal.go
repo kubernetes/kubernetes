@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package autoscalercontroller
+package podautoscaler
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/autoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,7 +40,7 @@ const (
 	tolerance = 0.1
 )
 
-type HorizontalPodAutoscalerController struct {
+type HorizontalController struct {
 	client        client.Interface
 	metricsClient metrics.MetricsClient
 }
@@ -48,14 +48,14 @@ type HorizontalPodAutoscalerController struct {
 var downscaleForbiddenWindow, _ = time.ParseDuration("20m")
 var upscaleForbiddenWindow, _ = time.ParseDuration("3m")
 
-func New(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalPodAutoscalerController {
-	return &HorizontalPodAutoscalerController{
+func NewHorizontalController(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalController {
+	return &HorizontalController{
 		client:        client,
 		metricsClient: metricsClient,
 	}
 }
 
-func (a *HorizontalPodAutoscalerController) Run(syncPeriod time.Duration) {
+func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	go util.Until(func() {
 		if err := a.reconcileAutoscalers(); err != nil {
 			glog.Errorf("Couldn't reconcile horizontal pod autoscalers: %v", err)
@@ -63,7 +63,7 @@ func (a *HorizontalPodAutoscalerController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
+func (a *HorizontalController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
 	list, err := a.client.Experimental().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
