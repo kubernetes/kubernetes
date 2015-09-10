@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -191,11 +192,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Validator: validation.NullSchema{},
 	}
 	generators := map[string]kubectl.Generator{
-		"run/v1":     kubectl.BasicReplicationController{},
-		"service/v1": kubectl.ServiceGeneratorV1{},
-		"service/v2": kubectl.ServiceGeneratorV2{},
+		"run/v1":       kubectl.BasicReplicationController{},
+		"run-pod/v1":   kubectl.BasicPod{},
+		"service/v1":   kubectl.ServiceGeneratorV1{},
+		"service/v2":   kubectl.ServiceGeneratorV2{},
+		"service/test": testServiceGenerator{},
 	}
-	return &cmdutil.Factory{
+	f := &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
 		},
@@ -228,7 +231,12 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 			generator, ok := generators[name]
 			return generator, ok
 		},
-	}, t, testapi.Default.Codec()
+	}
+
+	rf := cmdutil.NewFactory(nil)
+	f.PodSelectorForObject = rf.PodSelectorForObject
+
+	return f, t, testapi.Default.Codec()
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
@@ -560,4 +568,112 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	if reflect.ValueOf(sub.Flags().GetNormalizeFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
 		t.Fatal("child and root commands should have the same normalization functions")
 	}
+}
+
+type testServiceGenerator struct{}
+
+func (testServiceGenerator) ParamNames() []kubectl.GeneratorParam {
+	return []kubectl.GeneratorParam{
+		{"default-name", true},
+		{"name", false},
+		{"port", true},
+		{"labels", false},
+		{"public-ip", false},
+		{"create-external-load-balancer", false},
+		{"type", false},
+		{"protocol", false},
+		{"container-port", false}, // alias of target-port
+		{"target-port", false},
+		{"port-name", false},
+		{"session-affinity", false},
+	}
+}
+
+func (testServiceGenerator) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	params := map[string]string{}
+	for key, value := range genericParams {
+		strVal, isString := value.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
+		}
+		params[key] = strVal
+	}
+	labelsString, found := params["labels"]
+	var labels map[string]string
+	var err error
+	if found && len(labelsString) > 0 {
+		labels, err = kubectl.ParseLabels(labelsString)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	name, found := params["name"]
+	if !found || len(name) == 0 {
+		name, found = params["default-name"]
+		if !found || len(name) == 0 {
+			return nil, fmt.Errorf("'name' is a required parameter.")
+		}
+	}
+	portString, found := params["port"]
+	if !found {
+		return nil, fmt.Errorf("'port' is a required parameter.")
+	}
+	port, err := strconv.Atoi(portString)
+	if err != nil {
+		return nil, err
+	}
+	servicePortName, found := params["port-name"]
+	if !found {
+		// Leave the port unnamed.
+		servicePortName = ""
+	}
+	service := api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Name:     servicePortName,
+					Port:     port,
+					Protocol: api.Protocol(params["protocol"]),
+				},
+			},
+		},
+	}
+	targetPort, found := params["target-port"]
+	if !found {
+		targetPort, found = params["container-port"]
+	}
+	if found && len(targetPort) > 0 {
+		if portNum, err := strconv.Atoi(targetPort); err != nil {
+			service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString(targetPort)
+		} else {
+			service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(portNum)
+		}
+	} else {
+		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(port)
+	}
+	if params["create-external-load-balancer"] == "true" {
+		service.Spec.Type = api.ServiceTypeLoadBalancer
+	}
+	if len(params["external-ip"]) > 0 {
+		service.Spec.ExternalIPs = []string{params["external-ip"]}
+	}
+	if len(params["type"]) != 0 {
+		service.Spec.Type = api.ServiceType(params["type"])
+	}
+	if len(params["session-affinity"]) != 0 {
+		switch api.ServiceAffinity(params["session-affinity"]) {
+		case api.ServiceAffinityNone:
+			service.Spec.SessionAffinity = api.ServiceAffinityNone
+		case api.ServiceAffinityClientIP:
+			service.Spec.SessionAffinity = api.ServiceAffinityClientIP
+		default:
+			return nil, fmt.Errorf("unknown session affinity: %s", params["session-affinity"])
+		}
+	}
+	return &service, nil
 }
