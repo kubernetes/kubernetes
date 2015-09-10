@@ -339,8 +339,8 @@ func TestDefaultDescribers(t *testing.T) {
 
 func TestGetPodsTotalRequests(t *testing.T) {
 	testCases := []struct {
-		pods         []*api.Pod
-		expectedReqs map[api.ResourceName]resource.Quantity
+		pods                         []*api.Pod
+		expectedReqs, expectedLimits map[api.ResourceName]resource.Quantity
 	}{
 		{
 			pods: []*api.Pod{
@@ -402,7 +402,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		reqs, err := getPodsTotalRequests(testCase.pods)
+		reqs, _, err := getPodsTotalRequestsAndLimits(testCase.pods)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
