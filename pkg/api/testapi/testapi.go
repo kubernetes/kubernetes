@@ -22,10 +22,12 @@ import (
 	"os"
 	"strings"
 
+	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/expapi/install"
+
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -59,12 +61,12 @@ func init() {
 	// TODO: caesarxuchao: we need a central place to store all available API
 	// groups and their metadata.
 	if _, ok := Groups[""]; !ok {
-		// TODO: The second latest.Version will be latest.GroupVersion after we
+		// TODO: The second latest.GroupOrDie("").Version will be latest.GroupVersion after we
 		// have multiple group support
-		Groups[""] = TestGroup{"", latest.Version, latest.Version}
+		Groups[""] = TestGroup{"", latest.GroupOrDie("").Version, latest.GroupOrDie("").Version}
 	}
 	if _, ok := Groups["experimental"]; !ok {
-		Groups["experimental"] = TestGroup{"experimental", explatest.Version, explatest.Version}
+		Groups["experimental"] = TestGroup{"experimental", latest.GroupOrDie("experimental").Version, latest.GroupOrDie("experimental").Version}
 	}
 
 	Default = Groups[""]
@@ -88,14 +90,14 @@ func (g TestGroup) GroupAndVersion() string {
 func (g TestGroup) Codec() runtime.Codec {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.Codec
 	}
 	if g.Group == "experimental" {
-		interfaces, err := explatest.InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
@@ -109,14 +111,14 @@ func (g TestGroup) Codec() runtime.Codec {
 func (g TestGroup) Converter() runtime.ObjectConvertor {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.ObjectConvertor
 	}
 	if g.Group == "experimental" {
-		interfaces, err := explatest.InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
@@ -131,14 +133,14 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.MetadataAccessor
 	}
 	if g.Group == "experimental" {
-		interfaces, err := explatest.InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}

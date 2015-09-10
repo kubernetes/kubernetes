@@ -193,7 +193,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test unencodable api object
-	r = (&Request{codec: latest.Codec}).Body(&NotAnAPIObject{})
+	r = (&Request{codec: latest.GroupOrDie("").Codec}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -356,7 +356,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		r := &Request{
-			codec:        latest.Codec,
+			codec:        latest.GroupOrDie("").Codec,
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
@@ -543,7 +543,7 @@ func TestRequestStream(t *testing.T) {
 						})))),
 					}, nil
 				}),
-				codec:   latest.Codec,
+				codec:   latest.GroupOrDie("").Codec,
 				baseURL: &url.URL{},
 			},
 			Err: true,
@@ -1185,7 +1185,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := watchjson.NewEncoder(w, latest.Codec)
+		encoder := watchjson.NewEncoder(w, latest.GroupOrDie("").Codec)
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)

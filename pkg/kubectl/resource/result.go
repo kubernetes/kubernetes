@@ -220,7 +220,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, latest.Version)
+		converted, err := tryConvert(api.Scheme, object, version, latest.GroupOrDie("").Version)
 		if err != nil {
 			return nil, err
 		}

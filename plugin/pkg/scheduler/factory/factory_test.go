@@ -143,7 +143,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	handler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
+		ResponseBody: runtime.EncodeOrDie(latest.GroupOrDie("").Codec, testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()

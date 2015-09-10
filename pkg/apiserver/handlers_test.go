@@ -246,7 +246,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
 	}
 
-	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), latest.RESTMapper}
+	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), latest.GroupOrDie("").RESTMapper}
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)

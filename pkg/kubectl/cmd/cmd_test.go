@@ -175,7 +175,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	f, t, c := NewTestFactory()
 	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
-		return meta.MultiRESTMapper{t.Mapper, latest.RESTMapper}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+		return meta.MultiRESTMapper{t.Mapper, latest.GroupOrDie("").RESTMapper}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
 	}
 	f.RESTClient = func(m *meta.RESTMapping) (resource.RESTClient, error) {
 		if m.ObjectConvertor == api.Scheme {
@@ -197,7 +197,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			return latest.RESTMapper, api.Scheme
+			return latest.GroupOrDie("").RESTMapper, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			// Swap out the HTTP client out of the client with the fake's version.

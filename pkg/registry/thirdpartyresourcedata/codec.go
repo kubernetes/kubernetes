@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apis/experimental/latest"
@@ -49,7 +50,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, versions ...stri
 	if kind != "ThirdPartyResourceData" {
 		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
 	}
-	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.Version)
+	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("experimental").Version)
 	if err != nil {
 		return nil, err
 	}
@@ -263,6 +264,6 @@ func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.O
 	case "ThirdPartyResourceDataList":
 		return &experimental.ThirdPartyResourceDataList{}, nil
 	default:
-		return t.delegate.New(latest.Version, kind)
+		return t.delegate.New(latest.GroupOrDie("experimental").Version, kind)
 	}
 }
