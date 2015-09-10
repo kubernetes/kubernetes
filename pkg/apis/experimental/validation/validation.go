@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 const isNegativeErrorMsg string = `must be non-negative`
@@ -170,7 +171,7 @@ func ValidateDeploymentName(name string, prefix bool) (bool, string) {
 func ValidatePositiveIntOrPercent(intOrPercent util.IntOrString, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if intOrPercent.Kind == util.IntstrString {
-		if !util.IsValidPercent(intOrPercent.StrVal) {
+		if !validation.IsValidPercent(intOrPercent.StrVal) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
 		}
 
@@ -181,7 +182,7 @@ func ValidatePositiveIntOrPercent(intOrPercent util.IntOrString, fieldName strin
 }
 
 func getPercentValue(intOrStringValue util.IntOrString) (int, bool) {
-	if intOrStringValue.Kind != util.IntstrString || !util.IsValidPercent(intOrStringValue.StrVal) {
+	if intOrStringValue.Kind != util.IntstrString || !validation.IsValidPercent(intOrStringValue.StrVal) {
 		return 0, false
 	}
 	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
