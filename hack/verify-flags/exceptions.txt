@@ -1,3 +1,4 @@
+cluster/addons/cluster-monitoring/README.md:Heapster enables monitoring of Kubernetes Clusters using [cAdvisor](https://github.com/google/cadvisor). The kubelet will communicate with an instance of cAdvisor running on localhost and proxy container stats to Heapster. Kubelet will attempt to connect to cAdvisor on port 4194 by default but this port can be configured with kubelet's `--cadvisor-port` run flag. Detailed information about heapster can be found [here](https://github.com/GoogleCloudPlatform/heapster).
 cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
 cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
 cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
@@ -38,7 +39,7 @@ cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control obje
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + enable_horizontal_pod_autoscaler + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-proxy/default:     {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/default:    {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/default:  {% set api_servers_with_port = api_servers + ":7080" -%}
