@@ -31,7 +31,7 @@ const (
 	consumeCPUAddress         = "/ConsumeCPU"
 	consumeMemAddress         = "/ConsumeMem"
 	getCurrentStatusAddress   = "/GetCurrentStatus"
-	milicoresQuery            = "milicores"
+	millicoresQuery           = "millicores"
 	megabytesQuery            = "megabytes"
 	durationSecQuery          = "durationSec"
 )
@@ -68,21 +68,21 @@ func (handler ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *htt
 func (handler ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
 	// geting string data for consumeCPU
 	durationSecString := query.Get(durationSecQuery)
-	milicoresString := query.Get(milicoresQuery)
-	if durationSecString == "" || milicoresString == "" {
+	millicoresString := query.Get(millicoresQuery)
+	if durationSecString == "" || millicoresString == "" {
 		http.Error(w, notGivenFunctionArgument, http.StatusBadRequest)
 		return
 	} else {
 		// convert data (strings to ints) for consumeCPU
 		durationSec, durationSecError := strconv.Atoi(durationSecString)
-		milicores, milicoresError := strconv.Atoi(milicoresString)
-		if durationSecError != nil || milicoresError != nil {
+		millicores, millicoresError := strconv.Atoi(millicoresString)
+		if durationSecError != nil || millicoresError != nil {
 			http.Error(w, incorrectFunctionArgument, http.StatusBadRequest)
 			return
 		}
-		go ConsumeCPU(milicores, durationSec)
+		go ConsumeCPU(millicores, durationSec)
 		fmt.Fprintln(w, consumeCPUAddress[1:])
-		fmt.Fprintln(w, milicores, milicoresQuery)
+		fmt.Fprintln(w, millicores, millicoresQuery)
 		fmt.Fprintln(w, durationSec, durationSecQuery)
 
 	}
