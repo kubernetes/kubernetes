@@ -184,10 +184,23 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		data, err := mapping.Codec.Encode(obj)
+		resourceMapper := &resource.Mapper{ObjectTyper: typer, RESTMapper: mapper, ClientMapper: f.ClientMapperForCommand()}
+		info, err := resourceMapper.InfoForObject(obj)
 		if err != nil {
 			return err
 		}
+
+		// Serialize the configuration into an annotation.
+		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+			return err
+		}
+
+		// Serialize the object with the annotation applied.
+		data, err := mapping.Codec.Encode(info.Object)
+		if err != nil {
+			return err
+		}
+
 		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, data)
 		if err != nil {
 			return err
