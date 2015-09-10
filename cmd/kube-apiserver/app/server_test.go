@@ -38,12 +38,16 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 		"/api/v1/watch/stuff",
 		"/api/v1/default/service/proxy",
 		"/api/v1/pods/proxy/path/to/thing",
+		"/api/v1/namespaces/myns/pods/mypod/log",
 		"/api/v1/namespaces/myns/pods/mypod/logs",
 		"/api/v1/namespaces/myns/pods/mypod/portforward",
 		"/api/v1/namespaces/myns/pods/mypod/exec",
+		"/api/v1/namespaces/myns/pods/mypod/attach",
+		"/api/v1/namespaces/myns/pods/mypod/log/",
 		"/api/v1/namespaces/myns/pods/mypod/logs/",
 		"/api/v1/namespaces/myns/pods/mypod/portforward/",
 		"/api/v1/namespaces/myns/pods/mypod/exec/",
+		"/api/v1/namespaces/myns/pods/mypod/attach/",
 		"/api/v1/watch/namespaces/myns/pods",
 	}
 	for _, path := range dontMatch {

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/client_golang/extraction"
 	"github.com/prometheus/client_golang/model"
@@ -66,7 +67,7 @@ func (a KubeletMetricByLatency) Less(i, j int) bool { return a[i].Latency > a[j]
 type kubeletMetricIngester []KubeletMetric
 
 func (k *kubeletMetricIngester) Ingest(samples model.Samples) error {
-	acceptedMethods := util.NewStringSet(
+	acceptedMethods := sets.NewString(
 		metrics.PodWorkerLatencyKey,
 		metrics.PodWorkerStartLatencyKey,
 		metrics.SyncPodsLatencyKey,

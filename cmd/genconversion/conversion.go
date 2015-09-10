@@ -30,7 +30,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/expapi"
 	_ "k8s.io/kubernetes/pkg/expapi/v1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -84,7 +84,7 @@ func main() {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}
-	generator.RepackImports(util.NewStringSet())
+	generator.RepackImports(sets.NewString())
 	if err := generator.WriteImports(data); err != nil {
 		glog.Fatalf("error while writing imports: %v", err)
 	}

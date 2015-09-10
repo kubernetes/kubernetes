@@ -221,59 +221,59 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		controllers = append(controllers, rc)
 	}
 	if len(controllers) == 0 {
-		err = fmt.Errorf("Could not find controllers for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("Could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
 
-// StoreToDaemonLister gives a store List and Exists methods. The store must contain only Daemons.
-type StoreToDaemonLister struct {
+// StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
+type StoreToDaemonSetLister struct {
 	Store
 }
 
-// Exists checks if the given dc exists in the store.
-func (s *StoreToDaemonLister) Exists(daemon *expapi.Daemon) (bool, error) {
-	_, exists, err := s.Store.Get(daemon)
+// Exists checks if the given daemon set exists in the store.
+func (s *StoreToDaemonSetLister) Exists(ds *expapi.DaemonSet) (bool, error) {
+	_, exists, err := s.Store.Get(ds)
 	if err != nil {
 		return false, err
 	}
 	return exists, nil
 }
 
-// StoreToDaemonLister lists all daemons in the store.
+// List lists all daemon sets in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToDaemonLister) List() (daemons []expapi.Daemon, err error) {
+func (s *StoreToDaemonSetLister) List() (dss []expapi.DaemonSet, err error) {
 	for _, c := range s.Store.List() {
-		daemons = append(daemons, *(c.(*expapi.Daemon)))
+		dss = append(dss, *(c.(*expapi.DaemonSet)))
 	}
-	return daemons, nil
+	return dss, nil
 }
 
-// GetPodDaemons returns a list of daemons managing a pod. Returns an error iff no matching daemons are found.
-func (s *StoreToDaemonLister) GetPodDaemons(pod *api.Pod) (daemons []expapi.Daemon, err error) {
+// GetPodDaemonSets returns a list of daemon sets managing a pod. Returns an error iff no matching daemon sets are found.
+func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []expapi.DaemonSet, err error) {
 	var selector labels.Selector
-	var daemonController expapi.Daemon
+	var daemonSet expapi.DaemonSet
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No daemons found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("No daemon sets found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
 	for _, m := range s.Store.List() {
-		daemonController = *m.(*expapi.Daemon)
-		if daemonController.Namespace != pod.Namespace {
+		daemonSet = *m.(*expapi.DaemonSet)
+		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(daemonController.Spec.Selector).AsSelector()
+		selector = labels.Set(daemonSet.Spec.Selector).AsSelector()
 
-		// If a daemonController with a nil or empty selector creeps in, it should match nothing, not everything.
+		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
-		daemons = append(daemons, daemonController)
+		daemonSets = append(daemonSets, daemonSet)
 	}
-	if len(daemons) == 0 {
-		err = fmt.Errorf("Could not find daemons for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	if len(daemonSets) == 0 {
+		err = fmt.Errorf("Could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }

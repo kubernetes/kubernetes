@@ -20,9 +20,13 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strconv"
 )
 
-const consumeCPUBinary = "./consume-cpu/consume-cpu"
+const (
+	consumeCPUBinary = "./consume-cpu/consume-cpu"
+	consumeMemBinary = "stress"
+)
 
 func ConsumeCPU(millicores int, durationSec int) {
 	log.Printf("ConsumeCPU millicores: %v, durationSec: %v", millicores, durationSec)
@@ -35,7 +39,11 @@ func ConsumeCPU(millicores int, durationSec int) {
 
 func ConsumeMem(megabytes int, durationSec int) {
 	log.Printf("ConsumeMem megabytes: %v, durationSec: %v", megabytes, durationSec)
-	// not implemented
+	megabytesString := strconv.Itoa(megabytes) + "M"
+	durationSecString := strconv.Itoa(durationSec)
+	// creating new consume memory process
+	consumeMem := exec.Command(consumeMemBinary, "-m", "1", "--vm-bytes", megabytesString, "--vm-hang", "0", "-t", durationSecString)
+	consumeMem.Start()
 }
 
 func GetCurrentStatus() {

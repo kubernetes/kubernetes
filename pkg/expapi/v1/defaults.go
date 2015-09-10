@@ -28,7 +28,7 @@ func addDefaultingFuncs() {
 				obj.APIGroup = "experimental"
 			}
 		},
-		func(obj *Daemon) {
+		func(obj *DaemonSet) {
 			var labels map[string]string
 			if obj.Spec.Template != nil {
 				labels = obj.Spec.Template.Labels

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func oldRc(replicas int, original int) *api.ReplicationController {
@@ -1140,7 +1141,7 @@ func TestAddDeploymentHash(t *testing.T) {
 		},
 	}
 
-	seen := util.StringSet{}
+	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &client.FakeRESTClient{
 		Codec: codec,

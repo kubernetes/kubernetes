@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -495,8 +495,8 @@ func serviceAccountNameAndUID(secret *api.Secret) (string, string) {
 	return secret.Annotations[api.ServiceAccountNameKey], secret.Annotations[api.ServiceAccountUIDKey]
 }
 
-func getSecretReferences(serviceAccount *api.ServiceAccount) util.StringSet {
-	references := util.NewStringSet()
+func getSecretReferences(serviceAccount *api.ServiceAccount) sets.String {
+	references := sets.NewString()
 	for _, secret := range serviceAccount.Secrets {
 		references.Insert(secret.Name)
 	}

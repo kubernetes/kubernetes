@@ -22,14 +22,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeMirrorClient struct {
 	mirrorPodLock sync.RWMutex
 	// Note that a real mirror manager does not store the mirror pods in
 	// itself. This fake manager does this to track calls.
-	mirrorPods   util.StringSet
+	mirrorPods   sets.String
 	createCounts map[string]int
 	deleteCounts map[string]int
 }
@@ -53,7 +53,7 @@ func (fmc *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
 
 func newFakeMirrorClient() *fakeMirrorClient {
 	m := fakeMirrorClient{}
-	m.mirrorPods = util.NewStringSet()
+	m.mirrorPods = sets.NewString()
 	m.createCounts = make(map[string]int)
 	m.deleteCounts = make(map[string]int)
 	return &m

@@ -31,38 +31,38 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // atomsToAttrs states which attributes of which tags require URL substitution.
 // Sources: http://www.w3.org/TR/REC-html40/index/attributes.html
 //          http://www.w3.org/html/wg/drafts/html/master/index.html#attributes-1
-var atomsToAttrs = map[atom.Atom]util.StringSet{
-	atom.A:          util.NewStringSet("href"),
-	atom.Applet:     util.NewStringSet("codebase"),
-	atom.Area:       util.NewStringSet("href"),
-	atom.Audio:      util.NewStringSet("src"),
-	atom.Base:       util.NewStringSet("href"),
-	atom.Blockquote: util.NewStringSet("cite"),
-	atom.Body:       util.NewStringSet("background"),
-	atom.Button:     util.NewStringSet("formaction"),
-	atom.Command:    util.NewStringSet("icon"),
-	atom.Del:        util.NewStringSet("cite"),
-	atom.Embed:      util.NewStringSet("src"),
-	atom.Form:       util.NewStringSet("action"),
-	atom.Frame:      util.NewStringSet("longdesc", "src"),
-	atom.Head:       util.NewStringSet("profile"),
-	atom.Html:       util.NewStringSet("manifest"),
-	atom.Iframe:     util.NewStringSet("longdesc", "src"),
-	atom.Img:        util.NewStringSet("longdesc", "src", "usemap"),
-	atom.Input:      util.NewStringSet("src", "usemap", "formaction"),
-	atom.Ins:        util.NewStringSet("cite"),
-	atom.Link:       util.NewStringSet("href"),
-	atom.Object:     util.NewStringSet("classid", "codebase", "data", "usemap"),
-	atom.Q:          util.NewStringSet("cite"),
-	atom.Script:     util.NewStringSet("src"),
-	atom.Source:     util.NewStringSet("src"),
-	atom.Video:      util.NewStringSet("poster", "src"),
+var atomsToAttrs = map[atom.Atom]sets.String{
+	atom.A:          sets.NewString("href"),
+	atom.Applet:     sets.NewString("codebase"),
+	atom.Area:       sets.NewString("href"),
+	atom.Audio:      sets.NewString("src"),
+	atom.Base:       sets.NewString("href"),
+	atom.Blockquote: sets.NewString("cite"),
+	atom.Body:       sets.NewString("background"),
+	atom.Button:     sets.NewString("formaction"),
+	atom.Command:    sets.NewString("icon"),
+	atom.Del:        sets.NewString("cite"),
+	atom.Embed:      sets.NewString("src"),
+	atom.Form:       sets.NewString("action"),
+	atom.Frame:      sets.NewString("longdesc", "src"),
+	atom.Head:       sets.NewString("profile"),
+	atom.Html:       sets.NewString("manifest"),
+	atom.Iframe:     sets.NewString("longdesc", "src"),
+	atom.Img:        sets.NewString("longdesc", "src", "usemap"),
+	atom.Input:      sets.NewString("src", "usemap", "formaction"),
+	atom.Ins:        sets.NewString("cite"),
+	atom.Link:       sets.NewString("href"),
+	atom.Object:     sets.NewString("classid", "codebase", "data", "usemap"),
+	atom.Q:          sets.NewString("cite"),
+	atom.Script:     sets.NewString("src"),
+	atom.Source:     sets.NewString("src"),
+	atom.Video:      sets.NewString("poster", "src"),
 
 	// TODO: css URLs hidden in style elements.
 }

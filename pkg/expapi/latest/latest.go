@@ -26,7 +26,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var (
@@ -51,9 +51,9 @@ func init() {
 
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := util.NewStringSet()
+	rootScoped := sets.NewString()
 
-	ignoredKinds := util.NewStringSet()
+	ignoredKinds := sets.NewString()
 
 	RESTMapper = api.NewDefaultRESTMapper("experimental", Versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(RESTMapper)

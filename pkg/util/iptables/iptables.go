@@ -26,8 +26,8 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type RulePosition string
@@ -352,7 +352,7 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 		tmpField := strings.Trim(args[i], "\"")
 		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
 	}
-	argset := util.NewStringSet(argsCopy...)
+	argset := sets.NewString(argsCopy...)
 
 	for _, line := range strings.Split(string(out), "\n") {
 		var fields = strings.Fields(line)
@@ -370,7 +370,7 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 		}
 
 		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
-		if util.NewStringSet(fields...).IsSuperset(argset) {
+		if sets.NewString(fields...).IsSuperset(argset) {
 			return true, nil
 		}
 		glog.V(5).Infof("DBG: fields is not a superset of args: fields=%v  args=%v", fields, args)

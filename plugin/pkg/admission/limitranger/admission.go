@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -300,30 +301,31 @@ func sum(inputs []api.ResourceList) api.ResourceList {
 // the specified LimitRange.  The pod may be modified to apply default resource
 // requirements if not specified, and enumerated on the LimitRange
 func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
+	var errs []error
+
 	defaultResources := defaultContainerResourceRequirements(limitRange)
 	mergePodResourceRequirements(pod, &defaultResources)
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		limitType := limit.Type
-
 		// enforce container limits
 		if limitType == api.LimitTypeContainer {
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]
 				for k, v := range limit.Min {
 					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						return err
+						errs = append(errs, err)
 					}
 				}
 				for k, v := range limit.Max {
 					if err := maxConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						return err
+						errs = append(errs, err)
 					}
 				}
 				for k, v := range limit.MaxLimitRequestRatio {
 					if err := limitRequestRatioConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						return err
+						errs = append(errs, err)
 					}
 				}
 			}
@@ -341,20 +343,20 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 			podLimits := sum(containerLimits)
 			for k, v := range limit.Min {
 				if err := minConstraint(limitType, k, v, podRequests, podLimits); err != nil {
-					return err
+					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.Max {
 				if err := maxConstraint(limitType, k, v, podRequests, podLimits); err != nil {
-					return err
+					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.MaxLimitRequestRatio {
 				if err := limitRequestRatioConstraint(limitType, k, v, podRequests, podLimits); err != nil {
-					return err
+					errs = append(errs, err)
 				}
 			}
 		}
 	}
-	return nil
+	return errors.NewAggregate(errs)
 }

@@ -108,7 +108,7 @@ spec:
   restartPolicy: Never
 ```
 
-[Download example](downward-api/dapi-pod.yaml)
+[Download example](downward-api/dapi-pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE downward-api/dapi-pod.yaml -->
 
 
@@ -178,7 +178,7 @@ spec:
               fieldPath: metadata.annotations
 ```
 
-[Download example](downward-api/volume/dapi-volume.yaml)
+[Download example](downward-api/volume/dapi-volume.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE downward-api/volume/dapi-volume.yaml -->
 
 Some more thorough examples:

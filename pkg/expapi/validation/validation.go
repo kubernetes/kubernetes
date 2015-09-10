@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // ValidateHorizontalPodAutoscaler can be used to check whether the given autoscaler name is valid.
@@ -79,7 +80,7 @@ func ValidateThirdPartyResource(obj *expapi.ThirdPartyResource) errs.ValidationE
 	if len(obj.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
 	}
-	versions := util.StringSet{}
+	versions := sets.String{}
 	for ix := range obj.Versions {
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {
@@ -93,25 +94,25 @@ func ValidateThirdPartyResource(obj *expapi.ThirdPartyResource) errs.ValidationE
 	return allErrs
 }
 
-// ValidateDaemon tests if required fields in the daemon are set.
-func ValidateDaemon(controller *expapi.Daemon) errs.ValidationErrorList {
+// ValidateDaemonSet tests if required fields in the DaemonSet are set.
+func ValidateDaemonSet(controller *expapi.DaemonSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateDaemonSpec(&controller.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
 	return allErrs
 }
 
-// ValidateDaemonUpdate tests if required fields in the daemon are set.
-func ValidateDaemonUpdate(oldController, controller *expapi.Daemon) errs.ValidationErrorList {
+// ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
+func ValidateDaemonSetUpdate(oldController, controller *expapi.DaemonSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateDaemonSpec(&controller.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, ValidateDaemonTemplateUpdate(oldController.Spec.Template, controller.Spec.Template).Prefix("spec.template")...)
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, ValidateDaemonSetTemplateUpdate(oldController.Spec.Template, controller.Spec.Template).Prefix("spec.template")...)
 	return allErrs
 }
 
-// ValidateDaemonTemplateUpdate tests that certain fields in the daemon's pod template are not updated.
-func ValidateDaemonTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplateSpec) errs.ValidationErrorList {
+// ValidateDaemonSetTemplateUpdate tests that certain fields in the daemon set's pod template are not updated.
+func ValidateDaemonSetTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplateSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	podSpec := podTemplate.Spec
 	// podTemplate.Spec is not a pointer, so we can modify NodeSelector and NodeName directly.
@@ -125,8 +126,8 @@ func ValidateDaemonTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplateSp
 	return allErrs
 }
 
-// ValidateDaemonSpec tests if required fields in the daemon spec are set.
-func ValidateDaemonSpec(spec *expapi.DaemonSpec) errs.ValidationErrorList {
+// ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
+func ValidateDaemonSetSpec(spec *expapi.DaemonSetSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	selector := labels.Set(spec.Selector).AsSelector()
@@ -152,10 +153,10 @@ func ValidateDaemonSpec(spec *expapi.DaemonSpec) errs.ValidationErrorList {
 	return allErrs
 }
 
-// ValidateDaemonName can be used to check whether the given daemon name is valid.
+// ValidateDaemonSetName can be used to check whether the given daemon set name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateDaemonName(name string, prefix bool) (bool, string) {
+func ValidateDaemonSetName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 

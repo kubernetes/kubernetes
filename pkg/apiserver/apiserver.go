@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -115,7 +116,7 @@ const (
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
-	info := &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(g.Root, "/")), g.Mapper}
+	info := &APIRequestInfoResolver{sets.NewString(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
@@ -345,8 +346,7 @@ func parseTimeout(str string) time.Duration {
 		}
 		glog.Errorf("Failed to parse %q: %v", str, err)
 	}
-	// TODO: change back to 30s once #5180 is fixed
-	return 2 * time.Minute
+	return 30 * time.Second
 }
 
 func readBody(req *http.Request) ([]byte, error) {

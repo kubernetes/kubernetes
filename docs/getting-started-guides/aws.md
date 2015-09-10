@@ -76,7 +76,7 @@ using [cluster/aws/config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/co
 
 This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
 as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
-tokens are written in `~/.kube/kubeconfig`, they will be necessary to use the CLI or the HTTP Basic Auth.
+tokens are written in `~/.kube/config`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
 By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with `t2.micro` instances running on Ubuntu.
 You can override the variables defined in [config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/config-default.sh) to change this behavior as follows:

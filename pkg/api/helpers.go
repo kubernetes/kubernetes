@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -77,7 +78,7 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
-var standardResources = util.NewStringSet(
+var standardResources = sets.NewString(
 	string(ResourceMemory),
 	string(ResourceCPU),
 	string(ResourcePods),
@@ -111,7 +112,7 @@ func IsServiceIPRequested(service *Service) bool {
 	return service.Spec.ClusterIP == ""
 }
 
-var standardFinalizers = util.NewStringSet(
+var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes))
 
 func IsStandardFinalizerName(str string) bool {

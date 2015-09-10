@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // TimedValue is a value that should be processed at a designated time.
@@ -58,7 +59,7 @@ func (h *TimedQueue) Pop() interface{} {
 type UniqueQueue struct {
 	lock  sync.Mutex
 	queue TimedQueue
-	set   util.StringSet
+	set   sets.String
 }
 
 // Adds a new value to the queue if it wasn't added before, or was explicitly removed by the
@@ -143,7 +144,7 @@ func NewRateLimitedTimedQueue(limiter util.RateLimiter) *RateLimitedTimedQueue {
 	return &RateLimitedTimedQueue{
 		queue: UniqueQueue{
 			queue: TimedQueue{},
-			set:   util.NewStringSet(),
+			set:   sets.NewString(),
 		},
 		limiter: limiter,
 	}

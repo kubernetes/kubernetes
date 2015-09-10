@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -76,7 +77,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	store.Add(makeTestPod("pod2", 5))
 	store.Add(makeTestPod("pod3", 6))
 	{
-		podNames := util.StringSet{}
+		podNames := sets.String{}
 		for _, item := range store.List() {
 			podNames.Insert(item.(*api.Pod).ObjectMeta.Name)
 		}
@@ -94,7 +95,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		makeTestPod("pod5", 8),
 	}, "8")
 	{
-		podNames := util.StringSet{}
+		podNames := sets.String{}
 		for _, item := range store.List() {
 			podNames.Insert(item.(*api.Pod).ObjectMeta.Name)
 		}

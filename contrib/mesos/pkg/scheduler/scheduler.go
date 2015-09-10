@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type Slave struct {
@@ -711,7 +711,7 @@ func (k *KubernetesScheduler) explicitlyReconcileTasks(driver bindings.Scheduler
 
 	// tell mesos to send us the latest status updates for all the non-terminal tasks that we know about
 	statusList := []*mesos.TaskStatus{}
-	remaining := util.KeySet(reflect.ValueOf(taskToSlave))
+	remaining := sets.KeySet(reflect.ValueOf(taskToSlave))
 	for taskId, slaveId := range taskToSlave {
 		if slaveId == "" {
 			delete(taskToSlave, taskId)

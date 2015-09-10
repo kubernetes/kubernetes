@@ -165,12 +165,17 @@ func (s *ProxyServer) Run(_ []string) error {
 	var proxier proxy.ProxyProvider
 	var endpointsHandler config.EndpointsConfigHandler
 
-	// guaranteed false on error, error only necessary for debugging
-	shouldUseIptables, err := iptables.ShouldUseIptablesProxier()
-	if err != nil {
-		glog.Errorf("Can't determine whether to use iptables or userspace, using userspace proxier: %v", err)
+	shouldUseIptables := false
+	if !s.ForceUserspaceProxy {
+		var err error
+		// guaranteed false on error, error only necessary for debugging
+		shouldUseIptables, err = iptables.ShouldUseIptablesProxier()
+		if err != nil {
+			glog.Errorf("Can't determine whether to use iptables proxy, using userspace proxier: %v", err)
+		}
 	}
-	if !s.ForceUserspaceProxy && shouldUseIptables {
+
+	if shouldUseIptables {
 		glog.V(2).Info("Using iptables Proxier.")
 
 		execer := exec.New()

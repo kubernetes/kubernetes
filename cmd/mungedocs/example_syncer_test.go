@@ -41,11 +41,11 @@ spec:
 		{"", ""},
 		{
 			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE testdata/pod.yaml -->\n",
-			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](testdata/pod.yaml)\n<!-- END MUNGE: EXAMPLE testdata/pod.yaml -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](testdata/pod.yaml?raw=true)\n<!-- END MUNGE: EXAMPLE testdata/pod.yaml -->\n",
 		},
 		{
 			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
-			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](../mungedocs/testdata/pod.yaml)\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](../mungedocs/testdata/pod.yaml?raw=true)\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
 		},
 	}
 	repoRoot = ""

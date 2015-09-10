@@ -25,12 +25,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
-type FailedPredicateMap map[string]util.StringSet
+type FailedPredicateMap map[string]sets.String
 
 type FitError struct {
 	Pod              *api.Pod
@@ -124,7 +124,7 @@ func findNodesThatFit(pod *api.Pod, podLister algorithm.PodLister, predicateFunc
 			if !fit {
 				fits = false
 				if _, found := failedPredicateMap[node.Name]; !found {
-					failedPredicateMap[node.Name] = util.StringSet{}
+					failedPredicateMap[node.Name] = sets.String{}
 				}
 				if predicates.FailedResourceType != "" {
 					failedPredicateMap[node.Name].Insert(predicates.FailedResourceType)
