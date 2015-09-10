@@ -45,8 +45,8 @@ func (d *denyExecOnPrivileged) Admit(a admission.Attributes) (err error) {
 	if !ok {
 		return errors.NewBadRequest("a connect request was received, but could not convert the request object.")
 	}
-	// Only handle exec requests on pods
-	if connectRequest.ResourcePath != "pods/exec" {
+	// Only handle exec or attach requests on pods
+	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
 		return nil
 	}
 	pod, err := d.client.Pods(a.GetNamespace()).Get(connectRequest.Name)
@@ -54,7 +54,7 @@ func (d *denyExecOnPrivileged) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, err)
 	}
 	if isPrivileged(pod) {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into a privileged container"))
+		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a privileged container"))
 	}
 	return nil
 }

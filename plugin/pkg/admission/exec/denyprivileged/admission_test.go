@@ -47,15 +47,30 @@ func testAdmission(t *testing.T, pod *api.Pod, shouldAccept bool) {
 	handler := &denyExecOnPrivileged{
 		client: mockClient,
 	}
-	req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/exec"}
-	err := handler.Admit(admission.NewAttributesRecord(req, "Pod", "test", "name", "pods", "exec", admission.Connect, nil))
-	if shouldAccept && err != nil {
-		t.Errorf("Unexpected error returned from admission handler: %v", err)
-	}
-	if !shouldAccept && err == nil {
-		t.Errorf("An error was expected from the admission handler. Received nil")
+
+	// pods/exec
+	{
+		req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/exec"}
+		err := handler.Admit(admission.NewAttributesRecord(req, "Pod", "test", "name", "pods", "exec", admission.Connect, nil))
+		if shouldAccept && err != nil {
+			t.Errorf("Unexpected error returned from admission handler: %v", err)
+		}
+		if !shouldAccept && err == nil {
+			t.Errorf("An error was expected from the admission handler. Received nil")
+		}
 	}
 
+	// pods/attach
+	{
+		req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/attach"}
+		err := handler.Admit(admission.NewAttributesRecord(req, "Pod", "test", "name", "pods", "attach", admission.Connect, nil))
+		if shouldAccept && err != nil {
+			t.Errorf("Unexpected error returned from admission handler: %v", err)
+		}
+		if !shouldAccept && err == nil {
+			t.Errorf("An error was expected from the admission handler. Received nil")
+		}
+	}
 }
 
 func acceptPod(name string) *api.Pod {
