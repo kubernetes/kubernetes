@@ -328,7 +328,7 @@ replicationcontrollers/redis-slave
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master                           master                  redis                                    name=redis-master            1
-redis-slave                            slave                   kubernetes/redis-slave:v2                name=redis-slave             2
+redis-slave                            slave                   gcr.io/google_samples/gb-redisslave:v1   name=redis-slave             2
 ```
 
 Once the replication controller is up, you can list the pods in the cluster, to verify that the master and slaves are running.  You should see a list that includes something like the following:
@@ -413,7 +413,7 @@ spec:
     spec:
       containers:
       - name: php-redis
-        image: gcr.io/google_samples/gb-frontend:v2
+        image: gcr.io/google_samples/gb-frontend:v3
         env:
         - name: GET_HOSTS_FROM
           value: dns
@@ -441,9 +441,9 @@ Then, list all your replication controllers:
 ```console
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
-frontend                               php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
+frontend                               php-redis               kubernetes/example-guestbook-php-redis:v3  name=frontend                3
 redis-master                           master                  redis                                      name=redis-master            1
-redis-slave                            slave                   kubernetes/redis-slave:v2                  name=redis-slave             2
+redis-slave                            slave                   gcr.io/google_samples/gb-redisslave:v1     name=redis-slave             2
 ```
 
 Once it's up (again, it may take up to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are all running.  You should see a list that includes something like the following:
