@@ -11041,7 +11041,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "target": {
       "$ref": "v1beta3.ObjectReference",
@@ -11074,7 +11074,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.5/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.6/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "generation": {
       "type": "integer",
@@ -11124,7 +11124,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: http://releases.k8s.io/v1.0.5/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "specific resourceVersion to which this reference is made, if any: http://releases.k8s.io/v1.0.6/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "fieldPath": {
       "type": "string",
@@ -11148,7 +11148,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11168,7 +11168,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.5/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.6/docs/api-conventions.md#concurrency-control-and-consistency"
      }
     }
    },
@@ -11185,7 +11185,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "conditions": {
       "type": "array",
@@ -11237,7 +11237,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11264,7 +11264,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "subsets": {
       "type": "array",
@@ -11361,7 +11361,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "status": {
       "type": "string",
@@ -11462,7 +11462,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11490,7 +11490,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "involvedObject": {
       "$ref": "v1beta3.ObjectReference",
@@ -11552,7 +11552,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11576,11 +11576,11 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.LimitRangeSpec",
-      "description": "spec defines the limits enforced; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the limits enforced; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11636,7 +11636,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11660,15 +11660,15 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.NamespaceSpec",
-      "description": "spec defines the behavior of the Namespace; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the behavior of the Namespace; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.NamespaceStatus",
-      "description": "status describes the current status of a Namespace; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "status describes the current status of a Namespace; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11713,7 +11713,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11737,15 +11737,15 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.NodeSpec",
-      "description": "specification of a node; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "specification of a node; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.NodeStatus",
-      "description": "most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11775,7 +11775,7 @@
     "properties": {
      "capacity": {
       "type": "any",
-      "description": "compute resource capacity of the node; http://releases.k8s.io/v1.0.5/docs/resources.md"
+      "description": "compute resource capacity of the node; http://releases.k8s.io/v1.0.6/docs/resources.md"
      },
      "phase": {
       "type": "string",
@@ -11911,7 +11911,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#types-kinds"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
@@ -11935,7 +11935,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PersistentVolumeClaimSpec",
@@ -12017,7 +12017,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#types-kinds"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
@@ -12041,7 +12041,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PersistentVolumeSpec",
@@ -12333,7 +12333,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#types-kinds"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
@@ -12357,15 +12357,15 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PodSpec",
-      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.PodStatus",
-      "description": "most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -13093,7 +13093,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -13117,11 +13117,11 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "template": {
       "$ref": "v1beta3.PodTemplateSpec",
-      "description": "the template of the desired behavior of the pod; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "the template of the desired behavior of the pod; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -13130,11 +13130,11 @@
     "properties": {
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PodSpec",
-      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -13154,7 +13154,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -13178,15 +13178,15 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.ReplicationControllerSpec",
-      "description": "specification of the desired behavior of the replication controller; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the replication controller; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.ReplicationControllerStatus",
-      "description": "most recently observed status of the replication controller; populated by the system, read-only; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the replication controller; populated by the system, read-only; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -13242,7 +13242,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -13266,15 +13266,15 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.ResourceQuotaSpec",
-      "description": "spec defines the desired quota; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the desired quota; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.ResourceQuotaStatus",
-      "description": "status defines the actual enforced quota and current usage; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "status defines the actual enforced quota and current usage; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -13316,7 +13316,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -13340,7 +13340,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "data": {
       "type": "any",
@@ -13368,7 +13368,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -13392,7 +13392,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "secrets": {
       "type": "array",
@@ -13426,7 +13426,7 @@
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -13450,15 +13450,15 @@
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/v1.0.5/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/v1.0.6/docs/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.ServiceSpec",
-      "description": "specification of the desired behavior of the service; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the service; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.ServiceStatus",
-      "description": "most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/v1.0.5/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/v1.0.6/docs/api-conventions.md#spec-and-status"
      }
     }
    },
