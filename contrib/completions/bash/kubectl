@@ -781,7 +781,6 @@ _kubectl_expose()
     flags+=("--type=")
 
     must_have_one_flag=()
-    must_have_one_flag+=("--port=")
     must_have_one_noun=()
 }
 
