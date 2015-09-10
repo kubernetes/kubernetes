@@ -138,6 +138,7 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Services.*identically\snamed"
     "Services.*release.*load\sbalancer"
     "Services.*endpoint"
+    "Services.*up\sand\sdown"
     )
 
 # Tests that should not run on soak cluster.
