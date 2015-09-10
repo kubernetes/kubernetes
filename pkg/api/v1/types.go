@@ -1643,7 +1643,12 @@ type Endpoints struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// The set of all endpoints is the union of all subsets.
+	// The set of all endpoints is the union of all subsets. Addresses are placed into
+	// subsets according to the IPs they share. A single address with multiple ports,
+	// some of which are ready and some of which are not (because they come from
+	// different containers) will result in the address being displayed in different
+	// subsets for the different ports. No address will appear in both Addresses and
+	// NotReadyAddresses in the same subset.
 	// Sets of addresses and ports that comprise a service.
 	Subsets []EndpointSubset `json:"subsets"`
 }
@@ -1659,8 +1664,13 @@ type Endpoints struct {
 //     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
 //     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
 type EndpointSubset struct {
-	// IP addresses which offer the related ports.
+	// IP addresses which offer the related ports that are marked as ready. These endpoints
+	// should be considered safe for load balancers and clients to utilize.
 	Addresses []EndpointAddress `json:"addresses,omitempty"`
+	// IP addresses which offer the related ports but are not currently marked as ready
+	// because they have not yet finished starting, have recently failed a readiness check,
+	// or have recently failed a liveness check.
+	NotReadyAddresses []EndpointAddress `json:"notReadyAddresses,omitempty"`
 	// Port numbers available on the related IP addresses.
 	Ports []EndpointPort `json:"ports,omitempty"`
 }

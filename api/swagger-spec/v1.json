@@ -11213,7 +11213,7 @@
       "items": {
        "$ref": "v1.EndpointSubset"
       },
-      "description": "The set of all endpoints is the union of all subsets. Sets of addresses and ports that comprise a service."
+      "description": "The set of all endpoints is the union of all subsets. Addresses are placed into subsets according to the IPs they share. A single address with multiple ports, some of which are ready and some of which are not (because they come from different containers) will result in the address being displayed in different subsets for the different ports. No address will appear in both Addresses and NotReadyAddresses in the same subset. Sets of addresses and ports that comprise a service."
      }
     }
    },
@@ -11226,7 +11226,14 @@
       "items": {
        "$ref": "v1.EndpointAddress"
       },
-      "description": "IP addresses which offer the related ports."
+      "description": "IP addresses which offer the related ports that are marked as ready. These endpoints should be considered safe for load balancers and clients to utilize."
+     },
+     "notReadyAddresses": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.EndpointAddress"
+      },
+      "description": "IP addresses which offer the related ports but are not currently marked as ready because they have not yet finished starting, have recently failed a readiness check, or have recently failed a liveness check."
      },
      "ports": {
       "type": "array",

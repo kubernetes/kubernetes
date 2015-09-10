@@ -671,12 +671,22 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
-		if err != nil {
-			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
-			return !exist, nil
-		} else {
+		switch {
+		case err == nil:
+			if !exist {
+				return false, nil
+			}
 			Logf("Service %s in namespace %s found.", name, namespace)
-			return exist, nil
+			return true, nil
+		case apierrs.IsNotFound(err):
+			if exist {
+				return false, nil
+			}
+			Logf("Service %s in namespace %s disappeared.", name, namespace)
+			return true, nil
+		default:
+			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
+			return false, nil
 		}
 	})
 	if err != nil {

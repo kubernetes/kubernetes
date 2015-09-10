@@ -413,6 +413,16 @@ func deepCopy_v1_EndpointSubset(in EndpointSubset, out *EndpointSubset, c *conve
 	} else {
 		out.Addresses = nil
 	}
+	if in.NotReadyAddresses != nil {
+		out.NotReadyAddresses = make([]EndpointAddress, len(in.NotReadyAddresses))
+		for i := range in.NotReadyAddresses {
+			if err := deepCopy_v1_EndpointAddress(in.NotReadyAddresses[i], &out.NotReadyAddresses[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NotReadyAddresses = nil
+	}
 	if in.Ports != nil {
 		out.Ports = make([]EndpointPort, len(in.Ports))
 		for i := range in.Ports {

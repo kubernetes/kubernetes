@@ -33,9 +33,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -371,18 +373,20 @@ var _ = Describe("Kubectl client", func() {
 				lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
-				endpointFound := false
-				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+				err := wait.Poll(poll, timeout, func() (bool, error) {
 					endpoints, err := c.Endpoints(ns).Get(name)
 					if err != nil {
-						Logf("Get endpoints failed (%v elapsed, ignoring for %v): %v", time.Since(t), poll, err)
-						continue
+						if apierrs.IsNotFound(err) {
+							err = nil
+						}
+						Logf("Get endpoints failed (interval %v): %v", poll, err)
+						return false, err
 					}
 
 					uidToPort := getContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
 						Logf("No endpoint found, retrying")
-						continue
+						return false, nil
 					}
 					if len(uidToPort) > 1 {
 						Fail("Too many endpoints found")
@@ -392,12 +396,10 @@ var _ = Describe("Kubectl client", func() {
 							Failf("Wrong endpoint port: %d", port[0])
 						}
 					}
-					endpointFound = true
-					break
-				}
-				if !endpointFound {
-					Failf("1 endpoint is expected")
-				}
+					return true, nil
+				})
+				Expect(err).NotTo(HaveOccurred())
+
 				service, err := c.Services(ns).Get(name)
 				Expect(err).NotTo(HaveOccurred())
 
