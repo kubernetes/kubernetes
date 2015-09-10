@@ -216,8 +216,8 @@ func NewMainKubelet(
 	}
 	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
 
-	// TODO: get the real minion object of ourself,
-	// and use the real minion name and UID.
+	// TODO: get the real node object of ourself,
+	// and use the real node name and UID.
 	// TODO: what is namespace for node?
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",

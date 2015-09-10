@@ -45,7 +45,7 @@ func TestGetServersToValidate(t *testing.T) {
 	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.Codec, etcdtest.PathPrefix())
 	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
 
-	master.nodeRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
+	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
 	servers := master.getServersToValidate(&config)
 
