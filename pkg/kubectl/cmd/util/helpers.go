@@ -268,8 +268,9 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
-func AddValidateFlag(cmd *cobra.Command) {
+func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
+	cmd.Flags().Bool("cache-schema", true, "If true, use/store local schema files")
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {

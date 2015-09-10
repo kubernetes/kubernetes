@@ -20,7 +20,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -76,7 +78,7 @@ type Factory struct {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
-	Validator func(validate bool) (validation.Schema, error)
+	Validator func(validate, cacheSchema bool) (validation.Schema, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overriden.
@@ -214,13 +216,17 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return kubectl.ReaperFor(mapping.Kind, client)
 		},
-		Validator: func(validate bool) (validation.Schema, error) {
+		Validator: func(validate, cacheSchema bool) (validation.Schema, error) {
 			if validate {
 				client, err := clients.ClientForVersion("")
 				if err != nil {
 					return nil, err
 				}
-				return &clientSwaggerSchema{client, client.ExperimentalClient, api.Scheme}, nil
+				var cacheDir string
+				if cacheSchema {
+					cacheDir = "/tmp"
+				}
+				return &clientSwaggerSchema{client, client.ExperimentalClient, cacheDir}, nil
 			}
 			return validation.NullSchema{}, nil
 		},
@@ -273,18 +279,42 @@ func getServicePorts(spec api.ServiceSpec) []string {
 }
 
 type clientSwaggerSchema struct {
-	c  *client.Client
-	ec *client.ExperimentalClient
-	t  runtime.ObjectTyper
+	c        *client.Client
+	ec       *client.ExperimentalClient
+	cacheDir string
 }
 
-func getSchemaAndValidate(c *client.RESTClient, data []byte, group, version string) error {
-	schemaData, err := c.Get().
-		AbsPath("/swaggerapi", group, version).
-		Do().
-		Raw()
-	if err != nil {
-		return err
+const schemaFileName = "schema.json"
+
+type schemaClient interface {
+	Get() *client.Request
+}
+
+func getSchemaAndValidate(c schemaClient, data []byte, group, version, cacheDir string) (err error) {
+	var schemaData []byte
+	cacheFile := path.Join(cacheDir, group, version, schemaFileName)
+
+	if len(cacheDir) != 0 {
+		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if schemaData == nil {
+		schemaData, err = c.Get().
+			AbsPath("/swaggerapi", group, version).
+			Do().
+			Raw()
+		if err != nil {
+			return err
+		}
+		if len(cacheDir) != 0 {
+			if err = os.MkdirAll(path.Join(cacheDir, group, version), 0755); err != nil {
+				return err
+			}
+			if err = ioutil.WriteFile(cacheFile, schemaData, 0644); err != nil {
+				return err
+			}
+		}
 	}
 	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
 	if err != nil {
@@ -305,9 +335,9 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	// If experimental fails, return error from stable api.
 	// TODO: Figure out which group to try once multiple group support is merged
 	//       instead of trying everything.
-	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version)
+	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version)
+		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version, c.cacheDir)
 		if errExp == nil {
 			return nil
 		}
