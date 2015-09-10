@@ -246,7 +246,8 @@ kubernetes/cluster/ubuntu/build.sh
 sudo cp -f binaries/minion/* /usr/bin
 
 # Get the iptables based kube-proxy reccomended for this demo
-sudo wget https://github.com/projectcalico/calico-kubernetes/releases/download/v0.1.1/kube-proxy -P /usr/bin/
+wget https://github.com/projectcalico/calico-kubernetes/releases/download/v0.1.1/kube-proxy
+sudo cp kube-proxy /usr/bin/
 sudo chmod +x /usr/bin/kube-proxy
 ```
 
