@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -93,7 +94,7 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 // setMatcher is a matcher that matches any pod with id in the set.
 // Makes testing simpler.
 type setMatcher struct {
-	util.StringSet
+	sets.String
 }
 
 func (sm setMatcher) Matches(obj runtime.Object) (bool, error) {
@@ -189,7 +190,7 @@ func TestEtcdList(t *testing.T) {
 				R: singleElemListResp,
 				E: nil,
 			},
-			m:       setMatcher{util.NewStringSet("foo")},
+			m:       setMatcher{sets.NewString("foo")},
 			out:     &api.PodList{Items: []api.Pod{*podA}},
 			succeed: true,
 		},
@@ -198,7 +199,7 @@ func TestEtcdList(t *testing.T) {
 				R: normalListResp,
 				E: nil,
 			},
-			m:       setMatcher{util.NewStringSet("foo", "makeMatchSingleReturnFalse")},
+			m:       setMatcher{sets.NewString("foo", "makeMatchSingleReturnFalse")},
 			out:     &api.PodList{Items: []api.Pod{*podA}},
 			succeed: true,
 		},
@@ -560,8 +561,8 @@ func TestEtcdDelete(t *testing.T) {
 
 func TestEtcdWatch(t *testing.T) {
 	table := map[string]generic.Matcher{
-		"single": setMatcher{util.NewStringSet("foo")},
-		"multi":  setMatcher{util.NewStringSet("foo", "bar")},
+		"single": setMatcher{sets.NewString("foo")},
+		"multi":  setMatcher{sets.NewString("foo", "bar")},
 	}
 
 	for name, m := range table {

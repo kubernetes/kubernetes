@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {
@@ -34,7 +35,7 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 201 {
 		t.Errorf("unexpected free %d", f)
 	}
-	found := util.NewStringSet()
+	found := sets.NewString()
 	count := 0
 	for r.Free() > 0 {
 		p, err := r.AllocateNext()

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -41,7 +42,7 @@ type NamespaceController struct {
 }
 
 // NewNamespaceController creates a new NamespaceController
-func NewNamespaceController(kubeClient client.Interface, resyncPeriod time.Duration) *NamespaceController {
+func NewNamespaceController(kubeClient client.Interface, experimentalMode bool, resyncPeriod time.Duration) *NamespaceController {
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
@@ -57,7 +58,7 @@ func NewNamespaceController(kubeClient client.Interface, resyncPeriod time.Durat
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*api.Namespace)
-				if err := syncNamespace(kubeClient, *namespace); err != nil {
+				if err := syncNamespace(kubeClient, experimentalMode, *namespace); err != nil {
 					if estimate, ok := err.(*contentRemainingError); ok {
 						go func() {
 							// Estimate is the aggregate total of TerminationGracePeriodSeconds, which defaults to 30s
@@ -79,7 +80,7 @@ func NewNamespaceController(kubeClient client.Interface, resyncPeriod time.Durat
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				namespace := newObj.(*api.Namespace)
-				if err := syncNamespace(kubeClient, *namespace); err != nil {
+				if err := syncNamespace(kubeClient, experimentalMode, *namespace); err != nil {
 					if estimate, ok := err.(*contentRemainingError); ok {
 						go func() {
 							t := estimate.Estimate/2 + 1
@@ -128,7 +129,7 @@ func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namesp
 	namespaceFinalize := api.Namespace{}
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
-	finalizerSet := util.NewStringSet()
+	finalizerSet := sets.NewString()
 	for i := range namespace.Spec.Finalizers {
 		if namespace.Spec.Finalizers[i] != api.FinalizerKubernetes {
 			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
@@ -152,7 +153,7 @@ func (e *contentRemainingError) Error() string {
 // deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
 // of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
 // are guaranteed to be gone.
-func deleteAllContent(kubeClient client.Interface, namespace string, before util.Time) (estimate int64, err error) {
+func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namespace string, before util.Time) (estimate int64, err error) {
 	err = deleteServiceAccounts(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
@@ -189,12 +190,26 @@ func deleteAllContent(kubeClient client.Interface, namespace string, before util
 	if err != nil {
 		return estimate, err
 	}
-
+	// If experimental mode, delete all experimental resources for the namespace.
+	if experimentalMode {
+		err = deleteHorizontalPodAutoscalers(kubeClient.Experimental(), namespace)
+		if err != nil {
+			return estimate, err
+		}
+		err = deleteDaemons(kubeClient.Experimental(), namespace)
+		if err != nil {
+			return estimate, err
+		}
+		err = deleteDeployments(kubeClient.Experimental(), namespace)
+		if err != nil {
+			return estimate, err
+		}
+	}
 	return estimate, nil
 }
 
 // syncNamespace makes namespace life-cycle decisions
-func syncNamespace(kubeClient client.Interface, namespace api.Namespace) (err error) {
+func syncNamespace(kubeClient client.Interface, experimentalMode bool, namespace api.Namespace) (err error) {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -224,7 +239,7 @@ func syncNamespace(kubeClient client.Interface, namespace api.Namespace) (err er
 	}
 
 	// there may still be content for us to remove
-	estimate, err := deleteAllContent(kubeClient, namespace.Name, *namespace.DeletionTimestamp)
+	estimate, err := deleteAllContent(kubeClient, experimentalMode, namespace.Name, *namespace.DeletionTimestamp)
 	if err != nil {
 		return err
 	}
@@ -383,6 +398,48 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 	}
 	for i := range items.Items {
 		err := kubeClient.PersistentVolumeClaims(ns).Delete(items.Items[i].Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteHorizontalPodAutoscalers(expClient client.ExperimentalInterface, ns string) error {
+	items, err := expClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.HorizontalPodAutoscalers(ns).Delete(items.Items[i].Name, nil)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteDaemons(expClient client.ExperimentalInterface, ns string) error {
+	items, err := expClient.DaemonSets(ns).List(labels.Everything())
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.DaemonSets(ns).Delete(items.Items[i].Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteDeployments(expClient client.ExperimentalInterface, ns string) error {
+	items, err := expClient.Deployments(ns).List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.Deployments(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

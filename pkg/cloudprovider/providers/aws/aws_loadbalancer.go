@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
@@ -61,7 +61,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 	} else {
 		{
 			// Sync subnets
-			expected := util.NewStringSet(subnetIDs...)
+			expected := sets.NewString(subnetIDs...)
 			actual := stringSetFromPointers(loadBalancer.Subnets)
 
 			additions := expected.Difference(actual)
@@ -94,7 +94,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 
 		{
 			// Sync security groups
-			expected := util.NewStringSet(securityGroupIDs...)
+			expected := sets.NewString(securityGroupIDs...)
 			actual := stringSetFromPointers(loadBalancer.SecurityGroups)
 
 			if !expected.Equal(actual) {
@@ -255,12 +255,12 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(region string, loadBalancer *el
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
 func (s *AWSCloud) ensureLoadBalancerInstances(elbClient ELB, loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
-	expected := util.NewStringSet()
+	expected := sets.NewString()
 	for _, instance := range instances {
 		expected.Insert(orEmpty(instance.InstanceID))
 	}
 
-	actual := util.NewStringSet()
+	actual := sets.NewString()
 	for _, lbInstance := range lbInstances {
 		actual.Insert(orEmpty(lbInstance.InstanceID))
 	}

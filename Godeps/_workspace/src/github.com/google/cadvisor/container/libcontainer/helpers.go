@@ -15,14 +15,19 @@
 package libcontainer
 
 import (
+	"bufio"
 	"fmt"
+	"io/ioutil"
 	"path"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
+	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/utils/sysinfo"
 )
 
 type CgroupSubsystems struct {
@@ -74,7 +79,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 }
 
 // Get cgroup and networking stats of the specified container
-func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.ContainerStats, error) {
+func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.ContainerStats, error) {
 	cgroupStats, err := cgroupManager.GetStats()
 	if err != nil {
 		return nil, err
@@ -84,18 +89,85 @@ func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.
 	}
 	stats := toContainerStats(libcontainerStats)
 
-	// TODO(rjnagal): Use networking stats directly from libcontainer.
-	stats.Network.Interfaces = make([]info.InterfaceStats, len(networkInterfaces))
-	for i := range networkInterfaces {
-		interfaceStats, err := sysinfo.GetNetworkStats(networkInterfaces[i])
+	// If we know the pid then get network stats from /proc/<pid>/net/dev
+	if pid > 0 {
+		netStats, err := networkStatsFromProc(rootFs, pid)
 		if err != nil {
-			return stats, err
+			glog.V(2).Infof("Unable to get network stats from pid %d: %v", pid, err)
+		} else {
+			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
-		stats.Network.Interfaces[i] = interfaceStats
 	}
+
 	// For backwards compatibility.
-	if len(networkInterfaces) > 0 {
+	if len(stats.Network.Interfaces) > 0 {
 		stats.Network.InterfaceStats = stats.Network.Interfaces[0]
+	}
+
+	return stats, nil
+}
+
+func networkStatsFromProc(rootFs string, pid int) ([]info.InterfaceStats, error) {
+	netStatsFile := path.Join(rootFs, "proc", strconv.Itoa(pid), "/net/dev")
+
+	ifaceStats, err := scanInterfaceStats(netStatsFile)
+	if err != nil {
+		return []info.InterfaceStats{}, fmt.Errorf("couldn't read network stats: %v", err)
+	}
+
+	return ifaceStats, nil
+}
+
+var (
+	ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
+	netStatLineRE         = regexp.MustCompile("[  ]*(.+):([  ]+[0-9]+){16}")
+)
+
+func isIgnoredDevice(ifName string) bool {
+	for _, prefix := range ignoredDevicePrefixes {
+		if strings.HasPrefix(strings.ToLower(ifName), prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func scanInterfaceStats(netStatsFile string) ([]info.InterfaceStats, error) {
+	var (
+		bkt uint64
+	)
+
+	stats := []info.InterfaceStats{}
+
+	data, err := ioutil.ReadFile(netStatsFile)
+	if err != nil {
+		return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
+	}
+
+	reader := strings.NewReader(string(data))
+	scanner := bufio.NewScanner(reader)
+
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if netStatLineRE.MatchString(line) {
+			line = strings.Replace(line, ":", "", -1)
+
+			i := info.InterfaceStats{}
+
+			_, err := fmt.Sscanf(line, "%s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+				&i.Name, &i.RxBytes, &i.RxPackets, &i.RxErrors, &i.RxDropped, &bkt, &bkt, &bkt,
+				&bkt, &i.TxBytes, &i.TxPackets, &i.TxErrors, &i.TxDropped, &bkt, &bkt, &bkt, &bkt)
+
+			if err != nil {
+				return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
+			}
+
+			if !isIgnoredDevice(i.Name) {
+				stats = append(stats, i)
+			}
+		}
 	}
 
 	return stats, nil

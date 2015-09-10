@@ -246,18 +246,18 @@ type FakeExperimental struct {
 	*Fake
 }
 
-func (c *FakeExperimental) Daemons(namespace string) client.DaemonInterface {
-	return &FakeDaemons{Fake: c, Namespace: namespace}
+func (c *FakeExperimental) DaemonSets(namespace string) client.DaemonSetInterface {
+	return &FakeDaemonSets{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
-	panic("unimplemented")
-}
-
-func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
-	panic("unimplemented")
+	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterface {
-	panic("unimplemented")
+	return &FakeDeployments{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
+	return &FakeScales{Fake: c, Namespace: namespace}
 }

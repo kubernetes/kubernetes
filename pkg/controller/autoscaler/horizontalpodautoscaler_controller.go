@@ -42,17 +42,15 @@ const (
 
 type HorizontalPodAutoscalerController struct {
 	client        client.Interface
-	expClient     client.ExperimentalInterface
 	metricsClient metrics.MetricsClient
 }
 
 var downscaleForbiddenWindow, _ = time.ParseDuration("20m")
 var upscaleForbiddenWindow, _ = time.ParseDuration("3m")
 
-func New(client client.Interface, expClient client.ExperimentalInterface, metricsClient metrics.MetricsClient) *HorizontalPodAutoscalerController {
+func New(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalPodAutoscalerController {
 	return &HorizontalPodAutoscalerController{
 		client:        client,
-		expClient:     expClient,
 		metricsClient: metricsClient,
 	}
 }
@@ -67,14 +65,14 @@ func (a *HorizontalPodAutoscalerController) Run(syncPeriod time.Duration) {
 
 func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
-	list, err := a.expClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	list, err := a.client.Experimental().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
 	for _, hpa := range list.Items {
 		reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
 
-		scale, err := a.expClient.Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+		scale, err := a.client.Experimental().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 		if err != nil {
 			glog.Warningf("Failed to query scale subresource for %s: %v", reference, err)
 			continue
@@ -127,7 +125,7 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 
 		if rescale {
 			scale.Spec.Replicas = desiredReplicas
-			_, err = a.expClient.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+			_, err = a.client.Experimental().Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
 			if err != nil {
 				glog.Warningf("Failed to rescale %s: %v", reference, err)
 				continue
@@ -147,7 +145,7 @@ func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 			hpa.Status.LastScaleTimestamp = &now
 		}
 
-		_, err = a.expClient.HorizontalPodAutoscalers(hpa.Namespace).Update(&hpa)
+		_, err = a.client.Experimental().HorizontalPodAutoscalers(hpa.Namespace).Update(&hpa)
 		if err != nil {
 			glog.Warningf("Failed to update HorizontalPodAutoscaler %s: %v", hpa.Name, err)
 			continue

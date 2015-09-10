@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Describer generates output for the named resource or an error
@@ -933,7 +933,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			if sp.NodePort != 0 {
 				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
-			fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
+			fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(sp.Name)))
 		}
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {

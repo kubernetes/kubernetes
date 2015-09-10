@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Downwar dAPI volume", func() {
+var _ = Describe("Downward API volume", func() {
 	f := NewFramework("downward-api")
 
 	It("should provide labels and annotations files", func() {
