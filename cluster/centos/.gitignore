@@ -4,10 +4,9 @@ master/bin/etcd
 master/bin/etcdctl
 master/bin/kube*
 
-minion/bin/brctl
-minion/bin/docker
-minion/bin/etcd
-minion/bin/etcdctl
-minion/bin/flanneld
-minion/bin/kube*
-test.sh
+node/bin/docker
+node/bin/etcd
+node/bin/etcdctl
+node/bin/flanneld
+node/bin/kube*
+local-test.sh

@@ -20,13 +20,13 @@
 RELEASES_DIR=${RELEASES_DIR:-/tmp/downloads}
 
 # Define flannel version to use.
-FLANNEL_VERSION=${FLANNEL_VERSION:-"0.4.0"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
 
 # Define etcd version to use.
 ETCD_VERSION=${ETCD_VERSION:-"2.0.12"}
 
 # Define k8s version to use.
-K8S_VERSION=${K8S_VERSION:-"1.0.1"}
+K8S_VERSION=${K8S_VERSION:-"1.0.4"}
 
 FLANNEL_DOWNLOAD_URL=\
 "https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz"

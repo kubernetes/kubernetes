@@ -15,15 +15,14 @@
 # limitations under the License.
 
 ## Contains configuration values for the CentOS cluster
-
-# Currently only support root user.
-export MASTER=${MASTER:-"root@8.8.8.18"}
+# The user should have sudo privilege
+export MASTER=${MASTER:-"centos@172.10.0.11"}
 export MASTER_IP=${MASTER#*@}
 
 # Define all your minion nodes,
 # And separated with blank space like <user_1@ip_1> <user_2@ip_2> <user_3@ip_3>.
-# Currently only support root user.
-export MINIONS=${MINIONS:-"root@8.8.8.20 root@8.8.8.21"}
+# The user should have sudo privilege
+export MINIONS=${MINIONS:-"centos@172.10.0.12 centos@172.10.0.13"}
 # If it practically impossible to set an array as an environment variable
 # from a script, so assume variable is a string then convert it to an array
 export MINIONS_ARRAY=($MINIONS)
