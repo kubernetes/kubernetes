@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type ConversionGenerator interface {
@@ -33,7 +33,7 @@ type ConversionGenerator interface {
 	WriteConversionFunctions(w io.Writer) error
 	RegisterConversionFunctions(w io.Writer, pkg string) error
 	AddImport(pkg string) string
-	RepackImports(exclude util.StringSet)
+	RepackImports(exclude sets.String)
 	WriteImports(w io.Writer) error
 	OverwritePackage(pkg, overwrite string)
 	AssumePrivateConversions()
@@ -279,7 +279,7 @@ func (g *conversionGenerator) targetPackage(pkg string) {
 	g.shortImports[""] = pkg
 }
 
-func (g *conversionGenerator) RepackImports(exclude util.StringSet) {
+func (g *conversionGenerator) RepackImports(exclude sets.String) {
 	var packages []string
 	for key := range g.imports {
 		packages = append(packages, key)

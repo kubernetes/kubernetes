@@ -18,10 +18,10 @@ package aws_cloud
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func stringSetToPointers(in util.StringSet) []*string {
+func stringSetToPointers(in sets.String) []*string {
 	if in == nil {
 		return nil
 	}
@@ -32,11 +32,11 @@ func stringSetToPointers(in util.StringSet) []*string {
 	return out
 }
 
-func stringSetFromPointers(in []*string) util.StringSet {
+func stringSetFromPointers(in []*string) sets.String {
 	if in == nil {
 		return nil
 	}
-	out := util.NewStringSet()
+	out := sets.NewString()
 	for i := range in {
 		out.Insert(orEmpty(in[i]))
 	}

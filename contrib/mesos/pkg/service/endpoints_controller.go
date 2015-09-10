@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -132,8 +133,8 @@ func (e *endpointController) Run(workers int, stopCh <-chan struct{}) {
 	e.queue.ShutDown()
 }
 
-func (e *endpointController) getPodServiceMemberships(pod *api.Pod) (util.StringSet, error) {
-	set := util.StringSet{}
+func (e *endpointController) getPodServiceMemberships(pod *api.Pod) (sets.String, error) {
+	set := sets.String{}
 	services, err := e.serviceStore.GetPodServices(pod)
 	if err != nil {
 		// don't log this error because this function makes pointless

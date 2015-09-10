@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -103,11 +103,11 @@ func TestFilterQuotaPods(t *testing.T) {
 			Status: api.PodStatus{Phase: api.PodFailed},
 		},
 	}
-	expectedResults := util.NewStringSet("pod-running",
+	expectedResults := sets.NewString("pod-running",
 		"pod-pending", "pod-unknown", "pod-failed-with-restart-always",
 		"pod-failed-with-restart-on-failure")
 
-	actualResults := util.StringSet{}
+	actualResults := sets.String{}
 	result := FilterQuotaPods(pods)
 	for i := range result {
 		actualResults.Insert(result[i].Name)

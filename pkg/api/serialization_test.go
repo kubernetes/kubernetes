@@ -31,6 +31,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	_ "k8s.io/kubernetes/pkg/expapi"
 	_ "k8s.io/kubernetes/pkg/expapi/v1"
@@ -87,7 +88,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 // roundTripSame verifies the same source object is tested in all API versions.
 func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
-	set := util.NewStringSet(except...)
+	set := sets.NewString(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
 	version := testapi.Default.Version()
@@ -119,8 +120,8 @@ func TestList(t *testing.T) {
 	roundTripSame(t, item)
 }
 
-var nonRoundTrippableTypes = util.NewStringSet()
-var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions", "PodAttachOptions")
+var nonRoundTrippableTypes = sets.NewString()
+var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "PodExecOptions", "PodAttachOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 
 func TestRoundTripTypes(t *testing.T) {

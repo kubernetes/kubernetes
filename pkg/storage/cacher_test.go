@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -160,7 +161,7 @@ func TestListFromMemory(t *testing.T) {
 	if len(result.Items) != 2 {
 		t.Errorf("unexpected list result: %d", len(result.Items))
 	}
-	keys := util.StringSet{}
+	keys := sets.String{}
 	for _, item := range result.Items {
 		keys.Insert(item.ObjectMeta.Name)
 	}

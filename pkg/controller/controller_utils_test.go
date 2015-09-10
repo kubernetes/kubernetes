@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -224,13 +225,13 @@ func TestActivePodFiltering(t *testing.T) {
 	podList := newPodList(nil, 5, api.PodRunning, rc)
 	podList.Items[0].Status.Phase = api.PodSucceeded
 	podList.Items[1].Status.Phase = api.PodFailed
-	expectedNames := util.NewStringSet()
+	expectedNames := sets.NewString()
 	for _, pod := range podList.Items[2:] {
 		expectedNames.Insert(pod.Name)
 	}
 
 	got := FilterActivePods(podList.Items)
-	gotNames := util.NewStringSet()
+	gotNames := sets.NewString()
 	for _, pod := range got {
 		gotNames.Insert(pod.Name)
 	}

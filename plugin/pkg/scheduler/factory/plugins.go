@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -66,8 +66,8 @@ const (
 )
 
 type AlgorithmProviderConfig struct {
-	FitPredicateKeys     util.StringSet
-	PriorityFunctionKeys util.StringSet
+	FitPredicateKeys     sets.String
+	PriorityFunctionKeys sets.String
 }
 
 // RegisterFitPredicate registers a fit predicate with the algorithm
@@ -209,7 +209,7 @@ func IsPriorityFunctionRegistered(name string) bool {
 
 // Registers a new algorithm provider with the algorithm registry. This should
 // be called from the init function in a provider plugin.
-func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys util.StringSet) string {
+func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.String) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
@@ -234,7 +234,7 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(names util.StringSet, args PluginFactoryArgs) (map[string]algorithm.FitPredicate, error) {
+func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]algorithm.FitPredicate, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
@@ -249,7 +249,7 @@ func getFitPredicateFunctions(names util.StringSet, args PluginFactoryArgs) (map
 	return predicates, nil
 }
 
-func getPriorityFunctionConfigs(names util.StringSet, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
+func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 

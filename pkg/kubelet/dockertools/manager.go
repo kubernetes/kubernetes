@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -402,7 +403,7 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		return nil, err
 	}
 
-	containerDone := util.NewStringSet()
+	containerDone := sets.NewString()
 	// Loop through list of running and exited docker containers to construct
 	// the statuses. We assume docker returns a list of containers sorted in
 	// reverse by time.

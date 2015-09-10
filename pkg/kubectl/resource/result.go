@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -123,7 +123,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		return nil, err
 	}
 
-	versions := util.StringSet{}
+	versions := sets.String{}
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object != nil {

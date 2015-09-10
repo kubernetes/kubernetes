@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -626,7 +627,7 @@ func TestUpdatePods(t *testing.T) {
 	// both controllers
 	manager.updatePod(&pod1, &pod2)
 
-	expected := util.NewStringSet(testControllerSpec1.Name, testControllerSpec2.Name)
+	expected := sets.NewString(testControllerSpec1.Name, testControllerSpec2.Name)
 	for _, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
 		select {

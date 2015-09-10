@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -101,7 +101,7 @@ func TestSelectHost(t *testing.T) {
 	scheduler := genericScheduler{random: rand.New(rand.NewSource(0))}
 	tests := []struct {
 		list          algorithm.HostPriorityList
-		possibleHosts util.StringSet
+		possibleHosts sets.String
 		expectsErr    bool
 	}{
 		{
@@ -109,7 +109,7 @@ func TestSelectHost(t *testing.T) {
 				{Host: "machine1.1", Score: 1},
 				{Host: "machine2.1", Score: 2},
 			},
-			possibleHosts: util.NewStringSet("machine2.1"),
+			possibleHosts: sets.NewString("machine2.1"),
 			expectsErr:    false,
 		},
 		// equal scores
@@ -120,7 +120,7 @@ func TestSelectHost(t *testing.T) {
 				{Host: "machine1.3", Score: 2},
 				{Host: "machine2.1", Score: 2},
 			},
-			possibleHosts: util.NewStringSet("machine1.2", "machine1.3", "machine2.1"),
+			possibleHosts: sets.NewString("machine1.2", "machine1.3", "machine2.1"),
 			expectsErr:    false,
 		},
 		// out of order scores
@@ -132,13 +132,13 @@ func TestSelectHost(t *testing.T) {
 				{Host: "machine3.1", Score: 1},
 				{Host: "machine1.3", Score: 3},
 			},
-			possibleHosts: util.NewStringSet("machine1.1", "machine1.2", "machine1.3"),
+			possibleHosts: sets.NewString("machine1.1", "machine1.2", "machine1.3"),
 			expectsErr:    false,
 		},
 		// empty priorityList
 		{
 			list:          []algorithm.HostPriority{},
-			possibleHosts: util.NewStringSet(),
+			possibleHosts: sets.NewString(),
 			expectsErr:    true,
 		},
 	}

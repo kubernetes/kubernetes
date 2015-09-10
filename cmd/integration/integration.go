@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -738,7 +739,7 @@ func runMasterServiceTest(client *client.Client) {
 		glog.Fatalf("unexpected error listing services: %v", err)
 	}
 	var foundRW bool
-	found := util.StringSet{}
+	found := sets.String{}
 	for i := range svcList.Items {
 		found.Insert(svcList.Items[i].Name)
 		if svcList.Items[i].Name == "kubernetes" {
@@ -864,7 +865,7 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to list services across namespaces: %v", err)
 	}
-	names := util.NewStringSet()
+	names := sets.NewString()
 	for _, svc := range svcList.Items {
 		names.Insert(fmt.Sprintf("%s/%s", svc.Namespace, svc.Name))
 	}
@@ -1011,7 +1012,7 @@ func main() {
 	// Check that kubelet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
 	// really stupid, so kubelet tries to create these multiple times.
-	createdConts := util.StringSet{}
+	createdConts := sets.String{}
 	for _, p := range fakeDocker1.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {

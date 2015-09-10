@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
@@ -33,7 +34,7 @@ func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
 	return true
 }
 
-func CheckSetEq(lhs, rhs util.StringSet) bool {
+func CheckSetEq(lhs, rhs sets.String) bool {
 	return lhs.HasAll(rhs.List()...) && rhs.HasAll(lhs.List()...)
 }
 
@@ -51,7 +52,7 @@ func TestAddNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern := util.NewStringSet("first", "second", "third")
+	setPattern := sets.NewString("first", "second", "third")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -75,7 +76,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern := util.NewStringSet("second", "third")
+	setPattern := sets.NewString("second", "third")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -97,7 +98,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern = util.NewStringSet("first", "third")
+	setPattern = sets.NewString("first", "third")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -119,7 +120,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern = util.NewStringSet("first", "second")
+	setPattern = sets.NewString("first", "second")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -135,13 +136,13 @@ func TestTry(t *testing.T) {
 	evictor.Add("third")
 	evictor.Remove("second")
 
-	deletedMap := util.NewStringSet()
+	deletedMap := sets.NewString()
 	evictor.Try(func(value TimedValue) (bool, time.Duration) {
 		deletedMap.Insert(value.Value)
 		return true, 0
 	})
 
-	setPattern := util.NewStringSet("first", "third")
+	setPattern := sets.NewString("first", "third")
 	if len(deletedMap) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}

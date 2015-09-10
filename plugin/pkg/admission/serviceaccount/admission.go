@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -249,7 +249,7 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 		return "", err
 	}
 
-	references := util.NewStringSet()
+	references := sets.NewString()
 	for _, secret := range serviceAccount.Secrets {
 		references.Insert(secret.Name)
 	}
@@ -293,7 +293,7 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAcco
 
 func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
-	mountableSecrets := util.NewStringSet()
+	mountableSecrets := sets.NewString()
 	for _, s := range serviceAccount.Secrets {
 		mountableSecrets.Insert(s.Name)
 	}
@@ -309,7 +309,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 	}
 
 	// limit pull secret references as well
-	pullSecrets := util.NewStringSet()
+	pullSecrets := sets.NewString()
 	for _, s := range serviceAccount.ImagePullSecrets {
 		pullSecrets.Insert(s.Name)
 	}
@@ -340,7 +340,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 	// Find the volume and volume name for the ServiceAccountTokenSecret if it already exists
 	tokenVolumeName := ""
 	hasTokenVolume := false
-	allVolumeNames := util.NewStringSet()
+	allVolumeNames := sets.NewString()
 	for _, volume := range pod.Spec.Volumes {
 		allVolumeNames.Insert(volume.Name)
 		if volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken {

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var (
@@ -58,7 +59,7 @@ type NodeController struct {
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
 	deletingPodsRateLimiter util.RateLimiter
-	knownNodeSet            util.StringSet
+	knownNodeSet            sets.String
 	kubeClient              client.Interface
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
@@ -126,7 +127,7 @@ func NewNodeController(
 	evictorLock := sync.Mutex{}
 	return &NodeController{
 		cloud:                  cloud,
-		knownNodeSet:           make(util.StringSet),
+		knownNodeSet:           make(sets.String),
 		kubeClient:             kubeClient,
 		recorder:               recorder,
 		podEvictionTimeout:     podEvictionTimeout,
@@ -211,8 +212,8 @@ func (nc *NodeController) Run(period time.Duration) {
 }
 
 // Generates num pod CIDRs that could be assigned to nodes.
-func generateCIDRs(clusterCIDR *net.IPNet, num int) util.StringSet {
-	res := util.NewStringSet()
+func generateCIDRs(clusterCIDR *net.IPNet, num int) sets.String {
+	res := sets.NewString()
 	cidrIP := clusterCIDR.IP.To4()
 	for i := 0; i < num; i++ {
 		// TODO: Make the CIDRs configurable.
@@ -256,7 +257,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 	// If there's a difference between lengths of known Nodes and observed nodes
 	// we must have removed some Node.
 	if len(nc.knownNodeSet) != len(nodes.Items) {
-		observedSet := make(util.StringSet)
+		observedSet := make(sets.String)
 		for _, node := range nodes.Items {
 			observedSet.Insert(node.Name)
 		}
