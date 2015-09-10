@@ -1916,7 +1916,7 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 // GetKubeletContainerLogs returns logs from the container
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
 // or all of them.
-func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error {
+func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
 	// TODO(vmarmol): Refactor to not need the pod status and verification.
 	// Pod workers periodically write status to statusManager. If status is not
 	// cached there, something is wrong (or kubelet just restarted and hasn't
@@ -1940,13 +1940,13 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
 		return fmt.Errorf("Pod %q in namespace %q : %v", name, namespace, err)
 	}
-	containerID, err := kl.validateContainerStatus(&podStatus, containerName, previous)
+	containerID, err := kl.validateContainerStatus(&podStatus, containerName, logOptions.Previous)
 	if err != nil {
 		// No log is available if the container status is missing or is in the
 		// waiting state.
 		return fmt.Errorf("Pod %q in namespace %q: %v", name, namespace, err)
 	}
-	return kl.containerRuntime.GetContainerLogs(pod, containerID, tail, follow, stdout, stderr)
+	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.
