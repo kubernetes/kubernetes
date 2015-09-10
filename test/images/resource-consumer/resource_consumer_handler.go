@@ -104,8 +104,7 @@ func (handler ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, q
 			http.Error(w, incorrectFunctionArgument, http.StatusBadRequest)
 			return
 		}
-		ConsumeMem(megabytes, durationSec)
-		fmt.Fprintln(w, "Warning: not implemented!")
+		go ConsumeMem(megabytes, durationSec)
 		fmt.Fprintln(w, consumeMemAddress[1:])
 		fmt.Fprintln(w, megabytes, megabytesQuery)
 		fmt.Fprintln(w, durationSec, durationSecQuery)
