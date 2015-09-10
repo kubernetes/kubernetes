@@ -62,13 +62,37 @@ func AddSourceToErr(verb string, source string, err error) error {
 	return err
 }
 
+var fatalErrHandler = fatal
+
+// BehaviorOnFatal allows you to override the default behavior when a fatal
+// error occurs, which is call os.Exit(1). You can pass 'panic' as a function
+// here if you prefer the panic() over os.Exit(1).
+func BehaviorOnFatal(f func(string)) {
+	fatalErrHandler = f
+}
+
+// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
+// is invoked for extended information.
+func fatal(msg string) {
+	// add newline if needed
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+
+	if glog.V(2) {
+		glog.FatalDepth(2, msg)
+	}
+	fmt.Fprint(os.Stderr, msg)
+	os.Exit(1)
+}
+
 // CheckErr prints a user friendly error to STDERR and exits with a non-zero
 // exit code. Unrecognized errors will be printed with an "error: " prefix.
 //
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr(err, fatal)
+	checkErr(err, fatalErrHandler)
 }
 
 func checkErr(err error, handleErr func(string)) {
@@ -178,21 +202,6 @@ func messageForError(err error) string {
 		msg = err.Error()
 	}
 	return msg
-}
-
-// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
-// is invoked for extended information.
-func fatal(msg string) {
-	// add newline if needed
-	if !strings.HasSuffix(msg, "\n") {
-		msg += "\n"
-	}
-
-	if glog.V(2) {
-		glog.FatalDepth(2, msg)
-	}
-	fmt.Fprint(os.Stderr, msg)
-	os.Exit(1)
 }
 
 func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
