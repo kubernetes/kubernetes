@@ -73,10 +73,10 @@ func massageJSONPath(pathExpression string) (string, error) {
 //      NAME               API_VERSION
 //      foo                bar
 func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error) {
-	parts := strings.Split(spec, ",")
-	if len(parts) == 0 {
+	if len(spec) == 0 {
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
+	parts := strings.Split(spec, ",")
 	columns := make([]Column, len(parts))
 	for ix := range parts {
 		colSpec := strings.Split(parts[ix], ":")
