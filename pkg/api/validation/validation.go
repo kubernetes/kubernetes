@@ -1713,21 +1713,20 @@ func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]))...)
 	}
 
-	allErrs = append(allErrs, validateNetworkPolicy(namespace))
+	allErrs = append(allErrs, validateNetworkPolicy(string(namespace.Spec.NetworkPolicy))...)
 
 	return allErrs
 }
 
 var supportedNamespaceNetworkPolicy = util.NewStringSet(string(api.NamespacePublic), string(api.NamespacePrivate))
-func validateNetworkPolicy(namespace *api.Namespace) errs.ValidationErrorList {
+func validateNetworkPolicy(networkPolicy string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	/*if namespace.Spec.NetworkPolicy == "" {
+	if namespace.Spec.NetworkPolicy == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.networkPolicy"))
-	} else*/
-	if namespace.Spec.NetworkPolicy != "" {
-		if !supportedNamespaceNetworkPolicy.Has(string(namespace.Spec.NetworkPolicy)) {
-			allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.networkPolicy", namespace.Spec.NetworkPolicy, supportedNamespaceNetworkPolicy.List()))
+	} else {
+		if !supportedNamespaceNetworkPolicy.Has(networkPolicy) {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.networkPolicy", networkPolicy, supportedNamespaceNetworkPolicy.List()))
 		}
 	}
 
