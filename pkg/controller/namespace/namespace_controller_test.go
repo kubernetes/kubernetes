@@ -107,7 +107,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 	if experimentalMode {
 		expectedActionSet.Insert(
 			strings.Join([]string{"list", "horizontalpodautoscalers", ""}, "-"),
-			strings.Join([]string{"list", "daemons", ""}, "-"),
+			strings.Join([]string{"list", "daemonsets", ""}, "-"),
 			strings.Join([]string{"list", "deployments", ""}, "-"),
 		)
 	}

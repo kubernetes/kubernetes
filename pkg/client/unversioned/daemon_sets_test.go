@@ -25,20 +25,20 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getDCResourceName() string {
-	return "daemons"
+func getDSResourceName() string {
+	return "daemonsets"
 }
 
-func TestListDaemons(t *testing.T) {
+func TestListDaemonSets(t *testing.T) {
 	ns := api.NamespaceAll
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getDCResourceName(), ns, ""),
+			Path:   testapi.Experimental.ResourcePath(getDSResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
-			Body: &expapi.DaemonList{
-				Items: []expapi.Daemon{
+			Body: &expapi.DaemonSetList{
+				Items: []expapi.DaemonSet{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -47,7 +47,7 @@ func TestListDaemons(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Spec: expapi.DaemonSpec{
+						Spec: expapi.DaemonSetSpec{
 							Template: &api.PodTemplateSpec{},
 						},
 					},
@@ -55,18 +55,18 @@ func TestListDaemons(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup(t).Experimental().Daemons(ns).List(labels.Everything())
-	c.Validate(t, receivedControllerList, err)
+	receivedDSs, err := c.Setup(t).Experimental().DaemonSets(ns).List(labels.Everything())
+	c.Validate(t, receivedDSs, err)
 
 }
 
-func TestGetDaemon(t *testing.T) {
+func TestGetDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.Experimental.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "GET", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &expapi.Daemon{
+			Body: &expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -74,20 +74,20 @@ func TestGetDaemon(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
 	}
-	receivedController, err := c.Setup(t).Experimental().Daemons(ns).Get("foo")
-	c.Validate(t, receivedController, err)
+	receivedDaemonSet, err := c.Setup(t).Experimental().DaemonSets(ns).Get("foo")
+	c.Validate(t, receivedDaemonSet, err)
 }
 
-func TestGetDaemonWithNoName(t *testing.T) {
+func TestGetDaemonSetWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{Error: true}
-	receivedPod, err := c.Setup(t).Experimental().Daemons(ns).Get("")
+	receivedPod, err := c.Setup(t).Experimental().DaemonSets(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}
@@ -95,16 +95,16 @@ func TestGetDaemonWithNoName(t *testing.T) {
 	c.Validate(t, receivedPod, err)
 }
 
-func TestUpdateDaemon(t *testing.T) {
+func TestUpdateDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestController := &expapi.Daemon{
+	requestDaemonSet := &expapi.DaemonSet{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &expapi.Daemon{
+			Body: &expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -112,36 +112,36 @@ func TestUpdateDaemon(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
 	}
-	receivedController, err := c.Setup(t).Experimental().Daemons(ns).Update(requestController)
-	c.Validate(t, receivedController, err)
+	receivedDaemonSet, err := c.Setup(t).Experimental().DaemonSets(ns).Update(requestDaemonSet)
+	c.Validate(t, receivedDaemonSet, err)
 }
 
 func TestDeleteDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Experimental.ResourcePath(getDCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup(t).Experimental().Daemons(ns).Delete("foo")
+	err := c.Setup(t).Experimental().DaemonSets(ns).Delete("foo")
 	c.Validate(t, nil, err)
 }
 
-func TestCreateDaemon(t *testing.T) {
+func TestCreateDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestController := &expapi.Daemon{
+	requestDaemonSet := &expapi.DaemonSet{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: testapi.Experimental.ResourcePath(getDCResourceName(), ns, ""), Body: requestController, Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "POST", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &expapi.Daemon{
+			Body: &expapi.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -149,12 +149,12 @@ func TestCreateDaemon(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: expapi.DaemonSpec{
+				Spec: expapi.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
 	}
-	receivedController, err := c.Setup(t).Experimental().Daemons(ns).Create(requestController)
-	c.Validate(t, receivedController, err)
+	receivedDaemonSet, err := c.Setup(t).Experimental().DaemonSets(ns).Create(requestDaemonSet)
+	c.Validate(t, receivedDaemonSet, err)
 }

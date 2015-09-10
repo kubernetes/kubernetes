@@ -26,14 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func TestSetDefaultDaemon(t *testing.T) {
+func TestSetDefaultDaemonSet(t *testing.T) {
 	tests := []struct {
-		dc                 *Daemon
+		ds                 *DaemonSet
 		expectLabelsChange bool
 	}{
 		{
-			dc: &Daemon{
-				Spec: DaemonSpec{
+			ds: &DaemonSet{
+				Spec: DaemonSetSpec{
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
@@ -46,13 +46,13 @@ func TestSetDefaultDaemon(t *testing.T) {
 			expectLabelsChange: true,
 		},
 		{
-			dc: &Daemon{
+			ds: &DaemonSet{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
-				Spec: DaemonSpec{
+				Spec: DaemonSetSpec{
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
@@ -67,18 +67,18 @@ func TestSetDefaultDaemon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dc := test.dc
-		obj2 := roundTrip(t, runtime.Object(dc))
-		dc2, ok := obj2.(*Daemon)
+		ds := test.ds
+		obj2 := roundTrip(t, runtime.Object(ds))
+		ds2, ok := obj2.(*DaemonSet)
 		if !ok {
-			t.Errorf("unexpected object: %v", dc2)
+			t.Errorf("unexpected object: %v", ds2)
 			t.FailNow()
 		}
-		if test.expectLabelsChange != reflect.DeepEqual(dc2.Labels, dc2.Spec.Template.Labels) {
+		if test.expectLabelsChange != reflect.DeepEqual(ds2.Labels, ds2.Spec.Template.Labels) {
 			if test.expectLabelsChange {
-				t.Errorf("expected: %v, got: %v", dc2.Spec.Template.Labels, dc2.Labels)
+				t.Errorf("expected: %v, got: %v", ds2.Spec.Template.Labels, ds2.Labels)
 			} else {
-				t.Errorf("unexpected equality: %v", dc.Labels)
+				t.Errorf("unexpected equality: %v", ds.Labels)
 			}
 		}
 	}

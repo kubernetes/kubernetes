@@ -1571,9 +1571,9 @@ func convert_expapi_APIVersion_To_v1_APIVersion(in *expapi.APIVersion, out *APIV
 	return nil
 }
 
-func convert_expapi_Daemon_To_v1_Daemon(in *expapi.Daemon, out *Daemon, s conversion.Scope) error {
+func convert_expapi_DaemonSet_To_v1_DaemonSet(in *expapi.DaemonSet, out *DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.Daemon))(in)
+		defaulting.(func(*expapi.DaemonSet))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1581,18 +1581,18 @@ func convert_expapi_Daemon_To_v1_Daemon(in *expapi.Daemon, out *Daemon, s conver
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
 		return err
 	}
-	if err := convert_expapi_DaemonSpec_To_v1_DaemonSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := convert_expapi_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := convert_expapi_DaemonStatus_To_v1_DaemonStatus(&in.Status, &out.Status, s); err != nil {
+	if err := convert_expapi_DaemonSetStatus_To_v1_DaemonSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func convert_expapi_DaemonList_To_v1_DaemonList(in *expapi.DaemonList, out *DaemonList, s conversion.Scope) error {
+func convert_expapi_DaemonSetList_To_v1_DaemonSetList(in *expapi.DaemonSetList, out *DaemonSetList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.DaemonList))(in)
+		defaulting.(func(*expapi.DaemonSetList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1601,9 +1601,9 @@ func convert_expapi_DaemonList_To_v1_DaemonList(in *expapi.DaemonList, out *Daem
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]Daemon, len(in.Items))
+		out.Items = make([]DaemonSet, len(in.Items))
 		for i := range in.Items {
-			if err := convert_expapi_Daemon_To_v1_Daemon(&in.Items[i], &out.Items[i], s); err != nil {
+			if err := convert_expapi_DaemonSet_To_v1_DaemonSet(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
 			}
 		}
@@ -1613,9 +1613,9 @@ func convert_expapi_DaemonList_To_v1_DaemonList(in *expapi.DaemonList, out *Daem
 	return nil
 }
 
-func convert_expapi_DaemonSpec_To_v1_DaemonSpec(in *expapi.DaemonSpec, out *DaemonSpec, s conversion.Scope) error {
+func convert_expapi_DaemonSetSpec_To_v1_DaemonSetSpec(in *expapi.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.DaemonSpec))(in)
+		defaulting.(func(*expapi.DaemonSetSpec))(in)
 	}
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
@@ -1636,9 +1636,9 @@ func convert_expapi_DaemonSpec_To_v1_DaemonSpec(in *expapi.DaemonSpec, out *Daem
 	return nil
 }
 
-func convert_expapi_DaemonStatus_To_v1_DaemonStatus(in *expapi.DaemonStatus, out *DaemonStatus, s conversion.Scope) error {
+func convert_expapi_DaemonSetStatus_To_v1_DaemonSetStatus(in *expapi.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.DaemonStatus))(in)
+		defaulting.(func(*expapi.DaemonSetStatus))(in)
 	}
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
@@ -1959,9 +1959,9 @@ func convert_v1_APIVersion_To_expapi_APIVersion(in *APIVersion, out *expapi.APIV
 	return nil
 }
 
-func convert_v1_Daemon_To_expapi_Daemon(in *Daemon, out *expapi.Daemon, s conversion.Scope) error {
+func convert_v1_DaemonSet_To_expapi_DaemonSet(in *DaemonSet, out *expapi.DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*Daemon))(in)
+		defaulting.(func(*DaemonSet))(in)
 	}
 	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1969,18 +1969,18 @@ func convert_v1_Daemon_To_expapi_Daemon(in *Daemon, out *expapi.Daemon, s conver
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
 		return err
 	}
-	if err := convert_v1_DaemonSpec_To_expapi_DaemonSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := convert_v1_DaemonSetSpec_To_expapi_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := convert_v1_DaemonStatus_To_expapi_DaemonStatus(&in.Status, &out.Status, s); err != nil {
+	if err := convert_v1_DaemonSetStatus_To_expapi_DaemonSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func convert_v1_DaemonList_To_expapi_DaemonList(in *DaemonList, out *expapi.DaemonList, s conversion.Scope) error {
+func convert_v1_DaemonSetList_To_expapi_DaemonSetList(in *DaemonSetList, out *expapi.DaemonSetList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*DaemonList))(in)
+		defaulting.(func(*DaemonSetList))(in)
 	}
 	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1989,9 +1989,9 @@ func convert_v1_DaemonList_To_expapi_DaemonList(in *DaemonList, out *expapi.Daem
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]expapi.Daemon, len(in.Items))
+		out.Items = make([]expapi.DaemonSet, len(in.Items))
 		for i := range in.Items {
-			if err := convert_v1_Daemon_To_expapi_Daemon(&in.Items[i], &out.Items[i], s); err != nil {
+			if err := convert_v1_DaemonSet_To_expapi_DaemonSet(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
 			}
 		}
@@ -2001,9 +2001,9 @@ func convert_v1_DaemonList_To_expapi_DaemonList(in *DaemonList, out *expapi.Daem
 	return nil
 }
 
-func convert_v1_DaemonSpec_To_expapi_DaemonSpec(in *DaemonSpec, out *expapi.DaemonSpec, s conversion.Scope) error {
+func convert_v1_DaemonSetSpec_To_expapi_DaemonSetSpec(in *DaemonSetSpec, out *expapi.DaemonSetSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*DaemonSpec))(in)
+		defaulting.(func(*DaemonSetSpec))(in)
 	}
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
@@ -2024,9 +2024,9 @@ func convert_v1_DaemonSpec_To_expapi_DaemonSpec(in *DaemonSpec, out *expapi.Daem
 	return nil
 }
 
-func convert_v1_DaemonStatus_To_expapi_DaemonStatus(in *DaemonStatus, out *expapi.DaemonStatus, s conversion.Scope) error {
+func convert_v1_DaemonSetStatus_To_expapi_DaemonSetStatus(in *DaemonSetStatus, out *expapi.DaemonSetStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*DaemonStatus))(in)
+		defaulting.(func(*DaemonSetStatus))(in)
 	}
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
@@ -2379,10 +2379,10 @@ func init() {
 		convert_api_VolumeSource_To_v1_VolumeSource,
 		convert_api_Volume_To_v1_Volume,
 		convert_expapi_APIVersion_To_v1_APIVersion,
-		convert_expapi_DaemonList_To_v1_DaemonList,
-		convert_expapi_DaemonSpec_To_v1_DaemonSpec,
-		convert_expapi_DaemonStatus_To_v1_DaemonStatus,
-		convert_expapi_Daemon_To_v1_Daemon,
+		convert_expapi_DaemonSetList_To_v1_DaemonSetList,
+		convert_expapi_DaemonSetSpec_To_v1_DaemonSetSpec,
+		convert_expapi_DaemonSetStatus_To_v1_DaemonSetStatus,
+		convert_expapi_DaemonSet_To_v1_DaemonSet,
 		convert_expapi_DeploymentList_To_v1_DeploymentList,
 		convert_expapi_DeploymentStatus_To_v1_DeploymentStatus,
 		convert_expapi_Deployment_To_v1_Deployment,
@@ -2407,10 +2407,10 @@ func init() {
 		convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		convert_v1_ContainerPort_To_api_ContainerPort,
 		convert_v1_Container_To_api_Container,
-		convert_v1_DaemonList_To_expapi_DaemonList,
-		convert_v1_DaemonSpec_To_expapi_DaemonSpec,
-		convert_v1_DaemonStatus_To_expapi_DaemonStatus,
-		convert_v1_Daemon_To_expapi_Daemon,
+		convert_v1_DaemonSetList_To_expapi_DaemonSetList,
+		convert_v1_DaemonSetSpec_To_expapi_DaemonSetSpec,
+		convert_v1_DaemonSetStatus_To_expapi_DaemonSetStatus,
+		convert_v1_DaemonSet_To_expapi_DaemonSet,
 		convert_v1_DeploymentList_To_expapi_DeploymentList,
 		convert_v1_DeploymentStatus_To_expapi_DeploymentStatus,
 		convert_v1_Deployment_To_expapi_Deployment,
