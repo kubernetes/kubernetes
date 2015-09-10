@@ -30,7 +30,7 @@ import (
 const (
 	consumptionTimeInSeconds = 30
 	sleepTime                = 30 * time.Second
-	requestSizeInMilicores   = 100
+	requestSizeInMillicores  = 100
 	port                     = 80
 	targetPort               = 8080
 	timeoutRC                = 120 * time.Second
@@ -80,11 +80,11 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	for {
 		select {
 		case millicores := <-rc.channel:
-			count = millicores / requestSizeInMilicores
-			rest = millicores - count*requestSizeInMilicores
+			count = millicores / requestSizeInMillicores
+			rest = millicores - count*requestSizeInMillicores
 		case <-time.After(sleepTime):
 			if count > 0 {
-				rc.sendConsumeCPUrequests(count, requestSizeInMilicores, consumptionTimeInSeconds)
+				rc.sendConsumeCPUrequests(count, requestSizeInMillicores, consumptionTimeInSeconds)
 			}
 			if rest > 0 {
 				go rc.sendOneConsumeCPUrequest(rest, consumptionTimeInSeconds)
