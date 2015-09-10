@@ -13,6 +13,7 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
+    - flannel
     - helpers
     - cadvisor
     - kube-client-tools
@@ -43,6 +44,7 @@ base:
     - match: grain
     - generate-cert
     - etcd
+    - flannel
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler

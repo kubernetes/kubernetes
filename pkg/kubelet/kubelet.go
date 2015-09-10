@@ -313,9 +313,10 @@ func NewMainKubelet(
 		flannelServer:                  &FlannelServer{kubeClient},
 		useDefaultOverlay:              useDefaultOverlay,
 	}
-	if klet.useDefaultOverlay {
+	if klet.useDefaultOverlay && kubeClient != nil {
 		// TODO: Don't cast client, don't hardcode flannel as overlay etc
 		klet.flannelServer = NewFlannelServer(kubeClient.(*client.Client))
+		go klet.flannelServer.RunServer(util.NeverStop)
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -411,9 +412,6 @@ func NewMainKubelet(
 	}
 	klet.containerManager = containerManager
 
-	if useDefaultOverlay {
-		go klet.flannelServer.RunServer(util.NeverStop)
-	}
 	go util.Until(klet.syncNetworkStatus, 30*time.Second, util.NeverStop)
 	if klet.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
@@ -2453,7 +2451,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 		// We need to wait for flannel to write the mtu before restarting docker
 		// Note that the podCIDR returned by flannel is the same as the one
 		// received from the nodecontroller, so we can safely ignore it.
-		if kl.useDefaultOverlay && !kl.networkConfigured {
+		if kl.useDefaultOverlay && !kl.networkConfigured && kl.flannelServer != nil {
 			podCIDR, err := kl.flannelServer.Handshake()
 			if err != nil {
 				glog.Infof(" server handshake failed %v", err)

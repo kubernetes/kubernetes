@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,8 +26,10 @@ const (
 	dockerOptsFile               = "/etc/default/docker"
 	flannelSubnetKey             = "FLANNEL_SUBNET"
 	flannelMtuKey                = "FLANNEL_MTU"
-	dockerOptsKey                = "DOCKER_OPS"
+	dockerOptsKey                = "DOCKER_OPTS"
 	flannelSubnetFile            = "/var/run/flannel/subnet.env"
+	// TODO: Expose network.json through cmd line and set in local cluster
+	networkConfig = "/var/run/flannel/network.json"
 )
 
 type handler func(http.ResponseWriter, *http.Request)
@@ -76,7 +79,7 @@ func (f *FlannelServer) handleGetNetworkConfig(w http.ResponseWriter, r *http.Re
 	defer r.Body.Close()
 
 	checkNetwork(r)
-	b, err := ioutil.ReadFile("flannel-config.json")
+	b, err := ioutil.ReadFile(networkConfig)
 	if err != nil {
 		badResponse(w, err)
 		return
@@ -230,8 +233,10 @@ func writeDockerOptsFromFlannelConfig(flannelConfig map[string]string) error {
 		glog.Errorf("(flannel) Did not find docker opts, writing them")
 		opts = fmt.Sprintf(
 			" --bridge=cbr0 --iptables=false --ip-masq=false")
+	} else {
+		opts, _ = strconv.Unquote(opts)
 	}
-	dockerOpts[dockerOptsKey] = fmt.Sprintf("%v --mtu=%v", opts, mtu)
+	dockerOpts[dockerOptsKey] = fmt.Sprintf("\"%v --mtu=%v\"", opts, mtu)
 	if err = writeKVConfig(dockerOptsFile, dockerOpts); err != nil {
 		return err
 	}
@@ -268,7 +273,7 @@ func writeKVConfig(filename string, kv map[string]string) error {
 	}
 	content := ""
 	for k, v := range kv {
-		content += fmt.Sprintf("%v=\"%v\"\n", k, v)
+		content += fmt.Sprintf("%v=%v\n", k, v)
 	}
 	glog.Infof("(flannel) Writing kv options %+v to %v", content, filename)
 	return ioutil.WriteFile(filename, []byte(content), 0644)

@@ -298,7 +298,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	if s.AllocateNodeCIDRs {
-		if cloud == nil {
+		if cloud == nil || true {
 			glog.Warning("allocate-node-cidrs is set, but no cloud provider specified. Will not manage routes.")
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
