@@ -91,7 +91,7 @@ func gcloudListNodes() {
 // -t/--test flag or ginkgo.focus flag.
 var _ = Describe("Density", func() {
 	var c *client.Client
-	var minionCount int
+	var nodeCount int
 	var RCName string
 	var additionalPodsPrefix string
 	var ns string
@@ -101,10 +101,10 @@ var _ = Describe("Density", func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
-		minions, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		minionCount = len(minions.Items)
-		Expect(minionCount).NotTo(BeZero())
+		nodeCount = len(nodes.Items)
+		Expect(nodeCount).NotTo(BeZero())
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
@@ -136,7 +136,7 @@ var _ = Describe("Density", func() {
 		}
 
 		By("Removing additional pods if any")
-		for i := 1; i <= minionCount; i++ {
+		for i := 1; i <= nodeCount; i++ {
 			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 			c.Pods(ns).Delete(name, nil)
 		}
@@ -160,7 +160,7 @@ var _ = Describe("Density", func() {
 		skip bool
 		// Controls if e2e latency tests should be run (they are slow)
 		runLatencyTest bool
-		podsPerMinion  int
+		podsPerNode    int
 		// Controls how often the apiserver is polled for pods
 		interval time.Duration
 	}
@@ -170,17 +170,17 @@ var _ = Describe("Density", func() {
 		// (metrics from other tests affects this one).
 		// TODO: Reenable once we can measure latency only from a single test.
 		// TODO: Expose runLatencyTest as ginkgo flag.
-		{podsPerMinion: 3, skip: true, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerMinion: 30, skip: true, runLatencyTest: true, interval: 10 * time.Second},
+		{podsPerNode: 3, skip: true, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerNode: 30, skip: true, runLatencyTest: true, interval: 10 * time.Second},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
-		{podsPerMinion: 50, skip: true, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerMinion: 100, skip: true, runLatencyTest: false, interval: 1 * time.Second},
+		{podsPerNode: 50, skip: true, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerNode: 100, skip: true, runLatencyTest: false, interval: 1 * time.Second},
 	}
 
 	for _, testArg := range densityTests {
-		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerMinion)
-		if testArg.podsPerMinion == 30 {
+		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
+		if testArg.podsPerNode == 30 {
 			name = "[Performance suite] " + name
 		}
 		if testArg.skip {
@@ -188,7 +188,7 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
-			totalPods := itArg.podsPerMinion * minionCount
+			totalPods := itArg.podsPerNode * nodeCount
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
 			fileHndl, err := os.Create(fmt.Sprintf(testContext.OutputDir+"/%s/pod_states.csv", uuid))
 			expectNoError(err)
@@ -318,11 +318,11 @@ var _ = Describe("Density", func() {
 
 				// Create some additional pods with throughput ~5 pods/sec.
 				var wg sync.WaitGroup
-				wg.Add(minionCount)
+				wg.Add(nodeCount)
 				podLabels := map[string]string{
 					"name": additionalPodsPrefix,
 				}
-				for i := 1; i <= minionCount; i++ {
+				for i := 1; i <= nodeCount; i++ {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 					go createRunningPod(&wg, c, name, ns, "gcr.io/google_containers/pause:go", podLabels)
 					time.Sleep(200 * time.Millisecond)
@@ -330,7 +330,7 @@ var _ = Describe("Density", func() {
 				wg.Wait()
 
 				Logf("Waiting for all Pods begin observed by the watch...")
-				for start := time.Now(); len(watchTimes) < minionCount && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
+				for start := time.Now(); len(watchTimes) < nodeCount && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 				}
 				close(stopCh)
 
@@ -404,7 +404,7 @@ var _ = Describe("Density", func() {
 				}
 
 				Logf("Approx throughput: %v pods/min",
-					float64(minionCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
+					float64(nodeCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
 			}
 		})
 	}

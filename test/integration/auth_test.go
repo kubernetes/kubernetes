@@ -330,7 +330,7 @@ func getTestRequests() []struct {
 		{"GET", path("endpoints", api.NamespaceDefault, "a"), "", code200},
 		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
 
-		// Normal methods on minions
+		// Normal methods on nodes
 		{"GET", path("nodes", "", ""), "", code200},
 		{"POST", timeoutPath("nodes", "", ""), aNode, code201},
 		{"PUT", timeoutPath("nodes", "", "a"), aNode, code200},
@@ -364,7 +364,7 @@ func getTestRequests() []struct {
 		{"GET", pathWithPrefix("proxy", "nodes", api.NamespaceDefault, "a"), "", code404},
 		{"GET", pathWithPrefix("redirect", "nodes", api.NamespaceDefault, "a"), "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
-		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
+		// TODO: figure out how to create a node so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
 		{"GET", "/", "", code200},
