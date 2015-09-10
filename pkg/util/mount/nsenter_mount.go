@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -39,14 +40,48 @@ import (
 //     performed in the host's mount namespace do not propagate out to the
 //     bind-mount in this docker version.
 // 2.  The host's root filesystem must be available at /rootfs
-// 3.  The nsenter binary must be at /nsenter in the container's filesystem.
+// 3.  The nsenter binary must be on the Kubelet process' PATH in the container's
+//     filesystem.
 // 4.  The Kubelet process must have CAP_SYS_ADMIN (required by nsenter); at
 //     the present, this effectively means that the kubelet is running in a
 //     privileged container.
+// 5.  The volume path used by the Kubelet must be the same inside and outside
+//     the container and be writable by the container (to initialize volume)
+//     contents. TODO: remove this requirement.
+// 6.  The host image must have mount, findmnt, and umount binaries in /bin,
+//     /usr/sbin, or /usr/bin
 //
 // For more information about mount propagation modes, see:
 //   https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
-type NsenterMounter struct{}
+type NsenterMounter struct {
+	// a map of commands to their paths on the host filesystem
+	paths map[string]string
+}
+
+func NewNsenterMounter() *NsenterMounter {
+	m := &NsenterMounter{
+		paths: map[string]string{
+			"mount":   "",
+			"findmnt": "",
+			"umount":  "",
+		},
+	}
+	// search for the mount command in other locations besides /usr/bin
+	for binary := range m.paths {
+		// default to root
+		m.paths[binary] = filepath.Join("/", binary)
+		for _, path := range []string{"/bin", "/usr/sbin", "/usr/bin"} {
+			binPath := filepath.Join(hostRootFsPath, path, binary)
+			if _, err := os.Stat(binPath); err != nil {
+				continue
+			}
+			m.paths[binary] = binPath
+			break
+		}
+		// TODO: error, so that the kubelet can stop if the mounts don't exist
+	}
+	return m
+}
 
 // NsenterMounter implements mount.Interface
 var _ = Interface(&NsenterMounter{})
@@ -54,30 +89,30 @@ var _ = Interface(&NsenterMounter{})
 const (
 	hostRootFsPath     = "/rootfs"
 	hostProcMountsPath = "/rootfs/proc/mounts"
-	nsenterPath        = "/nsenter"
+	nsenterPath        = "nsenter"
 )
 
 // Mount runs mount(8) in the host's root mount namespace.  Aside from this
 // aspect, Mount has the same semantics as the mounter returned by mount.New()
-func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
+func (n *NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
 	bind, bindRemountOpts := isBind(options)
 
 	if bind {
-		err := doNsenterMount(source, target, fstype, []string{"bind"})
+		err := n.doNsenterMount(source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doNsenterMount(source, target, fstype, bindRemountOpts)
+		return n.doNsenterMount(source, target, fstype, bindRemountOpts)
 	}
 
-	return doNsenterMount(source, target, fstype, options)
+	return n.doNsenterMount(source, target, fstype, options)
 }
 
 // doNsenterMount nsenters the host's mount namespace and performs the
 // requested mount.
-func doNsenterMount(source, target, fstype string, options []string) error {
+func (n *NsenterMounter) doNsenterMount(source, target, fstype string, options []string) error {
 	glog.V(5).Infof("nsenter Mounting %s %s %s %v", source, target, fstype, options)
-	args := makeNsenterArgs(source, target, fstype, options)
+	args := n.makeNsenterArgs(source, target, fstype, options)
 
 	glog.V(5).Infof("Mount command: %v %v", nsenterPath, args)
 	exec := exec.New()
@@ -91,10 +126,11 @@ func doNsenterMount(source, target, fstype string, options []string) error {
 
 // makeNsenterArgs makes a list of argument to nsenter in order to do the
 // requested mount.
-func makeNsenterArgs(source, target, fstype string, options []string) []string {
+func (n *NsenterMounter) makeNsenterArgs(source, target, fstype string, options []string) []string {
 	nsenterArgs := []string{
 		"--mount=/rootfs/proc/1/ns/mnt",
-		"/usr/bin/mount",
+		"--",
+		n.absHostPath("mount"),
 	}
 
 	args := makeMountArgs(source, target, fstype, options)
@@ -103,10 +139,11 @@ func makeNsenterArgs(source, target, fstype string, options []string) []string {
 }
 
 // Unmount runs umount(8) in the host's mount namespace.
-func (*NsenterMounter) Unmount(target string) error {
+func (n *NsenterMounter) Unmount(target string) error {
 	args := []string{
 		"--mount=/rootfs/proc/1/ns/mnt",
-		"/usr/bin/umount",
+		"--",
+		n.absHostPath("umount"),
 		target,
 	}
 
@@ -127,13 +164,13 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 
 // IsMountPoint determines whether a path is a mountpoint by calling findmnt
 // in the host's root mount namespace.
-func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
+func (n *NsenterMounter) IsMountPoint(file string) (bool, error) {
 	file, err := filepath.Abs(file)
 	if err != nil {
 		return false, err
 	}
 
-	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "/usr/bin/findmnt", "-o", "target", "--noheadings", "--target", file}
+	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "--", n.absHostPath("findmnt"), "-o", "target", "--noheadings", "--target", file}
 	glog.V(5).Infof("findmnt command: %v %v", nsenterPath, args)
 
 	exec := exec.New()
@@ -150,4 +187,12 @@ func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (n *NsenterMounter) absHostPath(command string) string {
+	path, ok := n.paths[command]
+	if !ok {
+		return command
+	}
+	return path
 }
