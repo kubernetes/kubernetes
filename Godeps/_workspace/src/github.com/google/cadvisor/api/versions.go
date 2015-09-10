@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
@@ -449,8 +450,63 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 	}
 }
 
+func instCpuStats(last, cur *info.ContainerStats) (*v2.CpuInstStats, error) {
+	if last == nil {
+		return nil, nil
+	}
+	if !cur.Timestamp.After(last.Timestamp) {
+		return nil, fmt.Errorf("container stats move backwards in time")
+	}
+	if len(last.Cpu.Usage.PerCpu) != len(cur.Cpu.Usage.PerCpu) {
+		return nil, fmt.Errorf("different number of cpus")
+	}
+	timeDelta := cur.Timestamp.Sub(last.Timestamp)
+	if timeDelta <= 100*time.Millisecond {
+		return nil, fmt.Errorf("time delta unexpectedly small")
+	}
+	// Nanoseconds to gain precision and avoid having zero seconds if the
+	// difference between the timestamps is just under a second
+	timeDeltaNs := uint64(timeDelta.Nanoseconds())
+	convertToRate := func(lastValue, curValue uint64) (uint64, error) {
+		if curValue < lastValue {
+			return 0, fmt.Errorf("cumulative stats decrease")
+		}
+		valueDelta := curValue - lastValue
+		return (valueDelta * 1e9) / timeDeltaNs, nil
+	}
+	total, err := convertToRate(last.Cpu.Usage.Total, cur.Cpu.Usage.Total)
+	if err != nil {
+		return nil, err
+	}
+	percpu := make([]uint64, len(last.Cpu.Usage.PerCpu))
+	for i := range percpu {
+		var err error
+		percpu[i], err = convertToRate(last.Cpu.Usage.PerCpu[i], cur.Cpu.Usage.PerCpu[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	user, err := convertToRate(last.Cpu.Usage.User, cur.Cpu.Usage.User)
+	if err != nil {
+		return nil, err
+	}
+	system, err := convertToRate(last.Cpu.Usage.System, cur.Cpu.Usage.System)
+	if err != nil {
+		return nil, err
+	}
+	return &v2.CpuInstStats{
+		Usage: v2.CpuInstUsage{
+			Total:  total,
+			PerCpu: percpu,
+			User:   user,
+			System: system,
+		},
+	}, nil
+}
+
 func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
-	stats := []v2.ContainerStats{}
+	stats := make([]v2.ContainerStats, 0, len(cont.Stats))
+	var last *info.ContainerStats
 	for _, val := range cont.Stats {
 		stat := v2.ContainerStats{
 			Timestamp:        val.Timestamp,
@@ -463,6 +519,13 @@ func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
 		}
 		if stat.HasCpu {
 			stat.Cpu = val.Cpu
+			cpuInst, err := instCpuStats(last, val)
+			if err != nil {
+				glog.Warningf("Could not get instant cpu stats: %v", err)
+			} else {
+				stat.CpuInst = cpuInst
+			}
+			last = val
 		}
 		if stat.HasMemory {
 			stat.Memory = val.Memory

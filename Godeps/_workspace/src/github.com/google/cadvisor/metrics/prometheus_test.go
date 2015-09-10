@@ -34,6 +34,9 @@ func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.Container
 			ContainerReference: info.ContainerReference{
 				Name: "testcontainer",
 			},
+			Spec: info.ContainerSpec{
+				Image: "test",
+			},
 			Stats: []*info.ContainerStats{
 				{
 					Cpu: info.CpuStats{
@@ -67,6 +70,19 @@ func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.Container
 							TxPackets: 19,
 							TxErrors:  20,
 							TxDropped: 21,
+						},
+						Interfaces: []info.InterfaceStats{
+							{
+								Name:      "eth0",
+								RxBytes:   14,
+								RxPackets: 15,
+								RxErrors:  16,
+								RxDropped: 17,
+								TxBytes:   18,
+								TxPackets: 19,
+								TxErrors:  20,
+								TxDropped: 21,
+							},
 						},
 					},
 					Filesystem: []info.FsStats{
