@@ -78,7 +78,7 @@ func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
 }
 
-func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubetypes.PodUpdate, kubeletFinished <-chan struct{},
+func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubetypes.PodUpdate, nodeInfos chan<- executor.NodeInfo, kubeletFinished <-chan struct{},
 	staticPodsConfigPath string, apiclient *client.Client) error {
 	exec := executor.New(executor.Config{
 		Updates:         execUpdates,
@@ -113,6 +113,7 @@ func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubetypes.PodUpda
 		PodLW: cache.NewListWatchFromClient(apiclient, "pods", api.NamespaceAll,
 			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
 		),
+		NodeInfos: nodeInfos,
 	})
 
 	// initialize driver and initialize the executor with it
@@ -139,7 +140,7 @@ func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubetypes.PodUpda
 	return nil
 }
 
-func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubetypes.PodUpdate, kubeletDone chan<- struct{},
+func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubetypes.PodUpdate, nodeInfos <-chan executor.NodeInfo, kubeletDone chan<- struct{},
 	staticPodsConfigPath string, apiclient *client.Client) error {
 	kcfg, err := s.UnsecuredKubeletConfig()
 	if err == nil {
@@ -179,6 +180,20 @@ func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubetypes.PodUpdat
 			panic("cloud provider must not be set")
 		}
 
+		// create custom cAdvisor interface which return the resource values that Mesos reports
+		ni := <-nodeInfos
+		cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, s.CAdvisorPort)
+		if err != nil {
+			return err
+		}
+		kcfg.CAdvisorInterface = cAdvisorInterface
+		go func() {
+			for ni := range nodeInfos {
+				// TODO(sttts): implement with MachineAllocable mechanism when https://github.com/kubernetes/kubernetes/issues/13984 is finished
+				log.V(3).Infof("ignoring updated node resources: %v", ni)
+			}
+		}()
+
 		// create main pod source
 		updates := kcfg.PodConfig.Channel(MESOS_CFG_SOURCE)
 		go func() {
@@ -217,6 +232,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	// create shared channels
 	kubeletFinished := make(chan struct{})
 	execUpdates := make(chan kubetypes.PodUpdate, 1)
+	nodeInfos := make(chan executor.NodeInfo, 1)
 
 	// create static pods directory
 	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
@@ -237,13 +253,13 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	// start executor
-	err = s.runExecutor(execUpdates, kubeletFinished, staticPodsConfigPath, apiclient)
+	err = s.runExecutor(execUpdates, nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient)
 	if err != nil {
 		return err
 	}
 
 	// start kubelet, blocking
-	return s.runKubelet(execUpdates, kubeletFinished, staticPodsConfigPath, apiclient)
+	return s.runKubelet(execUpdates, nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient)
 }
 
 func defaultBindingAddress() string {

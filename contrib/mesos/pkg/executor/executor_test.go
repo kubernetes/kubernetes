@@ -135,8 +135,9 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: updates,
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   updates,
+		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
@@ -297,8 +298,9 @@ func TestExecutorStaticPods(t *testing.T) {
 
 	mockDriver := &MockExecutorDriver{}
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan kubetypes.PodUpdate, 1), // allow kube-executor source to proceed past init
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   make(chan kubetypes.PodUpdate, 1), // allow kube-executor source to proceed past init
+		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
@@ -379,8 +381,9 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	kubeletFinished := make(chan struct{})
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan kubetypes.PodUpdate, 1024),
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   make(chan kubetypes.PodUpdate, 1024),
+		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
@@ -558,8 +561,9 @@ func TestExecutorShutdown(t *testing.T) {
 	var exitCalled int32 = 0
 	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: updates,
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   updates,
+		NodeInfos: make(chan NodeInfo, 1),
 		ShutdownAlert: func() {
 			close(kubeletFinished)
 		},
