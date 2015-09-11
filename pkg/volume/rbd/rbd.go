@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -63,6 +64,10 @@ func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 		return true
 	}
 
+	return false
+}
+
+func (plugin *rbdPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
 	return false
 }
 

@@ -117,6 +117,10 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
+func (plugin *FakeVolumePlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return false
+}
+
 func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
 	return &FakeVolume{pod.UID, spec.Name(), plugin}, nil
 }
