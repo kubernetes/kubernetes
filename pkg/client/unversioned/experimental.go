@@ -119,14 +119,20 @@ func NewExperimentalOrDie(c *Config) *ExperimentalClient {
 }
 
 func setExperimentalDefaults(config *Config) error {
+	// if experimental group is not registered, return an error
+	g, err := latest.Group("experimental")
+	if err != nil {
+		return err
+	}
 	config.Prefix = "/experimental"
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
 	if config.Version == "" {
-		config.Version = latest.GroupOrDie("experimental").Version
+		config.Version = g.Version
 	}
-	versionInterfaces, err := latest.GroupOrDie("experimental").InterfacesFor(config.Version)
+
+	versionInterfaces, err := g.InterfacesFor(config.Version)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
 			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))

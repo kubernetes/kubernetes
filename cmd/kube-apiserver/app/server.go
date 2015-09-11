@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
+	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -331,6 +331,10 @@ func (s *APIServer) Run(_ []string) error {
 	// This takes preference over api/all, if specified.
 	enableExp := s.getRuntimeConfigValue("experimental/v1", false)
 
+	if enableExp && len(registered.GroupVersionsForGroup("experimental")) == 0 {
+		glog.Fatalf("experimental API is enabled in runtime config, but not registered throught environment variable KUBE_API_VERSIONS")
+	}
+
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 		Version: s.StorageVersion,
@@ -344,9 +348,14 @@ func (s *APIServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
-	expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, s.ExpStorageVersion, s.EtcdPathPrefix)
-	if err != nil {
-		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+
+	var expEtcdStorage storage.Interface
+	if enableExp {
+		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, s.ExpStorageVersion, s.EtcdPathPrefix)
+
+		if err != nil {
+			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+		}
 	}
 
 	n := s.ServiceClusterIPRange
