@@ -35,7 +35,7 @@ func isResourceGuaranteed(container *api.Container, resource api.ResourceName) b
 	if !hasReq || !hasLimit {
 		return false
 	}
-	return req.Value() == limit.Value() && req.Value() != 0
+	return req.Cmp(limit) == 0 && req.Value() != 0
 }
 
 // isResourceBestEffort returns true if the container's resource requirements are best-effort.
