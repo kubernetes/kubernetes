@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 )
 
 // FakeScales implements ScaleInterface. Meant to be embedded into a struct to get a default
@@ -27,19 +27,19 @@ type FakeScales struct {
 	Namespace string
 }
 
-func (c *FakeScales) Get(kind string, name string) (result *expapi.Scale, err error) {
+func (c *FakeScales) Get(kind string, name string) (result *experimental.Scale, err error) {
 	action := GetActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.Namespace
 	action.Resource = kind
 	action.Subresource = "scale"
 	action.Name = name
-	obj, err := c.Fake.Invokes(action, &expapi.Scale{})
-	result = obj.(*expapi.Scale)
+	obj, err := c.Fake.Invokes(action, &experimental.Scale{})
+	result = obj.(*experimental.Scale)
 	return
 }
 
-func (c *FakeScales) Update(kind string, scale *expapi.Scale) (result *expapi.Scale, err error) {
+func (c *FakeScales) Update(kind string, scale *experimental.Scale) (result *experimental.Scale, err error) {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
 	action.Namespace = c.Namespace
@@ -47,6 +47,6 @@ func (c *FakeScales) Update(kind string, scale *expapi.Scale) (result *expapi.Sc
 	action.Subresource = "scale"
 	action.Object = scale
 	obj, err := c.Fake.Invokes(action, scale)
-	result = obj.(*expapi.Scale)
+	result = obj.(*experimental.Scale)
 	return
 }

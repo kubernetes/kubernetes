@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -232,7 +232,7 @@ type StoreToDaemonSetLister struct {
 }
 
 // Exists checks if the given daemon set exists in the store.
-func (s *StoreToDaemonSetLister) Exists(ds *expapi.DaemonSet) (bool, error) {
+func (s *StoreToDaemonSetLister) Exists(ds *experimental.DaemonSet) (bool, error) {
 	_, exists, err := s.Store.Get(ds)
 	if err != nil {
 		return false, err
@@ -242,17 +242,17 @@ func (s *StoreToDaemonSetLister) Exists(ds *expapi.DaemonSet) (bool, error) {
 
 // List lists all daemon sets in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToDaemonSetLister) List() (dss []expapi.DaemonSet, err error) {
+func (s *StoreToDaemonSetLister) List() (dss []experimental.DaemonSet, err error) {
 	for _, c := range s.Store.List() {
-		dss = append(dss, *(c.(*expapi.DaemonSet)))
+		dss = append(dss, *(c.(*experimental.DaemonSet)))
 	}
 	return dss, nil
 }
 
 // GetPodDaemonSets returns a list of daemon sets managing a pod. Returns an error iff no matching daemon sets are found.
-func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []expapi.DaemonSet, err error) {
+func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []experimental.DaemonSet, err error) {
 	var selector labels.Selector
-	var daemonSet expapi.DaemonSet
+	var daemonSet experimental.DaemonSet
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("No daemon sets found for pod %v because it has no labels", pod.Name)
@@ -260,7 +260,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	}
 
 	for _, m := range s.Store.List() {
-		daemonSet = *m.(*expapi.DaemonSet)
+		daemonSet = *m.(*experimental.DaemonSet)
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}

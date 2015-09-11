@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/version"
 )
 
