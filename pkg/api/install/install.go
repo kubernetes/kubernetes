@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -39,6 +40,7 @@ const importPrefix = "k8s.io/kubernetes/pkg/api"
 var accessor = meta.NewAccessor()
 
 func init() {
+	debug.PrintStack()
 	groupMeta, err := latest.RegisterGroup("")
 	if err != nil {
 		fmt.Println(err)
@@ -47,7 +49,7 @@ func init() {
 	// Use the first API version in the list of registered versions as the latest.
 	registeredGroupVersions := registered.GroupVersionsForGroup("")
 	groupVersion := registeredGroupVersions[0]
-	groupMeta = &latest.GroupMeta{
+	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
 		Group:        apiutil.GetGroup(groupVersion),
 		Version:      apiutil.GetVersion(groupVersion),

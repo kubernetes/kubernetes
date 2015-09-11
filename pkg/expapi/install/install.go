@@ -43,7 +43,7 @@ func init() {
 	}
 	registeredGroupVersions := registered.GroupVersionsForGroup("experimental")
 	groupVersion := registeredGroupVersions[0]
-	groupMeta = &latest.GroupMeta{
+	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
 		Group:        apiutil.GetGroup(groupVersion),
 		Version:      apiutil.GetVersion(groupVersion),
