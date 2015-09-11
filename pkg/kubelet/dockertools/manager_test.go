@@ -885,7 +885,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil)
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -934,7 +934,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -1027,7 +1027,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 		// Kill the container since pod infra container is not running.
 		"stop",
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -2093,7 +2093,7 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil)
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -2132,7 +2132,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
