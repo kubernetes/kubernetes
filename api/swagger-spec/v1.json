@@ -13171,7 +13171,11 @@
     "properties": {
      "reason": {
       "type": "string",
-      "description": "(brief) reason the container is not yet running, such as pulling its image."
+      "description": "(brief) reason the container is not yet running."
+     },
+     "message": {
+      "type": "string",
+      "description": "Message regarding why the container is not yet running."
      }
     }
    },

@@ -1301,21 +1301,21 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 	fakeDocker.Lock()
 
 	eventSet := []string{
-		`pulling Pulling image "pod_infra_image"`,
-		`pulled Successfully pulled image "pod_infra_image"`,
-		`pulling Pulling image "pull_always_image"`,
-		`pulled Successfully pulled image "pull_always_image"`,
-		`pulling Pulling image "pull_if_not_present_image"`,
-		`pulled Successfully pulled image "pull_if_not_present_image"`,
-		`pulled Container image "existing_one" already present on machine`,
-		`pulled Container image "want:latest" already present on machine`,
+		`Pulling Pulling image "pod_infra_image"`,
+		`Pulled Successfully pulled image "pod_infra_image"`,
+		`Pulling Pulling image "pull_always_image"`,
+		`Pulled Successfully pulled image "pull_always_image"`,
+		`Pulling Pulling image "pull_if_not_present_image"`,
+		`Pulled Successfully pulled image "pull_if_not_present_image"`,
+		`Pulled Container image "existing_one" already present on machine`,
+		`Pulled Container image "want:latest" already present on machine`,
 	}
 
 	recorder := dm.recorder.(*record.FakeRecorder)
 
 	var actualEvents []string
 	for _, ev := range recorder.Events {
-		if strings.HasPrefix(ev, "pull") {
+		if strings.HasPrefix(ev, "Pull") {
 			actualEvents = append(actualEvents, ev)
 		}
 	}
