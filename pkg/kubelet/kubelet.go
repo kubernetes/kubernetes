@@ -95,6 +95,9 @@ const (
 	// Minimum period for performing global cleanup tasks, i.e., housekeeping
 	// will not be performed more than once per housekeepingMinimumPeriod.
 	housekeepingMinimumPeriod = time.Second * 2
+
+	// Persistent data file name
+	kubeStoreName = "store.db"
 )
 
 var (
@@ -226,6 +229,7 @@ func NewMainKubelet(
 		Namespace: "",
 	}
 
+	kubeStore := newKubeStore()
 	containerGC, err := newContainerGC(dockerClient, containerGCPolicy)
 	if err != nil {
 		return nil, err
@@ -238,7 +242,7 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
-	statusManager := newStatusManager(kubeClient)
+	statusManager := newStatusManager(kubeClient, kubeStore)
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
 
@@ -289,6 +293,7 @@ func NewMainKubelet(
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
+		kubeStore:                      kubeStore,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -568,6 +573,9 @@ type Kubelet struct {
 
 	// True if container cpu limits should be enforced via cgroup CFS quota
 	cpuCFSQuota bool
+
+	// Persistence DB
+	kubeStore *kubeStore
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -680,6 +688,11 @@ func dirExists(path string) bool {
 	return s.IsDir()
 }
 
+// Directory to store persistent data
+func (kl *Kubelet) getKubeStoreDir() string {
+	return path.Join(kl.getRootDir(), "store")
+}
+
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
@@ -690,6 +703,9 @@ func (kl *Kubelet) setupDataDirs() error {
 	}
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating plugins directory: %v", err)
+	}
+	if err := os.MkdirAll(kl.getKubeStoreDir(), 0750); err != nil {
+		return fmt.Errorf("error creating store directory: %v", err)
 	}
 	return nil
 }
@@ -743,6 +759,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 // Run starts the kubelet reacting to config updates
 func (kl *Kubelet) Run(updates <-chan PodUpdate) {
+	defer kl.kubeStore.Close()
 	if kl.logServer == nil {
 		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
 	}
@@ -757,6 +774,11 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
 		}
 		glog.Infof("Running in container %q", kl.resourceContainer)
+	}
+
+	if err := kl.kubeStore.Start(kl.getKubeStoreDir(), kubeStoreName); err != nil {
+		kl.recorder.Eventf(kl.nodeRef, "KubeletSetupFailed", "Failed to start kubeStore %v", err)
+		glog.Errorf("Failed to start kubestore, status may not be exact after a restart: %v", err)
 	}
 
 	if err := kl.imageManager.Start(); err != nil {
@@ -1215,7 +1237,6 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
-	start := time.Now()
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[ConfigFirstSeenAnnotationKey]; !ok {
 		glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
@@ -1234,16 +1255,12 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		if err != nil {
 			glog.Errorf("Unable to generate status for pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 		} else {
-			podToUpdate := pod
-			if mirrorPod != nil {
-				podToUpdate = mirrorPod
-			}
-			existingStatus, ok := kl.statusManager.GetPodStatus(podToUpdate.UID)
+			existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 			if !ok || existingStatus.Phase == api.PodPending && status.Phase == api.PodRunning &&
 				!firstSeenTime.IsZero() {
 				metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 			}
-			kl.statusManager.SetPodStatus(podToUpdate, status)
+			kl.statusManager.SetPodStatus(pod, mirrorPod, status)
 		}
 	}()
 
@@ -1307,8 +1324,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 
 		podStatus = pod.Status
-		podStatus.StartTime = &util.Time{Time: start}
-		kl.statusManager.SetPodStatus(pod, podStatus)
+		podStatus.StartTime = podStartTimeOrNow(pod)
+		kl.statusManager.SetPodStatus(pod, mirrorPod, podStatus)
 		glog.V(3).Infof("Not generating pod status for new pod %q", podFullName)
 	} else {
 		var err error
@@ -1834,11 +1851,17 @@ func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
 }
 
 func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
+	var mirrorPod *api.Pod
+	if isStaticPod(pod) {
+		mirrorPod, _ = kl.podManager.GetMirrorPodByPod(pod)
+	}
 	kl.recorder.Eventf(pod, reason, message)
-	kl.statusManager.SetPodStatus(pod, api.PodStatus{
-		Phase:   api.PodFailed,
-		Reason:  reason,
-		Message: "Pod " + message})
+	kl.statusManager.SetPodStatus(pod, mirrorPod, api.PodStatus{
+		Phase:     api.PodFailed,
+		Reason:    reason,
+		Message:   "Pod " + message,
+		StartTime: podStartTimeOrNow(pod),
+	})
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
@@ -1936,6 +1959,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 }
 
 func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType SyncPodType, mirrorPod *api.Pod, start time.Time) {
+	kl.statusManager.MergePodStatus(pod)
 	if kl.podIsTerminated(pod) {
 		return
 	}
@@ -1955,6 +1979,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *api.Pod, start time.Time) {
 	// corresponding static pod. Send update to the pod worker if the static
 	// pod exists.
 	if pod, ok := kl.podManager.GetPodByMirrorPod(mirrorPod); ok {
+		kl.statusManager.MergePodStatus(pod)
 		kl.dispatchWork(pod, SyncPodUpdate, mirrorPod, start)
 	}
 }
@@ -2532,26 +2557,16 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
-	if existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
-		// This is a hacky fix to ensure container restart counts increment
-		// monotonically. Normally, we should not modify given pod. In this
-		// case, we check if there are cached status for this pod, and update
-		// the pod so that we update restart count appropriately.
-		// TODO(yujuhong): We will not need to count dead containers every time
-		// once we add the runtime pod cache.
-		// Note that kubelet restarts may still cause temporarily setback of
-		// restart counts.
-		pod.Status = existingStatus
-	}
-
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
 		reason := "DeadlineExceeded"
 		kl.recorder.Eventf(pod, reason, "Pod was active on the node longer than specified deadline")
 		return api.PodStatus{
-			Phase:   api.PodFailed,
-			Reason:  reason,
-			Message: "Pod was active on the node longer than specified deadline"}, nil
+			Phase:     api.PodFailed,
+			Reason:    reason,
+			Message:   "Pod was active on the node longer than specified deadline",
+			StartTime: podStartTimeOrNow(pod),
+		}, nil
 	}
 
 	spec := &pod.Spec
@@ -2566,9 +2581,10 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		}
 
 		pendingStatus := api.PodStatus{
-			Phase:   api.PodPending,
-			Reason:  "GeneralError",
-			Message: fmt.Sprintf("Query container info failed with error (%v)", err),
+			Phase:     api.PodPending,
+			Reason:    "GeneralError",
+			Message:   fmt.Sprintf("Query container info failed with error (%v)", err),
+			StartTime: podStartTimeOrNow(pod),
 		}
 		return pendingStatus, nil
 	}
@@ -2598,7 +2614,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 			}
 		}
 	}
-
+	podStatus.StartTime = podStartTimeOrNow(pod)
 	return *podStatus, nil
 }
 
@@ -2787,4 +2803,12 @@ func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity
 		}
 	}
 	return ingress, egress, nil
+}
+
+func podStartTimeOrNow(pod *api.Pod) *util.Time {
+	if pod.Status.StartTime.IsZero() {
+		now := util.Now()
+		return &now
+	}
+	return pod.Status.StartTime
 }

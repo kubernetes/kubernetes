@@ -32,9 +32,18 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
+const (
+	BucketPodStatuses = "podStatuses"
+)
+
 type podStatusSyncRequest struct {
 	pod    *api.Pod
 	status api.PodStatus
+}
+
+type podStatusInfoType struct {
+	api.PodStatus
+	dirty bool
 }
 
 // Updates pod statuses in apiserver. Writes only when new status has changed.
@@ -43,15 +52,17 @@ type statusManager struct {
 	kubeClient client.Interface
 	// Map from pod full name to sync status of the corresponding pod.
 	podStatusesLock  sync.RWMutex
-	podStatuses      map[types.UID]api.PodStatus
+	podStatuses      map[types.UID]podStatusInfoType
 	podStatusChannel chan podStatusSyncRequest
+	kubeStore        *kubeStore
 }
 
-func newStatusManager(kubeClient client.Interface) *statusManager {
+func newStatusManager(kubeClient client.Interface, kubeStore *kubeStore) *statusManager {
 	return &statusManager{
 		kubeClient:       kubeClient,
-		podStatuses:      make(map[types.UID]api.PodStatus),
+		podStatuses:      make(map[types.UID]podStatusInfoType),
 		podStatusChannel: make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
+		kubeStore:        kubeStore,
 	}
 }
 
@@ -73,6 +84,7 @@ func (s *statusManager) Start() {
 		glog.Infof("Kubernetes client is nil, not starting status manager.")
 		return
 	}
+	s.loadFromKubeStore()
 	// syncBatch blocks when no updates are available, we can run it in a tight loop.
 	glog.Info("Starting to sync pod status with apiserver")
 	go util.Until(func() {
@@ -86,35 +98,13 @@ func (s *statusManager) Start() {
 func (s *statusManager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
 	s.podStatusesLock.RLock()
 	defer s.podStatusesLock.RUnlock()
-	status, ok := s.podStatuses[uid]
-	return status, ok
+	return s.getPodStatusUnSafe(uid)
 }
 
-func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
+func (s *statusManager) SetPodStatus(pod *api.Pod, mirrorPod *api.Pod, status api.PodStatus) {
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
-	oldStatus, found := s.podStatuses[pod.UID]
-
-	// ensure that the start time does not change across updates.
-	if found && oldStatus.StartTime != nil {
-		status.StartTime = oldStatus.StartTime
-	}
-
-	// if the status has no start time, we need to set an initial time
-	// TODO(yujuhong): Consider setting StartTime when generating the pod
-	// status instead, which would allow statusManager to become a simple cache
-	// again.
-	if status.StartTime.IsZero() {
-		if pod.Status.StartTime.IsZero() {
-			// the pod did not have a previously recorded value so set to now
-			now := util.Now()
-			status.StartTime = &now
-		} else {
-			// the pod had a recorded value, but the kubelet restarted so we need to rebuild cache
-			// based on last observed value
-			status.StartTime = pod.Status.StartTime
-		}
-	}
+	oldStatus, found := s.getPodStatusUnSafe(pod.UID)
 
 	// TODO: Holding a lock during blocking operations is dangerous. Refactor so this isn't necessary.
 	// The intent here is to prevent concurrent updates to a pod's status from
@@ -122,9 +112,16 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	// Currently this routine is not called for the same pod from multiple
 	// workers and/or the kubelet but dropping the lock before sending the
 	// status down the channel feels like an easy way to get a bullet in foot.
-	if !found || !isStatusEqual(&oldStatus, &status) || pod.DeletionTimestamp != nil {
-		s.podStatuses[pod.UID] = status
-		s.podStatusChannel <- podStatusSyncRequest{pod, status}
+
+	// TODO: Investigate if this stil holds true
+	if !found || !isStatusEqual(&oldStatus, &status) || pod.DeletionTimestamp != nil || (found && s.podStatuses[pod.UID].dirty) {
+		s.podStatuses[pod.UID] = podStatusInfoType{PodStatus: status, dirty: true}
+		targetPod := pod
+		if mirrorPod != nil {
+			targetPod = mirrorPod
+		}
+		s.kubeStore.SaveEntry(BucketPodStatuses, string(pod.UID), s.podStatuses[pod.UID])
+		s.podStatusChannel <- podStatusSyncRequest{targetPod, status}
 	} else {
 		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletUtil.FormatPodName(pod), status)
 	}
@@ -157,6 +154,7 @@ func (s *statusManager) DeletePodStatus(uid types.UID) {
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
 	delete(s.podStatuses, uid)
+	s.kubeStore.DeleteEntry(BucketPodStatuses, string(uid))
 }
 
 // TODO(filipg): It'd be cleaner if we can do this without signal from user.
@@ -167,6 +165,7 @@ func (s *statusManager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 		if _, ok := podUIDs[key]; !ok {
 			glog.V(5).Infof("Removing %q from status map.", key)
 			delete(s.podStatuses, key)
+			s.kubeStore.DeleteEntry(BucketPodStatuses, string(key))
 		}
 	}
 }
@@ -197,7 +196,9 @@ func (s *statusManager) syncBatch() error {
 		statusPod, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully", kubeletUtil.FormatPodName(pod))
-
+			// goroutine to avoid deadlock when the channel is full
+			// The channel writer holds a lock and is blocked, markClean blocks for the same lock
+			go s.markClean(pod.UID)
 			if pod.DeletionTimestamp == nil {
 				return nil
 			}
@@ -207,21 +208,58 @@ func (s *statusManager) syncBatch() error {
 			}
 			if err := s.kubeClient.Pods(statusPod.Namespace).Delete(statusPod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", statusPod.Name)
-				s.DeletePodStatus(pod.UID)
+				// goroutine to avoid deadlock when the channel is full
+				// The channel writer holds a lock and is blocked, Delete blocks for the same lock
+				go s.DeletePodStatus(pod.UID)
 				return nil
 			}
 		}
 	}
 
-	// We failed to update status. In order to make sure we retry next time
-	// we delete cached value. This may result in an additional update, but
-	// this is ok.
-	// Doing this synchronously will lead to a deadlock if the podStatusChannel
-	// is full, and the pod worker holding the lock is waiting on this method
-	// to clear the channel. Even if this delete never runs subsequent container
-	// changes on the node should trigger updates.
-	go s.DeletePodStatus(pod.UID)
 	return fmt.Errorf("error updating status for pod %q: %v", kubeletUtil.FormatPodName(pod), err)
+}
+
+// Merge the cached status into the pod, if there is one
+func (s *statusManager) MergePodStatus(pod *api.Pod) {
+	s.podStatusesLock.RLock()
+	defer s.podStatusesLock.RUnlock()
+	if cachedPodStatus, found := s.getPodStatusUnSafe(pod.UID); found {
+		pod.Status = cachedPodStatus
+	}
+}
+
+func (s *statusManager) markClean(uid types.UID) {
+	s.podStatusesLock.Lock()
+	defer s.podStatusesLock.Unlock()
+
+	if podStatusInfo, found := s.podStatuses[uid]; found {
+		podStatusInfo.dirty = false
+		s.kubeStore.SaveEntry(BucketPodStatuses, string(uid), podStatusInfo)
+	}
+}
+
+// hold a lock before calling this function
+func (s *statusManager) getPodStatusUnSafe(uid types.UID) (api.PodStatus, bool) {
+	var podStatus api.PodStatus
+	podStatusInfo, ok := s.podStatuses[uid]
+	if ok {
+		podStatus = podStatusInfo.PodStatus
+	}
+	return podStatus, ok
+}
+
+func (s *statusManager) loadFromKubeStore() {
+	ch := make(chan ResultValue)
+	go s.kubeStore.LoadMap(BucketPodStatuses, ch, &podStatusInfoType{})
+
+	s.podStatusesLock.Lock()
+	defer s.podStatusesLock.Unlock()
+
+	for p := range ch {
+		podStatusInfo := p.v.(*podStatusInfoType)
+		key := types.UID(p.k)
+		s.podStatuses[key] = *podStatusInfo
+	}
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
