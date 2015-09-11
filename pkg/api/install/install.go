@@ -18,8 +18,9 @@ package install
 
 import (
 	"fmt"
-	"runtime/debug"
 	"strings"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -40,10 +41,9 @@ const importPrefix = "k8s.io/kubernetes/pkg/api"
 var accessor = meta.NewAccessor()
 
 func init() {
-	debug.PrintStack()
 	groupMeta, err := latest.RegisterGroup("")
 	if err != nil {
-		fmt.Println(err)
+		glog.V(4).Infof("%v", err)
 		return
 	}
 	// Use the first API version in the list of registered versions as the latest.

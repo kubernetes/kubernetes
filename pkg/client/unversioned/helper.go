@@ -290,8 +290,6 @@ func SetKubernetesDefaults(config *Config) error {
 		config.Version = defaultVersionFor(config)
 	}
 	version := config.Version
-	fmt.Println("CHAO:")
-	fmt.Println(latest.GroupOrDie(""))
 	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(version)
 	if err != nil {
 		return fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.GroupOrDie("").Versions, ", "))
