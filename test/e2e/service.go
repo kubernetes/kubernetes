@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
@@ -397,6 +398,75 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
 		}
 		ingress := result.Status.LoadBalancer.Ingress[0]
+		if len(result.Spec.Ports) != 1 {
+			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
+		}
+		port := result.Spec.Ports[0]
+		if port.NodePort == 0 {
+			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
+		}
+		if !ServiceNodePortRange.Contains(port.NodePort) {
+			Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
+		}
+
+		By("creating pod to be part of service " + serviceName)
+		t.CreateWebserverRC(1)
+
+		By("hitting the pod through the service's NodePort")
+		testReachable(pickMinionIP(c), port.NodePort)
+
+		By("hitting the pod through the service's external load balancer")
+		testLoadBalancerReachable(ingress, inboundPort)
+	})
+
+	It("should be able to create a functioning external load balancer with user-provided load balancer ip", func() {
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke")
+
+		serviceName := "lb-test-with-user-ip"
+		ns := namespaces[0]
+
+		t := NewWebserverTest(c, ns, serviceName)
+		defer func() {
+			defer GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		inboundPort := 3000
+
+		service := t.BuildServiceSpec()
+		service.Spec.Type = api.ServiceTypeLoadBalancer
+		service.Spec.Ports[0].Port = inboundPort
+		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+
+		By("creating an external static ip")
+		rand.Seed(time.Now().UTC().UnixNano())
+		staticIPName := fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
+		glog.Errorf("static ip name is %s", staticIPName)
+		loadBalancerIP, err := createGCEStaticIP(staticIPName)
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			deleteGCEStaticIP(staticIPName)
+		}()
+
+		service.Spec.LoadBalancerIP = loadBalancerIP
+
+		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
+		result, err := t.CreateService(service)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Wait for the load balancer to be created asynchronously, which is
+		// currently indicated by ingress point(s) being added to the status.
+		result, err = waitForLoadBalancerIngress(c, serviceName, ns)
+		Expect(err).NotTo(HaveOccurred())
+		if len(result.Status.LoadBalancer.Ingress) != 1 {
+			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
+		}
+		ingress := result.Status.LoadBalancer.Ingress[0]
+		Expect(ingress.IP).To(Equal(loadBalancerIP))
 		if len(result.Spec.Ports) != 1 {
 			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
 		}

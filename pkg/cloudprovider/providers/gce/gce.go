@@ -352,7 +352,7 @@ func makeFirewallName(name string) string {
 // EnsureTCPLoadBalancer is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	if len(hosts) == 0 {
 		return nil, fmt.Errorf("Cannot EnsureTCPLoadBalancer() with no hosts")
 	}
@@ -399,6 +399,10 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.I
 		PortRange:  fmt.Sprintf("%d-%d", minPort, maxPort),
 		Target:     gce.targetPoolURL(name, region),
 	}
+	if loadBalancerIP != nil {
+		req.IPAddress = loadBalancerIP.String()
+	}
+
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return nil, err
