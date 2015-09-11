@@ -30,8 +30,10 @@ import (
 var RegisteredVersions []string
 
 func init() {
+	// TODO: caesarxuchao: rename this variable to validGroupVersions
 	validAPIVersions := map[string]bool{
-		"v1": true,
+		"v1":              true,
+		"experimental/v1": true,
 	}
 
 	// The default list of supported api versions, in order of most preferred to the least.
