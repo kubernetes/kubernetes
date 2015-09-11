@@ -17,9 +17,12 @@ limitations under the License.
 package kubectl
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -34,6 +37,105 @@ const (
 	padding_character = ' '
 	flags             = 0
 )
+
+var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
+
+// MassageJSONPath attempts to be flexible with JSONPath expressions, it accepts:
+//   * metadata.name (no leading '.' or curly brances '{...}'
+//   * {metadata.name} (no leading '.')
+//   * .metadata.name (no curly braces '{...}')
+//   * {.metadata.name} (complete expression)
+// And transforms them all into a valid jsonpat expression:
+//   {.metadata.name}
+func massageJSONPath(pathExpression string) (string, error) {
+	if len(pathExpression) == 0 {
+		return pathExpression, nil
+	}
+	submatches := jsonRegexp.FindStringSubmatch(pathExpression)
+	if submatches == nil {
+		return "", fmt.Errorf("unexpected path string, expected a 'name1.name2' or '.name1.name2' or '{name1.name2}' or '{.name1.name2}'")
+	}
+	if len(submatches) != 3 {
+		return "", fmt.Errorf("unexpected submatch list: %v", submatches)
+	}
+	var fieldSpec string
+	if len(submatches[1]) != 0 {
+		fieldSpec = submatches[1]
+	} else {
+		fieldSpec = submatches[2]
+	}
+	return fmt.Sprintf("{.%s}", fieldSpec), nil
+}
+
+// NewCustomColumnsPrinterFromSpec creates a custom columns printer from a comma separated list of <header>:<jsonpath-field-spec> pairs.
+// e.g. NAME:metadata.name,API_VERSION:apiVersion creates a printer that prints:
+//
+//      NAME               API_VERSION
+//      foo                bar
+func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error) {
+	if len(spec) == 0 {
+		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
+	}
+	parts := strings.Split(spec, ",")
+	columns := make([]Column, len(parts))
+	for ix := range parts {
+		colSpec := strings.Split(parts[ix], ":")
+		if len(colSpec) != 2 {
+			return nil, fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", parts[ix])
+		}
+		spec, err := massageJSONPath(colSpec[1])
+		if err != nil {
+			return nil, err
+		}
+		columns[ix] = Column{Header: colSpec[0], FieldSpec: spec}
+	}
+	return &CustomColumnsPrinter{Columns: columns}, nil
+}
+
+func splitOnWhitespace(line string) []string {
+	lineScanner := bufio.NewScanner(bytes.NewBufferString(line))
+	lineScanner.Split(bufio.ScanWords)
+	result := []string{}
+	for lineScanner.Scan() {
+		result = append(result, lineScanner.Text())
+	}
+	return result
+}
+
+// NewCustomColumnsPrinterFromTemplate creates a custom columns printer from a template stream.  The template is expected
+// to consist of two lines, whitespace separated.  The first line is the header line, the second line is the jsonpath field spec
+// For example the template below:
+// NAME               API_VERSION
+// {metadata.name}    {apiVersion}
+func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColumnsPrinter, error) {
+	scanner := bufio.NewScanner(templateReader)
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("invalid template, missing header line. Expected format is one line of space separated headers, one line of space separated column specs.")
+	}
+	headers := splitOnWhitespace(scanner.Text())
+
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("invalid template, missing spec line. Expected format is one line of space separated headers, one line of space separated column specs.")
+	}
+	specs := splitOnWhitespace(scanner.Text())
+
+	if len(headers) != len(specs) {
+		return nil, fmt.Errorf("number of headers (%d) and field specifications (%d) don't match", len(headers), len(specs))
+	}
+
+	columns := make([]Column, len(headers))
+	for ix := range headers {
+		spec, err := massageJSONPath(specs[ix])
+		if err != nil {
+			return nil, err
+		}
+		columns[ix] = Column{
+			Header:    headers[ix],
+			FieldSpec: spec,
+		}
+	}
+	return &CustomColumnsPrinter{Columns: columns}, nil
+}
 
 // Column represents a user specified column
 type Column struct {
@@ -104,4 +206,8 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	}
 	fmt.Fprintln(out, strings.Join(columns, "\t"))
 	return nil
+}
+
+func (s *CustomColumnsPrinter) HandledResources() []string {
+	return []string{}
 }
