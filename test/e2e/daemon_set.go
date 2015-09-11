@@ -125,7 +125,7 @@ func testDaemonSets(f *Framework) {
 	retryTimeout := 1 * time.Minute
 	retryInterval := 5 * time.Second
 
-	By(fmt.Sprintf("Creating simple daemon set %s", simpleDSName))
+	Logf("Creating simple daemon set %s", simpleDSName)
 	_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
 			Name: simpleDSName,
@@ -169,7 +169,7 @@ func testDaemonSets(f *Framework) {
 	complexDSName := "complex-daemon-set"
 	complexLabel := map[string]string{"name": complexDSName}
 	nodeSelector := map[string]string{"color": "blue"}
-	By(fmt.Sprintf("Creating daemon with a node selector %s", complexDSName))
+	Logf("Creating daemon with a node selector %s", complexDSName)
 	_, err = c.DaemonSets(ns).Create(&experimental.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
 			Name: complexDSName,
@@ -195,11 +195,11 @@ func testDaemonSets(f *Framework) {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Initially, daemon pods should not be running on any nodes."))
+	By("Initially, daemon pods should not be running on any nodes.")
 	err = wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, complexLabel))
 	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
-	By(fmt.Sprintf("Change label of node, check that daemon pod is launched."))
+	By("Change label of node, check that daemon pod is launched.")
 	nodeClient := c.Nodes()
 	nodeList, err := nodeClient.List(labels.Everything(), fields.Everything())
 	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
@@ -209,4 +209,13 @@ func testDaemonSets(f *Framework) {
 	Expect(len(newNode.Labels)).To(Equal(1))
 	err = wait.Poll(retryInterval, retryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{newNode.Name}))
 	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+
+	By("remove the node selector and wait for")
+	newNode, err = nodeClient.Get(newNode.Name)
+	Expect(err).NotTo(HaveOccurred(), "error getting node")
+	newNode.Labels = map[string]string{}
+	newNode, err = nodeClient.Update(newNode)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, complexLabel))).
+		NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 }
