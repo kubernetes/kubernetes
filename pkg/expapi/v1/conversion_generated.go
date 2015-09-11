@@ -1788,6 +1788,134 @@ func convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerS
 	return nil
 }
 
+func convert_expapi_Job_To_v1_Job(in *expapi.Job, out *Job, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.Job))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_JobStatus_To_v1_JobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_expapi_JobCondition_To_v1_JobCondition(in *expapi.JobCondition, out *JobCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.JobCondition))(in)
+	}
+	out.Type = JobConditionType(in.Type)
+	out.Status = v1.ConditionStatus(in.Status)
+	if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func convert_expapi_JobList_To_v1_JobList(in *expapi.JobList, out *JobList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.JobList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Job, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_Job_To_v1_Job(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_expapi_JobSpec_To_v1_JobSpec(in *expapi.JobSpec, out *JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.JobSpec))(in)
+	}
+	if in.Parallelism != nil {
+		out.Parallelism = new(int)
+		*out.Parallelism = *in.Parallelism
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int)
+		*out.Completions = *in.Completions
+	} else {
+		out.Completions = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(v1.PodTemplateSpec)
+		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_expapi_JobStatus_To_v1_JobStatus(in *expapi.JobStatus, out *JobStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.JobStatus))(in)
+	}
+	if in.Conditions != nil {
+		out.Conditions = make([]JobCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := convert_expapi_JobCondition_To_v1_JobCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		if err := s.Convert(&in.StartTime, &out.StartTime, 0); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		if err := s.Convert(&in.CompletionTime, &out.CompletionTime, 0); err != nil {
+			return err
+		}
+	} else {
+		out.CompletionTime = nil
+	}
+	out.Active = in.Active
+	out.Successful = in.Successful
+	out.Unsuccessful = in.Unsuccessful
+	return nil
+}
+
 func convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy(in *expapi.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.ReplicationControllerDummy))(in)
@@ -2176,6 +2304,134 @@ func convert_v1_HorizontalPodAutoscalerStatus_To_expapi_HorizontalPodAutoscalerS
 	return nil
 }
 
+func convert_v1_Job_To_expapi_Job(in *Job, out *expapi.Job, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Job))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_JobSpec_To_expapi_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_JobStatus_To_expapi_JobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_JobCondition_To_expapi_JobCondition(in *JobCondition, out *expapi.JobCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobCondition))(in)
+	}
+	out.Type = expapi.JobConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func convert_v1_JobList_To_expapi_JobList(in *JobList, out *expapi.JobList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.Job, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Job_To_expapi_Job(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_JobSpec_To_expapi_JobSpec(in *JobSpec, out *expapi.JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobSpec))(in)
+	}
+	if in.Parallelism != nil {
+		out.Parallelism = new(int)
+		*out.Parallelism = *in.Parallelism
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int)
+		*out.Completions = *in.Completions
+	} else {
+		out.Completions = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_v1_JobStatus_To_expapi_JobStatus(in *JobStatus, out *expapi.JobStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobStatus))(in)
+	}
+	if in.Conditions != nil {
+		out.Conditions = make([]expapi.JobCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := convert_v1_JobCondition_To_expapi_JobCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		if err := s.Convert(&in.StartTime, &out.StartTime, 0); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		if err := s.Convert(&in.CompletionTime, &out.CompletionTime, 0); err != nil {
+			return err
+		}
+	} else {
+		out.CompletionTime = nil
+	}
+	out.Active = in.Active
+	out.Successful = in.Successful
+	out.Unsuccessful = in.Unsuccessful
+	return nil
+}
+
 func convert_v1_ReplicationControllerDummy_To_expapi_ReplicationControllerDummy(in *ReplicationControllerDummy, out *expapi.ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerDummy))(in)
@@ -2390,6 +2646,11 @@ func init() {
 		convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
 		convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
 		convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
+		convert_expapi_JobCondition_To_v1_JobCondition,
+		convert_expapi_JobList_To_v1_JobList,
+		convert_expapi_JobSpec_To_v1_JobSpec,
+		convert_expapi_JobStatus_To_v1_JobStatus,
+		convert_expapi_Job_To_v1_Job,
 		convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy,
 		convert_expapi_ResourceConsumption_To_v1_ResourceConsumption,
 		convert_expapi_ScaleSpec_To_v1_ScaleSpec,
@@ -2431,6 +2692,11 @@ func init() {
 		convert_v1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler,
 		convert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,
+		convert_v1_JobCondition_To_expapi_JobCondition,
+		convert_v1_JobList_To_expapi_JobList,
+		convert_v1_JobSpec_To_expapi_JobSpec,
+		convert_v1_JobStatus_To_expapi_JobStatus,
+		convert_v1_Job_To_expapi_Job,
 		convert_v1_Lifecycle_To_api_Lifecycle,
 		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
