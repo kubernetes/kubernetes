@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package autoscalercontroller
+package podautoscaler
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/autoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -182,7 +182,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	}}
 	fake := fakeMetricsClient{consumption: &fakeRC}
 
-	hpaController := New(kubeClient, &fake)
+	hpaController := NewHorizontalController(kubeClient, &fake)
 
 	err := hpaController.reconcileAutoscalers()
 	if err != nil {
