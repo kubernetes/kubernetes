@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
@@ -85,6 +86,7 @@ func describerMap(c *client.Client) map[string]Describer {
 func expDescriberMap(c *client.Client) map[string]Describer {
 	return map[string]Describer{
 		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{c},
+		"Lock": &LockDescriber{c},
 	}
 }
 
@@ -128,6 +130,7 @@ func init() {
 		describeReplicationController,
 		describeNode,
 		describeNamespace,
+		describeLock,
 	)
 	if err != nil {
 		glog.Fatalf("Cannot register describers: %v", err)
@@ -1495,4 +1498,30 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 		err = out[1].Interface().(error)
 	}
 	return s, err
+}
+
+// LockDescriber generates information about a lock
+type LockDescriber struct {
+	client *client.Client
+}
+
+func (d *LockDescriber) Describe(namespace, name string) (string, error) {
+	lock, err := d.client.Experimental().Locks(namespace).Get(name)
+
+	if err != nil {
+		return "", err
+	}
+	return describeLock(lock)
+}
+
+func describeLock(lock *expapi.Lock) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", lock.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", lock.Namespace)
+		fmt.Fprintf(out, "HeldBy:\t%s\n", lock.Spec.HeldBy)
+		fmt.Fprintf(out, "LeaseSeconds:\t%d\n", lock.Spec.LeaseSeconds)
+		fmt.Fprintf(out, "AcquiredTime:\t%s\n", lock.Status.AcquiredTime.String())
+		fmt.Fprintf(out, "LastRenewalTime:\t%s\n", lock.Status.LastRenewalTime.String())
+		return nil
+	})
 }

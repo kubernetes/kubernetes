@@ -1788,6 +1788,70 @@ func convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerS
 	return nil
 }
 
+func convert_expapi_Lock_To_v1_Lock(in *expapi.Lock, out *Lock, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.Lock))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_LockSpec_To_v1_LockSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_LockStatus_To_v1_LockStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_expapi_LockList_To_v1_LockList(in *expapi.LockList, out *LockList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.LockList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Lock, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_Lock_To_v1_Lock(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_expapi_LockSpec_To_v1_LockSpec(in *expapi.LockSpec, out *LockSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.LockSpec))(in)
+	}
+	out.HeldBy = in.HeldBy
+	out.LeaseSeconds = in.LeaseSeconds
+	return nil
+}
+
+func convert_expapi_LockStatus_To_v1_LockStatus(in *expapi.LockStatus, out *LockStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.LockStatus))(in)
+	}
+	if err := s.Convert(&in.AcquiredTime, &out.AcquiredTime, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastRenewalTime, &out.LastRenewalTime, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy(in *expapi.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.ReplicationControllerDummy))(in)
@@ -2176,6 +2240,70 @@ func convert_v1_HorizontalPodAutoscalerStatus_To_expapi_HorizontalPodAutoscalerS
 	return nil
 }
 
+func convert_v1_Lock_To_expapi_Lock(in *Lock, out *expapi.Lock, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Lock))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_LockSpec_To_expapi_LockSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_LockStatus_To_expapi_LockStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_LockList_To_expapi_LockList(in *LockList, out *expapi.LockList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LockList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.Lock, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Lock_To_expapi_Lock(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_LockSpec_To_expapi_LockSpec(in *LockSpec, out *expapi.LockSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LockSpec))(in)
+	}
+	out.HeldBy = in.HeldBy
+	out.LeaseSeconds = in.LeaseSeconds
+	return nil
+}
+
+func convert_v1_LockStatus_To_expapi_LockStatus(in *LockStatus, out *expapi.LockStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LockStatus))(in)
+	}
+	if err := s.Convert(&in.AcquiredTime, &out.AcquiredTime, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastRenewalTime, &out.LastRenewalTime, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1_ReplicationControllerDummy_To_expapi_ReplicationControllerDummy(in *ReplicationControllerDummy, out *expapi.ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerDummy))(in)
@@ -2390,6 +2518,10 @@ func init() {
 		convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
 		convert_expapi_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
 		convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
+		convert_expapi_LockList_To_v1_LockList,
+		convert_expapi_LockSpec_To_v1_LockSpec,
+		convert_expapi_LockStatus_To_v1_LockStatus,
+		convert_expapi_Lock_To_v1_Lock,
 		convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy,
 		convert_expapi_ResourceConsumption_To_v1_ResourceConsumption,
 		convert_expapi_ScaleSpec_To_v1_ScaleSpec,
@@ -2434,6 +2566,10 @@ func init() {
 		convert_v1_Lifecycle_To_api_Lifecycle,
 		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
+		convert_v1_LockList_To_expapi_LockList,
+		convert_v1_LockSpec_To_expapi_LockSpec,
+		convert_v1_LockStatus_To_expapi_LockStatus,
+		convert_v1_Lock_To_expapi_Lock,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector,
 		convert_v1_ObjectMeta_To_api_ObjectMeta,

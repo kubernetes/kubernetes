@@ -998,6 +998,58 @@ func deepCopy_v1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus,
 	return nil
 }
 
+func deepCopy_v1_Lock(in Lock, out *Lock, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_LockSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_LockStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_LockList(in LockList, out *LockList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Lock, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_Lock(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_LockSpec(in LockSpec, out *LockSpec, c *conversion.Cloner) error {
+	out.HeldBy = in.HeldBy
+	out.LeaseSeconds = in.LeaseSeconds
+	return nil
+}
+
+func deepCopy_v1_LockStatus(in LockStatus, out *LockStatus, c *conversion.Cloner) error {
+	if err := deepCopy_util_Time(in.AcquiredTime, &out.AcquiredTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.LastRenewalTime, &out.LastRenewalTime, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_v1_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1228,6 +1280,10 @@ func init() {
 		deepCopy_v1_HorizontalPodAutoscalerList,
 		deepCopy_v1_HorizontalPodAutoscalerSpec,
 		deepCopy_v1_HorizontalPodAutoscalerStatus,
+		deepCopy_v1_Lock,
+		deepCopy_v1_LockList,
+		deepCopy_v1_LockSpec,
+		deepCopy_v1_LockStatus,
 		deepCopy_v1_ReplicationControllerDummy,
 		deepCopy_v1_ResourceConsumption,
 		deepCopy_v1_RollingUpdateDeployment,

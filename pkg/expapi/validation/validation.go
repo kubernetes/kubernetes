@@ -268,3 +268,32 @@ func ValidateThirdPartyResourceData(obj *expapi.ThirdPartyResourceData) errs.Val
 	}
 	return allErrs
 }
+
+// ValidateLockName can be used to check whether the given lock name is valid.
+func ValidateLockName(name string, prefix bool) (bool, string) {
+	if len(name) > 0 {
+		return true, ""
+	}
+	return false, "Must be longer than 0 characters"
+}
+
+func ValidateLock(lock, oldLock *expapi.Lock) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&lock.ObjectMeta, true, ValidateLockName).Prefix("metadata")...)
+
+	if len(lock.Spec.HeldBy) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("heldBy"))
+	}
+	if lock.Spec.LeaseSeconds <= 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("leaseSeconds"))
+	}
+	if oldLock != nil {
+		if lock.Spec.HeldBy != oldLock.Spec.HeldBy {
+			allErrs = append(allErrs, errs.NewFieldInvalid("HeldBy", lock.Spec.HeldBy, "heldby is not the current owner"))
+		}
+		if lock.Status.AcquiredTime != oldLock.Status.AcquiredTime {
+			allErrs = append(allErrs, errs.NewFieldInvalid("AcquiredTime", lock.Status.AcquiredTime, "acquiredtime should not have changed"))
+		}
+	}
+	return allErrs
+}

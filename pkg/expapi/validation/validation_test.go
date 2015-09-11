@@ -19,6 +19,7 @@ package validation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -655,6 +656,140 @@ func TestValidateDeployment(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+		}
+	}
+}
+
+func TestValidateLock(t *testing.T) {
+	successCases := []expapi.Lock{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "test-lock",
+				Namespace: "default",
+			},
+			Spec: expapi.LockSpec{
+				HeldBy:       "test-app",
+				LeaseSeconds: 5,
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateLock(&successCase, nil); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]struct {
+		oldLock *expapi.Lock
+		newLock *expapi.Lock
+	}{
+		"missing Name": {
+			oldLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app",
+					LeaseSeconds: 5,
+				},
+			},
+			newLock: nil,
+		},
+		"missing Namespace": {
+			oldLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app",
+					LeaseSeconds: 5,
+				},
+			},
+			newLock: nil,
+		},
+		"missing HeldBy": {
+			oldLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "",
+					LeaseSeconds: 5,
+				},
+			},
+			newLock: nil,
+		},
+		"zero LeaseSeconds": {
+			oldLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app",
+					LeaseSeconds: 0,
+				},
+			},
+			newLock: nil,
+		},
+		"invalid HeldBy": {
+			oldLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app",
+					LeaseSeconds: 30,
+				},
+			},
+			newLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app2",
+					LeaseSeconds: 30,
+				},
+			},
+		},
+		"AcquiredTime changed": {
+			oldLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app",
+					LeaseSeconds: 30,
+				},
+				Status: expapi.LockStatus{
+					AcquiredTime: util.NewTime(time.Now()),
+				},
+			},
+			newLock: &expapi.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-lock",
+					Namespace: "default",
+				},
+				Spec: expapi.LockSpec{
+					HeldBy:       "test-app2",
+					LeaseSeconds: 30,
+				},
+				Status: expapi.LockStatus{
+					AcquiredTime: util.NewTime(time.Now().Add(time.Duration(5))),
+				},
+			},
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateLock(v.oldLock, v.newLock)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
 		}
 	}
 }
