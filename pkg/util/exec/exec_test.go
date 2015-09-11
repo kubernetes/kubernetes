@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	osexec "os/exec"
 	"testing"
 )
 
@@ -79,5 +80,15 @@ func TestExecutorWithArgs(t *testing.T) {
 	}
 	if string(out) != "stderr\n" {
 		t.Errorf("unexpected output: %q", string(out))
+	}
+}
+
+func TestLookPath(t *testing.T) {
+	ex := New()
+
+	shExpected, _ := osexec.LookPath("sh")
+	sh, _ := ex.LookPath("sh")
+	if sh != shExpected {
+		t.Errorf("unexpected result for LookPath: got %s, expected %s", sh, shExpected)
 	}
 }
