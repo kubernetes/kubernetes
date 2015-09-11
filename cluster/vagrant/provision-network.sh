@@ -84,6 +84,9 @@ function provision-network {
     # add ip route rules such that all pod traffic flows through docker bridge and consequently to the gre tunnels
     echo "Add ip route rules such that all pod traffic flows through docker bridge"
     ip route add ${CONTAINER_SUBNET} dev ${DOCKER_BRIDGE} scope link src ${CONTAINER_ADDR}
+
+    # restart the network with the new configuration
+    systemctl restart network
   }
   echo "Network configuration verified"
 }
