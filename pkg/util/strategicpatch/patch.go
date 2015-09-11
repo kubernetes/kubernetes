@@ -31,28 +31,357 @@ import (
 // lists should be merged or replaced.
 //
 // For more information, see the PATCH section of docs/api-conventions.md.
-func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]byte, error) {
-	var o map[string]interface{}
-	err := json.Unmarshal(original, &o)
+//
+// Some of the content of this package was borrowed with minor adaptations from
+// evanphx/json-patch and openshift/origin.
+
+const specialKey = "$patch"
+const specialValue = "delete"
+
+var errBadJSONDoc = fmt.Errorf("Invalid JSON document")
+var errNoListOfLists = fmt.Errorf("Lists of lists are not supported")
+
+// CreateStrategicMergePatch creates a patch that can be passed to StrategicMergePatch.
+// The original and modified documents must be passed to the method as json encoded content.
+// It will return a mergeable json document with differences from original to modified, or an error
+// if either of the two documents is invalid.
+func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}) ([]byte, error) {
+	originalMap := map[string]interface{}{}
+	err := json.Unmarshal(original, &originalMap)
+	if err != nil {
+		return nil, errBadJSONDoc
+	}
+
+	modifiedMap := map[string]interface{}{}
+	err = json.Unmarshal(modified, &modifiedMap)
+	if err != nil {
+		return nil, errBadJSONDoc
+	}
+
+	t, err := getTagStructType(dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	var p map[string]interface{}
-	err = json.Unmarshal(patch, &p)
+	patchMap, err := diffMaps(originalMap, modifiedMap, t, false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	t := reflect.TypeOf(dataStruct)
+	return json.Marshal(patchMap)
+}
+
+// Returns a (recursive) strategic merge patch that yields modified when applied to original.
+func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreAdditions, ignoreChangesAndDeletions bool) (map[string]interface{}, error) {
+	patch := map[string]interface{}{}
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	if t.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("strategic merge patch needs a struct, %s received instead", t.Kind().String())
+
+	for key, modifiedValue := range modified {
+		originalValue, ok := original[key]
+		// value was added
+		if !ok {
+			if !ignoreAdditions {
+				patch[key] = modifiedValue
+			}
+
+			continue
+		}
+
+		if key == specialKey {
+			originalString, ok := originalValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid value for special key: %s", specialKey)
+			}
+
+			modifiedString, ok := modifiedValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid value for special key: %s", specialKey)
+			}
+
+			if modifiedString != originalString {
+				patch[key] = modifiedValue
+			}
+
+			continue
+		}
+
+		if !ignoreChangesAndDeletions {
+			// If types have changed, replace completely
+			if reflect.TypeOf(originalValue) != reflect.TypeOf(modifiedValue) {
+				patch[key] = modifiedValue
+				continue
+			}
+		}
+
+		// Types are the same, compare values
+		switch originalValueTyped := originalValue.(type) {
+		case map[string]interface{}:
+			modifiedValueTyped := modifiedValue.(map[string]interface{})
+			fieldType, _, _, err := forkedjson.LookupPatchMetadata(t, key)
+			if err != nil {
+				return nil, err
+			}
+
+			patchValue, err := diffMaps(originalValueTyped, modifiedValueTyped, fieldType, ignoreAdditions, ignoreChangesAndDeletions)
+			if err != nil {
+				return nil, err
+			}
+
+			if len(patchValue) > 0 {
+				patch[key] = patchValue
+			}
+
+			continue
+		case []interface{}:
+			modifiedValueTyped := modifiedValue.([]interface{})
+			fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, key)
+			if err != nil {
+				return nil, err
+			}
+
+			if fieldPatchStrategy == "merge" {
+				patchValue, err := diffLists(originalValueTyped, modifiedValueTyped, fieldType.Elem(), fieldPatchMergeKey, ignoreAdditions, ignoreChangesAndDeletions)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(patchValue) > 0 {
+					patch[key] = patchValue
+				}
+
+				continue
+			}
+		}
+
+		if !ignoreChangesAndDeletions {
+			if !reflect.DeepEqual(originalValue, modifiedValue) {
+				patch[key] = modifiedValue
+			}
+		}
 	}
 
-	result, err := mergeMap(o, p, t)
+	if !ignoreChangesAndDeletions {
+		// Now add all deleted values as nil
+		for key := range original {
+			_, found := modified[key]
+			if !found {
+				patch[key] = nil
+			}
+		}
+	}
+
+	return patch, nil
+}
+
+// Returns a (recursive) strategic merge patch that yields modified when applied to original,
+// for a pair of lists with merge semantics.
+func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreAdditions, ignoreChangesAndDeletions bool) ([]interface{}, error) {
+	if len(original) == 0 {
+		if len(modified) == 0 || ignoreAdditions {
+			return nil, nil
+		}
+
+		return modified, nil
+	}
+
+	elementType, err := sliceElementType(original, modified)
+	if err != nil {
+		return nil, err
+	}
+
+	var patch []interface{}
+
+	// If the elements are not maps...
+	if elementType.Kind() == reflect.Map {
+		patch, err = diffListsOfMaps(original, modified, t, mergeKey, ignoreAdditions, ignoreChangesAndDeletions)
+	} else {
+		patch, err = diffListsOfScalars(original, modified, ignoreAdditions)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return patch, nil
+}
+
+// Returns a (recursive) strategic merge patch that yields modified when applied to original,
+// for a pair of lists of scalars with merge semantics.
+func diffListsOfScalars(original, modified []interface{}, ignoreAdditions bool) ([]interface{}, error) {
+	if len(modified) == 0 {
+		// There is no need to check the length of original because there is no way to create
+		// a patch that deletes a scalar from a list of scalars with merge semantics.
+		return nil, nil
+	}
+
+	patch := []interface{}{}
+
+	originalScalars := uniqifyAndSortScalars(original)
+	modifiedScalars := uniqifyAndSortScalars(modified)
+	originalIndex, modifiedIndex := 0, 0
+
+loopB:
+	for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
+		for ; originalIndex < len(originalScalars); originalIndex++ {
+			originalString := fmt.Sprintf("%v", original[originalIndex])
+			modifiedString := fmt.Sprintf("%v", modified[modifiedIndex])
+			if originalString >= modifiedString {
+				if originalString != modifiedString {
+					if !ignoreAdditions {
+						patch = append(patch, modified[modifiedIndex])
+					}
+				}
+
+				continue loopB
+			}
+			// There is no else clause because there is no way to create a patch that deletes
+			// a scalar from a list of scalars with merge semantics.
+		}
+
+		break
+	}
+
+	if !ignoreAdditions {
+		// Add any remaining items found only in modified
+		for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
+			patch = append(patch, modified[modifiedIndex])
+		}
+	}
+
+	return patch, nil
+}
+
+var errNoMergeKeyFmt = "map: %v does not contain declared merge key: %s"
+var errBadArgTypeFmt = "expected a %s, but received a %t"
+
+// Returns a (recursive) strategic merge patch that yields modified when applied to original,
+// for a pair of lists of maps with merge semantics.
+func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreAdditions, ignoreChangesAndDeletions bool) ([]interface{}, error) {
+	patch := make([]interface{}, 0)
+
+	originalSorted, err := sortMergeListsByNameArray(original, t, mergeKey, false)
+	if err != nil {
+		return nil, err
+	}
+
+	modifiedSorted, err := sortMergeListsByNameArray(modified, t, mergeKey, false)
+	if err != nil {
+		return nil, err
+	}
+
+	originalIndex, modifiedIndex := 0, 0
+
+loopB:
+	for ; modifiedIndex < len(modifiedSorted); modifiedIndex++ {
+		modifiedMap, ok := modifiedSorted[modifiedIndex].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", modifiedSorted[modifiedIndex])
+		}
+
+		modifiedValue, ok := modifiedMap[mergeKey]
+		if !ok {
+			return nil, fmt.Errorf(errNoMergeKeyFmt, modifiedMap, mergeKey)
+		}
+
+		for ; originalIndex < len(originalSorted); originalIndex++ {
+			originalMap, ok := originalSorted[originalIndex].(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", originalSorted[originalIndex])
+			}
+
+			originalValue, ok := originalMap[mergeKey]
+			if !ok {
+				return nil, fmt.Errorf(errNoMergeKeyFmt, originalMap, mergeKey)
+			}
+
+			// Assume that the merge key values are comparable strings
+			originalString := fmt.Sprintf("%v", originalValue)
+			modifiedString := fmt.Sprintf("%v", modifiedValue)
+			if originalString >= modifiedString {
+				if originalString == modifiedString {
+					patchValue, err := diffMaps(originalMap, modifiedMap, t, ignoreAdditions, ignoreChangesAndDeletions)
+					if err != nil {
+						return nil, err
+					}
+
+					originalIndex++
+					if len(patchValue) > 0 {
+						patchValue[mergeKey] = modifiedValue
+						patch = append(patch, patchValue)
+					}
+				} else if !ignoreAdditions {
+					patch = append(patch, modifiedMap)
+				}
+
+				continue loopB
+			}
+
+			if !ignoreChangesAndDeletions {
+				patch = append(patch, map[string]interface{}{mergeKey: originalValue, specialKey: specialValue})
+			}
+		}
+
+		break
+	}
+
+	if !ignoreChangesAndDeletions {
+		// Delete any remaining items found only in original
+		for ; originalIndex < len(originalSorted); originalIndex++ {
+			originalMap, ok := originalSorted[originalIndex].(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", originalSorted[originalIndex])
+			}
+
+			originalValue, ok := originalMap[mergeKey]
+			if !ok {
+				return nil, fmt.Errorf(errNoMergeKeyFmt, originalMap, mergeKey)
+			}
+
+			patch = append(patch, map[string]interface{}{mergeKey: originalValue, specialKey: specialValue})
+		}
+	}
+
+	if !ignoreAdditions {
+		// Add any remaining items found only in modified
+		for ; modifiedIndex < len(modifiedSorted); modifiedIndex++ {
+			patch = append(patch, modified[modifiedIndex])
+		}
+	}
+
+	return patch, nil
+}
+
+// StrategicMergePatchData applies a patch using strategic merge patch semantics.
+// Deprecated: StrategicMergePatchData is deprecated. Use the synonym StrategicMergePatch,
+// instead, which follows the naming convention of evanphx/json-patch.
+func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]byte, error) {
+	return StrategicMergePatch(original, patch, dataStruct)
+}
+
+// StrategicMergePatch applies a strategic merge patch. The patch and the original document
+// must be json encoded content. A patch can be created from an original and a modified document
+// by calling CreateStrategicMergePatch.
+func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte, error) {
+	originalMap := map[string]interface{}{}
+	err := json.Unmarshal(original, &originalMap)
+	if err != nil {
+		return nil, errBadJSONDoc
+	}
+
+	patchMap := map[string]interface{}{}
+	err = json.Unmarshal(patch, &patchMap)
+	if err != nil {
+		return nil, errBadJSONDoc
+	}
+
+	t, err := getTagStructType(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := mergeMap(originalMap, patchMap, t)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +389,20 @@ func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]
 	return json.Marshal(result)
 }
 
-const specialKey = "$patch"
+func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
+	t := reflect.TypeOf(dataStruct)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf(errBadArgTypeFmt, "struct", t.Kind().String())
+	}
+
+	return t, nil
+}
+
+var errBadPatchTypeFmt = "unknown patch type: %s in map: %v"
 
 // Merge fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
@@ -74,7 +416,8 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 			delete(patch, specialKey)
 			return patch, nil
 		}
-		return nil, fmt.Errorf("unknown patch type found: %s", v)
+
+		return nil, fmt.Errorf(errBadPatchTypeFmt, v, patch)
 	}
 
 	// nil is an accepted value for original to simplify logic in other places.
@@ -92,29 +435,32 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 			if _, ok := original[k]; ok {
 				delete(original, k)
 			}
+
 			continue
 		}
+
 		_, ok := original[k]
 		if !ok {
 			// If it's not in the original document, just take the patch value.
 			original[k] = patchV
 			continue
 		}
+
 		// If the data type is a pointer, resolve the element.
 		if t.Kind() == reflect.Ptr {
 			t = t.Elem()
 		}
 
 		// If they're both maps or lists, recurse into the value.
-		// First find the fieldPatchStrategy and fieldPatchMergeKey.
-		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
-		if err != nil {
-			return nil, err
-		}
-
 		originalType := reflect.TypeOf(original[k])
 		patchType := reflect.TypeOf(patchV)
 		if originalType == patchType {
+			// First find the fieldPatchStrategy and fieldPatchMergeKey.
+			fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
+			if err != nil {
+				return nil, err
+			}
+
 			if originalType.Kind() == reflect.Map && fieldPatchStrategy != "replace" {
 				typedOriginal := original[k].(map[string]interface{})
 				typedPatch := patchV.(map[string]interface{})
@@ -123,8 +469,10 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				if err != nil {
 					return nil, err
 				}
+
 				continue
 			}
+
 			if originalType.Kind() == reflect.Slice && fieldPatchStrategy == "merge" {
 				elemType := fieldType.Elem()
 				typedOriginal := original[k].([]interface{})
@@ -134,6 +482,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				if err != nil {
 					return nil, err
 				}
+
 				continue
 			}
 		}
@@ -154,15 +503,13 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 	if len(original) == 0 && len(patch) == 0 {
 		return original, nil
 	}
+
 	// All the values must be of the same type, but not a list.
 	t, err := sliceElementType(original, patch)
 	if err != nil {
-		return nil, fmt.Errorf("types of list elements need to be the same, type: %s: %v",
-			elemType.Kind().String(), err)
+		return nil, err
 	}
-	if t.Kind() == reflect.Slice {
-		return nil, fmt.Errorf("not supporting merging lists of lists yet")
-	}
+
 	// If the elements are not maps, merge the slices of scalars.
 	if t.Kind() != reflect.Map {
 		// Maybe in the future add a "concat" mode that doesn't
@@ -182,10 +529,14 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 		typedV := v.(map[string]interface{})
 		patchType, ok := typedV[specialKey]
 		if ok {
-			if patchType == "delete" {
+			if patchType == specialValue {
 				mergeValue, ok := typedV[mergeKey]
 				if ok {
-					_, originalKey, found := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+					_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+					if err != nil {
+						return nil, err
+					}
+
 					if found {
 						// Delete the element at originalKey.
 						original = append(original[:originalKey], original[originalKey+1:]...)
@@ -199,7 +550,7 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			} else if patchType == "merge" {
 				return nil, fmt.Errorf("merging lists cannot yet be specified in the patch")
 			} else {
-				return nil, fmt.Errorf("unknown patch type found: %s", patchType)
+				return nil, fmt.Errorf(errBadPatchTypeFmt, patchType, typedV)
 			}
 		} else {
 			patchWithoutSpecialElements = append(patchWithoutSpecialElements, v)
@@ -218,11 +569,16 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 		typedV := v.(map[string]interface{})
 		mergeValue, ok := typedV[mergeKey]
 		if !ok {
-			return nil, fmt.Errorf("all list elements need the merge key %s", mergeKey)
+			return nil, fmt.Errorf(errNoMergeKeyFmt, typedV, mergeKey)
 		}
+
 		// If we find a value with this merge key value in original, merge the
 		// maps. Otherwise append onto original.
-		originalMap, originalKey, found := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+		originalMap, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+		if err != nil {
+			return nil, err
+		}
+
 		if found {
 			var mergedMaps interface{}
 			var err error
@@ -231,6 +587,7 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			if err != nil {
 				return nil, err
 			}
+
 			original[originalKey] = mergedMaps
 		} else {
 			original = append(original, v)
@@ -240,16 +597,21 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 	return original, nil
 }
 
-// This panics if any element of the slice is not a map.
-func findMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{}) (map[string]interface{}, int, bool) {
+// This method no longer panics if any element of the slice is not a map.
+func findMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{}) (map[string]interface{}, int, bool, error) {
 	for k, v := range m {
-		typedV := v.(map[string]interface{})
+		typedV, ok := v.(map[string]interface{})
+		if !ok {
+			return nil, 0, false, fmt.Errorf("value for key %v is not a map.", k)
+		}
+
 		valueToMatch, ok := typedV[key]
 		if ok && valueToMatch == value {
-			return typedV, k, true
+			return typedV, k, true, nil
 		}
 	}
-	return nil, 0, false
+
+	return nil, 0, false, nil
 }
 
 // This function takes a JSON map and sorts all the lists that should be merged
@@ -274,42 +636,45 @@ func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error
 func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
 	newS := map[string]interface{}{}
 	for k, v := range s {
-		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
-		if err != nil {
-			return nil, err
-		}
-		// If v is a map or a merge slice, recurse.
-		if typedV, ok := v.(map[string]interface{}); ok {
-			var err error
-			v, err = sortMergeListsByNameMap(typedV, fieldType)
+		if k != specialKey {
+			fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
 			if err != nil {
 				return nil, err
 			}
-		} else if typedV, ok := v.([]interface{}); ok {
-			if fieldPatchStrategy == "merge" {
+
+			// If v is a map or a merge slice, recurse.
+			if typedV, ok := v.(map[string]interface{}); ok {
 				var err error
-				v, err = sortMergeListsByNameArray(typedV, fieldType.Elem(), fieldPatchMergeKey)
+				v, err = sortMergeListsByNameMap(typedV, fieldType)
 				if err != nil {
 					return nil, err
 				}
+			} else if typedV, ok := v.([]interface{}); ok {
+				if fieldPatchStrategy == "merge" {
+					var err error
+					v, err = sortMergeListsByNameArray(typedV, fieldType.Elem(), fieldPatchMergeKey, true)
+					if err != nil {
+						return nil, err
+					}
+				}
 			}
 		}
+
 		newS[k] = v
 	}
+
 	return newS, nil
 }
 
-func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey string) ([]interface{}, error) {
+func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey string, recurse bool) ([]interface{}, error) {
 	if len(s) == 0 {
 		return s, nil
 	}
+
 	// We don't support lists of lists yet.
 	t, err := sliceElementType(s)
 	if err != nil {
 		return nil, err
-	}
-	if t.Kind() == reflect.Slice {
-		return nil, fmt.Errorf("not supporting lists of lists yet")
 	}
 
 	// If the elements are not maps...
@@ -319,15 +684,20 @@ func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey 
 	}
 
 	// Elements are maps - if one of the keys of the map is a map or a
-	// list, we need to recurse into it.
+	// list, we may need to recurse into it.
 	newS := []interface{}{}
 	for _, elem := range s {
-		typedElem := elem.(map[string]interface{})
-		newElem, err := sortMergeListsByNameMap(typedElem, elemType)
-		if err != nil {
-			return nil, err
+		if recurse {
+			typedElem := elem.(map[string]interface{})
+			newElem, err := sortMergeListsByNameMap(typedElem, elemType)
+			if err != nil {
+				return nil, err
+			}
+
+			newS = append(newS, newElem)
+		} else {
+			newS = append(newS, elem)
 		}
-		newS = append(newS, newElem)
 	}
 
 	// Sort the maps.
@@ -336,17 +706,30 @@ func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey 
 }
 
 func sortMapsBasedOnField(m []interface{}, fieldName string) []interface{} {
-	mapM := []map[string]interface{}{}
-	for _, v := range m {
-		mapM = append(mapM, v.(map[string]interface{}))
-	}
+	mapM := mapSliceFromSlice(m)
 	ss := SortableSliceOfMaps{mapM, fieldName}
 	sort.Sort(ss)
-	newM := []interface{}{}
-	for _, v := range ss.s {
-		newM = append(newM, v)
+	newS := sliceFromMapSlice(ss.s)
+	return newS
+}
+
+func mapSliceFromSlice(m []interface{}) []map[string]interface{} {
+	newM := []map[string]interface{}{}
+	for _, v := range m {
+		vt := v.(map[string]interface{})
+		newM = append(newM, vt)
 	}
+
 	return newM
+}
+
+func sliceFromMapSlice(s []map[string]interface{}) []interface{} {
+	newS := []interface{}{}
+	for _, v := range s {
+		newS = append(newS, v)
+	}
+
+	return newS
 }
 
 type SortableSliceOfMaps struct {
@@ -391,6 +774,7 @@ func uniqifyScalars(s []interface{}) []interface{} {
 			}
 		}
 	}
+
 	return s
 }
 
@@ -415,7 +799,7 @@ func (ss SortableSliceOfScalars) Swap(i, j int) {
 }
 
 // Returns the type of the elements of N slice(s). If the type is different,
-// returns an error.
+// another slice or undefined, returns an error.
 func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 	var prevType reflect.Type
 	for _, s := range slices {
@@ -424,16 +808,22 @@ func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 			currentType := reflect.TypeOf(v)
 			if prevType == nil {
 				prevType = currentType
+				// We don't support lists of lists yet.
+				if prevType.Kind() == reflect.Slice {
+					return nil, errNoListOfLists
+				}
 			} else {
 				if prevType != currentType {
-					return nil, fmt.Errorf("at least two types found: %s and %s", prevType, currentType)
+					return nil, fmt.Errorf("list element types are not identical: %v", fmt.Sprint(slices))
 				}
 				prevType = currentType
 			}
 		}
 	}
+
 	if prevType == nil {
-		return nil, fmt.Errorf("no elements in any given slices")
+		return nil, fmt.Errorf("no elements in any of the given slices")
 	}
+
 	return prevType, nil
 }
