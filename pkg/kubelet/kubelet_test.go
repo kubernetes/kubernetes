@@ -520,7 +520,7 @@ func TestMakeVolumeMounts(t *testing.T) {
 		"disk5": &stubVolume{"/var/lib/kubelet/podID/volumes/empty/disk5"},
 	}
 
-	mounts := makeMounts(&container, podVolumes)
+	mounts := makeMounts(nil, &container, podVolumes)
 
 	expectedMounts := []kubecontainer.Mount{
 		{
