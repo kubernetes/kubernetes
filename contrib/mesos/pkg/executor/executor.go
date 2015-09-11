@@ -92,6 +92,11 @@ type kuberTask struct {
 
 type podStatusFunc func() (*api.PodStatus, error)
 
+type NodeInfo struct {
+	Cores int
+	Mem   int64 // in bytes
+}
+
 // KubernetesExecutor is an mesos executor that runs pods
 // in a minion machine.
 type KubernetesExecutor struct {
@@ -112,6 +117,7 @@ type KubernetesExecutor struct {
 	podStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	staticPodsConfigPath string
 	podController        *framework.Controller
+	nodeInfos            chan<- NodeInfo
 }
 
 type Config struct {
@@ -125,6 +131,7 @@ type Config struct {
 	PodStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	StaticPodsConfigPath string
 	PodLW                cache.ListerWatcher
+	NodeInfos            chan<- NodeInfo
 }
 
 func (k *KubernetesExecutor) isConnected() bool {
@@ -149,6 +156,7 @@ func New(config Config) *KubernetesExecutor {
 		exitFunc:             config.ExitFunc,
 		podStatusFunc:        config.PodStatusFunc,
 		staticPodsConfigPath: config.StaticPodsConfigPath,
+		nodeInfos:            config.NodeInfos,
 	}
 
 	// watch pods from the given pod ListWatch
@@ -216,9 +224,19 @@ func (k *KubernetesExecutor) Registered(driver bindings.ExecutorDriver,
 		}
 	}
 
+	// emit first event to mark the pod config source as seen
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	if k.isDone() {
+		return
+	}
 	k.updateChan <- kubelet.PodUpdate{
 		Pods: []*api.Pod{},
 		Op:   kubelet.SET,
+	}
+
+	if slaveInfo != nil && k.nodeInfos != nil {
+		k.nodeInfos <- nodeInfo(slaveInfo, executorInfo) // leave it behind the upper lock to avoid panics
 	}
 }
 
@@ -238,17 +256,14 @@ func (k *KubernetesExecutor) Reregistered(driver bindings.ExecutorDriver, slaveI
 		if err != nil {
 			log.Errorf("cannot update node labels: %v", err)
 		}
-	}
 
-	// emit an empty update to allow the mesos "source" to be marked as seen
-	k.lock.Lock()
-	defer k.lock.Unlock()
-	if k.isDone() {
-		return
-	}
-	k.updateChan <- kubelet.PodUpdate{
-		Pods: []*api.Pod{},
-		Op:   kubelet.SET,
+		// make sure nodeInfos is not nil and send new NodeInfo
+		k.lock.Lock()
+		defer k.lock.Unlock()
+		if k.isDone() {
+			return
+		}
+		k.nodeInfos <- nodeInfo(slaveInfo, nil)
 	}
 }
 
@@ -791,6 +806,7 @@ func (k *KubernetesExecutor) doShutdown(driver bindings.ExecutorDriver) {
 	// signal to all listeners that this KubeletExecutor is done!
 	close(k.terminate)
 	close(k.updateChan)
+	close(k.nodeInfos)
 
 	if k.shutdownAlert != nil {
 		func() {
@@ -912,4 +928,41 @@ func (k *KubernetesExecutor) sendLoop() {
 			}
 		}
 	}
+}
+
+func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
+	var executorCPU, executorMem float64
+
+	// get executor resources
+	if ei != nil {
+		for _, r := range ei.GetResources() {
+			if r == nil || r.GetType() != mesos.Value_SCALAR {
+				continue
+			}
+			switch r.GetName() {
+			case "cpus":
+				executorCPU = r.GetScalar().GetValue()
+			case "mem":
+				executorMem = r.GetScalar().GetValue()
+			}
+		}
+	}
+
+	// get resource capacity of the node
+	ni := NodeInfo{}
+	for _, r := range si.GetResources() {
+		if r == nil || r.GetType() != mesos.Value_SCALAR {
+			continue
+		}
+
+		switch r.GetName() {
+		case "cpus":
+			ni.Cores = int(r.GetScalar().GetValue() - float64(int(executorCPU)))
+		// We intentionally take the floor of executorCPU because cores are integers
+		// and we would loose a complete cpu here if the value is <1.
+		case "mem":
+			ni.Mem = int64(r.GetScalar().GetValue()-executorMem) * 1024 * 1024
+		}
+	}
+	return ni
 }
