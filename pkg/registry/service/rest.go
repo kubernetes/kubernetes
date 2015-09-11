@@ -63,18 +63,6 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, namespace namesp
 }
 
 
-func (rs *REST) GetNamespaceNetworkPolicy(namespaceName string) (string, error) {
-	ctx := api.WithNamespace(api.NewContext(), namespaceName)
-    namespace, err := rs.namespace.GetNamespace(ctx, namespaceName)
-
-	if err != nil {
-		return "", err
-	}
-
-	return string(namespace.Spec.NetworkPolicy), err
-}
-
-
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
@@ -131,12 +119,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		}
 	}
 
-	if service.Spec.Type == api.ServiceTypePrivate{
+	if service.Spec.Type == api.ServiceTypeClosed{
 		nsPolicy, err := rs.GetNamespaceNetworkPolicy(string(service.ObjectMeta.Namespace))
 		if err != nil {
 			return nil, err
-		} else if nsPolicy == "Public" {
-			return nil, errors.NewConflict("service", string(api.ServiceTypePrivate), fmt.Errorf("ServiceTypePrivate cannot belong to a public namespace"))
+		} else if nsPolicy == "Open" {
+			return nil, errors.NewConflict("service", string(api.ServiceTypeClosed), fmt.Errorf("ServiceTypeClosed cannot belong to an open namespace"))
 		}
 	}
 
@@ -369,4 +357,15 @@ func shouldAssignNodePorts(service *api.Service) bool {
 		glog.Errorf("Unknown service type: %v", service.Spec.Type)
 		return false
 	}
+}
+
+func (rs *REST) GetNamespaceNetworkPolicy(namespaceName string) (string, error) {
+	ctx := api.WithNamespace(api.NewContext(), namespaceName)
+	namespace, err := rs.namespace.GetNamespace(ctx, namespaceName)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(namespace.Spec.NetworkPolicy), err
 }

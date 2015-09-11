@@ -2056,24 +2056,24 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "valid type - private",
+			name: "valid type - closed",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypePrivate
+				s.Spec.Type = api.ServiceTypeClosed
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid private service without NodePort",
+			name: "valid closed service without NodePort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypePrivate
+				s.Spec.Type = api.ServiceTypeClosed
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(12345)})
 			},
 			numErrs: 0,
 		},
 		{
-			name: "invalid private service with NodePort",
+			name: "invalid closed service with NodePort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypePrivate
+				s.Spec.Type = api.ServiceTypeClosed
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: util.NewIntOrStringFromInt(12345)})
 			},
 			numErrs: 1,
@@ -3175,19 +3175,22 @@ func TestValidateNamespace(t *testing.T) {
 	successCases := []api.Namespace{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Labels: validLabels},
+			Spec: api.NamespaceSpec{
+				NetworkPolicy: api.NamespaceNetworkPolicyOpen,
+			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: api.NamespaceSpec{
 				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
-				NetworkPolicy: api.NamespacePublic,
+				NetworkPolicy: api.NamespaceNetworkPolicyOpen,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
 			Spec: api.NamespaceSpec{
 				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
-				NetworkPolicy: api.NamespacePrivate,
+				NetworkPolicy: api.NamespaceNetworkPolicyClosed,
 			},
 		},
 	}

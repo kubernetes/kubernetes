@@ -1450,9 +1450,9 @@ const (
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
 
-    // ServiceTypePrivate means a service will only be accessible inside the
+    // ServiceTypeClosed means a service will only be accessible inside the
     // namespace, via the Cluster IP.
-	ServiceTypePrivate ServiceType = "Private"
+	ServiceTypeClosed ServiceType = "Closed"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -1898,10 +1898,10 @@ type NamespaceNetworkPolicy string
 
 // These are the valid network policies of a namespace
 const(
-    // Private namespaces are only accessible by pods within the namespace
-	NamespacePrivate NamespaceNetworkPolicy = "Private"
-    // Public namespaces are accessible from anywhere in the cluster
-	NamespacePublic NamespaceNetworkPolicy = "Public"
+    // Closed namespaces are only accessible by pods within the namespace
+	NamespaceNetworkPolicyClosed NamespaceNetworkPolicy = "Closed"
+    // Open namespaces are accessible from any namespace
+	NamespaceNetworkPolicyOpen NamespaceNetworkPolicy = "Open"
 )
 
 // NamespaceSpec describes the attributes on a Namespace.

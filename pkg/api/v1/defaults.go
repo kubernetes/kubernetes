@@ -157,7 +157,7 @@ func addDefaultingFuncs() {
 		},
 		func(obj *NamespaceSpec) {
 			if obj.NetworkPolicy == "" {
-				obj.NetworkPolicy = NamespacePublic
+				obj.NetworkPolicy = NamespaceNetworkPolicyOpen
 			}
 		},
 		func(obj *Node) {
