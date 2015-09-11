@@ -28,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+const isNegativeErrorMsg string = `must be non-negative`
+
 // ValidateHorizontalPodAutoscaler can be used to check whether the given autoscaler name is valid.
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string) {
@@ -266,5 +268,52 @@ func ValidateThirdPartyResourceData(obj *expapi.ThirdPartyResourceData) errs.Val
 	if len(obj.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
 	}
+	return allErrs
+}
+
+func ValidateJob(job *expapi.Job) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	// Jobs and rcs have the same name validation
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidateJobSpec(spec *expapi.JobSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if spec.Parallelism != nil && *spec.Parallelism < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("parallelism", spec.Parallelism, isNegativeErrorMsg))
+	}
+	if spec.Completions != nil && *spec.Completions < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, isNegativeErrorMsg))
+	}
+
+	selector := labels.Set(spec.Selector).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
+	}
+
+	if spec.Template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("template"))
+	} else {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
+		}
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+		if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
+			spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy",
+				spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
+		}
+	}
+	return allErrs
+}
+
+func ValidateJobUpdate(oldJob, job *expapi.Job) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
 	return allErrs
 }
