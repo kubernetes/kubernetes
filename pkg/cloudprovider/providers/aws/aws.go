@@ -687,6 +687,11 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	return orEmpty(instance.InstanceID), nil
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (aws *AWSCloud) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (aws *AWSCloud) InstanceID(name string) (string, error) {
 	// TODO: Do we need to verify it exists, or can we just construct it knowing our AZ (or via caching?)

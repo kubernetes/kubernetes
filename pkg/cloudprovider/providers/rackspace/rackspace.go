@@ -339,6 +339,11 @@ func (i *Instances) ExternalID(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (i *Instances) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (i *Instances) InstanceID(name string) (string, error) {
 	return "", nil

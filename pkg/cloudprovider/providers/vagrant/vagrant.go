@@ -161,6 +161,11 @@ func (v *VagrantCloud) ExternalID(instance string) (string, error) {
 	return minion.IP, nil
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (v *VagrantCloud) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (v *VagrantCloud) InstanceID(instance string) (string, error) {
 	minion, err := v.getInstanceByAddress(instance)

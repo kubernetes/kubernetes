@@ -177,6 +177,11 @@ func (f *FakeCloud) ExternalID(instance string) (string, error) {
 	return f.ExtID[instance], f.Err
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (f *FakeCloud) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (f *FakeCloud) InstanceID(instance string) (string, error) {
 	f.addCall("instance-id")

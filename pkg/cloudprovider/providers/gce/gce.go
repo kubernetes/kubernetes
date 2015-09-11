@@ -673,6 +673,11 @@ func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	return strconv.FormatUint(inst.Id, 10), nil
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (gce *GCECloud) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (gce *GCECloud) InstanceID(instance string) (string, error) {
 	return gce.projectID + "/" + gce.zone + "/" + canonicalizeInstanceName(instance), nil

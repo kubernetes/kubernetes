@@ -816,6 +816,14 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		labels, err := instances.Labels(kl.nodeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get labels from cloud provider: %v", err)
+		}
+		for k, v := range labels {
+			node.ObjectMeta.Labels[k] = v
+		}
 	} else {
 		node.Spec.ExternalID = kl.hostname
 	}

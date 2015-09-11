@@ -184,6 +184,11 @@ func (c *MesosCloud) ExternalID(instance string) (string, error) {
 	return ip.String(), nil
 }
 
+// Labels returns the cloud provider node labels of the specified instance.
+func (c *MesosCloud) Labels(name string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (c *MesosCloud) InstanceID(name string) (string, error) {
 	return "", nil
