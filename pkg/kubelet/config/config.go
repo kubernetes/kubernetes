@@ -216,6 +216,11 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
+			// Annotate the pod with the source before any comparison.
+			if ref.Annotations == nil {
+				ref.Annotations = make(map[string]string)
+			}
+			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			if existing, found := pods[name]; found {
 				if checkAndUpdatePod(existing, ref) {
 					// this is an update
@@ -226,10 +231,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				continue
 			}
 			// this is an add
-			if ref.Annotations == nil {
-				ref.Annotations = make(map[string]string)
-			}
-			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			recordFirstSeenTime(ref)
 			pods[name] = ref
 			adds.Pods = append(adds.Pods, ref)
@@ -258,6 +259,11 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
+			// Annotate the pod with the source before any comparison.
+			if ref.Annotations == nil {
+				ref.Annotations = make(map[string]string)
+			}
+			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
 				if checkAndUpdatePod(existing, ref) {
@@ -268,10 +274,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				// this is a no-op
 				continue
 			}
-			if ref.Annotations == nil {
-				ref.Annotations = make(map[string]string)
-			}
-			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			recordFirstSeenTime(ref)
 			pods[name] = ref
 			adds.Pods = append(adds.Pods, ref)
@@ -391,6 +393,9 @@ func updateAnnotations(existing, ref *api.Pod) {
 // checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
 // returns false if there was no update.
 func checkAndUpdatePod(existing, ref *api.Pod) bool {
+	// Overwrite the first-seen time with the existing one. This is our own
+	// internal annotation, there is no need to update.
+	ref.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubelet.ConfigFirstSeenAnnotationKey]
 	// TODO: it would be better to update the whole object and only preserve certain things
 	//       like the source annotation or the UID (to ensure safety)
 	if reflect.DeepEqual(existing.Spec, ref.Spec) &&
