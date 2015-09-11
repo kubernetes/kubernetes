@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	osexec "os/exec"
 	"path"
 	"regexp"
 	"strconv"
@@ -54,11 +53,11 @@ func setUpContainerInternal(e exec.Interface, containerPid int, containerInterfa
 }
 
 func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, containerInterfaceName string) (string, error) {
-	nsenterPath, err := osexec.LookPath("nsenter")
+	nsenterPath, err := e.LookPath("nsenter")
 	if err != nil {
 		return "", err
 	}
-	ethtoolPath, err := osexec.LookPath("ethtool")
+	ethtoolPath, err := e.LookPath("ethtool")
 	if err != nil {
 		return "", err
 	}
