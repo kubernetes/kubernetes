@@ -1722,12 +1722,10 @@ var supportedNamespaceNetworkPolicy = util.NewStringSet(string(api.NamespacePubl
 func validateNetworkPolicy(networkPolicy string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if namespace.Spec.NetworkPolicy == "" {
+	if networkPolicy == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.networkPolicy"))
-	} else {
-		if !supportedNamespaceNetworkPolicy.Has(networkPolicy) {
-			allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.networkPolicy", networkPolicy, supportedNamespaceNetworkPolicy.List()))
-		}
+	} else if !supportedNamespaceNetworkPolicy.Has(networkPolicy) {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.networkPolicy", networkPolicy, supportedNamespaceNetworkPolicy.List()))
 	}
 
 	return allErrs

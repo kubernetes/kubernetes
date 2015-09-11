@@ -38,26 +38,42 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/registry/namespace"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
 	registry         Registry
 	endpoints        endpoint.Registry
+	namespace        namespace.Registry
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface) *REST {
+func NewStorage(registry Registry, endpoints endpoint.Registry, namespace namespace.Registry,
+    serviceIPs ipallocator.Interface, serviceNodePorts portallocator.Interface) *REST {
 	return &REST{
 		registry:         registry,
 		endpoints:        endpoints,
+		namespace:        namespace,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
 	}
 }
+
+
+func (rs *REST) GetNamespaceNetworkPolicy(namespaceName string) (string, error) {
+	ctx := api.WithNamespace(api.NewContext(), namespaceName)
+    namespace, err := rs.namespace.GetNamespace(ctx, namespaceName)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(namespace.Spec.NetworkPolicy), err
+}
+
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
@@ -112,6 +128,15 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 				return nil, errors.NewInvalid("Service", service.Name, el)
 			}
 			servicePort.NodePort = nodePort
+		}
+	}
+
+	if service.Spec.Type == api.ServiceTypePrivate{
+		nsPolicy, err := rs.GetNamespaceNetworkPolicy(string(service.ObjectMeta.Namespace))
+		if err != nil {
+			return nil, err
+		} else if nsPolicy == "Public" {
+			return nil, errors.NewConflict("service", string(api.ServiceTypePrivate), fmt.Errorf("ServiceTypePrivate cannot belong to a public namespace"))
 		}
 	}
 

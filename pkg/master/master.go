@@ -487,7 +487,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator),
+		"services":               service.NewStorage(m.serviceRegistry, m.endpointRegistry, m.namespaceRegistry, serviceClusterIPAllocator, serviceNodePortAllocator),
 		"endpoints":              endpointsStorage,
 		"nodes":                  nodeStorage,
 		"nodes/status":           nodeStatusStorage,
