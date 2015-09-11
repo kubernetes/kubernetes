@@ -33,8 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	_ "k8s.io/kubernetes/pkg/expapi"
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	_ "k8s.io/kubernetes/pkg/apis/experimental"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
 
 	flag "github.com/spf13/pflag"
 )

@@ -38,7 +38,7 @@ with a number of existing API types and with the [API
 conventions](api-conventions.md).  If creating a new API
 type/resource, we also recommend that you first send a PR containing
 just a proposal for the new API types, and that you initially target
-the experimental API (pkg/expapi).
+the experimental API (pkg/apis/experimental).
 
 The Kubernetes API has two major components - the internal structures and
 the versioned APIs.  The versioned APIs are intended to be stable, while the
@@ -399,10 +399,10 @@ The conversion code resides with each versioned API. There are two files:
      functions
    - `pkg/api/<version>/conversion_generated.go` containing auto-generated
      conversion functions
-   - `pkg/expapi/<version>/conversion.go` containing manually written conversion
-     functions
-   - `pkg/expapi/<version>/conversion_generated.go` containing auto-generated
+   - `pkg/apis/experimental/<version>/conversion.go` containing manually written
      conversion functions
+   - `pkg/apis/experimental/<version>/conversion_generated.go` containing
+     auto-generated conversion functions
 
 Since auto-generated conversion functions are using manually written ones,
 those manually written should be named with a defined convention, i.e. a function
@@ -437,7 +437,7 @@ of your versioned api objects.
 
 The deep copy code resides with each versioned API:
    - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
-   - `pkg/expapi/<version>/deep_copy_generated.go` containing auto-generated copy functions
+   - `pkg/apis/experimental/<version>/deep_copy_generated.go` containing auto-generated copy functions
 
 To regenerate them:
    - run
@@ -445,6 +445,23 @@ To regenerate them:
 ```sh
 hack/update-generated-deep-copies.sh
 ```
+
+## Making a new API Group
+
+This section is under construction, as we make the tooling completely generic.
+
+At the moment, you'll have to make a new directory under pkg/apis/; copy the
+directory structure from pkg/apis/experimental. Add the new group/version to all
+of the hack/{verify,update}-generated-{deep-copy,conversions,swagger}.sh files
+in the appropriate places--it should just require adding your new group/version
+to a bash array. You will also need to make sure your new types are imported by
+the generation commands (cmd/gendeepcopy/ & cmd/genconversion). These
+instructions may not be complete and will be updated as we gain experience.
+
+Adding API groups outside of the pkg/apis/ directory is not currently supported,
+but is clearly desirable. The deep copy & conversion generators need to work by
+parsing go files instead of by reflection; then they will be easy to point at
+arbitrary directories: see issue [#13775](http://issue.k8s.io/13775).
 
 ## Update the fuzzer
 

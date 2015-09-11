@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/expapi"
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	_ "k8s.io/kubernetes/pkg/apis/experimental"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -44,6 +44,32 @@ var (
 	groupVersion = flag.StringP("version", "v", "", "groupPath/version for deep copies.")
 	overwrites   = flag.StringP("overwrites", "o", "", "Comma-separated overwrites for package names")
 )
+
+// types inside the api package don't need to say "api.Scheme"; all others do.
+func destScheme(group, version string) string {
+	if group == "api" && version == "" {
+		return "Scheme"
+	}
+	return "api.Scheme"
+}
+
+// We're moving to pkg/apis/group/version. This handles new and legacy packages.
+func pkgPath(group, version string) string {
+	if group == "" {
+		group = "api"
+	}
+	gv := group
+	if version != "" {
+		gv = path.Join(group, version)
+	}
+	switch {
+	case group == "api":
+		// TODO(lavalamp): remove this special case when we move api to apis/api
+		return path.Join(pkgBase, gv)
+	default:
+		return path.Join(pkgBase, "apis", gv)
+	}
+}
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -65,10 +91,7 @@ func main() {
 
 	group, version := path.Split(*groupVersion)
 	group = strings.TrimRight(group, "/")
-	registerTo := "api.Scheme"
-	if *groupVersion == "api/" {
-		registerTo = "Scheme"
-	}
+	registerTo := destScheme(group, version)
 	pkgname := group
 	if len(version) != 0 {
 		pkgname = version
@@ -79,7 +102,7 @@ func main() {
 		glog.Fatalf("error writing package line: %v", err)
 	}
 
-	versionPath := path.Join(pkgBase, group, version)
+	versionPath := pkgPath(group, version)
 	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
@@ -93,7 +116,7 @@ func main() {
 		}
 	}
 	for _, knownType := range api.Scheme.KnownTypes(version) {
-		if !strings.HasPrefix(knownType.PkgPath(), versionPath) {
+		if knownType.PkgPath() != versionPath {
 			continue
 		}
 		if err := generator.AddType(knownType); err != nil {

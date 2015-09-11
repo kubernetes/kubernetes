@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -101,7 +101,7 @@ func TestCodec(t *testing.T) {
 			}
 			continue
 		}
-		rsrcObj, ok := obj.(*expapi.ThirdPartyResourceData)
+		rsrcObj, ok := obj.(*experimental.ThirdPartyResourceData)
 		if !ok {
 			t.Errorf("[%s] unexpected object: %v", test.name, obj)
 			continue

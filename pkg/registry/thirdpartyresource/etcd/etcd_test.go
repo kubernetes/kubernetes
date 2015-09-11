@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
-	// Ensure that expapi/v1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	// Ensure that experimental/v1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -35,13 +35,13 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewThirdPartyResource(name string) *expapi.ThirdPartyResource {
-	return &expapi.ThirdPartyResource{
+func validNewThirdPartyResource(name string) *experimental.ThirdPartyResource {
+	return &experimental.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Versions: []expapi.APIVersion{
+		Versions: []experimental.APIVersion{
 			{
 				Name: "stable/v1",
 			},
@@ -58,7 +58,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		rsrc,
 		// invalid
-		&expapi.ThirdPartyResource{},
+		&experimental.ThirdPartyResource{},
 	)
 }
 
@@ -70,7 +70,7 @@ func TestUpdate(t *testing.T) {
 		validNewThirdPartyResource("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.ThirdPartyResource)
+			object := obj.(*experimental.ThirdPartyResource)
 			object.Description = "new description"
 			return object
 		},

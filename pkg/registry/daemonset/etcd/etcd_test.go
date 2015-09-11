@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -33,13 +33,13 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func newValidDaemonSet() *expapi.DaemonSet {
-	return &expapi.DaemonSet{
+func newValidDaemonSet() *experimental.DaemonSet {
+	return &experimental.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: expapi.DaemonSetSpec{
+		Spec: experimental.DaemonSetSpec{
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -72,8 +72,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		ds,
 		// invalid (invalid selector)
-		&expapi.DaemonSet{
-			Spec: expapi.DaemonSetSpec{
+		&experimental.DaemonSet{
+			Spec: experimental.DaemonSetSpec{
 				Selector: map[string]string{},
 				Template: validDaemonSet.Spec.Template,
 			},
@@ -89,28 +89,28 @@ func TestUpdate(t *testing.T) {
 		newValidDaemonSet(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.DaemonSet)
+			object := obj.(*experimental.DaemonSet)
 			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.DaemonSet)
+			object := obj.(*experimental.DaemonSet)
 			object.UID = "newUID"
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.DaemonSet)
+			object := obj.(*experimental.DaemonSet)
 			object.Name = ""
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.DaemonSet)
+			object := obj.(*experimental.DaemonSet)
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.DaemonSet)
+			object := obj.(*experimental.DaemonSet)
 			object.Spec.Selector = map[string]string{}
 			return object
 		},
