@@ -23,10 +23,6 @@ existing replication controller and overwrite at least one (common) label in its
 
 .SH OPTIONS
 .PP
-\fB\-\-cache\-schema\fP=true
-    If true, use/store local schema files
-
-.PP
 \fB\-\-deployment\-label\-key\fP="deployment"
     The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when \-\-image is specified, ignored otherwise
 
@@ -63,6 +59,10 @@ existing replication controller and overwrite at least one (common) label in its
 .PP
 \fB\-\-rollback\fP=false
     If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout
+
+.PP
+\fB\-\-schema\-cache\-dir\fP="/tmp/kubectl.schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'
 
 .PP
 \fB\-a\fP, \fB\-\-show\-all\fP=false
