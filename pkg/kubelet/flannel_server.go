@@ -29,7 +29,6 @@ const (
 	dockerOptsKey                = "DOCKER_OPTS"
 	flannelSubnetFile            = "/var/run/flannel/subnet.env"
 	// TODO: Expose network.json through cmd line and set in local cluster
-	networkConfig = "/var/run/flannel/network.json"
 )
 
 type handler func(http.ResponseWriter, *http.Request)
@@ -79,7 +78,7 @@ func (f *FlannelServer) handleGetNetworkConfig(w http.ResponseWriter, r *http.Re
 	defer r.Body.Close()
 
 	checkNetwork(r)
-	b, err := ioutil.ReadFile(networkConfig)
+	b, err := ioutil.ReadFile(f.networkConfig)
 	if err != nil {
 		badResponse(w, err)
 		return
@@ -168,12 +167,13 @@ func (f *FlannelServer) handle(rw http.ResponseWriter, req *http.Request) {
 
 type FlannelServer struct {
 	*KubeFlannelClient
-	port       int
-	subnetFile string
+	port          int
+	subnetFile    string
+	networkConfig string
 }
 
-func NewFlannelServer(client *client.Client) *FlannelServer {
-	return &FlannelServer{NewKubeFlannelClient(client), flannelPort, flannelSubnetFile}
+func NewFlannelServer(client *client.Client, networkConfig string) *FlannelServer {
+	return &FlannelServer{NewKubeFlannelClient(client), flannelPort, flannelSubnetFile, networkConfig}
 }
 
 func (f *FlannelServer) RunServer(stopCh <-chan struct{}) {

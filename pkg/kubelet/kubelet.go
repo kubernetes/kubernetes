@@ -198,7 +198,8 @@ func NewMainKubelet(
 	daemonEndpoints *api.NodeDaemonEndpoints,
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
-) (*Kubelet, error) {
+	useDefaultOverlay bool,
+	networkConfig string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -312,10 +313,14 @@ func NewMainKubelet(
 		daemonEndpoints:                daemonEndpoints,
 		flannelServer:                  &FlannelServer{kubeClient},
 		useDefaultOverlay:              useDefaultOverlay,
+
+		// Flannel parameters
+		useDefaultOverlay: useDefaultOverlay && kubeClient != nil,
+		networkConfig:     networkConfig,
 	}
-	if klet.useDefaultOverlay && kubeClient != nil {
+	if klet.useDefaultOverlay {
 		// TODO: Don't cast client, don't hardcode flannel as overlay etc
-		klet.flannelServer = NewFlannelServer(kubeClient.(*client.Client))
+		klet.flannelServer = NewFlannelServer(kubeClient.(*client.Client), klet.networkConfig)
 		go klet.flannelServer.RunServer(util.NeverStop)
 	}
 
@@ -654,6 +659,12 @@ type Kubelet struct {
 
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *api.NodeDaemonEndpoints
+	// Flannel parameters
+	useDefaultOverlay bool
+	networkConfig     string
+
+	// Serves flannel interface over http
+	flannelServer *FlannelServer
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -2451,14 +2462,14 @@ func (kl *Kubelet) syncNetworkStatus() {
 		// We need to wait for flannel to write the mtu before restarting docker
 		// Note that the podCIDR returned by flannel is the same as the one
 		// received from the nodecontroller, so we can safely ignore it.
-		if kl.useDefaultOverlay && !kl.networkConfigured && kl.flannelServer != nil {
+		if kl.useDefaultOverlay && !kl.networkConfigured {
 			podCIDR, err := kl.flannelServer.Handshake()
 			if err != nil {
 				glog.Infof(" server handshake failed %v", err)
 				return
 			}
 			if kl.podCIDR != podCIDR {
-				glog.Infof(
+				glog.Warningf(
 					"Kubelet and flannel pod cidrs don't match, kubelet %v flannel %v",
 					kl.podCIDR, podCIDR)
 			}

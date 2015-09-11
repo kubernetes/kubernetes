@@ -63,6 +63,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// TODO: Cmd line arg
+const useDefaultOverlay = true
+
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
 	Port                              int
@@ -298,8 +301,10 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	if s.AllocateNodeCIDRs {
-		if cloud == nil || true {
+		if cloud == nil {
 			glog.Warning("allocate-node-cidrs is set, but no cloud provider specified. Will not manage routes.")
+		} else if useDefaultOverlay {
+			glog.Infof("Not starting route controller, overlay network in use")
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
 		} else {
