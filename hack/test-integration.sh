@@ -58,7 +58,7 @@ runTests() {
   cleanup
 }
 
-KUBE_API_VERSIONS="v1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
+KUBE_API_VERSIONS="v1,experimental/v1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
