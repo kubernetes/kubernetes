@@ -118,45 +118,51 @@ else
       # This is the best option, but it is sadly broken on most distros
       # Bug: https://github.com/docker/docker/issues/4036
 
-      # 95% goes to the docker thin-pool
-      lvcreate -l 95%VG --thinpool docker-thinpool vg-ephemeral
+      # 80% goes to the docker thin-pool; we want to leave some space for host-volumes
+      lvcreate -l 80%VG --thinpool docker-thinpool vg-ephemeral
 
       DOCKER_OPTS="${DOCKER_OPTS} --storage-opt dm.thinpooldev=/dev/mapper/vg--ephemeral-docker--thinpool"
       # Note that we don't move docker; docker goes direct to the thinpool
-    else
+
+      # Remaining space (20%) is for kubernetes data
+      # TODO: Should this be a thin pool?  e.g. would we ever want to snapshot this data?
+      lvcreate -l 100%FREE -n kubernetes vg-ephemeral
+      mkfs -t ext4 /dev/vg-ephemeral/kubernetes
+      mkdir -p /mnt/ephemeral/kubernetes
+      echo "/dev/vg-ephemeral/kubernetes  /mnt/ephemeral/kubernetes  ext4  noatime  0 0" >> /etc/fstab
+      mount /mnt/ephemeral/kubernetes
+
+      move_kubelet="/mnt/ephemeral/kubernetes"
+     else
       # aufs
 
-      # Create a docker lv, use docker on it
-      # 95% goes to the docker thin-pool
+      # We used to split docker & kubernetes, but we no longer do that, because
+      # host volumes go into the kubernetes area, and it is otherwise very easy
+      # to fill up small volumes.
+
       release=`lsb_release -c -s`
       if [[ "${release}" != "wheezy" ]] ; then
-        lvcreate -l 95%VG --thinpool docker-thinpool vg-ephemeral
+        lvcreate -l 100%FREE --thinpool pool-ephemeral vg-ephemeral
 
-        THINPOOL_SIZE=$(lvs vg-ephemeral/docker-thinpool -o LV_SIZE --noheadings --units M --nosuffix)
-        lvcreate -V${THINPOOL_SIZE}M -T vg-ephemeral/docker-thinpool -n docker
+        THINPOOL_SIZE=$(lvs vg-ephemeral/pool-ephemeral -o LV_SIZE --noheadings --units M --nosuffix)
+        lvcreate -V${THINPOOL_SIZE}M -T vg-ephemeral/pool-ephemeral -n ephemeral
       else
         # Thin provisioning not supported by Wheezy
         echo "Detected wheezy; won't use LVM thin provisioning"
-        lvcreate -l 95%VG -n docker vg-ephemeral
+        lvcreate -l 100%VG -n ephemeral vg-ephemeral
       fi
 
-      mkfs -t ext4 /dev/vg-ephemeral/docker
-      mkdir -p /mnt/ephemeral/docker
-      echo "/dev/vg-ephemeral/docker  /mnt/ephemeral/docker  ext4  noatime  0 0" >> /etc/fstab
-      mount /mnt/ephemeral/docker
+      mkfs -t ext4 /dev/vg-ephemeral/ephemeral
+      mkdir -p /mnt/ephemeral
+      echo "/dev/vg-ephemeral/ephemeral  /mnt/ephemeral  ext4  noatime  0 0" >> /etc/fstab
+      mount /mnt/ephemeral
+
+      mkdir -p /mnt/ephemeral/kubernetes
+
       move_docker="/mnt/ephemeral"
-    fi
-
-    # Remaining 5% is for kubernetes data
-    # TODO: Should this be a thin pool?  e.g. would we ever want to snapshot this data?
-    lvcreate -l 100%FREE -n kubernetes vg-ephemeral
-    mkfs -t ext4 /dev/vg-ephemeral/kubernetes
-    mkdir -p /mnt/ephemeral/kubernetes
-    echo "/dev/vg-ephemeral/kubernetes  /mnt/ephemeral/kubernetes  ext4  noatime  0 0" >> /etc/fstab
-    mount /mnt/ephemeral/kubernetes
-
-    move_kubelet="/mnt/ephemeral/kubernetes"
-  else
+      move_kubelet="/mnt/ephemeral/kubernetes"
+     fi
+ else
     echo "Ignoring unknown DOCKER_STORAGE: ${docker_storage}"
   fi
 fi
