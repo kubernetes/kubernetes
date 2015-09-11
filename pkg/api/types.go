@@ -638,6 +638,24 @@ type VolumeMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// Required.
 	MountPath string `json:"mountPath"`
+	// Optional: Policies of VolumeMount.
+	Policy *VolumeMountPolicy `json:"policy,omitempty"`
+}
+
+// VolumeMountPolicy describes policies of a VolumeMount.
+type VolumeMountPolicy struct {
+	// Optional: LogDir policy.
+	LogDir *LogDirPolicy `json:"logDir,omitempty"`
+}
+
+// LogDirPolicy describes a policy of logDir, include log rotation and maximum log file size.
+type LogDirPolicy struct {
+	// Optional: Glob pattern of log files.
+	Glob string `json:"glob,omitempty"`
+	// Optional: Log rotation.
+	Rotate string `json:"rotate,omitempty"`
+	// Optional: Maximum log file size.
+	MaxFileSize int `json:"maxFileSize,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.

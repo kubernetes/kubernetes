@@ -817,6 +817,13 @@ func deepCopy_api_LocalObjectReference(in LocalObjectReference, out *LocalObject
 	return nil
 }
 
+func deepCopy_api_LogDirPolicy(in LogDirPolicy, out *LogDirPolicy, c *conversion.Cloner) error {
+	out.Glob = in.Glob
+	out.Rotate = in.Rotate
+	out.MaxFileSize = in.MaxFileSize
+	return nil
+}
+
 func deepCopy_api_NFSVolumeSource(in NFSVolumeSource, out *NFSVolumeSource, c *conversion.Cloner) error {
 	out.Server = in.Server
 	out.Path = in.Path
@@ -2069,6 +2076,26 @@ func deepCopy_api_VolumeMount(in VolumeMount, out *VolumeMount, c *conversion.Cl
 	out.Name = in.Name
 	out.ReadOnly = in.ReadOnly
 	out.MountPath = in.MountPath
+	if in.Policy != nil {
+		out.Policy = new(VolumeMountPolicy)
+		if err := deepCopy_api_VolumeMountPolicy(*in.Policy, out.Policy, c); err != nil {
+			return err
+		}
+	} else {
+		out.Policy = nil
+	}
+	return nil
+}
+
+func deepCopy_api_VolumeMountPolicy(in VolumeMountPolicy, out *VolumeMountPolicy, c *conversion.Cloner) error {
+	if in.LogDir != nil {
+		out.LogDir = new(LogDirPolicy)
+		if err := deepCopy_api_LogDirPolicy(*in.LogDir, out.LogDir, c); err != nil {
+			return err
+		}
+	} else {
+		out.LogDir = nil
+	}
 	return nil
 }
 
@@ -2270,6 +2297,7 @@ func init() {
 		deepCopy_api_LoadBalancerIngress,
 		deepCopy_api_LoadBalancerStatus,
 		deepCopy_api_LocalObjectReference,
+		deepCopy_api_LogDirPolicy,
 		deepCopy_api_NFSVolumeSource,
 		deepCopy_api_Namespace,
 		deepCopy_api_NamespaceList,
@@ -2340,6 +2368,7 @@ func init() {
 		deepCopy_api_TypeMeta,
 		deepCopy_api_Volume,
 		deepCopy_api_VolumeMount,
+		deepCopy_api_VolumeMountPolicy,
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
 		deepCopy_util_IntOrString,
