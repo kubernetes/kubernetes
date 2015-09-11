@@ -182,9 +182,24 @@ else
 fi
 echo "${reset}"
 
+echo "Running unit tests in changed directories... "
+for dir in $(git diff --cached --name-only --diff-filter ACM |grep -e ^pkg/ -e ^cmd/ |xargs -r dirname |sort |uniq); do
+  echo -ne "- ${dir}... "
+  if ! hack/test-go.sh "$dir" > /dev/null; then
+    echo "${red}ERROR!"
+    echo "The tests in $dir failed, run:"
+    echo "  hack/test-go.sh $dir"
+    exit_code=1
+  else
+    echo "${green}OK"
+  fi
+  echo -n ${reset}
+done
+echo
+
 if [[ "${exit_code}" != 0 ]]; then
   echo "${red}Aborting commit${reset}"
 fi
-exit ${exit_code}
 
+exit ${exit_code}
 # ex: ts=2 sw=2 et filetype=sh
