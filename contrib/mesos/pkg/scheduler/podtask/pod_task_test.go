@@ -146,10 +146,10 @@ func TestEmptyOffer(t *testing.T) {
 	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
 	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
 
-	if ok := DefaultPredicate(task, nil); ok {
+	if ok := DefaultPredicate(task, nil, nil); ok {
 		t.Fatalf("accepted nil offer")
 	}
-	if ok := DefaultPredicate(task, &mesos.Offer{}); ok {
+	if ok := DefaultPredicate(task, &mesos.Offer{}, nil); ok {
 		t.Fatalf("accepted empty offer")
 	}
 }
@@ -176,7 +176,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", 0.001),
 		},
 	}
-	if ok := DefaultPredicate(task, offer); ok {
+	if ok := DefaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
@@ -186,7 +186,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", t_min_mem),
 		},
 	}
-	if ok := DefaultPredicate(task, offer); !ok {
+	if ok := DefaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 }
@@ -203,7 +203,7 @@ func TestAcceptOfferPorts(t *testing.T) {
 			rangeResource("ports", []uint64{1, 1}),
 		},
 	}
-	if ok := DefaultPredicate(task, offer); !ok {
+	if ok := DefaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -218,17 +218,17 @@ func TestAcceptOfferPorts(t *testing.T) {
 	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
 	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
 
-	if ok := DefaultPredicate(task, offer); ok {
+	if ok := DefaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := DefaultPredicate(task, offer); !ok {
+	if ok := DefaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 0
-	if ok := DefaultPredicate(task, offer); !ok {
+	if ok := DefaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -236,12 +236,12 @@ func TestAcceptOfferPorts(t *testing.T) {
 		mutil.NewScalarResource("cpus", t_min_cpu),
 		mutil.NewScalarResource("mem", t_min_mem),
 	}
-	if ok := DefaultPredicate(task, offer); ok {
+	if ok := DefaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := DefaultPredicate(task, offer); ok {
+	if ok := DefaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 }
@@ -270,21 +270,61 @@ func TestGeneratePodName(t *testing.T) {
 func TestNodeSelector(t *testing.T) {
 	t.Parallel()
 
-	sel1 := map[string]string{"rack": "a"}
-	sel2 := map[string]string{"rack": "a", "gen": "2014"}
+	sel1 := map[string]string{"k8s.mesosphere.io/attribute-rack": "a"}
+	sel2 := map[string]string{"k8s.mesosphere.io/attribute-rack": "a", "k8s.mesosphere.io/attribute-gen": "2014"}
+	sel3 := map[string]string{"kubernetes.io/hostname": "node1"}
+	sel4 := map[string]string{"kubernetes.io/hostname": "node2"}
+	sel5 := map[string]string{"k8s.mesosphere.io/attribute-old": "42"}
+	sel6 := map[string]string{"some.other/label": "43"}
+
+	newNode := func(hostName string, l map[string]string) *api.Node {
+		nodeLabels := map[string]string{"kubernetes.io/hostname": hostName}
+		if l != nil {
+			for k, v := range l {
+				nodeLabels[k] = v
+			}
+		}
+		return &api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   hostName,
+				Labels: nodeLabels,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: hostName,
+			},
+		}
+	}
+	node1 := newNode("node1", nil)
+	node2 := newNode("node2", nil)
+	node3 := newNode("node3", map[string]string{
+		"k8s.mesosphere.io/attribute-old": "42",
+		"k8s.mesosphere.io/attribute-gen": "2015",
+		"some.other/label":                "43",
+	})
 
 	tests := []struct {
 		selector map[string]string
 		attrs    []*mesos.Attribute
+		node     *api.Node
 		ok       bool
+		desc     string
 	}{
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a")}, true},
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "b")}, false},
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, true},
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newScalarAttribute("num", 42.0)}, true},
-		{sel1, []*mesos.Attribute{newScalarAttribute("rack", 42.0)}, false},
-		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, true},
-		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2015")}, false},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a")}, node1, true, "label value matches"},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "b")}, node1, false, "label value does not match"},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, node1, true, "required labels match"},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newScalarAttribute("num", 42.0)}, node1, true, "scalar label matches"},
+		{sel1, []*mesos.Attribute{newScalarAttribute("rack", 42.0)}, node1, false, "scalar label does not match"},
+		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, node1, true, "all labels match"},
+		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2015")}, node1, false, "one label does not match"},
+
+		{sel3, []*mesos.Attribute{}, node1, true, "hostname label matches"},
+		{sel4, []*mesos.Attribute{}, node1, false, "hostname label does not match"},
+		{sel4, []*mesos.Attribute{}, node2, true, "hostname label does not match"},
+
+		{sel5, []*mesos.Attribute{}, node3, false, "old slave attribute is removed"},
+		{sel6, []*mesos.Attribute{}, node1, false, "non-slave attribute does not match"},
+		{sel6, []*mesos.Attribute{}, node3, true, "non-slave attribute matches"},
+		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, node3, true, "old slave attributes are overwritten"},
 	}
 
 	for _, ts := range tests {
@@ -296,9 +336,10 @@ func TestNodeSelector(t *testing.T) {
 				mutil.NewScalarResource("mem", t_min_mem),
 			},
 			Attributes: ts.attrs,
+			Hostname:   &ts.node.Name,
 		}
-		if got, want := DefaultPredicate(task, offer), ts.ok; got != want {
-			t.Fatalf("expected acceptance of offer %v for selector %v to be %v, got %v:", want, got, ts.attrs, ts.selector)
+		if got, want := DefaultPredicate(task, offer, ts.node), ts.ok; got != want {
+			t.Fatalf("expected acceptance of offer for selector %v to be %v, got %v: %q", ts.selector, want, got, ts.desc)
 		}
 	}
 }

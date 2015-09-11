@@ -31,6 +31,7 @@ import (
 	bindings "github.com/mesos/mesos-go/scheduler"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	offerMetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
@@ -82,6 +83,7 @@ type KubernetesScheduler struct {
 	etcdClient        tools.EtcdClient
 	failoverTimeout   float64 // in seconds
 	reconcileInterval int64
+	nodeRegistrator   node.Registrator
 
 	// Mesos context.
 
@@ -116,6 +118,7 @@ type Config struct {
 	FailoverTimeout   float64
 	ReconcileInterval int64
 	ReconcileCooldown time.Duration
+	LookupNode        node.LookupFunc
 }
 
 // New creates a new KubernetesScheduler
@@ -131,16 +134,23 @@ func New(config Config) *KubernetesScheduler {
 		etcdClient:        config.EtcdClient,
 		failoverTimeout:   config.FailoverTimeout,
 		reconcileInterval: config.ReconcileInterval,
+		nodeRegistrator:   node.NewRegistrator(config.Client, config.LookupNode),
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
-				// filter the offers: the executor IDs must not identify a kubelet-
-				// executor with a group that doesn't match ours
+				// the node must be registered and have up-to-date labels
+				n := config.LookupNode(o.GetHostname())
+				if n == nil || !node.IsUpToDate(n, node.SlaveAttributesToLabels(o.GetAttributes())) {
+					return false
+				}
+
+				// the executor IDs must not identify a kubelet-executor with a group that doesn't match ours
 				for _, eid := range o.GetExecutorIds() {
 					execuid := uid.Parse(eid.GetValue())
 					if execuid.Name() == execcfg.DefaultInfoID && execuid.Group() != k.executorGroup {
 						return false
 					}
 				}
+
 				return true
 			},
 			DeclineOffer: func(id string) <-chan error {
@@ -183,6 +193,7 @@ func (k *KubernetesScheduler) Init(electedMaster proc.Process, pl PluginInterfac
 	k.plugin = pl
 	k.offers.Init(k.terminate)
 	k.InstallDebugHandlers(mux)
+	k.nodeRegistrator.Run(k.terminate)
 	return k.recoverTasks()
 }
 
@@ -323,6 +334,15 @@ func (k *KubernetesScheduler) ResourceOffers(driver bindings.SchedulerDriver, of
 	for _, offer := range offers {
 		slaveId := offer.GetSlaveId().GetValue()
 		k.slaveHostNames.Register(slaveId, offer.GetHostname())
+
+		// create api object if not existing already
+		if k.nodeRegistrator != nil {
+			labels := node.SlaveAttributesToLabels(offer.GetAttributes())
+			_, err := k.nodeRegistrator.Register(offer.GetHostname(), labels)
+			if err != nil {
+				log.Error(err)
+			}
+		}
 	}
 }
 
