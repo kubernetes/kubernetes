@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -154,9 +154,9 @@ func detachDiskLogError(ebs *awsElasticBlockStore) {
 }
 
 // getVolumeProvider returns the AWS Volumes interface
-func (ebs *awsElasticBlockStore) getVolumeProvider() (aws_cloud.Volumes, error) {
+func (ebs *awsElasticBlockStore) getVolumeProvider() (cloudprovider.Volumes, error) {
 	cloud := ebs.plugin.host.GetCloudProvider()
-	volumes, ok := cloud.(aws_cloud.Volumes)
+	volumes, ok := cloud.Volumes()
 	if !ok {
 		return nil, fmt.Errorf("Cloud provider does not support volumes")
 	}

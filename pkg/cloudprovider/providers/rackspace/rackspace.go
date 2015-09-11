@@ -376,6 +376,11 @@ func (os *Rackspace) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
+// Volumes returns an implementation of Volumes for Rackspace
+func (os *Rackspace) Volumes() (cloudprovider.Volumes, bool) {
+	return nil, false
+}
+
 func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 

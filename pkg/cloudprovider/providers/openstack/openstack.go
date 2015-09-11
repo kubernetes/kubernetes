@@ -768,6 +768,11 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
+// Volumes returns an implementation of Volumes for OpenStack
+func (gce *OpenStack) Volumes() (cloudprovider.Volumes, bool) {
+	return nil, false
+}
+
 // Attaches given cinder volume to the compute running kubelet
 func (os *OpenStack) AttachDisk(diskName string) (string, error) {
 	disk, err := os.getVolume(diskName)

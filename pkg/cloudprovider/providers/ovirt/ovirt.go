@@ -143,6 +143,11 @@ func (v *OVirtCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
+// Volumes returns an implementation of Volumes for OVirtCloud
+func (gce *OVirtCloud) Volumes() (cloudprovider.Volumes, bool) {
+	return nil, false
+}
+
 // NodeAddresses returns the NodeAddresses of a particular machine instance
 func (v *OVirtCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	instance, err := v.fetchInstance(name)

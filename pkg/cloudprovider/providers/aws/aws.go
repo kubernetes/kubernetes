@@ -133,26 +133,6 @@ type AWSMetadata interface {
 	GetMetaData(key string) ([]byte, error)
 }
 
-type VolumeOptions struct {
-	CapacityMB int
-}
-
-// Volumes is an interface for managing cloud-provisioned volumes
-// TODO: Allow other clouds to implement this
-type Volumes interface {
-	// Attach the disk to the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
-	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
-	// Detach the disk from the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
-	DetachDisk(instanceName string, volumeName string) error
-
-	// Create a volume with the specified options
-	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
-	DeleteVolume(volumeName string) error
-}
-
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
 // TODO: Allow other clouds to implement this
 type InstanceGroups interface {
@@ -636,6 +616,11 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 
 // Routes returns an implementation of Routes for Amazon Web Services.
 func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
+	return aws, true
+}
+
+// Volumes returns an implementation of Volumes for Amazon Web Services.
+func (aws *AWSCloud) Volumes() (cloudprovider.Volumes, bool) {
 	return aws, true
 }
 
@@ -1201,7 +1186,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 }
 
 // Implements Volumes.CreateVolume
-func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
+func (aws *AWSCloud) CreateVolume(volumeOptions *cloudprovider.VolumeOptions) (string, error) {
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	// This is only used for testing right now
 
