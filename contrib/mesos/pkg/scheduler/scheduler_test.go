@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"reflect"
 	"testing"
 
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -27,6 +28,8 @@ import (
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 //get number of non-expired offers from  offer registry
@@ -42,10 +45,47 @@ func getNumberOffers(os offers.Registry) int {
 	return walked
 }
 
-//test adding of ressource offer, should be added to offer registry and slavesf
+type mockRegistrator struct {
+	store cache.Store
+}
+
+func (r *mockRegistrator) Run(terminate <-chan struct{}) error {
+	return nil
+}
+
+func (r *mockRegistrator) Register(hostName string, labels map[string]string) (bool, error) {
+	obj, _, err := r.store.GetByKey(hostName)
+	if err != nil {
+		return false, err
+	}
+	if obj == nil {
+		return true, r.store.Add(&api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   hostName,
+				Labels: labels,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: hostName,
+			},
+			Status: api.NodeStatus{
+				Phase: api.NodePending,
+			},
+		})
+	} else {
+		n := obj.(*api.Node)
+		if reflect.DeepEqual(n.Labels, labels) {
+			return false, nil
+		}
+		n.Labels = labels
+		return true, r.store.Update(n)
+	}
+}
+
+//test adding of ressource offer, should be added to offer registry and slaves
 func TestResourceOffer_Add(t *testing.T) {
 	assert := assert.New(t)
 
+	registrator := &mockRegistrator{cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	testScheduler := &KubernetesScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
@@ -59,7 +99,8 @@ func TestResourceOffer_Add(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: slave.NewRegistry(),
+		slaveHostNames:  slave.NewRegistry(),
+		nodeRegistrator: registrator,
 	}
 
 	hostname := "h1"
@@ -67,6 +108,7 @@ func TestResourceOffer_Add(t *testing.T) {
 	offer1 := &mesos.Offer{Id: offerID1, Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers1 := []*mesos.Offer{offer1}
 	testScheduler.ResourceOffers(nil, offers1)
+	assert.Equal(1, len(registrator.store.List()))
 
 	assert.Equal(1, getNumberOffers(testScheduler.offers))
 	//check slave hostname

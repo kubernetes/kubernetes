@@ -63,8 +63,10 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -76,6 +78,7 @@ const (
 	defaultMesosUser         = "root" // should have privs to execute docker and iptables commands
 	defaultReconcileInterval = 300    // 5m default task reconciliation interval
 	defaultReconcileCooldown = 15 * time.Second
+	defaultNodeRelistPeriod  = 5 * time.Minute
 	defaultFrameworkName     = "Kubernetes"
 	defaultExecutorCPUs      = mresource.CPUShares(0.25)  // initial CPU allocated for executor
 	defaultExecutorMem       = mresource.MegaBytes(128.0) // initial memory allocated for executor
@@ -145,6 +148,7 @@ type SchedulerServer struct {
 	DockerCfgPath                 string
 	ContainPodResources           bool
 	AccountForPodResources        bool
+	nodeRelistPeriod              time.Duration
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -192,6 +196,7 @@ func NewSchedulerServer() *SchedulerServer {
 		KubeletSyncFrequency:   10 * time.Second,
 		ContainPodResources:    true,
 		AccountForPodResources: true,
+		nodeRelistPeriod:       defaultNodeRelistPeriod,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -245,6 +250,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.DefaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
 	fs.BoolVar(&s.ContainPodResources, "contain-pod-resources", s.ContainPodResources, "Reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
 	fs.BoolVar(&s.AccountForPodResources, "account-for-pod-resources", s.AccountForPodResources, "Allocate pod CPU and memory resources from offers (Default: true)")
+	fs.DurationVar(&s.nodeRelistPeriod, "node-monitor-period", s.nodeRelistPeriod, "Period between relisting of all nodes from the apiserver.")
 
 	fs.IntVar(&s.ExecutorLogV, "executor-logv", s.ExecutorLogV, "Logging verbosity of spawned minion and executor processes.")
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
@@ -678,7 +684,24 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 			podtask.DefaultMinimalProcurement)
 	}
 
-	fcfs := scheduler.NewFCFSPodScheduler(as)
+	// mirror all nodes into the nodeStore
+	nodesClient, err := s.createAPIServerClient()
+	if err != nil {
+		log.Fatalf("Cannot create client to watch nodes: %v", err)
+	}
+	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	nodeLW := cache.NewListWatchFromClient(nodesClient, "nodes", api.NamespaceAll, fields.Everything())
+	cache.NewReflector(nodeLW, &api.Node{}, nodeStore, s.nodeRelistPeriod).Run()
+
+	lookupNode := func(hostName string) *api.Node {
+		n, _, _ := nodeStore.GetByKey(hostName) // ignore error and return nil then
+		if n == nil {
+			return nil
+		}
+		return n.(*api.Node)
+	}
+
+	fcfs := scheduler.NewFCFSPodScheduler(as, lookupNode)
 	mesosPodScheduler := scheduler.New(scheduler.Config{
 		Schedcfg:          *sc,
 		Executor:          executor,
@@ -688,6 +711,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		FailoverTimeout:   s.FailoverTimeout,
 		ReconcileInterval: s.ReconcileInterval,
 		ReconcileCooldown: s.ReconcileCooldown,
+		LookupNode:        lookupNode,
 	})
 
 	masterUri := s.MesosMaster
