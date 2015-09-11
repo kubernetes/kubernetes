@@ -25,7 +25,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -167,8 +166,8 @@ func TestEncode_Ptr(t *testing.T) {
 		},
 	}
 	obj := runtime.Object(pod)
-	data, err := latest.GroupOrDie("").Codec.Encode(obj)
-	obj2, err2 := latest.GroupOrDie("").Codec.Decode(data)
+	data, err := testapi.Default.Codec().Encode(obj)
+	obj2, err2 := testapi.Default.Codec().Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -182,11 +181,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := latest.GroupOrDie("").Codec.Decode(badJSONMissingKind); err == nil {
+	if _, err := testapi.Default.Codec().Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := latest.GroupOrDie("").Codec.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := testapi.Default.Codec().Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
@@ -202,7 +201,7 @@ func BenchmarkEncode(b *testing.B) {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	for i := 0; i < b.N; i++ {
-		latest.GroupOrDie("").Codec.Encode(&pod)
+		testapi.Default.Codec().Encode(&pod)
 	}
 }
 
@@ -220,9 +219,9 @@ func BenchmarkDecode(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := latest.GroupOrDie("").Codec.Encode(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
 	for i := 0; i < b.N; i++ {
-		latest.GroupOrDie("").Codec.Decode(data)
+		testapi.Default.Codec().Decode(data)
 	}
 }
 
@@ -230,10 +229,10 @@ func BenchmarkDecodeInto(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := latest.GroupOrDie("").Codec.Encode(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
 	for i := 0; i < b.N; i++ {
 		obj := api.Pod{}
-		latest.GroupOrDie("").Codec.DecodeInto(data, &obj)
+		testapi.Default.Codec().DecodeInto(data, &obj)
 	}
 }
 
@@ -242,7 +241,7 @@ func BenchmarkDecodeJSON(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := latest.GroupOrDie("").Codec.Encode(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
 	for i := 0; i < b.N; i++ {
 		obj := api.Pod{}
 		json.Unmarshal(data, &obj)
