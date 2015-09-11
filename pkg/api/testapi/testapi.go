@@ -204,3 +204,7 @@ func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name stri
 func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 	return g.ResourcePathWithPrefix("", resource, namespace, name)
 }
+
+func (g TestGroup) RESTMapper() meta.RESTMapper {
+	return latest.GroupOrDie(g.Group).RESTMapper
+}
