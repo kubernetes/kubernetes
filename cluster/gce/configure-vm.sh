@@ -312,6 +312,11 @@ cluster_registry_disk_size: $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZ
 cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
 EOF
     fi
+    if [ -n "${ENABLE_HORIZONTAL_POD_AUTOSCALER:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_horizontal_pod_autoscaler: '$(echo "$ENABLE_HORIZONTAL_POD_AUTOSCALER" | sed -e "s/'/''/g")'
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
@@ -568,6 +573,11 @@ EOF
     # CIDR range.
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cbr-cidr: ${MASTER_IP_RANGE}
+EOF
+  fi
+  if [[ ! -z "${RUNTIME_CONFIG:-}" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
   fi
 }
