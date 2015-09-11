@@ -340,6 +340,7 @@ func convert_api_ContainerStateWaiting_To_v1_ContainerStateWaiting(in *api.Conta
 		defaulting.(func(*api.ContainerStateWaiting))(in)
 	}
 	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
@@ -2743,6 +2744,7 @@ func convert_v1_ContainerStateWaiting_To_api_ContainerStateWaiting(in *Container
 		defaulting.(func(*ContainerStateWaiting))(in)
 	}
 	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
