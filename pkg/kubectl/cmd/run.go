@@ -239,14 +239,15 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	return nil
 }
 
-func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) error {
+func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) (status api.PodPhase, err error) {
 	for {
 		pod, err := c.Pods(pod.Namespace).Get(pod.Name)
 		if err != nil {
-			return err
+			return api.PodUnknown, err
 		}
+		ready := false
 		if pod.Status.Phase == api.PodRunning {
-			ready := true
+			ready = true
 			for _, status := range pod.Status.ContainerStatuses {
 				if !status.Ready {
 					ready = false
@@ -254,10 +255,13 @@ func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) error {
 				}
 			}
 			if ready {
-				return nil
+				return api.PodRunning, nil
 			}
 		}
-		fmt.Fprintf(out, "Waiting for pod %s/%s to be running\n", pod.Namespace, pod.Name)
+		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+			return pod.Status.Phase, nil
+		}
+		fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: %v\n", pod.Namespace, pod.Name, pod.Status.Phase, ready)
 		time.Sleep(2 * time.Second)
 		continue
 	}
@@ -280,8 +284,12 @@ func handleAttachReplicationController(c *client.Client, controller *api.Replica
 }
 
 func handleAttachPod(c *client.Client, pod *api.Pod, opts *AttachOptions) error {
-	if err := waitForPodRunning(c, pod, opts.Out); err != nil {
+	status, err := waitForPodRunning(c, pod, opts.Out)
+	if err != nil {
 		return err
+	}
+	if status == api.PodSucceeded || status == api.PodFailed {
+		return handleLog(c, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, false, false, opts.Out)
 	}
 	opts.Client = c
 	opts.PodName = pod.Name
