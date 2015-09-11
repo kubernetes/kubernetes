@@ -383,6 +383,7 @@ var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE
 var serviceColumns = []string{"NAME", "CLUSTER_IP", "EXTERNAL_IP", "PORT(S)", "SELECTOR", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
+var ingressPointColumns = []string{"NAME", "HOST", "PATH", "SERVICE:PORT", "NODEPORT", "LABELS"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
@@ -407,6 +408,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
+	h.Handler(ingressPointColumns, printIngressPoint)
+	h.Handler(ingressPointColumns, printIngressPointList)
 	h.Handler(endpointColumns, printEndpoints)
 	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
@@ -771,6 +774,27 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, svc := range list.Items {
 		if err := printService(&svc, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printIngressPoint(ingressPoint *api.IngressPoint, w io.Writer, withNamespace, wide bool, showAll bool, columnLabels []string) error {
+	for subdomain, pathList := range ingressPoint.Spec.PathMap {
+		for _, p := range pathList {
+			_, err := fmt.Fprintf(w, "%s\t%s\t%+v\t%v:%v\t%s\n", ingressPoint.Name, subdomain, p.Url, p.Service.Name, p.Service.Port, ingressPoint.Status.Address)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func printIngressPointList(ingressPointList *api.IngressPointList, w io.Writer, withNamespace, wide bool, showAll bool, columnLabels []string) error {
+	for _, ingressPoint := range ingressPointList.Items {
+		if err := printIngressPoint(&ingressPoint, w, withNamespace, wide, true, columnLabels); err != nil {
 			return err
 		}
 	}
