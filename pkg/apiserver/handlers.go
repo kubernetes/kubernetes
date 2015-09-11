@@ -230,6 +230,15 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	return tw.w.Write(p)
 }
 
+func (tw *baseTimeoutWriter) Flush() {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+
+	if flusher, ok := tw.w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
