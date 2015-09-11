@@ -39,7 +39,7 @@ func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
 		return nil, fmt.Errorf("group %v is already registered", g)
 	}
 	if len(registered.GroupVersionsForGroup(group)) == 0 {
-		return nil, fmt.Errorf("No version is registered for %v", g)
+		return nil, fmt.Errorf("No version is registered for group %v", group)
 	}
 	g[group] = &GroupMeta{}
 	return g[group], nil

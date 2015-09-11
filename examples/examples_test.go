@@ -27,7 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -365,7 +365,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				}
 				//TODO: Add validate method for &schedulerapi.Policy
 			} else {
-				if err := latest.GroupOrDie("").Codec.DecodeInto(data, expectedType); err != nil {
+				if err := testapi.Default.Codec().DecodeInto(data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -451,14 +451,14 @@ func TestReadme(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
 			}
-			if err := latest.GroupOrDie("").Codec.DecodeInto(json, expectedType); err != nil {
+			if err := testapi.Default.Codec().DecodeInto(json, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
 				continue
 			}
 			if errors := validateObject(expectedType); len(errors) > 0 {
 				t.Errorf("%s did not validate correctly: %v", path, errors)
 			}
-			_, err = latest.GroupOrDie("").Codec.Encode(expectedType)
+			_, err = testapi.Default.Codec().Encode(expectedType)
 			if err != nil {
 				t.Errorf("Could not encode object: %v", err)
 				continue

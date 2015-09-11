@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -38,7 +40,7 @@ var accessor = meta.NewAccessor()
 func init() {
 	groupMeta, err := latest.RegisterGroup("experimental")
 	if err != nil {
-		fmt.Println(err)
+		glog.V(4).Infof("%v", err)
 		return
 	}
 	registeredGroupVersions := registered.GroupVersionsForGroup("experimental")
@@ -47,7 +49,8 @@ func init() {
 		GroupVersion: groupVersion,
 		Group:        apiutil.GetGroup(groupVersion),
 		Version:      apiutil.GetVersion(groupVersion),
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
+		// TODO: caesarxuchao: change it to groupVersion when we support multiple groups
+		Codec: runtime.CodecFor(api.Scheme, apiutil.GetVersion(groupVersion)),
 	}
 	var versions []string
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {

@@ -60,7 +60,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
 	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
-	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
+	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
 
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -458,7 +458,7 @@ func initThirdParty(t *testing.T, version string) (*tools.FakeEtcdClient, *httpt
 
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
+	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
 
 	if !assert.NoError(master.InstallThirdPartyAPI(api)) {
 		t.FailNow()
@@ -629,11 +629,12 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		t.FailNow()
 	}
 
-	obj, err := explatest.Codec.Decode([]byte(etcdResp.Node.Value))
-	assert.NoError(err)
-
+	obj, err := testapi.Experimental.Codec().Decode([]byte(etcdResp.Node.Value))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	thirdPartyObj, ok := obj.(*experimental.ThirdPartyResourceData)
-	if !assert.True(ok) {
+	if !ok {
 		t.Errorf("unexpected object: %v", obj)
 	}
 	item = Foo{}
