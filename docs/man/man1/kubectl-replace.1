@@ -27,10 +27,6 @@ Please refer to the models in
 
 .SH OPTIONS
 .PP
-\fB\-\-cache\-schema\fP=true
-    If true, use/store local schema files
-
-.PP
 \fB\-\-cascade\fP=false
     Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).
 
@@ -49,6 +45,10 @@ Please refer to the models in
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
+
+.PP
+\fB\-\-schema\-cache\-dir\fP="/tmp/kubectl.schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'
 
 .PP
 \fB\-\-timeout\fP=0
