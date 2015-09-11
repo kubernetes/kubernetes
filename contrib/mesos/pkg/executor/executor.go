@@ -33,6 +33,7 @@ import (
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -225,6 +226,13 @@ func (k *KubernetesExecutor) Registered(driver bindings.ExecutorDriver,
 		k.staticPodsConfig = executorInfo.Data
 	}
 
+	if slaveInfo != nil {
+		_, err := node.CreateOrUpdate(k.client, slaveInfo.GetHostname(), node.SlaveAttributesToLabels(slaveInfo.Attributes))
+		if err != nil {
+			log.Errorf("cannot update node labels: %v", err)
+		}
+	}
+
 	k.initialRegistration.Do(k.onInitialRegistration)
 }
 
@@ -239,11 +247,19 @@ func (k *KubernetesExecutor) Reregistered(driver bindings.ExecutorDriver, slaveI
 		log.Errorf("failed to reregister/transition to a connected state")
 	}
 
+	if slaveInfo != nil {
+		_, err := node.CreateOrUpdate(k.client, slaveInfo.GetHostname(), node.SlaveAttributesToLabels(slaveInfo.Attributes))
+		if err != nil {
+			log.Errorf("cannot update node labels: %v", err)
+		}
+	}
+
 	k.initialRegistration.Do(k.onInitialRegistration)
 }
 
 func (k *KubernetesExecutor) onInitialRegistration() {
 	defer close(k.initialRegComplete)
+
 	// emit an empty update to allow the mesos "source" to be marked as seen
 	k.updateChan <- kubelet.PodUpdate{
 		Pods:   []*api.Pod{},
