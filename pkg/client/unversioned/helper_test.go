@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
@@ -222,7 +221,7 @@ func TestTLSTransportCache(t *testing.T) {
 		"host":           {Insecure: true, Host: "foo"},
 		"prefix":         {Insecure: true, Prefix: "foo"},
 		"version":        {Insecure: true, Version: "foo"},
-		"codec":          {Insecure: true, Codec: latest.GroupOrDie("").Codec},
+		"codec":          {Insecure: true, Codec: testapi.Default.Codec()},
 		"basic":          {Insecure: true, Username: "bob", Password: "password"},
 		"bearer":         {Insecure: true, BearerToken: "token"},
 		"user agent":     {Insecure: true, UserAgent: "useragent"},
@@ -336,8 +335,8 @@ func TestSetKubernetesDefaults(t *testing.T) {
 			Config{},
 			Config{
 				Prefix:  "/api",
-				Version: latest.GroupOrDie("").Version,
-				Codec:   latest.GroupOrDie("").Codec,
+				Version: testapi.Default.Version(),
+				Codec:   testapi.Default.Codec(),
 				QPS:     5,
 				Burst:   10,
 			},

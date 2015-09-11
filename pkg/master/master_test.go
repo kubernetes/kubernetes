@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
@@ -58,7 +59,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.GroupOrDie("").Codec, etcdtest.PathPrefix())
+	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
 
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
@@ -506,7 +507,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return latest.GroupOrDie("").Codec.Encode(&thirdPartyData)
+	return testapi.Default.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {
