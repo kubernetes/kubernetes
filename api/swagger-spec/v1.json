@@ -12852,6 +12852,32 @@
      "mountPath": {
       "type": "string",
       "description": "Path within the container at which the volume should be mounted."
+     },
+     "policy": {
+      "$ref": "v1.VolumeMountPolicy"
+     }
+    }
+   },
+   "v1.VolumeMountPolicy": {
+    "id": "v1.VolumeMountPolicy",
+    "properties": {
+     "logDir": {
+      "$ref": "v1.LogDirPolicy"
+     }
+    }
+   },
+   "v1.LogDirPolicy": {
+    "id": "v1.LogDirPolicy",
+    "properties": {
+     "glob": {
+      "type": "string"
+     },
+     "rotate": {
+      "type": "string"
+     },
+     "maxFileSize": {
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
