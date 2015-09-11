@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/labels"
@@ -244,7 +245,7 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
-	statusManager := newStatusManager(kubeClient)
+	statusManager := status.NewManager(kubeClient)
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
 
@@ -503,7 +504,7 @@ type Kubelet struct {
 	machineInfo *cadvisorApi.MachineInfo
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
-	statusManager *statusManager
+	statusManager status.Manager
 
 	// Manager for the volume maps for the pods.
 	volumeManager *volumeManager
