@@ -119,6 +119,7 @@ type KubeletServer struct {
 	ResolverConfig                 string
 	ResourceContainer              string
 	RktPath                        string
+	RktStage1Image                 string
 	RootDirectory                  string
 	RunOnce                        bool
 	StandaloneMode                 bool
@@ -189,6 +190,7 @@ func NewKubeletServer() *KubeletServer {
 		RegistryBurst:     10,
 		ResourceContainer: "/kubelet",
 		RktPath:           "",
+		RktStage1Image:    "",
 		RootDirectory:     defaultRootDir,
 		SyncFrequency:     10 * time.Second,
 		SystemContainer:   "",
@@ -254,6 +256,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'")
+	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used")
 	fs.StringVar(&s.SystemContainer, "system-container", s.SystemContainer, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 	fs.IntVar(&s.MaxPods, "max-pods", 40, "Number of Pods that can run on this Kubelet.")
@@ -364,6 +367,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		ResolverConfig:                 s.ResolverConfig,
 		ResourceContainer:              s.ResourceContainer,
 		RktPath:                        s.RktPath,
+		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
 		StandaloneMode:                 (len(s.APIServerList) == 0),
@@ -789,6 +793,7 @@ type KubeletConfig struct {
 	ResolverConfig                 string
 	ResourceContainer              string
 	RktPath                        string
+	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
 	StandaloneMode                 bool
@@ -851,6 +856,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.RktPath,
+		kc.RktStage1Image,
 		kc.Mounter,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,

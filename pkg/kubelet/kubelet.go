@@ -164,6 +164,7 @@ func NewMainKubelet(
 	cgroupRoot string,
 	containerRuntime string,
 	rktPath string,
+	rktStage1Image string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
 	systemContainer string,
@@ -335,6 +336,7 @@ func NewMainKubelet(
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
+			Stage1Image:        rktStage1Image,
 			InsecureSkipVerify: true,
 		}
 		rktRuntime, err := rkt.New(
