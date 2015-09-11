@@ -519,6 +519,10 @@ func translateTimestamp(timestamp util.Time) string {
 }
 
 func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	return printPodBase(pod, w, withNamespace, wide, showAll, true, columnLabels)
+}
+
+func printPodBase(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll bool, showIfTerminating bool, columnLabels []string) error {
 	name := pod.Name
 	namespace := pod.Namespace
 
@@ -528,7 +532,7 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll 
 
 	reason := string(pod.Status.Phase)
 	// if not printing all pods, skip terminated pods (default)
-	if !showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
+	if !showIfTerminating && !showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
 		return nil
 	}
 	if pod.Status.Reason != "" {
@@ -588,7 +592,7 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll 
 
 func printPodList(podList *api.PodList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, pod := range podList.Items {
-		if err := printPod(&pod, w, withNamespace, wide, showAll, columnLabels); err != nil {
+		if err := printPodBase(&pod, w, withNamespace, wide, showAll, false, columnLabels); err != nil {
 			return err
 		}
 	}
