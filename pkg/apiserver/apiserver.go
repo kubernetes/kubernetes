@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
+	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -353,6 +354,15 @@ func write(statusCode int, apiVersion string, codec runtime.Codec, object runtim
 			return
 		}
 		defer out.Close()
+
+		if wsstream.IsWebSocketRequest(req) {
+			r := wsstream.NewReader(out, true)
+			if err := r.Copy(w, req); err != nil {
+				util.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
+			}
+			return
+		}
+
 		if len(contentType) == 0 {
 			contentType = "application/octet-stream"
 		}
