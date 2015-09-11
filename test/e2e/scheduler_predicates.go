@@ -334,7 +334,7 @@ var _ = Describe("SchedulerPredicates", func() {
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// nonempty Selector set.
-	It("validates that NodeSelector is respected.", func() {
+	It("validates that NodeSelector is respected if not matching", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
@@ -370,5 +370,78 @@ var _ = Describe("SchedulerPredicates", func() {
 
 		verifyResult(c, podName, ns, currentlyDeadPods)
 		cleanupPods(c, ns)
+	})
+
+	It("validates that NodeSelector is respected if matching.", func() {
+		// launch a pod to find a node which can launch a pod. We intentionally do
+		// not just take the node list and choose the first of them. Depending on the
+		// cluster and the scheduler it might be that a "normal" pod cannot be
+		// scheduled onto it.
+		By("Trying to launch a pod without a label to get a node which can launch it.")
+		podName := "without-label"
+		_, err := c.Pods(ns).Create(&api.Pod{
+			TypeMeta: unversioned.TypeMeta{
+				Kind: "Pod",
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  podName,
+						Image: "gcr.io/google_containers/pause:go",
+					},
+				},
+			},
+		})
+		expectNoError(err)
+		expectNoError(waitForPodRunningInNamespace(c, podName, ns))
+		pod, err := c.Pods(ns).Get(podName)
+		expectNoError(err)
+
+		nodeName := pod.Spec.NodeName
+		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
+		expectNoError(err)
+
+		By("Trying to apply a random label on the found node.")
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
+		v := "42"
+		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
+		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
+		expectNoError(err)
+
+		node, err := c.Nodes().Get(nodeName)
+		expectNoError(err)
+		Expect(node.Labels[k]).To(Equal(v))
+
+		By("Trying to relaunch the pod, now with labels.")
+		labelPodName := "with-labels"
+		_, err = c.Pods(ns).Create(&api.Pod{
+			TypeMeta: unversioned.TypeMeta{
+				Kind: "Pod",
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name: labelPodName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  labelPodName,
+						Image: "gcr.io/google_containers/pause:go",
+					},
+				},
+				NodeSelector: map[string]string{
+					"kubernetes.io/hostname": nodeName,
+					k: v,
+				},
+			},
+		})
+		expectNoError(err)
+		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
+		expectNoError(waitForPodRunningInNamespace(c, labelPodName, ns))
+		labelPod, err := c.Pods(ns).Get(labelPodName)
+		expectNoError(err)
+		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
 })
