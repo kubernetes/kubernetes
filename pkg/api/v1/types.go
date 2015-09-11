@@ -582,6 +582,8 @@ type RBDVolumeSource struct {
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// Optional: Sidecar is the sidecar container's name
+	Sidecar string `json:"sidecar,omitempty"`
 }
 
 // CinderVolumeSource represents a cinder volume resource in Openstack.
@@ -988,6 +990,12 @@ type Container struct {
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty"`
+	// Whether this container should send stdout.
+	// Default is false.
+	Stdout bool `json:"stdout,omitempty"`
+	// Whether this container should send stderr.
+	// Default is false.
+	Stderr bool `json:"stderr,omitempty"`
 }
 
 // Handler defines a specific action that should be taken

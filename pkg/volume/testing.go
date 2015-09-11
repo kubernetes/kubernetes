@@ -92,6 +92,10 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	return []VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
 }
 
+func (f *fakeVolumeHost) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	return nil, nil
+}
+
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:

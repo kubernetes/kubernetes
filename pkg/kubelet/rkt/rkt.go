@@ -1155,6 +1155,11 @@ func (r *runtime) ExecInContainer(containerID string, cmd []string, stdin io.Rea
 	return command.Run()
 }
 
+//TODO placeholder
+func (r *runtime) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	return nil, fmt.Errorf("not supported")
+}
+
 // findRktID returns the rkt uuid for the pod.
 func (r *runtime) findRktID(pod *kubecontainer.Pod) (string, error) {
 	serviceName := makePodServiceFileName(pod.ID)

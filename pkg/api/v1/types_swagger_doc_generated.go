@@ -144,6 +144,8 @@ var map_Container = map[string]string{
 	"securityContext":        "Security options the pod should run with. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md",
 	"stdin":                  "Whether this container should allocate a buffer for stdin in the container runtime. Default is false.",
 	"tty":                    "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+	"stdout":                 "Whether this container should send stdout. Default is false.",
+	"stderr":                 "Whether this container should send stderr. Default is false.",
 }
 
 func (Container) SwaggerDoc() map[string]string {
@@ -1037,6 +1039,7 @@ var map_RBDVolumeSource = map[string]string{
 	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
+	"sidecar":   "Optional: Sidecar is the sidecar container's name",
 }
 
 func (RBDVolumeSource) SwaggerDoc() map[string]string {

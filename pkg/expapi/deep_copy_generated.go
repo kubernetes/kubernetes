@@ -175,6 +175,8 @@ func deepCopy_api_Container(in api.Container, out *api.Container, c *conversion.
 	}
 	out.Stdin = in.Stdin
 	out.TTY = in.TTY
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
 	return nil
 }
 
@@ -520,6 +522,7 @@ func deepCopy_api_RBDVolumeSource(in api.RBDVolumeSource, out *api.RBDVolumeSour
 		out.SecretRef = nil
 	}
 	out.ReadOnly = in.ReadOnly
+	out.Sidecar = in.Sidecar
 	return nil
 }
 

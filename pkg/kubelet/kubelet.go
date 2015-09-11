@@ -2788,3 +2788,17 @@ func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity
 	}
 	return ingress, egress, nil
 }
+
+// Runs the command in the container
+func (kl *Kubelet) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	// Mount volumes.
+	podFullName := kubecontainer.GetPodFullName(pod)
+	podVolumes, err := kl.mountExternalVolumes(pod)
+	if err != nil {
+		err = fmt.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
+		return nil, err
+	}
+	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
+
+	return kl.runner.RunContainerCommand(pod, container, cmd)
+}

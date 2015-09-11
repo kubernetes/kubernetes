@@ -670,8 +670,10 @@ func (dm *DockerManager) runContainer(
 			WorkingDir: container.WorkingDir,
 			Labels:     labels,
 			// Interactive containers:
-			OpenStdin: container.Stdin,
-			Tty:       container.TTY,
+			OpenStdin:    container.Stdin,
+			Tty:          container.TTY,
+			AttachStdout: container.Stdout,
+			AttachStderr: container.Stderr,
 		},
 	}
 
@@ -1877,4 +1879,36 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 	}
 	dm.clearReasonCache(pod, container)
 	return false
+}
+
+// create and start a container then log the output
+func (dm *DockerManager) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	opts, err := dm.generator.GenerateRunContainerOptions(pod, container)
+	if err != nil {
+		return nil, err
+	}
+
+	utsMode := ""
+	if pod.Spec.HostNetwork {
+		utsMode = "host"
+	}
+	netNamespace := ""
+	if pod.Spec.HostNetwork {
+		netNamespace = "host"
+	}
+
+	// create and start container
+	// see https://docs.docker.com/reference/api/docker_remote_api_v1.20/#3-1-inside-docker-run
+	id, err := dm.runContainer(pod, container, opts, nil, netNamespace, "", utsMode)
+	if err != nil {
+		return nil, err
+	}
+	defer dm.KillContainerInPod("", container, pod)
+
+	var stdout, stderr bytes.Buffer
+	if err := dm.GetContainerLogs(pod, id, "all", true, &stdout, &stderr); err != nil {
+		return nil, err
+	}
+	out := append(stdout.Bytes(), stderr.Bytes()...)
+	return out, nil
 }

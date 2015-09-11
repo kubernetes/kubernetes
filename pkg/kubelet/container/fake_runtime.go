@@ -312,3 +312,11 @@ func (f *FakeRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteClos
 	f.CalledFunctions = append(f.CalledFunctions, "PortForward")
 	return f.Err
 }
+
+func (f *FakeRuntime) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "RunContainerCommand")
+	return nil, f.Err
+}

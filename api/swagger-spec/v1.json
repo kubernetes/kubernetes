@@ -12262,6 +12262,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+     },
+     "sidecar": {
+      "type": "string",
+      "description": "Optional: Sidecar is the sidecar container's name"
      }
     }
    },
@@ -12765,6 +12769,14 @@
      "tty": {
       "type": "boolean",
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false."
+     },
+     "stdout": {
+      "type": "boolean",
+      "description": "Whether this container should send stdout. Default is false."
+     },
+     "stderr": {
+      "type": "boolean",
+      "description": "Whether this container should send stderr. Default is false."
      }
     }
    },
