@@ -33,7 +33,16 @@ Documentation for other releases can be found at
 
 # kubeconfig files
 
-In order to easily switch between multiple clusters, a kubeconfig file was defined.  This file contains a series of authentication mechanisms and cluster connection information associated with nicknames.  It also introduces the concept of a tuple of authentication information (user) and cluster connection information called a context that is also associated with a nickname.
+Authentication in kubernetes can differ for different individuals.
+
+- A running kubelet might have one way of authenticating (i.e. certificates).
+- Users might have a different way of authenticating (i.e. tokens).
+- Administrators might have a list of certificates which they provide individual users.
+- There may be multiple clusters, and we may want to define them all in one place - giving users the ability to use their own certificates and reusing the same global configuration.
+
+So in order to easily switch between multiple clusters, for multiple users, a kubeconfig file was defined.
+
+This file contains a series of authentication mechanisms and cluster connection information associated with nicknames.  It also introduces the concept of a tuple of authentication information (user) and cluster connection information called a context that is also associated with a nickname.
 
 Multiple kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
 
@@ -43,7 +52,10 @@ http://issue.k8s.io/1755
 
 ## Example kubeconfig file
 
+The below file contains a `current-context` which will be used by default by clients which are using the file to connect to a cluster.  Thus, this kubeconfig file has more information in it then we will necessarily have to use in a given session.  You can see it defines many clusters, and users associated with those clusters.  The context itself is associated with both a cluster AND a user.
+
 ```yaml
+current-context: federal-context
 apiVersion: v1
 clusters:
 - cluster:
@@ -69,7 +81,6 @@ contexts:
     namespace: saw-ns
     user: black-user
   name: queen-anne-context
-current-context: federal-context
 kind: Config
 preferences:
   colors: true
@@ -82,6 +93,28 @@ users:
     client-certificate: path/to/my/client/cert
     client-key: path/to/my/client/key
 ```
+
+### Building your own kubeconfig file
+
+NOTE, that if you are deploying k8s via kube-up.sh, you do not need to create your own kubeconfig files, the script will do it for you.
+
+In any case, you can easily use this file as a template to create your own kubeconfig files.
+
+So, lets do a quick walk through the basics of the above file so you can easily modify it as needed...
+
+The above file would likely correspond to an api-server which was launched using the `--token-auth-file=tokens.csv` option, where the tokens.csv file looked something like this:
+
+```
+blue-user,blue-user,1
+mister-red,mister-red,2
+```
+
+Also, since we have other users who validate using **other** mechanisms, the api-server would have probably been launched with other authentication options (there are many such options, make sure you understand which ones YOU care about before crafting a kubeconfig file, as nobody needs to implement all the different permutations of possible authentication schemes).
+
+- Since the user for the current context is "green-user", any client of the api-server using this kubeconfig file would naturally be able to log in succesfully, because we are providigin the green-user's client credentials.
+- Similarly, we can operate as the "blue-user" if we choose to change the value of current-context.
+
+In the above scenario, green-user would have to log in by providing certificates, whereas blue-user would just provide the token.  All this information would be handled for us by the
 
 ## Loading and merging rules
 
@@ -195,6 +228,18 @@ $ kubectl config set-context queen-anne-context --cluster=pig-cluster --user=bla
 $ kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
 $ kubectl config use-context federal-context
 ```
+
+### Final notes for tying it all together
+
+So, tying this all together, a quick start to creating your own kubeconfig file:
+
+- Take a good look and understand how you're api-server is being launched: You need to know YOUR security requirements and policies before you can design a kubeconfig file for convenient authentication.
+
+- Replace the snippet above with information for your cluster's api-server endpoint.
+
+- Make sure your api-server is launched in such a way that at least one user (i.e. green-user) credentials are provided to it.  You will of course have to look at api-server documentation in order to determine the current state-of-the-art in terms of providing authentication details.
+
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
