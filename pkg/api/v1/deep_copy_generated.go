@@ -1992,6 +1992,7 @@ func deepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 		out.ExternalIPs = nil
 	}
 	out.SessionAffinity = in.SessionAffinity
+	out.LoadBalancerIP = in.LoadBalancerIP
 	return nil
 }
 

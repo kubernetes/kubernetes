@@ -138,6 +138,7 @@ kube-master
 label-columns
 last-release-pr
 legacy-userspace-proxy
+load-balancer-ip
 log-flush-frequency
 long-running-request-regexp
 low-diskspace-threshold-mb
