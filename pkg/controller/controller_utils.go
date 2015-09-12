@@ -20,17 +20,19 @@ import (
 	"fmt"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"sync/atomic"
 )
 
 const (
@@ -213,6 +215,8 @@ func NewControllerExpectations() *ControllerExpectations {
 type PodControlInterface interface {
 	// CreateReplica creates new replicated pods according to the spec.
 	CreateReplica(namespace string, controller *api.ReplicationController) error
+	// CreateReplicaOnNode creates a new pod according to the spec on the specified node.
+	CreateReplicaOnNode(namespace string, ds *experimental.DaemonSet, nodeName string) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string) error
 }
@@ -287,6 +291,40 @@ func (r RealPodControl) CreateReplica(namespace string, controller *api.Replicat
 		glog.V(4).Infof("Controller %v created pod %v", controller.Name, newPod.Name)
 		r.Recorder.Eventf(controller, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
+	return nil
+}
+
+func (r RealPodControl) CreateReplicaOnNode(namespace string, ds *experimental.DaemonSet, nodeName string) error {
+	desiredLabels := getReplicaLabelSet(ds.Spec.Template)
+	desiredAnnotations, err := getReplicaAnnotationSet(ds.Spec.Template, ds)
+	if err != nil {
+		return err
+	}
+	prefix := getReplicaPrefix(ds.Name)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels:       desiredLabels,
+			Annotations:  desiredAnnotations,
+			GenerateName: prefix,
+		},
+	}
+	if err := api.Scheme.Convert(&ds.Spec.Template.Spec, &pod.Spec); err != nil {
+		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	// if a pod does not have labels then it cannot be controlled by any controller
+	if labels.Set(pod.Labels).AsSelector().Empty() {
+		return fmt.Errorf("unable to create pod replica, no labels")
+	}
+	pod.Spec.NodeName = nodeName
+	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
+		r.Recorder.Eventf(ds, "failedCreate", "Error creating: %v", err)
+		return fmt.Errorf("unable to create pod replica: %v", err)
+	} else {
+		glog.V(4).Infof("Controller %v created pod %v", ds.Name, newPod.Name)
+		r.Recorder.Eventf(ds, "successfulCreate", "Created pod: %v", newPod.Name)
+	}
+
 	return nil
 }
 
