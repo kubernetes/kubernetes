@@ -30,8 +30,16 @@ import (
 	"github.com/golang/glog"
 )
 
-// DockerConfig represents the config file used by the docker CLI.
-// This config that represents the credentials that should be used
+// newDockerConfig represents the .docker/config.json file used by
+// newer docker clients.  Currently, this file is just a JSON blob
+// wrapping the legacy .dockercfg format in another layer of JSON
+// object under the field "auths"
+type newDockerConfig struct {
+	Auths DockerConfig `json:"auths"`
+}
+
+// DockerConfig represents the .dockercfg file used by the docker CLI.
+// This config holds the credentials that should be used
 // when pulling images from specific image repositories.
 type DockerConfig map[string]DockerConfigEntry
 
@@ -47,8 +55,6 @@ var (
 	workingDirPath    = ""
 	homeDirPath       = os.Getenv("HOME")
 	rootDirPath       = "/"
-
-	configFileName = ".dockercfg"
 )
 
 func SetPreferredDockercfgPath(path string) {
@@ -63,7 +69,7 @@ func GetPreferredDockercfgPath() string {
 	return preferredPath
 }
 
-func ReadDockerConfigFile() (cfg DockerConfig, err error) {
+func ReadDockerConfigFile(configFileName string) (cfg DockerConfig, err error) {
 	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
 	for _, configPath := range dockerConfigFileLocations {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
@@ -71,7 +77,7 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
 			continue
 		}
-		glog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
+		glog.V(4).Infof("looking for %s at %s", configFileName, absDockerConfigFileLocation)
 		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
 		if os.IsNotExist(err) {
 			continue
@@ -82,11 +88,11 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 		}
 		cfg, err := readDockerConfigFileFromBytes(contents)
 		if err == nil {
-			glog.V(4).Infof("found .dockercfg at %s", absDockerConfigFileLocation)
+			glog.V(4).Infof("found %s at %s", configFileName, absDockerConfigFileLocation)
 			return cfg, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", dockerConfigFileLocations)
+	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configFileName, dockerConfigFileLocations)
 }
 
 // HttpError wraps a non-StatusOK error code as an error.
@@ -143,6 +149,16 @@ func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error
 	if err = json.Unmarshal(contents, &cfg); err != nil {
 		glog.Errorf("while trying to parse blob %q: %v", contents, err)
 		return nil, err
+	}
+	var new_cfg newDockerConfig
+	if err = json.Unmarshal(contents, &new_cfg); err != nil {
+		glog.Errorf("while trying to parse blob %q: %v", contents, err)
+		return nil, err
+	}
+	// We shouldn't have entries in both formats, see which was populated.
+	// If both have entries, the new format wins.
+	if len(new_cfg.Auths) > 0 {
+		return new_cfg.Auths, nil
 	}
 	return
 }
