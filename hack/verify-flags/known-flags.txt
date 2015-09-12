@@ -230,6 +230,7 @@ root-dir
 run-proxy
 runtime-config
 scheduler-config
+schema-cache-dir
 secure-port
 service-account-key-file
 service-account-lookup
