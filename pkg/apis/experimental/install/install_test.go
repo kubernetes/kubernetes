@@ -22,11 +22,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 )
 
 func TestResourceVersioner(t *testing.T) {
-	daemonSet := expapi.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
+	daemonSet := experimental.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -35,7 +35,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Errorf("unexpected version %v", version)
 	}
 
-	daemonSetList := expapi.DaemonSetList{ListMeta: api.ListMeta{ResourceVersion: "10"}}
+	daemonSetList := experimental.DaemonSetList{ListMeta: api.ListMeta{ResourceVersion: "10"}}
 	version, err = accessor.ResourceVersion(&daemonSetList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -46,12 +46,12 @@ func TestResourceVersioner(t *testing.T) {
 }
 
 func TestCodec(t *testing.T) {
-	daemonSet := expapi.DaemonSet{}
+	daemonSet := experimental.DaemonSet{}
 	data, err := latest.GroupOrDie("experimental").Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	other := expapi.DaemonSet{}
+	other := experimental.DaemonSet{}
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}
 
-		rc := &expapi.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		rc := &experimental.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		name, err := mapping.MetadataAccessor.Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
