@@ -29,7 +29,6 @@ import (
 )
 
 const (
-	NoneSource = ""
 	TestSource = "test"
 )
 
@@ -91,18 +90,24 @@ func expectPodUpdate(t *testing.T, ch <-chan kubelet.PodUpdate, expected ...kube
 	for i := range expected {
 		update := <-ch
 		sort.Sort(sortedPods(update.Pods))
-		// Clear the annotation field before the comparison.
-		// TODO: consider mock out recordFirstSeen in config.go
-		for _, pod := range update.Pods {
-			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)
-			delete(pod.Annotations, kubelet.ConfigSourceAnnotationKey)
+		sort.Sort(sortedPods(expected[i].Pods))
+		// Make copies of the expected/actual update to compare all fields
+		// except for "Pods", which are compared separately below.
+		expectedCopy, updateCopy := expected[i], update
+		expectedCopy.Pods, updateCopy.Pods = nil, nil
+		if !api.Semantic.DeepEqual(expectedCopy, updateCopy) {
+			t.Fatalf("Expected %#v, Got %#v", expectedCopy, updateCopy)
 		}
-		for _, pod := range expected[i].Pods {
-			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)
-			delete(pod.Annotations, kubelet.ConfigSourceAnnotationKey)
-		}
-		if !api.Semantic.DeepEqual(expected[i], update) {
+
+		if len(expected[i].Pods) != len(update.Pods) {
 			t.Fatalf("Expected %#v, Got %#v", expected[i], update)
+		}
+		// Compare pods one by one. This is necessary beacuse we don't want to
+		// compare local annotations.
+		for j := range expected[i].Pods {
+			if podsDifferSemantically(expected[i].Pods[j], update.Pods[j]) {
+				t.Fatalf("Expected %#v, Got %#v", expected[i].Pods[j], update.Pods[j])
+			}
 		}
 	}
 	expectNoPodUpdate(t, ch)
@@ -120,9 +125,9 @@ func TestNewPodAdded(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// see an update
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new")))
 
 	config.Sync()
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, kubelet.AllSource, CreateValidPod("foo", "new")))
@@ -132,7 +137,7 @@ func TestNewPodAddedInvalidNamespace(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// see an update
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", ""))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", ""))
 	channel <- podUpdate
 	config.Sync()
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, kubelet.AllSource))
@@ -142,9 +147,9 @@ func TestNewPodAddedDefaultNamespace(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// see an update
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "default"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "default"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "default")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "default")))
 
 	config.Sync()
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, kubelet.AllSource, CreateValidPod("foo", "default")))
@@ -154,14 +159,14 @@ func TestNewPodAddedDifferentNamespaces(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// see an update
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "default"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "default"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "default")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "default")))
 
 	// see an update in another namespace
-	podUpdate = CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"))
+	podUpdate = CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new")))
 
 	config.Sync()
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, kubelet.AllSource, CreateValidPod("foo", "default"), CreateValidPod("foo", "new")))
@@ -171,12 +176,12 @@ func TestInvalidPodFiltered(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// see an update
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new")))
 
 	// add an invalid update
-	podUpdate = CreatePodUpdate(kubelet.UPDATE, NoneSource, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	podUpdate = CreatePodUpdate(kubelet.UPDATE, TestSource, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	channel <- podUpdate
 	expectNoPodUpdate(t, ch)
 }
@@ -185,7 +190,7 @@ func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationSnapshotAndUpdates)
 
 	// see an set
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, TestSource, CreateValidPod("foo", "new")))
 
@@ -195,15 +200,15 @@ func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 	// container updates are separated as UPDATE
 	pod := *podUpdate.Pods[0]
 	pod.Spec.Containers = []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent}}
-	channel <- CreatePodUpdate(kubelet.ADD, NoneSource, &pod)
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, &pod))
+	channel <- CreatePodUpdate(kubelet.ADD, TestSource, &pod)
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, &pod))
 }
 
 func TestNewPodAddedSnapshot(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationSnapshot)
 
 	// see an set
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, TestSource, CreateValidPod("foo", "new")))
 
@@ -213,7 +218,7 @@ func TestNewPodAddedSnapshot(t *testing.T) {
 	// container updates are separated as UPDATE
 	pod := *podUpdate.Pods[0]
 	pod.Spec.Containers = []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent}}
-	channel <- CreatePodUpdate(kubelet.ADD, NoneSource, &pod)
+	channel <- CreatePodUpdate(kubelet.ADD, TestSource, &pod)
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, TestSource, &pod))
 }
 
@@ -221,9 +226,9 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// should register an add
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new")))
 
 	// should ignore ADDs that are identical
 	expectNoPodUpdate(t, ch)
@@ -231,22 +236,22 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	// an kubelet.ADD should be converted to kubelet.UPDATE
 	pod := CreateValidPod("foo", "new")
 	pod.Spec.Containers = []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent}}
-	podUpdate = CreatePodUpdate(kubelet.ADD, NoneSource, pod)
+	podUpdate = CreatePodUpdate(kubelet.ADD, TestSource, pod)
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 
-	podUpdate = CreatePodUpdate(kubelet.REMOVE, NoneSource, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "new"}})
+	podUpdate = CreatePodUpdate(kubelet.REMOVE, TestSource, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "new"}})
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.REMOVE, NoneSource, pod))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.REMOVE, TestSource, pod))
 }
 
 func TestNewPodAddedUpdatedSet(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
 	// should register an add
-	podUpdate := CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"), CreateValidPod("foo2", "new"), CreateValidPod("foo3", "new"))
+	podUpdate := CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"), CreateValidPod("foo2", "new"), CreateValidPod("foo3", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new"), CreateValidPod("foo2", "new"), CreateValidPod("foo3", "new")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"), CreateValidPod("foo2", "new"), CreateValidPod("foo3", "new")))
 
 	// should ignore ADDs that are identical
 	expectNoPodUpdate(t, ch)
@@ -254,12 +259,12 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 	// should be converted to an kubelet.ADD, kubelet.REMOVE, and kubelet.UPDATE
 	pod := CreateValidPod("foo2", "new")
 	pod.Spec.Containers = []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent}}
-	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, pod, CreateValidPod("foo3", "new"), CreateValidPod("foo4", "new"))
+	podUpdate = CreatePodUpdate(kubelet.SET, TestSource, pod, CreateValidPod("foo3", "new"), CreateValidPod("foo4", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch,
-		CreatePodUpdate(kubelet.REMOVE, NoneSource, CreateValidPod("foo", "new")),
-		CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo4", "new")),
-		CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+		CreatePodUpdate(kubelet.REMOVE, TestSource, CreateValidPod("foo", "new")),
+		CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo4", "new")),
+		CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 }
 
 func TestPodUpdateAnnotations(t *testing.T) {
@@ -274,22 +279,22 @@ func TestPodUpdateAnnotations(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	podUpdate := CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new"), clone.(*api.Pod), CreateValidPod("foo3", "new"))
+	podUpdate := CreatePodUpdate(kubelet.SET, TestSource, CreateValidPod("foo1", "new"), clone.(*api.Pod), CreateValidPod("foo3", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new")))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new")))
 
 	pod.Annotations["kubenetes.io/blah"] = "superblah"
-	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
+	podUpdate = CreatePodUpdate(kubelet.SET, TestSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 
 	pod.Annotations["kubernetes.io/otherblah"] = "doh"
-	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
+	podUpdate = CreatePodUpdate(kubelet.SET, TestSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 
 	delete(pod.Annotations, "kubernetes.io/blah")
-	podUpdate = CreatePodUpdate(kubelet.SET, NoneSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
+	podUpdate = CreatePodUpdate(kubelet.SET, TestSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
 	channel <- podUpdate
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 }

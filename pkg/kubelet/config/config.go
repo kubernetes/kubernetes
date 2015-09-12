@@ -185,19 +185,13 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-// recordFirstSeenTime records the first seen time of this pod.
-func recordFirstSeenTime(pod *api.Pod) {
-	glog.V(4).Infof("Receiving a new pod %q", kubeletUtil.FormatPodName(pod))
-	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
-}
-
 func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubelet.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
-	adds = &kubelet.PodUpdate{Op: kubelet.ADD}
-	updates = &kubelet.PodUpdate{Op: kubelet.UPDATE}
-	deletes = &kubelet.PodUpdate{Op: kubelet.REMOVE}
+	adds = &kubelet.PodUpdate{Op: kubelet.ADD, Source: source}
+	updates = &kubelet.PodUpdate{Op: kubelet.UPDATE, Source: source}
+	deletes = &kubelet.PodUpdate{Op: kubelet.REMOVE, Source: source}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -355,9 +349,12 @@ func isLocalAnnotationKey(key string) bool {
 // for local annotations.
 func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 	if candidateMap == nil {
-		return true
+		candidateMap = make(map[string]string)
 	}
 	for k, v := range candidateMap {
+		if isLocalAnnotationKey(k) {
+			continue
+		}
 		if existingValue, ok := existingMap[k]; ok && existingValue == v {
 			continue
 		}
@@ -375,6 +372,12 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 	return true
 }
 
+// recordFirstSeenTime records the first seen time of this pod.
+func recordFirstSeenTime(pod *api.Pod) {
+	glog.V(4).Infof("Receiving a new pod %q", kubeletUtil.FormatPodName(pod))
+	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
+}
+
 // updateAnnotations returns an Annotation map containing the api annotation map plus
 // locally managed annotations
 func updateAnnotations(existing, ref *api.Pod) {
@@ -390,21 +393,30 @@ func updateAnnotations(existing, ref *api.Pod) {
 	existing.Annotations = annotations
 }
 
-// checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
-// returns false if there was no update.
-func checkAndUpdatePod(existing, ref *api.Pod) bool {
-	// Overwrite the first-seen time with the existing one. This is our own
-	// internal annotation, there is no need to update.
-	ref.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubelet.ConfigFirstSeenAnnotationKey]
-	// TODO: it would be better to update the whole object and only preserve certain things
-	//       like the source annotation or the UID (to ensure safety)
+func podsDifferSemantically(existing, ref *api.Pod) bool {
 	if reflect.DeepEqual(existing.Spec, ref.Spec) &&
 		reflect.DeepEqual(existing.DeletionTimestamp, ref.DeletionTimestamp) &&
 		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) &&
 		isAnnotationMapEqual(existing.Annotations, ref.Annotations) {
 		return false
 	}
+	return true
+}
+
+// checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
+// returns false if there was no update.
+func checkAndUpdatePod(existing, ref *api.Pod) bool {
+	// TODO: it would be better to update the whole object and only preserve certain things
+	//       like the source annotation or the UID (to ensure safety)
+	if !podsDifferSemantically(existing, ref) {
+		return false
+	}
 	// this is an update
+
+	// Overwrite the first-seen time with the existing one. This is our own
+	// internal annotation, there is no need to update.
+	ref.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubelet.ConfigFirstSeenAnnotationKey]
+
 	existing.Spec = ref.Spec
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
