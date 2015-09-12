@@ -46,7 +46,7 @@ This example shows how to build a simple, multi-tier web application using Kuber
   - [Step Three: Fire up the replicated slave pods](#step-three-fire-up-the-replicated-slave-pods)
   - [Step Four: Create the redis slave service](#step-four-create-the-redis-slave-service)
   - [Step Five: Create the frontend replicated pods](#step-five-create-the-frontend-replicated-pods)
-  - [Step Six: Set up the guestbook frontend service.](#step-six-set-up-the-guestbook-frontend-service)
+  - [Step Six: Set up the guestbook frontend service](#step-six-set-up-the-guestbook-frontend-service)
     - [Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)](#using-type-loadbalancer-for-the-frontend-service-cloud-provider-specific)
     - [Create the Frontend Service](#create-the-frontend-service)
     - [Accessing the guestbook site externally](#accessing-the-guestbook-site-externally)
