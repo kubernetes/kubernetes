@@ -47,6 +47,8 @@ func TestResourceVersioner(t *testing.T) {
 
 func TestCodec(t *testing.T) {
 	daemonSet := experimental.DaemonSet{}
+	// We do want to use package latest rather than testapi here, because we
+	// want to test if the package install and package latest work as expected.
 	data, err := latest.GroupOrDie("experimental").Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
