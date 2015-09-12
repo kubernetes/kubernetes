@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -105,12 +104,12 @@ func TestNewEtcdStorage(t *testing.T) {
 	assert := assert.New(t)
 	fakeClient := tools.NewFakeEtcdClient(t)
 	// Pass case
-	_, err := NewEtcdStorage(fakeClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
+	_, err := NewEtcdStorage(fakeClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	assert.NoError(err, "Unable to create etcdstorage: %s", err)
 
 	// Fail case
 	errorFunc := func(apiVersion string) (*meta.VersionInterfaces, error) { return nil, errors.New("ERROR") }
-	_, err = NewEtcdStorage(fakeClient, errorFunc, latest.Version, etcdtest.PathPrefix())
+	_, err = NewEtcdStorage(fakeClient, errorFunc, testapi.Default.Version(), etcdtest.PathPrefix())
 	assert.Error(err, "NewEtcdStorage should have failed")
 
 }
@@ -283,10 +282,10 @@ func TestExpapi(t *testing.T) {
 
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.expAPIPrefix)
-	assert.Equal(expAPIGroup.Mapper, explatest.RESTMapper)
-	assert.Equal(expAPIGroup.Codec, explatest.Codec)
-	assert.Equal(expAPIGroup.Linker, explatest.SelfLinker)
-	assert.Equal(expAPIGroup.Version, explatest.Version)
+	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
+	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
+	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned

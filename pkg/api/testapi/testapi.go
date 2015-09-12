@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/expapi/install"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/install"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
