@@ -67,6 +67,8 @@ func IsRegisteredAPIVersion(version string) bool {
 	return false
 }
 
+// GroupVersionsForGroup returns the registered versions of a group in the form
+// of "group/version".
 func GroupVersionsForGroup(group string) []string {
 	ret := []string{}
 	for _, v := range RegisteredVersions {
