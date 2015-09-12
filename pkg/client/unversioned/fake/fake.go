@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This is made a separate package and should only be imported by tests, because
+// it imports testapi
 package fake
 
 import (

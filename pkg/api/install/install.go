@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package install installs the v1 monolithic api, making it available as an
+// option to all of the API encoding/decoding machinery.
 package install
 
 import (
