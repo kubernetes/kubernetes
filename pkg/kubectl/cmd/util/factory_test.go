@@ -17,10 +17,20 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path"
 	"sort"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/validation"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -164,5 +174,103 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 	// In case of failure of this test check this PR: spf13/pflag#23
 	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
 		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
+	}
+}
+
+func loadSchemaForTest() (validation.Schema, error) {
+	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
+	data, err := ioutil.ReadFile(pathToSwaggerSpec)
+	if err != nil {
+		return nil, err
+	}
+	return validation.NewSwaggerSchemaFromBytes(data)
+}
+
+func TestValidateCachesSchema(t *testing.T) {
+	schema, err := loadSchemaForTest()
+	if err != nil {
+		t.Errorf("Error loading schema: %v", err)
+		t.FailNow()
+	}
+	output, err := json.Marshal(schema)
+	if err != nil {
+		t.Errorf("Error serializing schema: %v", err)
+		t.FailNow()
+	}
+	requests := map[string]int{}
+
+	c := &client.FakeRESTClient{
+		Codec: testapi.Default.Codec(),
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
+				requests[p] = requests[p] + 1
+				return &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	dir := os.TempDir() + "/schemaCache"
+	os.RemoveAll(dir)
+
+	obj := &api.Pod{}
+	data, err := testapi.Default.Codec().Encode(obj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+
+	// Initial request, should use HTTP and write
+	if getSchemaAndValidate(c, data, "foo", "bar", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
+		t.Errorf("unexpected missing cache file: %v", err)
+	}
+	if requests["/swaggerapi/foo/bar"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
+	}
+
+	// Same version and group, should skip HTTP
+	if getSchemaAndValidate(c, data, "foo", "bar", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if requests["/swaggerapi/foo/bar"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
+	}
+
+	// Different API group, should go to HTTP and write
+	if getSchemaAndValidate(c, data, "foo", "baz", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
+		t.Errorf("unexpected missing cache file: %v", err)
+	}
+	if requests["/swaggerapi/foo/baz"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/baz"])
+	}
+
+	// Different version, should go to HTTP and write
+	if getSchemaAndValidate(c, data, "foo2", "bar", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
+		t.Errorf("unexpected missing cache file: %v", err)
+	}
+	if requests["/swaggerapi/foo2/bar"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo2/bar"])
+	}
+
+	// No cache dir, should go straight to HTTP and not write
+	if getSchemaAndValidate(c, data, "foo", "blah", ""); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if requests["/swaggerapi/foo/blah"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/blah"])
+	}
+	if _, err := os.Stat(path.Join(dir, "foo", "blah", schemaFileName)); err == nil || !os.IsNotExist(err) {
+		t.Errorf("unexpected cache file error: %v", err)
 	}
 }
