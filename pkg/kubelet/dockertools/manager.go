@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -1733,6 +1734,16 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
+		}
+
+		// Setup the host interface (FIXME: move to networkPlugin when ready)
+		podInfraContainer, err := dm.client.InspectContainer(string(podInfraContainerID))
+		if err != nil {
+			glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, podFullName)
+			return err
+		}
+		if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
+			glog.Warningf("Hairpin setup failed for pod %q: %v", podFullName, err)
 		}
 	}
 
