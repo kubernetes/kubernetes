@@ -66,11 +66,7 @@ func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
 		}
 	}
-	hasNetworkPolicy := false
-	if string(namespace.Spec.NetworkPolicy) == "Open" || string(namespace.Spec.NetworkPolicy) == "Closed" {
-		hasNetworkPolicy = true
-	}
-	if !hasNetworkPolicy {
+	if string(namespace.Spec.NetworkPolicy) == "" {
 		namespace.Spec.NetworkPolicy = api.NamespaceNetworkPolicyOpen
 	}
 }
