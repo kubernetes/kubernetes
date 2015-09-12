@@ -25,14 +25,19 @@ import (
 )
 
 var (
-	allGroups     = GroupMetaMap{}
-	Group         = allGroups.Group
+	allGroups = GroupMetaMap{}
+	// Group is a shortcut to allGroups.Group.
+	Group = allGroups.Group
+	// RegisterGroup is a shortcut to allGroups.RegisterGroup.
 	RegisterGroup = allGroups.RegisterGroup
-	GroupOrDie    = allGroups.GroupOrDie
+	// GroupOrDie is a shortcut to allGroups.GroupOrDie.
+	GroupOrDie = allGroups.GroupOrDie
 )
 
+// GroupMetaMap is a map between group names and their metadata.
 type GroupMetaMap map[string]*GroupMeta
 
+// RegisterGroup registers a group to GroupMetaMap.
 func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
 	_, found := g[group]
 	if found {
@@ -45,6 +50,8 @@ func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
 	return g[group], nil
 }
 
+// Group returns the metadata of a group if the gruop is registered, otherwise
+// an erorr is returned.
 func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
 	groupMeta, found := g[group]
 	if !found {
@@ -100,5 +107,7 @@ type GroupMeta struct {
 	// Kubernetes versions.
 	RESTMapper meta.RESTMapper
 
+	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+	// string, or an error if the version is not known.
 	InterfacesFor func(version string) (*meta.VersionInterfaces, error)
 }

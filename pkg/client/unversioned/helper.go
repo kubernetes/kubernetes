@@ -33,7 +33,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -142,7 +141,7 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 
-	if len(registered.GroupVersionsForGroup("experimental")) == 0 {
+	if _, err := latest.Group("experimental"); err != nil {
 		return &Client{RESTClient: client, ExperimentalClient: nil}, nil
 	}
 	experimentalConfig := *c
