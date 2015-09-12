@@ -19,5 +19,5 @@ package unversioned
 // These imports are the API groups the client will support.
 import (
 	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/expapi/install"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/install"
 )
