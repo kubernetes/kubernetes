@@ -37,9 +37,9 @@ func isMemoryBestEffort(container *api.Container) bool {
 func isMemoryGuaranteed(container *api.Container) bool {
 	// A container is memory guaranteed if its memory request == memory limit.
 	// If memory request == memory limit, the user is very confident of resource consumption.
-	memoryRequestValue := container.Resources.Requests.Memory().Value()
-	memoryLimitValue := container.Resources.Limits.Memory().Value()
-	return memoryRequestValue == memoryLimitValue && memoryRequestValue != 0
+	memoryRequest := container.Resources.Requests.Memory()
+	memoryLimit := container.Resources.Limits.Memory()
+	return (*memoryRequest).Cmp(*memoryLimit) == 0 && memoryRequest.Value() != 0
 }
 
 // GetContainerOomAdjust returns the amount by which the OOM score of all processes in the
