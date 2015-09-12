@@ -210,7 +210,7 @@ func testDaemonSets(f *Framework) {
 	err = wait.Poll(retryInterval, retryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{newNode.Name}))
 	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
 
-	By("remove the node selector and wait for")
+	By("remove the node selector and wait for daemons to be unscheduled")
 	newNode, err = nodeClient.Get(newNode.Name)
 	Expect(err).NotTo(HaveOccurred(), "error getting node")
 	newNode.Labels = map[string]string{}
