@@ -17,8 +17,8 @@ limitations under the License.
 package glusterfs
 
 import (
-	"math/rand"
 	"os"
+	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -221,12 +221,23 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 		options = append(options, "ro")
 	}
 
-	l := len(b.hosts.Subsets)
+	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
+	if err := os.MkdirAll(p, 0750); err != nil {
+		return err
+	}
+	log := path.Join(p, "glusterfs.log")
+	options = append(options, "log-file="+log)
+
+	addr := make(map[string]struct{})
+	for _, s := range b.hosts.Subsets {
+		for _, a := range s.Addresses {
+			addr[a.IP] = struct{}{}
+		}
+	}
+
 	// Avoid mount storm, pick a host randomly.
-	start := rand.Int() % l
 	// Iterate all hosts until mount succeeds.
-	for i := start; i < start+l; i++ {
-		hostIP := b.hosts.Subsets[i%l].Addresses[0].IP
+	for hostIP := range addr {
 		errs = b.mounter.Mount(hostIP+":"+b.path, dir, "glusterfs", options)
 		if errs == nil {
 			return nil
