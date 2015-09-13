@@ -240,7 +240,7 @@ func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
 	req, reqExists := request[resourceName]
 	lim, limExists := limit[resourceName]
-	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
+	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists || (observedReqValue == int64(0)) {
 		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no request is specified or request is 0.", resourceName, limitType, enforced.String())
@@ -249,10 +249,16 @@ func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.Resou
 		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no limit is specified or limit is 0.", resourceName, limitType, enforced.String())
 	}
 
-	observedValue := observedLimValue / observedReqValue
+	observedRatio := float64(observedLimValue) / float64(observedReqValue)
+	displayObservedRatio := observedRatio
+	maxLimitRequestRatio := float64(enforced.Value())
+	if enforced.Value() <= resource.MaxMilliValue {
+		observedRatio = observedRatio * 1000
+		maxLimitRequestRatio = float64(enforced.MilliValue())
+	}
 
-	if observedValue > enforcedValue {
-		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %d.", resourceName, limitType, enforced.String(), observedValue)
+	if observedRatio > maxLimitRequestRatio {
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f.", resourceName, limitType, enforced.String(), displayObservedRatio)
 	}
 
 	return nil
