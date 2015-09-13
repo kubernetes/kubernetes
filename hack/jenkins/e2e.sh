@@ -149,6 +149,7 @@ GCE_PARALLEL_SKIP_TESTS=(
 GCE_PARALLEL_FLAKY_TESTS=(
     "DaemonRestart"
     "Elasticsearch"
+    "Namespaces.*should\sdelete\sfast"
     "PD"
     "ServiceAccounts"
     "Services.*change\sthe\stype"
