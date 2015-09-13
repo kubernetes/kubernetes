@@ -93,7 +93,7 @@ REBOOT_SKIP_TESTS=(
     "Autoscaling\sSuite"
     "Skipped"
     "Reboot"
-    "Restart"
+    "Restart\sshould\srestart\sall\snodes"
     "Example"
     )
 
@@ -115,9 +115,10 @@ GKE_REQUIRED_SKIP_TESTS=(
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
     "DaemonRestart"
-    "ResourceUsage"
+    "Elasticsearch"
+    "ResourceUsage" #issue #12429
     "monotonically\sincreasing\srestart\scount"
-    "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
+    "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13818
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
     )
 
@@ -134,40 +135,24 @@ GCE_SLOW_TESTS=(
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
-    "Etcd"
-    "NetworkingNew"
-    "Nodes\sNetwork"
-    "Nodes\sResize"
-    "MaxPods"
-    "ResourceUsage"
-    "SchedulerPredicates"
-    "Services.*restarting"
-    "Shell.*services"
+    "Etcd"                  # simulate Etcd failures.
+    "Nodes\sNetwork"        # simulate node network failures.
+    "Nodes\sResize"         # add and remove nodes to and from the cluster
+    "MaxPods"               # saturates nodes with pods
+    "ResourceUsage"         # TODO: Not clear why this is here?
+    "SchedulerPredicates"   # TODO: Perhaps enable some of these?
+    "restarting\skube-proxy"# breaks pod and service networking
     )
 
 # Tests which are known to be flaky when run in parallel.
 GCE_PARALLEL_FLAKY_TESTS=(
-    "DaemonRestart"
-    "Elasticsearch"
-    "PD"
-    "ServiceAccounts"
-    "Services.*change\sthe\stype"
-    "Services.*functioning\sexternal\sload\sbalancer"
-    "Services.*identically\snamed"
     "Services.*release.*load\sbalancer"
-    "Services.*endpoint"
     "Services.*up\sand\sdown"
     )
 
 # Tests that should not run on soak cluster.
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
-    "Density.*30\spods"
-    "Elasticsearch"
     "Etcd.*SIGKILL"
-    "external\sload\sbalancer"
-    "identically\snamed\sservices"
-    "network\spartition"
-    "Services.*Type\sgoes\sfrom"
     )
 
 GCE_RELEASE_SKIP_TESTS=(
@@ -306,12 +291,15 @@ case ${JOB_NAME} in
     NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
 
-  # Runs only the reboot tests on GCE.
+  # Runs only the reboot and node restart tests on GCE.
   kubernetes-e2e-gce-reboot)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-reboot"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_allow_empty \
+          Reboot \
+          Restart\sshould\srestart\sall\snodes}
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
