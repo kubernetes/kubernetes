@@ -114,8 +114,39 @@ const (
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
-// in a slash. A restful WebService is created for the group and version.
+// in a slash.
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+	installer := g.newInstaller()
+	ws := installer.NewWebService()
+	registrationErrors := installer.Install(ws)
+	container.Add(ws)
+	return errors.NewAggregate(registrationErrors)
+}
+
+// UpdateREST registers the REST handlers for this APIGroupVersion to an existing web service
+// in the restful Container.  It will use the prefix (root/version) to find the existing
+// web service.  If a web service does not exist within the container to support the prefix
+// this method will return an error.
+func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
+	installer := g.newInstaller()
+	var ws *restful.WebService = nil
+
+	for i, s := range container.RegisteredWebServices() {
+		if s.RootPath() == installer.prefix {
+			ws = container.RegisteredWebServices()[i]
+			break
+		}
+	}
+
+	if ws == nil {
+		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
+	}
+
+	return errors.NewAggregate(installer.Install(ws))
+}
+
+// newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
+func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	info := &APIRequestInfoResolver{sets.NewString(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
 	prefix := path.Join(g.Root, g.Version)
@@ -126,9 +157,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		minRequestTimeout: g.MinRequestTimeout,
 		proxyDialerFn:     g.ProxyDialerFn,
 	}
-	ws, registrationErrors := installer.Install()
-	container.Add(ws)
-	return errors.NewAggregate(registrationErrors)
+	return installer
 }
 
 // TODO: document all handlers

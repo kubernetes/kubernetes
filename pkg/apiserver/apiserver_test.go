@@ -2008,6 +2008,84 @@ func TestCreateChecksDecode(t *testing.T) {
 	}
 }
 
+// TestUpdateREST tests that you can add new rest implementations to a pre-existing
+// web service.
+func TestUpdateREST(t *testing.T) {
+	makeGroup := func(storage map[string]rest.Storage) *APIGroupVersion {
+		return &APIGroupVersion{
+			Storage:   storage,
+			Root:      "/api",
+			Creater:   api.Scheme,
+			Convertor: api.Scheme,
+			Typer:     api.Scheme,
+			Linker:    selfLinker,
+
+			Admit:   admissionControl,
+			Context: requestContextMapper,
+			Mapper:  namespaceMapper,
+
+			Version:       newVersion,
+			ServerVersion: newVersion,
+			Codec:         newCodec,
+		}
+	}
+
+	makeStorage := func(paths ...string) map[string]rest.Storage {
+		storage := map[string]rest.Storage{}
+		for _, s := range paths {
+			storage[s] = &SimpleRESTStorage{}
+		}
+		return storage
+	}
+
+	testREST := func(t *testing.T, container *restful.Container, barCode int) {
+		w := httptest.NewRecorder()
+		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/version2/namespaces/test/foo/test"}})
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected OK: %#v", w)
+		}
+
+		w = httptest.NewRecorder()
+		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/version2/namespaces/test/bar/test"}})
+		if w.Code != barCode {
+			t.Errorf("expected response code %d for GET to bar but received %d", barCode, w.Code)
+		}
+	}
+
+	storage1 := makeStorage("foo")
+	group1 := makeGroup(storage1)
+
+	storage2 := makeStorage("bar")
+	group2 := makeGroup(storage2)
+
+	container := restful.NewContainer()
+
+	// install group1.  Ensure that
+	// 1. Foo storage is accessible
+	// 2. Bar storage is not accessible
+	if err := group1.InstallREST(container); err != nil {
+		t.Fatal(err)
+	}
+	testREST(t, container, http.StatusNotFound)
+
+	// update with group2.  Ensure that
+	// 1.  Foo storage is still accessible
+	// 2.  Bar storage is now accessible
+	if err := group2.UpdateREST(container); err != nil {
+		t.Fatal(err)
+	}
+	testREST(t, container, http.StatusOK)
+
+	// try to update a group that does not have an existing webservice with a matching prefix
+	// should not affect the existing registered webservice
+	invalidGroup := makeGroup(storage1)
+	invalidGroup.Root = "bad"
+	if err := invalidGroup.UpdateREST(container); err == nil {
+		t.Fatal("expected an error from UpdateREST when updating a non-existing prefix but got none")
+	}
+	testREST(t, container, http.StatusOK)
+}
+
 func TestParentResourceIsRequired(t *testing.T) {
 	storage := &SimpleTypedStorage{
 		baseType: &SimpleRoot{}, // a root scoped type
