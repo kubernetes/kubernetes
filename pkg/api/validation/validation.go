@@ -1458,16 +1458,27 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 			keys.Insert(string(k))
 			min[string(k)] = q
 		}
-		for k, q := range limit.Default {
-			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].default[%s]", i, k))...)
-			keys.Insert(string(k))
-			defaults[string(k)] = q
+
+		if limit.Type == api.LimitTypePod {
+			if len(limit.Default) > 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid("spec.limits[%d].default", limit.Default, "Default is not supported when limit type is Pod"))
+			}
+			if len(limit.DefaultRequest) > 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid("spec.limits[%d].defaultRequest", limit.DefaultRequest, "DefaultRequest is not supported when limit type is Pod"))
+			}
+		} else {
+			for k, q := range limit.Default {
+				allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].default[%s]", i, k))...)
+				keys.Insert(string(k))
+				defaults[string(k)] = q
+			}
+			for k, q := range limit.DefaultRequest {
+				allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k))...)
+				keys.Insert(string(k))
+				defaultRequests[string(k)] = q
+			}
 		}
-		for k, q := range limit.DefaultRequest {
-			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].defaultRequest[%s]", i, k))...)
-			keys.Insert(string(k))
-			defaultRequests[string(k)] = q
-		}
+
 		for k := range limit.MaxLimitRequestRatio {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].maxLimitRequestRatio[%s]", i, k))...)
 		}
