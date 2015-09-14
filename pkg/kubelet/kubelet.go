@@ -208,11 +208,7 @@ func NewMainKubelet(
 		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				obj, err := kubeClient.Nodes().Get(nodeName)
-				if err != nil {
-					return nil, err
-				}
-				return &api.NodeList{Items: []api.Node{*obj}}, nil
+				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
