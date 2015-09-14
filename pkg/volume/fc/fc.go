@@ -164,16 +164,8 @@ func (b *fcDiskBuilder) SetUpAt(dir string) error {
 	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("fc: failed to setup")
-		return err
 	}
-	globalPDPath := b.manager.MakeGlobalPDName(*b.fcDisk)
-	var options []string
-	if b.readOnly {
-		options = []string{"remount", "ro"}
-	} else {
-		options = []string{"remount", "rw"}
-	}
-	return b.mounter.Mount(globalPDPath, dir, "", options)
+	return err
 }
 
 type fcDiskCleaner struct {
