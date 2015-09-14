@@ -1970,6 +1970,9 @@ type PodLogOptions struct {
 	// Return previous terminated container logs.
 	// Defaults to false.
 	Previous bool `json:"previous,omitempty"`
+
+	// Number of lines to show from the end of the logs
+	Tail string `json:"tail"`
 }
 
 // PodAttachOptions is the query options to a Pod's remote attach call.

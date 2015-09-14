@@ -926,6 +926,7 @@ var map_PodLogOptions = map[string]string{
 	"container": "The container for which to stream logs. Defaults to only container if there is one container in the pod.",
 	"follow":    "Follow the log stream of the pod. Defaults to false.",
 	"previous":  "Return previous terminated container logs. Defaults to false.",
+	"tail":      "Number of lines to show from the end of the logs",
 }
 
 func (PodLogOptions) SwaggerDoc() map[string]string {
