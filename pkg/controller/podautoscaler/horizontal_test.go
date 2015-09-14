@@ -45,6 +45,7 @@ const (
 	hpaListHandler   = "HpaList"
 	scaleHandler     = "Scale"
 	updateHpaHandler = "HpaUpdate"
+	eventHandler     = "Event"
 )
 
 type serverResponse struct {
@@ -101,6 +102,11 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 			*responses[updateHpaHandler])
 	}
 
+	if responses[eventHandler] != nil {
+		handlers[eventHandler] = mkHandler(fmt.Sprintf("/api/v1/namespaces/%s/events", namespace),
+			*responses[eventHandler])
+	}
+
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		res.WriteHeader(http.StatusNotFound)
@@ -109,13 +115,13 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 }
 
 func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
-
 	hpaResponse := serverResponse{http.StatusOK, &experimental.HorizontalPodAutoscalerList{
 		Items: []experimental.HorizontalPodAutoscaler{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      hpaName,
 					Namespace: namespace,
+					SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 				},
 				Spec: experimental.HorizontalPodAutoscalerSpec{
 					ScaleRef: &experimental.SubresourceReference{
@@ -149,7 +155,6 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		DesiredReplicas: 3,
 	}
 	updateHpaResponse := serverResponse{http.StatusOK, &experimental.HorizontalPodAutoscaler{
-
 		ObjectMeta: api.ObjectMeta{
 			Name:      hpaName,
 			Namespace: namespace,
@@ -168,11 +173,14 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		Status: &status,
 	}}
 
+	eventResponse := serverResponse{http.StatusOK, &api.Event{}}
+
 	testServer, handlers := makeTestServer(t,
 		map[string]*serverResponse{
 			hpaListHandler:   &hpaResponse,
 			scaleHandler:     &scaleResponse,
 			updateHpaHandler: &updateHpaResponse,
+			eventHandler:     &eventResponse,
 		})
 
 	defer testServer.Close()
