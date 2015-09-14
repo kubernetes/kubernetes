@@ -599,3 +599,34 @@ func RemoveAllSkipMountPoints(path string) error {
 	}
 	return err
 }
+
+// borrowed from ioutil.ReadDir
+// ReadDir reads the directory named by dirname and returns
+// a list of directory entries, ignoring lstat returns
+func ReadDirNoExit(dirname string) ([]os.FileInfo, error) {
+	if dirname == "" {
+		dirname = "."
+	}
+
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	names, err := f.Readdirnames(-1)
+	list := make([]os.FileInfo, 0, len(names))
+	for _, filename := range names {
+		fip, lerr := os.Lstat(dirname + "/" + filename)
+		if os.IsNotExist(lerr) {
+			// File disappeared between readdir + stat.
+			// Just treat it as if it didn't exist.
+			continue
+		}
+		if fip != nil {
+			list = append(list, fip)
+		}
+	}
+
+	return list, nil
+}
