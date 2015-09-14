@@ -613,6 +613,55 @@ func (gce *GCECloud) DeleteUrlMap(name string) error {
 	return gce.waitForGlobalOp(op)
 }
 
+// TargetProxy management
+
+// GetTargetHttpProxy returns the TargetHttpProxy by name.
+func (gce *GCECloud) GetTargetHttpProxy(name string) (*compute.TargetHttpProxy, error) {
+	return gce.service.TargetHttpProxies.Get(gce.projectID, name).Do()
+}
+
+// GetTargetHttpProxy returns the UrlMap by name.
+func (gce *GCECloud) GetTargetHttpProxy(name string) (*compute.TargetHttpProxy, error) {
+	return gce.service.TargetHttpProxies.Get(gce.projectID, name).Do()
+}
+
+// CreateTargetHttpProxy creates and returns a TargetHttpProxy with the given UrlMap.
+func (gce *GCECloud) CreateTargetHttpProxy(urlMap *compute.UrlMap, name string) (*compute.TargetHttpProxy, error) {
+	proxy := &compute.TargetHttpProxy{
+		Name:   name,
+		UrlMap: urlMap.SelfLink,
+	}
+	op, err := gce.service.TargetHttpProxies.Insert(gce.projectID, proxy).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetTargetHttpProxy(name)
+}
+
+// SetUrlMapForProxy sets the given urlmap for the given target proxy.
+func (gce *GCECloud) SetUrlMapForProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
+	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{urlMap.SelfLink}).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteProxy deletes the target proxy by name.
+func (gce *GCECloud) DeleteProxy(name string) error {
+	op, err := gce.service.TargetHttpProxies.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
 // Take a GCE instance 'hostname' and break it down to something that can be fed
 // to the GCE API client library.  Basically this means reducing 'kubernetes-
 // minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
