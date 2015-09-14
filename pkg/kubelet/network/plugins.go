@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 const DefaultPluginName = "kubernetes.io/no-op"
@@ -87,7 +87,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	allErrs := []error{}
 	for _, plugin := range plugins {
 		name := plugin.Name()
-		if !util.IsQualifiedName(name) {
+		if !validation.IsQualifiedName(name) {
 			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %#v", plugin))
 			continue
 		}
