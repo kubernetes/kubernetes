@@ -36,9 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -58,8 +58,8 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.Codec, etcdtest.PathPrefix())
-	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
+	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
+	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
 
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -104,12 +104,12 @@ func TestNewEtcdStorage(t *testing.T) {
 	assert := assert.New(t)
 	fakeClient := tools.NewFakeEtcdClient(t)
 	// Pass case
-	_, err := NewEtcdStorage(fakeClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
+	_, err := NewEtcdStorage(fakeClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	assert.NoError(err, "Unable to create etcdstorage: %s", err)
 
 	// Fail case
 	errorFunc := func(apiVersion string) (*meta.VersionInterfaces, error) { return nil, errors.New("ERROR") }
-	_, err = NewEtcdStorage(fakeClient, errorFunc, latest.Version, etcdtest.PathPrefix())
+	_, err = NewEtcdStorage(fakeClient, errorFunc, testapi.Default.Version(), etcdtest.PathPrefix())
 	assert.Error(err, "NewEtcdStorage should have failed")
 
 }
@@ -282,10 +282,10 @@ func TestExpapi(t *testing.T) {
 
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.expAPIPrefix)
-	assert.Equal(expAPIGroup.Mapper, explatest.RESTMapper)
-	assert.Equal(expAPIGroup.Codec, explatest.Codec)
-	assert.Equal(expAPIGroup.Linker, explatest.SelfLinker)
-	assert.Equal(expAPIGroup.Version, explatest.Version)
+	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
+	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
+	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
@@ -457,7 +457,7 @@ func initThirdParty(t *testing.T, version string) (*tools.FakeEtcdClient, *httpt
 
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
+	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
 
 	if !assert.NoError(master.InstallThirdPartyAPI(api)) {
 		t.FailNow()
@@ -506,7 +506,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return latest.Codec.Encode(&thirdPartyData)
+	return testapi.Default.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {
@@ -628,11 +628,12 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		t.FailNow()
 	}
 
-	obj, err := explatest.Codec.Decode([]byte(etcdResp.Node.Value))
-	assert.NoError(err)
-
+	obj, err := testapi.Experimental.Codec().Decode([]byte(etcdResp.Node.Value))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	thirdPartyObj, ok := obj.(*experimental.ThirdPartyResourceData)
-	if !assert.True(ok) {
+	if !ok {
 		t.Errorf("unexpected object: %v", obj)
 	}
 	item = Foo{}

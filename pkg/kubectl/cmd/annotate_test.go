@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -420,9 +421,9 @@ func TestAnnotateObject(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &client.FakeRESTClient{
+	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
@@ -467,9 +468,9 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &client.FakeRESTClient{
+	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
@@ -515,9 +516,9 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &client.FakeRESTClient{
+	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {

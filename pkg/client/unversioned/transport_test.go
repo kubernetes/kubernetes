@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestUnsecuredTLSTransport(t *testing.T) {
@@ -109,7 +109,7 @@ func TestTLSConfigKey(t *testing.T) {
 		"host":           {Host: "foo"},
 		"prefix":         {Prefix: "foo"},
 		"version":        {Version: "foo"},
-		"codec":          {Codec: latest.Codec},
+		"codec":          {Codec: testapi.Default.Codec()},
 		"basic":          {Username: "bob", Password: "password"},
 		"bearer":         {BearerToken: "token"},
 		"user agent":     {UserAgent: "useragent"},

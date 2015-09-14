@@ -207,7 +207,7 @@ func testPodWithVolume(image, path string, source *api.EmptyDirVolumeSource) *ap
 	return &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.Version,
+			APIVersion: latest.GroupOrDie("").Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,

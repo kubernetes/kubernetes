@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -617,7 +616,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.GroupOrDie("").RESTMapper, "api")
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -747,12 +746,12 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
 		Root: m.apiPrefix,
 
-		Mapper: latest.RESTMapper,
+		Mapper: latest.GroupOrDie("").RESTMapper,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
-		Linker:    latest.SelfLinker,
+		Linker:    latest.GroupOrDie("").SelfLinker,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -807,9 +806,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
+		Mapper:  thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version),
+		Codec:   latest.GroupOrDie("experimental").Codec,
+		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
 		Version: version,
 
@@ -847,11 +846,11 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  explatest.RESTMapper,
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
+		Mapper:  latest.GroupOrDie("experimental").RESTMapper,
+		Codec:   latest.GroupOrDie("experimental").Codec,
+		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
-		Version: explatest.Version,
+		Version: latest.GroupOrDie("experimental").Version,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

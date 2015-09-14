@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 )
 
 // List of registered API versions.
@@ -29,12 +30,14 @@ import (
 var RegisteredVersions []string
 
 func init() {
+	// TODO: caesarxuchao: rename this variable to validGroupVersions
 	validAPIVersions := map[string]bool{
-		"v1": true,
+		"v1":              true,
+		"experimental/v1": true,
 	}
 
 	// The default list of supported api versions, in order of most preferred to the least.
-	defaultSupportedVersions := "v1"
+	defaultSupportedVersions := "v1,experimental/v1"
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that should be registered in the scheme.
 	// The versions should be in the order of most preferred to the least.
 	supportedVersions := os.Getenv("KUBE_API_VERSIONS")
@@ -62,4 +65,16 @@ func IsRegisteredAPIVersion(version string) bool {
 		}
 	}
 	return false
+}
+
+// GroupVersionsForGroup returns the registered versions of a group in the form
+// of "group/version".
+func GroupVersionsForGroup(group string) []string {
+	ret := []string{}
+	for _, v := range RegisteredVersions {
+		if apiutil.GetGroup(v) == group {
+			ret = append(ret, v)
+		}
+	}
+	return ret
 }

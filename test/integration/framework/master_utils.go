@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -131,11 +130,11 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	var err error
 	if masterConfig == nil {
 		etcdClient := NewEtcdClient()
-		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
+		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, etcdtest.PathPrefix())
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
-		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
@@ -269,11 +268,11 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	etcdClient := NewEtcdClient()
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
