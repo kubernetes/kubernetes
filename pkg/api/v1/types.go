@@ -143,6 +143,18 @@ type ObjectMeta struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	CreationTimestamp unversioned.Time `json:"creationTimestamp,omitempty"`
 
+	// CreationUserName is the user name field of the authenticated user that created this object.
+	// It may be empty if the underlying system created the user directly, or may have been created
+	// by a user that no longer is tracked by the authentication provider. This value may be
+	// targeted for either human or machine users depending on the setup of the Kubernetes cluster,
+	// and clients should not assume it has any particular format.
+	//
+	// Populated by the system.
+	// Read-only.
+	// Null for lists.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	CreationUserName string `json:"creationUserName,omitempty"`
+
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
 	// directly settable by a client. The resource will be deleted (no longer visible from

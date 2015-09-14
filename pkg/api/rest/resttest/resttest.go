@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -143,6 +144,7 @@ func (t *Tester) TestCreate(valid runtime.Object, setFn SetFunc, getFn GetFunc, 
 		t.testCreateGeneratesNameReturnsServerTimeout(copyOrDie(valid))
 	}
 	t.testCreateEquals(copyOrDie(valid), getFn)
+	t.testCreateFillsUserName(copyOrDie(valid))
 	t.testCreateAlreadyExisting(copyOrDie(valid), setFn)
 	if t.clusterScope {
 		t.testCreateDiscardsObjectNamespace(copyOrDie(valid))
@@ -372,6 +374,7 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	now := unversioned.Now()
 	objectMeta.UID = "bad-uid"
 	objectMeta.CreationTimestamp = now
+	objectMeta.CreationUserName = "bad-user"
 
 	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
 	if err != nil {
@@ -380,8 +383,27 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	if obj == nil {
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
-	if objectMeta.UID == "bad-uid" || objectMeta.CreationTimestamp == now {
+	if objectMeta.UID == "bad-uid" || objectMeta.CreationTimestamp == now || objectMeta.CreationUserName == "bad-user" {
 		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
+	}
+}
+
+func (t *Tester) testCreateFillsUserName(valid runtime.Object) {
+	objectMeta := t.getObjectMetaOrFail(valid)
+	objectMeta.Name = ""
+	objectMeta.GenerateName = "test-"
+	ctx := t.TestContext()
+	ctx = api.WithUser(ctx, &user.DefaultInfo{Name: "user"})
+
+	obj, err := t.storage.(rest.Creater).Create(ctx, valid)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if obj == nil {
+		t.Fatalf("Unexpected object from result: %#v", obj)
+	}
+	if objectMeta.CreationUserName != "user" {
+		t.Errorf("ObjectMeta did not set user from context: %#v", objectMeta)
 	}
 }
 
