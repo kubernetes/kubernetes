@@ -90,11 +90,11 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, err)
 	}
 
-	if d.hostPID && pod.Spec.HostPID {
+	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
 		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host pid"))
 	}
 
-	if d.hostIPC && pod.Spec.HostIPC {
+	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
 		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host ipc"))
 	}
 

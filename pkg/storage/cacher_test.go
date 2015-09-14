@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -56,14 +57,9 @@ func newTestCacher(client tools.EtcdClient) *storage.Cacher {
 }
 
 func makeTestPod(name string) *api.Pod {
-	gracePeriod := int64(30)
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Namespace: "ns", Name: name},
-		Spec: api.PodSpec{
-			TerminationGracePeriodSeconds: &gracePeriod,
-			DNSPolicy:                     api.DNSClusterFirst,
-			RestartPolicy:                 api.RestartPolicyAlways,
-		},
+		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 }
 

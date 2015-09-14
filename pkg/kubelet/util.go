@@ -40,7 +40,7 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 
 // Check whether we have the capabilities to run the specified pod.
 func canRunPod(pod *api.Pod) error {
-	if pod.Spec.HostNetwork {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
 		allowed, err := allowHostNetwork(pod)
 		if err != nil {
 			return err
@@ -50,7 +50,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.HostPID {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
 		allowed, err := allowHostPID(pod)
 		if err != nil {
 			return err
@@ -60,7 +60,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.HostIPC {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
 		allowed, err := allowHostIPC(pod)
 		if err != nil {
 			return err

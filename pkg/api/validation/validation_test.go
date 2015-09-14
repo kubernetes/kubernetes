@@ -1254,20 +1254,25 @@ func TestValidatePodSpec(t *testing.T) {
 					{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
 				},
 			},
-			HostNetwork:   true,
-			HostIPC:       true,
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate HostIPC.
-			HostIPC:       true,
+			SecurityContext: &api.PodSecurityContext{
+				HostIPC: true,
+			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate HostPID.
-			HostPID:       true,
+			SecurityContext: &api.PodSecurityContext{
+				HostPID: true,
+			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
@@ -1319,7 +1324,9 @@ func TestValidatePodSpec(t *testing.T) {
 					{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
 				},
 			},
-			HostNetwork:   true,
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},

@@ -53,6 +53,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				TerminationMessagePath: "/dev/termination-log",
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
+			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
 	json, err := testapi.Default.Codec().Encode(pod)
@@ -115,6 +116,7 @@ func TestDecodePodList(t *testing.T) {
 				TerminationMessagePath: "/dev/termination-log",
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
+			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
 	podList := &api.PodList{
