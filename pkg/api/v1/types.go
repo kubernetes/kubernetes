@@ -1036,8 +1036,10 @@ const (
 
 // ContainerStateWaiting is a waiting state of a container.
 type ContainerStateWaiting struct {
-	// (brief) reason the container is not yet running, such as pulling its image.
+	// (brief) reason the container is not yet running.
 	Reason string `json:"reason,omitempty"`
+	// Message regarding why the container is not yet running.
+	Message string `json:"message,omitempty"`
 }
 
 // ContainerStateRunning is a running state of a container.
@@ -1509,6 +1511,13 @@ type ServiceSpec struct {
 	// Defaults to None.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
+
+	// Only applies to Service Type: LoadBalancer
+	// LoadBalancer will get created with the IP specified in this field.
+	// This feature depends on whether the underlying cloud-provider supports specifying
+	// the loadBalancerIP when a load balancer is created.
+	// This field will be ignored if the cloud-provider does not support the feature.
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
 // ServicePort conatins information on service's port.

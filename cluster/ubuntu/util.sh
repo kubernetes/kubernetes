@@ -19,8 +19,6 @@ set -e
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
 
-# use an array to record name and ip
-declare -A mm
 MASTER=""
 MASTER_IP=""
 MINION_IPS=""
@@ -443,24 +441,42 @@ function prepare-push() {
      echo "Upgrading nodes to local binaries is not yet supported.Please specify the version"
      exit 1
   fi
-  # Run build.sh to get the latest release
-  source "${KUBE_ROOT}/cluster/ubuntu/build.sh"    
+
+  # Run build.sh to get the required release 
+  pushd ubuntu
+  source "build.sh"    
+  popd
 }
 
-# Update a kubernetes master with latest release
+# Update a kubernetes master with required release
 function push-master {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
   setClusterInfo
   ii=0
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
-      echo "Cleaning on master ${i#*@}"
-      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop' || true
+    if [[ "${roles[${ii}]}" == "a" ]]; then
+      echo "Cleaning master ${i#*@}"
+      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
+      sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd;
+      sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
+      sudo rm -rf ~/kube' || true
       provision-master
+    elif [[ "${roles[${ii}]}" == "ai" ]]; then 
+      echo "Cleaning master ${i#*@}"
+      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
+      sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd;
+      sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
+      sudo rm -rf ~/kube' || true
+      provision-masterandminion
     elif [[ "${roles[${ii}]}" == "i" ]]; then
+      ((ii=ii+1))
       continue
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}, please check"
       exit 1
     fi
     ((ii=ii+1))
@@ -468,41 +484,76 @@ function push-master {
   verify-cluster
 }
 
-# Update a kubernetes node with latest release
+# Update a kubernetes node with required release
 function push-node() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
-  node=${1}
+  node_ip=${1}
   setClusterInfo
   ii=0
+  existing=false
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "i" || "${roles[${ii}]}" == "ai" && $i == *$node ]]; then
-    echo "Cleaning on node ${i#*@}"
-      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop' || true
+    if [[ "${roles[${ii}]}" == "i" && ${i#*@} == $node_ip ]]; then
+      echo "Cleaning node ${i#*@}"
+      ssh -t $i 'sudo -p "[sudo] stop the all process: " service flanneld stop;
+      sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
+      sudo rm -rf ~/kube' || true
       provision-minion $i
+      existing=true
+    elif [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]] && [[ ${i#*@} == $node_ip ]]; then
+      echo "${i} is master node, please try ./kube-push -m instead"
+      existing=true
+    elif [[ "${roles[${ii}]}" == "i" || "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
+      ((ii=ii+1))
+      continue
     else
-      echo "unsupported role for ${i}, or nodes ${i} don't exist. please check"
+      echo "unsupported role for ${i}, please check"
       exit 1
     fi
     ((ii=ii+1))
   done
-  verify-cluster
+  if [[ "${existing}" == false ]]; then
+    echo "node ${node_ip} does not exist"
+  else
+    verify-cluster
+  fi 
+  
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
+# Update a kubernetes cluster with required source
+function kube-push { 
   prepare-push
-  #stop all the kube's process & etcd 
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+
+  #stop all the kube's process & etcd 
+  ii=0
   for i in ${nodes}; do
-    echo "Cleaning on node ${i#*@}"
-    ssh -t $i 'sudo -p "[sudo] stop all process: " service etcd stop' || true
-    ssh -t $i 'rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; rm -rf ~/kube' || true
+    {
+      echo "Cleaning on node ${i#*@}"
+      if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
+        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop; 
+        sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd' || true
+      elif [[ "${roles[${ii}]}" == "i" ]]; then
+        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password for stopping flanneld: " service flanneld stop' || true
+      else
+        echo "unsupported role for ${i}"
+      fi
+
+      ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
+      sudo rm -rf ~/kube' || true
+    }
+    ((ii=ii+1))
   done
-  #Update all nodes with the lasted release
+
+  #Update all nodes with the required release
   if [[ ! -f "ubuntu/binaries/master/kube-apiserver" ]]; then
-    echo "There is no latest release of kubernetes,please check first"
+    echo "There is no required release of kubernetes, please check first"
     exit 1
   fi
+
   #provision all nodes,include master&nodes
   setClusterInfo
   ii=0

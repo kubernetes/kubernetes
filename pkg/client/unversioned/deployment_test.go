@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -33,7 +33,7 @@ func getDeploymentsResoureName() string {
 
 func TestDeploymentCreate(t *testing.T) {
 	ns := api.NamespaceDefault
-	deployment := expapi.Deployment{
+	deployment := experimental.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -58,7 +58,7 @@ func TestDeploymentCreate(t *testing.T) {
 
 func TestDeploymentGet(t *testing.T) {
 	ns := api.NamespaceDefault
-	deployment := &expapi.Deployment{
+	deployment := &experimental.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -80,8 +80,8 @@ func TestDeploymentGet(t *testing.T) {
 
 func TestDeploymentList(t *testing.T) {
 	ns := api.NamespaceDefault
-	deploymentList := &expapi.DeploymentList{
-		Items: []expapi.Deployment{
+	deploymentList := &experimental.DeploymentList{
+		Items: []experimental.Deployment{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
@@ -105,7 +105,7 @@ func TestDeploymentList(t *testing.T) {
 
 func TestDeploymentUpdate(t *testing.T) {
 	ns := api.NamespaceDefault
-	deployment := &expapi.Deployment{
+	deployment := &experimental.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,

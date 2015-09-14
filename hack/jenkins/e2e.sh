@@ -70,6 +70,10 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
+
+elif [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
+  KUBERNETES_PROVIDER="gke"
+  : ${E2E_ZONE:="us-central1-f"}
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -84,13 +88,27 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
   fi
 fi
 
-# Specialized tests which should be skipped by default for projects.
-GCE_DEFAULT_SKIP_TESTS=(
+# Specialized to skip when running reboot tests.
+REBOOT_SKIP_TESTS=(
     "Autoscaling\sSuite"
     "Skipped"
     "Reboot"
     "Restart"
     "Example"
+    )
+
+# Specialized tests which should be skipped by default for projects.
+GCE_DEFAULT_SKIP_TESTS=(
+    "${REBOOT_SKIP_TESTS[@]}"
+    "Reboot")
+
+# Tests which cannot be run on GKE, e.g. because they require
+# master ssh access.
+GKE_REQUIRED_SKIP_TESTS=(
+    "Nodes"
+    "Etcd\sFailure"
+    "MasterCerts"
+    "Shell"
     )
 
 # The following tests are known to be flaky, and are thus run only in their own
@@ -131,6 +149,7 @@ GCE_PARALLEL_SKIP_TESTS=(
 GCE_PARALLEL_FLAKY_TESTS=(
     "DaemonRestart"
     "Elasticsearch"
+    "Namespaces.*should\sdelete\sfast"
     "PD"
     "ServiceAccounts"
     "Services.*change\sthe\stype"
@@ -345,6 +364,81 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
+
+  kubernetes-e2e-gke-prod)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-prod"}
+    : ${E2E_NETWORK:="e2e-gke-prod"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_USE_SERVER_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-prod"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    ;;
+
+  kubernetes-e2e-gke-staging)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${GKE_API_ENDPOINT:="https://staging-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-staging"}
+    : ${E2E_NETWORK:="e2e-gke-staging"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_USE_SERVER_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-staging"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    ;;
+
+  kubernetes-e2e-gke-test)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/rc"}
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
+    : ${E2E_NETWORK:="e2e-gke-test"}
+    : ${JENKINS_USE_RELEASE_TARS:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    ;;
+
+  kubernetes-e2e-gke-ci)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
+    : ${E2E_NETWORK:="e2e-gke-ci"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    ;;
+
+  kubernetes-e2e-gke-ci-reboot)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
+    : ${E2E_NETWORK:="e2e-gke-ci"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          )"}
+    ;;
 esac
 
 # AWS variables
@@ -362,6 +456,13 @@ export KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX:-}
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
 export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
+export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
+export DOGFOOD_GCLOUD=${DOGFOOD_GCLOUD:-}
+export CMD_GROUP=${CMD_GROUP:-}
+
+if [[ ! -z "${GKE_API_ENDPOINT:-}" ]]; then
+  export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER=${GKE_API_ENDPOINT}
+fi
 
 # Shared cluster variables
 export E2E_MIN_STARTUP_PODS=${E2E_MIN_STARTUP_PODS:-}
@@ -371,6 +472,7 @@ export MINION_SIZE=${MINION_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
 export PROJECT=${PROJECT:-}
 
+export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}
 export PATH=${PATH}:/usr/local/go/bin
 export KUBE_SKIP_CONFIRMATIONS=y
 
@@ -407,10 +509,13 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # gcloud bug can cause racing component updates to stomp on each
         # other.
         export KUBE_SKIP_UPDATE=y
-        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
-        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update preview -q" || true
-        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update alpha -q" || true
-        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update beta -q" || true
+        {
+          sudo flock -x -n 9
+          gcloud components update -q || true
+          gcloud components update preview -q || true
+          gcloud components update alpha -q || true
+          gcloud components update beta -q || true
+        } 9>/var/run/lock/gcloud-components.lock
 
         if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
             # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
@@ -495,6 +600,21 @@ cd kubernetes
 ARTIFACTS=${WORKSPACE}/_artifacts
 mkdir -p ${ARTIFACTS}
 export E2E_REPORT_DIR=${ARTIFACTS}
+
+### Pre Set Up ###
+# Install gcloud from a custom path if provided. Used to test GKE with gcloud
+# at HEAD, release candidate.
+if [[ ! -z "${CLOUDSDK_BUCKET:-}" ]]; then
+    sudo gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
+    mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
+    mkdir ~/cloudsdk
+    tar zvxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
+    export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
+    ~/cloudsdk/google-cloud-sdk/install.sh --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
+    export PATH=${HOME}/cloudsdk/google-cloud-sdk/bin:${PATH}
+    export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
+fi
 
 ### Set up ###
 if [[ "${E2E_UP,,}" == "true" ]]; then

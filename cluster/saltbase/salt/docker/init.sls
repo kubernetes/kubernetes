@@ -84,10 +84,10 @@ net.ipv4.ip_forward:
 #
 # To change:
 #
-# 1. Find new deb name with:
-#    curl https://get.docker.com/ubuntu/dists/docker/main/binary-amd64/Packages
+# 1. Find new deb name at:
+#    http://apt.dockerproject.org/repo/pool/main/d/docker-engine
 # 2. Download based on that:
-#    curl -O https://get.docker.com/ubuntu/pool/main/<...>
+#    curl -O http://apt.dockerproject.org/repo/pool/main/d/docker-engine/<deb>
 # 3. Upload to GCS:
 #    gsutil cp <deb> gs://kubernetes-release/docker/<deb>
 # 4. Make it world readable:
@@ -99,16 +99,22 @@ net.ipv4.ip_forward:
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
 
+# Only upgrade Docker to 1.8.2 for the containerVM image.
+# TODO(dchen1107): For release 1.1, we want to update the ContainerVM image to
+# include Docker 1.8.2 and comment out the upgrade below.
+{% if grains.get('cloud', '') == 'gce'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'wheezy' -%}
+{% set docker_pkg_name='docker-engine' %}
+{% set override_deb='docker-engine_1.8.2-0~wheezy_amd64.deb' %}
+{% set override_deb_sha1='dcff80bffcbde458508da58d2a9fe7bef8eed404' %}
+{% set override_docker_ver='1.8.2-0~wheezy' %}
+{% else %}
+{% set docker_pkg_name='lxc-docker-1.7.1' %}
+{% set override_docker_ver='1.7.1' %}
 {% set override_deb='lxc-docker-1.7.1_1.7.1_amd64.deb' %}
 {% set override_deb_sha1='81abef31dd2c616883a61f85bfb294d743b1c889' %}
-{% set override_docker_ver='1.7.1' %}
-
-# Comment out below logic for master branch, so that we can upgrade GCE cluster
-# to docker 1.7.1 by default.
-#
-# TODO(dchen1107): For release 1.1, we want to fall back to
-# ContainerVM installed docker by set override_deb, override_deb_sha1 and
-# override_docker_ver back to '' for gce cloud provider.
+{% endif %}
 
 {% if override_docker_ver != '' %}
 purge-old-docker-package:
@@ -135,10 +141,10 @@ purge-old-docker-package:
     - mode: 644
     - makedirs: true
 
-lxc-docker-{{ override_docker_ver }}:
+docker-upgrade:
   pkg.installed:
     - sources:
-      - lxc-docker-{{ override_docker_ver }}: /var/cache/docker-install/{{ override_deb }}
+      - {{ docker_pkg_name }}: /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
 {% endif %} # end override_docker_ver != ''
@@ -168,7 +174,7 @@ fix-service-docker:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
     - require:
-      - pkg: lxc-docker-{{ override_docker_ver }}
+      - pkg: {{ docker_pkg_name }}-{{ override_docker_ver }}
 {% endif %}
 
 {% endif %}
@@ -187,13 +193,13 @@ docker:
     - watch:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
-      - pkg: lxc-docker-{{ override_docker_ver }}
+      - pkg: docker-upgrade
 {% endif %}
 {% if pillar.get('is_systemd') %}
       - file: {{ pillar.get('systemd_system_path') }}/docker.service
 {% endif %}
 {% if override_docker_ver != '' %}
     - require:
-      - pkg: lxc-docker-{{ override_docker_ver }}
+      - pkg: docker-upgrade
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'

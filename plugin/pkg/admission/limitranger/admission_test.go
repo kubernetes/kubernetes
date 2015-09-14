@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
@@ -46,7 +46,7 @@ func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequ
 }
 
 // createLimitRange creates a limit range with the specified data
-func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRequest api.ResourceList) api.LimitRange {
+func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRequest, maxLimitRequestRatio api.ResourceList) api.LimitRange {
 	return api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
@@ -55,11 +55,12 @@ func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRe
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
 				{
-					Type:           limitType,
-					Min:            min,
-					Max:            max,
-					Default:        defaultLimit,
-					DefaultRequest: defaultRequest,
+					Type:                 limitType,
+					Min:                  min,
+					Max:                  max,
+					Default:              defaultLimit,
+					DefaultRequest:       defaultRequest,
+					MaxLimitRequestRatio: maxLimitRequestRatio,
 				},
 			},
 		},
@@ -187,67 +188,75 @@ func TestPodLimitFunc(t *testing.T) {
 	successCases := []testCase{
 		{
 			pod:        validPod("ctr-min-cpu-request", 1, getResourceRequirements(getResourceList("100m", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-cpu-request-limit", 1, getResourceRequirements(getResourceList("100m", ""), getResourceList("200m", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-memory-request", 1, getResourceRequirements(getResourceList("", "60Mi"), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-memory-request-limit", 1, getResourceRequirements(getResourceList("", "60Mi"), getResourceList("", "100Mi"))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-cpu-request-limit", 1, getResourceRequirements(getResourceList("500m", ""), getResourceList("1", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-cpu-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-mem-request-limit", 1, getResourceRequirements(getResourceList("", "250Mi"), getResourceList("", "500Mi"))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-max-cpu-ratio", 1, getResourceRequirements(getResourceList("500m", ""), getResourceList("750m", ""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getResourceList("1.5", "")),
 		},
 		{
 			pod:        validPod("ctr-max-mem-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "500Mi"))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-cpu-request", 2, getResourceRequirements(getResourceList("75m", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-cpu-request-limit", 2, getResourceRequirements(getResourceList("75m", ""), getResourceList("200m", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-memory-request", 2, getResourceRequirements(getResourceList("", "60Mi"), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-memory-request-limit", 2, getResourceRequirements(getResourceList("", "60Mi"), getResourceList("", "100Mi"))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-cpu-request-limit", 2, getResourceRequirements(getResourceList("500m", ""), getResourceList("1", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-cpu-limit", 2, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-mem-request-limit", 2, getResourceRequirements(getResourceList("", "250Mi"), getResourceList("", "500Mi"))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-mem-limit", 2, getResourceRequirements(getResourceList("", ""), getResourceList("", "500Mi"))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-mem-ratio", 3, getResourceRequirements(getResourceList("", "300Mi"), getResourceList("", "450Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "2Gi"), api.ResourceList{}, api.ResourceList{}, getResourceList("", "1.5")),
 		},
 	}
 	for i := range successCases {
@@ -261,83 +270,91 @@ func TestPodLimitFunc(t *testing.T) {
 	errorCases := []testCase{
 		{
 			pod:        validPod("ctr-min-cpu-request", 1, getResourceRequirements(getResourceList("40m", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-cpu-request-limit", 1, getResourceRequirements(getResourceList("40m", ""), getResourceList("200m", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-cpu-no-request-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("50m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-memory-request", 1, getResourceRequirements(getResourceList("", "40Mi"), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-memory-request-limit", 1, getResourceRequirements(getResourceList("", "40Mi"), getResourceList("", "100Mi"))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-min-memory-no-request-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, getResourceList("", "50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-cpu-request-limit", 1, getResourceRequirements(getResourceList("500m", ""), getResourceList("2500m", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-cpu-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("2500m", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-cpu-no-request-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-max-cpu-ratio", 1, getResourceRequirements(getResourceList("1250m", ""), getResourceList("2500m", ""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getResourceList("1", "")),
 		},
 		{
 			pod:        validPod("ctr-max-mem-request-limit", 1, getResourceRequirements(getResourceList("", "250Mi"), getResourceList("", "2Gi"))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-mem-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "2Gi"))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("ctr-max-mem-no-request-limit", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-cpu-request", 1, getResourceRequirements(getResourceList("75m", ""), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-cpu-request-limit", 1, getResourceRequirements(getResourceList("75m", ""), getResourceList("200m", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("100m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-memory-request", 1, getResourceRequirements(getResourceList("", "60Mi"), getResourceList("", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-min-memory-request-limit", 1, getResourceRequirements(getResourceList("", "60Mi"), getResourceList("", "100Mi"))),
-			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, getResourceList("", "100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-cpu-request-limit", 3, getResourceRequirements(getResourceList("500m", ""), getResourceList("1", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-cpu-limit", 3, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-mem-request-limit", 3, getResourceRequirements(getResourceList("", "250Mi"), getResourceList("", "500Mi"))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
 			pod:        validPod("pod-max-mem-limit", 3, getResourceRequirements(getResourceList("", ""), getResourceList("", "500Mi"))),
-			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-mem-ratio", 3, getResourceRequirements(getResourceList("", "250Mi"), getResourceList("", "500Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getResourceList("", "2Gi"), api.ResourceList{}, api.ResourceList{}, getResourceList("", "1.5")),
 		},
 	}
 	for i := range errorCases {

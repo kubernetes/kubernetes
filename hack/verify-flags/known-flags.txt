@@ -138,6 +138,7 @@ kube-master
 label-columns
 last-release-pr
 legacy-userspace-proxy
+load-balancer-ip
 log-flush-frequency
 long-running-request-regexp
 low-diskspace-threshold-mb
@@ -223,11 +224,13 @@ resource-container
 resource-quota-sync-period
 resource-version
 rkt-path
+rkt-stage1-image
 root-ca-file
 root-dir
 run-proxy
 runtime-config
 scheduler-config
+schema-cache-dir
 secure-port
 service-account-key-file
 service-account-lookup

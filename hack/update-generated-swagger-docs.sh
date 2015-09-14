@@ -24,14 +24,14 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 function generate_version() {
-	local groupVersion=$1
-	local TMPFILE="/tmp/types_swagger_doc_generated.$(date +%s).go"
+  local group_version=$1
+  local TMPFILE="/tmp/types_swagger_doc_generated.$(date +%s).go"
 
-	echo "Generating swagger type docs for ${groupVersion}"
+  echo "Generating swagger type docs for ${group_version}"
 
-	sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > $TMPFILE
-  echo "package ${groupVersion##*/}" >> $TMPFILE
-	cat >> $TMPFILE <<EOF
+  sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > $TMPFILE
+  echo "package ${group_version##*/}" >> $TMPFILE
+  cat >> $TMPFILE <<EOF
 
 // This file contains a collection of methods that can be used from go-resful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -46,21 +46,23 @@ function generate_version() {
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	GOPATH=$(godep path):$GOPATH go run cmd/genswaggertypedocs/swagger_type_docs.go -s "pkg/${groupVersion}/types.go" -f - >>  $TMPFILE
+  GOPATH=$(godep path):$GOPATH go run cmd/genswaggertypedocs/swagger_type_docs.go -s \
+    "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types.go" -f - \
+    >>  $TMPFILE
 
-	echo "// AUTO-GENERATED FUNCTIONS END HERE" >> $TMPFILE
+  echo "// AUTO-GENERATED FUNCTIONS END HERE" >> $TMPFILE
 
-	gofmt -w -s $TMPFILE
-	mv $TMPFILE "pkg/${groupVersion}/types_swagger_doc_generated.go"
+  gofmt -w -s $TMPFILE
+  mv $TMPFILE "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 }
 
-GROUP_VERSIONS="api/v1 expapi/v1"
+GROUP_VERSIONS="api/v1 experimental/v1"
 # To avoid compile errors, remove the currently existing files.
-for groupVersion in $GROUP_VERSIONS; do
-	rm -f "pkg/${groupVersion}/types_swagger_doc_generated.go"
+for group_version in $GROUP_VERSIONS; do
+  rm -f "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 done
-for groupVersion in $GROUP_VERSIONS; do
-	generate_version "${groupVersion}"
+for group_version in $GROUP_VERSIONS; do
+  generate_version "${group_version}"
 done
 
 "${KUBE_ROOT}/hack/update-swagger-spec.sh"

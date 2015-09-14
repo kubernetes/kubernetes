@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -35,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -99,6 +100,19 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer, err = NewJSONPathPrinter(string(data))
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
+		}
+	case "custom-columns":
+		var err error
+		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument); err != nil {
+			return nil, false, err
+		}
+	case "custom-columns-file":
+		file, err := os.Open(formatArgument)
+		if err != nil {
+			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
+		}
+		if printer, err = NewCustomColumnsPrinterFromTemplate(file); err != nil {
+			return nil, false, err
 		}
 	case "wide":
 		fallthrough
@@ -505,6 +519,10 @@ func translateTimestamp(timestamp util.Time) string {
 }
 
 func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	return printPodBase(pod, w, withNamespace, wide, showAll, true, columnLabels)
+}
+
+func printPodBase(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll bool, showIfTerminating bool, columnLabels []string) error {
 	name := pod.Name
 	namespace := pod.Namespace
 
@@ -514,7 +532,7 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll 
 
 	reason := string(pod.Status.Phase)
 	// if not printing all pods, skip terminated pods (default)
-	if !showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
+	if !showIfTerminating && !showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
 		return nil
 	}
 	if pod.Status.Reason != "" {
@@ -574,7 +592,7 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, showAll 
 
 func printPodList(podList *api.PodList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, pod := range podList.Items {
-		if err := printPod(&pod, w, withNamespace, wide, showAll, columnLabels); err != nil {
+		if err := printPodBase(&pod, w, withNamespace, wide, showAll, false, columnLabels); err != nil {
 			return err
 		}
 	}
@@ -1118,7 +1136,7 @@ func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNa
 	return nil
 }
 
-func printThirdPartyResource(rsrc *expapi.ThirdPartyResource, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printThirdPartyResource(rsrc *experimental.ThirdPartyResource, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	versions := make([]string, len(rsrc.Versions))
 	for ix := range rsrc.Versions {
 		version := &rsrc.Versions[ix]
@@ -1131,7 +1149,7 @@ func printThirdPartyResource(rsrc *expapi.ThirdPartyResource, w io.Writer, withN
 	return nil
 }
 
-func printThirdPartyResourceList(list *expapi.ThirdPartyResourceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printThirdPartyResourceList(list *experimental.ThirdPartyResourceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printThirdPartyResource(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
@@ -1141,7 +1159,7 @@ func printThirdPartyResourceList(list *expapi.ThirdPartyResourceList, w io.Write
 	return nil
 }
 
-func printDeployment(deployment *expapi.Deployment, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printDeployment(deployment *experimental.Deployment, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	if withNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", deployment.Namespace); err != nil {
 			return err
@@ -1157,7 +1175,7 @@ func printDeployment(deployment *expapi.Deployment, w io.Writer, withNamespace b
 	return err
 }
 
-func printDeploymentList(list *expapi.DeploymentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printDeploymentList(list *experimental.DeploymentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printDeployment(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
@@ -1166,7 +1184,7 @@ func printDeploymentList(list *expapi.DeploymentList, w io.Writer, withNamespace
 	return nil
 }
 
-func printHorizontalPodAutoscaler(hpa *expapi.HorizontalPodAutoscaler, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printHorizontalPodAutoscaler(hpa *experimental.HorizontalPodAutoscaler, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	namespace := hpa.Namespace
 	name := hpa.Name
 	reference := fmt.Sprintf("%s/%s/%s/%s",
@@ -1203,7 +1221,7 @@ func printHorizontalPodAutoscaler(hpa *expapi.HorizontalPodAutoscaler, w io.Writ
 	return err
 }
 
-func printHorizontalPodAutoscalerList(list *expapi.HorizontalPodAutoscalerList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+func printHorizontalPodAutoscalerList(list *experimental.HorizontalPodAutoscalerList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for i := range list.Items {
 		if err := printHorizontalPodAutoscaler(&list.Items[i], w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err

@@ -41,8 +41,9 @@ const incomingQueueLength = 25
 type Broadcaster struct {
 	lock sync.Mutex
 
-	watchers    map[int64]*broadcasterWatcher
-	nextWatcher int64
+	watchers     map[int64]*broadcasterWatcher
+	nextWatcher  int64
+	distributing sync.WaitGroup
 
 	incoming chan Event
 
@@ -67,6 +68,7 @@ func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *B
 		watchQueueLength:    queueLength,
 		fullChannelBehavior: fullChannelBehavior,
 	}
+	m.distributing.Add(1)
 	go m.loop()
 	return m
 }
@@ -146,9 +148,14 @@ func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 }
 
 // Shutdown disconnects all watchers (but any queued events will still be distributed).
-// You must not call Action after calling Shutdown.
+// You must not call Action or Watch* after calling Shutdown. This call blocks
+// until all events have been distributed through the outbound channels. Note
+// that since they can be buffered, this means that the watchers might not
+// have received the data yet as it can remain sitting in the buffered
+// channel.
 func (m *Broadcaster) Shutdown() {
 	close(m.incoming)
+	m.distributing.Wait()
 }
 
 // loop receives from m.incoming and distributes to all watchers.
@@ -163,6 +170,7 @@ func (m *Broadcaster) loop() {
 		m.distribute(event)
 	}
 	m.closeAll()
+	m.distributing.Done()
 }
 
 // distribute sends event to all watchers. Blocking.
