@@ -61,11 +61,8 @@ type documentable interface {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
-	errors = make([]error, 0)
-
-	// Create the WebService.
-	ws = a.newWebService()
+func (a *APIInstaller) Install(ws *restful.WebService) []error {
+	errors := make([]error, 0)
 
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
 
@@ -82,10 +79,11 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 			errors = append(errors, err)
 		}
 	}
-	return ws, errors
+	return errors
 }
 
-func (a *APIInstaller) newWebService() *restful.WebService {
+// NewWebService creates a new restful webservice with the api installer's prefix and version.
+func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
 	ws.Doc("API at " + a.prefix + " version " + a.group.Version)
