@@ -1132,8 +1132,8 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 	return allErrs
 }
 
-var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
-var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
+var supportedSessionAffinityType = sets.NewString(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
+var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
 	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypeNamespaceIP))
 
 // ValidateService tests if required fields in the service are set.
@@ -1717,7 +1717,7 @@ func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	return allErrs
 }
 
-var supportedNamespaceNetworkPolicy = util.NewStringSet(string(api.NamespaceNetworkPolicyOpen), string(api.NamespaceNetworkPolicyClosed))
+var supportedNamespaceNetworkPolicy = sets.NewString(string(api.NamespaceNetworkPolicyOpen), string(api.NamespaceNetworkPolicyClosed))
 func validateNamespaceNetworkPolicy(networkPolicy string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
