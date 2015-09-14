@@ -28,18 +28,18 @@ import (
 // and responsible Mesos resource procurement. c and m are resource quantities written into
 // k8s api.Pod.Spec's that don't declare resources (all containers in k8s-mesos require cpu
 // and memory limits).
-func NewDefaultProcurement(c mresource.CPUShares, m mresource.MegaBytes) Procurement {
+func NewDefaultProcurement(c mresource.CPUShares, m mresource.MegaBytes, other ...Procurement) Procurement {
 	requireSome := &RequireSomePodResources{
 		defaultContainerCPULimit: c,
 		defaultContainerMemLimit: m,
 	}
-	return AllOrNothingProcurement([]Procurement{
+	return AllOrNothingProcurement(append([]Procurement{
 		ValidateProcurement,
 		NodeProcurement,
 		requireSome.Procure,
 		PodResourcesProcurement,
 		PortsProcurement,
-	}).Procure
+	}, other...)).Procure
 }
 
 // Procurement funcs allocate resources for a task from an offer.

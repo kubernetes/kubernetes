@@ -31,4 +31,5 @@ const (
 	PortNameMappingKeyPrefix = "k8s.mesosphere.io/portName_"
 	PortNameMappingKeyFormat = PortNameMappingKeyPrefix + "%s_%s"
 	ContainerPortKeyFormat   = "k8s.mesosphere.io/containerPort_%s_%s_%d"
+	StaticPodFilename        = "k8s.mesosphere.io/staticPodFilename"
 )

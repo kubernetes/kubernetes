@@ -378,7 +378,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		PodLW:                cache.NewListWatchFromClient(kc.KubeClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, kc.NodeName)),
 	})
 
-	go exec.InitializeStaticPodsSource(func() {
+	go exec.InitializeStaticPodsSource(kc.Hostname, func() {
 		// Create file source only when we are called back. Otherwise, it is never marked unseen.
 		fileSourceUpdates := pc.Channel(kubelet.FileSource)
 

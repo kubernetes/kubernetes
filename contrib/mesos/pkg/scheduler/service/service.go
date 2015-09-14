@@ -18,7 +18,6 @@ package service
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -46,11 +45,11 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
 
-	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	minioncfg "k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
@@ -61,7 +60,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -71,6 +69,9 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
+
+	// lock to this API version, compilation will fail when this becomes unsupported
+	_ "k8s.io/kubernetes/pkg/api/v1"
 )
 
 const (
@@ -420,49 +421,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	}
 
 	// Check for staticPods
-	var staticPodCPUs, staticPodMem float64
-	if s.StaticPodsConfigPath != "" {
-		bs, paths, err := archive.ZipDir(s.StaticPodsConfigPath)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// try to read pod files and sum resources
-		// TODO(sttts): don't terminate when static pods are broken, but skip them
-		// TODO(sttts): add a directory watch and tell running executors about updates
-		for _, podPath := range paths {
-			podJson, err := ioutil.ReadFile(podPath)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error reading static pod spec: %v", err)
-			}
-
-			pod := api.Pod{}
-			err = json.Unmarshal(podJson, &pod)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error parsing static pod spec at %v: %v", podPath, err)
-			}
-
-			// TODO(sttts): allow unlimited static pods as well and patch in the default resource limits
-			unlimitedCPU := mresource.LimitPodCPU(&pod, s.DefaultContainerCPULimit)
-			unlimitedMem := mresource.LimitPodMem(&pod, s.DefaultContainerMemLimit)
-			if unlimitedCPU {
-				return nil, nil, fmt.Errorf("found static pod without limit on cpu resources: %v", podPath)
-			}
-			if unlimitedMem {
-				return nil, nil, fmt.Errorf("found static pod without limit on memory resources: %v", podPath)
-			}
-
-			cpu := mresource.PodCPULimit(&pod)
-			mem := mresource.PodMemLimit(&pod)
-			log.V(2).Infof("reserving %.2f cpu shares and %.2f MB of memory to static pod %s", cpu, mem, pod.Name)
-
-			staticPodCPUs += float64(cpu)
-			staticPodMem += float64(mem)
-		}
-
-		// pass zipped pod spec to executor
-		execInfo.Data = bs
-	}
+	data, staticPodCPUs, staticPodMem := s.prepareStaticPods()
 
 	execInfo.Resources = []*mesos.Resource{
 		mutil.NewScalarResource("cpus", float64(s.MesosExecutorCPUs)+staticPodCPUs),
@@ -474,8 +433,42 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ehash := hashExecutorInfo(execInfo)
 	eid := uid.New(ehash, execcfg.DefaultInfoID)
 	execInfo.ExecutorId = &mesos.ExecutorID{Value: proto.String(eid.String())}
+	execInfo.Data = data
 
 	return execInfo, eid, nil
+}
+
+func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, staticPodMem float64) {
+	// TODO(sttts): add a directory watch and tell running executors about updates
+	if s.StaticPodsConfigPath == "" {
+		return
+	}
+
+	entries, errCh := podutil.ReadFromDir(s.StaticPodsConfigPath)
+	go func() {
+		// we just skip file system errors for now, do our best to gather
+		// as many static pod specs as we can.
+		for err := range errCh {
+			log.Errorln(err.Error())
+		}
+	}()
+
+	// validate cpu and memory limits, tracking the running totals in staticPod{CPUs,Mem}
+	validateResourceLimits := StaticPodValidator(
+		s.DefaultContainerCPULimit,
+		s.DefaultContainerMemLimit,
+		&staticPodCPUs,
+		&staticPodMem,
+		!s.AccountForPodResources)
+
+	zipped, err := podutil.Gzip(validateResourceLimits.Do(entries))
+	if err != nil {
+		log.Errorf("failed to generate static pod data: %v", err)
+		staticPodCPUs, staticPodMem = 0, 0
+	} else {
+		data = zipped
+	}
+	return
 }
 
 // TODO(jdef): hacked from kubelet/server/server.go
@@ -675,13 +668,15 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	as := scheduler.NewAllocationStrategy(
 		podtask.DefaultPredicate,
-		podtask.NewDefaultProcurement(s.DefaultContainerCPULimit, s.DefaultContainerMemLimit))
+		podtask.NewDefaultProcurement(
+			s.DefaultContainerCPULimit,
+			s.DefaultContainerMemLimit))
 
 	// downgrade allocation strategy if user disables "account-for-pod-resources"
 	if !s.AccountForPodResources {
 		as = scheduler.NewAllocationStrategy(
 			podtask.DefaultMinimalPredicate,
-			podtask.DefaultMinimalProcurement)
+			podtask.NewDefaultMinimalProcurement())
 	}
 
 	// mirror all nodes into the nodeStore

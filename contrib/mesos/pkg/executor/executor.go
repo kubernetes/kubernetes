@@ -31,9 +31,9 @@ import (
 	bindings "github.com/mesos/mesos-go/executor"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
-	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
+	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -270,7 +270,7 @@ func (k *KubernetesExecutor) onInitialRegistration() {
 
 // InitializeStaticPodsSource blocks until initial regstration is complete and
 // then creates a static pod source using the given factory func.
-func (k *KubernetesExecutor) InitializeStaticPodsSource(sourceFactory func()) {
+func (k *KubernetesExecutor) InitializeStaticPodsSource(hostname string, sourceFactory func()) {
 	<-k.initialRegComplete
 
 	if k.staticPodsConfig == nil {
@@ -278,11 +278,10 @@ func (k *KubernetesExecutor) InitializeStaticPodsSource(sourceFactory func()) {
 	}
 
 	log.V(2).Infof("extracting static pods config to %s", k.staticPodsConfigPath)
-	err := archive.UnzipDir(k.staticPodsConfig, k.staticPodsConfigPath)
-	if err != nil {
-		log.Errorf("Failed to extract static pod config: %v", err)
-		return
-	}
+	annotator := podutil.Annotator(map[string]string{
+		meta.BindingHostKey: hostname,
+	})
+	podutil.WriteToDir(annotator.Do(podutil.Gunzip(k.staticPodsConfig)), k.staticPodsConfigPath)
 
 	log.V(2).Infof("initializing static pods source factory, configured at path %q", k.staticPodsConfigPath)
 	sourceFactory()
