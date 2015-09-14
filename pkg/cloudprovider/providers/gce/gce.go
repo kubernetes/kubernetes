@@ -745,6 +745,114 @@ func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, 
 	return gce.service.HttpHealthChecks.Get(gce.projectID, name).Do()
 }
 
+// InstanceGroup Management
+
+// CreateInstanceGroup creates an instance group with the given instances. It is the callers responsibility to add named ports.
+func (gce *GCECloud) CreateInstanceGroup(name string) (*compute.InstanceGroup, error) {
+	op, err := gce.service.InstanceGroups.Insert(
+		gce.projectID, gce.zone, &compute.InstanceGroup{Name: name}).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForZoneOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetInstanceGroup(name)
+}
+
+// DeleteInstanceGroup deletes an instance group.
+func (gce *GCECloud) DeleteInstanceGroup(name string) error {
+	op, err := gce.service.InstanceGroups.Delete(
+		gce.projectID, gce.zone, name).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForZoneOp(op)
+}
+
+// ListInstancesInInstanceGroup lists all the instances in a given istance group and state.
+func (gce *GCECloud) ListInstancesInInstanceGroup(name string, state string) (*compute.InstanceGroupsListInstances, error) {
+	return gce.service.InstanceGroups.ListInstances(
+		gce.projectID, gce.zone, name,
+		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Do()
+}
+
+// AddInstancesToInstanceGroup adds the given instances to the given instance group.
+func (gce *GCECloud) AddInstancesToInstanceGroup(name string, instanceNames []string) error {
+	if len(instanceNames) == 0 {
+		return nil
+	}
+	// Adding the same instance twice will result in a 4xx error
+	instances := []*compute.InstanceReference{}
+	for _, ins := range instanceNames {
+		instances = append(instances, &compute.InstanceReference{makeHostURL(gce.projectID, gce.zone, ins)})
+	}
+	op, err := gce.service.InstanceGroups.AddInstances(
+		gce.projectID, gce.zone, name,
+		&compute.InstanceGroupsAddInstancesRequest{
+			Instances: instances,
+		}).Do()
+
+	if err != nil {
+		return err
+	}
+	return gce.waitForZoneOp(op)
+}
+
+// RemoveInstancesFromInstanceGroup removes the given instances from the instance group.
+func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, instanceNames []string) error {
+	if len(instanceNames) == 0 {
+		return nil
+	}
+	instances := []*compute.InstanceReference{}
+	for _, ins := range instanceNames {
+		instanceLink := makeHostURL(gce.projectID, gce.zone, ins)
+		instances = append(instances, &compute.InstanceReference{instanceLink})
+	}
+	op, err := gce.service.InstanceGroups.RemoveInstances(
+		gce.projectID, gce.zone, name,
+		&compute.InstanceGroupsRemoveInstancesRequest{
+			Instances: instances,
+		}).Do()
+
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForZoneOp(op)
+}
+
+// AddPortToInstanceGroup adds a port to the given instance group.
+func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int64) (*compute.NamedPort, error) {
+	for _, np := range ig.NamedPorts {
+		if np.Port == port {
+			glog.Infof("Instance group %v already has named port %+v", ig.Name, np)
+			return np, nil
+		}
+	}
+	glog.Infof("Adding port %v to instance group %v with %d ports", port, ig.Name, len(ig.NamedPorts))
+	namedPort := compute.NamedPort{fmt.Sprintf("port%v", port), port}
+	ig.NamedPorts = append(ig.NamedPorts, &namedPort)
+	op, err := gce.service.InstanceGroups.SetNamedPorts(
+		gce.projectID, gce.zone, ig.Name,
+		&compute.InstanceGroupsSetNamedPortsRequest{
+			NamedPorts: ig.NamedPorts}).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForZoneOp(op); err != nil {
+		return nil, err
+	}
+	return &namedPort, nil
+}
+
+// GetInstanceGroup returns an instance group by name.
+func (gce *GCECloud) GetInstanceGroup(name string) (*compute.InstanceGroup, error) {
+	return gce.service.InstanceGroups.Get(gce.projectID, gce.zone, name).Do()
+}
+
 // Take a GCE instance 'hostname' and break it down to something that can be fed
 // to the GCE API client library.  Basically this means reducing 'kubernetes-
 // minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
