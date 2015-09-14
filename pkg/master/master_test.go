@@ -81,7 +81,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.enableSwaggerSupport, config.EnableSwaggerSupport)
 	assert.Equal(master.enableProfiling, config.EnableProfiling)
 	assert.Equal(master.apiPrefix, config.APIPrefix)
-	assert.Equal(master.expAPIPrefix, config.ExpAPIPrefix)
+	assert.Equal(master.apiGroupPrefix, config.APIGroupPrefix)
 	assert.Equal(master.corsAllowedOriginList, config.CorsAllowedOriginList)
 	assert.Equal(master.authenticator, config.Authenticator)
 	assert.Equal(master.authorizer, config.Authorizer)
@@ -281,7 +281,7 @@ func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
 	expAPIGroup := master.experimental(&config)
-	assert.Equal(expAPIGroup.Root, master.expAPIPrefix)
+	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix+"/"+latest.GroupOrDie("experimental").Group)
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)

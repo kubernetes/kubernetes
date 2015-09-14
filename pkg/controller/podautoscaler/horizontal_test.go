@@ -89,16 +89,16 @@ func makeTestServer(t *testing.T, responses map[string]*serverResponse) (*httpte
 	}
 
 	if responses[hpaListHandler] != nil {
-		handlers[hpaListHandler] = mkHandler("/experimental/v1/horizontalpodautoscalers", *responses[hpaListHandler])
+		handlers[hpaListHandler] = mkHandler("/apis/experimental/v1/horizontalpodautoscalers", *responses[hpaListHandler])
 	}
 
 	if responses[scaleHandler] != nil {
 		handlers[scaleHandler] = mkHandler(
-			fmt.Sprintf("/experimental/v1/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
+			fmt.Sprintf("/apis/experimental/v1/namespaces/%s/replicationcontrollers/%s/scale", namespace, rcName), *responses[scaleHandler])
 	}
 
 	if responses[updateHpaHandler] != nil {
-		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/experimental/v1/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
+		handlers[updateHpaHandler] = mkHandler(fmt.Sprintf("/apis/experimental/v1/namespaces/%s/horizontalpodautoscalers/%s", namespace, hpaName),
 			*responses[updateHpaHandler])
 	}
 
@@ -121,7 +121,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name:      hpaName,
 					Namespace: namespace,
-					SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
+					SelfLink:  "/apis/experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 				},
 				Spec: experimental.HorizontalPodAutoscalerSpec{
 					ScaleRef: &experimental.SubresourceReference{
