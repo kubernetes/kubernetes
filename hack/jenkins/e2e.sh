@@ -109,6 +109,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Etcd\sFailure"
     "MasterCerts"
     "Shell"
+    "Daemon\sset"
     )
 
 # The following tests are known to be flaky, and are thus run only in their own
