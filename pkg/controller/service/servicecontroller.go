@@ -238,7 +238,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 	case cache.Sync:
 		err, retry := s.createLoadBalancerIfNeeded(namespacedName, service, cachedService.appliedState)
 		if err != nil {
-			message := "error creating load balancer"
+			message := "Error creating load balancer"
 			if retry {
 				message += " (will retry): "
 			} else {
@@ -255,14 +255,14 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		cachedService.appliedState = service
 		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
-		s.eventRecorder.Event(service, "DeletingLoadBalancer", "deleting loadbalancer")
+		s.eventRecorder.Event(service, "DeletingLoadBalancer", "Deleting load balancer")
 		err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
-			message := "error deleting load balancer (will retry): " + err.Error()
+			message := "Error deleting load balancer (will retry): " + err.Error()
 			s.eventRecorder.Event(service, "DeletingLoadBalancerFailed", message)
 			return err, retryable
 		}
-		s.eventRecorder.Event(service, "DeletedLoadBalancer", "deleted loadbalancer")
+		s.eventRecorder.Event(service, "DeletedLoadBalancer", "Deleted load balancer")
 		s.cache.delete(namespacedName.String())
 	default:
 		glog.Errorf("Unexpected delta type: %v", delta.Type)
@@ -305,11 +305,11 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 
 		if needDelete {
 			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", namespacedName)
-			s.eventRecorder.Event(service, "DeletingLoadBalancer", "deleting loadbalancer")
+			s.eventRecorder.Event(service, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region); err != nil {
 				return err, retryable
 			}
-			s.eventRecorder.Event(service, "DeletedLoadBalancer", "deleted loadbalancer")
+			s.eventRecorder.Event(service, "DeletedLoadBalancer", "Deleted load balancer")
 		}
 
 		service.Status.LoadBalancer = api.LoadBalancerStatus{}
@@ -319,12 +319,12 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
 
 		// The load balancer doesn't exist yet, so create it.
-		s.eventRecorder.Event(service, "CreatingLoadBalancer", "creating loadbalancer")
+		s.eventRecorder.Event(service, "CreatingLoadBalancer", "Creating load balancer")
 		err := s.createExternalLoadBalancer(service)
 		if err != nil {
 			return fmt.Errorf("failed to create external load balancer for service %s: %v", namespacedName, err), retryable
 		}
-		s.eventRecorder.Event(service, "CreatedLoadBalancer", "created loadbalancer")
+		s.eventRecorder.Event(service, "CreatedLoadBalancer", "Created load balancer")
 	}
 
 	// Write the state if changed
@@ -659,7 +659,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 	name := cloudprovider.GetLoadBalancerName(service)
 	err := s.balancer.UpdateTCPLoadBalancer(name, s.zone.Region, hosts)
 	if err == nil {
-		s.eventRecorder.Event(service, "UpdatedLoadBalancer", "updated loadbalancer with new hosts")
+		s.eventRecorder.Event(service, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
 		return nil
 	}
 
@@ -670,8 +670,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 		return nil
 	}
 
-	message := "error updating loadbalancer with new hosts: " + err.Error()
-	s.eventRecorder.Event(service, "LoadBalancerUpdateFailed", message)
+	s.eventRecorder.Eventf(service, "LoadBalancerUpdateFailed", "Error updating load balancer with new hosts: %v", err)
 	return err
 }
 
