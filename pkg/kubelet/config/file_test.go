@@ -32,7 +32,8 @@ import (
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := sourceFile{"/some/fake/file", "localhost", ch}
+	c := sourceFile{path: "/some/fake/file", nodeName: "localhost", updates: ch}
+	c.applyDefaults = c.defaultApplyDefaults
 	err := c.extractFromPath()
 	if err == nil {
 		t.Errorf("Expected error")
@@ -41,7 +42,7 @@ func TestExtractFromNonExistentFile(t *testing.T) {
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
 	ch := make(chan interface{})
-	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
+	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch, nil)
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
@@ -130,7 +131,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			defer os.Remove(file.Name())
 
 			ch := make(chan interface{})
-			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
+			NewSourceFile(file.Name(), hostname, time.Millisecond, ch, nil)
 			select {
 			case got := <-ch:
 				update := got.(kubelet.PodUpdate)
@@ -154,7 +155,8 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{}, 1)
-	c := sourceFile{file.Name(), "localhost", ch}
+	c := sourceFile{path: file.Name(), nodeName: "localhost", updates: ch}
+	c.applyDefaults = c.defaultApplyDefaults
 	err := c.extractFromPath()
 	if err == nil {
 		t.Fatalf("Expected error")
@@ -170,7 +172,8 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := sourceFile{dirName, "localhost", ch}
+	c := sourceFile{path: dirName, nodeName: "localhost", updates: ch}
+	c.applyDefaults = c.defaultApplyDefaults
 	err = c.extractFromPath()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

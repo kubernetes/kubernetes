@@ -370,7 +370,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		// Create file source only when we are called back. Otherwise, it is never marked unseen.
 		fileSourceUpdates := pc.Channel(kubelet.FileSource)
 
-		kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
+		kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates, nil)
 	})
 
 	k := &kubeletExecutor{

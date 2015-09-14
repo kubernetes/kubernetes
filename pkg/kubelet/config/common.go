@@ -38,7 +38,7 @@ func generatePodName(name, nodeName string) string {
 	return fmt.Sprintf("%s-%s", name, nodeName)
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) error {
+func ApplyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		if isFile {
