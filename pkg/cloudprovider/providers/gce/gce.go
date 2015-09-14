@@ -566,6 +566,53 @@ func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	return err
 }
 
+// UrlMap management
+
+// GetUrlMap returns the UrlMap by name.
+func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
+	return gce.service.UrlMaps.Get(gce.projectID, name).Do()
+}
+
+// CreateUrlMap creates an url map, using the given backend service as the default service.
+func (gce *GCECloud) CreateUrlMap(backend *compute.BackendService, name string) (*compute.UrlMap, error) {
+	urlMap := &compute.UrlMap{
+		Name:           name,
+		DefaultService: backend.SelfLink,
+	}
+	op, err := gce.service.UrlMaps.Insert(gce.projectID, urlMap).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetUrlMap(name)
+}
+
+// UpdateUrlMap applies the given urlmap as an update, and returns the new urlmap.
+func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) (*compute.UrlMap, error) {
+	op, err := gce.service.UrlMaps.Update(gce.projectID, urlMap.Name, urlMap).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.service.UrlMaps.Get(gce.projectID, urlMap.Name).Do()
+}
+
+// DeleteUrlMap deletes a url map by name.
+func (gce *GCECloud) DeleteUrlMap(name string) error {
+	op, err := gce.service.UrlMaps.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
 // Take a GCE instance 'hostname' and break it down to something that can be fed
 // to the GCE API client library.  Basically this means reducing 'kubernetes-
 // minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
