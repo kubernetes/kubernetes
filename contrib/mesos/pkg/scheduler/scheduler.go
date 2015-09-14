@@ -33,6 +33,5 @@ type Scheduler interface {
 	Reconcile(t *podtask.T)
 	KillTask(id string) error
 	LaunchTask(t *podtask.T) error
-
 	Run(done <-chan struct{})
 }
