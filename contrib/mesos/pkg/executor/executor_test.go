@@ -505,7 +505,7 @@ func TestExecutorStaticPods(t *testing.T) {
 	executor := New(config)
 	hostname := "h1"
 	go executor.InitializeStaticPodsSource(func() {
-		kconfig.NewSourceFile(staticPodsConfigPath, hostname, 1*time.Second, updates)
+		kconfig.NewSourceFile(staticPodsConfigPath, hostname, 1*time.Second, updates, nil)
 	})
 
 	// create ExecutorInfo with static pod zip in data field

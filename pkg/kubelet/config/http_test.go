@@ -34,7 +34,7 @@ import (
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
 	ch := make(chan interface{})
-	NewSourceURL("http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
+	NewSourceURL("http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch, nil)
 	select {
 	case got := <-ch:
 		t.Errorf("Expected no update, Got %#v", got)
@@ -44,7 +44,8 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0}
+	c := sourceURL{url: "http://localhost:49575/_not_found_", header: http.Header{}, nodeName: "other", updates: ch}
+	c.applyDefaults = c.defaultApplyDefaults
 	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
@@ -113,7 +114,8 @@ func TestExtractInvalidPods(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0}
+		c := sourceURL{url: testServer.URL, header: http.Header{}, nodeName: "localhost", updates: ch}
+		c.applyDefaults = c.defaultApplyDefaults
 		if err := c.extractFromURL(); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
@@ -267,7 +269,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0}
+		c := sourceURL{url: testServer.URL, header: http.Header{}, nodeName: hostname, updates: ch}
+		c.applyDefaults = c.defaultApplyDefaults
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
@@ -314,7 +317,8 @@ func TestURLWithHeader(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")
-	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0}
+	c := sourceURL{url: testServer.URL, header: header, nodeName: "localhost", updates: ch}
+	c.applyDefaults = c.defaultApplyDefaults
 	if err := c.extractFromURL(); err != nil {
 		t.Fatalf("Unexpected error extracting from URL: %v", err)
 	}

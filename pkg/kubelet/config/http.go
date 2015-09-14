@@ -32,15 +32,16 @@ import (
 )
 
 type sourceURL struct {
-	url         string
-	header      http.Header
-	nodeName    string
-	updates     chan<- interface{}
-	data        []byte
-	failureLogs int
+	url           string
+	header        http.Header
+	nodeName      string
+	updates       chan<- interface{}
+	data          []byte
+	failureLogs   int
+	applyDefaults func(*api.Pod) error
 }
 
-func NewSourceURL(url string, header http.Header, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url string, header http.Header, nodeName string, period time.Duration, updates chan<- interface{}, applyDefaults func(*api.Pod) error) {
 	config := &sourceURL{
 		url:      url,
 		header:   header,
@@ -48,6 +49,10 @@ func NewSourceURL(url string, header http.Header, nodeName string, period time.D
 		updates:  updates,
 		data:     nil,
 	}
+	if applyDefaults == nil {
+		applyDefaults = config.defaultApplyDefaults
+	}
+	config.applyDefaults = applyDefaults
 	glog.V(1).Infof("Watching URL %s", url)
 	go util.Until(config.run, period, util.NeverStop)
 }
@@ -70,8 +75,8 @@ func (s *sourceURL) run() {
 	}
 }
 
-func (s *sourceURL) applyDefaults(pod *api.Pod) error {
-	return applyDefaults(pod, s.url, false, s.nodeName)
+func (s *sourceURL) defaultApplyDefaults(pod *api.Pod) error {
+	return ApplyDefaults(pod, s.url, false, s.nodeName)
 }
 
 func (s *sourceURL) extractFromURL() error {
