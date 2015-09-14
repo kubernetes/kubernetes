@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	expapi "k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
@@ -30,13 +30,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const thirdpartyprefix = "/thirdparty/"
+const thirdpartyprefix = "/apis/"
 
 func makeThirdPartyPath(group string) string {
 	return thirdpartyprefix + group
 }
 
-// resourceInterface is the interface for the parts of the master than know how to add/remove 
+// resourceInterface is the interface for the parts of the master that know how to add/remove
 // third party resources.  Extracted into an interface for injection for testing.
 type resourceInterface interface {
 	// Remove a third party resource based on the RESTful path for that resource
@@ -58,6 +58,9 @@ type ThirdPartyController struct {
 
 // Synchronize a single resource with RESTful resources on the master
 func (t *ThirdPartyController) SyncOneResource(rsrc *expapi.ThirdPartyResource) error {
+	// TODO: we also need to test if the existing installed resource matches the resource we are sync-ing.
+	// Currently, if there is an older, incompatible resource installed, we won't remove it.  We should detect
+	// older, incompatible resources and remove them before testing if the resource exists.
 	hasResource, err := t.master.HasThirdPartyResource(rsrc)
 	if err != nil {
 		return err
@@ -105,7 +108,7 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		found := false
 		// search across the expected restful resources to see if this resource belongs to one of the expected ones
 		for _, apiPath := range existing.List() {
-			if strings.HasPrefix(installedAPI, apiPath) {
+			if installedAPI == apiPath || strings.HasPrefix(installedAPI, apiPath+"/") {
 				found = true
 				break
 			}

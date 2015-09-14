@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	expapi "k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -94,10 +94,32 @@ func TestSyncAPIs(t *testing.T) {
 				},
 			},
 			apis: []string{
-				"/thirdparty/example.com",
-				"/thirdparty/example.com/v1",
+				"/apis/example.com",
+				"/apis/example.com/v1",
 			},
 			name: "does nothing",
+		},
+		{
+			list: &expapi.ThirdPartyResourceList{
+				Items: []expapi.ThirdPartyResource{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "foo.example.com",
+						},
+					},
+				},
+			},
+			apis: []string{
+				"/apis/example.com",
+				"/apis/example.com/v1",
+				"/apis/example.co",
+				"/apis/example.co/v1",
+			},
+			name: "deletes substring API",
+			expectedRemoved: []string{
+				"/apis/example.co",
+				"/apis/example.co/v1",
+			},
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
@@ -115,8 +137,8 @@ func TestSyncAPIs(t *testing.T) {
 				},
 			},
 			apis: []string{
-				"/thirdparty/company.com",
-				"/thirdparty/company.com/v1",
+				"/apis/company.com",
+				"/apis/company.com/v1",
 			},
 			expectedInstalled: []string{"foo.example.com"},
 			name:              "adds with existing",
@@ -132,11 +154,11 @@ func TestSyncAPIs(t *testing.T) {
 				},
 			},
 			apis: []string{
-				"/thirdparty/company.com",
-				"/thirdparty/company.com/v1",
+				"/apis/company.com",
+				"/apis/company.com/v1",
 			},
 			expectedInstalled: []string{"foo.example.com"},
-			expectedRemoved:   []string{"/thirdparty/company.com", "/thirdparty/company.com/v1"},
+			expectedRemoved:   []string{"/apis/company.com", "/apis/company.com/v1"},
 			name:              "removes with existing",
 		},
 	}
