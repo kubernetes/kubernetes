@@ -517,7 +517,7 @@ func TestIsAExitError(t *testing.T) {
 
 func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 	var ports []api.ContainerPort
-	if !pod.Spec.HostNetwork {
+	if pod.Spec.SecurityContext == nil || !pod.Spec.SecurityContext.HostNetwork {
 		for _, container := range pod.Spec.Containers {
 			ports = append(ports, container.Ports...)
 		}
@@ -1819,7 +1819,9 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 			Containers: []api.Container{
 				{Name: "bar"},
 			},
-			HostNetwork: true,
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
 		},
 	}
 
@@ -2041,7 +2043,8 @@ func TestGetPidMode(t *testing.T) {
 	}
 
 	// test true
-	pod.Spec.HostPID = true
+	pod.Spec.SecurityContext = &api.PodSecurityContext{}
+	pod.Spec.SecurityContext.HostPID = true
 	pidMode = getPidMode(pod)
 	if pidMode != "host" {
 		t.Errorf("expected host pid mode for pod but got %v", pidMode)
@@ -2058,7 +2061,8 @@ func TestGetIPCMode(t *testing.T) {
 	}
 
 	// test true
-	pod.Spec.HostIPC = true
+	pod.Spec.SecurityContext = &api.PodSecurityContext{}
+	pod.Spec.SecurityContext.HostIPC = true
 	ipcMode = getIPCMode(pod)
 	if ipcMode != "host" {
 		t.Errorf("expected host ipc mode for pod but got %v", ipcMode)

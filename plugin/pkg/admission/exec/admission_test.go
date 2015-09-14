@@ -34,10 +34,12 @@ func TestAdmission(t *testing.T) {
 	}
 
 	hostPIDPod := validPod("hostPID")
-	hostPIDPod.Spec.HostPID = true
+	hostPIDPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostPIDPod.Spec.SecurityContext.HostPID = true
 
 	hostIPCPod := validPod("hostIPC")
-	hostIPCPod.Spec.HostIPC = true
+	hostIPCPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostIPCPod.Spec.SecurityContext.HostIPC = true
 
 	testCases := map[string]struct {
 		pod          *api.Pod
@@ -130,10 +132,12 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 	}
 
 	hostPIDPod := validPod("hostPID")
-	hostPIDPod.Spec.HostPID = true
+	hostPIDPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostPIDPod.Spec.SecurityContext.HostPID = true
 
 	hostIPCPod := validPod("hostIPC")
-	hostIPCPod.Spec.HostIPC = true
+	hostIPCPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostIPCPod.Spec.SecurityContext.HostIPC = true
 
 	testCases := map[string]struct {
 		pod          *api.Pod

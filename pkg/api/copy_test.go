@@ -24,6 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/util"
+
+	"github.com/google/gofuzz"
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {
@@ -31,21 +34,34 @@ func TestDeepCopyApiObjects(t *testing.T) {
 		for _, version := range []string{"", testapi.Default.Version()} {
 			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
 			for kind := range api.Scheme.KnownTypes(version) {
-				item, err := api.Scheme.New(version, kind)
-				if err != nil {
-					t.Fatalf("Could not create a %s: %s", kind, err)
-				}
-				f.Fuzz(item)
-				itemCopy, err := api.Scheme.DeepCopy(item)
-				if err != nil {
-					t.Errorf("Could not deep copy a %s: %s", kind, err)
-					continue
-				}
-
-				if !reflect.DeepEqual(item, itemCopy) {
-					t.Errorf("\nexpected %#v\ngot      %#v", item, itemCopy)
-				}
+				doDeepCopyTest(t, version, kind, f)
 			}
+		}
+	}
+}
+
+func doDeepCopyTest(t *testing.T, version, kind string, f *fuzz.Fuzzer) {
+	item, err := api.Scheme.New(version, kind)
+	if err != nil {
+		t.Fatalf("Could not create a %s: %s", kind, err)
+	}
+	f.Fuzz(item)
+	itemCopy, err := api.Scheme.DeepCopy(item)
+	if err != nil {
+		t.Errorf("Could not deep copy a %s: %s", kind, err)
+		return
+	}
+
+	if !reflect.DeepEqual(item, itemCopy) {
+		t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", item, itemCopy, util.ObjectDiff(item, itemCopy))
+	}
+}
+
+func TestDeepCopySingleType(t *testing.T) {
+	for i := 0; i < *fuzzIters; i++ {
+		for _, version := range []string{"", testapi.Default.Version()} {
+			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
+			doDeepCopyTest(t, version, "Pod", f)
 		}
 	}
 }
