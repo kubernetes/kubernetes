@@ -288,7 +288,7 @@ func TestPluginBackCompat(t *testing.T) {
 		Name: "vol1",
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""}, nil)
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

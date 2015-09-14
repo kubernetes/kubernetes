@@ -96,7 +96,7 @@ func TestPlugin(t *testing.T) {
 		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/vol1"}},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{}, nil)
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), nil)
+	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 
 	if !builder.IsReadOnly() {
 		t.Errorf("Expected true for builder.IsReadOnly")

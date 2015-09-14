@@ -69,9 +69,9 @@ func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolum
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Builder, error) {
@@ -106,12 +106,12 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
-		diskMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{plugin.host.GetMounter(), exec.New()}}, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Cleaner, error) {
