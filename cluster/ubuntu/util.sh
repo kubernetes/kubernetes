@@ -371,7 +371,7 @@ function provision-minion() {
                          create-kubelet-opts "${1#*@}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}"; \
                          create-kube-proxy-opts "${MASTER_IP}"; \
                          create-flanneld-opts "${MASTER_IP}"; \
-                         sudo -p '[sudo] password to copy files and start minion: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
+                         sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                          && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin; \
                          sudo service flanneld start; \
                          sudo -b ~/kube/reconfDocker.sh "i";"
@@ -395,7 +395,7 @@ function provision-masterandminion() {
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                             create-kube-proxy-opts "${MASTER_IP}";\
                             create-flanneld-opts "127.0.0.1"; \
-                            sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
+                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
                             sudo groupadd -f -r kube-cert; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
@@ -436,16 +436,20 @@ function kube-down {
 
 # Perform common upgrade setup tasks
 function prepare-push() {
-  #Not yet support upgrading by using local binaries.
   if [[ $KUBE_VERSION == "" ]]; then
-     echo "Upgrading nodes to local binaries is not yet supported.Please specify the version"
-     exit 1
+    if [[ ! -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
+      echo "No local binaries.Please check"
+      exit 1
+    else 
+      echo "Please make sure all the required local binaries are prepared ahead"
+      sleep 3
+    fi
+  else
+    # Run build.sh to get the required release 
+    pushd ubuntu
+    source "build.sh"    
+    popd
   fi
-
-  # Run build.sh to get the required release 
-  pushd ubuntu
-  source "build.sh"    
-  popd
 }
 
 # Update a kubernetes master with required release
@@ -526,6 +530,11 @@ function kube-push {
   prepare-push
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
+  if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
+    echo "There is no required release of kubernetes, please check first"
+    exit 1
+  fi
+
   #stop all the kube's process & etcd 
   ii=0
   for i in ${nodes}; do
@@ -548,13 +557,7 @@ function kube-push {
     ((ii=ii+1))
   done
 
-  #Update all nodes with the required release
-  if [[ ! -f "ubuntu/binaries/master/kube-apiserver" ]]; then
-    echo "There is no required release of kubernetes, please check first"
-    exit 1
-  fi
-
-  #provision all nodes,include master&nodes
+  #provision all nodes,including master & nodes
   setClusterInfo
   ii=0
   for i in ${nodes}; do
