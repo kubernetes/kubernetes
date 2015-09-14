@@ -687,7 +687,6 @@ func SimpleKubelet(client *client.Client,
 		SystemContainer:     "",
 		TLSOptions:          tlsOptions,
 		Writer:              &io.StdWriter{},
-		VolumePlugins:       volumePlugins,
 	}
 	return &kcfg
 }
