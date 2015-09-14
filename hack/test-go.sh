@@ -136,7 +136,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  local KUBE_TEST_API_NO_SLASH=echo "${KUBE_TEST_API//\//-}"
+  local KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API//\//-}"
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
 }
 
