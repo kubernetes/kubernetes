@@ -30,7 +30,6 @@ import (
 type DockerContainerGetter interface {
 	GetRunningContainers() ([]*kubecontainer.Container, error)
 	GetTerminatedContainers() ([]*kubecontainer.Container, error)
-	GetAllContainers() ([]*kubecontainer.Container, error)
 	ExamineContainer(dockerID string) (*dockertools.ContainerExaminationResult, error)
 }
 
@@ -179,7 +178,7 @@ func (d *DockerPLEG) relist() {
 	missed := dead.Difference(oldDead).Difference(oldAlive)
 
 	// Generate corresponding container events, which will be treated the same
-	// way as the events from upstream. Note that the internal alive/dead
+	// way as the events from upstream. Note that the internal running/dead
 	// container sets will be modified accordingly when processing the events.
 	started := alive.Difference(oldAlive)
 	stopped := oldAlive.Difference(alive)
