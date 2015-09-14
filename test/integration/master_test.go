@@ -29,7 +29,7 @@ func TestExperimentalPrefix(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	resp, err := http.Get(s.URL + "/experimental/")
+	resp, err := http.Get(s.URL + "/apis/experimental/")
 	if err != nil {
 		t.Fatalf("unexpected error getting experimental prefix: %v", err)
 	}

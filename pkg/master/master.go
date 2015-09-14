@@ -117,7 +117,7 @@ type Config struct {
 	EnableProfiling       bool
 	EnableWatchCache      bool
 	APIPrefix             string
-	ExpAPIPrefix          string
+	APIGroupPrefix        string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -195,7 +195,7 @@ type Master struct {
 	enableProfiling       bool
 	enableWatchCache      bool
 	apiPrefix             string
-	expAPIPrefix          string
+	apiGroupPrefix        string
 	corsAllowedOriginList []string
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
@@ -354,7 +354,7 @@ func New(c *Config) *Master {
 		enableProfiling:       c.EnableProfiling,
 		enableWatchCache:      c.EnableWatchCache,
 		apiPrefix:             c.APIPrefix,
-		expAPIPrefix:          c.ExpAPIPrefix,
+		apiGroupPrefix:        c.APIGroupPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
@@ -575,7 +575,7 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
+		apiserver.AddApiWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", []string{expVersion.Version})
 		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
@@ -840,7 +840,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root: m.expAPIPrefix,
+		Root: m.apiGroupPrefix + "/" + latest.GroupOrDie("experimental").Group,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,

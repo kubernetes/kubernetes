@@ -71,7 +71,7 @@ type APIServer struct {
 	TLSPrivateKeyFile          string
 	CertDirectory              string
 	APIPrefix                  string
-	ExpAPIPrefix               string
+	APIGroupPrefix             string
 	StorageVersion             string
 	ExpStorageVersion          string
 	CloudProvider              string
@@ -121,7 +121,7 @@ func NewAPIServer() *APIServer {
 		BindAddress:            net.ParseIP("0.0.0.0"),
 		SecurePort:             6443,
 		APIPrefix:              "/api",
-		ExpAPIPrefix:           "/experimental",
+		APIGroupPrefix:         "/apis",
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
@@ -180,7 +180,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
-	fs.StringVar(&s.ExpAPIPrefix, "experimental-prefix", s.ExpAPIPrefix, "The prefix for experimental API requests on the server. Default '/experimental'.")
+	fs.MarkDeprecated("api-prefix", "--api-prefix is deprecated and will be removed when the v1 API is retired")
 	fs.StringVar(&s.StorageVersion, "storage-version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
@@ -437,7 +437,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableWatchCache:       s.EnableWatchCache,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
-		ExpAPIPrefix:           s.ExpAPIPrefix,
+		APIGroupPrefix:         s.APIGroupPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadWritePort:          s.SecurePort,
 		PublicAddress:          s.AdvertiseAddress,
