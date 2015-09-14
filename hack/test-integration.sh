@@ -47,18 +47,18 @@ runTests() {
   KUBE_GOFLAGS="-tags 'integration no-docker' " \
     KUBE_RACE="-race" \
     KUBE_TEST_API_VERSIONS="$1" \
-    KUBE_API_VERSIONS="v1" \
+    KUBE_API_VERSIONS="v1,experimental/v1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
   kube::log::status "Running integration test scenario"
 
-  KUBE_API_VERSIONS="v1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+  KUBE_API_VERSIONS="v1,experimental/v1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
     --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
 }
 
-KUBE_API_VERSIONS="v1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
+KUBE_API_VERSIONS="v1,experimental/v1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT

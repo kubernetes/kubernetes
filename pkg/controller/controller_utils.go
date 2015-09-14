@@ -244,7 +244,7 @@ func getReplicaAnnotationSet(template *api.PodTemplateSpec, object runtime.Objec
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
-	createdByRefJson, err := latest.Codec.Encode(&api.SerializedReference{
+	createdByRefJson, err := latest.GroupOrDie("").Codec.Encode(&api.SerializedReference{
 		Reference: *createdByRef,
 	})
 	if err != nil {
