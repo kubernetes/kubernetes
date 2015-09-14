@@ -145,7 +145,7 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 	for _, volumeKindDir := range volumeKindDirs {
 		volumeKind := volumeKindDir.Name()
 		volumeKindPath := path.Join(podVolDir, volumeKind)
-		volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
+		volumeNameDirs, err := util.ReadDirNoExit(volumeKindPath)
 		if err != nil {
 			return []*volumeTuple{}, fmt.Errorf("could not read directory %s: %v", volumeKindPath, err)
 		}
