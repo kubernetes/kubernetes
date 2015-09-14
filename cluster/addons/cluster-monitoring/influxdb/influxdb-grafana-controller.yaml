@@ -41,10 +41,8 @@ spec:
               cpu: 100m
               memory: 100Mi
           env: 
-            - name: INFLUXDB_EXTERNAL_URL
-              value: /api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api/db/
             - name: INFLUXDB_HOST
-              value: monitoring-influxdb
+              value: localhost
             - name: INFLUXDB_PORT
               value: "8086"
       volumes:
