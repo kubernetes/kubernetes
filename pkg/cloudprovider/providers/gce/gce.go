@@ -589,7 +589,7 @@ func (gce *GCECloud) CreateUrlMap(backend *compute.BackendService, name string) 
 	return gce.GetUrlMap(name)
 }
 
-// UpdateUrlMap applies the given urlmap as an update, and returns the new urlmap.
+// UpdateUrlMap applies the given UrlMap as an update, and returns the new UrlMap.
 func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) (*compute.UrlMap, error) {
 	op, err := gce.service.UrlMaps.Update(gce.projectID, urlMap.Name, urlMap).Do()
 	if err != nil {
@@ -613,12 +613,7 @@ func (gce *GCECloud) DeleteUrlMap(name string) error {
 	return gce.waitForGlobalOp(op)
 }
 
-// TargetProxy management
-
-// GetTargetHttpProxy returns the TargetHttpProxy by name.
-func (gce *GCECloud) GetTargetHttpProxy(name string) (*compute.TargetHttpProxy, error) {
-	return gce.service.TargetHttpProxies.Get(gce.projectID, name).Do()
-}
+// TargetHttpProxy management
 
 // GetTargetHttpProxy returns the UrlMap by name.
 func (gce *GCECloud) GetTargetHttpProxy(name string) (*compute.TargetHttpProxy, error) {
@@ -641,8 +636,8 @@ func (gce *GCECloud) CreateTargetHttpProxy(urlMap *compute.UrlMap, name string) 
 	return gce.GetTargetHttpProxy(name)
 }
 
-// SetUrlMapForProxy sets the given urlmap for the given target proxy.
-func (gce *GCECloud) SetUrlMapForProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
+// SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
+func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
 	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{urlMap.SelfLink}).Do()
 	if err != nil {
 		return err
@@ -650,8 +645,8 @@ func (gce *GCECloud) SetUrlMapForProxy(proxy *compute.TargetHttpProxy, urlMap *c
 	return gce.waitForGlobalOp(op)
 }
 
-// DeleteProxy deletes the target proxy by name.
-func (gce *GCECloud) DeleteProxy(name string) error {
+// DeleteTargetHttpProxy deletes the TargetHttpProxy by name.
+func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 	op, err := gce.service.TargetHttpProxies.Delete(gce.projectID, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -660,6 +655,52 @@ func (gce *GCECloud) DeleteProxy(name string) error {
 		return err
 	}
 	return gce.waitForGlobalOp(op)
+}
+
+// GlobalForwardingRule management
+
+// CreateGlobalForwardingRule creates and returns a GlobalForwardingRule that points to the given TargetHttpProxy.
+func (gce *GCECloud) CreateGlobalForwardingRule(proxy *compute.TargetHttpProxy, name string, portRange string) (*compute.ForwardingRule, error) {
+	rule := &compute.ForwardingRule{
+		Name:       name,
+		Target:     proxy.SelfLink,
+		PortRange:  portRange,
+		IPProtocol: "TCP",
+	}
+	op, err := gce.service.GlobalForwardingRules.Insert(gce.projectID, rule).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetGlobalForwardingRule(name)
+}
+
+// SetProxyForGlobalForwardingRule links the given TargetHttpProxy with the given GlobalForwardingRule.
+func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, proxy *compute.TargetHttpProxy) error {
+	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{proxy.SelfLink}).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
+func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
+	op, err := gce.service.GlobalForwardingRules.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// GetGlobalForwardingRule returns the GlobalForwardingRule by name.
+func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRule, error) {
+	return gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
 }
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
