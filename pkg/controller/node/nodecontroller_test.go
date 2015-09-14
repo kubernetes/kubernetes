@@ -400,7 +400,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet never posted node status."),
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            fmt.Sprintf("Kubelet never posted node status."),
 								LastHeartbeatTime:  util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},
@@ -486,7 +487,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet stopped posting node status."),
+								Reason:             "NodeStatusStopUpdated",
+								Message:            fmt.Sprintf("Kubelet stopped posting node status."),
 								LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								LastTransitionTime: util.Time{Time: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
 							},
