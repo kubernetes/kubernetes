@@ -52,7 +52,7 @@ Life of a Pull Request
 
 Unless in the last few weeks of a milestone when we need to reduce churn and stabilize, we aim to be always accepting pull requests.
 
-Either the [on call](https://github.com/kubernetes/kubernetes/wiki/Kubernetes-on-call-rotation) manually or the [submit queue](https://github.com/contrib/tree/master/submit-queue) automatically will manage merging PRs.
+Either the [on call](https://github.com/kubernetes/kubernetes/wiki/Kubernetes-on-call-rotation) manually or the [submit queue](https://github.com/kubernetes/contrib/tree/master/submit-queue) automatically will manage merging PRs.
 
 There are several requirements for the submit queue to work:
 * Author must have signed CLA ("cla: yes" label added to PR)
