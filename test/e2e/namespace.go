@@ -19,13 +19,14 @@ package e2e
 import (
 	"fmt"
 	//"k8s.io/kubernetes/pkg/api"
+	"strings"
+	"sync"
+	"time"
+
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"strings"
-	"sync"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -110,10 +111,10 @@ var _ = Describe("Namespaces", func() {
 
 	//Confirms that namespace draining is functioning reasonably
 	//at minute intervals.
-	It("Delete 90 percent of 100 namespace in 150 seconds",
+	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
 		func() { extinguish(c, 100, 10, 150) })
 
 	//comprehensive draining ; uncomment after #7372
-	PIt("Delete ALL of 100 namespace in 150 seconds",
+	PIt("should always delete fast (ALL of 100 namespaces in 150 seconds)",
 		func() { extinguish(c, 100, 0, 150) })
 })

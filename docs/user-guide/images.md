@@ -88,7 +88,7 @@ use the full image name (e.g. gcr.io/my_project/image:tag).
 
 All pods in a cluster will have read access to images in this registry.
 
-The kubelet kubelet will authenticate to GCR using the instance's
+The kubelet will authenticate to GCR using the instance's
 Google service account.  The service account on the instance
 will have a `https://www.googleapis.com/auth/devstorage.read_only`,
 so it can pull from the project's GCR, but not push.

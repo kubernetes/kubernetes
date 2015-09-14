@@ -199,8 +199,9 @@ func (ContainerStateTerminated) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerStateWaiting = map[string]string{
-	"":       "ContainerStateWaiting is a waiting state of a container.",
-	"reason": "(brief) reason the container is not yet running, such as pulling its image.",
+	"":        "ContainerStateWaiting is a waiting state of a container.",
+	"reason":  "(brief) reason the container is not yet running.",
+	"message": "Message regarding why the container is not yet running.",
 }
 
 func (ContainerStateWaiting) SwaggerDoc() map[string]string {
@@ -1272,6 +1273,7 @@ var map_ServiceSpec = map[string]string{
 	"type":            "Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer. Defaults to ClusterIP. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services",
 	"externalIPs":     "ExternalIPs are used by external load balancers, or can be set by users to handle external traffic that arrives at a node. Externally visible IPs (e.g. load balancers) that should be proxied to this service.",
 	"sessionAffinity": "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies",
+	"loadBalancerIP":  "Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.",
 }
 
 func (ServiceSpec) SwaggerDoc() map[string]string {

@@ -53,6 +53,18 @@ function join_csv {
 
 # Verify prereqs
 function verify-prereqs {
+  if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="experimental/v1=true"
+    else
+      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1=false" and appending "experimental/v1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1=true"; then
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+        exit 1
+      fi
+    fi
+  fi
+
   local cmd
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
@@ -465,6 +477,7 @@ function write-master-env {
   if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
     KUBELET_APISERVER="${MASTER_NAME}"
   fi
+
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
 }
 

@@ -23,6 +23,8 @@ import "fmt"
 type Config struct {
 	// The absolute path to the binary, or leave empty to find it in $PATH.
 	Path string
+	// The image to use as stage1.
+	Stage1Image string
 	// The debug flag for rkt.
 	Debug bool
 	// The rkt data directory.

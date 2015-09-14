@@ -711,19 +711,19 @@ __EOF__
 
   ### Create and delete persistent volume examples
   # Pre-condition: no persistent volumes currently exist
-  kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/user-guide/persistent-volumes/volumes/local-01.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" 'pv0001:'
+  kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" 'pv0001:'
   kubectl delete pv pv0001 "${kube_flags[@]}"
   kubectl create -f docs/user-guide/persistent-volumes/volumes/local-02.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" 'pv0002:'
+  kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" 'pv0002:'
   kubectl delete pv pv0002 "${kube_flags[@]}"
   kubectl create -f docs/user-guide/persistent-volumes/volumes/gce.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" 'pv0003:'
+  kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" 'pv0003:'
   kubectl delete pv pv0003 "${kube_flags[@]}"
   # Post-condition: no PVs
-  kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ############################
   # Persistent Volume Claims #
@@ -731,21 +731,21 @@ __EOF__
 
   ### Create and delete persistent volume claim examples
   # Pre-condition: no persistent volume claims currently exist
-  kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/user-guide/persistent-volumes/claims/claim-01.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" 'myclaim-1:'
+  kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" 'myclaim-1:'
   kubectl delete pvc myclaim-1 "${kube_flags[@]}"
 
   kubectl create -f docs/user-guide/persistent-volumes/claims/claim-02.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" 'myclaim-2:'
+  kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" 'myclaim-2:'
   kubectl delete pvc myclaim-2 "${kube_flags[@]}"
 
   kubectl create -f docs/user-guide/persistent-volumes/claims/claim-03.json "${kube_flags[@]}"
-  kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" 'myclaim-3:'
+  kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" 'myclaim-3:'
   kubectl delete pvc myclaim-3 "${kube_flags[@]}"
   # Post-condition: no PVCs
-  kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" ''
 
 
 

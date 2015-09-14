@@ -34,7 +34,7 @@ import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubeprober "k8s.io/kubernetes/pkg/kubelet/prober"
@@ -885,7 +885,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil)
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -934,7 +934,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -1027,7 +1027,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 		// Kill the container since pod infra container is not running.
 		"stop",
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -1301,21 +1301,21 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 	fakeDocker.Lock()
 
 	eventSet := []string{
-		`pulling Pulling image "pod_infra_image"`,
-		`pulled Successfully pulled image "pod_infra_image"`,
-		`pulling Pulling image "pull_always_image"`,
-		`pulled Successfully pulled image "pull_always_image"`,
-		`pulling Pulling image "pull_if_not_present_image"`,
-		`pulled Successfully pulled image "pull_if_not_present_image"`,
-		`pulled Container image "existing_one" already present on machine`,
-		`pulled Container image "want:latest" already present on machine`,
+		`Pulling Pulling image "pod_infra_image"`,
+		`Pulled Successfully pulled image "pod_infra_image"`,
+		`Pulling Pulling image "pull_always_image"`,
+		`Pulled Successfully pulled image "pull_always_image"`,
+		`Pulling Pulling image "pull_if_not_present_image"`,
+		`Pulled Successfully pulled image "pull_if_not_present_image"`,
+		`Pulled Container image "existing_one" already present on machine`,
+		`Pulled Container image "want:latest" already present on machine`,
 	}
 
 	recorder := dm.recorder.(*record.FakeRecorder)
 
 	var actualEvents []string
 	for _, ev := range recorder.Events {
-		if strings.HasPrefix(ev, "pull") {
+		if strings.HasPrefix(ev, "Pull") {
 			actualEvents = append(actualEvents, ev)
 		}
 	}
@@ -2093,7 +2093,7 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil)
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -2132,7 +2132,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container",
+		"create", "start", "inspect_container", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})

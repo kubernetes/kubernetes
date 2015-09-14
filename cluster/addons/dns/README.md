@@ -43,17 +43,12 @@ For a regular service, this resolves to the port number and the CNAME:
 `my-svc.my-namespace.svc.cluster.local`.
 For a headless service, this resolves to multiple answers, one for each pod
 that is backing the service, and contains the port number and a CNAME of the pod
-with the format `auto-generated-name.my-svc.my-namespace.svc.cluster.local`
-SRV records always contain the 'svc' segment in them and are not supported for
-old-style CNAMEs where the 'svc' segment was omitted.
-
+of the form `auto-generated-name.my-svc.my-namespace.svc.cluster.local`.
 
 ### Backwards compatibility
 Previous versions of kube-dns made names of the for
-`my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  For
-compatibility, kube-dns supports both names for the time being.  Users should
-avoid creating a namespace named 'svc', to avoid conflicts.  The old name
-format is deprecated and will be removed in a future release.
+`my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  This
+is no longer supported.
 
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
@@ -178,6 +173,11 @@ paths to the node's own DNS settings.  If the node is able to resolve DNS names
 specific to the larger environment, pods should be able to, also.  See "Known
 issues" below for a caveat.
 
+If you don't want this, or if you want a different DNS config for pods, you can
+use the kubelet's `--resolv-conf` flag.  Setting it to "" means that pods will
+not inherit DNS.  Setting it to a valid file path means that kubelet will use
+this file instead of `/etc/resolv.conf` for DNS inheritance.
+
 ## Known issues
 Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
@@ -190,7 +190,7 @@ consume 1 `nameserver` record and 3 `search` records.  This means that if a
 local installation already uses 3 `nameserver`s or uses more than 3 `search`es,
 some of those settings will be lost.  As a partial workaround, the node can run
 `dnsmasq` which will provide more `nameserver` entries, but not more `search`
-entries.
+entries.  You can also use kubelet's `--resolv-conf` flag.
 
 ## Making changes
 Please observe the release process for making changes to the `kube2sky`

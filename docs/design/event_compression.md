@@ -60,7 +60,7 @@ Instead of a single Timestamp, each event object [contains](http://releases.k8s.
 
 Each binary that generates events:
  * Maintains a historical record of previously generated events:
-   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/unversioned/record/events_cache.go`](../../pkg/client/unversioned/record/events_cache.go).
+   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/record/events_cache.go`](../../pkg/client/record/events_cache.go).
    * The key in the cache is generated from the event object minus timestamps/count/transient fields, specifically the following events fields are used to construct a unique key for an event:
      * `event.Source.Component`
      * `event.Source.Host`

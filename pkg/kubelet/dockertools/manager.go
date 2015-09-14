@@ -37,11 +37,12 @@ import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -275,13 +276,13 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID, tail string
 
 var (
 	// ErrNoContainersInPod is returned when there are no containers for a given pod
-	ErrNoContainersInPod = errors.New("no containers exist for this pod")
+	ErrNoContainersInPod = errors.New("NoContainersInPod")
 
 	// ErrNoPodInfraContainerInPod is returned when there is no pod infra container for a given pod
-	ErrNoPodInfraContainerInPod = errors.New("No pod infra container exists for this pod")
+	ErrNoPodInfraContainerInPod = errors.New("NoPodInfraContainerInPod")
 
 	// ErrContainerCannotRun is returned when a container is created, but cannot run properly
-	ErrContainerCannotRun = errors.New("Container cannot run")
+	ErrContainerCannotRun = errors.New("ContainerCannotRun")
 )
 
 // Internal information kept for containers from inspection
@@ -333,17 +334,21 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 		}
 	} else if !inspectResult.State.FinishedAt.IsZero() {
 		reason := ""
+		message := ""
 		// Note: An application might handle OOMKilled gracefully.
 		// In that case, the container is oom killed, but the exit
 		// code could be 0.
 		if inspectResult.State.OOMKilled {
-			reason = "OOM Killed"
+			reason = "OOMKilled"
 		} else {
-			reason = inspectResult.State.Error
+			reason = "Error"
+			message = inspectResult.State.Error
 		}
 		result.status.State.Terminated = &api.ContainerStateTerminated{
-			ExitCode:    inspectResult.State.ExitCode,
-			Reason:      reason,
+			ExitCode: inspectResult.State.ExitCode,
+			Message:  message,
+			Reason:   reason,
+
 			StartedAt:   util.NewTime(inspectResult.State.StartedAt),
 			FinishedAt:  util.NewTime(inspectResult.State.FinishedAt),
 			ContainerID: DockerPrefix + dockerID,
@@ -503,11 +508,13 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		_, err := dm.client.InspectImage(image)
 		if err == nil {
 			containerStatus.State.Waiting = &api.ContainerStateWaiting{
-				Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
+				Message: fmt.Sprintf("Image: %s is ready, container is creating", image),
+				Reason:  "ContainerCreating",
 			}
 		} else if err == docker.ErrNoSuchImage {
 			containerStatus.State.Waiting = &api.ContainerStateWaiting{
-				Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
+				Message: fmt.Sprintf("Image: %s is not ready on the node", image),
+				Reason:  "ImageNotReady",
 			}
 		}
 		statuses[container.Name] = &containerStatus
@@ -1727,6 +1734,16 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
+		}
+
+		// Setup the host interface (FIXME: move to networkPlugin when ready)
+		podInfraContainer, err := dm.client.InspectContainer(string(podInfraContainerID))
+		if err != nil {
+			glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, podFullName)
+			return err
+		}
+		if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
+			glog.Warningf("Hairpin setup failed for pod %q: %v", podFullName, err)
 		}
 	}
 

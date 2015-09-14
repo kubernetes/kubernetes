@@ -2911,6 +2911,12 @@ func TestValidateLimitRange(t *testing.T) {
 						Type:                 api.LimitTypePod,
 						Max:                  getResourceList("100m", "10000Mi"),
 						Min:                  getResourceList("5m", "100Mi"),
+						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+					{
+						Type:                 api.LimitTypeContainer,
+						Max:                  getResourceList("100m", "10000Mi"),
+						Min:                  getResourceList("5m", "100Mi"),
 						Default:              getResourceList("50m", "500Mi"),
 						DefaultRequest:       getResourceList("10m", "200Mi"),
 						MaxLimitRequestRatio: getResourceList("10", ""),
@@ -2923,7 +2929,7 @@ func TestValidateLimitRange(t *testing.T) {
 			spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
-						Type:                 api.LimitTypePod,
+						Type:                 api.LimitTypeContainer,
 						Max:                  getResourceList("100m", "10000T"),
 						Min:                  getResourceList("5m", "100Mi"),
 						Default:              getResourceList("50m", "500Mi"),
@@ -2978,6 +2984,32 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"",
 		},
+		"default-limit-type-pod": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:    api.LimitTypePod,
+						Max:     getResourceList("100m", "10000m"),
+						Min:     getResourceList("0m", "100m"),
+						Default: getResourceList("10m", "100m"),
+					},
+				},
+			}},
+			"Default is not supported when limit type is Pod",
+		},
+		"default-request-limit-type-pod": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:           api.LimitTypePod,
+						Max:            getResourceList("100m", "10000m"),
+						Min:            getResourceList("0m", "100m"),
+						DefaultRequest: getResourceList("10m", "100m"),
+					},
+				},
+			}},
+			"DefaultRequest is not supported when limit type is Pod",
+		},
 		"min value 100m is greater than max value 10m": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
@@ -2994,7 +3026,7 @@ func TestValidateLimitRange(t *testing.T) {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
-						Type:    api.LimitTypePod,
+						Type:    api.LimitTypeContainer,
 						Max:     getResourceList("1", ""),
 						Min:     getResourceList("100m", ""),
 						Default: getResourceList("2000m", ""),
@@ -3007,7 +3039,7 @@ func TestValidateLimitRange(t *testing.T) {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
-						Type:           api.LimitTypePod,
+						Type:           api.LimitTypeContainer,
 						Max:            getResourceList("1", ""),
 						Min:            getResourceList("100m", ""),
 						DefaultRequest: getResourceList("2000m", ""),

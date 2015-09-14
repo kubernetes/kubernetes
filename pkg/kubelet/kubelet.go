@@ -39,9 +39,9 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -164,6 +164,7 @@ func NewMainKubelet(
 	cgroupRoot string,
 	containerRuntime string,
 	rktPath string,
+	rktStage1Image string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
 	systemContainer string,
@@ -207,7 +208,11 @@ func NewMainKubelet(
 		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
+				obj, err := kubeClient.Nodes().Get(nodeName)
+				if err != nil {
+					return nil, err
+				}
+				return &api.NodeList{Items: []api.Node{*obj}}, nil
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
@@ -331,6 +336,7 @@ func NewMainKubelet(
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
+			Stage1Image:        rktStage1Image,
 			InsecureSkipVerify: true,
 		}
 		rktRuntime, err := rkt.New(
@@ -714,17 +720,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
 		return nil, errors.New("no node entry for kubelet in standalone mode")
 	}
-	l, err := kl.nodeLister.List()
-	if err != nil {
-		return nil, errors.New("cannot list nodes")
-	}
-	nodeName := kl.nodeName
-	for _, n := range l.Items {
-		if n.Name == nodeName {
-			return &n, nil
-		}
-	}
-	return nil, fmt.Errorf("node %v not found", nodeName)
+	return kl.nodeLister.GetNodeInfo(kl.nodeName)
 }
 
 // Starts garbage collection threads.
@@ -1337,7 +1333,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 	if egress != nil || ingress != nil {
 		if pod.Spec.HostNetwork {
-			kl.recorder.Event(pod, "host network not supported", "Bandwidth shaping is not currently supported on the host network")
+			kl.recorder.Event(pod, "HostNetworkNotSupported", "Bandwidth shaping is not currently supported on the host network")
 		} else if kl.shaper != nil {
 			status, found := kl.statusManager.GetPodStatus(pod.UID)
 			if !found {
@@ -1352,7 +1348,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", status.PodIP), egress, ingress)
 			}
 		} else {
-			kl.recorder.Event(pod, "nil shaper", "Pod requests bandwidth shaping, but the shaper is undefined")
+			kl.recorder.Event(pod, "NilShaper", "Pod requests bandwidth shaping, but the shaper is undefined")
 		}
 	}
 
@@ -2344,21 +2340,24 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
-			Reason:            "kubelet is posting ready status",
+			Reason:            "KubeletReady",
+			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
 	} else {
 		var reasons []string
+		var messages []string
 		if !containerRuntimeUp {
-			reasons = append(reasons, "container runtime is down")
+			messages = append(messages, "container runtime is down")
 		}
 		if !networkConfigured {
-			reasons = append(reasons, "network not configured correctly")
+			messages = append(reasons, "network not configured correctly")
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionFalse,
-			Reason:            strings.Join(reasons, ","),
+			Reason:            "KubeletNotReady",
+			Message:           strings.Join(messages, ","),
 			LastHeartbeatTime: currentTime,
 		}
 	}

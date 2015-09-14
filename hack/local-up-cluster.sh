@@ -86,6 +86,8 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/loc
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
+RKT_PATH=${RKT_PATH:-""}
+RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 
 function test_apiserver_off {
@@ -251,6 +253,8 @@ function start_kubelet {
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
+        --rkt-path="${RKT_PATH}" \
+        --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \

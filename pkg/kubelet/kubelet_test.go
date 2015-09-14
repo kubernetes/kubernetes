@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -39,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -966,7 +965,12 @@ type testNodeLister struct {
 }
 
 func (ls testNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	return nil, errors.New("not implemented")
+	for _, node := range ls.nodes {
+		if node.Name == id {
+			return &node, nil
+		}
+	}
+	return nil, fmt.Errorf("Node with name: %s does not exist", id)
 }
 
 func (ls testNodeLister) List() (api.NodeList, error) {
@@ -2380,7 +2384,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
-					Reason:             fmt.Sprintf("kubelet is posting ready status"),
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  util.Time{},
 					LastTransitionTime: util.Time{},
 				},
@@ -2448,7 +2453,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					{
 						Type:               api.NodeReady,
 						Status:             api.ConditionTrue,
-						Reason:             fmt.Sprintf("kubelet is posting ready status"),
+						Reason:             "KubeletReady",
+						Message:            fmt.Sprintf("kubelet is posting ready status"),
 						LastHeartbeatTime:  util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
@@ -2484,7 +2490,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
-					Reason:             fmt.Sprintf("kubelet is posting ready status"),
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  util.Time{}, // placeholder
 					LastTransitionTime: util.Time{}, // placeholder
 				},
@@ -2578,7 +2585,8 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionFalse,
-					Reason:             fmt.Sprintf("container runtime is down"),
+					Reason:             "KubeletNotReady",
+					Message:            fmt.Sprintf("container runtime is down"),
 					LastHeartbeatTime:  util.Time{},
 					LastTransitionTime: util.Time{},
 				},

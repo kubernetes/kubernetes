@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,22 +31,22 @@ type FakeDeployments struct {
 	Namespace string
 }
 
-func (c *FakeDeployments) Get(name string) (*expapi.Deployment, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("deployments", c.Namespace, name), &expapi.Deployment{})
+func (c *FakeDeployments) Get(name string) (*experimental.Deployment, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("deployments", c.Namespace, name), &experimental.Deployment{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*expapi.Deployment), err
+	return obj.(*experimental.Deployment), err
 }
 
-func (c *FakeDeployments) List(label labels.Selector, field fields.Selector) (*expapi.DeploymentList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("deployments", c.Namespace, label, field), &expapi.DeploymentList{})
+func (c *FakeDeployments) List(label labels.Selector, field fields.Selector) (*experimental.DeploymentList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("deployments", c.Namespace, label, field), &experimental.DeploymentList{})
 	if obj == nil {
 		return nil, err
 	}
-	list := &expapi.DeploymentList{}
-	for _, deployment := range obj.(*expapi.DeploymentList).Items {
+	list := &experimental.DeploymentList{}
+	for _, deployment := range obj.(*experimental.DeploymentList).Items {
 		if label.Matches(labels.Set(deployment.Labels)) {
 			list.Items = append(list.Items, deployment)
 		}
@@ -54,26 +54,26 @@ func (c *FakeDeployments) List(label labels.Selector, field fields.Selector) (*e
 	return list, err
 }
 
-func (c *FakeDeployments) Create(deployment *expapi.Deployment) (*expapi.Deployment, error) {
+func (c *FakeDeployments) Create(deployment *experimental.Deployment) (*experimental.Deployment, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("deployments", c.Namespace, deployment), deployment)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*expapi.Deployment), err
+	return obj.(*experimental.Deployment), err
 }
 
-func (c *FakeDeployments) Update(deployment *expapi.Deployment) (*expapi.Deployment, error) {
+func (c *FakeDeployments) Update(deployment *experimental.Deployment) (*experimental.Deployment, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction("deployments", c.Namespace, deployment), deployment)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*expapi.Deployment), err
+	return obj.(*experimental.Deployment), err
 }
 
 func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("deployments", c.Namespace, name), &expapi.Deployment{})
+	_, err := c.Fake.Invokes(NewDeleteAction("deployments", c.Namespace, name), &experimental.Deployment{})
 	return err
 }
 

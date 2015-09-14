@@ -835,8 +835,10 @@ const (
 )
 
 type ContainerStateWaiting struct {
-	// Reason could be pulling image,
+	// A brief CamelCase string indicating details about why the container is in waiting state.
 	Reason string `json:"reason,omitempty"`
+	// A human-readable message indicating details about why the container is in waiting state.
+	Message string `json:"message,omitempty"`
 }
 
 type ContainerStateRunning struct {
@@ -1185,6 +1187,9 @@ type LoadBalancerIngress struct {
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
+	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
+	Type ServiceType `json:"type,omitempty"`
+
 	// Required: The list of ports that are exposed by this service.
 	Ports []ServicePort `json:"ports"`
 
@@ -1200,12 +1205,16 @@ type ServiceSpec struct {
 	// None can be specified for headless services when proxying is not required
 	ClusterIP string `json:"clusterIP,omitempty"`
 
-	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
-	Type ServiceType `json:"type,omitempty"`
-
 	// ExternalIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
 	ExternalIPs []string `json:"externalIPs,omitempty"`
+
+	// Only applies to Service Type: LoadBalancer
+	// LoadBalancer will get created with the IP specified in this field.
+	// This feature depends on whether the underlying cloud-provider supports specifying
+	// the loadBalancerIP when a load balancer is created.
+	// This field will be ignored if the cloud-provider does not support the feature.
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`

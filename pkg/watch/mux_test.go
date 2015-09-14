@@ -124,9 +124,8 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 	event2 := Event{Added, &myType{"bar", "hello world 2"}}
 
 	// Add a couple watchers
-	const testWatchers = 2
-	watches := make([]Interface, testWatchers)
-	for i := 0; i < testWatchers; i++ {
+	watches := make([]Interface, 2)
+	for i := range watches {
 		watches[i] = m.Watch()
 	}
 
@@ -139,8 +138,8 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 
 	// Pull events from the queue.
 	wg := sync.WaitGroup{}
-	wg.Add(testWatchers)
-	for i := 0; i < testWatchers; i++ {
+	wg.Add(len(watches))
+	for i := range watches {
 		// Verify that each watcher only gets the first event because its watch
 		// queue of length one was full from the first one.
 		go func(watcher int, w Interface) {
@@ -148,14 +147,12 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 			e1, ok := <-w.ResultChan()
 			if !ok {
 				t.Errorf("Watcher %v failed to retrieve first event.", watcher)
-				return
 			}
 			if e, a := event1, e1; !reflect.DeepEqual(e, a) {
 				t.Errorf("Watcher %v: Expected (%v, %#v), got (%v, %#v)",
 					watcher, e.Type, e.Object, a.Type, a.Object)
-			} else {
-				t.Logf("Got (%v, %#v)", e1.Type, e1.Object)
 			}
+			t.Logf("Got (%v, %#v)", e1.Type, e1.Object)
 			e2, ok := <-w.ResultChan()
 			if ok {
 				t.Errorf("Watcher %v received second event (%v, %#v) even though it shouldn't have.",

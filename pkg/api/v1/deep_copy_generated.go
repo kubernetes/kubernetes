@@ -317,6 +317,7 @@ func deepCopy_v1_ContainerStateTerminated(in ContainerStateTerminated, out *Cont
 
 func deepCopy_v1_ContainerStateWaiting(in ContainerStateWaiting, out *ContainerStateWaiting, c *conversion.Cloner) error {
 	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
@@ -1992,6 +1993,7 @@ func deepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 		out.ExternalIPs = nil
 	}
 	out.SessionAffinity = in.SessionAffinity
+	out.LoadBalancerIP = in.LoadBalancerIP
 	return nil
 }
 
