@@ -23,7 +23,8 @@ import (
 )
 
 func TestDockerConfigJSONDecode(t *testing.T) {
-	input := []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`)
+	old := `{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`
+	new := `{"auths":` + old + `}`
 
 	expect := DockerConfig(map[string]DockerConfigEntry{
 		"http://foo.example.com": {
@@ -38,14 +39,20 @@ func TestDockerConfigJSONDecode(t *testing.T) {
 		},
 	})
 
-	var output DockerConfig
-	err := json.Unmarshal(input, &output)
-	if err != nil {
-		t.Errorf("Received unexpected error: %v", err)
+	tests := []string{
+		old,
+		new,
 	}
 
-	if !reflect.DeepEqual(expect, output) {
-		t.Errorf("Received unexpected output. Expected %#v, got %#v", expect, output)
+	for _, input := range tests {
+		output, err := readDockerConfigFileFromBytes([]byte(input))
+		if err != nil {
+			t.Errorf("Received unexpected error: %v", err)
+		}
+
+		if !reflect.DeepEqual(expect, output) {
+			t.Errorf("Received unexpected output. Expected %#v, got %#v", expect, output)
+		}
 	}
 }
 

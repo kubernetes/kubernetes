@@ -33,11 +33,19 @@ type DockerConfigProvider interface {
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file
+type legacyDockerConfigProvider struct{}
+
+// A DockerConfigProvider that simply reads the .docker/config.json file
 type defaultDockerConfigProvider struct{}
 
 // init registers our default provider, which simply reads the .dockercfg file.
 func init() {
 	RegisterCredentialProvider(".dockercfg",
+		&CachingDockerConfigProvider{
+			Provider: &legacyDockerConfigProvider{},
+			Lifetime: 5 * time.Minute,
+		})
+	RegisterCredentialProvider(".docker/config.json",
 		&CachingDockerConfigProvider{
 			Provider: &defaultDockerConfigProvider{},
 			Lifetime: 5 * time.Minute,
@@ -58,6 +66,22 @@ type CachingDockerConfigProvider struct {
 }
 
 // Enabled implements dockerConfigProvider
+func (d *legacyDockerConfigProvider) Enabled() bool {
+	return true
+}
+
+// Provide implements dockerConfigProvider
+func (d *legacyDockerConfigProvider) Provide() DockerConfig {
+	// Read the standard Docker credentials from .dockercfg
+	if cfg, err := ReadDockerConfigFile(".dockercfg"); err == nil {
+		return cfg
+	} else if !os.IsNotExist(err) {
+		glog.V(4).Infof("Unable to parse Docker config file: %v", err)
+	}
+	return DockerConfig{}
+}
+
+// Enabled implements dockerConfigProvider
 func (d *defaultDockerConfigProvider) Enabled() bool {
 	return true
 }
@@ -65,7 +89,7 @@ func (d *defaultDockerConfigProvider) Enabled() bool {
 // Provide implements dockerConfigProvider
 func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 	// Read the standard Docker credentials from .dockercfg
-	if cfg, err := ReadDockerConfigFile(); err == nil {
+	if cfg, err := ReadDockerConfigFile(".docker/config.json"); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
 		glog.V(4).Infof("Unable to parse Docker config file: %v", err)
