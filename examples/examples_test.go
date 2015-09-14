@@ -308,7 +308,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-sentinel-controller": &api.ReplicationController{},
 			"redis-sentinel-service":    &api.Service{},
 		},
-		"../docs/user-guide/resourcequota": {
+		"../docs/admin/resourcequota": {
 			"namespace": &api.Namespace{},
 			"limits":    &api.LimitRange{},
 			"quota":     &api.ResourceQuota{},
