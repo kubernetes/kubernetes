@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -83,7 +82,7 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 	}
 }
 
-func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
+func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
 		return &hostPathBuilder{
 			hostPath: &hostPath{path: spec.Volume.HostPath.Path},
@@ -97,7 +96,7 @@ func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volu
 	}
 }
 
-func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
+func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	return &hostPathCleaner{&hostPath{""}}, nil
 }
 

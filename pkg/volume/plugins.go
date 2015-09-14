@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -64,12 +65,12 @@ type VolumePlugin interface {
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
 	// - pod: The enclosing pod
-	NewBuilder(spec *Spec, podRef *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error)
+	NewBuilder(spec *Spec, podRef *api.Pod, opts VolumeOptions) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
 	// - podUID: The UID of the enclosing pod
-	NewCleaner(name string, podUID types.UID, mounter mount.Interface) (Cleaner, error)
+	NewCleaner(name string, podUID types.UID) (Cleaner, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -116,15 +117,21 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error)
+	NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperBuilder for more
 	// context.
-	NewWrapperCleaner(spec *Spec, podUID types.UID, mounter mount.Interface) (Cleaner, error)
+	NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error)
 
-	//Get cloud provider from kubelet
+	// Get cloud provider from kubelet.
 	GetCloudProvider() cloudprovider.Interface
+
+	// Get mounter interface.
+	GetMounter() mount.Interface
+
+	// Get writer interface for writing data to disk.
+	GetWriter() io.Writer
 }
 
 // VolumePluginMgr tracks registered plugins.

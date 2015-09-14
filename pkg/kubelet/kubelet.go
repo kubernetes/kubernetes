@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilErrors "k8s.io/kubernetes/pkg/util/errors"
+	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -167,6 +168,7 @@ func NewMainKubelet(
 	rktPath string,
 	rktStage1Image string,
 	mounter mount.Interface,
+	writer kubeio.Writer,
 	dockerDaemonContainer string,
 	systemContainer string,
 	configureCBR0 bool,
@@ -287,6 +289,7 @@ func NewMainKubelet(
 		oomWatcher:                     oomWatcher,
 		cgroupRoot:                     cgroupRoot,
 		mounter:                        mounter,
+		writer:                         writer,
 		configureCBR0:                  configureCBR0,
 		podCIDR:                        podCIDR,
 		pods:                           pods,
@@ -543,6 +546,9 @@ type Kubelet struct {
 
 	// Mounter to use for volumes.
 	mounter mount.Interface
+
+	// Writer interface to use for volumes.
+	writer kubeio.Writer
 
 	// Manager of non-Runtime containers.
 	containerManager containerManager
