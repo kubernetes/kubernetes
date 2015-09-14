@@ -2056,24 +2056,24 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "valid type - closed",
+			name: "valid type - NamepsaceIP",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeClosed
+				s.Spec.Type = api.ServiceTypeNamespaceIP
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid closed service without NodePort",
+			name: "valid NamespaceIP service without NodePort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeClosed
+				s.Spec.Type = api.ServiceTypeNamespaceIP
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(12345)})
 			},
 			numErrs: 0,
 		},
 		{
-			name: "invalid closed service with NodePort",
+			name: "invalid NamespaceIP service with NodePort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeClosed
+				s.Spec.Type = api.ServiceTypeNamespaceIP
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: util.NewIntOrStringFromInt(12345)})
 			},
 			numErrs: 1,

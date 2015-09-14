@@ -52,7 +52,7 @@ type REST struct {
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, endpoints endpoint.Registry, namespace namespace.Registry,
-    serviceIPs ipallocator.Interface, serviceNodePorts portallocator.Interface) *REST {
+	serviceIPs ipallocator.Interface, serviceNodePorts portallocator.Interface) *REST {
 	return &REST{
 		registry:         registry,
 		endpoints:        endpoints,
@@ -61,7 +61,6 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, namespace namesp
 		serviceNodePorts: serviceNodePorts,
 	}
 }
-
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
@@ -119,12 +118,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		}
 	}
 
-	if service.Spec.Type == api.ServiceTypeClosed{
+	if service.Spec.Type == api.ServiceTypeNamespaceIP{
 		nsPolicy, err := rs.GetNamespaceNetworkPolicy(string(service.ObjectMeta.Namespace))
 		if err != nil {
 			return nil, err
 		} else if nsPolicy == "Open" {
-			return nil, errors.NewConflict("service", string(api.ServiceTypeClosed), fmt.Errorf("ServiceTypeClosed cannot belong to an open namespace"))
+			return nil, errors.NewConflict("service", string(api.ServiceTypeNamespaceIP), fmt.Errorf("ServiceTypeNamespaceIP cannot belong to an open namespace"))
 		}
 	}
 

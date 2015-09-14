@@ -1152,7 +1152,7 @@ const (
 	// cluster, via the ClusterIP.
 	ServiceTypeClusterIP ServiceType = "ClusterIP"
 
-    // ServiceTypeNodePort means a service will be exposed on one port of
+	// ServiceTypeNodePort means a service will be exposed on one port of
 	// every node, in addition to 'ClusterIP' type.
 	ServiceTypeNodePort ServiceType = "NodePort"
 
@@ -1161,9 +1161,9 @@ const (
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
 
-    // ServiceTypeClosed means a service will only be accessible inside the
-    // namespace, via the Cluster IP.
-	ServiceTypeClosed ServiceType = "Closed"
+	// ServiceTypeNamespaceIP means a service will only be accessible inside the
+	// namespace, via the Cluster IP.
+	ServiceTypeNamespaceIP ServiceType = "NamespaceIP"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1194,7 +1194,7 @@ type LoadBalancerIngress struct {
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer, Private
+	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer, NamespaceIP
 	Type ServiceType `json:"type,omitempty"`
 
 	// Required: The list of ports that are exposed by this service.
@@ -1530,8 +1530,8 @@ type NamespaceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers
 	Finalizers []FinalizerName `json:"finalizers,omitempty"`
 
-	// NetworkPolicy determines who is authorized to access pods in the namespace
-	// Must be either Private or Public. Defaults to Public
+	// NetworkPolicy indicates who is authorized to access pods in the namespace.
+	// Must be either Open or Closed. Defaults to Open.
 	NetworkPolicy NamespaceNetworkPolicy `json:"networkPolicy,omitempty"`
 }
 

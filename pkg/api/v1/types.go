@@ -1450,9 +1450,9 @@ const (
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
 
-    // ServiceTypeClosed means a service will only be accessible inside the
-    // namespace, via the Cluster IP.
-	ServiceTypeClosed ServiceType = "Closed"
+	// ServiceTypeNamespaceIP means a service will only be accessible inside the
+	// namespace, via the Cluster IP.
+	ServiceTypeNamespaceIP ServiceType = "NamespaceIP"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -1502,7 +1502,7 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
 
-	// Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or Private.
+	// Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or NamespaceIP.
 	// Defaults to ClusterIP.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
@@ -1893,14 +1893,14 @@ const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
 )
 
-// NamespaceNetworkPolicy determines who is authorized to access pods in the namespace
+// NamespaceNetworkPolicy indicates who is authorized to access pods in the namespace
 type NamespaceNetworkPolicy string
 
 // These are the valid network policies of a namespace
 const(
-    // Closed namespaces are only accessible by pods within the namespace
+	// Closed namespaces are only accessible by pods within the namespace
 	NamespaceNetworkPolicyClosed NamespaceNetworkPolicy = "Closed"
-    // Open namespaces are accessible from any namespace
+	// Open namespaces are accessible from any namespace
 	NamespaceNetworkPolicyOpen NamespaceNetworkPolicy = "Open"
 )
 
@@ -1910,8 +1910,8 @@ type NamespaceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers
 	Finalizers []FinalizerName `json:"finalizers,omitempty"`
 
-	// NetworkPolicy determines who is authorized to access pods in the namespace
-	// Must be either Private or Public. Defaults to Public
+	// NetworkPolicy indicates who is authorized to access pods in the namespace.
+	// Must be either Open or Closed. Defaults to Open.
 	NetworkPolicy NamespaceNetworkPolicy `json:"networkPolicy,omitempty"`
 }
 

@@ -1134,7 +1134,7 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
 var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
-	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypeClosed))
+	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypeNamespaceIP))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1202,10 +1202,11 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
-	if service.Spec.Type == api.ServiceTypeClosed {
+	//  Check that NodePort is not specified with a service type NamespaceIP
+	if service.Spec.Type == api.ServiceTypeNamespaceIP {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].NodePort != 0 {
-				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type Closed"))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type NamespaceIP"))
 			}
 		}
 	}

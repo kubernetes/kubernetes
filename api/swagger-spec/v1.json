@@ -11658,6 +11658,10 @@
        "$ref": "v1.FinalizerName"
       },
       "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers"
+     },
+     "networkPolicy": {
+      "type": "string",
+      "description": "NetworkPolicy indicates who is authorized to access pods in the namespace. Must be either Open or Closed. Defaults to Open."
      }
     }
    },
@@ -13693,7 +13697,7 @@
      },
      "type": {
       "type": "string",
-      "description": "Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer. Defaults to ClusterIP. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services"
+      "description": "Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or NamespaceIP. Defaults to ClusterIP. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services"
      },
      "externalIPs": {
       "type": "array",
