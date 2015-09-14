@@ -703,6 +703,48 @@ func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRu
 	return gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
 }
 
+// BackendService Management
+
+// GetBackendService retrieves a backend by name.
+func (gce *GCECloud) GetBackendService(name string) (*compute.BackendService, error) {
+	return gce.service.BackendServices.Get(gce.projectID, name).Do()
+}
+
+// UpdateBackendService applies the given BackendService as an update to an existing service.
+func (gce *GCECloud) UpdateBackendService(bg *compute.BackendService) error {
+	op, err := gce.service.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteBackendService deletes the given BackendService by name.
+func (gce *GCECloud) DeleteBackendService(name string) error {
+	op, err := gce.service.BackendServices.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// CreateBackendService creates the given BackendService.
+func (gce *GCECloud) CreateBackendService(bg *compute.BackendService) error {
+	op, err := gce.service.BackendServices.Insert(gce.projectID, bg).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// GetHttpHealthCheck returns the given HttpHealthCheck by name.
+func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, error) {
+	return gce.service.HttpHealthChecks.Get(gce.projectID, name).Do()
+}
+
 // Take a GCE instance 'hostname' and break it down to something that can be fed
 // to the GCE API client library.  Basically this means reducing 'kubernetes-
 // minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
