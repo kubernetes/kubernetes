@@ -26,12 +26,15 @@ function cleanup {
 }
 trap cleanup SIGHUP SIGINT SIGTERM
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+pushd ${KUBE_ROOT}/cluster/ubuntu
+
 mkdir -p binaries/master
 mkdir -p binaries/minion
 
 # flannel
-echo "Download flannel release ..."
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.4.0"}
+echo "Prepare flannel ${FLANNEL_VERSION} release ..."
 if [ ! -f flannel.tar.gz ] ; then
   curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz
   tar xzf flannel.tar.gz
@@ -40,11 +43,9 @@ cp flannel-${FLANNEL_VERSION}/flanneld binaries/master
 cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
 
 # ectd
-echo "Download etcd release ..."
-
 ETCD_VERSION=${ETCD_VERSION:-"2.0.12"}
 ETCD="etcd-v${ETCD_VERSION}-linux-amd64"
-
+echo "Prepare etcd ${ETCD_VERSION} release ..."
 if [ ! -f etcd.tar.gz ] ; then
   curl -L https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${ETCD}.tar.gz -o etcd.tar.gz
   tar xzf etcd.tar.gz
@@ -52,9 +53,8 @@ fi
 cp $ETCD/etcd $ETCD/etcdctl binaries/master
 
 # k8s
-echo "Download kubernetes release ..."
 KUBE_VERSION=${KUBE_VERSION:-"1.0.3"}
-
+echo "Prepare kubernetes ${KUBE_VERSION} release ..."
 if [ ! -f kubernetes.tar.gz ] ; then
   curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
@@ -73,4 +73,5 @@ cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
 
 rm -rf flannel* kubernetes* etcd*
 
-echo "Done! All your commands locate in ./binaries dir"
+echo "Done! All your commands locate in kubernetes/cluster/ubuntu/binaries dir"
+popd

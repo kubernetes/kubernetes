@@ -23,8 +23,6 @@ MASTER=""
 MASTER_IP=""
 MINION_IPS=""
 
-KUBECTL_PATH=${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl
-
 # Assumed Vars:
 #   KUBE_ROOT
 function test-build-release {
@@ -266,7 +264,6 @@ EOF
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
   setClusterInfo
   KUBE_MASTER=$MASTER
@@ -281,7 +278,6 @@ function detect-master {
 # Vars set:
 #   KUBE_MINION_IP_ADDRESS (array)
 function detect-minions {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
   KUBE_MINION_IP_ADDRESSES=()
@@ -305,13 +301,12 @@ function detect-minions {
 
 # Instantiate a kubernetes cluster on ubuntu
 function kube-up() {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
-  # ensure the binaries are downloaded
+  # ensure the binaries are well prepared
   if [ ! -f "ubuntu/binaries/master/kube-apiserver" ]; then
-    echo "warning: not enough binaries to build k8s, please run build.sh in cluster/ubuntu first"
-    exit 1
+    echo "No local binaries for kube-up, downloading... "
+    "${KUBE_ROOT}/cluster/ubuntu/build.sh"
   fi
 
   setClusterInfo
@@ -364,7 +359,7 @@ function provision-master() {
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-flanneld-opts "127.0.0.1"; \
-                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
+                            sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
                             sudo groupadd -f -r kube-cert; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
@@ -385,7 +380,7 @@ function provision-minion() {
                          create-kubelet-opts "${1#*@}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}"; \
                          create-kube-proxy-opts "${MASTER_IP}"; \
                          create-flanneld-opts "${MASTER_IP}"; \
-                         sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
+                         sudo -p '[sudo] password to start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                          && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin; \
                          sudo service flanneld start; \
                          sudo -b ~/kube/reconfDocker.sh "i";"
@@ -409,7 +404,7 @@ function provision-masterandminion() {
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                             create-kube-proxy-opts "${MASTER_IP}";\
                             create-flanneld-opts "127.0.0.1"; \
-                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
+                            sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
                             sudo groupadd -f -r kube-cert; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
@@ -419,7 +414,6 @@ function provision-masterandminion() {
 
 # Delete a kubernetes cluster
 function kube-down {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
   
   source "${KUBE_ROOT}/cluster/common.sh"
@@ -430,10 +424,10 @@ function kube-down {
     {
       echo "Cleaning on node ${i#*@}"
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
-        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*; 
+        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop && sudo rm -rf /infra*; 
           sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd'
       elif [[ "${roles[${ii}]}" == "i" ]]; then
-        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password for stopping flanneld: " service flanneld stop'
+        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop'
       else
         echo "unsupported role for ${i}"
       fi
@@ -450,7 +444,8 @@ function kube-down {
 
 # Perform common upgrade setup tasks
 function prepare-push() {
-  if [[ $KUBE_VERSION == "" ]]; then
+  # Use local binaries for kube-push
+  if [[ "${KUBE_VERSION}" == "" ]]; then
     if [[ ! -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
       echo "No local binaries.Please check"
       exit 1
@@ -460,15 +455,19 @@ function prepare-push() {
     fi
   else
     # Run build.sh to get the required release 
-    pushd ubuntu
-    source "build.sh"    
-    popd
+    KUBE_VERSION=${KUBE_VERSION} "${KUBE_ROOT}/cluster/ubuntu/build.sh"
   fi
 }
 
 # Update a kubernetes master with required release
 function push-master {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+
+  if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
+    echo "There is no required release of kubernetes, please check first"
+    exit 1
+  fi
+
   setClusterInfo
   ii=0
   for i in ${nodes}; do
@@ -505,6 +504,12 @@ function push-master {
 # Update a kubernetes node with required release
 function push-node() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+
+  if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/minion/kubelet" ]]; then
+    echo "There is no required release of kubernetes, please check first"
+    exit 1
+  fi
+
   node_ip=${1}
   setClusterInfo
   ii=0
@@ -555,10 +560,10 @@ function kube-push {
     {
       echo "Cleaning on node ${i#*@}"
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
-        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop; 
+        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop; 
         sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd' || true
       elif [[ "${roles[${ii}]}" == "i" ]]; then
-        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password for stopping flanneld: " service flanneld stop' || true
+        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop' || true
       else
         echo "unsupported role for ${i}"
       fi
