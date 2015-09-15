@@ -651,7 +651,7 @@ export E2E_REPORT_DIR=${ARTIFACTS}
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 if [[ ! -z "${CLOUDSDK_BUCKET:-}" ]]; then
-    sudo gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
+    gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
     tar zvxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
