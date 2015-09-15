@@ -125,6 +125,7 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
 			Image:     "foo:V" + strconv.Itoa(i),
 			Resources: resources,
+			Name:      "foo-" + strconv.Itoa(i),
 		})
 	}
 	return pod
@@ -145,6 +146,22 @@ func TestDefaultContainerResourceRequirements(t *testing.T) {
 	}
 }
 
+func verifyAnnotation(t *testing.T, pod *api.Pod, expected string) {
+	a, ok := pod.ObjectMeta.Annotations[limitRangerAnnotation]
+	if !ok {
+		t.Errorf("No annotation but expected %v", expected)
+	}
+	if a != expected {
+		t.Errorf("Wrong annotation set by Limit Ranger: got %v, expected %v", a, expected)
+	}
+}
+
+func expectNoAnnotation(t *testing.T, pod *api.Pod) {
+	if a, ok := pod.ObjectMeta.Annotations[limitRangerAnnotation]; ok {
+		t.Errorf("Expected no annotation but got %v", a)
+	}
+}
+
 func TestMergePodResourceRequirements(t *testing.T) {
 	limitRange := validLimitRange()
 
@@ -159,6 +176,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
+	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu, memory request for container foo-0; cpu, memory limit for container foo-0")
 
 	// pod with some resources enumerated should only merge empty
 	input := getResourceRequirements(getResourceList("", "512Mi"), getResourceList("", ""))
@@ -177,6 +195,20 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
+	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu request for container foo-0; cpu, memory limit for container foo-0")
+
+	// pod with all resources enumerated should not merge anything
+	input = getResourceRequirements(getResourceList("100m", "512Mi"), getResourceList("200m", "1G"))
+	pod = validPod("limit-memory", 1, input)
+	expected = input
+	mergePodResourceRequirements(&pod, &defaultRequirements)
+	for i := range pod.Spec.Containers {
+		actual := pod.Spec.Containers[i].Resources
+		if !api.Semantic.DeepEqual(expected, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
+		}
+	}
+	expectNoAnnotation(t, &pod)
 }
 
 func TestPodLimitFunc(t *testing.T) {
