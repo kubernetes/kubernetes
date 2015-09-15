@@ -153,23 +153,23 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 	filterFunc := e.filterAndDecorateFunction(m)
 	defer trace.LogIfLong(600 * time.Millisecond)
 	if name, ok := m.MatchesSingle(); ok {
-		trace.Step("About to read single object")
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
+		if key, err := e.KeyFunc(ctx, name); err == nil {
+			trace.Step("About to read single object")
+			err := e.Storage.GetToList(key, filterFunc, list)
+			trace.Step("Object extracted")
+			if err != nil {
+				return nil, err
+			}
+			return list, nil
 		}
-		err = e.Storage.GetToList(key, filterFunc, list)
-		trace.Step("Object extracted")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		trace.Step("About to list directory")
-		err := e.Storage.List(e.KeyRootFunc(ctx), filterFunc, list)
-		trace.Step("List extracted")
-		if err != nil {
-			return nil, err
-		}
+		// if we cannot extract a key based on the current context, the optimization is skipped
+	}
+
+	trace.Step("About to list directory")
+	err := e.Storage.List(e.KeyRootFunc(ctx), filterFunc, list)
+	trace.Step("List extracted")
+	if err != nil {
+		return nil, err
 	}
 	return list, nil
 }
@@ -452,11 +452,13 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 	filterFunc := e.filterAndDecorateFunction(m)
 
 	if name, ok := m.MatchesSingle(); ok {
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
+		if key, err := e.KeyFunc(ctx, name); err == nil {
+			if err != nil {
+				return nil, err
+			}
+			return e.Storage.Watch(key, version, filterFunc)
 		}
-		return e.Storage.Watch(key, version, filterFunc)
+		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
 	return e.Storage.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
