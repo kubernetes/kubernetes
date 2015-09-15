@@ -51,8 +51,8 @@ def download_go():
     fairly recent edition of GO. This fetches the golang archive and installs
     it in /usr/local
     """
-    go_url = 'https://storage.googleapis.com/golang/go1.4.2.linux-amd64.tar.gz'
-    go_sha1 = '5020af94b52b65cc9b6f11d50a67e4bae07b0aff'
+    go_url = 'https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz'
+    go_sha1 = '46eecd290d8803887dec718c691cc243f2175fe0'
     handler = archiveurl.ArchiveUrlFetchHandler()
     handler.install(go_url, '/usr/local', go_sha1, 'sha1')
 

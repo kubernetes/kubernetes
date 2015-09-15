@@ -69,8 +69,8 @@ class TestInstallHook():
         """
         ins_mock = aumock.return_value.install
         install.download_go()
-        url = 'https://storage.googleapis.com/golang/go1.4.2.linux-amd64.tar.gz'
-        sha1='5020af94b52b65cc9b6f11d50a67e4bae07b0aff'
+        url = 'https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz'
+        sha1='46eecd290d8803887dec718c691cc243f2175fe0'
         ins_mock.assert_called_with(url, '/usr/local', sha1, 'sha1')
 
     @patch('install.subprocess')

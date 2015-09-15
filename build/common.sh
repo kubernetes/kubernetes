@@ -53,7 +53,7 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 # KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
 readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-readonly KUBE_BUILD_GOLANG_VERSION=1.4
+readonly KUBE_BUILD_GOLANG_VERSION=1.5.1
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
 # Here we map the output directories across both the local and remote _output
