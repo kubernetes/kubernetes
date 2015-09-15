@@ -17,7 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -25,31 +25,23 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"time"
 )
 
 // Marked with [Skipped] to skip the test by default (see driver.go),
 // the test needs privileged containers, which are disabled by default.
 // Run the test with "go run hack/e2e.go ... --ginkgo.focus=PersistentVolume"
 var _ = Describe("[Skipped] persistentVolumes", func() {
+	framework := Framework{BaseName: "persistent-volumes"}
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("pv", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	It("PersistentVolume", func() {
 		config := VolumeTestConfig{
