@@ -37,8 +37,8 @@ Documentation for other releases can be found at
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Compute Resources](#compute-resources)
-  - [Container and Pod Resource Limits](#container-and-pod-resource-limits)
-  - [How Pods with Resource Limits are Scheduled](#how-pods-with-resource-limits-are-scheduled)
+  - [Resource Requests and Limits of Pod and Container](#resource-requests-and-limits-of-pod-and-container)
+  - [How Pods with Resource Requests are Scheduled](#how-pods-with-resource-requests-are-scheduled)
   - [How Pods with Resource Limits are Run](#how-pods-with-resource-limits-are-run)
   - [Monitoring Compute Resource Usage](#monitoring-compute-resource-usage)
   - [Troubleshooting](#troubleshooting)
@@ -49,9 +49,11 @@ Documentation for other releases can be found at
 <!-- END MUNGE: GENERATED_TOC -->
 
 When specifying a [pod](pods.md), you can optionally specify how much CPU and memory (RAM) each
-container needs.  When containers have resource limits, the scheduler is able to make better
-decisions about which nodes to place pods on, and contention for resources can be handled in a
-consistent manner.
+container needs.  When containers have their resource requests specified, the scheduler is
+able to make better decisions about which nodes to place pods on; and when containers have their
+limits specified, contention for resources on a node can be handled in a specified manner. For
+more details about the difference between requests and limits, please refer to
+[Resource QoS](../proposals/resource-qos.md).
 
 *CPU* and *memory* are each a *resource type*.  A resource type has a base unit.  CPU is specified
 in units of cores.  Memory is specified in units of bytes.
@@ -62,22 +64,26 @@ distinct from [API resources](working-with-resources.md).  API resources, such a
 [services](services.md) are objects that can be written to and retrieved from the Kubernetes API
 server.
 
-## Container and Pod Resource Limits
+## Resource Requests and Limits of Pod and Container
 
 Each container of a Pod can optionally specify `spec.container[].resources.limits.cpu` and/or
-`spec.container[].resources.limits.memory`.  The `spec.container[].resources.requests` field is not
-currently used and need not be set.
+`spec.container[].resources.limits.memory` and/or `spec.container[].resources.requests.cpu`
+and/or `spec.container[].resources.requests.memory`.
 
-Specifying resource limits is optional.  In some clusters, an unset value may be replaced with a
-default value when a pod is created or updated.  The default value depends on how the cluster is
-configured.
+Specifying resource requests and/or limits is optional. In some clusters, unset limits or requests
+may be replaced with default values when a pod is created or updated. The default value depends on
+how the cluster is configured. If value of requests is not specified, they are set to be equal
+to limits by default. Please note that resource limits must be greater than or equal to resource
+requests.
 
-Although limits can only be specified on individual containers, it is convenient to talk about pod
-resource limits.  A *pod resource limit* for a particular resource type is the sum of the resource
-limits of that type for each container in the pod, with unset values treated as zero.
+Although requests/limits can only be specified on individual containers, it is convenient to talk
+about pod resource requests/limits.  A *pod resource request/limit* for a particular resource
+type is the sum of the resource requests/limits of that type for each container in the pod, with
+unset values treated as zero (or equal to default values in some cluster configurations).
 
-The following pod has two containers.  Each has a limit of 0.5 core of cpu and 128MiB
-(2<sup>20</sup> bytes) of memory.  The pod can be said to have a limit of 1 core and 256MiB of
+The following pod has two containers.  Each has a request of 0.25 core of cpu and 64MiB
+(2<sup>20</sup> bytes) of memory and a limit of 0.5 core of cpu and 128MiB of memory. The pod can
+be said to have a request of 0.5 core and 128 MiB of memory and a limit of 1 core and 256MiB of
 memory.
 
 ```yaml
@@ -90,31 +96,34 @@ spec:
   - name: db
     image: mysql
     resources:
+	  requests:
+	    memory: "64Mi"
+		cpu: "250m"
       limits:
         memory: "128Mi"
         cpu: "500m"
   - name: wp
     image: wordpress
     resources:
-      limits:
+      requests:
+	    memory: "64Mi"
+		cpu: "250m"
+	  limits:
         memory: "128Mi"
         cpu: "500m"
 ```
 
-## How Pods with Resource Limits are Scheduled
+## How Pods with Resource Requests are Scheduled
 
 When a pod is created, the Kubernetes scheduler selects a node for the pod to
 run on.  Each node has a maximum capacity for each of the resource types: the
 amount of CPU and memory it can provide for pods.  The scheduler ensures that,
-for each resource type (CPU and memory), the sum of the resource limits of the
+for each resource type (CPU and memory), the sum of the resource requests of the
 containers scheduled to the node is less than the capacity of the node.  Note
 that although actual memory or CPU resource usage on nodes is very low, the
 scheduler will still refuse to place pods onto nodes if the capacity check
 fails.  This protects against a resource shortage on a node when resource usage
 later increases, such as due to a daily peak in request rate.
-
-Note: Although the scheduler normally spreads pods out across nodes, there are currently some cases
-where pods with no limits (unset values) might all land on the same node.
 
 ## How Pods with Resource Limits are Run
 
@@ -157,13 +166,17 @@ until a place can be found.    An event will be produced each time the scheduler
 place for the pod, like this:
 
 ```console
-$ kubectl describe pods/frontend | grep -A 3 Events
+$ kubectl describe pod frontend | grep -A 3 Events
 Events:
-  FirstSeen				LastSeen			Count	From SubobjectPath	Reason			Message
-  Tue, 30 Jun 2015 09:01:41 -0700	Tue, 30 Jun 2015 09:39:27 -0700	128	{scheduler }            failedScheduling	Error scheduling: For each of these fitness predicates, pod frontend failed on at least one node: PodFitsResources.
+  FirstSeen	LastSeen	 Count	From          Subobject   PathReason			Message
+  36s		5s		 6	    {scheduler }              FailedScheduling	Failed for reason PodExceedsFreeCPU and possibly others
+
 ```
 
-If a pod or pods are pending with this message, then there are several things to try:
+In the case shown above, the pod "frontend" fails to be scheduled due to insufficient
+CPU resource on the node. Similar error messages can also suggest failure due to insufficient
+memory (PodExceedsFreeMemory). In general, if a pod or pods are pending with this message and
+alike, then there are several things to try:
 - Add more nodes to the cluster.
 - Terminate unneeded pods to make room for pending pods.
 - Check that the pod is not larger than all the nodes.  For example, if all the nodes
@@ -266,13 +279,11 @@ The current system only allows resource quantities to be specified on a containe
 It is planned to improve accounting for resources which are shared by all containers in a pod,
 such as [EmptyDir volumes](volumes.md#emptydir).
 
-The current system only supports container limits for CPU and Memory.
+The current system only supports container requests and limits for CPU and Memory.
 It is planned to add new resource types, including a node disk space
 resource, and a framework for adding custom [resource types](../design/resources.md#resource-types).
 
-The current system does not facilitate overcommitment of resources because resources reserved
-with container limits are assured.  It is planned to support multiple levels of [Quality of
-Service](http://issue.k8s.io/168).
+Kubernetes supports overcommitment of resources by supporting multiple levels of [Quality of Service](http://issue.k8s.io/168).
 
 Currently, one unit of CPU means different things on different cloud providers, and on different
 machine types within the same cloud providers.  For example, on AWS, the capacity of a node
