@@ -39,9 +39,12 @@ import (
 type PodConfigNotificationMode int
 
 const (
+	// PodConfigNotificationUnknown is the default value for
+	// PodConfigNotificationMode when uninitialized.
+	PodConfigNotificationUnknown = iota
 	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
 	// any change occurs.
-	PodConfigNotificationSnapshot = iota
+	PodConfigNotificationSnapshot
 	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE message whenever pods are
 	// changed, and a SET message if there are any additions or removals.
 	PodConfigNotificationSnapshotAndUpdates
@@ -178,6 +181,8 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- kubelet.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubelet.SET, Source: source}
 		}
 
+	case PodConfigNotificationUnknown:
+		fallthrough
 	default:
 		panic(fmt.Sprintf("unsupported PodConfigNotificationMode: %#v", s.mode))
 	}
