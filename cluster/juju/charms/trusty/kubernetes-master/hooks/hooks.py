@@ -23,8 +23,9 @@ import socket
 import subprocess
 import sys
 from charmhelpers.core import hookenv, host
+from charmhelpers.contrib import ssl
 from kubernetes_installer import KubernetesInstaller
-from path import path
+from path import Path
 
 hooks = hookenv.Hooks()
 
@@ -55,10 +56,14 @@ def config_changed():
     create kubernetes binary files.
     """
     hookenv.log('Starting config-changed')
-    charm_dir = path(hookenv.charm_dir())
+    charm_dir = Path(hookenv.charm_dir())
     config = hookenv.config()
     # Get the version of kubernetes to install.
     version = config['version']
+    username = config['username']
+    password = config['password']
+    certificate = config['apiserver-cert']
+    key = config['apiserver-key']
 
     if version == 'master':
         # The 'master' branch of kuberentes is used when master is configured.
@@ -70,32 +75,59 @@ def config_changed():
         # Create a branch to a tag to get the release version.
         branch = 'tags/{0}'.format(version)
 
-    # Get the package architecture, rather than arch from the kernel (uname -m).
+    cert_file = '/srv/kubernetes/apiserver.crt'
+    key_file = '/srv/kubernetes/apiserver.key'
+    # When the cert or key changes we need to restart the apiserver.
+    if config.changed('apiserver-cert') or config.changed('apiserver-key'):
+        hookenv.log('Certificate or key has changed.')
+        if not certificate or not key:
+            generate_cert(key=key_file, cert=cert_file)
+        else:
+            hookenv.log('Writing new certificate and key to server.')
+            with open(key_file, 'w') as file:
+                file.write(key)
+            with open(cert_file, 'w') as file:
+                file.write(certificate)
+        # Restart apiserver as the certificate or key has changed.
+        if host.service_running('apiserver'):
+            host.service_restart('apiserver')
+        # Reload nginx because it proxies https to apiserver.
+        if host.service_running('nginx'):
+            host.service_reload('nginx')
+
+    if config.changed('username') or config.changed('password'):
+        hookenv.log('Username or password changed, creating authentication.')
+        basic_auth(config['username'], config['username'], config['password'])
+        if host.service_running('apiserver'):
+            host.service_restart('apiserver')
+
+    # Get package architecture, rather than arch from the kernel (uname -m).
     arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
 
     if not branch:
         output_path = charm_dir / 'files/output'
-        installer = KubernetesInstaller(arch, version, output_path)
+        kube_installer = KubernetesInstaller(arch, version, output_path)
     else:
 
         # Build the kuberentes binaries from source on the units.
-        kubernetes_dir = path('/opt/kubernetes')
+        kubernetes_dir = Path('/opt/kubernetes')
 
         # Construct the path to the binaries using the arch.
         output_path = kubernetes_dir / '_output/local/bin/linux' / arch
-        installer = KubernetesInstaller(arch, version, output_path)
+        kube_installer = KubernetesInstaller(arch, version, output_path)
 
         if not kubernetes_dir.exists():
-            print('The source directory {0} does not exist'.format(kubernetes_dir))
-            print('Was the kubernetes code cloned during install?')
+            message = 'The kubernetes source directory {0} does not exist. ' \
+                'Was the kubernetes repository cloned during the install?'
+            print(message.format(kubernetes_dir))
             exit(1)
 
         # Change to the kubernetes directory (git repository).
         with kubernetes_dir:
-
             # Create a command to get the current branch.
             git_branch = 'git branch | grep "\*" | cut -d" " -f2'
-            current_branch = subprocess.check_output(git_branch, shell=True).strip()
+            current_branch = subprocess.check_output(git_branch, shell=True)
+            current_branch = current_branch.strip()
             print('Current branch: ', current_branch)
             # Create the path to a file to indicate if the build was broken.
             broken_build = charm_dir / '.broken_build'
@@ -104,12 +136,12 @@ def config_changed():
                 print('Last build failed: ', last_build_failed)
                 # Rebuild if current version is different or last build failed.
                 if current_branch != version or last_build_failed:
-                    installer.build(branch)
+                    kube_installer.build(branch)
             if not output_path.isdir():
                 broken_build.touch()
 
     # Create the symoblic links to the right directories.
-    installer.install()
+    kube_installer.install()
 
     relation_changed()
 
@@ -123,10 +155,10 @@ def relation_changed():
     # Check required keys
     for k in ('etcd_servers',):
         if not template_data.get(k):
-            print "Missing data for", k, template_data
+            print 'Missing data for', k, template_data
             return
 
-    print "Running with\n", template_data
+    print 'Running with\n', template_data
 
     # Render and restart as needed
     for n in ('apiserver', 'controller-manager', 'scheduler'):
@@ -157,7 +189,7 @@ def network_relation_changed():
 
 
 def notify_minions():
-    print("Notify minions.")
+    print('Notify minions.')
     config = hookenv.config()
     for r in hookenv.relation_ids('minions-api'):
         hookenv.relation_set(
@@ -165,7 +197,49 @@ def notify_minions():
             hostname=hookenv.unit_private_ip(),
             port=8080,
             version=config['version'])
-    print("Notified minions of version " + config['version'])
+    print('Notified minions of version ' + config['version'])
+
+
+def basic_auth(name, id, pwd=None, file='/srv/kubernetes/basic-auth.csv'):
+    """
+    Create a basic authentication file for kubernetes. The file is a csv file
+    with 3 columns: password, user name, user id. From the Kubernetes docs:
+    The basic auth credentials last indefinitely, and the password cannot be
+    changed without restarting apiserver.
+    """
+    if not pwd:
+        import random
+        import string
+        alphanumeric = string.ascii_letters + string.digits
+        pwd = ''.join(random.choice(alphanumeric) for _ in range(16))
+    lines = []
+    auth_file = Path(file)
+    if auth_file.isfile():
+        lines = auth_file.lines()
+        for line in lines:
+            target = ',{0},{1}'.format(name, id)
+            if target in line:
+                lines.remove(line)
+    auth_line = '{0},{1},{2}'.format(pwd, name, id)
+    lines.append(auth_line)
+    auth_file.write_lines(lines)
+
+
+def generate_cert(common_name=None,
+                  key='/srv/kubernetes/apiserver.key',
+                  cert='/srv/kubernetes/apiserver.crt'):
+    """
+    Create the certificate and key for the Kubernetes tls enablement.
+    """
+    hookenv.log('Generating new self signed certificate and key', 'INFO')
+    if not common_name:
+        common_name = hookenv.unit_get('public-address')
+    if os.path.isfile(key) or os.path.isfile(cert):
+        hookenv.log('Overwriting the existing certificate or key', 'WARNING')
+    hookenv.log('Generating certificate for {0}'.format(common_name), 'INFO')
+    # Generate the self signed certificate with the public address as CN.
+    # https://pythonhosted.org/charmhelpers/api/charmhelpers.contrib.ssl.html
+    ssl.generate_selfsigned(key, cert, cn=common_name)
 
 
 def get_template_data():
@@ -173,18 +247,21 @@ def get_template_data():
     config = hookenv.config()
     version = config['version']
     template_data = {}
-    template_data['etcd_servers'] = ",".join([
-        "http://%s:%s" % (s[0], s[1]) for s in sorted(
+    template_data['etcd_servers'] = ','.join([
+        'http://%s:%s' % (s[0], s[1]) for s in sorted(
             get_rel_hosts('etcd', rels, ('hostname', 'port')))])
-    template_data['minions'] = ",".join(get_rel_hosts('minions-api', rels))
+    template_data['minions'] = ','.join(get_rel_hosts('minions-api', rels))
+    private_ip = hookenv.unit_private_ip()
+    public_ip = hookenv.unit_public_ip()
+    template_data['api_public_address'] = _bind_addr(public_ip)
+    template_data['api_private_address'] = _bind_addr(private_ip)
+    template_data['bind_address'] = '127.0.0.1'
+    template_data['api_http_uri'] = 'http://%s:%s' % (private_ip, 8080)
+    template_data['api_https_uri'] = 'https://%s:%s' % (private_ip, 6443)
 
-    template_data['api_bind_address'] = _bind_addr(hookenv.unit_private_ip())
-    template_data['bind_address'] = "127.0.0.1"
-    template_data['api_server_address'] = "http://%s:%s" % (
-        hookenv.unit_private_ip(), 8080)
     arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
 
-    template_data['web_uri'] = "/kubernetes/%s/local/bin/linux/%s/" % (version,
+    template_data['web_uri'] = '/kubernetes/%s/local/bin/linux/%s/' % (version,
                                                                        arch)
     if version == 'local':
         template_data['alias'] = hookenv.charm_dir() + '/files/output/'
@@ -201,7 +278,7 @@ def _bind_addr(addr):
     try:
         return socket.gethostbyname(addr)
     except socket.error:
-            raise ValueError("Could not resolve private address")
+            raise ValueError('Could not resolve address %s' % addr)
 
 
 def _encode(d):
@@ -223,7 +300,7 @@ def get_rel_hosts(rel_name, rels, keys=('private-address',)):
     return hosts
 
 
-def render_file(name, data, src_suffix="upstart.tmpl", tgt_path=None):
+def render_file(name, data, src_suffix='upstart.tmpl', tgt_path=None):
     tmpl_path = os.path.join(
         os.environ.get('CHARM_DIR'), 'files', '%s.%s' % (name, src_suffix))
 
@@ -243,6 +320,7 @@ def render_file(name, data, src_suffix="upstart.tmpl", tgt_path=None):
     with open(tgt_path, 'w') as fh:
         fh.write(rendered)
     return True
+
 
 if __name__ == '__main__':
     hooks.execute(sys.argv)
