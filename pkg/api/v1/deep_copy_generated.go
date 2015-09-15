@@ -1373,6 +1373,7 @@ func deepCopy_v1_PodLogOptions(in PodLogOptions, out *PodLogOptions, c *conversi
 	out.Container = in.Container
 	out.Follow = in.Follow
 	out.Previous = in.Previous
+	out.Tail = in.Tail
 	return nil
 }
 

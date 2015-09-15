@@ -71,7 +71,7 @@ type logParams struct {
 func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	params := &logParams{}
 	cmd := &cobra.Command{
-		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
+		Use:     "logs [-f] [-p] [-t n] POD [-c CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
@@ -85,6 +85,7 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
 	cmd.Flags().BoolP("previous", "p", false, "If true, print the logs for the previous instance of the container in a pod if it exists.")
 	cmd.Flags().StringVarP(&params.containerName, "container", "c", "", "Container name")
+	cmd.Flags().StringP("tail", "t", "all", "Number of lines to show from the end of the logs")
 	return cmd
 }
 
@@ -146,10 +147,13 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if cmdutil.GetFlagBool(cmd, "previous") {
 		previous = true
 	}
-	return handleLog(client, namespace, podID, container, follow, previous, out)
+
+	tail := cmdutil.GetFlagString(cmd, "tail")
+
+	return handleLog(client, namespace, podID, container, follow, previous, tail, out)
 }
 
-func handleLog(client *client.Client, namespace, podID, container string, follow, previous bool, out io.Writer) error {
+func handleLog(client *client.Client, namespace, podID, container string, follow, previous bool, tail string, out io.Writer) error {
 	readCloser, err := client.RESTClient.Get().
 		Namespace(namespace).
 		Name(podID).
@@ -158,6 +162,7 @@ func handleLog(client *client.Client, namespace, podID, container string, follow
 		Param("follow", strconv.FormatBool(follow)).
 		Param("container", container).
 		Param("previous", strconv.FormatBool(previous)).
+		Param("tail", tail).
 		Stream()
 	if err != nil {
 		return err

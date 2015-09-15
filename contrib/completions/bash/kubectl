@@ -506,6 +506,8 @@ _kubectl_logs()
     flags+=("--interactive")
     flags+=("--previous")
     flags+=("-p")
+    flags+=("--tail=")
+    two_word_flags+=("-t")
 
     must_have_one_flag=()
     must_have_one_noun=()

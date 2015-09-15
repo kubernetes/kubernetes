@@ -6064,6 +6064,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "tail",
+        "description": "Number of lines to show from the end of the logs",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",

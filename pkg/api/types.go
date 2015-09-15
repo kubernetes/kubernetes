@@ -1588,6 +1588,9 @@ type PodLogOptions struct {
 
 	// If true, return previous terminated container logs
 	Previous bool
+
+	// Number of lines to show from the end of the logs
+	Tail string
 }
 
 // PodAttachOptions is the query options to a Pod's remote attach call

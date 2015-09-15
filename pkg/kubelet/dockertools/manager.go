@@ -263,11 +263,8 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID, tail string
 		ErrorStream:  stderr,
 		Timestamps:   false,
 		RawTerminal:  false,
+		Tail:         tail,
 		Follow:       follow,
-	}
-
-	if !follow {
-		opts.Tail = tail
 	}
 
 	err = dm.client.Logs(opts)

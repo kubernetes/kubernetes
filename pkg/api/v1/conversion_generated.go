@@ -1587,6 +1587,7 @@ func convert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, out *P
 	out.Container = in.Container
 	out.Follow = in.Follow
 	out.Previous = in.Previous
+	out.Tail = in.Tail
 	return nil
 }
 
@@ -3991,6 +3992,7 @@ func convert_v1_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *api.P
 	out.Container = in.Container
 	out.Follow = in.Follow
 	out.Previous = in.Previous
+	out.Tail = in.Tail
 	return nil
 }
 
