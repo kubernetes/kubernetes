@@ -68,6 +68,7 @@ duration-sec
 e2e-output-dir
 enable-debugging-handlers
 enable-horizontal-pod-autoscaler
+enable-deployment-controller
 enable-server
 etcd-config
 etcd-prefix
@@ -101,6 +102,7 @@ ha-domain
 healthz-bind-address
 healthz-port
 horizontal-pod-autoscaler-sync-period
+deployment-controller-sync-period
 hostname-override
 host-network-sources
 http-check-frequency
