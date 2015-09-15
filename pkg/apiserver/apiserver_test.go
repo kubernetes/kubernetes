@@ -131,7 +131,7 @@ func init() {
 	// the mapper how to address our resources
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
-			root := kind == "SimpleRoot"
+			root := bool(kind == "SimpleRoot")
 			if root {
 				nsMapper.Add(meta.RESTScopeRoot, kind, version, false)
 			} else {
