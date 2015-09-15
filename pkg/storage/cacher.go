@@ -213,13 +213,13 @@ func (c *Cacher) Get(key string, objPtr runtime.Object, ignoreNotFound bool) err
 }
 
 // Implements storage.Interface.
-func (c *Cacher) GetToList(key string, listObj runtime.Object) error {
-	return c.storage.GetToList(key, listObj)
+func (c *Cacher) GetToList(key string, filter FilterFunc, listObj runtime.Object) error {
+	return c.storage.GetToList(key, filter, listObj)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) List(key string, listObj runtime.Object) error {
-	return c.storage.List(key, listObj)
+func (c *Cacher) List(key string, filter FilterFunc, listObj runtime.Object) error {
+	return c.storage.List(key, filter, listObj)
 }
 
 // ListFromMemory implements list operation (the same signature as List method)
@@ -303,7 +303,7 @@ func filterFunction(key string, keyFunc func(runtime.Object) (string, error), fi
 	return func(obj runtime.Object) bool {
 		objKey, err := keyFunc(obj)
 		if err != nil {
-			glog.Errorf("Invalid object for filter: %v", obj)
+			glog.Errorf("invalid object for filter: %v", obj)
 			return false
 		}
 		if !strings.HasPrefix(objKey, key) {
@@ -343,7 +343,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 	list := lw.newListFunc()
-	if err := lw.storage.List(lw.resourcePrefix, list); err != nil {
+	if err := lw.storage.List(lw.resourcePrefix, Everything, list); err != nil {
 		return nil, err
 	}
 	return list, nil

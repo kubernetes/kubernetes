@@ -111,11 +111,11 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(key string, listObj runtime.Object) error
+	GetToList(key string, filter FilterFunc, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	List(key string, listObj runtime.Object) error
+	List(key string, filter FilterFunc, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
