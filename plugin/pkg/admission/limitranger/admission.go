@@ -19,6 +19,8 @@ package limitranger
 import (
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,6 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
+)
+
+const (
+	limitRangerAnnotation = "kubernetes.io/limit-ranger"
 )
 
 func init() {
@@ -162,9 +168,14 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 }
 
 // mergePodResourceRequirements merges enumerated requirements with default requirements
+// it annotates the pod with information about what requirements were modified
 func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) {
+	annotations := []string{}
+
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
+		setRequests := []string{}
+		setLimits := []string{}
 		if container.Resources.Limits == nil {
 			container.Resources.Limits = api.ResourceList{}
 		}
@@ -175,14 +186,34 @@ func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.Resourc
 			_, found := container.Resources.Limits[k]
 			if !found {
 				container.Resources.Limits[k] = *v.Copy()
+				setLimits = append(setLimits, string(k))
 			}
 		}
 		for k, v := range defaultRequirements.Requests {
 			_, found := container.Resources.Requests[k]
 			if !found {
 				container.Resources.Requests[k] = *v.Copy()
+				setRequests = append(setRequests, string(k))
 			}
 		}
+		if len(setRequests) > 0 {
+			sort.Strings(setRequests)
+			a := strings.Join(setRequests, ", ") + " request for container " + container.Name
+			annotations = append(annotations, a)
+		}
+		if len(setLimits) > 0 {
+			sort.Strings(setLimits)
+			a := strings.Join(setLimits, ", ") + " limit for container " + container.Name
+			annotations = append(annotations, a)
+		}
+	}
+
+	if len(annotations) > 0 {
+		if pod.ObjectMeta.Annotations == nil {
+			pod.ObjectMeta.Annotations = make(map[string]string)
+		}
+		val := "LimitRanger plugin set: " + strings.Join(annotations, "; ")
+		pod.ObjectMeta.Annotations[limitRangerAnnotation] = val
 	}
 }
 
