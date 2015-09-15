@@ -2788,6 +2788,58 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	}
 }
 
+func TestUpdateMirrorPodAnnotations(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	kl := testKubelet.kubelet
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "file",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "1234", Image: "foo"},
+			},
+		},
+	}
+	// Mirror pod additional annotations
+	mirrorPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "11111111",
+			Name:      "foo",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "file",
+				ConfigMirrorAnnotationKey: "mirror",
+				"kubernetes.io/key":       "value",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "1234", Image: "foo"},
+			},
+		},
+	}
+
+	pods := []*api.Pod{pod, mirrorPod}
+	kl.podManager.SetPods(pods)
+	err := kl.syncPod(pod, mirrorPod, container.Pod{}, SyncPodUpdate)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if value, ok := pod.Annotations["kubernetes.io/key"]; !ok || value != "value" {
+		t.Errorf("expected static pod to contain \"kubernetes.io/key\"annotation, got %#v", pod.Annotations)
+	}
+}
+
 func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	// pods contain one static and one mirror pod with the same name but
 	// different UIDs.
