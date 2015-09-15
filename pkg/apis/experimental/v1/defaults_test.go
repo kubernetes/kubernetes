@@ -98,7 +98,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: DeploymentSpec{
 					Replicas: newInt(1),
 					Strategy: DeploymentStrategy{
-						Type: DeploymentRollingUpdate,
+						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -123,7 +123,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: DeploymentSpec{
 					Replicas: newInt(5),
 					Strategy: DeploymentStrategy{
-						Type: DeploymentRollingUpdate,
+						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
 							MaxSurge:       &differentIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -138,7 +138,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: DeploymentSpec{
 					Replicas: newInt(5),
 					Strategy: DeploymentStrategy{
-						Type: DeploymentRecreate,
+						Type: RecreateDeploymentStrategyType,
 					},
 				},
 			},
@@ -146,7 +146,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: DeploymentSpec{
 					Replicas: newInt(5),
 					Strategy: DeploymentStrategy{
-						Type: DeploymentRecreate,
+						Type: RecreateDeploymentStrategyType,
 					},
 					UniqueLabelKey: newString(deploymentLabelKey),
 				},
@@ -157,7 +157,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: DeploymentSpec{
 					Replicas: newInt(5),
 					Strategy: DeploymentStrategy{
-						Type: DeploymentRecreate,
+						Type: RecreateDeploymentStrategyType,
 					},
 					UniqueLabelKey: newString("customDeploymentKey"),
 				},
@@ -166,7 +166,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: DeploymentSpec{
 					Replicas: newInt(5),
 					Strategy: DeploymentStrategy{
-						Type: DeploymentRecreate,
+						Type: RecreateDeploymentStrategyType,
 					},
 					UniqueLabelKey: newString("customDeploymentKey"),
 				},
