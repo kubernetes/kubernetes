@@ -245,7 +245,7 @@ my-nginx-kqdjk    1/1       Waiting   0          33s
 my-nginx-nyj3x    1/1       Waiting   0          33s
 ```
 
-You need to wait for the provisioning to complete, you can monitor the minions by doing:
+You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
 ```console
 $ sudo salt '*minion-1' cmd.run 'docker images'
