@@ -417,7 +417,7 @@ func (nc *NodeController) recordNodeStatusChange(node *api.Node, new_status stri
 }
 
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
-// is entitled, state of current and last observed Ready Condition, and an error if it ocured.
+// is entitled, state of current and last observed Ready Condition, and an error if it occurred.
 func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, api.NodeCondition, *api.NodeCondition, error) {
 	var err error
 	var gracePeriod time.Duration

@@ -59,7 +59,7 @@ type Broadcaster struct {
 }
 
 // NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
-// It is guaranteed that events will be distibuted in the order in which they ocur,
+// It is guaranteed that events will be distributed in the order in which they occur,
 // but the order in which a single event is distributed among all of the watchers is unspecified.
 func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
