@@ -27,7 +27,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
 
 if [ "$(id -u)" != "0" ]; then
-    echo "WARNING : This script MAY be run as root for docker socket / iptables functionality... if failures occur... Retry as root." 2>&1
+    echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
 fi
 
 # Stop right away if the build fails
@@ -63,7 +63,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh"
+    "${KUBE_ROOT}/hack/build-go.sh" cmd/kube-proxy cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet plugin/cmd/kube-scheduler
 else
     echo "skipped the build."
 fi
