@@ -1,6 +1,6 @@
 all: clean consumer
 
-TAG = alpha
+TAG = beta
 
 consumer:
 	CGO_ENABLED=0 godep go build -a -installsuffix cgo --ldflags '-w' -o consume-cpu/consume-cpu ./consume-cpu/consume_cpu.go
