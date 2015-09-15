@@ -56,7 +56,7 @@ type SystemModeler interface {
 	ForgetPodByKey(key string)
 
 	// For serializing calls to Assume/ForgetPod: imagine you want to add
-	// a pod iff a bind succeeds, but also remove a pod if it is deleted.
+	// a pod if and only if a bind succeeds, but also remove a pod if it is deleted.
 	// TODO: if SystemModeler begins modeling things other than pods, this
 	// should probably be parameterized or specialized for pods.
 	LockedAction(f func())
@@ -137,8 +137,8 @@ func (s *Scheduler) scheduleOne() {
 		},
 	}
 
-	// We want to add the pod to the model iff the bind succeeds, but we don't want to race
-	// with any deletions, which happen asynchronously.
+	// We want to add the pod to the model if and only if the bind succeeds,
+	// but we don't want to race with any deletions, which happen asynchronously.
 	s.config.Modeler.LockedAction(func() {
 		bindingStart := time.Now()
 		err := s.config.Binder.Bind(b)
