@@ -55,8 +55,7 @@ work, which has been merge into this document.
 ## Prerequisites
 
 1. The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge.
-2. All machines can communicate with each other, no need to connect Internet (should use
-private docker registry in this case).
+2. All machines can communicate with each other. Master node needs to connect the Internet to download the necessary files, while working nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
 Ubuntu 15 which use systemd instead of upstart. We are working around fixing this.
 4. Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.3, may work with higher versions.
@@ -135,6 +134,10 @@ that conflicts with your own private network range.
 
 The `FLANNEL_NET` variable defines the IP range used for flannel overlay network,
 should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
+
+**Note:** When deploying, master needs to connect the Internet to download the necessary files. If your machines locate in a private network that need proxy setting to connect the Internet, you can set the config `PROXY_SETTING` in cluster/ubuntu/config-default.sh such as:
+
+     PROXY_SETTING="http_proxy=http://server:port https_proxy=https://server:port"
 
 After all the above variables being set correctly, we can use following command in cluster/ directory to bring up the whole cluster.
 

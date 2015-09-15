@@ -361,7 +361,7 @@ function provision-master() {
                             create-flanneld-opts "127.0.0.1"; \
                             sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
                             sudo groupadd -f -r kube-cert; \
-                            sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+                            ${PROXY_SETTING} sudo -E ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
                             sudo service etcd start; \
                             sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh "a";"
@@ -406,7 +406,7 @@ function provision-masterandminion() {
                             create-flanneld-opts "127.0.0.1"; \
                             sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
                             sudo groupadd -f -r kube-cert; \
-                            sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+                            ${PROXY_SETTING} sudo -E ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
                             sudo service etcd start; \
                             sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh "ai";"
