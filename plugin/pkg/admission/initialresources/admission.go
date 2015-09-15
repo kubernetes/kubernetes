@@ -19,6 +19,7 @@ package initialresources
 import (
 	"flag"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -123,6 +124,7 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 			req[api.ResourceMemory] = *mem
 		}
 		if len(setRes) > 0 {
+			sort.Strings(setRes)
 			a := strings.Join(setRes, ", ") + " request for container " + c.Name
 			annotations = append(annotations, a)
 		}
