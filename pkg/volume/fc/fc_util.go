@@ -28,14 +28,36 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+type ioHandler interface {
+	ReadDir(dirname string) ([]os.FileInfo, error)
+	Lstat(name string) (os.FileInfo, error)
+	EvalSymlinks(path string) (string, error)
+	WriteFile(filename string, data []byte, perm os.FileMode) error
+}
+
+type osIOHandler struct{}
+
+func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
+	return ioutil.ReadDir(dirname)
+}
+func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
+	return os.Lstat(name)
+}
+func (handler *osIOHandler) EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
+}
+func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	return ioutil.WriteFile(filename, data, perm)
+}
+
 // given a disk path like /dev/sdx, find the devicemapper parent
-func findMultipathDeviceMapper(disk string) string {
+func findMultipathDeviceMapper(disk string, io ioHandler) string {
 	sys_path := "/sys/block/"
-	if dirs, err := ioutil.ReadDir(sys_path); err == nil {
+	if dirs, err := io.ReadDir(sys_path); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
 			if strings.HasPrefix(name, "dm-") {
-				if _, err1 := os.Lstat(sys_path + name + "/slaves/" + disk); err1 == nil {
+				if _, err1 := io.Lstat(sys_path + name + "/slaves/" + disk); err1 == nil {
 					return "/dev/" + name
 				}
 			}
@@ -45,18 +67,18 @@ func findMultipathDeviceMapper(disk string) string {
 }
 
 // given a wwn and lun, find the device and associated devicemapper parent
-func findDisk(wwn, lun string) (string, string) {
+func findDisk(wwn, lun string, io ioHandler) (string, string) {
 	fc_path := "-fc-0x" + wwn + "-lun-" + lun
 	dev_path := "/dev/disk/by-path/"
-	if dirs, err := ioutil.ReadDir(dev_path); err == nil {
+	if dirs, err := io.ReadDir(dev_path); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
 			if strings.Contains(name, fc_path) {
-				if disk, err1 := filepath.EvalSymlinks(dev_path + name); err1 == nil {
+				if disk, err1 := io.EvalSymlinks(dev_path + name); err1 == nil {
 					arr := strings.Split(disk, "/")
 					l := len(arr) - 1
 					dev := arr[l]
-					dm := findMultipathDeviceMapper(dev)
+					dm := findMultipathDeviceMapper(dev, io)
 					return disk, dm
 				}
 			}
@@ -65,7 +87,7 @@ func findDisk(wwn, lun string) (string, string) {
 	return "", ""
 }
 
-func createMultipathConf(path string) {
+func createMultipathConf(path string, io ioHandler) {
 	if _, err := os.Lstat(path); err != nil {
 		data := []byte(`defaults {
 	find_multipaths yes
@@ -76,18 +98,18 @@ func createMultipathConf(path string) {
 blacklist {
 }
 `)
-		ioutil.WriteFile(path, data, 0664)
+		io.WriteFile(path, data, 0664)
 	}
 }
 
 // rescan scsi bus
-func scsiHostRescan() {
+func scsiHostRescan(io ioHandler) {
 	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := ioutil.ReadDir(scsi_path); err == nil {
+	if dirs, err := io.ReadDir(scsi_path); err == nil {
 		for _, f := range dirs {
 			name := scsi_path + f.Name() + "/scan"
 			data := []byte("- - -")
-			ioutil.WriteFile(name, data, 0666)
+			io.WriteFile(name, data, 0666)
 		}
 	}
 }
@@ -103,19 +125,17 @@ func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
 	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun)
 }
 
-func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
+func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
 	disk := ""
 	dm := ""
-	devicePath := ""
-	wwns := b.wwns
-	lun := b.lun
+
 	rescaned := false
 	// two-phase search:
 	// first phase, search existing device path, if a multipath dm is found, exit loop
 	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
 	for true {
 		for _, wwn := range wwns {
-			disk, dm = findDisk(wwn, lun)
+			disk, dm = findDisk(wwn, lun, io)
 			// if multipath device is found, break
 			if dm != "" {
 				break
@@ -127,11 +147,20 @@ func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
 		}
 		// rescan and search again
 		// create multipath conf if it is not there
-		createMultipathConf("/etc/multipath.conf")
+		createMultipathConf("/etc/multipath.conf", io)
 		// rescan scsi bus
-		scsiHostRescan()
+		scsiHostRescan(io)
 		rescaned = true
 	}
+	return disk, dm
+}
+
+func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
+	devicePath := ""
+	wwns := b.wwns
+	lun := b.lun
+	io := b.io
+	disk, dm := searchDisk(wwns, lun, io)
 	// if no disk matches input wwn and lun, exit
 	if disk == "" && dm == "" {
 		return fmt.Errorf("no fc disk found")

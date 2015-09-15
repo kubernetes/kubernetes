@@ -103,6 +103,7 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 			lun:     lun,
 			manager: manager,
 			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
+			io:      &osIOHandler{},
 			plugin:  plugin},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
@@ -121,6 +122,7 @@ func (plugin *fcPlugin) newCleanerInternal(volName string, podUID types.UID, man
 		manager: manager,
 		mounter: mounter,
 		plugin:  plugin,
+		io:      &osIOHandler{},
 	}}, nil
 }
 
@@ -139,6 +141,8 @@ type fcDisk struct {
 	mounter mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
+	// io handler interface
+	io ioHandler
 }
 
 func (fc *fcDisk) GetPath() string {
