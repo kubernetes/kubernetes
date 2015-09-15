@@ -95,10 +95,13 @@ func (f *Framework) afterEach() {
 		Failf("All nodes should be ready after test, %v", err)
 	}
 
-	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
-
-	if err := deleteNS(f.Client, f.Namespace.Name); err != nil {
-		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
+	if testContext.DeleteNamespace {
+		By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
+		if err := deleteNS(f.Client, f.Namespace.Name); err != nil {
+			Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
+		}
+	} else {
+		Logf("Skipping namespace deletion!")
 	}
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
