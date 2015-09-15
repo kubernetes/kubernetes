@@ -130,11 +130,14 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	var err error
 	if masterConfig == nil {
 		etcdClient := NewEtcdClient()
+		storageVersions := make(map[string]string)
 		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, etcdtest.PathPrefix())
+		storageVersions[""] = latest.GroupOrDie("").Version
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
 		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
+		storageVersions["experimental"] = latest.GroupOrDie("experimental").Version
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
@@ -142,6 +145,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig = &master.Config{
 			DatabaseStorage:      etcdStorage,
 			ExpDatabaseStorage:   expEtcdStorage,
+			StorageVersions:      storageVersions,
 			KubeletClient:        client.FakeKubeletClient{},
 			EnableExp:            true,
 			EnableLogsSupport:    false,
@@ -270,11 +274,14 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	etcdClient := NewEtcdClient()
+	storageVersions := make(map[string]string)
 	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	storageVersions[""] = testapi.Default.Version()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
+	storageVersions["experimental"] = testapi.Experimental.Version()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,6 +298,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableExp:          true,
 		Authorizer:         apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:   admit.NewAlwaysAdmit(),
+		StorageVersions:    storageVersions,
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

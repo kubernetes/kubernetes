@@ -100,9 +100,11 @@ const (
 type Config struct {
 	DatabaseStorage    storage.Interface
 	ExpDatabaseStorage storage.Interface
-	EventTTL           time.Duration
-	NodeRegexp         string
-	KubeletClient      client.KubeletClient
+	// StorageVersions is a map between groups and their storage versions
+	StorageVersions map[string]string
+	EventTTL        time.Duration
+	NodeRegexp      string
+	KubeletClient   client.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
 	EnableLogsSupport     bool
@@ -570,15 +572,41 @@ func (m *Master) init(c *Config) {
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
+	// allGroups records all supported groups at /apis
+	allGroups := []api.APIGroup{}
 	if m.exp {
 		expVersion := m.experimental(c)
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		apiserver.AddApiWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", []string{expVersion.Version})
+		g, err := latest.Group("experimental")
+		if err != nil {
+			glog.Fatalf("Unable to setup experimental api: %v", err)
+		}
+		expAPIVersions := []api.GroupVersion{
+			{
+				GroupVersion: g.Group + "/" + expVersion.Version,
+				Version:      expVersion.Version,
+			},
+		}
+		storageVersion, found := c.StorageVersions[g.Group]
+		if !found {
+			glog.Fatalf("Couldn't find storage version of group %v", g.Group)
+		}
+		group := api.APIGroup{
+			Name:             g.Group,
+			Versions:         expAPIVersions,
+			PreferredVersion: api.GroupVersion{GroupVersion: g.Group + "/" + storageVersion, Version: storageVersion},
+		}
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
+		allGroups = append(allGroups, group)
 		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
+
+	// This should be done after all groups are registered
+	// TODO: replace the hardcoded "apis".
+	apiserver.AddApisWebService(m.handlerContainer, "/apis", allGroups)
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
@@ -784,7 +812,15 @@ func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) err
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
 	thirdPartyAPIPrefix := makeThirdPartyPath(group) + "/"
-	apiserver.AddApiWebService(m.handlerContainer, thirdPartyAPIPrefix, []string{rsrc.Versions[0].Name})
+	groupVersion := api.GroupVersion{
+		GroupVersion: group + "/" + rsrc.Versions[0].Name,
+		Version:      rsrc.Versions[0].Name,
+	}
+	apiGroup := api.APIGroup{
+		Name:     group,
+		Versions: []api.GroupVersion{groupVersion},
+	}
+	apiserver.AddGroupWebService(m.handlerContainer, thirdPartyAPIPrefix, apiGroup)
 	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
 	return nil

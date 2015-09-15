@@ -10,6 +10,10 @@
     "description": "get available API versions"
    },
    {
+    "path": "/apis",
+    "description": "get available API versions"
+   },
+   {
     "path": "/version",
     "description": "git code version from which this is built"
    }

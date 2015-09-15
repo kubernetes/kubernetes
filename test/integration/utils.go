@@ -81,6 +81,7 @@ func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

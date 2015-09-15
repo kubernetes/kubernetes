@@ -68,6 +68,7 @@ func TestSecrets(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	framework.DeleteAllEtcdKeys()
