@@ -122,6 +122,7 @@ type TestContextType struct {
 	MinStartupPods        int
 	UpgradeTarget         string
 	PrometheusPushGateway string
+	VerifyServiceAccount  bool
 }
 
 var testContext TestContextType
@@ -481,8 +482,10 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		return nil, err
 	}
 
-	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-		return nil, err
+	if testContext.VerifyServiceAccount {
+		if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
+			return nil, err
+		}
 	}
 	return got, nil
 }
