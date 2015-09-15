@@ -58,11 +58,11 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 
 	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return errors.NewInternalError(err)
 	}
 	mapping, err := api.RESTMapper.RESTMapping(kind, defaultVersion)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return errors.NewInternalError(err)
 	}
 	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 		return nil
@@ -74,7 +74,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		},
 	})
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return errors.NewInternalError(err)
 	}
 
 	// refuse to operate on non-existent namespaces
@@ -82,7 +82,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
 		namespaceObj, err = l.client.Namespaces().Get(a.GetNamespace())
 		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+			return admission.NewNotFound(a)
 		}
 	}
 
@@ -93,6 +93,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 			return nil
 		}
 
+		// TODO: This should probably not be a 403
 		return admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
 	}
 
