@@ -717,8 +717,8 @@ func (k *KubernetesExecutor) FrameworkMessage(driver bindings.ExecutorDriver, me
 
 	log.Infof("Receives message from framework %v\n", message)
 	//TODO(jdef) master reported a lost task, reconcile this! @see scheduler.go:handleTaskLost
-	if strings.HasPrefix(message, "task-lost:") && len(message) > 10 {
-		taskId := message[10:]
+	if strings.HasPrefix(message, messages.TaskLost+":") {
+		taskId := message[len(messages.TaskLost)+1:]
 		if taskId != "" {
 			// clean up pod state
 			k.lock.Lock()

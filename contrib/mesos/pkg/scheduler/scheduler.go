@@ -441,7 +441,7 @@ func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDri
 		//to do anything. The underlying driver transport may be able to send a
 		//FrameworkMessage directly to the slave to terminate the task.
 		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
-		data := fmt.Sprintf("task-lost:%s", task.ID) //TODO(jdef) use a real message type
+		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) //TODO(jdef) use a real message type
 		if _, err := driver.SendFrameworkMessage(taskStatus.ExecutorId, taskStatus.SlaveId, data); err != nil {
 			log.Error(err.Error())
 		}
