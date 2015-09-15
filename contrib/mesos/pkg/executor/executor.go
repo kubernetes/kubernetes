@@ -979,6 +979,7 @@ func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
 		case "cpus":
 			// We intentionally take the floor of executorCPU because cores are integers
 			// and we would loose a complete cpu here if the value is <1.
+			// TODO(sttts): switch to float64 when "Machine Allocables" are implemented
 			ni.Cores = int(r.GetScalar().GetValue() - float64(int(executorCPU)))
 		case "mem":
 			ni.Mem = int64(r.GetScalar().GetValue()-executorMem) * 1024 * 1024

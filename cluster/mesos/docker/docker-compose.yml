@@ -145,6 +145,7 @@ scheduler:
     --mesos-master=mesosmaster1:5050
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
+    --mesos-executor-cpus=1.0
     --v=4
   environment:
   - MESOS_DOCKER_ETCD_TIMEOUT
