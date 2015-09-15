@@ -56,7 +56,7 @@ If you are running the Vagrant based environment, the **salt-api** service is ru
 
 ## Standalone Salt Configuration on GCE
 
-On GCE, the master and nodes are all configured as [standalone minions](http://docs.saltstack.com/en/latest/topics/tutorials/standalone_minion.html). The configuration for each VM is derived from the VM's [instance metadata](https://cloud.google.com/compute/docs/metadata) and then stored in Salt grains (`/etc/salt/minion.d/grains.conf`) and pillars (`/srv/salt-overlay/pillar/cluster-params.sls`) that local Salt uses to enforce state.
+On GCE, the master and nodes are all configured as [standalone nodes](http://docs.saltstack.com/en/latest/topics/tutorials/standalone_minion.html). The configuration for each VM is derived from the VM's [instance metadata](https://cloud.google.com/compute/docs/metadata) and then stored in Salt grains (`/etc/salt/minion.d/grains.conf`) and pillars (`/srv/salt-overlay/pillar/cluster-params.sls`) that local Salt uses to enforce state.
 
 All remaining sections that refer to master/minion setups should be ignored for GCE. One fallout of the GCE setup is that the Salt mine doesn't exist - there is no sharing of configuration amongst nodes.
 
@@ -64,7 +64,7 @@ All remaining sections that refer to master/minion setups should be ignored for 
 
 *(Not applicable on default GCE setup.)*
 
-Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
+Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from nodes.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
 ```console
 [root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
