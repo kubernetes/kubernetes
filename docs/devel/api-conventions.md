@@ -679,7 +679,7 @@ Accumulate repeated events in the client, especially for frequent events, to red
 ## Naming conventions
 
 * Go field names must be CamelCase. JSON field names must be camelCase. Other than capitalization of the initial letter, the two should almost always match. No underscores nor dashes in either.
-* Field and resource names should be declarative, not imperative (DoSomething, SomethingDoer).
+* Field and resource names should be declarative, not imperative (DoSomething, SomethingDoer, DoneBy, DoneAt).
 * `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to the node resource in the context of the cluster. Use `Host` where referring to properties of the individual physical/virtual system, such as `hostname`, `hostPath`, `hostNetwork`, etc.
 * `FooController` is a deprecated kind naming convention. Name the kind after the thing being controlled instead (e.g., `Job` rather than `JobController`).
 * The name of a field that specifies the time at which `something` occurs should be called `somethingTime`. Do not use `stamp` (e.g., `creationTimestamp`).
@@ -690,6 +690,7 @@ Accumulate repeated events in the client, especially for frequent events, to red
 * Do not use abbreviations in the API, except where they are extremely commonly used, such as "id", "args", or "stdin".
 * Acronyms should similarly only be used when extremely commonly known. All letters in the acronym should have the same case, using the appropriate case for the situation. For example, at the beginning of a field name, the acronym should be all lowercase, such as "httpGet". Where used as a constant, all letters should be uppercase, such as "TCP" or "UDP".
 * The name of a field referring to another resource of kind `Foo` by name should be called `fooName`. The name of a field referring to another resource of kind `Foo` by ObjectReference (or subset thereof) should be called `fooRef`.
+* More generally, include the units and/or type in the field name if they could be ambiguous and they are not specified by the value or value type.
 
 ## Label, selector, and annotation conventions
 
