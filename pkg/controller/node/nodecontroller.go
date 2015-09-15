@@ -571,12 +571,15 @@ func (nc *NodeController) evictPods(nodeName string) bool {
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
 // returns true if an eviction was queued.
 func (nc *NodeController) cancelPodEviction(nodeName string) bool {
-	glog.V(2).Infof("Cancelling pod Eviction on Node: %v", nodeName)
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.podEvictor.Remove(nodeName)
 	wasTerminating := nc.terminationEvictor.Remove(nodeName)
-	return wasDeleting || wasTerminating
+	if wasDeleting || wasTerminating {
+		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", nodeName)
+		return true
+	}
+	return false
 }
 
 // deletePods will delete all pods from master running on given node, and return true
