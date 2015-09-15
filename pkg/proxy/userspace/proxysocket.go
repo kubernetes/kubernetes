@@ -92,8 +92,9 @@ func (tcp *tcpProxySocket) ListenPort() int {
 }
 
 // Generic function type for proxying TCP and UDP request
-type proxyMethod func(in, out net.Conn, err error)
+type proxyMethod func(in, out net.Conn)
 
+// Set up the connection and proxy. This is expected to be run as goroutine.
 func connectAndProxy(service proxy.ServicePortName, inConn net.Conn, srcAddr net.Addr, protocol string, proxier *Proxier, proxy proxyMethod) {
 	var outConn net.Conn
 	var endpoint string
@@ -119,7 +120,14 @@ func connectAndProxy(service proxy.ServicePortName, inConn net.Conn, srcAddr net
 	if outConn == nil && err == nil {
 		err = fmt.Errorf("failed to connect to an endpoint.")
 	}
-	proxy(inConn, outConn, err)
+	if err != nil {
+		if protocol == "tcp" {
+			glog.Errorf("Failed to connect to balancer: %v", err)
+			inConn.Close()
+		}
+		return
+	}
+	proxy(inConn, outConn)
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
@@ -151,12 +159,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 }
 
 // proxyTCP proxies data bi-directionally between in and out.
-func proxyTCP(in, out net.Conn, err error) {
-	if err != nil {
-		glog.Errorf("Failed to connect to balancer: %v", err)
-		in.Close()
-		return
-	}
+func proxyTCP(in, out net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	glog.V(4).Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
@@ -252,11 +255,8 @@ func (udp *udpProxySocket) connectBackend(activeClients *clientCache, buffer *[b
 			return nil, err
 =======
 		glog.V(2).Infof("New UDP connection from %s", cliAddr)
-		go connectAndProxy(service, udp, cliAddr, "udp", proxier, func(in, svrConn net.Conn, err error) {
-			if err != nil {
-				return
-			}
-			if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		go connectAndProxy(service, udp, cliAddr, "udp", proxier, func(in, svrConn net.Conn) {
+			if err := svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
 				glog.Errorf("SetDeadline failed: %v", err)
 				return
 			}
