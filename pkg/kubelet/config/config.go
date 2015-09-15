@@ -153,7 +153,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
-	adds, updates, deletes := s.merge(source, change)
+	adds, updates, deletes, newSource := s.merge(source, change)
 
 	// deliver update notifications
 	switch s.mode {
@@ -164,12 +164,12 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		if len(adds.Pods) > 0 {
 			s.updates <- *adds
 		}
-		if len(updates.Pods) > 0 {
+		if len(updates.Pods) > 0 || newSource {
 			s.updates <- *updates
 		}
 
 	case PodConfigNotificationSnapshotAndUpdates:
-		if len(updates.Pods) > 0 {
+		if len(updates.Pods) > 0 || newSource {
 			s.updates <- *updates
 		}
 		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
@@ -177,7 +177,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		}
 
 	case PodConfigNotificationSnapshot:
-		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
+		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 || newSource {
 			s.updates <- kubelet.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubelet.SET, Source: source}
 		}
 
@@ -196,13 +196,14 @@ func recordFirstSeenTime(pod *api.Pod) {
 	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubelet.PodUpdate) {
+func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubelet.PodUpdate, newSource bool) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
 	adds = &kubelet.PodUpdate{Op: kubelet.ADD}
 	updates = &kubelet.PodUpdate{Op: kubelet.UPDATE}
 	deletes = &kubelet.PodUpdate{Op: kubelet.REMOVE}
+	newSource = false
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -255,7 +256,8 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 	case kubelet.SET:
 		glog.V(4).Infof("Setting pods for source %s", source)
-		s.markSourceSet(source)
+
+		newSource = s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
 		pods = make(map[string]*api.Pod)
@@ -295,13 +297,15 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	}
 
 	s.pods[source] = pods
-	return adds, updates, deletes
+	return adds, updates, deletes, newSource
 }
 
-func (s *podStorage) markSourceSet(source string) {
+func (s *podStorage) markSourceSet(source string) bool {
 	s.sourcesSeenLock.Lock()
 	defer s.sourcesSeenLock.Unlock()
+	newSource := !s.sourcesSeen.Has(source)
 	s.sourcesSeen.Insert(source)
+	return newSource
 }
 
 func (s *podStorage) seenSources(sources ...string) bool {

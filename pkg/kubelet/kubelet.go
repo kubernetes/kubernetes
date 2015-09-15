@@ -571,6 +571,9 @@ type Kubelet struct {
 
 	// True if container cpu limits should be enforced via cgroup CFS quota
 	cpuCFSQuota bool
+
+	// True when all sources have checked in
+	sourcesReadyForUse bool
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1596,7 +1599,7 @@ func (kl *Kubelet) removeOrphanedPodStatuses(pods []*api.Pod, mirrorPods []*api.
 }
 
 func (kl *Kubelet) deletePod(uid types.UID) error {
-	if !kl.sourcesReady() {
+	if !kl.sourcesReadyForUse {
 		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
 		// for sources that haven't reported yet.
 		return fmt.Errorf("skipping delete because sources aren't ready yet")
@@ -1628,7 +1631,7 @@ func (kl *Kubelet) deletePod(uid types.UID) error {
 // should not contain any blocking calls. Re-examine the function and decide
 // whether or not we should move it into a separte goroutine.
 func (kl *Kubelet) HandlePodCleanups() error {
-	if !kl.sourcesReady() {
+	if !kl.sourcesReadyForUse {
 		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
 		// for sources that haven't reported yet.
 		glog.V(4).Infof("Skipping cleanup, sources aren't ready yet.")
@@ -1884,7 +1887,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		// housekeepingMinimumPeriod.
 		// TODO (#13418): Investigate whether we can/should spawn a dedicated
 		// goroutine for housekeeping
-		if housekeepingTimestamp.IsZero() || time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
+		if time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
 			glog.V(4).Infof("SyncLoop (housekeeping)")
 			if err := handler.HandlePodCleanups(); err != nil {
 				glog.Errorf("Failed cleaning pods: %v", err)
@@ -1978,6 +1981,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 }
 
 func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
+	defer func(sourcesReadyValue bool) { kl.sourcesReadyForUse = sourcesReadyValue }(kl.sourcesReady())
 	start := time.Now()
 	for _, pod := range pods {
 		kl.podManager.UpdatePod(pod)

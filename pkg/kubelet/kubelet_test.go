@@ -369,6 +369,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 			},
 		},
 	}
+	kubelet.sourcesReadyForUse = true
 	kubelet.podManager.SetPods(pods)
 	kubelet.HandlePodSyncs(pods)
 	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
@@ -2246,7 +2247,9 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 		t.Fatalf("expected to have status cached for pod2")
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
+	kl.sourcesReadyForUse = true
 	kl.podManager.SetPods([]*api.Pod{})
+	kl.sourcesReadyForUse = true
 	kl.HandlePodCleanups()
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
@@ -2775,6 +2778,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 
 	kl.podManager.SetPods(orphanPods)
 	// Sync with an empty pod list to delete all mirror pods.
+	kl.sourcesReadyForUse = true
 	kl.HandlePodCleanups()
 	if manager.NumOfPods() != 0 {
 		t.Errorf("expected zero mirror pods, got %v", manager.GetPods())
@@ -3307,6 +3311,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 		},
 	}
 
+	kl.sourcesReadyForUse = true
 	kl.podManager.SetPods(pods)
 	// Sync to create pod directories.
 	kl.HandlePodSyncs(kl.podManager.GetPods())
@@ -3330,6 +3335,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*api.Pod, podsToCheck []*api.Pod, shouldExist bool) {
 	kl := testKubelet.kubelet
 
+	kl.sourcesReadyForUse = true
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
 	kl.HandlePodCleanups()
