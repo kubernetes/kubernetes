@@ -71,9 +71,6 @@ func init() {
 		&ThirdPartyResourceList{},
 		&ThirdPartyResourceData{},
 	)
-	// Legacy names are supported
-	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
-	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
