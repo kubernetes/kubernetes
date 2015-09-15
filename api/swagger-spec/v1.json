@@ -12490,7 +12490,11 @@
      },
      "hostNetwork": {
       "type": "boolean",
-      "description": "Host networking requested for this pod. Uses the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false."
+      "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false."
+     },
+     "hostPID": {
+      "type": "boolean",
+      "description": "Use the host's pid namespace. Optional: Default to false."
      },
      "imagePullSecrets": {
       "type": "array",

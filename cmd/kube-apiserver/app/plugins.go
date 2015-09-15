@@ -26,7 +26,7 @@ import (
 	// Admission policies
 	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/exec/denyprivileged"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"

@@ -103,6 +103,7 @@ healthz-port
 horizontal-pod-autoscaler-sync-period
 hostname-override
 host-network-sources
+host-pid-sources
 http-check-frequency
 http-port
 ignore-not-found
