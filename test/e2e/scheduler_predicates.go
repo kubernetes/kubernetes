@@ -25,7 +25,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -135,45 +134,19 @@ func cleanupPods(c *client.Client, ns string) {
 }
 
 var _ = Describe("SchedulerPredicates", func() {
+	framework := Framework{BaseName: "sched-pred"}
 	var c *client.Client
 	var nodeList *api.NodeList
-	var nodeCount int
 	var totalPodCapacity int64
-	var RCName string
 	var ns string
-	var uuid string
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		nodeList, err = c.Nodes().List(labels.Everything(), fields.Everything())
-		expectNoError(err)
-		nodeCount = len(nodeList.Items)
-		Expect(nodeCount).NotTo(BeZero())
-
-		err = deleteTestingNS(c)
-		expectNoError(err)
-
-		nsForTesting, err := createTestingNS("sched-pred", c)
-		ns = nsForTesting.Name
-		expectNoError(err)
-		uuid = string(util.NewUUID())
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		rc, err := c.ReplicationControllers(ns).Get(RCName)
-		if err == nil && rc.Spec.Replicas != 0 {
-			By("Cleaning up the replication controller")
-			err := DeleteRC(c, ns, RCName)
-			expectNoError(err)
-		}
-
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
 	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check

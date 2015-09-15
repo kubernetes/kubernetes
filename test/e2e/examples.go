@@ -49,24 +49,17 @@ except:
 	print 'err'`
 
 var _ = Describe("Examples e2e", func() {
+	framework := Framework{BaseName: "examples"}
 	var c *client.Client
 	var ns string
-	var testingNs *api.Namespace
+
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		testingNs, err = createTestingNS("examples", c)
-		ns = testingNs.Name
-		Expect(err).NotTo(HaveOccurred())
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	Describe("[Skipped][Example]Redis", func() {
 		It("should create and stop redis servers", func() {

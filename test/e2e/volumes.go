@@ -33,9 +33,10 @@ package e2e
 
 import (
 	"fmt"
+	"time"
+
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -217,28 +218,23 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 }
 
 var _ = Describe("Volumes", func() {
-	clean := true // If 'false', the test won't clear its namespace (and pods and services) upon completion. Useful for debugging.
+	clean := true /* if 'false', the test won't delete its pods
+	   /* and services upon completion. Useful for
+	   /* debugging. Note however that the Framework
+	   /* will delete your namespace unless run with
+	   /* --delete-namespace=false */
 
-	// filled in BeforeEach
+	framework := Framework{BaseName: "volumes"}
 	var c *client.Client
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		By("Building a namespace api object")
-		namespace, err = createTestingNS("volume", c)
-		Expect(err).NotTo(HaveOccurred())
+		framework.beforeEach()
+		c = framework.Client
+		namespace = framework.Namespace
 	})
 
-	AfterEach(func() {
-		if clean {
-			if err := deleteNS(c, namespace.Name); err != nil {
-				Failf("Couldn't delete ns %s", err)
-			}
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	////////////////////////////////////////////////////////////////////////
 	// NFS
