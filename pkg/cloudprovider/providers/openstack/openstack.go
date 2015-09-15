@@ -677,26 +677,20 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 	status := &api.LoadBalancerStatus{}
 
-	if lb.opts.FloatingNetworkId == "" {
-		status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
+	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
 
-		return status, nil
-	}
+	if lb.opts.FloatingNetworkId != "" {
+		floatIPOpts := floatingips.CreateOpts{
+			FloatingNetworkID: lb.opts.FloatingNetworkId,
+			PortID:            vip.PortID,
+		}
+		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
+		if err != nil {
+			return nil, err
+		}
 
-	vipAddr, err := getVipByName(lb.network, name)
-	if err != nil {
-		return nil, err
+		status.Ingress = append(status.Ingress, api.LoadBalancerIngress{IP: floatIP.FloatingIP})
 	}
-	floatIPOpts := floatingips.CreateOpts{
-		FloatingNetworkID: lb.opts.FloatingNetworkId,
-		PortID:            vipAddr.PortID,
-	}
-	floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
-	if err != nil {
-		return nil, err
-	}
-
-	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}, {IP: floatIP.FloatingIP}}
 
 	return status, nil
 
@@ -777,9 +771,9 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error 
 			return err
 		}
 		if floatingIP != nil {
-			error := floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
-			if error != nil && !isNotFound(error) {
-				return error
+			err = floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
+			if err != nil && !isNotFound(err) {
+				return err
 			}
 		}
 	}
