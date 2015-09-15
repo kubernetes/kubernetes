@@ -168,6 +168,7 @@ type ThirdPartyResourceList struct {
 }
 
 // An APIVersion represents a single concrete version of an object model.
+// TODO: we should consider merge this struct with GroupVersion in unversioned.go
 type APIVersion struct {
 	// Name of this version (e.g. 'v1').
 	Name string `json:"name,omitempty"`
