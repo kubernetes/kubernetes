@@ -133,10 +133,10 @@ KUBE_MASTER="--master=http://kube-master:8080"
 # The address on the local server to listen to.
 KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
 
-KUBE_ETCD_SERVERS="--etcd_servers=http://kube-master:4001"
+KUBE_ETCD_SERVERS="--etcd-servers=http://kube-master:4001"
 
 # Remove ServiceAccount from this line to run without API Tokens
-KUBE_ADMISSION_CONTROL="--admission_control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ResourceQuota"
+KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ResourceQuota"
 ```
 
 * Create /var/run/kubernetes on master:
@@ -313,10 +313,10 @@ KUBE_MASTER="--master=http://kube-master:8080"
 KUBELET_ADDRESS="--address=0.0.0.0"
 
 # You may leave this blank to use the actual hostname
-# KUBELET_HOSTNAME="--hostname_override=127.0.0.1"
+# KUBELET_HOSTNAME="--hostname-override=127.0.0.1"
 
 # location of the api-server
-KUBELET_API_SERVER="--api_servers=http://kube-master:8080"
+KUBELET_API_SERVER="--api-servers=http://kube-master:8080"
 
 # Add your own!
 KUBELET_ARGS="--network-plugin=calico"
