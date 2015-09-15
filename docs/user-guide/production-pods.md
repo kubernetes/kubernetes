@@ -272,9 +272,14 @@ spec:
             cpu: 500m
             # memory units are bytes
             memory: 64Mi
+		  requests:
+			# cpu units are cores
+		    cpu: 500m
+			# memory units are bytes
+			memory: 64Mi
 ```
 
-The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability.
+The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability. By specifying request, pod is guaranteed to be able to use that much of resource when needed. See [Resource QoS](../proposals/resource-qos.md) for the difference between resource limits and requests.
 
 If you’re not sure how much resources to request, you can first launch the application without specifying resources, and use [resource usage monitoring](monitoring.md) to determine appropriate values.
 
