@@ -154,7 +154,7 @@ function create-provision-scripts {
     echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
     echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
     echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
-    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
@@ -179,7 +179,7 @@ function create-provision-scripts {
       echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
       echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
       echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done

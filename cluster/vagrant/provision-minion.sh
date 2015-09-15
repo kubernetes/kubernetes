@@ -107,7 +107,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 done
 
 # Configure network
-provision-network
+provision-network-minion
 
 # Placeholder for any other manifests that may be per-node.
 mkdir -p /etc/kubernetes/manifests
