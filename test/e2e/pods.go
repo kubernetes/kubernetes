@@ -660,7 +660,7 @@ var _ = Describe("Pods", func() {
 				pod.Status.Host, pod.Name, pod.Spec.Containers[0].Name))
 			req := framework.Client.Get().
 				Prefix("proxy").
-				Resource("minions").
+				Resource("nodes").
 				Name(pod.Status.Host).
 				Suffix("exec", framework.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 
@@ -734,7 +734,7 @@ var _ = Describe("Pods", func() {
 
 			req := framework.Client.Get().
 				Prefix("proxy").
-				Resource("minions").
+				Resource("nodes").
 				Name(pod.Status.Host).
 				Suffix("portForward", framework.Namespace.Name, pod.Name)
 

@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// FakeNodes implements MinionInterface. Meant to be embedded into a struct to get a default
+// FakeNodes implements NodeInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeNodes struct {
 	Fake *Fake
@@ -47,8 +47,8 @@ func (c *FakeNodes) List(label labels.Selector, field fields.Selector) (*api.Nod
 	return obj.(*api.NodeList), err
 }
 
-func (c *FakeNodes) Create(minion *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(NewRootCreateAction("nodes", minion), minion)
+func (c *FakeNodes) Create(node *api.Node) (*api.Node, error) {
+	obj, err := c.Fake.Invokes(NewRootCreateAction("nodes", node), node)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,8 +56,8 @@ func (c *FakeNodes) Create(minion *api.Node) (*api.Node, error) {
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(NewRootUpdateAction("nodes", minion), minion)
+func (c *FakeNodes) Update(node *api.Node) (*api.Node, error) {
+	obj, err := c.Fake.Invokes(NewRootUpdateAction("nodes", node), node)
 	if obj == nil {
 		return nil, err
 	}
@@ -74,14 +74,14 @@ func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resource
 	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", label, field, resourceVersion))
 }
 
-func (c *FakeNodes) UpdateStatus(minion *api.Node) (*api.Node, error) {
+func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 	action := CreateActionImpl{}
 	action.Verb = "update"
 	action.Resource = "nodes"
 	action.Subresource = "status"
-	action.Object = minion
+	action.Object = node
 
-	obj, err := c.Fake.Invokes(action, minion)
+	obj, err := c.Fake.Invokes(action, node)
 	if obj == nil {
 		return nil, err
 	}
