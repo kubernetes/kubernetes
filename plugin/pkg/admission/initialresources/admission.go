@@ -36,9 +36,10 @@ var (
 )
 
 const (
-	samplesThreshold = 60
-	week             = 7 * 24 * time.Hour
-	month            = 30 * 24 * time.Hour
+	initialResourcesAnnotation = "kubernetes.io/initial-resources"
+	samplesThreshold           = 60
+	week                       = 7 * 24 * time.Hour
+	month                      = 30 * 24 * time.Hour
 )
 
 // WARNING: this feature is experimental and will definitely change.
@@ -81,6 +82,7 @@ func (ir initialResources) Admit(a admission.Attributes) (err error) {
 // The method veryfies whether resources should be set for the given pod and
 // if there is estimation available the method fills Request field.
 func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
+	annotations := []string{}
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		req := c.Resources.Requests
@@ -109,16 +111,29 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 			c.Resources.Requests = api.ResourceList{}
 			req = c.Resources.Requests
 		}
+		setRes := []string{}
 		if cpu != nil {
 			glog.Infof("CPU estimation for container %v in pod %v/%v is %v", c.Name, pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, cpu.String())
+			setRes = append(setRes, string(api.ResourceCPU))
 			req[api.ResourceCPU] = *cpu
 		}
 		if mem != nil {
 			glog.Infof("Memory estimation for container %v in pod  %v/%v is %v", c.Name, pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, mem.String())
+			setRes = append(setRes, string(api.ResourceMemory))
 			req[api.ResourceMemory] = *mem
 		}
+		if len(setRes) > 0 {
+			a := strings.Join(setRes, ", ") + " request for container " + c.Name
+			annotations = append(annotations, a)
+		}
 	}
-	// TODO(piosz): verify the estimates fits in LimitRanger
+	if len(annotations) > 0 {
+		if pod.ObjectMeta.Annotations == nil {
+			pod.ObjectMeta.Annotations = make(map[string]string)
+		}
+		val := "Initial Resources plugin set: " + strings.Join(annotations, "; ")
+		pod.ObjectMeta.Annotations[initialResourcesAnnotation] = val
+	}
 }
 
 func (ir initialResources) getEstimation(kind api.ResourceName, c *api.Container) (*resource.Quantity, error) {
