@@ -49,7 +49,7 @@ except:
 	print 'err'`
 
 var _ = Describe("Examples e2e", func() {
-	framework := Framework{BaseName: "docker-containers"}
+	framework := Framework{BaseName: "examples"}
 	var c *client.Client
 	var ns string
 

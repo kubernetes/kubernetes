@@ -65,24 +65,16 @@ var (
 
 var _ = Describe("Kubectl client", func() {
 	defer GinkgoRecover()
+	framework := Framework{BaseName: "kubectl"}
 	var c *client.Client
 	var ns string
-	var testingNs *api.Namespace
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		testingNs, err = createTestingNS("kubectl", c)
-		Expect(err).NotTo(HaveOccurred())
-		ns = testingNs.Name
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	Describe("Update Demo", func() {
 		var updateDemoRoot, nautilusPath, kittenPath string
