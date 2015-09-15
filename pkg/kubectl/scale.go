@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -52,6 +53,7 @@ type ControllerScaleErrorType int
 const (
 	ControllerScaleGetFailure ControllerScaleErrorType = iota
 	ControllerScaleUpdateFailure
+	ControllerScaleUpdateInvalidFailure
 )
 
 // A ControllerScaleError is returned when a scale request passes
@@ -118,6 +120,10 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		case nil:
 			return true, nil
 		case ControllerScaleError:
+			// if it's invalid we shouldn't keep waiting
+			if e.FailureType == ControllerScaleUpdateInvalidFailure {
+				return false, err
+			}
 			if e.FailureType == ControllerScaleUpdateFailure {
 				return false, nil
 			}
@@ -139,6 +145,9 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 	controller.Spec.Replicas = int(newSize)
 	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.UpdateReplicationController(namespace, controller); err != nil {
+		if errors.IsInvalid(err) {
+			return "", ControllerScaleError{ControllerScaleUpdateInvalidFailure, controller.ResourceVersion, err}
+		}
 		return "", ControllerScaleError{ControllerScaleUpdateFailure, controller.ResourceVersion, err}
 	}
 	// TODO: do a better job of printing objects here.
