@@ -22,27 +22,20 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Docker Containers", func() {
+	framework := Framework{BaseName: "docker-containers"}
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("containers", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	It("should use the image defaults if command and args are blank", func() {
 		testContainerOutputInNamespace("use defaults", c, entrypointTestPod(), 0, []string{
