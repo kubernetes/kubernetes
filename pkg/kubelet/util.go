@@ -50,6 +50,16 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
+	if pod.Spec.HostPID {
+		allowed, err := allowHostPID(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host PID, but is disallowed", pod.UID)
+		}
+	}
+
 	if !capabilities.Get().AllowPrivileged {
 		for _, container := range pod.Spec.Containers {
 			if securitycontext.HasPrivilegedRequest(&container) {
@@ -67,6 +77,20 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 		return false, err
 	}
 	for _, source := range capabilities.Get().PrivilegedSources.HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Determined whether the specified pod is allowed to use host networking
+func allowHostPID(pod *api.Pod) (bool, error) {
+	podSource, err := getPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostPIDSources {
 		if source == podSource {
 			return true, nil
 		}

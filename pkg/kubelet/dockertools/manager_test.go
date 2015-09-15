@@ -2335,3 +2335,20 @@ func TestGetUidFromUser(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPidMode(t *testing.T) {
+	// test false
+	pod := &api.Pod{}
+	pidMode := getPidMode(pod)
+
+	if pidMode != "" {
+		t.Errorf("expected empty pid mode for pod but got %v", pidMode)
+	}
+
+	// test true
+	pod.Spec.HostPID = true
+	pidMode = getPidMode(pod)
+	if pidMode != "host" {
+		t.Errorf("expected host pid mode for pod but got %v", pidMode)
+	}
+}

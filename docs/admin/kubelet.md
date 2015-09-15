@@ -84,6 +84,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --healthz-port=0: The port of the localhost healthz endpoint
   -h, --help=false: help for kubelet
       --host-network-sources="": Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use "*" [default="file"]
+      --host-pid-sources="": Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. For all sources use "*" [default="file"]
       --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
       --http-check-frequency=0: Duration between checking http for new data
       --image-gc-high-threshold=0: The percent of disk usage after which image garbage collection is always run. Default: 90%%
