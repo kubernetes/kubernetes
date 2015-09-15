@@ -680,6 +680,13 @@ __EOF__
   kubectl delete pod valid-pod "${kube_flags[@]}"
   kubectl delete service frontend{,-2,-3,-4,-5} "${kube_flags[@]}"
 
+  ### Expose negative invalid resource test
+  # Pre-condition: don't need
+  # Command
+  output_message=$(! kubectl expose nodes 127.0.0.1 2>&1 "${kube_flags[@]}")
+  # Post-condition: the error message has "invalid resource" string
+  kube::test::if_has_string "${output_message}" 'invalid resource'
+
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'

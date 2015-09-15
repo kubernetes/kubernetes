@@ -227,15 +227,19 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
+		CanBeExposed: func(kind string) error {
+			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
+		},
 		Generator: func(name string) (kubectl.Generator, bool) {
 			generator, ok := generators[name]
 			return generator, ok
 		},
 	}
-
 	rf := cmdutil.NewFactory(nil)
 	f.PodSelectorForObject = rf.PodSelectorForObject
-
 	return f, t, testapi.Default.Codec()
 }
 
