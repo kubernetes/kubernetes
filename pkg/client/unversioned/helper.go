@@ -508,7 +508,7 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 	return hostURL, nil
 }
 
-// IsConfigTransportTLS returns true iff the provided config will result in a protected
+// IsConfigTransportTLS returns true if and only if the provided config will result in a protected
 // connection to the server when it is passed to client.New() or client.RESTClientFor().
 // Use to determine when to send credentials over the wire.
 //

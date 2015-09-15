@@ -29,27 +29,27 @@ import (
 	"github.com/golang/glog"
 )
 
-// IsEtcdNotFound returns true iff err is an etcd not found error.
+// IsEtcdNotFound returns true if and only if err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
 	return isEtcdErrorNum(err, tools.EtcdErrorCodeNotFound)
 }
 
-// IsEtcdNodeExist returns true iff err is an etcd node already exist error.
+// IsEtcdNodeExist returns true if and only if err is an etcd node already exist error.
 func IsEtcdNodeExist(err error) bool {
 	return isEtcdErrorNum(err, tools.EtcdErrorCodeNodeExist)
 }
 
-// IsEtcdTestFailed returns true iff err is an etcd write conflict.
+// IsEtcdTestFailed returns true if and only if err is an etcd write conflict.
 func IsEtcdTestFailed(err error) bool {
 	return isEtcdErrorNum(err, tools.EtcdErrorCodeTestFailed)
 }
 
-// IsEtcdWatchStoppedByUser returns true iff err is a client triggered stop.
+// IsEtcdWatchStoppedByUser returns true if and only if err is a client triggered stop.
 func IsEtcdWatchStoppedByUser(err error) bool {
 	return goetcd.ErrWatchStoppedByUser == err
 }
 
-// isEtcdErrorNum returns true iff err is an etcd error, whose errorCode matches errorCode
+// isEtcdErrorNum returns true if and only if err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
 	etcdError, ok := err.(*goetcd.EtcdError)
 	return ok && etcdError != nil && etcdError.ErrorCode == errorCode
