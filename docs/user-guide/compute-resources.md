@@ -74,7 +74,7 @@ configured.
 
 Although limits can only be specified on individual containers, it is convenient to talk about pod
 resource limits.  A *pod resource limit* for a particular resource type is the sum of the resource
-limits of that type for each container in the pod, with unset values treated as zero.
+requests of that type for each container in the pod, with unset values treated as zero.
 
 The following pod has two containers.  Each has a limit of 0.5 core of cpu and 128MiB
 (2<sup>20</sup> bytes) of memory.  The pod can be said to have a limit of 1 core and 256MiB of
