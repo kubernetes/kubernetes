@@ -122,11 +122,11 @@ func PredicateTwo(pod *api.Pod, existingPods []*api.Pod, node string) (bool, err
 	return true, nil
 }
 
-func PriorityOne(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PriorityOne(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	return []algorithm.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	return []algorithm.HostPriority{}, nil
 }
 
@@ -179,7 +179,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 }
 
-func TestMinionEnumerator(t *testing.T) {
+func TestNodeEnumerator(t *testing.T) {
 	testList := &api.NodeList{
 		Items: []api.Node{
 			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
