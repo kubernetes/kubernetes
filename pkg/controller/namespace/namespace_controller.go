@@ -196,7 +196,7 @@ func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namesp
 		if err != nil {
 			return estimate, err
 		}
-		err = deleteDaemons(kubeClient.Experimental(), namespace)
+		err = deleteDaemonSets(kubeClient.Experimental(), namespace)
 		if err != nil {
 			return estimate, err
 		}
@@ -419,7 +419,7 @@ func deleteHorizontalPodAutoscalers(expClient client.ExperimentalInterface, ns s
 	return nil
 }
 
-func deleteDaemons(expClient client.ExperimentalInterface, ns string) error {
+func deleteDaemonSets(expClient client.ExperimentalInterface, ns string) error {
 	items, err := expClient.DaemonSets(ns).List(labels.Everything())
 	if err != nil {
 		return err
