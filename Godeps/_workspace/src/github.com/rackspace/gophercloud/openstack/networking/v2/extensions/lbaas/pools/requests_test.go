@@ -296,6 +296,7 @@ func TestAssociateHealthMonitor(t *testing.T) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `{}`)
 	})
 
 	_, err := AssociateMonitor(fake.ServiceClient(), "332abe93-f488-41ba-870b-2ac66be7f853", "b624decf-d5d3-4c66-9a3d-f047e7786181").Extract()

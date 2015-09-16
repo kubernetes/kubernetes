@@ -22,6 +22,8 @@ func TestCreateOpts(t *testing.T) {
 			"name": "createdserver",
 			"imageRef": "image-id",
 			"flavorRef": "flavor-id",
+			"flavorName": "",
+			"imageName": "",
 			"key_name": "mykey",
 			"OS-DCF:diskConfig": "MANUAL"
 		}

@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rackspace/gophercloud"
@@ -22,7 +23,7 @@ func tokenPostErr(t *testing.T, options gophercloud.AuthOptions, expectedErr err
 	HandleTokenPost(t, "")
 
 	actualErr := Create(client.ServiceClient(), AuthOptions{options}).Err
-	th.CheckEquals(t, expectedErr, actualErr)
+	th.CheckDeepEquals(t, expectedErr, actualErr)
 }
 
 func TestCreateWithPassword(t *testing.T) {
@@ -128,7 +129,7 @@ func TestRequireUsername(t *testing.T) {
 		Password: "thing",
 	}
 
-	tokenPostErr(t, options, ErrUsernameRequired)
+	tokenPostErr(t, options, fmt.Errorf("You must provide either username/password or tenantID/token values."))
 }
 
 func TestRequirePassword(t *testing.T) {

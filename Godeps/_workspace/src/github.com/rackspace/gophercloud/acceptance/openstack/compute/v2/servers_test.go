@@ -107,6 +107,12 @@ func createServer(t *testing.T, client *gophercloud.ServiceClient, choices *Comp
 			servers.Network{UUID: network.ID},
 		},
 		AdminPass: pwd,
+		Personality: servers.Personality{
+			&servers.File{
+				Path:     "/etc/test",
+				Contents: []byte("hello world"),
+			},
+		},
 	}).Extract()
 	if err != nil {
 		t.Fatalf("Unable to create server: %v", err)

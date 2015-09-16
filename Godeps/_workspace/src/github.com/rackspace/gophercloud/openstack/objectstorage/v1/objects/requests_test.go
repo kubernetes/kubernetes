@@ -2,7 +2,10 @@ package objects
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/rackspace/gophercloud/pagination"
@@ -83,22 +86,42 @@ func TestListObjectNames(t *testing.T) {
 func TestCreateObject(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	HandleCreateTextObjectSuccessfully(t)
 
-	content := bytes.NewBufferString("Did gyre and gimble in the wabe")
+	content := "Did gyre and gimble in the wabe"
+
+	HandleCreateTextObjectSuccessfully(t, content)
+
 	options := &CreateOpts{ContentType: "text/plain"}
-	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, options)
+	res := Create(fake.ServiceClient(), "testContainer", "testObject", strings.NewReader(content), options)
 	th.AssertNoErr(t, res.Err)
 }
 
 func TestCreateObjectWithoutContentType(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	HandleCreateTypelessObjectSuccessfully(t)
 
-	content := bytes.NewBufferString("The sky was the color of television, tuned to a dead channel.")
-	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, &CreateOpts{})
+	content := "The sky was the color of television, tuned to a dead channel."
+
+	HandleCreateTypelessObjectSuccessfully(t, content)
+
+	res := Create(fake.ServiceClient(), "testContainer", "testObject", strings.NewReader(content), &CreateOpts{})
 	th.AssertNoErr(t, res.Err)
+}
+
+func TestErrorIsRaisedForChecksumMismatch(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	th.Mux.HandleFunc("/testContainer/testObject", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", "acbd18db4cc2f85cedef654fccc4a4d8")
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	content := strings.NewReader("The sky was the color of television, tuned to a dead channel.")
+	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, &CreateOpts{})
+
+	err := fmt.Errorf("Local checksum does not match API ETag header")
+	th.AssertDeepEquals(t, err, res.Err)
 }
 
 func TestCopyObject(t *testing.T) {

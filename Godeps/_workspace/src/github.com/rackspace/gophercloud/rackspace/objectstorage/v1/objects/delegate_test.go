@@ -1,7 +1,7 @@
 package objects
 
 import (
-	"bytes"
+	"strings"
 	"testing"
 
 	os "github.com/rackspace/gophercloud/openstack/objectstorage/v1/objects"
@@ -66,21 +66,23 @@ func TestListObjectNames(t *testing.T) {
 func TestCreateObject(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	os.HandleCreateTextObjectSuccessfully(t)
+	
+        content := "Did gyre and gimble in the wabe"
+        os.HandleCreateTextObjectSuccessfully(t, content)
 
-	content := bytes.NewBufferString("Did gyre and gimble in the wabe")
 	options := &os.CreateOpts{ContentType: "text/plain"}
-	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, options)
+	res := Create(fake.ServiceClient(), "testContainer", "testObject", strings.NewReader(content), options)
 	th.AssertNoErr(t, res.Err)
 }
 
 func TestCreateObjectWithoutContentType(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	os.HandleCreateTypelessObjectSuccessfully(t)
 
-	content := bytes.NewBufferString("The sky was the color of television, tuned to a dead channel.")
-	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, &os.CreateOpts{})
+        content := "The sky was the color of television, tuned to a dead channel."
+	os.HandleCreateTypelessObjectSuccessfully(t, content)
+
+	res := Create(fake.ServiceClient(), "testContainer", "testObject", strings.NewReader(content), &os.CreateOpts{})
 	th.AssertNoErr(t, res.Err)
 }
 

@@ -174,8 +174,10 @@ func (p Pager) AllPages() (Page, error) {
 		if err != nil {
 			return nil, err
 		}
-		// Remove the trailing comma.
-		pagesSlice = pagesSlice[:len(pagesSlice)-1]
+		if len(pagesSlice) > 0 {
+			// Remove the trailing comma.
+			pagesSlice = pagesSlice[:len(pagesSlice)-1]
+		}
 		var b []byte
 		// Combine the slice of slices in to a single slice.
 		for _, slice := range pagesSlice {
