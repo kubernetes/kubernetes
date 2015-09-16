@@ -584,13 +584,24 @@ func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[docker.
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
 			protocol = "/tcp"
 		}
+
 		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
 		exposedPorts[dockerPort] = struct{}{}
-		portBindings[dockerPort] = []docker.PortBinding{
-			{
-				HostPort: strconv.Itoa(exteriorPort),
-				HostIP:   port.HostIP,
-			},
+
+		hostBinding := docker.PortBinding{
+			HostPort: strconv.Itoa(exteriorPort),
+			HostIP:   port.HostIP,
+		}
+
+		// Allow multiple host ports bind to same docker port
+		if existedBindings, ok := portBindings[dockerPort]; ok {
+			// If a docker port already map to a host port, just append the host ports
+			portBindings[dockerPort] = append(existedBindings, hostBinding)
+		} else {
+			// Otherwise, it's fresh new port binding
+			portBindings[dockerPort] = []docker.PortBinding{
+				hostBinding,
+			}
 		}
 	}
 	return exposedPorts, portBindings
