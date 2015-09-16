@@ -25,31 +25,63 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// stat a path, if not exists, retry maxRetries times
-func waitForPathToExist(devicePath string, maxRetries int) bool {
-	for i := 0; i < maxRetries; i++ {
-		_, err := os.Stat(devicePath)
-		if err == nil {
-			return true
+// search /sys/bus for rbd device that matches given pool and image
+func getDevFromImageAndPool(pool, image string) (string, bool) {
+	// /sys/bus/rbd/devices/X/name and /sys/bus/rbd/devices/X/pool
+	sys_path := "/sys/bus/rbd/devices"
+	if dirs, err := ioutil.ReadDir(sys_path); err == nil {
+		for _, f := range dirs {
+			// pool and name format:
+			// see rbd_pool_show() and rbd_name_show() at
+			// https://github.com/torvalds/linux/blob/master/drivers/block/rbd.c
+			name := f.Name()
+			// first match pool, then match name
+			po := path.Join(sys_path, name, "pool")
+			img := path.Join(sys_path, name, "name")
+			exe := exec.New()
+			out, err := exe.Command("cat", po, img).CombinedOutput()
+			if err != nil {
+				continue
+			}
+			matched, err := regexp.MatchString("^"+pool+"\n"+image+"\n$", string(out))
+			if err != nil || !matched {
+				continue
+			}
+			// found a match, check if device exists
+			devicePath := "/dev/rbd" + name
+			if _, err := os.Lstat(devicePath); err == nil {
+				return devicePath, true
+			}
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return false
+	}
+	return "", false
+}
+
+// stat a path, if not exists, retry maxRetries times
+func waitForPath(pool, image string, maxRetries int) (string, bool) {
+	for i := 0; i < maxRetries; i++ {
+		devicePath, found := getDevFromImageAndPool(pool, image)
+		if found {
+			return devicePath, true
 		}
 		time.Sleep(time.Second)
 	}
-	return false
+	return "", false
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/rbd/pool-image-image
@@ -178,9 +210,9 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
-	devicePath := strings.Join([]string{"/dev/rbd", b.Pool, b.Image}, "/")
-	exist := waitForPathToExist(devicePath, 1)
-	if !exist {
+
+	devicePath, found := waitForPath(b.Pool, b.Image, 1)
+	if !found {
 		// modprobe
 		_, err = b.plugin.execCommand("modprobe", []string{"rbd"})
 		if err != nil {
@@ -209,8 +241,8 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	if err != nil {
 		return err
 	}
-	exist = waitForPathToExist(devicePath, 10)
-	if !exist {
+	devicePath, found = waitForPath(b.Pool, b.Image, 10)
+	if !found {
 		return errors.New("Could not map image: Timeout after 10s")
 	}
 	// mount it
@@ -230,6 +262,8 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 
 	// fence off other mappers
 	if err := util.fencing(b); err != nil {
+		// rbd unmap before exit
+		b.plugin.execCommand("rbd", []string{"unmap", devicePath})
 		return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
 	}
 	// rbd lock remove needs ceph and image config
