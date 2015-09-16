@@ -109,6 +109,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
+	kubelet.daemonEndpoints = &api.NodeDaemonEndpoints{}
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
 	podManager, fakeMirrorClient := newFakePodManager()

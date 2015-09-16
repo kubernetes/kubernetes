@@ -1366,23 +1366,35 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty"`
 }
 
+// DaemonEndpoint contains information about a single Daemon endpoint.
+type DaemonEndpoint struct {
+	// Port number of the given endpoint.
+	Port int `json:port`
+}
+
+// NodeDaemonEndpoints lists ports opened by daemons running on the Node.
+type NodeDaemonEndpoints struct {
+	// Endpoint on which Kubelet is listening.
+	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty"`
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
-	// MachineID is the machine-id reported by the node
+	// Machine ID reported by the node.
 	MachineID string `json:"machineID"`
-	// SystemUUID is the system-uuid reported by the node
+	// System UUID reported by the node.
 	SystemUUID string `json:"systemUUID"`
-	// BootID is the boot-id reported by the node
+	// Boot ID reported by the node.
 	BootID string `json:"bootID"`
-	// Kernel version reported by the node
+	// Kernel Version reported by the node.
 	KernelVersion string `json:"kernelVersion"`
-	// OS image used reported by the node
+	// OS Image reported by the node.
 	OsImage string `json:"osImage"`
-	// Container runtime version reported by the node
+	// ContainerRuntime Version reported by the node.
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
-	// Kubelet version reported by the node
+	// Kubelet Version reported by the node.
 	KubeletVersion string `json:"kubeletVersion"`
-	// Kube-proxy version reported by the node
+	// KubeProxy Version reported by the node.
 	KubeProxyVersion string `json:"kubeProxyVersion"`
 }
 
@@ -1396,7 +1408,9 @@ type NodeStatus struct {
 	Conditions []NodeCondition `json:"conditions,omitempty"`
 	// Queried from cloud provider, if available.
 	Addresses []NodeAddress `json:"addresses,omitempty"`
-	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
+	// Endpoints of daemons running on the Node.
+	DaemonEndpoints NodeDaemonEndpoints `json:"daemonEndpoints,omitempty"`
+	// Set of ids/uuids to uniquely identify the node.
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }
 

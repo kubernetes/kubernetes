@@ -11770,9 +11770,13 @@
       },
       "description": "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses"
      },
+     "daemonEndpoints": {
+      "$ref": "v1.NodeDaemonEndpoints",
+      "description": "Endpoints of daemons running on the Node."
+     },
      "nodeInfo": {
       "$ref": "v1.NodeSystemInfo",
-      "description": "NodeSystemInfo is a set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info"
+      "description": "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info"
      }
     }
    },
@@ -11828,6 +11832,30 @@
      }
     }
    },
+   "v1.NodeDaemonEndpoints": {
+    "id": "v1.NodeDaemonEndpoints",
+    "description": "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
+    "properties": {
+     "kubeletEndpoint": {
+      "$ref": "v1.DaemonEndpoint",
+      "description": "Endpoint on which Kubelet is listening."
+     }
+    }
+   },
+   "v1.DaemonEndpoint": {
+    "id": "v1.DaemonEndpoint",
+    "description": "DaemonEndpoint contains information about a single Daemon endpoint.",
+    "required": [
+     "Port"
+    ],
+    "properties": {
+     "Port": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Port number of the given endpoint."
+     }
+    }
+   },
    "v1.NodeSystemInfo": {
     "id": "v1.NodeSystemInfo",
     "description": "NodeSystemInfo is a set of ids/uuids to uniquely identify the node.",
@@ -11844,35 +11872,35 @@
     "properties": {
      "machineID": {
       "type": "string",
-      "description": "MachineID is the machine-id reported by the node."
+      "description": "Machine ID reported by the node."
      },
      "systemUUID": {
       "type": "string",
-      "description": "SystemUUID is the system-uuid reported by the node."
+      "description": "System UUID reported by the node."
      },
      "bootID": {
       "type": "string",
-      "description": "BootID is the boot-id reported by the node."
+      "description": "Boot ID reported by the node."
      },
      "kernelVersion": {
       "type": "string",
-      "description": "Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)"
+      "description": "Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)."
      },
      "osImage": {
       "type": "string",
-      "description": "OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"
+      "description": "OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))."
      },
      "containerRuntimeVersion": {
       "type": "string",
-      "description": "Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)"
+      "description": "ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0)."
      },
      "kubeletVersion": {
       "type": "string",
-      "description": "Kubelet version reported by the node."
+      "description": "Kubelet Version reported by the node."
      },
      "kubeProxyVersion": {
       "type": "string",
-      "description": "Kube-proxy version reported by the node."
+      "description": "KubeProxy Version reported by the node."
      }
     }
    },
