@@ -249,7 +249,8 @@ func (s *StoreToDaemonSetLister) List() (dss []experimental.DaemonSet, err error
 	return dss, nil
 }
 
-// GetPodDaemonSets returns a list of daemon sets managing a pod. Returns an error iff no matching daemon sets are found.
+// GetPodDaemonSets returns a list of daemon sets managing a pod.
+// Returns an error if and only if no matching daemon sets are found.
 func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []experimental.DaemonSet, err error) {
 	var selector labels.Selector
 	var daemonSet experimental.DaemonSet

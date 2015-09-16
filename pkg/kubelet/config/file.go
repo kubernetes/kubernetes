@@ -92,8 +92,8 @@ func (s *sourceFile) extractFromPath() error {
 	return nil
 }
 
-// Get as many pod configs as we can from a directory.  Return an error iff something
-// prevented us from reading anything at all.  Do not return an error if only some files
+// Get as many pod configs as we can from a directory. Return an error if and only if something
+// prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
 func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))

@@ -61,13 +61,13 @@ func (s String) Delete(items ...string) {
 	}
 }
 
-// Has returns true iff item is contained in the set.
+// Has returns true if and only if item is contained in the set.
 func (s String) Has(item string) bool {
 	_, contained := s[item]
 	return contained
 }
 
-// HasAll returns true iff all items are contained in the set.
+// HasAll returns true if and only if all items are contained in the set.
 func (s String) HasAll(items ...string) bool {
 	for _, item := range items {
 		if !s.Has(item) {
@@ -121,7 +121,7 @@ func (s1 String) Union(s2 String) String {
 	return result
 }
 
-// IsSuperset returns true iff s1 is a superset of s2.
+// IsSuperset returns true if and only if s1 is a superset of s2.
 func (s1 String) IsSuperset(s2 String) bool {
 	for item := range s2 {
 		if !s1.Has(item) {
@@ -131,7 +131,7 @@ func (s1 String) IsSuperset(s2 String) bool {
 	return true
 }
 
-// Equal returns true iff s1 is equal (as a set) to s2.
+// Equal returns true if and only if s1 is equal (as a set) to s2.
 // Two sets are equal if their membership is identical.
 // (In practice, this means same elements, order doesn't matter)
 func (s1 String) Equal(s2 String) bool {
