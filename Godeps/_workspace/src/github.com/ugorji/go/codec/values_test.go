@@ -1,7 +1,7 @@
 // // +build testing
 
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -56,6 +56,11 @@ type TestStruc struct {
 	Byslice   []byte
 
 	Iptrslice []*int64
+
+	// TODO: test these separately, specifically for reflection and codecgen.
+	// Unfortunately, ffjson doesn't support these. Its compilation even fails.
+	// Ui64array      [4]uint64
+	// Ui64slicearray [][4]uint64
 
 	AnonInTestStruc
 

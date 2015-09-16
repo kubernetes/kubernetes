@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -55,10 +55,12 @@ r.ReadMapEnd()
 `
 
 const genDecListTmpl = `
-{{var "v"}} := *{{ .Varname }}
+{{var "v"}} := {{ if not isArray}}*{{ end }}{{ .Varname }}
 {{var "h"}}, {{var "l"}} := z.DecSliceHelperStart()
 
-var {{var "c"}} bool 
+var {{var "c"}} bool
+_ = {{var "c"}}
+
 {{ if not isArray }}if {{var "v"}} == nil {
 	if {{var "l"}} <= 0 {
         {{var "v"}} = make({{ .CTyp }}, 0)
@@ -82,7 +84,7 @@ if {{var "l"}} == 0 { {{ if isSlice }}
 	{{ else }} 
 	{{var "n"}} := {{var "l"}} 
 	if {{var "l"}} > cap({{var "v"}}) {
-		{{ if isArray }}r.ReadArrayCannotExpand(len({{var "v"}}), {{var "l"}})
+		{{ if isArray }}z.DecArrayCannotExpand(len({{var "v"}}), {{var "l"}})
 		{{var "n"}} = len({{var "v"}})
 		{{ else }}{{ if .Immutable }}
 		{{var "v2"}} := {{var "v"}}
@@ -94,8 +96,8 @@ if {{var "l"}} == 0 { {{ if isSlice }}
 		{{ end }}{{var "c"}} = true 
 		{{ end }}
 	} else if {{var "l"}} != len({{var "v"}}) {
-		{{var "v"}} = {{var "v"}}[:{{var "l"}}]
-		{{var "c"}} = true 
+		{{ if isSlice }}{{var "v"}} = {{var "v"}}[:{{var "l"}}]
+		{{var "c"}} = true {{ end }}
 	}
 	{{var "j"}} := 0
 	for ; {{var "j"}} < {{var "n"}} ; {{var "j"}}++ {
@@ -108,7 +110,7 @@ if {{var "l"}} == 0 { {{ if isSlice }}
 } else {
 	for {{var "j"}} := 0; !r.CheckBreak(); {{var "j"}}++ {
 		if {{var "j"}} >= len({{var "v"}}) {
-			{{ if isArray }}r.ReadArrayCannotExpand(len({{var "v"}}), {{var "j"}}+1)
+			{{ if isArray }}z.DecArrayCannotExpand(len({{var "v"}}), {{var "j"}}+1)
 			{{ else if isSlice}}{{var "v"}} = append({{var "v"}}, {{zero}})// var {{var "z"}} {{ .Typ }}
 			{{var "c"}} = true {{ end }}
 		}
@@ -129,8 +131,9 @@ if {{var "l"}} == 0 { {{ if isSlice }}
 	}
 	{{var "h"}}.End()
 }
-if {{var "c"}} { 
+{{ if not isArray }}if {{var "c"}} { 
 	*{{ .Varname }} = {{var "v"}}
-}
+}{{ end }}
+
 `
 

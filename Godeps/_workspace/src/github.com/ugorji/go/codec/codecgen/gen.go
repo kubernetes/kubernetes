@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 // codecgen generates codec.Selfer implementations for a set of types.
 package main
@@ -14,6 +14,7 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +23,8 @@ import (
 	"text/template"
 	"time"
 )
+
+const genCodecPkg = "codec1978" // keep this in sync with codec.genCodecPkg
 
 const genFrunMainTmpl = `//+build ignore
 
@@ -69,7 +72,7 @@ func CodecGenTempWrite{{ .RandString }}() {
 	var t{{ $index }} {{ . }}
 	typs = append(typs, reflect.TypeOf(t{{ $index }}))
 {{ end }}
-	{{ if not .CodecPkgFiles }}{{ .CodecPkgName }}.{{ end }}Gen(&out, "{{ .BuildTag }}", "{{ .PackageName }}", {{ .UseUnsafe }}, typs...)
+	{{ if not .CodecPkgFiles }}{{ .CodecPkgName }}.{{ end }}Gen(&out, "{{ .BuildTag }}", "{{ .PackageName }}", "{{ .RandString }}", {{ .UseUnsafe }}, typs...)
 	bout, err := format.Source(out.Bytes())
 	if err != nil {
 		fout.Write(out.Bytes())
@@ -89,7 +92,7 @@ func CodecGenTempWrite{{ .RandString }}() {
 // Tool then executes: "go run __frun__" which creates fout.
 // fout contains Codec(En|De)codeSelf implementations for every type T.
 //
-func Generate(outfile, buildTag, codecPkgPath string, useUnsafe bool, goRunTag string,
+func Generate(outfile, buildTag, codecPkgPath string, uid int64, useUnsafe bool, goRunTag string,
 	regexName *regexp.Regexp, deleteTempFile bool, infiles ...string) (err error) {
 	// For each file, grab AST, find each type, and write a call to it.
 	if len(infiles) == 0 {
@@ -98,6 +101,13 @@ func Generate(outfile, buildTag, codecPkgPath string, useUnsafe bool, goRunTag s
 	if outfile == "" || codecPkgPath == "" {
 		err = errors.New("outfile and codec package path cannot be blank")
 		return
+	}
+	if uid < 0 {
+		uid = -uid
+	}
+	if uid == 0 {
+		rr := rand.New(rand.NewSource(time.Now().UnixNano()))
+		uid = 101 + rr.Int63n(9777)
 	}
 	// We have to parse dir for package, before opening the temp file for writing (else ImportDir fails).
 	// Also, ImportDir(...) must take an absolute path.
@@ -123,12 +133,12 @@ func Generate(outfile, buildTag, codecPkgPath string, useUnsafe bool, goRunTag s
 		UseUnsafe       bool
 	}
 	tv := tmplT{
-		CodecPkgName:    "codec1978",
+		CodecPkgName:    genCodecPkg,
 		OutFile:         outfile,
 		CodecImportPath: codecPkgPath,
 		BuildTag:        buildTag,
 		UseUnsafe:       useUnsafe,
-		RandString:      strconv.FormatInt(time.Now().UnixNano(), 10),
+		RandString:      strconv.FormatInt(uid, 10),
 	}
 	tv.ImportPath = pkg.ImportPath
 	if tv.ImportPath == tv.CodecImportPath {
@@ -261,9 +271,9 @@ func main() {
 	rt := flag.String("rt", "", "tags for go run")
 	x := flag.Bool("x", false, "keep temp file")
 	u := flag.Bool("u", false, "Use unsafe, e.g. to avoid unnecessary allocation on []byte->string")
-
+	d := flag.Int64("d", 0, "random identifier for use in generated code")
 	flag.Parse()
-	if err := Generate(*o, *t, *c, *u, *rt,
+	if err := Generate(*o, *t, *c, *d, *u, *rt,
 		regexp.MustCompile(*r), !*x, flag.Args()...); err != nil {
 		fmt.Fprintf(os.Stderr, "codecgen error: %v\n", err)
 		os.Exit(1)

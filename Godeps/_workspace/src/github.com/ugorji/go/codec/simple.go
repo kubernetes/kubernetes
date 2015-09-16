@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -77,7 +77,7 @@ func (e *simpleEncDriver) encUint(v uint64, bd uint8) {
 	} else if v <= math.MaxUint32 {
 		e.w.writen1(bd + 2)
 		bigenHelper{e.b[:4], e.w}.writeUint32(uint32(v))
-	} else if v <= math.MaxUint64 {
+	} else { // if v <= math.MaxUint64 {
 		e.w.writen1(bd + 3)
 		bigenHelper{e.b[:8], e.w}.writeUint64(v)
 	}
