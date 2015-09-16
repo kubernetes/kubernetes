@@ -3,24 +3,71 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl new \- Create a new object of the given type by filling in a template
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl new\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
+Create a new object of the given type using a template.
 
 .PP
-Find more information at 
-\[la]https://github.com/kubernetes/kubernetes\[ra].
+The new command pulls down an example for the given object type, allows
+you to edit the filled in example, and then submits it for creation.  The
+editing functionality functions similarly to the 'edit' command \-\- you
+can control the editor used, as well as the format and version, using
+the same flags and environment variables.
+
+.PP
+By default, before submission your new object will be validated.  If an
+invalid object is encountered, you will be returned to the editor with the
+invalid part indicated with comments.  Use the '\-\-validate=false' in order
+to skip local validation.
+
+.PP
+You can specify namespace, name, and labels (in 'key1=value1,key2=value2' form)
+from the command line using the '\-\-namespace', '\-\-name', and '\-\-labels' flags.
+
+.PP
+You can use the '\-\-dry\-run' flag to just output the example to standard out
+without launching an editor or submitting the object for creation.
 
 
 .SH OPTIONS
+.PP
+\fB\-\-dry\-run\fP=false
+    If true, only print the example object, without editing or creating it.
+
+.PP
+\fB\-\-labels\fP=""
+    A comma\-separated list of labels in key=value form to apply to the created object
+
+.PP
+\fB\-\-name\fP=""
+    The name of the new object
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP="yaml"
+    Output format. One of: 'yaml' or 'json'.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
+
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -114,9 +161,27 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Create a new pod named 'website':
+  $ kubectl new pod \-\-name website \-\-labels end=front,app=site
+
+  # Don't validate the object before creation
+  $ kubectl new namespace \-\-validate=false \-\-name my\-ns
+
+  # Don't edit or create a new object \-\- just output the example
+  $ kubectl new namespace \-\-name my\-ns \-\-dry\-run
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-edit(1)\fP, \fBkubectl\-apply(1)\fP, \fBkubectl\-new(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-attach(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-annotate(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP, \fBkubectl\-explain(1)\fP, \fBkubectl\-convert(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY

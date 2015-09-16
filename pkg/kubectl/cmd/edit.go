@@ -27,12 +27,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
@@ -94,9 +96,12 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames []string) error {
+type editProcessingFunc func(resource.Visitor, []byte, []byte, runtime.Object, *resource.Info, string, *editResults, meta.RESTMapper, string) error
+
+func getEditPrinter(cmd *cobra.Command) (kubectl.ResourcePrinter, string, error) {
 	var printer kubectl.ResourcePrinter
 	var ext string
+	var err error
 	switch format := cmdutil.GetFlagString(cmd, "output"); format {
 	case "json":
 		printer = &kubectl.JSONPrinter{}
@@ -105,7 +110,16 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		printer = &kubectl.YAMLPrinter{}
 		ext = ".yaml"
 	default:
-		return cmdutil.UsageError(cmd, "The flag 'output' must be one of yaml|json")
+		err = cmdutil.UsageError(cmd, "The flag 'output' must be one of yaml|json")
+	}
+
+	return printer, ext, err
+}
+
+func doEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, prefix string, rejectSame bool, addSource func(*resource.Builder, bool, kubectl.ResourcePrinter) *resource.Builder, process editProcessingFunc) error {
+	printer, ext, err := getEditPrinter(cmd)
+	if err != nil {
+		return err
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -120,13 +134,13 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		ClientMapper: f.ClientMapperForCommand(),
 	}
 
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, filenames...).
-		ResourceTypeOrNameArgs(true, args...).
-		Latest().
-		Flatten().
-		Do()
+		Flatten()
+
+	b = addSource(b, enforceNamespace, printer)
+
+	r := b.Do()
 	err = r.Err()
 	if err != nil {
 		return err
@@ -181,7 +195,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err != nil {
 			return preservedFile(err, file, out)
 		}
-		if bytes.Equal(original, edited) {
+		if rejectSame && bytes.Equal(original, edited) {
 			if len(results.edit) > 0 {
 				preservedFile(nil, file, out)
 			} else {
@@ -218,10 +232,47 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		visitor := resource.NewFlattenListVisitor(updates, rmap)
 
 		// need to make sure the original namespace wasn't changed while editing
-		if err = visitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
+		if err := visitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
 			return preservedFile(err, file, out)
 		}
 
+		err = process(visitor, original, edited, obj, updates, file, &results, mapper, defaultVersion)
+
+		if err != nil {
+			return preservedFile(err, file, out)
+		}
+
+		if results.retryable > 0 {
+			fmt.Fprintf(out, "You can run `kubectl replace -f %s` to try this update again.\n", file)
+			return errExit
+		}
+		if results.conflict > 0 {
+			fmt.Fprintf(out, "You must update your local resource version and run `kubectl replace -f %s` to overwrite the remote changes.\n", file)
+			return errExit
+		}
+		if len(results.edit) == 0 {
+			if results.notfound == 0 {
+				os.Remove(file)
+			} else {
+				fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
+			}
+			return nil
+		}
+
+		// loop again and edit the remaining items
+		infos = results.edit
+	}
+	return nil
+}
+
+func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames []string) error {
+	addSource := func(b *resource.Builder, enforceNamespace bool, printer kubectl.ResourcePrinter) *resource.Builder {
+		return b.FilenameParam(enforceNamespace, filenames...).
+			ResourceTypeOrNameArgs(true, args...).
+			Latest()
+	}
+
+	process := func(visitor resource.Visitor, original, edited []byte, obj runtime.Object, updates *resource.Info, file string, results *editResults, mapper meta.RESTMapper, defaultVersion string) error {
 		// use strategic merge to create a patch
 		originalJS, err := yaml.ToJSON(original)
 		if err != nil {
@@ -250,7 +301,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return preservedFile(nil, file, out)
 		}
 
-		err = visitor.Visit(func(info *resource.Info, err error) error {
+		return visitor.Visit(func(info *resource.Info, err error) error {
 			patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 			if err != nil {
 				fmt.Fprintln(out, results.addError(err, info))
@@ -260,31 +311,9 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "edited")
 			return nil
 		})
-		if err != nil {
-			return preservedFile(err, file, out)
-		}
-
-		if results.retryable > 0 {
-			fmt.Fprintf(out, "You can run `kubectl replace -f %s` to try this update again.\n", file)
-			return errExit
-		}
-		if results.conflict > 0 {
-			fmt.Fprintf(out, "You must update your local resource version and run `kubectl replace -f %s` to overwrite the remote changes.\n", file)
-			return errExit
-		}
-		if len(results.edit) == 0 {
-			if results.notfound == 0 {
-				os.Remove(file)
-			} else {
-				fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
-			}
-			return nil
-		}
-
-		// loop again and edit the remaining items
-		infos = results.edit
 	}
-	return nil
+
+	return doEdit(f, out, cmd, "kubectl-edit-", true, addSource, process)
 }
 
 // print json file (such as patch file) content for debugging
