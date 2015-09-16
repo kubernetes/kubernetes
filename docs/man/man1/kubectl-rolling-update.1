@@ -61,8 +61,8 @@ existing replication controller and overwrite at least one (common) label in its
     If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout
 
 .PP
-\fB\-\-schema\-cache\-dir\fP="/tmp/kubectl.schema"
-    If non\-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'
+\fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
 
 .PP
 \fB\-a\fP, \fB\-\-show\-all\fP=false
