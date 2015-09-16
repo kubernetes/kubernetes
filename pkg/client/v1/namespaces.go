@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -30,14 +30,14 @@ type NamespacesInterface interface {
 }
 
 type NamespaceInterface interface {
-	Create(item *api.Namespace) (*api.Namespace, error)
-	Get(name string) (result *api.Namespace, err error)
-	List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error)
+	Create(item *v1.Namespace) (*v1.Namespace, error)
+	Get(name string) (result *v1.Namespace, err error)
+	List(label labels.Selector, field fields.Selector) (*v1.NamespaceList, error)
 	Delete(name string) error
-	Update(item *api.Namespace) (*api.Namespace, error)
+	Update(item *v1.Namespace) (*v1.Namespace, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	Finalize(item *api.Namespace) (*api.Namespace, error)
-	Status(item *api.Namespace) (*api.Namespace, error)
+	Finalize(item *v1.Namespace) (*v1.Namespace, error)
+	Status(item *v1.Namespace) (*v1.Namespace, error)
 }
 
 // namespaces implements NamespacesInterface
@@ -51,15 +51,15 @@ func newNamespaces(c *Client) *namespaces {
 }
 
 // Create creates a new namespace.
-func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
-	result := &api.Namespace{}
+func (c *namespaces) Create(namespace *v1.Namespace) (*v1.Namespace, error) {
+	result := &v1.Namespace{}
 	err := c.r.Post().Resource("namespaces").Body(namespace).Do().Into(result)
 	return result, err
 }
 
 // List lists all the namespaces in the cluster.
-func (c *namespaces) List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error) {
-	result := &api.NamespaceList{}
+func (c *namespaces) List(label labels.Selector, field fields.Selector) (*v1.NamespaceList, error) {
+	result := &v1.NamespaceList{}
 	err := c.r.Get().
 		Resource("namespaces").
 		LabelsSelectorParam(label).
@@ -69,8 +69,8 @@ func (c *namespaces) List(label labels.Selector, field fields.Selector) (*api.Na
 }
 
 // Update takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
-func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Update(namespace *v1.Namespace) (result *v1.Namespace, err error) {
+	result = &v1.Namespace{}
 	if len(namespace.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
 		return
@@ -80,8 +80,8 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 }
 
 // Finalize takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
-func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Finalize(namespace *v1.Namespace) (result *v1.Namespace, err error) {
+	result = &v1.Namespace{}
 	if len(namespace.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
 		return
@@ -91,8 +91,8 @@ func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, 
 }
 
 // Status takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
-func (c *namespaces) Status(namespace *api.Namespace) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Status(namespace *v1.Namespace) (result *v1.Namespace, err error) {
+	result = &v1.Namespace{}
 	if len(namespace.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
 		return
@@ -102,8 +102,8 @@ func (c *namespaces) Status(namespace *api.Namespace) (result *api.Namespace, er
 }
 
 // Get gets an existing namespace
-func (c *namespaces) Get(name string) (*api.Namespace, error) {
-	result := &api.Namespace{}
+func (c *namespaces) Get(name string) (*v1.Namespace, error) {
+	result := &v1.Namespace{}
 	err := c.r.Get().Resource("namespaces").Name(name).Do().Into(result)
 	return result, err
 }

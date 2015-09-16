@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"bytes"
@@ -71,6 +71,18 @@ func (r *RequestConstructionError) Error() string {
 	return fmt.Sprintf("request construction error: '%v'", r.Err)
 }
 
+// TODO: Remove this when runtime.codecWrapper natively decodes to the
+// intended version.
+type versionedDecoder struct {
+	runtime.Codec
+	apiVersion string
+}
+
+// Decode decodes the data into the intended versioned data type.
+func (c *versionedDecoder) Decode(data []byte) (runtime.Object, error) {
+	return c.DecodeToVersion(data, c.apiVersion)
+}
+
 // Request allows for building up a request to a server in a chained fashion.
 // Any errors are stored until the end of your call, so you only have to
 // check once.
@@ -117,7 +129,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion str
 		baseURL:    baseURL,
 		path:       baseURL.Path,
 		apiVersion: apiVersion,
-		codec:      codec,
+		codec:      &versionedDecoder{codec, apiVersion},
 	}
 }
 

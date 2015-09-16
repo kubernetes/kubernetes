@@ -15,15 +15,15 @@ limitations under the License.
 */
 
 /*
-Package client contains the implementation of the client side communication with the
+Package v1 contains the implementation of the v1 client side communication with the
 Kubernetes master. The Client class provides methods for reading, creating, updating,
 and deleting pods, replication controllers, daemons, services, and nodes.
 
 Most consumers should use the Config object to create a Client:
 
     import (
-      "k8s.io/kubernetes/pkg/client"
-      "k8s.io/kubernetes/pkg/api"
+      client "k8s.io/kubernetes/pkg/client/v1"
+      api "k8s.io/kubernetes/pkg/api/v1"
       "k8s.io/kubernetes/pkg/fields"
       "k8s.io/kubernetes/pkg/labels"
     )
@@ -56,4 +56,4 @@ The RESTClient type implements the Kubernetes API conventions (see `docs/devel/a
 for a given API path and is intended for use by consumers implementing their own Kubernetes
 compatible APIs.
 */
-package unversioned
+package v1

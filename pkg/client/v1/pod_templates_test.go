@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -31,13 +31,13 @@ func getPodTemplatesResoureName() string {
 }
 
 func TestPodTemplateCreate(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplate := api.PodTemplate{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	podTemplate := v1.PodTemplate{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
-		Template: api.PodTemplateSpec{},
+		Template: v1.PodTemplateSpec{},
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -54,13 +54,13 @@ func TestPodTemplateCreate(t *testing.T) {
 }
 
 func TestPodTemplateGet(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplate := &api.PodTemplate{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	podTemplate := &v1.PodTemplate{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
-		Template: api.PodTemplateSpec{},
+		Template: v1.PodTemplateSpec{},
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -77,11 +77,11 @@ func TestPodTemplateGet(t *testing.T) {
 }
 
 func TestPodTemplateList(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplateList := &api.PodTemplateList{
-		Items: []api.PodTemplate{
+	ns := v1.NamespaceDefault
+	podTemplateList := &v1.PodTemplateList{
+		Items: []v1.PodTemplate{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "foo",
 					Namespace: ns,
 				},
@@ -102,14 +102,14 @@ func TestPodTemplateList(t *testing.T) {
 }
 
 func TestPodTemplateUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplate := &api.PodTemplate{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	podTemplate := &v1.PodTemplate{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Template: api.PodTemplateSpec{},
+		Template: v1.PodTemplateSpec{},
 	}
 	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
@@ -120,7 +120,7 @@ func TestPodTemplateUpdate(t *testing.T) {
 }
 
 func TestPodTemplateDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
@@ -137,6 +137,6 @@ func TestPodTemplateWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).PodTemplates(v1.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

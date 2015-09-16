@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -31,7 +31,7 @@ func getJobResourceName() string {
 }
 
 func TestListJobs(t *testing.T) {
-	ns := api.NamespaceAll
+	ns := v1.NamespaceAll
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
@@ -41,7 +41,7 @@ func TestListJobs(t *testing.T) {
 			Body: &experimental.JobList{
 				Items: []experimental.Job{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Name: "foo",
 							Labels: map[string]string{
 								"foo":  "bar",
@@ -49,7 +49,7 @@ func TestListJobs(t *testing.T) {
 							},
 						},
 						Spec: experimental.JobSpec{
-							Template: &api.PodTemplateSpec{},
+							Template: &v1.PodTemplateSpec{},
 						},
 					},
 				},
@@ -61,7 +61,7 @@ func TestListJobs(t *testing.T) {
 }
 
 func TestGetJob(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
@@ -71,7 +71,7 @@ func TestGetJob(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -79,7 +79,7 @@ func TestGetJob(t *testing.T) {
 					},
 				},
 				Spec: experimental.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -89,7 +89,7 @@ func TestGetJob(t *testing.T) {
 }
 
 func TestGetJobWithNoName(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{Error: true}
 	receivedJob, err := c.Setup(t).Experimental().Jobs(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
@@ -100,9 +100,9 @@ func TestGetJobWithNoName(t *testing.T) {
 }
 
 func TestUpdateJob(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	requestJob := &experimental.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
@@ -117,7 +117,7 @@ func TestUpdateJob(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -125,7 +125,7 @@ func TestUpdateJob(t *testing.T) {
 					},
 				},
 				Spec: experimental.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -135,9 +135,9 @@ func TestUpdateJob(t *testing.T) {
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	requestJob := &experimental.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
@@ -152,7 +152,7 @@ func TestUpdateJobStatus(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -160,7 +160,7 @@ func TestUpdateJobStatus(t *testing.T) {
 					},
 				},
 				Spec: experimental.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 				Status: experimental.JobStatus{
 					Active: 1,
@@ -173,7 +173,7 @@ func TestUpdateJobStatus(t *testing.T) {
 }
 
 func TestDeleteJob(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
@@ -187,9 +187,9 @@ func TestDeleteJob(t *testing.T) {
 }
 
 func TestCreateJob(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	requestJob := &experimental.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
@@ -204,7 +204,7 @@ func TestCreateJob(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -212,7 +212,7 @@ func TestCreateJob(t *testing.T) {
 					},
 				},
 				Spec: experimental.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},

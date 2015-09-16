@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -32,9 +32,9 @@ func getHorizontalPodAutoscalersResoureName() string {
 }
 
 func TestHorizontalPodAutoscalerCreate(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	horizontalPodAutoscaler := experimental.HorizontalPodAutoscaler{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
@@ -57,9 +57,9 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 }
 
 func TestHorizontalPodAutoscalerGet(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
@@ -79,11 +79,11 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 }
 
 func TestHorizontalPodAutoscalerList(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	horizontalPodAutoscalerList := &experimental.HorizontalPodAutoscalerList{
 		Items: []experimental.HorizontalPodAutoscaler{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "foo",
 					Namespace: ns,
 				},
@@ -104,9 +104,9 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 }
 
 func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,
 			ResourceVersion: "1",
@@ -121,7 +121,7 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 }
 
 func TestHorizontalPodAutoscalerDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.Experimental.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
@@ -138,6 +138,6 @@ func TestHorizontalPodAutoscalerWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Experimental().HorizontalPodAutoscalers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).Experimental().HorizontalPodAutoscalers(v1.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

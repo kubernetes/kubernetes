@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -32,19 +32,19 @@ func getPersistentVolumeClaimsResoureName() string {
 }
 
 func TestPersistentVolumeClaimCreate(t *testing.T) {
-	ns := api.NamespaceDefault
-	pv := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	pv := &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "abc",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
-				api.ReadOnlyMany,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
 			},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -65,20 +65,20 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimGet(t *testing.T) {
-	ns := api.NamespaceDefault
-	persistentVolumeClaim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	persistentVolumeClaim := &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "foo",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
-				api.ReadOnlyMany,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
 			},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -98,11 +98,11 @@ func TestPersistentVolumeClaimGet(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimList(t *testing.T) {
-	ns := api.NamespaceDefault
-	persistentVolumeList := &api.PersistentVolumeClaimList{
-		Items: []api.PersistentVolumeClaim{
+	ns := v1.NamespaceDefault
+	persistentVolumeList := &v1.PersistentVolumeClaimList{
+		Items: []v1.PersistentVolumeClaim{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"},
+				ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "ns"},
 			},
 		},
 	}
@@ -120,20 +120,20 @@ func TestPersistentVolumeClaimList(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	persistentVolumeClaim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	persistentVolumeClaim := &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			ResourceVersion: "1",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
-				api.ReadOnlyMany,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
 			},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -147,25 +147,25 @@ func TestPersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	persistentVolumeClaim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	persistentVolumeClaim := &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			ResourceVersion: "1",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
-				api.ReadOnlyMany,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
 			},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
-		Status: api.PersistentVolumeClaimStatus{
-			Phase: api.ClaimBound,
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
 		},
 	}
 	c := &testClient{
@@ -180,7 +180,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
@@ -197,6 +197,6 @@ func TestPersistentVolumeClaimWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).PersistentVolumeClaims(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).PersistentVolumeClaims(v1.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

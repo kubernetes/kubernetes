@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -30,10 +30,10 @@ type ReplicationControllersNamespacer interface {
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	List(selector labels.Selector) (*api.ReplicationControllerList, error)
-	Get(name string) (*api.ReplicationController, error)
-	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
-	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	List(selector labels.Selector) (*v1.ReplicationControllerList, error)
+	Get(name string) (*v1.ReplicationController, error)
+	Create(ctrl *v1.ReplicationController) (*v1.ReplicationController, error)
+	Update(ctrl *v1.ReplicationController) (*v1.ReplicationController, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -50,29 +50,29 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 }
 
 // List takes a selector, and returns the list of replication controllers that match that selector.
-func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
-	result = &api.ReplicationControllerList{}
+func (c *replicationControllers) List(selector labels.Selector) (result *v1.ReplicationControllerList, err error) {
+	result = &v1.ReplicationControllerList{}
 	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular replication controller.
-func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
-	result = &api.ReplicationController{}
+func (c *replicationControllers) Get(name string) (result *v1.ReplicationController, err error) {
+	result = &v1.ReplicationController{}
 	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new replication controller.
-func (c *replicationControllers) Create(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
-	result = &api.ReplicationController{}
+func (c *replicationControllers) Create(controller *v1.ReplicationController) (result *v1.ReplicationController, err error) {
+	result = &v1.ReplicationController{}
 	err = c.r.Post().Namespace(c.ns).Resource("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
 // Update updates an existing replication controller.
-func (c *replicationControllers) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
-	result = &api.ReplicationController{}
+func (c *replicationControllers) Update(controller *v1.ReplicationController) (result *v1.ReplicationController, err error) {
+	result = &v1.ReplicationController{}
 	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).Body(controller).Do().Into(result)
 	return
 }

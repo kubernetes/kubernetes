@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -30,12 +30,12 @@ type ResourceQuotasNamespacer interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	List(selector labels.Selector) (*api.ResourceQuotaList, error)
-	Get(name string) (*api.ResourceQuota, error)
+	List(selector labels.Selector) (*v1.ResourceQuotaList, error)
+	Get(name string) (*v1.ResourceQuota, error)
 	Delete(name string) error
-	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
+	Create(resourceQuota *v1.ResourceQuota) (*v1.ResourceQuota, error)
+	Update(resourceQuota *v1.ResourceQuota) (*v1.ResourceQuota, error)
+	UpdateStatus(resourceQuota *v1.ResourceQuota) (*v1.ResourceQuota, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -54,15 +54,15 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 }
 
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
-func (c *resourceQuotas) List(selector labels.Selector) (result *api.ResourceQuotaList, err error) {
-	result = &api.ResourceQuotaList{}
+func (c *resourceQuotas) List(selector labels.Selector) (result *v1.ResourceQuotaList, err error) {
+	result = &v1.ResourceQuotaList{}
 	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get takes the name of the resourceQuota, and returns the corresponding ResourceQuota object, and an error if it occurs
-func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Get(name string) (result *v1.ResourceQuota, err error) {
+	result = &v1.ResourceQuota{}
 	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").Name(name).Do().Into(result)
 	return
 }
@@ -73,22 +73,22 @@ func (c *resourceQuotas) Delete(name string) error {
 }
 
 // Create takes the representation of a resourceQuota.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
-func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Create(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
+	result = &v1.ResourceQuota{}
 	err = c.r.Post().Namespace(c.ns).Resource("resourceQuotas").Body(resourceQuota).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a resourceQuota to update spec.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
-func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Update(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
+	result = &v1.ResourceQuota{}
 	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).Body(resourceQuota).Do().Into(result)
 	return
 }
 
 // Status takes the representation of a resourceQuota to update status.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
-func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
+	result = &v1.ResourceQuota{}
 	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
 	return
 }

@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -35,7 +36,7 @@ type JobInterface interface {
 	Get(name string) (*experimental.Job, error)
 	Create(job *experimental.Job) (*experimental.Job, error)
 	Update(job *experimental.Job) (*experimental.Job, error)
-	Delete(name string, options *api.DeleteOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	UpdateStatus(job *experimental.Job) (*experimental.Job, error)
 }
@@ -80,7 +81,7 @@ func (c *jobs) Update(job *experimental.Job) (result *experimental.Job, err erro
 }
 
 // Delete deletes a job, returns error if one occurs.
-func (c *jobs) Delete(name string, options *api.DeleteOptions) (err error) {
+func (c *jobs) Delete(name string, options *v1.DeleteOptions) (err error) {
 	if options == nil {
 		return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Do().Error()
 	}

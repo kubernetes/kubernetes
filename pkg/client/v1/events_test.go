@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -42,11 +43,11 @@ func TestEventSearch(t *testing.T) {
 				api.LabelSelectorQueryParam(testapi.Default.Version()): []string{},
 			},
 		},
-		Response: Response{StatusCode: 200, Body: &api.EventList{}},
+		Response: Response{StatusCode: 200, Body: &v1.EventList{}},
 	}
 	eventList, err := c.Setup(t).Events("baz").Search(
-		&api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		&v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "baz",
 				SelfLink:  testapi.Default.SelfLink("pods", ""),
@@ -57,7 +58,7 @@ func TestEventSearch(t *testing.T) {
 }
 
 func TestEventCreate(t *testing.T) {
-	objReference := &api.ObjectReference{
+	objReference := &v1.ObjectReference{
 		Kind:            "foo",
 		Namespace:       "nm",
 		Name:            "objref1",
@@ -66,9 +67,9 @@ func TestEventCreate(t *testing.T) {
 		ResourceVersion: "1",
 	}
 	timeStamp := unversioned.Now()
-	event := &api.Event{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+	event := &v1.Event{
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: v1.NamespaceDefault,
 		},
 		InvolvedObject: *objReference,
 		FirstTimestamp: timeStamp,
@@ -78,13 +79,13 @@ func TestEventCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath("events", api.NamespaceDefault, ""),
+			Path:   testapi.Default.ResourcePath("events", v1.NamespaceDefault, ""),
 			Body:   event,
 		},
 		Response: Response{StatusCode: 200, Body: event},
 	}
 
-	response, err := c.Setup(t).Events(api.NamespaceDefault).Create(event)
+	response, err := c.Setup(t).Events(v1.NamespaceDefault).Create(event)
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -96,7 +97,7 @@ func TestEventCreate(t *testing.T) {
 }
 
 func TestEventGet(t *testing.T) {
-	objReference := &api.ObjectReference{
+	objReference := &v1.ObjectReference{
 		Kind:            "foo",
 		Namespace:       "nm",
 		Name:            "objref1",
@@ -105,8 +106,8 @@ func TestEventGet(t *testing.T) {
 		ResourceVersion: "1",
 	}
 	timeStamp := unversioned.Now()
-	event := &api.Event{
-		ObjectMeta: api.ObjectMeta{
+	event := &v1.Event{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "other",
 		},
 		InvolvedObject: *objReference,
@@ -135,8 +136,8 @@ func TestEventGet(t *testing.T) {
 }
 
 func TestEventList(t *testing.T) {
-	ns := api.NamespaceDefault
-	objReference := &api.ObjectReference{
+	ns := v1.NamespaceDefault
+	objReference := &v1.ObjectReference{
 		Kind:            "foo",
 		Namespace:       ns,
 		Name:            "objref1",
@@ -145,8 +146,8 @@ func TestEventList(t *testing.T) {
 		ResourceVersion: "1",
 	}
 	timeStamp := unversioned.Now()
-	eventList := &api.EventList{
-		Items: []api.Event{
+	eventList := &v1.EventList{
+		Items: []v1.Event{
 			{
 				InvolvedObject: *objReference,
 				FirstTimestamp: timeStamp,
@@ -182,7 +183,7 @@ func TestEventList(t *testing.T) {
 }
 
 func TestEventDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"fmt"
@@ -31,8 +31,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -252,12 +252,12 @@ func NewOrDie(c *Config) *Client {
 // running inside a pod running on kuberenetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + v1.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
 	}
 	tlsClientConfig := TLSClientConfig{}
-	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
+	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + v1.ServiceAccountRootCAKey
 	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
 		glog.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {

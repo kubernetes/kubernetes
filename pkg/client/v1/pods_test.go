@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
@@ -22,32 +22,33 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestListEmptyPods(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: &api.PodList{}},
+		Response: Response{StatusCode: 200, Body: &v1.PodList{}},
 	}
 	podList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, podList, err)
 }
 
 func TestListPods(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200,
-			Body: &api.PodList{
-				Items: []api.Pod{
+			Body: &v1.PodList{
+				Items: []v1.Pod{
 					{
-						Status: api.PodStatus{
-							Phase: api.PodRunning,
+						Status: v1.PodStatus{
+							Phase: v1.PodRunning,
 						},
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
@@ -63,7 +64,7 @@ func TestListPods(t *testing.T) {
 }
 
 func TestListPodsLabels(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Default.Version())
 	c := &testClient{
 		Request: testRequest{
@@ -72,13 +73,13 @@ func TestListPodsLabels(t *testing.T) {
 			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.PodList{
-				Items: []api.Pod{
+			Body: &v1.PodList{
+				Items: []v1.Pod{
 					{
-						Status: api.PodStatus{
-							Phase: api.PodRunning,
+						Status: v1.PodStatus{
+							Phase: v1.PodRunning,
 						},
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
@@ -97,16 +98,16 @@ func TestListPodsLabels(t *testing.T) {
 }
 
 func TestGetPod(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.Pod{
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
+			Body: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
 				},
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
 						"foo":  "bar",
 						"name": "baz",
@@ -120,7 +121,7 @@ func TestGetPod(t *testing.T) {
 }
 
 func TestGetPodWithNoName(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{Error: true}
 	receivedPod, err := c.Setup(t).Pods(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
@@ -131,7 +132,7 @@ func TestGetPodWithNoName(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
@@ -141,12 +142,12 @@ func TestDeletePod(t *testing.T) {
 }
 
 func TestCreatePod(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestPod := &api.Pod{
-		Status: api.PodStatus{
-			Phase: api.PodRunning,
+	ns := v1.NamespaceDefault
+	requestPod := &v1.Pod{
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Labels: map[string]string{
 				"foo":  "bar",
 				"name": "baz",
@@ -165,9 +166,9 @@ func TestCreatePod(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	requestPod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
 			Labels: map[string]string{
@@ -175,8 +176,8 @@ func TestUpdatePod(t *testing.T) {
 				"name": "baz",
 			},
 		},
-		Status: api.PodStatus{
-			Phase: api.PodRunning,
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
 		},
 	}
 	c := &testClient{

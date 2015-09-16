@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -32,11 +32,11 @@ type LimitRangesNamespacer interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	List(selector labels.Selector) (*api.LimitRangeList, error)
-	Get(name string) (*api.LimitRange, error)
+	List(selector labels.Selector) (*v1.LimitRangeList, error)
+	Get(name string) (*v1.LimitRange, error)
 	Delete(name string) error
-	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
-	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
+	Create(limitRange *v1.LimitRange) (*v1.LimitRange, error)
+	Update(limitRange *v1.LimitRange) (*v1.LimitRange, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -55,15 +55,15 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 }
 
 // List takes a selector, and returns the list of limitRanges that match that selector.
-func (c *limitRanges) List(selector labels.Selector) (result *api.LimitRangeList, err error) {
-	result = &api.LimitRangeList{}
+func (c *limitRanges) List(selector labels.Selector) (result *v1.LimitRangeList, err error) {
+	result = &v1.LimitRangeList{}
 	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get takes the name of the limitRange, and returns the corresponding Pod object, and an error if it occurs
-func (c *limitRanges) Get(name string) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Get(name string) (result *v1.LimitRange, err error) {
+	result = &v1.LimitRange{}
 	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Into(result)
 	return
 }
@@ -74,15 +74,15 @@ func (c *limitRanges) Delete(name string) error {
 }
 
 // Create takes the representation of a limitRange.  Returns the server's representation of the limitRange, and an error, if it occurs.
-func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Create(limitRange *v1.LimitRange) (result *v1.LimitRange, err error) {
+	result = &v1.LimitRange{}
 	err = c.r.Post().Namespace(c.ns).Resource("limitRanges").Body(limitRange).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a limitRange to update.  Returns the server's representation of the limitRange, and an error, if it occurs.
-func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Update(limitRange *v1.LimitRange) (result *v1.LimitRange, err error) {
+	result = &v1.LimitRange{}
 	if len(limitRange.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", limitRange)
 		return

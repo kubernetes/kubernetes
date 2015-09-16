@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,13 +34,13 @@ type EventNamespacer interface {
 
 // EventInterface has methods to work with Event resources
 type EventInterface interface {
-	Create(event *api.Event) (*api.Event, error)
-	Update(event *api.Event) (*api.Event, error)
-	List(label labels.Selector, field fields.Selector) (*api.EventList, error)
-	Get(name string) (*api.Event, error)
+	Create(event *v1.Event) (*v1.Event, error)
+	Update(event *v1.Event) (*v1.Event, error)
+	List(label labels.Selector, field fields.Selector) (*v1.EventList, error)
+	Get(name string) (*v1.Event, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	// Search finds events about the specified object
-	Search(objOrRef runtime.Object) (*api.EventList, error)
+	Search(objOrRef runtime.Object) (*v1.EventList, error)
 	Delete(name string) error
 	// Returns the appropriate field selector based on the API version being used to communicate with the server.
 	// The returned field selector can be used with List and Watch to filter desired events.
@@ -64,11 +65,11 @@ func newEvents(c *Client, ns string) *events {
 // or an error. The namespace to create the event within is deduced from the
 // event; it must either match this event client's namespace, or this event
 // client must have been created with the "" namespace.
-func (e *events) Create(event *api.Event) (*api.Event, error) {
+func (e *events) Create(event *v1.Event) (*v1.Event, error) {
 	if e.namespace != "" && event.Namespace != e.namespace {
 		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.namespace)
 	}
-	result := &api.Event{}
+	result := &v1.Event{}
 	err := e.client.Post().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
@@ -83,11 +84,11 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 // namespace must either match this event client's namespace, or this event client must have been
 // created with the "" namespace. Update also requires the ResourceVersion to be set in the event
 // object.
-func (e *events) Update(event *api.Event) (*api.Event, error) {
+func (e *events) Update(event *v1.Event) (*v1.Event, error) {
 	if len(event.ResourceVersion) == 0 {
 		return nil, fmt.Errorf("invalid event update object, missing resource version: %#v", event)
 	}
-	result := &api.Event{}
+	result := &v1.Event{}
 	err := e.client.Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
@@ -99,8 +100,8 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 }
 
 // List returns a list of events matching the selectors.
-func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
-	result := &api.EventList{}
+func (e *events) List(label labels.Selector, field fields.Selector) (*v1.EventList, error) {
+	result := &v1.EventList{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
@@ -112,8 +113,8 @@ func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventL
 }
 
 // Get returns the given event, or an error.
-func (e *events) Get(name string) (*api.Event, error) {
-	result := &api.Event{}
+func (e *events) Get(name string) (*v1.Event, error) {
+	result := &v1.Event{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
@@ -138,7 +139,7 @@ func (e *events) Watch(label labels.Selector, field fields.Selector, resourceVer
 // Search finds events about the specified object. The namespace of the
 // object must match this event's client namespace unless the event client
 // was made with the "" namespace.
-func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
+func (e *events) Search(objOrRef runtime.Object) (*v1.EventList, error) {
 	ref, err := api.GetReference(objOrRef)
 	if err != nil {
 		return nil, err

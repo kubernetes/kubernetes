@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -30,7 +30,7 @@ func getDSResourceName() string {
 }
 
 func TestListDaemonSets(t *testing.T) {
-	ns := api.NamespaceAll
+	ns := v1.NamespaceAll
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
@@ -40,7 +40,7 @@ func TestListDaemonSets(t *testing.T) {
 			Body: &experimental.DaemonSetList{
 				Items: []experimental.DaemonSet{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Name: "foo",
 							Labels: map[string]string{
 								"foo":  "bar",
@@ -48,7 +48,7 @@ func TestListDaemonSets(t *testing.T) {
 							},
 						},
 						Spec: experimental.DaemonSetSpec{
-							Template: &api.PodTemplateSpec{},
+							Template: &v1.PodTemplateSpec{},
 						},
 					},
 				},
@@ -61,13 +61,13 @@ func TestListDaemonSets(t *testing.T) {
 }
 
 func TestGetDaemonSet(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -75,7 +75,7 @@ func TestGetDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: experimental.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -85,7 +85,7 @@ func TestGetDaemonSet(t *testing.T) {
 }
 
 func TestGetDaemonSetWithNoName(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{Error: true}
 	receivedPod, err := c.Setup(t).Experimental().DaemonSets(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
@@ -96,16 +96,16 @@ func TestGetDaemonSetWithNoName(t *testing.T) {
 }
 
 func TestUpdateDaemonSet(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	requestDaemonSet := &experimental.DaemonSet{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: v1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -113,7 +113,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: experimental.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -123,7 +123,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 }
 
 func TestDeleteDaemon(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
@@ -133,16 +133,16 @@ func TestDeleteDaemon(t *testing.T) {
 }
 
 func TestCreateDaemonSet(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	requestDaemonSet := &experimental.DaemonSet{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: v1.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
@@ -150,7 +150,7 @@ func TestCreateDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: experimental.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},

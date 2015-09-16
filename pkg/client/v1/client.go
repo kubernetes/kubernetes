@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"encoding/json"
@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -156,22 +157,22 @@ func (c *Client) ServerAPIVersions() (*api.APIVersions, error) {
 }
 
 type ComponentValidatorInterface interface {
-	ValidateComponents() (*api.ComponentStatusList, error)
+	ValidateComponents() (*v1.ComponentStatusList, error)
 }
 
 // ValidateComponents retrieves and parses the master's self-monitored cluster state.
 // TODO: This should hit the versioned endpoint when that is implemented.
-func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
+func (c *Client) ValidateComponents() (*v1.ComponentStatusList, error) {
 	body, err := c.Get().AbsPath("/validate").DoRaw()
 	if err != nil {
 		return nil, err
 	}
 
-	statuses := []api.ComponentStatus{}
+	statuses := []v1.ComponentStatus{}
 	if err := json.Unmarshal(body, &statuses); err != nil {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
-	return &api.ComponentStatusList{Items: statuses}, nil
+	return &v1.ComponentStatusList{Items: statuses}, nil
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.

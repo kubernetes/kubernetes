@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 )
 
 type ScaleNamespacer interface {

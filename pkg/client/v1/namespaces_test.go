@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestNamespaceCreate(t *testing.T) {
 	// we create a namespace relative to another namespace
-	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+	namespace := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -53,8 +53,8 @@ func TestNamespaceCreate(t *testing.T) {
 }
 
 func TestNamespaceGet(t *testing.T) {
-	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+	namespace := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -77,10 +77,10 @@ func TestNamespaceGet(t *testing.T) {
 }
 
 func TestNamespaceList(t *testing.T) {
-	namespaceList := &api.NamespaceList{
-		Items: []api.Namespace{
+	namespaceList := &v1.NamespaceList{
+		Items: []v1.Namespace{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: v1.ObjectMeta{Name: "foo"},
 			},
 		},
 	}
@@ -109,8 +109,8 @@ func TestNamespaceList(t *testing.T) {
 }
 
 func TestNamespaceUpdate(t *testing.T) {
-	requestNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	requestNamespace := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
 			Labels: map[string]string{
@@ -118,8 +118,8 @@ func TestNamespaceUpdate(t *testing.T) {
 				"name": "baz",
 			},
 		},
-		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		Spec: v1.NamespaceSpec{
+			Finalizers: []v1.FinalizerName{v1.FinalizerKubernetes},
 		},
 	}
 	c := &testClient{
@@ -133,8 +133,8 @@ func TestNamespaceUpdate(t *testing.T) {
 }
 
 func TestNamespaceFinalize(t *testing.T) {
-	requestNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	requestNamespace := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
 			Labels: map[string]string{
@@ -142,8 +142,8 @@ func TestNamespaceFinalize(t *testing.T) {
 				"name": "baz",
 			},
 		},
-		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		Spec: v1.NamespaceSpec{
+			Finalizers: []v1.FinalizerName{v1.FinalizerKubernetes},
 		},
 	}
 	c := &testClient{

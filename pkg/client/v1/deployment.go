@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -33,7 +34,7 @@ type DeploymentsNamespacer interface {
 type DeploymentInterface interface {
 	List(label labels.Selector, field fields.Selector) (*experimental.DeploymentList, error)
 	Get(name string) (*experimental.Deployment, error)
-	Delete(name string, options *api.DeleteOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
 	Create(Deployment *experimental.Deployment) (*experimental.Deployment, error)
 	Update(Deployment *experimental.Deployment) (*experimental.Deployment, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -68,7 +69,7 @@ func (c *deployments) Get(name string) (result *experimental.Deployment, err err
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
-func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
+func (c *deployments) Delete(name string, options *v1.DeleteOptions) error {
 	if options == nil {
 		return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Do().Error()
 	}

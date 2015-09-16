@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -30,12 +30,12 @@ type NodesInterface interface {
 }
 
 type NodeInterface interface {
-	Get(name string) (result *api.Node, err error)
-	Create(node *api.Node) (*api.Node, error)
-	List(label labels.Selector, field fields.Selector) (*api.NodeList, error)
+	Get(name string) (result *v1.Node, err error)
+	Create(node *v1.Node) (*v1.Node, error)
+	List(label labels.Selector, field fields.Selector) (*v1.NodeList, error)
 	Delete(name string) error
-	Update(*api.Node) (*api.Node, error)
-	UpdateStatus(*api.Node) (*api.Node, error)
+	Update(*v1.Node) (*v1.Node, error)
+	UpdateStatus(*v1.Node) (*v1.Node, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -55,22 +55,22 @@ func (c *nodes) resourceName() string {
 }
 
 // Create creates a new node.
-func (c *nodes) Create(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) Create(node *v1.Node) (*v1.Node, error) {
+	result := &v1.Node{}
 	err := c.r.Post().Resource(c.resourceName()).Body(node).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of nodes that match that selector in the cluster.
-func (c *nodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
-	result := &api.NodeList{}
+func (c *nodes) List(label labels.Selector, field fields.Selector) (*v1.NodeList, error) {
+	result := &v1.NodeList{}
 	err := c.r.Get().Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return result, err
 }
 
 // Get gets an existing node.
-func (c *nodes) Get(name string) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) Get(name string) (*v1.Node, error) {
+	result := &v1.Node{}
 	err := c.r.Get().Resource(c.resourceName()).Name(name).Do().Into(result)
 	return result, err
 }
@@ -81,8 +81,8 @@ func (c *nodes) Delete(name string) error {
 }
 
 // Update updates an existing node.
-func (c *nodes) Update(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) Update(node *v1.Node) (*v1.Node, error) {
+	result := &v1.Node{}
 	if len(node.ResourceVersion) == 0 {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
@@ -91,8 +91,8 @@ func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 	return result, err
 }
 
-func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) UpdateStatus(node *v1.Node) (*v1.Node, error) {
+	result := &v1.Node{}
 	if len(node.ResourceVersion) == 0 {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
@@ -105,7 +105,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 func (c *nodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
-		Namespace(api.NamespaceAll).
+		Namespace(v1.NamespaceAll).
 		Resource(c.resourceName()).
 		Param("resourceVersion", resourceVersion).
 		LabelsSelectorParam(label).

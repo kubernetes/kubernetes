@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"bytes"
@@ -36,6 +36,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -201,7 +202,7 @@ func TestRequestBody(t *testing.T) {
 
 func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	res := Result{err: errors.New("test")}
-	if err := res.Into(&api.Pod{}); err != res.err {
+	if err := res.Into(&v1.Pod{}); err != res.err {
 		t.Errorf("should have returned exact error from result")
 	}
 }
@@ -714,7 +715,7 @@ func TestRequestDo(t *testing.T) {
 
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -810,9 +811,9 @@ func BenchmarkCheckRetryClosesBody(t *testing.B) {
 	}
 }
 func TestDoRequestNewWayReader(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := testapi.Default.Codec().Encode(reqObj)
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -852,9 +853,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := testapi.Default.Codec().Encode(reqObj)
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -894,7 +895,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := testapi.Default.Codec().Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -910,7 +911,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -951,13 +952,13 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestWasCreated(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := testapi.Default.Codec().Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -1168,9 +1169,9 @@ func TestWatch(t *testing.T) {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "first"}}},
-		{watch.Modified, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "second"}}},
-		{watch.Deleted, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "last"}}},
+		{watch.Added, &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "last"}}},
 	}
 
 	auth := &Config{Username: "user", Password: "pass"}

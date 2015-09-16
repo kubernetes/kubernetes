@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -38,7 +39,7 @@ func TestListNodes(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 		},
-		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
+		Response: Response{StatusCode: 200, Body: &v1.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
 	response, err := c.Setup(t).Nodes().List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
@@ -53,10 +54,10 @@ func TestListNodesLabels(t *testing.T) {
 			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.NodeList{
-				Items: []api.Node{
+			Body: &v1.NodeList{
+				Items: []v1.Node{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
@@ -80,7 +81,7 @@ func TestGetNode(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "1"),
 		},
-		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
+		Response: Response{StatusCode: 200, Body: &v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-1"}}},
 	}
 	response, err := c.Setup(t).Nodes().Get("1")
 	c.Validate(t, response, err)
@@ -97,17 +98,17 @@ func TestGetNodeWithNoName(t *testing.T) {
 }
 
 func TestCreateNode(t *testing.T) {
-	requestNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+	requestNode := &v1.Node{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "node-1",
 		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1000m"),
-				api.ResourceMemory: resource.MustParse("1Mi"),
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1000m"),
+				v1.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
-		Spec: api.NodeSpec{
+		Spec: v1.NodeSpec{
 			Unschedulable: false,
 		},
 	}
@@ -138,18 +139,18 @@ func TestDeleteNode(t *testing.T) {
 }
 
 func TestUpdateNode(t *testing.T) {
-	requestNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+	requestNode := &v1.Node{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1000m"),
-				api.ResourceMemory: resource.MustParse("1Mi"),
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1000m"),
+				v1.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
-		Spec: api.NodeSpec{
+		Spec: v1.NodeSpec{
 			Unschedulable: true,
 		},
 	}

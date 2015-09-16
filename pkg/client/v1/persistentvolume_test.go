@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -32,16 +32,16 @@ func getPersistentVolumesResoureName() string {
 }
 
 func TestPersistentVolumeCreate(t *testing.T) {
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "abc",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "/foo"},
 			},
 		},
 	}
@@ -61,17 +61,17 @@ func TestPersistentVolumeCreate(t *testing.T) {
 }
 
 func TestPersistentVolumeGet(t *testing.T) {
-	persistentVolume := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	persistentVolume := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "foo",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "/foo"},
 			},
 		},
 	}
@@ -90,10 +90,10 @@ func TestPersistentVolumeGet(t *testing.T) {
 }
 
 func TestPersistentVolumeList(t *testing.T) {
-	persistentVolumeList := &api.PersistentVolumeList{
-		Items: []api.PersistentVolume{
+	persistentVolumeList := &v1.PersistentVolumeList{
+		Items: []v1.PersistentVolume{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: v1.ObjectMeta{Name: "foo"},
 			},
 		},
 	}
@@ -111,17 +111,17 @@ func TestPersistentVolumeList(t *testing.T) {
 }
 
 func TestPersistentVolumeUpdate(t *testing.T) {
-	persistentVolume := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	persistentVolume := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			ResourceVersion: "1",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "/foo"},
 			},
 		},
 	}
@@ -134,21 +134,21 @@ func TestPersistentVolumeUpdate(t *testing.T) {
 }
 
 func TestPersistentVolumeStatusUpdate(t *testing.T) {
-	persistentVolume := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	persistentVolume := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			ResourceVersion: "1",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "/foo"},
 			},
 		},
-		Status: api.PersistentVolumeStatus{
-			Phase:   api.VolumeBound,
+		Status: v1.PersistentVolumeStatus{
+			Phase:   v1.VolumeBound,
 			Message: "foo",
 		},
 	}

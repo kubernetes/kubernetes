@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -28,11 +28,11 @@ type ServiceAccountsNamespacer interface {
 }
 
 type ServiceAccountsInterface interface {
-	Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error)
-	Update(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error)
+	Create(serviceAccount *v1.ServiceAccount) (*v1.ServiceAccount, error)
+	Update(serviceAccount *v1.ServiceAccount) (*v1.ServiceAccount, error)
 	Delete(name string) error
-	List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error)
-	Get(name string) (*api.ServiceAccount, error)
+	List(label labels.Selector, field fields.Selector) (*v1.ServiceAccountList, error)
+	Get(name string) (*v1.ServiceAccount, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -50,8 +50,8 @@ func newServiceAccounts(c *Client, ns string) ServiceAccountsInterface {
 	}
 }
 
-func (s *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
-	result := &api.ServiceAccount{}
+func (s *serviceAccounts) Create(serviceAccount *v1.ServiceAccount) (*v1.ServiceAccount, error) {
+	result := &v1.ServiceAccount{}
 	err := s.client.Post().
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
@@ -63,8 +63,8 @@ func (s *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.Servi
 }
 
 // List returns a list of serviceAccounts matching the selectors.
-func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error) {
-	result := &api.ServiceAccountList{}
+func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*v1.ServiceAccountList, error) {
+	result := &v1.ServiceAccountList{}
 
 	err := s.client.Get().
 		Namespace(s.namespace).
@@ -78,8 +78,8 @@ func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*a
 }
 
 // Get returns the given serviceAccount, or an error.
-func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
-	result := &api.ServiceAccount{}
+func (s *serviceAccounts) Get(name string) (*v1.ServiceAccount, error) {
+	result := &v1.ServiceAccount{}
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
@@ -111,8 +111,8 @@ func (s *serviceAccounts) Delete(name string) error {
 		Error()
 }
 
-func (s *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
-	result = &api.ServiceAccount{}
+func (s *serviceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
+	result = &v1.ServiceAccount{}
 	err = s.client.Put().
 		Namespace(s.namespace).
 		Resource("serviceAccounts").

@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -29,26 +29,26 @@ func getRCResourceName() string {
 }
 
 func TestListControllers(t *testing.T) {
-	ns := api.NamespaceAll
+	ns := v1.NamespaceAll
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getRCResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
-			Body: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{
+			Body: &v1.ReplicationControllerList{
+				Items: []v1.ReplicationController{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Name: "foo",
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
 							},
 						},
-						Spec: api.ReplicationControllerSpec{
-							Replicas: 2,
-							Template: &api.PodTemplateSpec{},
+						Spec: v1.ReplicationControllerSpec{
+							Replicas: intPointer(2),
+							Template: &v1.PodTemplateSpec{},
 						},
 					},
 				},
@@ -61,22 +61,22 @@ func TestListControllers(t *testing.T) {
 }
 
 func TestGetController(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+			Body: &v1.ReplicationController{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
 						"name": "baz",
 					},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: intPointer(2),
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -86,7 +86,7 @@ func TestGetController(t *testing.T) {
 }
 
 func TestGetControllerWithNoName(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{Error: true}
 	receivedPod, err := c.Setup(t).ReplicationControllers(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
@@ -97,25 +97,25 @@ func TestGetControllerWithNoName(t *testing.T) {
 }
 
 func TestUpdateController(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestController := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+	ns := v1.NamespaceDefault
+	requestController := &v1.ReplicationController{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+			Body: &v1.ReplicationController{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
 						"name": "baz",
 					},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: intPointer(2),
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -125,7 +125,7 @@ func TestUpdateController(t *testing.T) {
 }
 
 func TestDeleteController(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
@@ -135,25 +135,25 @@ func TestDeleteController(t *testing.T) {
 }
 
 func TestCreateController(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestController := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+	ns := v1.NamespaceDefault
+	requestController := &v1.ReplicationController{
+		ObjectMeta: v1.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, ""), Body: requestController, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+			Body: &v1.ReplicationController{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo":  "bar",
 						"name": "baz",
 					},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: intPointer(2),
+					Template: &v1.PodTemplateSpec{},
 				},
 			},
 		},
@@ -161,3 +161,5 @@ func TestCreateController(t *testing.T) {
 	receivedController, err := c.Setup(t).ReplicationControllers(ns).Create(requestController)
 	c.Validate(t, receivedController, err)
 }
+
+func intPointer(x int) *int { return &x }

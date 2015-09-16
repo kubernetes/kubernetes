@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -32,11 +32,11 @@ type EndpointsNamespacer interface {
 
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
-	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
-	List(selector labels.Selector) (*api.EndpointsList, error)
-	Get(name string) (*api.Endpoints, error)
+	Create(endpoints *v1.Endpoints) (*v1.Endpoints, error)
+	List(selector labels.Selector) (*v1.EndpointsList, error)
+	Get(name string) (*v1.Endpoints, error)
 	Delete(name string) error
-	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
+	Update(endpoints *v1.Endpoints) (*v1.Endpoints, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -52,15 +52,15 @@ func newEndpoints(c *Client, namespace string) *endpoints {
 }
 
 // Create creates a new endpoint.
-func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	result := &api.Endpoints{}
+func (c *endpoints) Create(endpoints *v1.Endpoints) (*v1.Endpoints, error) {
+	result := &v1.Endpoints{}
 	err := c.r.Post().Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
-func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, err error) {
-	result = &api.EndpointsList{}
+func (c *endpoints) List(selector labels.Selector) (result *v1.EndpointsList, err error) {
+	result = &v1.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -71,8 +71,8 @@ func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, e
 }
 
 // Get returns information about the endpoints for a particular service.
-func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
-	result = &api.Endpoints{}
+func (c *endpoints) Get(name string) (result *v1.Endpoints, err error) {
+	result = &v1.Endpoints{}
 	err = c.r.Get().Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
 	return
 }
@@ -94,8 +94,8 @@ func (c *endpoints) Watch(label labels.Selector, field fields.Selector, resource
 		Watch()
 }
 
-func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	result := &api.Endpoints{}
+func (c *endpoints) Update(endpoints *v1.Endpoints) (*v1.Endpoints, error) {
+	result := &v1.Endpoints{}
 	if len(endpoints.ResourceVersion) == 0 {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
 	}

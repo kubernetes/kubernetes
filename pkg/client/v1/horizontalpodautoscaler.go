@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -33,7 +34,7 @@ type HorizontalPodAutoscalersNamespacer interface {
 type HorizontalPodAutoscalerInterface interface {
 	List(label labels.Selector, field fields.Selector) (*experimental.HorizontalPodAutoscalerList, error)
 	Get(name string) (*experimental.HorizontalPodAutoscaler, error)
-	Delete(name string, options *api.DeleteOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
 	Create(horizontalPodAutoscaler *experimental.HorizontalPodAutoscaler) (*experimental.HorizontalPodAutoscaler, error)
 	Update(horizontalPodAutoscaler *experimental.HorizontalPodAutoscaler) (*experimental.HorizontalPodAutoscaler, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -68,7 +69,7 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *experimental.Horizo
 }
 
 // Delete takes the name of the horizontalPodAutoscaler and deletes it.  Returns an error if one occurs.
-func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
+func (c *horizontalPodAutoscalers) Delete(name string, options *v1.DeleteOptions) error {
 	// TODO: to make this reusable in other client libraries
 	if options == nil {
 		return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Do().Error()

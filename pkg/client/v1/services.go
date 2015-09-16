@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -30,10 +30,10 @@ type ServicesNamespacer interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	List(selector labels.Selector) (*api.ServiceList, error)
-	Get(name string) (*api.Service, error)
-	Create(srv *api.Service) (*api.Service, error)
-	Update(srv *api.Service) (*api.Service, error)
+	List(selector labels.Selector) (*v1.ServiceList, error)
+	Get(name string) (*v1.Service, error)
+	Create(srv *v1.Service) (*v1.Service, error)
+	Update(srv *v1.Service) (*v1.Service, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	ProxyGet(name, path string, params map[string]string) ResponseWrapper
@@ -51,8 +51,8 @@ func newServices(c *Client, namespace string) *services {
 }
 
 // List takes a selector, and returns the list of services that match that selector
-func (c *services) List(selector labels.Selector) (result *api.ServiceList, err error) {
-	result = &api.ServiceList{}
+func (c *services) List(selector labels.Selector) (result *v1.ServiceList, err error) {
+	result = &v1.ServiceList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
@@ -63,22 +63,22 @@ func (c *services) List(selector labels.Selector) (result *api.ServiceList, err 
 }
 
 // Get returns information about a particular service.
-func (c *services) Get(name string) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Get(name string) (result *v1.Service, err error) {
+	result = &v1.Service{}
 	err = c.r.Get().Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new service.
-func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Create(svc *v1.Service) (result *v1.Service, err error) {
+	result = &v1.Service{}
 	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
-func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Update(svc *v1.Service) (result *v1.Service, err error) {
+	result = &v1.Service{}
 	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }

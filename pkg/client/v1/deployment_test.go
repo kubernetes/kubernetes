@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/v1"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -32,9 +32,9 @@ func getDeploymentsResoureName() string {
 }
 
 func TestDeploymentCreate(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	deployment := experimental.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
@@ -57,9 +57,9 @@ func TestDeploymentCreate(t *testing.T) {
 }
 
 func TestDeploymentGet(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	deployment := &experimental.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
@@ -79,11 +79,11 @@ func TestDeploymentGet(t *testing.T) {
 }
 
 func TestDeploymentList(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	deploymentList := &experimental.DeploymentList{
 		Items: []experimental.Deployment{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "foo",
 					Namespace: ns,
 				},
@@ -104,9 +104,9 @@ func TestDeploymentList(t *testing.T) {
 }
 
 func TestDeploymentUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	deployment := &experimental.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,
 			ResourceVersion: "1",
@@ -125,7 +125,7 @@ func TestDeploymentUpdate(t *testing.T) {
 }
 
 func TestDeploymentDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
@@ -147,6 +147,6 @@ func TestDeploymentWatch(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).Deployments(v1.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }
