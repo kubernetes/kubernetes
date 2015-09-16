@@ -3111,7 +3111,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		done <- struct{}{}
 	}()
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("timed out waiting for registration")
 	case <-done:
 		return

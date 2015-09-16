@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -700,7 +701,7 @@ func TestWatchFromOtherError(t *testing.T) {
 		if ok {
 			t.Fatalf("expected result channel to be closed")
 		}
-	case <-time.After(1 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("watch should have closed channel: %#v", watching)
 	}
 
