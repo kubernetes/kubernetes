@@ -99,7 +99,7 @@ type DockerManager struct {
 	//   2. We use an LRU cache to avoid extra garbage collection work. This
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
-	reasonCache stringCache
+	reasonCache reasonInfoCache
 	// TODO(yifan): Record the pull failure so we can eliminate the image checking
 	// in GetPodStatus()?
 	// Lower level docker image puller.
@@ -187,7 +187,7 @@ func NewDockerManager(
 		}
 	}
 
-	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
+	reasonCache := reasonInfoCache{cache: lru.New(maxReasonCacheEntries)}
 
 	dm := &DockerManager{
 		client:                 client,
@@ -217,35 +217,39 @@ func NewDockerManager(
 }
 
 // A cache which stores strings keyed by <pod_UID>_<container_name>.
-type stringCache struct {
+type reasonInfoCache struct {
 	lock  sync.RWMutex
 	cache *lru.Cache
 }
+type reasonInfo struct {
+	reason  string
+	message string
+}
 
-func (sc *stringCache) composeKey(uid types.UID, name string) string {
+func (sc *reasonInfoCache) composeKey(uid types.UID, name string) string {
 	return fmt.Sprintf("%s_%s", uid, name)
 }
 
-func (sc *stringCache) Add(uid types.UID, name string, value string) {
+func (sc *reasonInfoCache) Add(uid types.UID, name string, reason, message string) {
 	sc.lock.Lock()
 	defer sc.lock.Unlock()
-	sc.cache.Add(sc.composeKey(uid, name), value)
+	sc.cache.Add(sc.composeKey(uid, name), reasonInfo{reason, message})
 }
 
-func (sc *stringCache) Remove(uid types.UID, name string) {
+func (sc *reasonInfoCache) Remove(uid types.UID, name string) {
 	sc.lock.Lock()
 	defer sc.lock.Unlock()
 	sc.cache.Remove(sc.composeKey(uid, name))
 }
 
-func (sc *stringCache) Get(uid types.UID, name string) (string, bool) {
+func (sc *reasonInfoCache) Get(uid types.UID, name string) (reasonInfo, bool) {
 	sc.lock.RLock()
 	defer sc.lock.RUnlock()
 	value, ok := sc.cache.Get(sc.composeKey(uid, name))
 	if ok {
-		return value.(string), ok
+		return value.(reasonInfo), ok
 	} else {
-		return "", ok
+		return reasonInfo{"", ""}, ok
 	}
 }
 
@@ -485,8 +489,8 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	// Handle the containers for which we cannot find any associated active or dead docker containers or are in restart backoff
 	for _, container := range manifest.Containers {
 		if containerStatus, found := statuses[container.Name]; found {
-			reason, ok := dm.reasonCache.Get(uid, container.Name)
-			if ok && reason == kubecontainer.ErrCrashLoopBackOff.Error() {
+			reasonInfo, ok := dm.reasonCache.Get(uid, container.Name)
+			if ok && reasonInfo.reason == kubecontainer.ErrCrashLoopBackOff.Error() {
 				// We need to increment the restart count if we are going to
 				// move the current state to last terminated state.
 				if containerStatus.State.Terminated != nil {
@@ -496,7 +500,8 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 					}
 				}
 				containerStatus.LastTerminationState = containerStatus.State
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{Reason: reason}
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{Reason: reasonInfo.reason,
+					Message: reasonInfo.message}
 				containerStatus.State.Running = nil
 			}
 			continue
@@ -532,8 +537,9 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	for containerName, status := range statuses {
 		if status.State.Waiting != nil {
 			// For containers in the waiting state, fill in a specific reason if it is recorded.
-			if reason, ok := dm.reasonCache.Get(uid, containerName); ok {
-				status.State.Waiting.Reason = reason
+			if reasonInfo, ok := dm.reasonCache.Get(uid, containerName); ok {
+				status.State.Waiting.Reason = reasonInfo.reason
+				status.State.Waiting.Message = reasonInfo.message
 			}
 		}
 		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, *status)
@@ -1681,12 +1687,12 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 }
 
 // updateReasonCache updates the failure reason based on the latest error.
-func (dm *DockerManager) updateReasonCache(pod *api.Pod, container *api.Container, err error) {
-	if err == nil {
+func (dm *DockerManager) updateReasonCache(pod *api.Pod, container *api.Container, briefError string, err error) {
+	if briefError == "" || err == nil {
 		return
 	}
 	errString := err.Error()
-	dm.reasonCache.Add(pod.UID, container.Name, errString)
+	dm.reasonCache.Add(pod.UID, container.Name, briefError, errString)
 }
 
 // clearReasonCache removes the entry in the reason cache.
@@ -1780,7 +1786,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		}
 		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
 		err := dm.imagePuller.PullImage(pod, container, pullSecrets)
-		dm.updateReasonCache(pod, container, err)
+		dm.updateReasonCache(pod, container, "PullImageError", err)
 		if err != nil {
 			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", container.Image, kubecontainer.GetPodFullName(pod), container.Name, err)
 			continue
@@ -1788,7 +1794,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot {
 			err := dm.verifyNonRoot(container)
-			dm.updateReasonCache(pod, container, err)
+			dm.updateReasonCache(pod, container, "VerifyNonRootError", err)
 			if err != nil {
 				glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
 				continue
@@ -1798,7 +1804,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
 		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod))
-		dm.updateReasonCache(pod, container, err)
+		dm.updateReasonCache(pod, container, "RunContainerError", err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
 			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
@@ -1901,8 +1907,9 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 			if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 				dm.recorder.Eventf(ref, "Backoff", "Back-off restarting failed docker container")
 			}
-			dm.updateReasonCache(pod, container, kubecontainer.ErrCrashLoopBackOff)
-			glog.Infof("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, kubecontainer.GetPodFullName(pod))
+			err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, kubecontainer.GetPodFullName(pod))
+			dm.updateReasonCache(pod, container, kubecontainer.ErrCrashLoopBackOff.Error(), err)
+			glog.Infof("%s", err.Error())
 			return true
 		}
 		backOff.Next(stableName, ts.Time)
