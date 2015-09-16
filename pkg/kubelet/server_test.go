@@ -85,7 +85,7 @@ func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, erro
 	return fk.containerVersionFunc()
 }
 
-func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (fk *fakeKubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return fk.machineInfoFunc()
 }
 
