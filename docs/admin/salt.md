@@ -56,7 +56,7 @@ If you are running the Vagrant based environment, the **salt-api** service is ru
 
 ## Standalone Salt Configuration on GCE
 
-On GCE, the master and nodes are all configured as [standalone nodes](http://docs.saltstack.com/en/latest/topics/tutorials/standalone_minion.html). The configuration for each VM is derived from the VM's [instance metadata](https://cloud.google.com/compute/docs/metadata) and then stored in Salt grains (`/etc/salt/minion.d/grains.conf`) and pillars (`/srv/salt-overlay/pillar/cluster-params.sls`) that local Salt uses to enforce state.
+On GCE, the master and nodes are all configured as [standalone minions](http://docs.saltstack.com/en/latest/topics/tutorials/standalone_minion.html). The configuration for each VM is derived from the VM's [instance metadata](https://cloud.google.com/compute/docs/metadata) and then stored in Salt grains (`/etc/salt/minion.d/grains.conf`) and pillars (`/srv/salt-overlay/pillar/cluster-params.sls`) that local Salt uses to enforce state.
 
 All remaining sections that refer to master/minion setups should be ignored for GCE. One fallout of the GCE setup is that the Salt mine doesn't exist - there is no sharing of configuration amongst nodes.
 
