@@ -41,6 +41,15 @@ import (
 // For testing, bypass HandleCrash.
 var ReallyCrash bool
 
+// For any test of the style:
+//   ...
+//   <- time.After(timeout):
+//      t.Errorf("Timed out")
+// The value for timeout should effectively be "forever." Obviously we don't want our tests to truly lock up forever, but 30s
+// is long enough that it is effectively forever for the things that can slow down a run on a heavily contended machine
+// (GC, seeks, etc), but not so long as to make a developer ctrl-c a test run if they do happen to break that test.
+var ForeverTestTimeout = time.Second * 30
+
 // PanicHandlers is a list of functions which will be invoked when a panic happens.
 var PanicHandlers = []func(interface{}){logPanic}
 
