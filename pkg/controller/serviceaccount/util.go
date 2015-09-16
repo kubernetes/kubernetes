@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/auth/user"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 const (
@@ -80,4 +84,43 @@ func UserInfo(namespace, name, uid string) user.Info {
 		UID:    uid,
 		Groups: MakeGroupNames(namespace, name),
 	}
+}
+
+// GetServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
+func GetServiceAccountTokens(secretsNamespacer client.SecretsNamespacer, sa *api.ServiceAccount) ([]*api.Secret, error) {
+	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	secrets, err := secretsNamespacer.Secrets(sa.Namespace).List(labels.Everything(), tokenSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenSecrets := []*api.Secret{}
+	for i := range secrets.Items {
+		secret := &secrets.Items[i]
+		if IsServiceAccountToken(secret, sa) {
+			tokenSecrets = append(tokenSecrets, secret)
+		}
+	}
+
+	return tokenSecrets, nil
+}
+
+// IsServiceAccountToken returns true if the secret is a valid api token for the service account
+func IsServiceAccountToken(secret *api.Secret, sa *api.ServiceAccount) bool {
+	if secret.Type != api.SecretTypeServiceAccountToken {
+		return false
+	}
+
+	name := secret.Annotations[api.ServiceAccountNameKey]
+	uid := secret.Annotations[api.ServiceAccountUIDKey]
+	if name != sa.Name {
+		// Name must match
+		return false
+	}
+	if len(uid) > 0 && uid != string(sa.UID) {
+		// If UID is specified, it must match
+		return false
+	}
+
+	return true
 }
