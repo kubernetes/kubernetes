@@ -132,7 +132,7 @@ type ebsManager interface {
 	DetachDisk(c *awsElasticBlockStoreCleaner) error
 }
 
-// awsElasticBlockStore volumes are disk resources provided by Google Compute Engine
+// awsElasticBlockStore volumes are disk resources provided by Amazon Web Services
 // that are attached to the kubelet's host machine and exposed to the pod.
 type awsElasticBlockStore struct {
 	volName string
