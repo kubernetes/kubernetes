@@ -79,8 +79,8 @@ done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
-# Configure the openvswitch network
-provision-network
+# Configure the master network
+provision-network-master
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
@@ -108,6 +108,7 @@ grains:
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
+  keep_host_etcd: true
 EOF
 
 mkdir -p /srv/salt-overlay/pillar

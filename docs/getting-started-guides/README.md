@@ -134,7 +134,7 @@ Here are all the solutions mentioned above in table form.
 IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms | Support Level
 -------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ---------| ----------------------------
 GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine) | [✓][3]   | Commercial
-Vagrant              | Saltstack    | Fedora | OVS         | [docs](vagrant.md)                                | [✓][2]   | Project
+Vagrant              | Saltstack    | Fedora | flannel     | [docs](vagrant.md)                                | [✓][2]   | Project
 GCE                  | Saltstack    | Debian | GCE         | [docs](gce.md)                                    | [✓][1]   | Project
 Azure                | CoreOS       | CoreOS | Weave       | [docs](coreos/azure/README.md)                    |          | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin))
 Docker Single Node   | custom       | N/A    | local       | [docs](docker.md)                                 |          | Project ([@brendandburns](https://github.com/brendandburns))
