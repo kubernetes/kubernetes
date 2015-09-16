@@ -25,6 +25,10 @@ import (
 
 type fakeCodec struct{}
 
+func (fakeCodec) Version() string {
+	return ""
+}
+
 func (fakeCodec) Encode(runtime.Object) ([]byte, error) {
 	return []byte{}, nil
 }

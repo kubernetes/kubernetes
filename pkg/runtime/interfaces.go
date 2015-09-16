@@ -45,6 +45,9 @@ type Decoder interface {
 // Encoder defines methods for serializing API objects into bytes
 type Encoder interface {
 	Encode(obj Object) (data []byte, err error)
+	// Version returns the group and version the encoder will encode an object
+	// to, in the form of "group/version".
+	Version() (version string)
 }
 
 // Codec defines methods for serializing and deserializing API objects.

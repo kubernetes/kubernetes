@@ -78,6 +78,11 @@ func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
 	return c.EncodeToVersion(obj, c.version)
 }
 
+// Version implements Encoder
+func (c *codecWrapper) Version() string {
+	return c.version
+}
+
 // TODO: Make this behaviour default when we move everyone away from
 // the unversioned types.
 //
