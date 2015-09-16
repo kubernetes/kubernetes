@@ -113,10 +113,10 @@ func (r *RequireSomePodResources) Procure(t *T, offer *mesos.Offer) error {
 	// TODO(jdef): changing the state of t.Pod here feels dirty, especially since we don't use a kosher
 	// method to clone the api.Pod state in T.Clone(). This needs some love.
 	if unlimitedCPU := mresource.LimitPodCPU(&t.Pod, r.defaultContainerCPULimit); unlimitedCPU {
-		log.Warningf("Pod %s/%s without cpu limits is admitted %.2f cpu shares", t.Pod.Namespace, t.Pod.Name, mresource.PodCPULimit(&t.Pod))
+		log.V(2).Infof("Pod %s/%s without cpu limits is admitted %.2f cpu shares", t.Pod.Namespace, t.Pod.Name, mresource.PodCPULimit(&t.Pod))
 	}
 	if unlimitedMem := mresource.LimitPodMem(&t.Pod, r.defaultContainerMemLimit); unlimitedMem {
-		log.Warningf("Pod %s/%s without memory limits is admitted %.2f MB", t.Pod.Namespace, t.Pod.Name, mresource.PodMemLimit(&t.Pod))
+		log.V(2).Infof("Pod %s/%s without memory limits is admitted %.2f MB", t.Pod.Namespace, t.Pod.Name, mresource.PodMemLimit(&t.Pod))
 	}
 	return nil
 }
