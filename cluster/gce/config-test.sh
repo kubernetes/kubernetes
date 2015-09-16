@@ -62,10 +62,7 @@ TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=4}"
 
 KUBELET_TEST_ARGS="--max-pods=100 $TEST_CLUSTER_LOG_LEVEL"
 APISERVER_TEST_ARGS="--runtime-config=experimental/v1 ${TEST_CLUSTER_LOG_LEVEL}"
-# pod-eviction-timeout is currently 2 * node-monitor-grace-period to allow for some network
-# problems, but don't ensure that the Kubelet can be restarted without evicting Pods. We don't
-# think it's necessary for tests.
-CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL} --pod-eviction-timeout=1m20s"
+CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 SCHEDULER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 
