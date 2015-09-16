@@ -100,7 +100,7 @@ func NewDefaultPathOptions() *PathOptions {
 		EnvVar:           clientcmd.RecommendedConfigPathEnvVar,
 		ExplicitFileFlag: clientcmd.RecommendedConfigPathFlag,
 
-		GlobalFileSubpath: clientcmd.RecommendedHomeFileName,
+		GlobalFileSubpath: path.Join(clientcmd.RecommendedHomeDir, clientcmd.RecommendedFileName),
 
 		LoadingRules: clientcmd.NewDefaultClientConfigLoadingRules(),
 	}

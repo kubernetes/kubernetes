@@ -24,6 +24,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path"
 	"strconv"
 
@@ -308,9 +309,63 @@ type schemaClient interface {
 	Get() *client.Request
 }
 
+func recursiveSplit(dir string) []string {
+	parent, file := path.Split(dir)
+	if len(parent) == 0 {
+		return []string{file}
+	}
+	return append(recursiveSplit(parent[:len(parent)-1]), file)
+}
+
+func substituteUserHome(dir string) (string, error) {
+	if len(dir) == 0 || dir[0] != '~' {
+		return dir, nil
+	}
+	parts := recursiveSplit(dir)
+	if len(parts[0]) == 1 {
+		parts[0] = os.Getenv("HOME")
+	} else {
+		usr, err := user.Lookup(parts[0][1:])
+		if err != nil {
+			return "", err
+		}
+		parts[0] = usr.HomeDir
+	}
+	return path.Join(parts...), nil
+}
+
+func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersion string) error {
+	if err := os.MkdirAll(path.Join(cacheDir, prefix, groupVersion), 0755); err != nil {
+		return err
+	}
+	tmpFile, err := ioutil.TempFile(cacheDir, "schema")
+	if err != nil {
+		// If we can't write, keep going.
+		if os.IsPermission(err) {
+			return nil
+		}
+		return err
+	}
+	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
+		return err
+	}
+	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
+		// If we can't write due to file existing, or permission problems, keep going.
+		if os.IsExist(err) || os.IsPermission(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string) (err error) {
 	var schemaData []byte
-	cacheFile := path.Join(cacheDir, prefix, groupVersion, schemaFileName)
+	fullDir, err := substituteUserHome(cacheDir)
+	if err != nil {
+		return err
+	}
+	cacheFile := path.Join(fullDir, prefix, groupVersion, schemaFileName)
 
 	if len(cacheDir) != 0 {
 		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
@@ -326,17 +381,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 			return err
 		}
 		if len(cacheDir) != 0 {
-			if err = os.MkdirAll(path.Join(cacheDir, prefix, groupVersion), 0755); err != nil {
-				return err
-			}
-			tmpFile, err := ioutil.TempFile(cacheDir, "schema")
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
-				return err
-			}
-			if err := os.Link(tmpFile.Name(), cacheFile); err != nil && !os.IsExist(err) {
+			if err := writeSchemaFile(schemaData, fullDir, cacheFile, prefix, groupVersion); err != nil {
 				return err
 			}
 		}
