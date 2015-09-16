@@ -212,7 +212,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.Kind, kubectl.NewScalerClient(client))
+			return kubectl.ScalerFor(mapping.Kind, client)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
