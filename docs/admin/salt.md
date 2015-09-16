@@ -64,7 +64,7 @@ All remaining sections that refer to master/minion setups should be ignored for 
 
 *(Not applicable on default GCE setup.)*
 
-Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from nodes.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
+Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
 ```console
 [root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
