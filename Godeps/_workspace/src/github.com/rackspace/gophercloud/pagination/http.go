@@ -36,13 +36,19 @@ func PageResultFrom(resp *http.Response) (PageResult, error) {
 		parsedBody = rawBody
 	}
 
+	return PageResultFromParsed(resp, parsedBody), err
+}
+
+// PageResultFromParsed constructs a PageResult from an HTTP response that has already had its
+// body parsed as JSON (and closed).
+func PageResultFromParsed(resp *http.Response, body interface{}) PageResult {
 	return PageResult{
 		Result: gophercloud.Result{
-			Body:   parsedBody,
+			Body:   body,
 			Header: resp.Header,
 		},
 		URL: *resp.Request.URL,
-	}, err
+	}
 }
 
 // Request performs an HTTP request and extracts the http.Response from the result.
