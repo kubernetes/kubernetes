@@ -92,9 +92,8 @@ func (k *k8smScheduler) createPodTask(ctx api.Context, pod *api.Pod) (*podtask.T
 	return podtask.New(ctx, "", *pod, k.internal.executor)
 }
 
-func (k *k8smScheduler) slaveFor(id string) (slave *Slave, ok bool) {
-	slave, ok = k.internal.slaves.getSlave(id)
-	return
+func (k *k8smScheduler) slaveHostNameFor(id string) string {
+	return k.internal.slaveHostNames.HostName(id)
 }
 
 func (k *k8smScheduler) killTask(taskId string) error {
@@ -326,7 +325,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
 	slaveId := details.GetSlaveId().GetValue()
-	if slave, ok := k.api.slaveFor(slaveId); !ok {
+	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
 		k.api.offers().Invalidate(details.Id.GetValue())
@@ -343,7 +342,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			offer.Release()
 			return "", err
 		}
-		return slave.HostName, nil
+		return slaveHostName, nil
 	}
 }
 
