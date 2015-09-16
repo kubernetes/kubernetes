@@ -26,11 +26,21 @@ mesosmaster1:
   links:
   - etcd
   - "ambassador:apiserver"
-mesosslave1:
-  hostname: mesosslave1
+mesosslave:
+  hostname: mesosslave
   privileged: true
   image: mesosphere/mesos-slave-dind:0.23.0-1.0.ubuntu1404.docker181
-  entrypoint: [ "bash", "-c", "wrapdocker mesos-slave --hostname=$(getent hosts mesosslave1 | cut -d' ' -f1 | sort -u | tail -1)" ]
+  entrypoint:
+  - bash
+  - -xc
+  - >
+    NAME=$(cut -f2 -d/ <<<$MESOSMASTER1_NAME) &&
+    N=${NAME##*_} &&
+    DOCKER_NETWORK_OFFSET=0.0.$N.0
+    exec wrapdocker mesos-slave
+    --work_dir="/var/tmp/mesos/$N"
+    --attributes=rack:$N\\;gen:201$N
+    --hostname=$(getent hosts mesosslave | cut -d' ' -f1 | sort -u | tail -1)
   command: ~
   environment:
   - MESOS_MASTER=mesosmaster1:5050
@@ -40,38 +50,13 @@ mesosslave1:
   - MESOS_RESOURCES=cpus:4;mem:1280;disk:25600;ports:[21000-21099]
   - MESOS_SWITCH_USER=0
   - MESOS_CONTAINERIZERS=docker,mesos
-  - MESOS_WORK_DIR=/var/tmp/mesos
-  - DOCKER_NETWORK_OFFSET=0.0.1.0
   - DOCKER_DAEMON_ARGS
   links:
   - etcd
   - mesosmaster1
   - "ambassador:apiserver"
   volumes:
-  - ${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos:/var/tmp/mesos
-mesosslave2:
-  hostname: mesosslave2
-  privileged: true
-  image: mesosphere/mesos-slave-dind:0.23.0-1.0.ubuntu1404.docker181
-  entrypoint: [ "bash", "-c", "wrapdocker mesos-slave --hostname=$(getent hosts mesosslave2 | cut -d' ' -f1 | sort -u | tail -1)" ]
-  command: ~
-  environment:
-  - MESOS_MASTER=mesosmaster1:5050
-  - MESOS_PORT=5051
-  - MESOS_LOG_DIR=/var/log/mesos
-  - MESOS_LOGGING_LEVEL=INFO
-  - MESOS_RESOURCES=cpus:4;mem:1280;disk:25600;ports:[21000-21099]
-  - MESOS_SWITCH_USER=0
-  - MESOS_CONTAINERIZERS=docker,mesos
-  - MESOS_WORK_DIR=/var/tmp/mesos
-  - DOCKER_NETWORK_OFFSET=0.0.2.0
-  - DOCKER_DAEMON_ARGS
-  links:
-  - etcd
-  - mesosmaster1
-  - "ambassador:apiserver"
-  volumes:
-  - ${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:/var/tmp/mesos
+  - ${MESOS_DOCKER_WORK_DIR}/mesosslave:/var/tmp/mesos
 apiserver:
   hostname: apiserver
   image: mesosphere/kubernetes-mesos
@@ -166,8 +151,6 @@ scheduler:
   links:
   - etcd
   - mesosmaster1
-  - mesosslave1
-  - mesosslave2
   - apiserver
 keygen:
   image: mesosphere/kubernetes-mesos-keygen
