@@ -33,13 +33,12 @@ type MockScheduler struct {
 	mock.Mock
 }
 
-func (m *MockScheduler) slaveFor(id string) (slave *Slave, ok bool) {
+func (m *MockScheduler) slaveHostNameFor(id string) (hostName string) {
 	args := m.Called(id)
 	x := args.Get(0)
 	if x != nil {
-		slave = x.(*Slave)
+		hostName = x.(string)
 	}
-	ok = args.Bool(1)
 	return
 }
 func (m *MockScheduler) algorithm() (f PodScheduler) {
@@ -87,8 +86,8 @@ func (m *MockScheduler) launchTask(task *podtask.T) error {
 // @deprecated this is a placeholder for me to test the mock package
 func TestNoSlavesYet(t *testing.T) {
 	obj := &MockScheduler{}
-	obj.On("slaveFor", "foo").Return(nil, false)
-	obj.slaveFor("foo")
+	obj.On("slaveHostNameFor", "foo").Return(nil)
+	obj.slaveHostNameFor("foo")
 	obj.AssertExpectations(t)
 }
 
