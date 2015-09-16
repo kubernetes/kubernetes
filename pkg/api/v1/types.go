@@ -1715,23 +1715,35 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty"`
 }
 
+// DaemonEndpoint contains information about a single Daemon endpoint.
+type DaemonEndpoint struct {
+	// Port number of the given endpoint.
+	Port int `json:port`
+}
+
+// NodeDaemonEndpoints lists ports opened by daemons running on the Node.
+type NodeDaemonEndpoints struct {
+	// Endpoint on which Kubelet is listening.
+	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty"`
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
-	// MachineID is the machine-id reported by the node.
+	// Machine ID reported by the node.
 	MachineID string `json:"machineID"`
-	// SystemUUID is the system-uuid reported by the node.
+	// System UUID reported by the node.
 	SystemUUID string `json:"systemUUID"`
-	// BootID is the boot-id reported by the node.
+	// Boot ID reported by the node.
 	BootID string `json:"bootID"`
-	// Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)
+	// Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
 	KernelVersion string `json:"kernelVersion"`
-	// OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))
+	// OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).
 	OsImage string `json:"osImage"`
-	// Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)
+	// ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0).
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
-	// Kubelet version reported by the node.
+	// Kubelet Version reported by the node.
 	KubeletVersion string `json:"kubeletVersion"`
-	// Kube-proxy version reported by the node.
+	// KubeProxy Version reported by the node.
 	KubeProxyVersion string `json:"kubeProxyVersion"`
 }
 
@@ -1750,7 +1762,9 @@ type NodeStatus struct {
 	// Queried from cloud provider, if available.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses
 	Addresses []NodeAddress `json:"addresses,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
-	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
+	// Endpoints of daemons running on the Node.
+	DaemonEndpoints NodeDaemonEndpoints `json:"daemonEndpoints,omitempty"`
+	// Set of ids/uuids to uniquely identify the node.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }

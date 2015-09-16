@@ -173,7 +173,8 @@ func NewMainKubelet(
 	pods int,
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
-	cpuCFSQuota bool) (*Kubelet, error) {
+	cpuCFSQuota bool,
+	daemonEndpoints *api.NodeDaemonEndpoints) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -291,6 +292,7 @@ func NewMainKubelet(
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
+		daemonEndpoints:                daemonEndpoints,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -571,6 +573,9 @@ type Kubelet struct {
 
 	// True if container cpu limits should be enforced via cgroup CFS quota
 	cpuCFSQuota bool
+
+	// Information about the ports which are opened by daemons on Node running this Kubelet server.
+	daemonEndpoints *api.NodeDaemonEndpoints
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -2323,6 +2328,8 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		// TODO: kube-proxy might be different version from kubelet in the future
 		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 	}
+
+	node.Status.DaemonEndpoints = *kl.daemonEndpoints
 
 	// Check whether container runtime can be reported as up.
 	containerRuntimeUp := kl.containerRuntimeUp()

@@ -224,6 +224,15 @@ func (ContainerStatus) SwaggerDoc() map[string]string {
 	return map_ContainerStatus
 }
 
+var map_DaemonEndpoint = map[string]string{
+	"":     "DaemonEndpoint contains information about a single Daemon endpoint.",
+	"Port": "Port number of the given endpoint.",
+}
+
+func (DaemonEndpoint) SwaggerDoc() map[string]string {
+	return map_DaemonEndpoint
+}
+
 var map_DeleteOptions = map[string]string{
 	"":                   "DeleteOptions may be provided when deleting an API object",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
@@ -653,6 +662,15 @@ func (NodeCondition) SwaggerDoc() map[string]string {
 	return map_NodeCondition
 }
 
+var map_NodeDaemonEndpoints = map[string]string{
+	"":                "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
+	"kubeletEndpoint": "Endpoint on which Kubelet is listening.",
+}
+
+func (NodeDaemonEndpoints) SwaggerDoc() map[string]string {
+	return map_NodeDaemonEndpoints
+}
+
 var map_NodeList = map[string]string{
 	"":         "NodeList is the whole list of all Nodes which have been registered with master.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -676,12 +694,13 @@ func (NodeSpec) SwaggerDoc() map[string]string {
 }
 
 var map_NodeStatus = map[string]string{
-	"":           "NodeStatus is information about the current status of a node.",
-	"capacity":   "Capacity represents the available resources of a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details.",
-	"phase":      "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase",
-	"conditions": "Conditions is an array of current observed node conditions. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-condition",
-	"addresses":  "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses",
-	"nodeInfo":   "NodeSystemInfo is a set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
+	"":                "NodeStatus is information about the current status of a node.",
+	"capacity":        "Capacity represents the available resources of a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details.",
+	"phase":           "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase",
+	"conditions":      "Conditions is an array of current observed node conditions. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-condition",
+	"addresses":       "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses",
+	"daemonEndpoints": "Endpoints of daemons running on the Node.",
+	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
@@ -690,14 +709,14 @@ func (NodeStatus) SwaggerDoc() map[string]string {
 
 var map_NodeSystemInfo = map[string]string{
 	"":                        "NodeSystemInfo is a set of ids/uuids to uniquely identify the node.",
-	"machineID":               "MachineID is the machine-id reported by the node.",
-	"systemUUID":              "SystemUUID is the system-uuid reported by the node.",
-	"bootID":                  "BootID is the boot-id reported by the node.",
-	"kernelVersion":           "Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)",
-	"osImage":                 "OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))",
-	"containerRuntimeVersion": "Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)",
-	"kubeletVersion":          "Kubelet version reported by the node.",
-	"kubeProxyVersion":        "Kube-proxy version reported by the node.",
+	"machineID":               "Machine ID reported by the node.",
+	"systemUUID":              "System UUID reported by the node.",
+	"bootID":                  "Boot ID reported by the node.",
+	"kernelVersion":           "Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).",
+	"osImage":                 "OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).",
+	"containerRuntimeVersion": "ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0).",
+	"kubeletVersion":          "Kubelet Version reported by the node.",
+	"kubeProxyVersion":        "KubeProxy Version reported by the node.",
 }
 
 func (NodeSystemInfo) SwaggerDoc() map[string]string {
