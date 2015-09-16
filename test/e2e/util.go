@@ -490,9 +490,9 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 	return got, nil
 }
 
-// deleteTestingNS checks whether all e2e based existing namespaces are in the Terminating state
-// and waits until they are finally deleted.
-func deleteTestingNS(c *client.Client) error {
+// checkTestingNSDeletedExcept checks whether all e2e based existing namespaces are in the Terminating state
+// and waits until they are finally deleted. It ignores namespace skip.
+func checkTestingNSDeletedExcept(c *client.Client, skip string) error {
 	// TODO: Since we don't have support for bulk resource deletion in the API,
 	// while deleting a namespace we are deleting all objects from that namespace
 	// one by one (one deletion == one API call). This basically exposes us to
@@ -515,7 +515,7 @@ func deleteTestingNS(c *client.Client) error {
 		}
 		terminating := 0
 		for _, ns := range namespaces.Items {
-			if strings.HasPrefix(ns.ObjectMeta.Name, "e2e-tests-") {
+			if strings.HasPrefix(ns.ObjectMeta.Name, "e2e-tests-") && ns.ObjectMeta.Name != skip {
 				if ns.Status.Phase == api.NamespaceActive {
 					return fmt.Errorf("Namespace %s is active", ns.ObjectMeta.Name)
 				}

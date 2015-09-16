@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"sync"
@@ -30,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -72,20 +71,6 @@ func printLatencies(latencies []podLatencyData, header string) {
 	Logf("perc50: %v, perc90: %v, perc99: %v", perc50, perc90, perc99)
 }
 
-// List nodes via gcloud. We don't rely on the apiserver because we really want the node ips
-// and sometimes the node controller is slow to populate them.
-func gcloudListNodes() {
-	Logf("Listing nodes via gcloud:")
-	output, err := exec.Command("gcloud", "compute", "instances", "list",
-		"--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone).CombinedOutput()
-	if err != nil {
-		Logf("Failed to list nodes: %v", err)
-		return
-	}
-	Logf(string(output))
-	return
-}
-
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -97,11 +82,14 @@ var _ = Describe("Density", func() {
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
+	framework := Framework{BaseName: "density"}
 
 	BeforeEach(func() {
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 		var err error
-		c, err = loadClient()
-		expectNoError(err)
+
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
@@ -110,25 +98,31 @@ var _ = Describe("Density", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = deleteTestingNS(c)
+		err = checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
-		nsForTesting, err := createTestingNS("density", c)
-		ns = nsForTesting.Name
-		expectNoError(err)
 		uuid = string(util.NewUUID())
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
-		gcloudListNodes()
+
+		Logf("Listing nodes for easy debugging:\n")
+		for _, node := range nodes.Items {
+			for _, address := range node.Status.Addresses {
+				if address.Type == api.NodeInternalIP {
+					Logf("Name: %v IP: %v", node.ObjectMeta.Name, address.Address)
+				}
+			}
+		}
 	})
 
 	AfterEach(func() {
 		// Remove any remaining pods from this test if the
 		// replication controller still exists and the replica count
 		// isn't 0.  This means the controller wasn't cleaned up
-		// during the test so clean it up here
+		// during the test so clean it up here. We want to do it separately
+		// to not cause a timeout on Namespace removal.
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
@@ -142,17 +136,14 @@ var _ = Describe("Density", func() {
 			c.Pods(ns).Delete(name, nil)
 		}
 
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
 		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, sets.NewString("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+
+		framework.afterEach()
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
@@ -206,7 +197,7 @@ var _ = Describe("Density", func() {
 
 			// Create a listener for events.
 			events := make([](*api.Event), 0)
-			_, controller := framework.NewInformer(
+			_, controller := controllerFramework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func() (runtime.Object, error) {
 						return c.Events(ns).List(labels.Everything(), fields.Everything())
@@ -217,7 +208,7 @@ var _ = Describe("Density", func() {
 				},
 				&api.Event{},
 				0,
-				framework.ResourceEventHandlerFuncs{
+				controllerFramework.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						events = append(events, obj.(*api.Event))
 					},
@@ -289,7 +280,7 @@ var _ = Describe("Density", func() {
 				}
 
 				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
-				_, controller := framework.NewInformer(
+				_, controller := controllerFramework.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func() (runtime.Object, error) {
 							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
@@ -300,7 +291,7 @@ var _ = Describe("Density", func() {
 					},
 					&api.Pod{},
 					0,
-					framework.ResourceEventHandlerFuncs{
+					controllerFramework.ResourceEventHandlerFuncs{
 						AddFunc: func(obj interface{}) {
 							p, ok := obj.(*api.Pod)
 							Expect(ok).To(Equal(true))

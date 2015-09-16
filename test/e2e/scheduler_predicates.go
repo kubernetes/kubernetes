@@ -153,7 +153,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		nodeCount = len(nodeList.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
-		err = deleteTestingNS(c)
+		err = checkTestingNSDeletedExcept(c, "")
 		expectNoError(err)
 
 		nsForTesting, err := createTestingNS("sched-pred", c)
