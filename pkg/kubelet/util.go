@@ -73,3 +73,58 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 	}
 	return false, nil
 }
+
+// Annotations that the kubelet adds to the pod.
+var localAnnotations = []string{
+	ConfigSourceAnnotationKey,
+	ConfigMirrorAnnotationKey,
+	ConfigFirstSeenAnnotationKey,
+}
+
+func isLocalAnnotationKey(key string) bool {
+	for _, localKey := range localAnnotations {
+		if key == localKey {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPodRemoteAnnotationMapEqual returns true if the existing annotation Map is equal to candidate except
+// for local annotations.
+func IsPodRemoteAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
+	if candidateMap == nil {
+		return true
+	}
+	for k, v := range candidateMap {
+		if existingValue, ok := existingMap[k]; ok && existingValue == v {
+			continue
+		}
+		return false
+	}
+	for k := range existingMap {
+		if isLocalAnnotationKey(k) {
+			continue
+		}
+		// stale entry in existing map.
+		if _, exists := candidateMap[k]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+// UpdatePodRemoteAnnotations returns an Annotation map containing the api annotation map plus
+// locally managed annotations
+func UpdatePodRemoteAnnotations(existing, ref *api.Pod) {
+	annotations := make(map[string]string, len(ref.Annotations)+len(localAnnotations))
+	for k, v := range ref.Annotations {
+		annotations[k] = v
+	}
+	for _, k := range localAnnotations {
+		if v, ok := existing.Annotations[k]; ok {
+			annotations[k] = v
+		}
+	}
+	existing.Annotations = annotations
+}

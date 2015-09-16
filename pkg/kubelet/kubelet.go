@@ -1355,12 +1355,17 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	if isStaticPod(pod) {
-		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
-			// The mirror pod is semantically different from the static pod. Remove
-			// it. The mirror pod will get recreated later.
-			glog.Errorf("Deleting mirror pod %q because it is outdated", podFullName)
-			if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
-				glog.Errorf("Failed deleting mirror pod %q: %v", podFullName, err)
+		if mirrorPod != nil {
+			if !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
+				// The mirror pod is semantically different from the static pod. Remove
+				// it. The mirror pod will get recreated later.
+				glog.Errorf("Deleting mirror pod %q because it is outdated", podFullName)
+				if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
+					glog.Errorf("Failed deleting mirror pod %q: %v", podFullName, err)
+				}
+			} else {
+				// Merge in the annotations from the mirror pod.
+				UpdatePodRemoteAnnotations(pod, mirrorPod)
 			}
 		}
 		if mirrorPod == nil {
