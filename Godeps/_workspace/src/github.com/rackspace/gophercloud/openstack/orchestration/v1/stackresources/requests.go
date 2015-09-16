@@ -25,12 +25,6 @@ type ListOptsBuilder interface {
 // ListOpts allows the filtering and sorting of paginated collections through
 // the API. Marker and Limit are used for pagination.
 type ListOpts struct {
-	// The stack resource ID with which to start the listing.
-	Marker string `q:"marker"`
-
-	// Integer value for the limit of values to return.
-	Limit int `q:"limit"`
-
 	// Include resources from nest stacks up to Depth levels of recursion.
 	Depth int `q:"nested_depth"`
 }
@@ -57,9 +51,7 @@ func List(client *gophercloud.ServiceClient, stackName, stackID string, opts Lis
 	}
 
 	createPageFn := func(r pagination.PageResult) pagination.Page {
-		p := ResourcePage{pagination.MarkerPageBase{PageResult: r}}
-		p.MarkerPageBase.Owner = p
-		return p
+		return ResourcePage{pagination.SinglePageBase(r)}
 	}
 
 	return pagination.NewPager(client, url, createPageFn)

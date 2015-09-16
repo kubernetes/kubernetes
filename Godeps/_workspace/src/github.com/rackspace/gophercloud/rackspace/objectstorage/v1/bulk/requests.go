@@ -43,7 +43,9 @@ func Delete(c *gophercloud.ServiceClient, opts DeleteOptsBuilder) DeleteResult {
 		JSONBody:     reqBody,
 		JSONResponse: &res.Body,
 	})
-	res.Header = resp.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }

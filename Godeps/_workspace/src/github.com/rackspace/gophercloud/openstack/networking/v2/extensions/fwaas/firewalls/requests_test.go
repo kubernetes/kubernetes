@@ -212,9 +212,9 @@ func TestUpdate(t *testing.T) {
         "name": "fw",
         "admin_state_up": false,
         "tenant_id": "b4eedccc6fb74fa8a7ad6b08382b852b",
-        "firewall_policy_id": "19ab8c87-4a32-4e6a-a74e-b77fffb89a0c"
+        "firewall_policy_id": "19ab8c87-4a32-4e6a-a74e-b77fffb89a0c",
         "id": "ea5b5315-64f6-4ea3-8e58-981cc37c6576",
-        "description": "OpenStack firewall",
+        "description": "OpenStack firewall"
     }
 }
     `)
