@@ -208,7 +208,7 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 
 // ScaleRC scales the given rc to the given replicas.
 func ScaleRC(name, ns string, replicas int, restClient *client.Client) (*api.ReplicationController, error) {
-	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(restClient))
+	scaler, err := kubectl.ScalerFor("ReplicationController", restClient)
 	if err != nil {
 		return nil, err
 	}
