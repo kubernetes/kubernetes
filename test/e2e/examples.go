@@ -223,11 +223,11 @@ var _ = Describe("Examples e2e", func() {
 
 			By("starting workers")
 			runKubectl("create", "-f", workerControllerYaml, nsFlag)
-			ScaleRC(c, ns, "spark-worker-controller", 2)
+			ScaleRC(c, ns, "spark-worker-controller", 2, true)
 			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
-            })
+			})
 		})
 	})
 

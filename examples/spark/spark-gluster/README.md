@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/examples/spark/spark-gluster/README.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Spark on GlusterFS example
 
 This guide is an extension of the standard [Spark on Kubernetes Guide](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/spark) and describes how to run Spark on GlusterFS using the [Kubernetes Volume Plugin for GlusterFS](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/glusterfs)
@@ -8,58 +41,64 @@ The setup is the same in that you will setup a Spark Master Service in the same 
 
 ## Step Zero: Prerequisites
 
-This example assumes that you have been able to successfully get the standard Spark Example working in Kubernetes and that you have a GlusterFS cluster that is accessible from your Kubernetes cluster. It is also recommended that you are familiar with the GlusterFS Volume Plugin and how to configure it. 
+This example assumes that you have been able to successfully get the standard Spark Example working in Kubernetes and that you have a GlusterFS cluster that is accessible from your Kubernetes cluster. It is also recommended that you are familiar with the GlusterFS Volume Plugin and how to configure it.
 
 ## Step One: Define the endpoints for your GlusterFS Cluster
 
-Modify the `examples/spark/spark-gluster/glusterfs-endpoints.json` file to list the IP addresses of some of the servers in your GlusterFS cluster. The GlusterFS Volume Plugin uses these IP addresses to perform a Fuse Mount of the GlusterFS Volume into the Spark Worker Containers that are launched by the ReplicationController in the next section.
+Modify the `examples/spark/spark-gluster/glusterfs-endpoints.yaml` file to list the IP addresses of some of the servers in your GlusterFS cluster. The GlusterFS Volume Plugin uses these IP addresses to perform a Fuse Mount of the GlusterFS Volume into the Spark Worker Containers that are launched by the ReplicationController in the next section.
 
 Register your endpoints by running the following command:
 
 ```shell
-$ kubectl create -f examples/spark/spark-gluster/glusterfs-endpoints.json
+$ kubectl create -f examples/spark/spark-gluster/glusterfs-endpoints.yaml
 ```
+
 ## Step Two: Modify and Submit your Spark Master Pod
 
-Modify the `examples/spark/spark-gluster/spark-master.json` file to reflect the GlusterFS Volume that you wish to use in the PATH parameter of the volumes subsection. 
+Modify the `examples/spark/spark-gluster/spark-master.yaml` file to reflect the GlusterFS Volume that you wish to use in the PATH parameter of the volumes subsection.
 
-Submit the Spark Master Pod 
+Submit the Spark Master Pod
 
 ```shell
-$ kubectl create -f examples/spark/spark-gluster/spark-master.json
+$ kubectl create -f examples/spark/spark-gluster/spark-master.yaml
 ```
+
 Verify that the Spark Master Pod deployed successfully.
 
 ```shell
 $ kubectl get pods
 ```
 
-Submit the Spark Master Service 
+Submit the Spark Master Service
+
 ```shell
-$ kubectl create -f examples/spark/spark-gluster/spark-master-service.json
+$ kubectl create -f examples/spark/spark-gluster/spark-master-service.yaml
 ```
 
 Verify that the Spark Master Service deployed successfully.
+
 ```shell
 $ kubectl get services
 ```
 
 ## Step Three: Start your Spark workers
 
-Modify the `examples/spark/spark-gluster/spark-worker-rc.json` file to reflect the GlusterFS Volume that you wish to use in the PATH parameter of the Volumes subsection. 
+Modify the `examples/spark/spark-gluster/spark-worker-rc.yaml` file to reflect the GlusterFS Volume that you wish to use in the PATH parameter of the Volumes subsection.
 
 Make sure that the replication factor for the pods is not greater than the amount of Kubernetes nodes available in your Kubernetes cluster.
 
 Submit your Spark Worker ReplicationController by running the following command:
 
 ```shell
-$ kubectl create -f examples/spark/spark-gluster/spark-worker-rc.json
+$ kubectl create -f examples/spark/spark-gluster/spark-worker-rc.yaml
 ```
+
 Verify that the Spark Worker ReplicationController deployed its pods successfully.
 
 ```shell
 $ kubectl get pods
 ```
+
 Follow the steps from the standard example to verify the Spark Worker pods have registered successfully with the Spark Master.
 
 ## Step Four: Submit a Spark Job
@@ -67,6 +106,7 @@ Follow the steps from the standard example to verify the Spark Worker pods have 
 All the Spark Workers and the Spark Master in your cluster have a mount to GlusterFS. This means that any of them can be used as the Spark Client to submit a job. For simplicity, lets use the Spark Master as an example.
 
 Obtain the Host (Kubernetes Node) that the Spark Master container is running on
+
 ```shell
 $ kubectl describe pod spark-master
 ```
@@ -110,8 +150,14 @@ SparkContext available as sc, HiveContext available as sqlContext.
 >>> counts = file.flatMap(lambda line: line.split(" ")).map(lambda word: (word, 1)).reduceByKey(lambda a, b: a + b)
 >>> counts.saveAsTextFile("/mnt/glusterfs/output")
 ```
+
 While still in the container, you can see the output of your Spark Job in the Distributed File System by running the following:
 
 ```shell
 root@88a8531f9329:/# ls -l /mnt/glusterfs/output
 ```
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/spark-gluster/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
