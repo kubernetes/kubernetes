@@ -171,28 +171,39 @@ func NewClientCertTLSConfig(certData, keyData, caData []byte) (*tls.Config, erro
 	if err != nil {
 		return nil, err
 	}
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caData)
+
 	return &tls.Config{
 		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
 		MinVersion: tls.VersionTLS10,
 		Certificates: []tls.Certificate{
 			cert,
 		},
-		RootCAs:    certPool,
-		ClientCAs:  certPool,
-		ClientAuth: tls.RequireAndVerifyClientCert,
+		RootCAs: rootCertPool(caData),
 	}, nil
 }
 
 func NewTLSConfig(caData []byte) (*tls.Config, error) {
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caData)
 	return &tls.Config{
 		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
 		MinVersion: tls.VersionTLS10,
-		RootCAs:    certPool,
+		RootCAs:    rootCertPool(caData),
 	}, nil
+}
+
+// rootCertPool returns nil if caData is empty.  When passed along, this will mean "use system CAs".
+// When caData is not empty, it will be the ONLY information used in the CertPool.
+func rootCertPool(caData []byte) *x509.CertPool {
+	// What we really want is a copy of x509.systemRootsPool, but that isn't exposed.  It's difficult to build (see the go
+	// code for a look at the platform specific insanity), so we'll use the fact that RootCAs == nil gives us the system values
+	// It doesn't allow trusting either/or, but hopefully that won't be an issue
+	if len(caData) == 0 {
+		return nil
+	}
+
+	// if we have caData, use it
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caData)
+	return certPool
 }
 
 func NewUnsafeTLSConfig() *tls.Config {
