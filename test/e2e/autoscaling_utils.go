@@ -31,10 +31,11 @@ const (
 	consumptionTimeInSeconds = 30
 	sleepTime                = 30 * time.Second
 	requestSizeInMillicores  = 100
+	requestSizeInMegabytes   = 100
 	port                     = 80
 	targetPort               = 8080
 	timeoutRC                = 120 * time.Second
-	image                    = "gcr.io/google_containers/resource_consumer:alpha"
+	image                    = "gcr.io/google_containers/resource_consumer:beta"
 	rcIsNil                  = "ERROR: replicationController = nil"
 )
 
@@ -49,60 +50,101 @@ rc.ConsumeCPU(300)
 type ResourceConsumer struct {
 	name      string
 	framework *Framework
-	channel   chan int
-	stop      chan int
+	cpu       chan int
+	mem       chan int
+	stopCPU   chan int
+	stopMem   chan int
 }
 
-// NewResourceConsumer creates new ResourceConsumer
-// cpu argument is in millicores
-func NewResourceConsumer(name string, replicas int, cpu int, framework *Framework) *ResourceConsumer {
+/*
+NewResourceConsumer creates new ResourceConsumer
+initCPU argument is in millicores
+initMemory argument is in megabytes
+*/
+func NewResourceConsumer(name string, replicas, initCPU, initMemory int, framework *Framework) *ResourceConsumer {
 	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas)
 	rc := &ResourceConsumer{
 		name:      name,
 		framework: framework,
-		channel:   make(chan int),
-		stop:      make(chan int),
+		cpu:       make(chan int),
+		mem:       make(chan int),
+		stopCPU:   make(chan int),
+		stopMem:   make(chan int),
 	}
 	go rc.makeConsumeCPURequests()
-	rc.ConsumeCPU(cpu)
+	rc.ConsumeCPU(initCPU)
+	go rc.makeConsumeMemRequests()
+	rc.ConsumeMem(initMemory)
 	return rc
 }
 
 // ConsumeCPU consumes given number of CPU
 func (rc *ResourceConsumer) ConsumeCPU(millicores int) {
-	rc.channel <- millicores
+	rc.cpu <- millicores
+}
+
+// ConsumeMem consumes given number of Mem
+func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
+	rc.mem <- megabytes
 }
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
-	defer GinkgoRecover()
 	var count int
 	var rest int
 	for {
 		select {
-		case millicores := <-rc.channel:
+		case millicores := <-rc.cpu:
 			count = millicores / requestSizeInMillicores
 			rest = millicores - count*requestSizeInMillicores
 		case <-time.After(sleepTime):
 			if count > 0 {
-				rc.sendConsumeCPUrequests(count, requestSizeInMillicores, consumptionTimeInSeconds)
+				rc.sendConsumeCPURequests(count, requestSizeInMillicores, consumptionTimeInSeconds)
 			}
 			if rest > 0 {
-				go rc.sendOneConsumeCPUrequest(rest, consumptionTimeInSeconds)
+				go rc.sendOneConsumeCPURequest(rest, consumptionTimeInSeconds)
 			}
-		case <-rc.stop:
+		case <-rc.stopCPU:
 			return
 		}
 	}
 }
 
-func (rc *ResourceConsumer) sendConsumeCPUrequests(requests, millicores, durationSec int) {
-	for i := 0; i < requests; i++ {
-		go rc.sendOneConsumeCPUrequest(millicores, durationSec)
+func (rc *ResourceConsumer) makeConsumeMemRequests() {
+	var count int
+	var rest int
+	for {
+		select {
+		case megabytes := <-rc.mem:
+			count = megabytes / requestSizeInMegabytes
+			rest = megabytes - count*requestSizeInMegabytes
+		case <-time.After(sleepTime):
+			if count > 0 {
+				rc.sendConsumeMemRequests(count, requestSizeInMegabytes, consumptionTimeInSeconds)
+			}
+			if rest > 0 {
+				go rc.sendOneConsumeMemRequest(rest, consumptionTimeInSeconds)
+			}
+		case <-rc.stopMem:
+			return
+		}
 	}
 }
 
-// sendOneConsumeCPUrequest sends POST request for cpu consumption
-func (rc *ResourceConsumer) sendOneConsumeCPUrequest(millicores int, durationSec int) {
+func (rc *ResourceConsumer) sendConsumeCPURequests(requests, millicores, durationSec int) {
+	for i := 0; i < requests; i++ {
+		go rc.sendOneConsumeCPURequest(millicores, durationSec)
+	}
+}
+
+func (rc *ResourceConsumer) sendConsumeMemRequests(requests, megabytes, durationSec int) {
+	for i := 0; i < requests; i++ {
+		go rc.sendOneConsumeMemRequest(megabytes, durationSec)
+	}
+}
+
+// sendOneConsumeCPURequest sends POST request for cpu consumption
+func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec int) {
+	defer GinkgoRecover()
 	_, err := rc.framework.Client.Post().
 		Prefix("proxy").
 		Namespace(rc.framework.Namespace.Name).
@@ -110,6 +152,22 @@ func (rc *ResourceConsumer) sendOneConsumeCPUrequest(millicores int, durationSec
 		Name(rc.name).
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
+		Param("durationSec", strconv.Itoa(durationSec)).
+		Do().
+		Raw()
+	expectNoError(err)
+}
+
+// sendOneConsumeMemRequest sends POST request for memory consumption
+func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec int) {
+	defer GinkgoRecover()
+	_, err := rc.framework.Client.Post().
+		Prefix("proxy").
+		Namespace(rc.framework.Namespace.Name).
+		Resource("services").
+		Name(rc.name).
+		Suffix("ConsumeMem").
+		Param("megabytes", strconv.Itoa(megabytes)).
 		Param("durationSec", strconv.Itoa(durationSec)).
 		Do().
 		Raw()
@@ -139,7 +197,8 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
 }
 
 func (rc *ResourceConsumer) CleanUp() {
-	rc.stop <- 0
+	rc.stopCPU <- 0
+	rc.stopMem <- 0
 	expectNoError(DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
 	expectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
 	expectNoError(rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(rc.name, api.NewDeleteOptions(0)))
@@ -171,4 +230,5 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		Replicas:  replicas,
 	}
 	expectNoError(RunRC(config))
+
 }
