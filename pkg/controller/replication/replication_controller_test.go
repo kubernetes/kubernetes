@@ -45,12 +45,6 @@ type FakePodControl struct {
 	err            error
 }
 
-// Give each test that starts a background controller up to 1/2 a second.
-// Since we need to start up a goroutine to test watch, this routine needs
-// to get cpu before the test can complete. If the test is starved of cpu,
-// the watch test will take up to 1/2 a second before timing out.
-const controllerTimeout = 500 * time.Millisecond
-
 var alwaysReady = func() bool { return true }
 
 func init() {
@@ -236,7 +230,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 		if key != expected {
 			t.Errorf("Unexpected sync all for rc %v, expected %v", key, expected)
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Processing DeleteFinalStateUnknown took longer than expected")
 	}
 }
@@ -495,7 +489,7 @@ func TestWatchControllers(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(controllerTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -540,7 +534,7 @@ func TestWatchPods(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(controllerTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -592,7 +586,7 @@ func TestUpdatePods(t *testing.T) {
 			if !expected.Has(got) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
-		case <-time.After(controllerTimeout):
+		case <-time.After(util.ForeverTestTimeout):
 			t.Errorf("Expected update notifications for controllers within 100ms each")
 		}
 	}
@@ -632,7 +626,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 		if key != expectedKey {
 			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
 		}
-	case <-time.After(controllerTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		manager.queue.ShutDown()
 		t.Errorf("Expected to find an rc in the queue, found none.")
 	}
