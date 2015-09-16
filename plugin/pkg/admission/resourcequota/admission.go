@@ -194,7 +194,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	if a.GetResource() == "pods" {
 		for _, resourceName := range []api.ResourceName{api.ResourceMemory, api.ResourceCPU} {
 
-			// ignore tracking the resource if its not in the quota document
+			// ignore tracking the resource if it's not in the quota document
 			if !set[resourceName] {
 				continue
 			}
@@ -250,7 +250,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			}
 
 			if newUsageValue > hardUsageValue {
-				return false, fmt.Errorf("Unable to admit pod without exceeding quota for resource %s.  Limited to %s but require %s to succeed.", resourceName, hard.String(), newUsage.String())
+				return false, fmt.Errorf("Unable to admit pod without exceeding quota for resource %s:  Limited to %s but require %s to succeed.", resourceName, hard.String(), newUsage.String())
 			} else {
 				status.Used[resourceName] = *newUsage
 				dirty = true
