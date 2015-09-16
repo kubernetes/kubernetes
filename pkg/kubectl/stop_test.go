@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -266,6 +267,78 @@ func TestReplicationControllerStop(t *testing.T) {
 			}
 			if actions[i].GetVerb() != verb {
 				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+			}
+		}
+	}
+}
+
+func TestJobStop(t *testing.T) {
+	name := "foo"
+	ns := "default"
+	zero := 0
+	tests := []struct {
+		Name            string
+		Objs            []runtime.Object
+		StopError       error
+		StopMessage     string
+		ExpectedActions []string
+	}{
+		{
+			Name: "OnlyOneJob",
+			Objs: []runtime.Object{
+				&experimental.Job{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: experimental.JobSpec{
+						Parallelism: &zero,
+						Selector:    map[string]string{"k1": "v1"}},
+				},
+				&experimental.JobList{ // LIST
+					Items: []experimental.Job{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: experimental.JobSpec{
+								Parallelism: &zero,
+								Selector:    map[string]string{"k1": "v1"}},
+						},
+					},
+				},
+			},
+			StopError:       nil,
+			StopMessage:     "foo stopped",
+			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
+		},
+	}
+
+	for _, test := range tests {
+		fake := testclient.NewSimpleFake(test.Objs...)
+		reaper := JobReaper{fake, time.Millisecond, time.Millisecond}
+		s, err := reaper.Stop(ns, name, 0, nil)
+		if !reflect.DeepEqual(err, test.StopError) {
+			t.Errorf("%s unexpected error: %v", test.Name, err)
+			continue
+		}
+
+		if s != test.StopMessage {
+			t.Errorf("%s expected '%s', got '%s'", test.Name, test.StopMessage, s)
+			continue
+		}
+		actions := fake.Actions()
+		if len(actions) != len(test.ExpectedActions) {
+			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
+			continue
+		}
+		for i, verb := range test.ExpectedActions {
+			if actions[i].GetResource() != "jobs" {
+				t.Errorf("%s unexpected action: %+v, expected %s-job", test.Name, actions[i], verb)
+			}
+			if actions[i].GetVerb() != verb {
+				t.Errorf("%s unexpected action: %+v, expected %s-job", test.Name, actions[i], verb)
 			}
 		}
 	}
