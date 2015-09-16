@@ -28,17 +28,16 @@ kube::test::find_dirs() {
     cd ${KUBE_ROOT}
     find . -not \( \
         \( \
-          -wholename './output' \
-          -o -wholename './_output' \
-          -o -wholename './_artifacts/' \
-          -o -wholename './_gopath/' \
-          -o -wholename './release' \
-          -o -wholename './target' \
-          -o -wholename '*/Godeps/*' \
-          -o -wholename './release*' \
-          -o -wholename '*/contrib/podex/*' \
-          -o -wholename '*/test/e2e/*' \
-          -o -wholename '*/test/integration/*' \
+          -path './_artifacts/*' \
+          -o -path './_output/*' \
+          -o -path './_gopath/*' \
+          -o -path './Godeps/*' \
+          -o -path './contrib/podex/*' \
+          -o -path './output/*' \
+          -o -path './release/*' \
+          -o -path './target/*' \
+          -o -path './test/e2e/*' \
+          -o -path './test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
