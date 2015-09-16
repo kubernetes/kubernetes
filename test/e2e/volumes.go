@@ -233,10 +233,14 @@ var _ = Describe("Volumes", func() {
 	})
 
 	AfterEach(func() {
-		if clean {
-			if err := deleteNS(c, namespace.Name); err != nil {
-				Failf("Couldn't delete ns %s", err)
+		if testContext.DeleteNamespace {
+			if clean {
+				if err := deleteNS(c, namespace.Name); err != nil {
+					Failf("Couldn't delete ns %s", err)
+				}
 			}
+		} else {
+			Logf("Skipping namespace deletion!")
 		}
 	})
 

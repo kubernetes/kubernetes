@@ -50,9 +50,14 @@ var _ = Describe("hostPath", func() {
 	})
 
 	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
-		if err := deleteNS(c, namespace.Name); err != nil {
-			Failf("Couldn't delete ns %s", err)
+		if testContext.DeleteNamespace {
+			By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
+			if err := deleteNS(c, namespace.Name); err != nil {
+				Failf("Couldn't delete ns %s", err)
+			}
+		} else {
+			Logf("Skipping namespace deletion!")
+
 		}
 	})
 
