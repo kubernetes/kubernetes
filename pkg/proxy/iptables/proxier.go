@@ -248,6 +248,13 @@ func ipsEqual(lhs, rhs []string) bool {
 	return true
 }
 
+// Sync is called to immediately synchronize the proxier state to iptables
+func (proxier *Proxier) Sync() {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.syncProxyRules()
+}
+
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
@@ -255,11 +262,7 @@ func (proxier *Proxier) SyncLoop() {
 	for {
 		<-t.C
 		glog.V(6).Infof("Periodic sync")
-		func() {
-			proxier.mu.Lock()
-			defer proxier.mu.Unlock()
-			proxier.syncProxyRules()
-		}()
+		proxier.Sync()
 	}
 }
 
