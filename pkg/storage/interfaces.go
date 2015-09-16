@@ -55,7 +55,7 @@ type ResponseMeta struct {
 }
 
 // FilterFunc is a predicate which takes an API object and returns true
-// iff the object should remain in the set.
+// if and only if the object should remain in the set.
 type FilterFunc func(obj runtime.Object) bool
 
 // Everything is a FilterFunc which accepts all objects.
