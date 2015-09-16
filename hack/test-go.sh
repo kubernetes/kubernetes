@@ -30,6 +30,8 @@ kube::test::find_dirs() {
         \( \
           -wholename './output' \
           -o -wholename './_output' \
+          -o -wholename './_artifacts/' \
+          -o -wholename './_gopath/' \
           -o -wholename './release' \
           -o -wholename './target' \
           -o -wholename '*/Godeps/*' \
