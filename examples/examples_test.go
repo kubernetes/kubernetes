@@ -106,6 +106,16 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expValidation.ValidateDeployment(t)
+	case *experimental.Job:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateJob(t)
+	case *experimental.DaemonSet:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -211,6 +221,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"multi-pod":   nil,
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
+			"job":         &experimental.Job{},
+		},
+		"../docs/admin": {
+			"daemon": &experimental.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
