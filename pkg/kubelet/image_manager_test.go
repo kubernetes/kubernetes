@@ -21,30 +21,27 @@ import (
 	"testing"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 var zero time.Time
 
-func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *dockertools.FakeDockerClient, *cadvisor.Mock) {
-	fakeDocker := &dockertools.FakeDockerClient{
-		RemovedImages: sets.NewString(),
-	}
+func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.FakeRuntime, *cadvisor.Mock) {
+	fakeRuntime := &container.FakeRuntime{}
 	mockCadvisor := new(cadvisor.Mock)
 	return &realImageManager{
-		dockerClient: fakeDocker,
+		runtime:      fakeRuntime,
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
 		recorder:     &record.FakeRecorder{},
-	}, fakeDocker, mockCadvisor
+	}, fakeRuntime, mockCadvisor
 }
 
 // Accessors used for thread-safe testing.
@@ -67,29 +64,33 @@ func imageName(id int) string {
 }
 
 // Make an image with the specified ID.
-func makeImage(id int, size int64) docker.APIImages {
-	return docker.APIImages{
-		ID:          imageName(id),
-		VirtualSize: size,
+func makeImage(id int, size int64) container.Image {
+	return container.Image{
+		ID:   imageName(id),
+		Size: size,
 	}
 }
 
 // Make a container with the specified ID. It will use the image with the same ID.
-func makeContainer(id int) docker.APIContainers {
-	return docker.APIContainers{
-		ID:    fmt.Sprintf("container-%d", id),
+func makeContainer(id int) *container.Container {
+	return &container.Container{
+		ID:    types.UID(fmt.Sprintf("container-%d", id)),
 		Image: imageName(id),
 	}
 }
 
 func TestDetectImagesInitialDetect(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		},
 	}
 
 	startTime := time.Now().Add(-time.Millisecond)
@@ -109,13 +110,17 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 
 func TestDetectImagesWithNewImage(t *testing.T) {
 	// Just one image initially.
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		},
 	}
 
 	err := manager.detectImages(zero)
@@ -124,7 +129,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	assert.Equal(manager.imageRecordsLen(), 2)
 
 	// Add a new image.
-	fakeDocker.Images = []docker.APIImages{
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 1024),
 		makeImage(2, 1024),
@@ -150,13 +155,17 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		},
 	}
 
 	err := manager.detectImages(zero)
@@ -167,7 +176,8 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	require.True(t, ok)
 
 	// Simulate container being stopped.
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime.ContainerList = []*container.Container{}
+	fakeRuntime.PodList = []*container.Pod{}
 	err = manager.detectImages(time.Now())
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 2)
@@ -182,13 +192,17 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 }
 
 func TestDetectImagesWithRemovedImages(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		},
 	}
 
 	err := manager.detectImages(zero)
@@ -197,48 +211,63 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 	assert.Equal(manager.imageRecordsLen(), 2)
 
 	// Simulate both images being removed.
-	fakeDocker.Images = []docker.APIImages{}
+	fakeRuntime.ImageList = []container.Image{}
 	err = manager.detectImages(time.Now())
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 0)
 }
 
 func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		},
 	}
 
 	spaceFreed, err := manager.freeSpace(2048)
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeDocker.RemovedImages, 1)
-	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
+	assert.Len(fakeRuntime.ImageList, 1)
 }
 
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(0),
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(0),
+				makeContainer(1),
+			},
+		},
 	}
 
 	// Make 1 be more recently used than 0.
 	require.NoError(t, manager.detectImages(zero))
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(1),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		},
 	}
 	require.NoError(t, manager.detectImages(time.Now()))
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{},
+		},
+	}
 	require.NoError(t, manager.detectImages(time.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
@@ -246,53 +275,51 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeDocker.RemovedImages, 1)
-	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
+	assert.Len(fakeRuntime.ImageList, 1)
 }
 
 func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(0),
+	fakeRuntime.PodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				makeContainer(0),
+			},
+		},
 	}
 
 	// Make 1 more recently detected but used at the same time as 0.
 	require.NoError(t, manager.detectImages(zero))
-	fakeDocker.Images = []docker.APIImages{
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeContainer(0),
-		makeContainer(1),
-	}
 	require.NoError(t, manager.detectImages(time.Now()))
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime.PodList = []*container.Pod{}
 	require.NoError(t, manager.detectImages(time.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
 	spaceFreed, err := manager.freeSpace(1024)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeDocker.RemovedImages, 1)
-	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
+	assert.EqualValues(2048, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 1)
 }
 
 func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
-	fakeDocker.Images = []docker.APIImages{
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		{
-			ID:          "5678",
-			RepoTags:    []string{"potato", "salad"},
-			VirtualSize: 2048,
+			ID:   "5678",
+			Tags: []string{"potato", "salad"},
+			Size: 2048,
 		},
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
+	fakeRuntime.ContainerList = []*container.Container{
 		{
 			ID:    "c5678",
 			Image: "salad",
@@ -303,8 +330,7 @@ func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeDocker.RemovedImages, 1)
-	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
+	assert.Len(fakeRuntime.ImageList, 1)
 }
 
 func TestGarbageCollectBelowLowThreshold(t *testing.T) {
@@ -339,14 +365,14 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeDocker, mockCadvisor := newRealImageManager(policy)
+	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 95% usage and most of it gets freed.
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiV2.FsInfo{
 		Usage:    950,
 		Capacity: 1000,
 	}, nil)
-	fakeDocker.Images = []docker.APIImages{
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 450),
 	}
 
@@ -358,14 +384,14 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeDocker, mockCadvisor := newRealImageManager(policy)
+	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 95% usage and little of it gets freed.
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiV2.FsInfo{
 		Usage:    950,
 		Capacity: 1000,
 	}, nil)
-	fakeDocker.Images = []docker.APIImages{
+	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 50),
 	}
 

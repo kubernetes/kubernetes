@@ -234,10 +234,7 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, err
 	}
-	imageManager, err := newImageManager(dockerClient, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
-	}
+
 	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
@@ -275,7 +272,6 @@ func NewMainKubelet(
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
 		containerGC:                    containerGC,
-		imageManager:                   imageManager,
 		diskSpaceManager:               diskSpaceManager,
 		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
@@ -355,6 +351,13 @@ func NewMainKubelet(
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
+
+	// setup imageManager
+	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
+	}
+	klet.imageManager = imageManager
 
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
