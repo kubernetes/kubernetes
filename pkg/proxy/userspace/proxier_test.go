@@ -121,6 +121,12 @@ func (fake *fakeIptables) RestoreAll(data []byte, flush iptables.FlushFlag, coun
 	return nil
 }
 
+func (fake *fakeIptables) AddReloadFunc(reloadFunc func()) {
+}
+
+func (fake *fakeIptables) Destroy() {
+}
+
 var tcpServerPort int
 var udpServerPort int
 
