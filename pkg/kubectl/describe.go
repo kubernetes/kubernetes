@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -85,6 +86,7 @@ func describerMap(c *client.Client) map[string]Describer {
 func expDescriberMap(c *client.Client) map[string]Describer {
 	return map[string]Describer{
 		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{c},
+		"Job": &JobDescriber{c},
 	}
 }
 
@@ -846,6 +848,46 @@ func describeReplicationController(controller *api.ReplicationController, events
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if controller.Spec.Template != nil {
 			describeVolumes(controller.Spec.Template.Spec.Volumes, out)
+		}
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+// JobDescriber generates information about a job and the pods it has created.
+type JobDescriber struct {
+	client *client.Client
+}
+
+func (d *JobDescriber) Describe(namespace, name string) (string, error) {
+	job, err := d.client.Experimental().Jobs(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	events, _ := d.client.Events(namespace).Search(job)
+
+	return describeJob(job, events)
+}
+
+func describeJob(job *experimental.Job, events *api.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)
+		if job.Spec.Template != nil {
+			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
+		} else {
+			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
+		}
+		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(job.Spec.Selector))
+		fmt.Fprintf(out, "Parallelism:\t%d\n", job.Spec.Parallelism)
+		fmt.Fprintf(out, "Completions:\t%d\n", job.Spec.Completions)
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(job.Labels))
+		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Successful, job.Status.Unsuccessful)
+		if job.Spec.Template != nil {
+			describeVolumes(job.Spec.Template.Spec.Volumes, out)
 		}
 		if events != nil {
 			DescribeEvents(events, out)

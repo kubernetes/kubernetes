@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package controller provides Registry interface and it's RESTStorage
+// Package job provides Registry interface and it's RESTStorage
 // implementation for storing Job api objects.
 package job

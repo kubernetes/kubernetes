@@ -261,3 +261,7 @@ func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterf
 func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
 	return &FakeScales{Fake: c, Namespace: namespace}
 }
+
+func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
+	panic("unimplemented")
+}
