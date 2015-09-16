@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
@@ -37,19 +38,51 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// stat a path, if not exists, retry maxRetries times
-func waitForPathToExist(devicePath string, maxRetries int) bool {
-	for i := 0; i < maxRetries; i++ {
-		_, err := os.Stat(devicePath)
-		if err == nil {
-			return true
+// search /sys/bus for rbd device that matches given pool and image
+func getDevFromImageAndPool(pool, image string) string {
+	// /sys/bus/rbd/devices/X/name and /sys/bus/rbd/devices/X/pool
+	sys_path := "/sys/bus/rbd/devices"
+	if dirs, err := ioutil.ReadDir(sys_path); err == nil {
+		for _, f := range dirs {
+			name := f.Name()
+			po := path.Join(sys_path, name, "pool")
+			img := path.Join(sys_path, name, "name")
+			if _, err = os.Lstat(po); err != nil {
+				continue
+			}
+			if _, err := os.Lstat(img); err != nil {
+				continue
+			}
+
+			// pool and name format:
+			// see rbd_pool_show() and rbd_name_show() at
+			// https://github.com/torvalds/linux/blob/master/drivers/block/rbd.c
+			if b, err := ioutil.ReadFile(po); err != nil || string(b) != pool+"\n" {
+				continue
+			}
+			if b, err := ioutil.ReadFile(img); err != nil || string(b) != image+"\n" {
+				continue
+			}
+			// found a match, check if device exists
+			devicePath := "/dev/rbd" + name
+			if _, err := os.Lstat(devicePath); err == nil {
+				return devicePath
+			}
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return false
+	}
+	return ""
+}
+
+// stat a path, if not exists, retry maxRetries times
+func waitForPath(pool, image string, maxRetries int) string {
+	for i := 0; i < maxRetries; i++ {
+		devicePath := getDevFromImageAndPool(pool, image)
+		if devicePath != "" {
+			return devicePath
 		}
 		time.Sleep(time.Second)
 	}
-	return false
+	return ""
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/rbd/pool-image-image
@@ -178,9 +211,9 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
-	devicePath := strings.Join([]string{"/dev/rbd", b.Pool, b.Image}, "/")
-	exist := waitForPathToExist(devicePath, 1)
-	if !exist {
+
+	devicePath := waitForPath(b.Pool, b.Image, 1)
+	if devicePath == "" {
 		// modprobe
 		_, err = b.plugin.execCommand("modprobe", []string{"rbd"})
 		if err != nil {
@@ -209,8 +242,8 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	if err != nil {
 		return err
 	}
-	exist = waitForPathToExist(devicePath, 10)
-	if !exist {
+	devicePath = waitForPath(b.Pool, b.Image, 10)
+	if devicePath == "" {
 		return errors.New("Could not map image: Timeout after 10s")
 	}
 	// mount it
