@@ -65,6 +65,7 @@ dockercfg-path
 driver-port
 dry-run
 duration-sec
+e2e-verify-service-account
 e2e-output-dir
 enable-debugging-handlers
 enable-horizontal-pod-autoscaler
