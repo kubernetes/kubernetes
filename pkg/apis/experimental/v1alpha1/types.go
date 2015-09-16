@@ -314,14 +314,17 @@ type DaemonSetSpec struct {
 type DaemonSetStatus struct {
 	// CurrentNumberScheduled is the number of nodes that are running exactly 1
 	// daemon pod and are supposed to run the daemon pod.
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
 	CurrentNumberScheduled int `json:"currentNumberScheduled"`
 
 	// NumberMisscheduled is the number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
 	NumberMisscheduled int `json:"numberMisscheduled"`
 
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
 	DesiredNumberScheduled int `json:"desiredNumberScheduled"`
 }
 
@@ -400,17 +403,21 @@ type JobSpec struct {
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
 	Parallelism *int `json:"parallelism,omitempty"`
 
 	// Completions specifies the desired number of successfully finished pods the
 	// job should be run with. Defaults to 1.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
 	Completions *int `json:"completions,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
 	Template *v1.PodTemplateSpec `json:"template"`
 }
 
@@ -418,6 +425,7 @@ type JobSpec struct {
 type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
