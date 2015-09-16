@@ -62,9 +62,9 @@ Ubuntu 15 which use systemd instead of upstart. We are working around fixing thi
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
 
-### Starting a Cluster
+## Starting a Cluster
 
-#### Download binaries
+### Download binaries
 
 First clone the kubernetes github repo
 
@@ -154,7 +154,7 @@ If all things goes right, you will see the below message from console indicating
 Cluster validation succeeded
 ```
 
-#### Test it out
+### Test it out
 
 You can use `kubectl` command to check if the newly created k8s is working correctly.
 The `kubectl` binary is under the `cluster/ubuntu/binaries` directory.
@@ -173,7 +173,7 @@ NAME            LABELS                                 STATUS
 Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
-#### Deploy addons
+### Deploy addons
 
 Assuming you have a starting cluster now, this section will tell you how to deploy addons like DNS
 and UI onto the existing cluster.
@@ -208,7 +208,7 @@ $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
 
 After some time, you can use `$ kubectl get pods --namespace=kube-system` to see the DNS and UI pods are running in the cluster.
 
-#### On going
+### On going
 
 We are working on these features which we'd like to let everybody know:
 
@@ -216,7 +216,7 @@ We are working on these features which we'd like to let everybody know:
 to eliminate OS-distro differences.
 2. Tearing Down scripts: clear and re-create the whole stack by one click.
 
-#### Trouble shooting
+### Trouble shooting
 
 Generally, what this approach does is quite simple:
 
