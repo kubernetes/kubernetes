@@ -50,7 +50,7 @@ import (
 
 const (
 	acVersion             = "0.6.1"
-	rktMinimumVersion     = "0.7.0"
+	rktMinimumVersion     = "0.8.1"
 	systemdMinimumVersion = "219"
 
 	systemdServiceDir = "/run/systemd/system"
@@ -942,8 +942,14 @@ func (r *runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 // TODO(yifan): Searching the image via 'rkt images' might not be the most efficient way.
 func (r *runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 	repoToPull, tag := parseImageName(image.Image)
-	// TODO(yifan): Change appname to imagename. See https://github.com/coreos/rkt/issues/1295.
-	output, err := r.runCommand("image", "list", "--fields=appname", "--no-legend")
+	// Example output of 'rkt image list --fields=name':
+	//
+	// NAME
+	// nginx:latest
+	// coreos.com/rkt/stage1:0.8.1
+	//
+	// With '--no-legend=true' the fist line (NAME) will be omitted.
+	output, err := r.runCommand("image", "list", "--no-legend=true", "--fields=name")
 	if err != nil {
 		return false, err
 	}
@@ -1277,7 +1283,14 @@ func (r *runtime) getImageByName(imageName string) (*kubecontainer.Image, error)
 
 // ListImages lists all the available appc images on the machine by invoking 'rkt image list'.
 func (r *runtime) ListImages() ([]kubecontainer.Image, error) {
-	output, err := r.runCommand("image", "list", "--no-legend=true", "--fields=key,appname")
+	// Example output of 'rkt image list --fields=key,name':
+	//
+	// KEY									        NAME
+	// sha512-374770396f23dd153937cd66694fe705cf375bcec7da00cf87e1d9f72c192da7	nginx:latest
+	// sha512-bead9e0df8b1b4904d0c57ade2230e6d236e8473f62614a8bc6dcf11fc924123	coreos.com/rkt/stage1:0.8.1
+	//
+	// With '--no-legend=true' the fist line (KEY NAME) will be omitted.
+	output, err := r.runCommand("image", "list", "--no-legend=true", "--fields=key,name")
 	if err != nil {
 		return nil, err
 	}
