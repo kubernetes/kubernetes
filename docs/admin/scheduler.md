@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/scheduler.md).
+[here](http://releases.k8s.io/release-1.0/docs/admin/scheduler.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -79,6 +79,8 @@ If you want to get a global picture of how the scheduler works, you can start in
 [plugin/cmd/kube-scheduler/app/server.go](http://releases.k8s.io/HEAD/plugin/cmd/kube-scheduler/app/server.go)
 
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/scheduler.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/scheduler.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
