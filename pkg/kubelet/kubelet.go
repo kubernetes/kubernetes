@@ -1634,13 +1634,6 @@ func (kl *Kubelet) deletePod(uid types.UID) error {
 // should not contain any blocking calls. Re-examine the function and decide
 // whether or not we should move it into a separte goroutine.
 func (kl *Kubelet) HandlePodCleanups() error {
-	if !kl.sourcesReady() {
-		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
-		// for sources that haven't reported yet.
-		glog.V(4).Infof("Skipping cleanup, sources aren't ready yet.")
-		return nil
-	}
-
 	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave regardless of the restart policy. The statuses
@@ -1884,21 +1877,30 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			glog.Infof("Skipping pod synchronization, network is not configured")
 			continue
 		}
+
+		// Make sure we sync first to receive the pods from the sources before
+		// performing housekeeping.
+		if !kl.syncLoopIteration(updates, handler) {
+			break
+		}
 		// We don't want to perform housekeeping too often, so we set a minimum
 		// period for it. Housekeeping would be performed at least once every
 		// kl.resyncInterval, and *no* more than once every
 		// housekeepingMinimumPeriod.
 		// TODO (#13418): Investigate whether we can/should spawn a dedicated
 		// goroutine for housekeeping
-		if housekeepingTimestamp.IsZero() || time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
+		if !kl.sourcesReady() {
+			// If the sources aren't ready, skip housekeeping, as we may
+			// accidentally delete pods from unready sources.
+			glog.V(4).Infof("Skipping cleanup, sources aren't ready yet.")
+		} else if housekeepingTimestamp.IsZero() {
+			housekeepingTimestamp = time.Now()
+		} else if time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
 			glog.V(4).Infof("SyncLoop (housekeeping)")
 			if err := handler.HandlePodCleanups(); err != nil {
 				glog.Errorf("Failed cleaning pods: %v", err)
 			}
 			housekeepingTimestamp = time.Now()
-		}
-		if !kl.syncLoopIteration(updates, handler) {
-			break
 		}
 	}
 }
