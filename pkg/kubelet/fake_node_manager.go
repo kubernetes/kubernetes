@@ -44,3 +44,7 @@ func (f *fakeNodeManager) GetHostIP() (net.IP, error) {
 func (f *fakeNodeManager) GetPodCIDR() string {
 	return f.podCIDR
 }
+
+func (f *fakeNodeManager) NodeIsSchedulable() bool {
+	return !f.node.Spec.Unschedulable
+}

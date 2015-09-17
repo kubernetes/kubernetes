@@ -87,7 +87,7 @@ func TestRunOnce(t *testing.T) {
 		containerRefManager: kubecontainer.NewRefManager(),
 		readinessManager:    kubecontainer.NewReadinessManager(),
 		podManager:          podManager,
-		nodeManager:         &fakeNodeManager{},
+		nodeManager:         &fakeNodeManager{node: &api.Node{}},
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
 		diskSpaceManager:    diskSpaceManager,

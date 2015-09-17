@@ -1672,6 +1672,9 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
 func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, string) {
+	if !kl.nodeManager.NodeIsSchedulable() && !isStaticPod(pod) {
+		return false, "NodeUnschedulable", "cannot start the pod because node is not schedulable"
+	}
 	if hasHostPortConflicts(pods) {
 		return false, "HostPortConflict", "cannot start the pod due to host port conflict."
 	}

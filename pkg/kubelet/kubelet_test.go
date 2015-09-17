@@ -108,7 +108,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
-	fakeNodeManager := &fakeNodeManager{}
+	fakeNodeManager := &fakeNodeManager{node: &api.Node{}}
 	kubelet.nodeManager = fakeNodeManager
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
@@ -3287,5 +3287,51 @@ func TestExtractBandwidthResources(t *testing.T) {
 		if !reflect.DeepEqual(egress, test.expectedEgress) {
 			t.Errorf("expected: %v, saw: %v", egress, test.expectedEgress)
 		}
+	}
+}
+
+func TestRejectPodIfNodeNotSchedulable(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeNodeManager.node = &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+		Spec:       api.NodeSpec{Unschedulable: true}}
+
+	kl := testKubelet.kubelet
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID: "1234",
+				Annotations: map[string]string{
+					ConfigSourceAnnotationKey: "api",
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID: "5678",
+				Annotations: map[string]string{
+					ConfigSourceAnnotationKey: "file",
+				},
+			},
+		},
+	}
+	// The api pod should be rejected.
+	notfittingPod := pods[0]
+	fittingPod := pods[1]
+
+	kl.HandlePodAdditions(pods)
+	// Check pod status stored in the status map.
+	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+	if status, found := kl.statusManager.GetPodStatus(fittingPod.UID); found {
+		t.Fatalf("expected pod status %#v to not be found for pod %q", status, fittingPod.UID)
 	}
 }
