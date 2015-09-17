@@ -380,13 +380,13 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 		if node.Spec.PodCIDR == "" {
 			podCIDR, found := availableCIDRs.PopAny()
 			if !found {
-				nc.recordNodeStatusChange(&node, "No available CIDR")
+				nc.recordNodeStatusChange(&node, "CIDRNotAvailable")
 				continue
 			}
 			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
 			node.Spec.PodCIDR = podCIDR
 			if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
-				nc.recordNodeStatusChange(&node, "CIDR assignment failed")
+				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
 			}
 		}
 	}
