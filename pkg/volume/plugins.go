@@ -60,6 +60,9 @@ type VolumePlugin interface {
 	// const.
 	CanSupport(spec *Spec) bool
 
+	// CanSupportCloud tests whether the plugin supports a given cloud provider.
+	CanSupportCloud(cloudprovider.Interface) bool
+
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec

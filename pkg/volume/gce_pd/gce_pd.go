@@ -23,6 +23,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -57,6 +59,10 @@ func (plugin *gcePersistentDiskPlugin) Name() string {
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.GCEPersistentDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
+}
+
+func (plugin *gcePersistentDiskPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return cloud.ProviderName() == gce_cloud.ProviderName
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {

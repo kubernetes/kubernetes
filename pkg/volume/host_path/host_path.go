@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -75,6 +77,11 @@ func (plugin *hostPathPlugin) Name() string {
 func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath != nil) ||
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
+}
+
+// CanSupportCloud for HostPath only supports the fake cloud provider used in testing.
+func (plugin *hostPathPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return cloud.ProviderName() == fake_cloud.ProviderName
 }
 
 func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {

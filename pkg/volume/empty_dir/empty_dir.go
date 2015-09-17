@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -66,6 +67,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
 		return true
 	}
+	return false
+}
+
+func (plugin *emptyDirPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
 	return false
 }
 

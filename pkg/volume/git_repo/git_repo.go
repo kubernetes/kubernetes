@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -55,6 +56,10 @@ func (plugin *gitRepoPlugin) Name() string {
 
 func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
+}
+
+func (plugin *gitRepoPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return false
 }
 
 func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {

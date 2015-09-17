@@ -22,6 +22,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -54,6 +56,10 @@ func (plugin *cinderPlugin) Name() string {
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
+}
+
+func (plugin *cinderPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return cloud.ProviderName() == openstack.ProviderName
 }
 
 func (plugin *cinderPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {

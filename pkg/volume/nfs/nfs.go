@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -69,6 +70,10 @@ func (plugin *nfsPlugin) Name() string {
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
 		(spec.Volume != nil && spec.Volume.NFS != nil)
+}
+
+func (plugin *nfsPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return false
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {

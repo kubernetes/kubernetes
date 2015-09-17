@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -50,6 +51,10 @@ func (plugin *persistentClaimPlugin) Name() string {
 
 func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.PersistentVolumeClaim != nil
+}
+
+func (plugin *persistentClaimPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return false
 }
 
 func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {

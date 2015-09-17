@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -53,6 +54,10 @@ func (plugin *cephfsPlugin) Name() string {
 
 func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.CephFS != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CephFS != nil)
+}
+
+func (plugin *cephfsPlugin) CanSupportCloud(cloud cloudprovider.Interface) bool {
+	return false
 }
 
 func (plugin *cephfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
