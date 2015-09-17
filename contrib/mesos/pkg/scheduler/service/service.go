@@ -45,6 +45,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
@@ -64,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -630,6 +632,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	metrics.Register()
 	runtime.Register()
 	s.mux.Handle("/metrics", prometheus.Handler())
+	healthz.InstallHandler(s.mux)
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		log.Fatalf("specify either --etcd-servers or --etcd-config")
