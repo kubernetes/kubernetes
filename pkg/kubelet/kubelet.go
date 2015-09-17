@@ -2119,26 +2119,26 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-// getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
+// getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an notReady condition.
 func getPodReadyCondition(spec *api.PodSpec, statuses []api.ContainerStatus) []api.PodCondition {
 	ready := []api.PodCondition{{
 		Type:   api.PodReady,
 		Status: api.ConditionTrue,
 	}}
-	unready := []api.PodCondition{{
+	notReady := []api.PodCondition{{
 		Type:   api.PodReady,
 		Status: api.ConditionFalse,
 	}}
 	if statuses == nil {
-		return unready
+		return notReady
 	}
 	for _, container := range spec.Containers {
 		if containerStatus, ok := api.GetContainerStatus(statuses, container.Name); ok {
 			if !containerStatus.Ready {
-				return unready
+				return notReady
 			}
 		} else {
-			return unready
+			return notReady
 		}
 	}
 	return ready

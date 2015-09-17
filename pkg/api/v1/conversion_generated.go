@@ -463,6 +463,16 @@ func convert_api_EndpointSubset_To_v1_EndpointSubset(in *api.EndpointSubset, out
 	} else {
 		out.Addresses = nil
 	}
+	if in.NotReadyAddresses != nil {
+		out.NotReadyAddresses = make([]EndpointAddress, len(in.NotReadyAddresses))
+		for i := range in.NotReadyAddresses {
+			if err := convert_api_EndpointAddress_To_v1_EndpointAddress(&in.NotReadyAddresses[i], &out.NotReadyAddresses[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NotReadyAddresses = nil
+	}
 	if in.Ports != nil {
 		out.Ports = make([]EndpointPort, len(in.Ports))
 		for i := range in.Ports {
@@ -2887,6 +2897,16 @@ func convert_v1_EndpointSubset_To_api_EndpointSubset(in *EndpointSubset, out *ap
 		}
 	} else {
 		out.Addresses = nil
+	}
+	if in.NotReadyAddresses != nil {
+		out.NotReadyAddresses = make([]api.EndpointAddress, len(in.NotReadyAddresses))
+		for i := range in.NotReadyAddresses {
+			if err := convert_v1_EndpointAddress_To_api_EndpointAddress(&in.NotReadyAddresses[i], &out.NotReadyAddresses[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NotReadyAddresses = nil
 	}
 	if in.Ports != nil {
 		out.Ports = make([]api.EndpointPort, len(in.Ports))
