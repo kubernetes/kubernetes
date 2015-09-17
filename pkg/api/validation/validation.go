@@ -1412,7 +1412,7 @@ func ValidateNodeUpdate(oldNode *api.Node, node *api.Node) errs.ValidationErrorL
 }
 
 // Validate compute resource typename.
-// Refer to docs/resources.md for more details.
+// Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if !validation.IsQualifiedName(value) {
@@ -1433,7 +1433,7 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&limitRange.ObjectMeta, true, ValidateLimitRangeName).Prefix("metadata")...)
 
-	// ensure resource names are properly qualified per docs/resources.md
+	// ensure resource names are properly qualified per docs/design/resources.md
 	limitTypeSet := map[api.LimitType]bool{}
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]

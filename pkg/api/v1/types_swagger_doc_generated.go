@@ -1378,7 +1378,7 @@ func (ThirdPartyResourceData) SwaggerDoc() map[string]string {
 
 var map_ThirdPartyResourceList = map[string]string{
 	"":         "ThirdPartyResourceList is a list of ThirdPartyResource.",
-	"metadata": "Standard list metadata. More info: http://docs.k8s.io/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"items":    "Items is a list of schema objects.",
 }
 

@@ -37,7 +37,7 @@ type Foo struct {
 
 type FooList struct {
 	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+	api.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
 	items []Foo `json:"items"`
 }
