@@ -43,7 +43,8 @@ Documentation for other releases can be found at
   - [What does each plug-in do?](#what-does-each-plug-in-do)
     - [AlwaysAdmit](#alwaysadmit)
     - [AlwaysDeny](#alwaysdeny)
-    - [DenyExecOnPrivileged](#denyexeconprivileged)
+    - [DenyExecOnPrivileged (deprecated)](#denyexeconprivileged-deprecated)
+    - [DenyEscalatingExec](#denyescalatingexec)
     - [ServiceAccount](#serviceaccount)
     - [SecurityContextDeny](#securitycontextdeny)
     - [ResourceQuota](#resourcequota)
@@ -92,12 +93,24 @@ Use this plugin by itself to pass-through all requests.
 
 Rejects all requests.  Used for testing.
 
-### DenyExecOnPrivileged
+### DenyExecOnPrivileged (deprecated)
 
 This plug-in will intercept all requests to exec a command in a pod if that pod has a privileged container.
 
 If your cluster supports privileged containers, and you want to restrict the ability of end-users to exec
 commands in those containers, we strongly encourage enabling this plug-in.
+
+This functionality has been merged into [DenyEscalatingExec](#denyescalatingexec).
+
+### DenyEscalatingExec
+
+This plug-in will deny exec and attach commands to pods that run with escalated privileges that
+allow host access.  This includes pods that run as privileged, have access to the host IPC namespace, and
+have access to the host PID namespace.
+
+If your cluster supports containers that run with escalated privileges, and you want to
+restrict the ability of end-users to exec commands in those containers, we strongly encourage
+enabling this plug-in.
 
 ### ServiceAccount
 
@@ -159,7 +172,7 @@ Yes.
 For Kubernetes 1.0, we strongly recommend running the following set of admission control plug-ins (order matters):
 
 ```
---admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 ```
 
 

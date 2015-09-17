@@ -38,6 +38,9 @@ type Capabilities struct {
 type PrivilegedSources struct {
 	// List of pod sources for which using host network is allowed.
 	HostNetworkSources []string
+
+	// List of pod sources for which using host pid namespace is allowed.
+	HostPIDSources []string
 }
 
 // TODO: Clean these up into a singleton
@@ -79,6 +82,7 @@ func Get() Capabilities {
 			AllowPrivileged: false,
 			PrivilegedSources: PrivilegedSources{
 				HostNetworkSources: []string{},
+				HostPIDSources:     []string{},
 			},
 		})
 	}
