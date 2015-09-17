@@ -98,9 +98,10 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 // diskLooksUnformatted uses 'file' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	args := []string{"-L", "--special-files", disk}
-	cmd := mounter.Runner.Command("file", args...)
+	args := []string{"-nd", "-o", "FSTYPE", disk}
+	cmd := mounter.Runner.Command("lsblk", args...)
 	dataOut, err := cmd.CombinedOutput()
+	output := strings.TrimSpace(string(dataOut))
 
 	// TODO (#13212): check if this disk has partitions and return false, and
 	// an error if so.
@@ -109,7 +110,7 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 		return false, err
 	}
 
-	return !strings.Contains(string(dataOut), "filesystem"), nil
+	return output == "", nil
 }
 
 // New returns a mount.Interface for the current system.
