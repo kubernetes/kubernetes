@@ -214,7 +214,7 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 			encounteredError = true
 		} else {
 			if err = ipt.DeleteChain(iptables.TableNAT, c); err != nil {
-				glog.Errorf("Error flushing userspace chain: %v", err)
+				glog.Errorf("Error deleting userspace chain: %v", err)
 				encounteredError = true
 			}
 		}
