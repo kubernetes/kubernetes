@@ -315,6 +315,21 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 func ValidateJobUpdate(oldJob, job *experimental.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, ValidateJobSpecUpdate(oldJob.Spec, job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidateJobSpecUpdate(oldSpec, spec experimental.JobSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateJobSpec(&spec)...)
+	if !api.Semantic.DeepEqual(oldSpec.Completions, spec.Completions) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, "field is immutable"))
+	}
+	if !api.Semantic.DeepEqual(oldSpec.Selector, spec.Selector) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("selector", spec.Selector, "field is immutable"))
+	}
+	if !api.Semantic.DeepEqual(oldSpec.Template, spec.Template) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("template", "[omitted]", "field is immutable"))
+	}
 	return allErrs
 }
