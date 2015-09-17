@@ -74,6 +74,21 @@ func ValidateProcurement(t *T, offer *mesos.Offer) error {
 	return nil
 }
 
+func setCommandArgument(ei *mesos.ExecutorInfo, flag, value string, create bool) {
+	argv := ei.Command.Arguments
+	overwrite := false
+	for i, arg := range argv {
+		if strings.HasPrefix(arg, flag+"=") {
+			overwrite = true
+			argv[i] = flag + "=" + value
+			break
+		}
+	}
+	if !overwrite && create {
+		ei.Command.Arguments = append(argv, flag+"="+value)
+	}
+}
+
 // NodeProcurement updates t.Spec in preparation for the task to be launched on the
 // slave associated with the offer.
 func NodeProcurement(t *T, offer *mesos.Offer) error {
@@ -82,22 +97,8 @@ func NodeProcurement(t *T, offer *mesos.Offer) error {
 
 	// hostname needs of the executor needs to match that of the offer, otherwise
 	// the kubelet node status checker/updater is very unhappy
-	const HOSTNAME_OVERRIDE_FLAG = "--hostname-override="
-	hostname := offer.GetHostname() // required field, non-empty
-	hostnameOverride := HOSTNAME_OVERRIDE_FLAG + hostname
+	setCommandArgument(t.executor, "--hostname-override", offer.GetHostname(), true)
 
-	argv := t.executor.Command.Arguments
-	overwrite := false
-	for i, arg := range argv {
-		if strings.HasPrefix(arg, HOSTNAME_OVERRIDE_FLAG) {
-			overwrite = true
-			argv[i] = hostnameOverride
-			break
-		}
-	}
-	if !overwrite {
-		t.executor.Command.Arguments = append(argv, hostnameOverride)
-	}
 	return nil
 }
 
