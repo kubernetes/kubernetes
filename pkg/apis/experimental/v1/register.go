@@ -46,6 +46,8 @@ func addKnownTypes() {
 		&DaemonSet{},
 		&ThirdPartyResourceData{},
 		&ThirdPartyResourceDataList{},
+		&Ingress{},
+		&IngressList{},
 	)
 }
 
@@ -63,3 +65,5 @@ func (*DaemonSet) IsAnAPIObject()                   {}
 func (*DaemonSetList) IsAnAPIObject()               {}
 func (*ThirdPartyResourceData) IsAnAPIObject()      {}
 func (*ThirdPartyResourceDataList) IsAnAPIObject()  {}
+func (*Ingress) IsAnAPIObject()                     {}
+func (*IngressList) IsAnAPIObject()                 {}
