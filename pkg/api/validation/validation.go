@@ -397,9 +397,9 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateHostPathVolumeSource(hostDir *api.HostPathVolumeSource) errs.ValidationErrorList {
+func validateHostPathVolumeSource(hostPath *api.HostPathVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if hostDir.Path == "" {
+	if hostPath.Path == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("path"))
 	}
 	return allErrs
