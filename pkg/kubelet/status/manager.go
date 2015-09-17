@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -133,7 +134,7 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	if status.StartTime.IsZero() {
 		if pod.Status.StartTime.IsZero() {
 			// the pod did not have a previously recorded value so set to now
-			now := util.Now()
+			now := unversioned.Now()
 			status.StartTime = &now
 		} else {
 			// the pod had a recorded value, but the kubelet restarted so we need to rebuild cache

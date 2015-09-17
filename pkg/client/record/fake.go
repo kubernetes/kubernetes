@@ -19,8 +19,8 @@ package record
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // FakeRecorder is used as a fake during tests.
@@ -36,5 +36,5 @@ func (f *FakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, 
 	f.Events = append(f.Events, fmt.Sprintf(reason+" "+messageFmt, args...))
 }
 
-func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
+func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
 }

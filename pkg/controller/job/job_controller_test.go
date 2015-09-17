@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -120,7 +121,7 @@ func newPodList(count int, status api.PodPhase, job *experimental.Job) []api.Pod
 	for i := 0; i < count; i++ {
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      fmt.Sprintf("pod-%v", util.Now().UnixNano()),
+				Name:      fmt.Sprintf("pod-%v", unversioned.Now().UnixNano()),
 				Labels:    job.Spec.Selector,
 				Namespace: job.Namespace,
 			},
@@ -493,8 +494,8 @@ func TestWatchJobs(t *testing.T) {
 			Conditions: []experimental.JobCondition{{
 				Type:               experimental.JobComplete,
 				Status:             api.ConditionTrue,
-				LastProbeTime:      util.Now(),
-				LastTransitionTime: util.Now(),
+				LastProbeTime:      unversioned.Now(),
+				LastTransitionTime: unversioned.Now(),
 			}},
 		},
 	}

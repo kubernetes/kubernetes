@@ -162,7 +162,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
 	// This is used by the autoscaler to control how often the number of pods is changed.
-	LastScaleTimestamp *util.Time
+	LastScaleTimestamp *unversioned.Time
 }
 
 // ResourceConsumption is an object for specifying average resource consumption of a particular resource.
