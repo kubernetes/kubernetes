@@ -129,7 +129,7 @@ func setExperimentalDefaults(config *Config) error {
 	if err != nil {
 		return err
 	}
-	config.Prefix = "/experimental"
+	config.Prefix = "apis/" + g.Group
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
