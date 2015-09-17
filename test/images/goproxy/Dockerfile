@@ -14,4 +14,5 @@
 
 FROM scratch
 ADD goproxy goproxy
+EXPOSE 8080
 ENTRYPOINT ["/goproxy"]
