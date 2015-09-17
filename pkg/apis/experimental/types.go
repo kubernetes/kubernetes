@@ -461,3 +461,79 @@ type JobCondition struct {
 	// Human readable message indicating details about last transition.
 	Message string `json:"message,omitempty"`
 }
+
+// Ingress encapsulates the inputs needed to config the load-balancer.
+// It represents a rule collection of inbound connections from the external network
+// that would be satisfied by a load-balancer.
+type Ingress struct {
+	api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the desired state of the Ingress.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec IngressSpec `json:"spec,omitempty"`
+
+	// Status is the current state of the Ingress.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status IngressStatus `json:"status,omitempty"`
+}
+
+// IngressList is a collection of Ingress.
+type IngressList struct {
+	api.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	api.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of ingress.
+	Items []Ingress `json:"items"`
+}
+
+// IngressSpec describes the ingress the user wishes to exist.
+type IngressSpec struct {
+	// PathMap defines a list of rules which mapping multiple hosts and paths to the backend services.
+	// The rules will be used to configure the corresponding load-balancer.
+	// Example: Host + Path -> Service Backend (Service Name + Service Protocol + Service Port)
+	PathMap []IngressMap `json:"pathMap,omitempty"`
+}
+
+// IngressStatus describe the current state of the ingress.
+type IngressStatus struct {
+	// LoadBalancer contains the current status of the load-balancer.
+	LoadBalancer api.LoadBalancerStatus `json:"loadBalancer,omitempty"`
+}
+
+// IngressMap represents the rules mapping the paths under a specified host to the related backend services.
+// It will contains a single host and multiple paths.
+type IngressMap struct {
+	// Host that points to the services, can be host or host:port.
+	// Examples: "www.example.com", "www.example.com:8080".
+	Host string `json:"host,omitempty"`
+
+	// Paths describe a list of load-balancer rules under the specified host.
+	Paths []IngressPath `json:"paths,omitempty"`
+}
+
+// IngressPath describes a single rule mapping the url path to specified service backend.
+type IngressPath struct {
+	// Path defines URL path.
+	// Examples: "/images", "/images/*".
+	Path string `json:"path,omitempty"`
+
+	// Define the referenced service endpoint which the traffic will be forwarded to.
+	Backend IngressBackend `json:"backend,omitempty"`
+}
+
+// IngressBackend describes an unique service endpoint.
+type IngressBackend struct {
+	// Specify the name of the referenced service.
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// Specify the protocol of the referenced service backend.
+	ServiceProtocol api.Protocol `json:"serviceProtocol,omitempty"`
+
+	// Specify the port of the referenced service backend.
+	ServicePort int `json:"servicePort,omitempty"`
+}
