@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -361,7 +362,11 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	//       instead of trying everything.
 	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version, c.cacheDir)
+		g, err := latest.Group("experimental")
+		if err != nil {
+			return err
+		}
+		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "apis"+"/"+g.Group, version, c.cacheDir)
 		if errExp == nil {
 			return nil
 		}
