@@ -175,7 +175,7 @@ kube::util::gen-docs() {
   # create the list of generated files
   pushd "${dest}" > /dev/null
   touch .generated_docs
-  find -type f | cut -sd / -f 2- | LC_ALL=C sort > .generated_docs
+  find . -type f | cut -sd / -f 2- | LC_ALL=C sort > .generated_docs
   popd > /dev/null
 
   while read file; do
