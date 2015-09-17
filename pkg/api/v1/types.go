@@ -1452,7 +1452,7 @@ const (
 
 	// ServiceTypeNamespaceIP means a service will only be accessible inside the
 	// namespace, via the Cluster IP.
-	ServiceTypeNamespaceIP ServiceType = "NamespaceIP"
+	ServiceTypeNamespaceIP ServiceType = "experimentalNamespaceIP"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -1502,7 +1502,7 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
 
-	// Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or NamespaceIP.
+	// Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or experimentalNamespaceIP.
 	// Defaults to ClusterIP.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
@@ -1912,7 +1912,7 @@ type NamespaceSpec struct {
 
 	// NetworkPolicy indicates who is authorized to access pods in the namespace.
 	// Must be either Open or Closed. Defaults to Open.
-	NetworkPolicy NamespaceNetworkPolicy `json:"networkPolicy,omitempty"`
+	NetworkPolicy NamespaceNetworkPolicy `json:"experimentalNetworkPolicy,omitempty"`
 }
 
 // NamespaceStatus is information about the current status of a Namespace.

@@ -1206,7 +1206,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	if service.Spec.Type == api.ServiceTypeNamespaceIP {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].NodePort != 0 {
-				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type NamespaceIP"))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type experimentalNamespaceIP"))
 			}
 		}
 	}
@@ -1722,9 +1722,9 @@ func validateNamespaceNetworkPolicy(networkPolicy string) errs.ValidationErrorLi
 	allErrs := errs.ValidationErrorList{}
 
 	if networkPolicy == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("spec.networkPolicy"))
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.experimentalNetworkPolicy"))
 	} else if !supportedNamespaceNetworkPolicy.Has(networkPolicy) {
-		allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.networkPolicy", networkPolicy, supportedNamespaceNetworkPolicy.List()))
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.experimentalNetworkPolicy", networkPolicy, supportedNamespaceNetworkPolicy.List()))
 	}
 
 	return allErrs

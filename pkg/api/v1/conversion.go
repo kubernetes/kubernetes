@@ -114,7 +114,7 @@ func addConversionFuncs() {
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase",
-				"spec.networkPolicy":
+				"spec.experimentalNetworkPolicy":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)

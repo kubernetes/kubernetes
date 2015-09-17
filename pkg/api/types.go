@@ -1163,7 +1163,7 @@ const (
 
 	// ServiceTypeNamespaceIP means a service will only be accessible inside the
 	// namespace, via the Cluster IP.
-	ServiceTypeNamespaceIP ServiceType = "NamespaceIP"
+	ServiceTypeNamespaceIP ServiceType = "experimentalNamespaceIP"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1194,7 +1194,7 @@ type LoadBalancerIngress struct {
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer, NamespaceIP
+	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer, experimentalNamespaceIP
 	Type ServiceType `json:"type,omitempty"`
 
 	// Required: The list of ports that are exposed by this service.
@@ -1532,7 +1532,7 @@ type NamespaceSpec struct {
 
 	// NetworkPolicy indicates who is authorized to access pods in the namespace.
 	// Must be either Open or Closed. Defaults to Open.
-	NetworkPolicy NamespaceNetworkPolicy `json:"networkPolicy,omitempty"`
+	NetworkPolicy NamespaceNetworkPolicy `json:"experimentalNetworkPolicy,omitempty"`
 }
 
 type FinalizerName string
