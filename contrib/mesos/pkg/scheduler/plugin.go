@@ -438,7 +438,12 @@ func (q *queuer) Run(done <-chan struct{}) {
 
 			pod := p.(*Pod)
 			if recoverAssignedSlave(pod.Pod) != "" {
-				log.V(3).Infof("dequeuing pod for scheduling: %v", pod.Pod.Name)
+				log.V(3).Infof("dequeuing assigned pod for scheduling: %v", pod.Pod.Name)
+				q.dequeue(pod.GetUID())
+			} else if pod.InGracefulTermination() {
+				// pods which are pre-scheduled (i.e. NodeName is set) may be gracefully deleted,
+				// even though they are not running yet.
+				log.V(3).Infof("dequeuing graceful deleted pre-scheduled pod for scheduling: %v", pod.Pod.Name)
 				q.dequeue(pod.GetUID())
 			} else {
 				// use ReplaceExisting because we are always pushing the latest state
