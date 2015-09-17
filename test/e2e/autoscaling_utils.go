@@ -60,9 +60,11 @@ type ResourceConsumer struct {
 NewResourceConsumer creates new ResourceConsumer
 initCPU argument is in millicores
 initMemory argument is in megabytes
+memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod
+cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
-func NewResourceConsumer(name string, replicas, initCPU, initMemory int, framework *Framework) *ResourceConsumer {
-	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas)
+func NewResourceConsumer(name string, replicas, initCPU, initMemory int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:      name,
 		framework: framework,
@@ -204,7 +206,7 @@ func (rc *ResourceConsumer) CleanUp() {
 	expectNoError(rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(rc.name, api.NewDeleteOptions(0)))
 }
 
-func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, replicas int) {
+func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, replicas int, cpuLimitMillis, memLimitMb int64) {
 	_, err := c.Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -228,7 +230,8 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		Namespace: ns,
 		Timeout:   timeoutRC,
 		Replicas:  replicas,
+		CpuLimit:  cpuLimitMillis,
+		MemLimit:  memLimitMb * 1024 * 1024, // MemLimit is in bytes
 	}
 	expectNoError(RunRC(config))
-
 }
