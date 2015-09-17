@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestFieldPath(t *testing.T) {
@@ -64,7 +65,7 @@ func TestFieldPath(t *testing.T) {
 func TestGenerateContainerRef(t *testing.T) {
 	var (
 		okPod = api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind:       "Pod",
 				APIVersion: testapi.Default.Version(),
 			},

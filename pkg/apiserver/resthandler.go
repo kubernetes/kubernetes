@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -321,7 +322,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			out, err := r.Create(ctx, name, obj)
-			if status, ok := out.(*api.Status); ok && err == nil && status.Code == 0 {
+			if status, ok := out.(*unversioned.Status); ok && err == nil && status.Code == 0 {
 				status.Code = http.StatusCreated
 			}
 			return out, err
@@ -567,17 +568,17 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
-			result = &api.Status{
-				Status: api.StatusSuccess,
+			result = &unversioned.Status{
+				Status: unversioned.StatusSuccess,
 				Code:   http.StatusOK,
-				Details: &api.StatusDetails{
+				Details: &unversioned.StatusDetails{
 					Name: name,
 					Kind: scope.Kind,
 				},
 			}
 		} else {
 			// when a non-status response is returned, set the self link
-			if _, ok := result.(*api.Status); !ok {
+			if _, ok := result.(*unversioned.Status); !ok {
 				if err := setSelfLink(result, req, scope.Namer); err != nil {
 					errorJSON(err, scope.Codec, w)
 					return
@@ -636,7 +637,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 	select {
 	case result = <-ch:
-		if status, ok := result.(*api.Status); ok {
+		if status, ok := result.(*unversioned.Status); ok {
 			return nil, errors.FromObject(status)
 		}
 		return result, nil

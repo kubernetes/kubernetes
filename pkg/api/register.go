@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -36,7 +37,6 @@ func init() {
 		&Service{},
 		&NodeList{},
 		&Node{},
-		&Status{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Binding{},
@@ -71,6 +71,13 @@ func init() {
 		&ThirdPartyResourceList{},
 		&ThirdPartyResourceData{},
 	)
+
+	// Register Unversioned types
+	Scheme.AddKnownTypes("", &unversioned.Status{})
+
+	// Legacy names are supported
+	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
+	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
@@ -87,7 +94,6 @@ func (*EndpointsList) IsAnAPIObject()             {}
 func (*Node) IsAnAPIObject()                      {}
 func (*NodeList) IsAnAPIObject()                  {}
 func (*Binding) IsAnAPIObject()                   {}
-func (*Status) IsAnAPIObject()                    {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
 func (*List) IsAnAPIObject()                      {}

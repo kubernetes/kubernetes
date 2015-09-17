@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -183,11 +184,11 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 	}
 	o.last[kind] = index + 1
 
-	if status, ok := out.(*api.Status); ok {
+	if status, ok := out.(*unversioned.Status); ok {
 		if status.Details != nil {
 			status.Details.Kind = kind
 		}
-		if status.Status != api.StatusSuccess {
+		if status.Status != unversioned.StatusSuccess {
 			return nilValue, &errors.StatusError{ErrStatus: *status}
 		}
 	}
@@ -220,7 +221,7 @@ func (o objects) Add(obj runtime.Object) error {
 			}
 		}
 	default:
-		if status, ok := obj.(*api.Status); ok && status.Details != nil {
+		if status, ok := obj.(*unversioned.Status); ok && status.Details != nil {
 			kind = status.Details.Kind
 		}
 		o.types[kind] = append(o.types[kind], obj)

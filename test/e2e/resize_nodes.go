@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -183,7 +184,7 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
 	return &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: latest.GroupOrDie("").Version,
 		},

@@ -31,6 +31,7 @@ package experimental
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -51,7 +52,7 @@ type ScaleStatus struct {
 
 // Scale subresource, applicable to ReplicationControllers and (in future) Deployment.
 type Scale struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
 	api.ObjectMeta `json:"metadata,omitempty"`
 
@@ -64,7 +65,7 @@ type Scale struct {
 
 // Dummy definition
 type ReplicationControllerDummy struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 }
 
 // SubresourceReference contains enough information to let you inspect or modify the referred subresource.
@@ -122,8 +123,8 @@ type HorizontalPodAutoscalerStatus struct {
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
@@ -134,8 +135,8 @@ type HorizontalPodAutoscaler struct {
 
 // HorizontalPodAutoscaler is a collection of pod autoscalers.
 type HorizontalPodAutoscalerList struct {
-	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,omitempty"`
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of horizontal pod autoscalers.
 	Items []HorizontalPodAutoscaler `json:"items"`
@@ -144,7 +145,7 @@ type HorizontalPodAutoscalerList struct {
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
 type ThirdPartyResource struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Standard object metadata
 	api.ObjectMeta `json:"metadata,omitempty"`
@@ -157,10 +158,10 @@ type ThirdPartyResource struct {
 }
 
 type ThirdPartyResourceList struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Standard list metadata.
-	api.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of horizontal pod autoscalers.
 	Items []ThirdPartyResource `json:"items"`
@@ -177,7 +178,7 @@ type APIVersion struct {
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 type ThirdPartyResourceData struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata.
 	api.ObjectMeta `json:"metadata,omitempty"`
 
@@ -186,8 +187,8 @@ type ThirdPartyResourceData struct {
 }
 
 type Deployment struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the Deployment.
 	Spec DeploymentSpec `json:"spec,omitempty"`
@@ -286,8 +287,8 @@ type DeploymentStatus struct {
 }
 
 type DeploymentList struct {
-	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,omitempty"`
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of deployments.
 	Items []Deployment `json:"items"`
@@ -326,7 +327,7 @@ type DaemonSetStatus struct {
 
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	api.ObjectMeta `json:"metadata,omitempty"`
@@ -345,27 +346,27 @@ type DaemonSet struct {
 
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of daemon sets.
 	Items []DaemonSet `json:"items"`
 }
 
 type ThirdPartyResourceDataList struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 	// Items is a list of third party objects
 	Items []ThirdPartyResourceData `json:"items"`
 }
 
 // Job represents the configuration of a single job.
 type Job struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	api.ObjectMeta `json:"metadata,omitempty"`
@@ -381,10 +382,10 @@ type Job struct {
 
 // JobList is a collection of jobs.
 type JobList struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Job.
 	Items []Job `json:"items"`

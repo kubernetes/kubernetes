@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -252,7 +253,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "10"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}
 	r := cache.NewReflector(lw, &api.Pod{}, store, 0)
