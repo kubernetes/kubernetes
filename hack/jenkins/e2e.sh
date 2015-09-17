@@ -116,7 +116,7 @@ GKE_REQUIRED_SKIP_TESTS=(
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
     "DaemonRestart"
-    "Daemon set should launch a daemon pod on every node of the cluster"
+    "Daemon\sset\sshould\slaunch\sa\sdaemon\spod\son\severy\snode\sof\sthe\scluster"
     "ResourceUsage"
     "monotonically\sincreasing\srestart\scount"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
