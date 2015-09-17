@@ -92,13 +92,7 @@ func (c *FakePods) Bind(binding *api.Binding) error {
 }
 
 func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	action := UpdateActionImpl{}
-	action.Verb = "update"
-	action.Resource = "pods"
-	action.Subresource = "status"
-	action.Object = pod
-
-	obj, err := c.Fake.Invokes(action, pod)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("pods", "status", c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}

@@ -350,7 +350,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := rm.podControl.CreateReplica(rc.Namespace, rc); err != nil {
+				if err := rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc); err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)

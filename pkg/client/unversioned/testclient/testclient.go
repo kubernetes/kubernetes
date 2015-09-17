@@ -304,5 +304,5 @@ func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
 }
 
 func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
-	panic("unimplemented")
+	return &FakeJobs{Fake: c, Namespace: namespace}
 }
