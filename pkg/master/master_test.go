@@ -479,7 +479,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 
 	fakeClient.ExpectNotFoundGet(etcdtest.PathPrefix() + "/ThirdPartyResourceData/company.com/foos/default")
 
-	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos")
+	resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos")
 	if !assert.NoError(err) {
 		return
 	}
@@ -558,7 +558,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		return
 	}
 
-	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
@@ -603,8 +603,9 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		return
 	}
 
-	resp, err := http.Post(server.URL+"/thirdparty/company.com/"+version+"/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
+	resp, err := http.Post(server.URL+"/apis/company.com/"+version+"/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
 	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
 		return
 	}
 
@@ -670,7 +671,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		return
 	}
 
-	resp, err := http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
@@ -687,14 +688,14 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	resp, err = httpDelete(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err = httpDelete(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
 
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	resp, err = http.Get(server.URL + "/thirdparty/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}

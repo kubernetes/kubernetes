@@ -783,8 +783,8 @@ func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) err
 	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
-	thirdPartyPrefix := "/thirdparty/" + group + "/"
-	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
+	thirdPartyAPIPrefix := makeThirdPartyPath(group) + "/"
+	apiserver.AddApiWebService(m.handlerContainer, thirdPartyAPIPrefix, []string{rsrc.Versions[0].Name})
 	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
 	return nil
@@ -793,7 +793,7 @@ func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) err
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := "/thirdparty/" + group + "/"
+	apiRoot := makeThirdPartyPath(group) + "/"
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
