@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -38,7 +39,7 @@ var (
 )
 
 type FakePodControl struct {
-	daemonSet     []experimental.DaemonSet
+	podSpec       []api.PodTemplateSpec
 	deletePodName []string
 	lock          sync.Mutex
 	err           error
@@ -48,17 +49,17 @@ func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
-func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationController) error {
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
 	return nil
 }
 
-func (f *FakePodControl) CreateReplicaOnNode(namespace string, ds *experimental.DaemonSet, nodeName string) error {
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.err != nil {
 		return f.err
 	}
-	f.daemonSet = append(f.daemonSet, *ds)
+	f.podSpec = append(f.podSpec, *spec)
 	return nil
 }
 
@@ -75,7 +76,7 @@ func (f *FakePodControl) clear() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.deletePodName = []string{}
-	f.daemonSet = []experimental.DaemonSet{}
+	f.podSpec = []api.PodTemplateSpec{}
 }
 
 func newDaemonSet(name string) *experimental.DaemonSet {
@@ -164,8 +165,8 @@ func newTestController() (*DaemonSetsController, *FakePodControl) {
 }
 
 func validateSyncDaemonSets(t *testing.T, fakePodControl *FakePodControl, expectedCreates, expectedDeletes int) {
-	if len(fakePodControl.daemonSet) != expectedCreates {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.daemonSet))
+	if len(fakePodControl.podSpec) != expectedCreates {
+		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.podSpec))
 	}
 	if len(fakePodControl.deletePodName) != expectedDeletes {
 		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodName))
