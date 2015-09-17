@@ -462,3 +462,80 @@ type JobCondition struct {
 	// Human readable message indicating details about last transition.
 	Message string `json:"message,omitempty"`
 }
+
+// An Ingress is a way to give services externally-reachable urls. Each Ingress is a
+// collection of rules that allow inbound connections to reach the endpoints defined by
+// a backend.
+type Ingress struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the desired state of the Ingress.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec IngressSpec `json:"spec,omitempty"`
+
+	// Status is the current state of the Ingress.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status IngressStatus `json:"status,omitempty"`
+}
+
+// IngressList is a collection of Ingress.
+type IngressList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of Ingress.
+	Items []Ingress `json:"items"`
+}
+
+// IngressSpec describes the Ingress the user wishes to exist.
+type IngressSpec struct {
+	// TODO: Add the ability to specify load-balancer IP just like what Service has already done?
+	// A list of rules used to configure the Ingress.
+	// http://<host>:<port>/<path>?<searchpart> -> IngressBackend
+	// Where parts of the url conform to RFC 1738.
+	Rules []IngressRule `json:"rules"`
+}
+
+// IngressStatus describe the current state of the Ingress.
+type IngressStatus struct {
+	// LoadBalancer contains the current status of the load-balancer.
+	LoadBalancer api.LoadBalancerStatus `json:"loadBalancer,omitempty"`
+}
+
+// IngressRule represents the rules mapping the paths under a specified host to the related backend services.
+type IngressRule struct {
+	// Host is the fully qualified domain name of a network host, or its IP
+	// address as a set of four decimal digit groups separated by ".".
+	// Conforms to RFC 1738.
+	Host string `json:"host,omitempty"`
+
+	// Paths describe a list of load-balancer rules under the specified host.
+	Paths []IngressPath `json:"paths"`
+}
+
+// IngressPath associates a path regex with an IngressBackend.
+// Incoming urls matching the Path are forwarded to the Backend.
+type IngressPath struct {
+	// Path is a regex matched against the url of an incoming request.
+	Path string `json:"path,omitempty"`
+
+	// Define the referenced service endpoint which the traffic will be forwarded to.
+	Backend IngressBackend `json:"backend"`
+}
+
+// IngressBackend describes all endpoints for a given Service, port and protocol.
+type IngressBackend struct {
+	// Specifies the referenced service.
+	ServiceRef api.LocalObjectReference `json:"serviceRef"`
+
+	// Specifies the port of the referenced service.
+	ServicePort util.IntOrString `json:"servicePort,omitempty"`
+
+	// Specifies the protocol of the referenced service.
+	Protocol api.Protocol `json:"protocol,omitempty"`
+}
