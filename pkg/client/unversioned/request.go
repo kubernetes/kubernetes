@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -757,7 +758,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status api.Status
+	var status unversioned.Status
 	if err := r.codec.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
@@ -774,7 +775,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// If the server gave us a status back, look at what it was.
 	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
-	if isStatusResponse && (status.Status != api.StatusSuccess && !success) {
+	if isStatusResponse && (status.Status != unversioned.StatusSuccess && !success) {
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
 		return Result{err: errors.FromObject(&status)}
 	}

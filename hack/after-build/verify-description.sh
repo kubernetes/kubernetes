@@ -41,13 +41,14 @@ find_files() {
     \) \
     \( -wholename '*pkg/api/v*/types.go' \
        -o -wholename '*pkg/apis/*/v*/types.go' \
+       -o -wholename '*pkg/api/unversioned/types.go' \
     \)
 }
 
 if [[ $# -eq 0 ]]; then
-  versioned_api_files=`find_files | egrep "pkg/.[^/]*/v.[^/]*/types\.go"`
+  versioned_api_files=$(find_files | egrep "pkg/.[^/]*/((v.[^/]*)|unversioned)/types\.go")
 else
-  versioned_api_files=("${@}")
+  versioned_api_files="${*}"
 fi
 
 for file in $versioned_api_files; do

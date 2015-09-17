@@ -29,9 +29,9 @@ function generate_version() {
 
   echo "Generating swagger type docs for ${group_version}"
 
-  sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > $TMPFILE
-  echo "package ${group_version##*/}" >> $TMPFILE
-  cat >> $TMPFILE <<EOF
+  sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > "$TMPFILE"
+  echo "package ${group_version##*/}" >> "$TMPFILE"
+  cat >> "$TMPFILE" <<EOF
 
 // This file contains a collection of methods that can be used from go-resful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -48,20 +48,20 @@ EOF
 
   GOPATH=$(godep path):$GOPATH go run cmd/genswaggertypedocs/swagger_type_docs.go -s \
     "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types.go" -f - \
-    >>  $TMPFILE
+    >>  "$TMPFILE"
 
-  echo "// AUTO-GENERATED FUNCTIONS END HERE" >> $TMPFILE
+  echo "// AUTO-GENERATED FUNCTIONS END HERE" >> "$TMPFILE"
 
-  gofmt -w -s $TMPFILE
-  mv $TMPFILE "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
+  gofmt -w -s "$TMPFILE"
+  mv "$TMPFILE" "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 }
 
-GROUP_VERSIONS="api/v1 experimental/v1"
+GROUP_VERSIONS=(api/unversioned api/v1 experimental/v1)
 # To avoid compile errors, remove the currently existing files.
-for group_version in $GROUP_VERSIONS; do
+for group_version in "${GROUP_VERSIONS[@]}"; do
   rm -f "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 done
-for group_version in $GROUP_VERSIONS; do
+for group_version in "${GROUP_VERSIONS[@]}"; do
   generate_version "${group_version}"
 done
 

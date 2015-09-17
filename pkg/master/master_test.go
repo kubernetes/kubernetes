@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -425,16 +426,16 @@ func TestGenerateSSHKey(t *testing.T) {
 var versionsToTest = []string{"v1", "v3"}
 
 type Foo struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
 }
 
 type FooList struct {
-	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
 	items []Foo `json:"items"`
 }
@@ -546,7 +547,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "test",
 		},
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
 			APIVersion: version,
 		},
@@ -591,7 +592,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "test",
 		},
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
 			APIVersion: version,
 		},
@@ -660,7 +661,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 			Name:      "test",
 			Namespace: "default",
 		},
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind: "Foo",
 		},
 		SomeField:  "test field",

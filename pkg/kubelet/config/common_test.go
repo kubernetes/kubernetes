@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
@@ -33,7 +34,7 @@ func noDefault(*api.Pod) error { return nil }
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -95,7 +96,7 @@ func TestDecodeSinglePod(t *testing.T) {
 func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{

@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,12 +39,12 @@ import (
 )
 
 type testStruct struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
-	Key            string         `json:"Key"`
-	Map            map[string]int `json:"Map"`
-	StringList     []string       `json:"StringList"`
-	IntList        []int          `json:"IntList"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+	Key                  string         `json:"Key"`
+	Map                  map[string]int `json:"Map"`
+	StringList           []string       `json:"StringList"`
+	IntList              []int          `json:"IntList"`
 }
 
 func (ts *testStruct) IsAnAPIObject() {}
@@ -292,7 +293,7 @@ func TestNamePrinter(t *testing.T) {
 	}{
 		"singleObject": {
 			&api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind: "Pod",
 				},
 				ObjectMeta: api.ObjectMeta{
@@ -302,7 +303,7 @@ func TestNamePrinter(t *testing.T) {
 			"pod/foo\n"},
 		"List": {
 			&v1.List{
-				TypeMeta: v1.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind: "List",
 				},
 				Items: []runtime.RawExtension{
