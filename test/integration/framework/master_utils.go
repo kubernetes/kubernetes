@@ -131,13 +131,13 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	if masterConfig == nil {
 		etcdClient := NewEtcdClient()
 		storageVersions := make(map[string]string)
-		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, etcdtest.PathPrefix())
-		storageVersions[""] = latest.GroupOrDie("").Version
+		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion, etcdtest.PathPrefix())
+		storageVersions[""] = latest.GroupOrDie("").GroupVersion
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
-		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
-		storageVersions["experimental"] = latest.GroupOrDie("experimental").Version
+		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").GroupVersion, etcdtest.PathPrefix())
+		storageVersions["experimental"] = latest.GroupOrDie("experimental").GroupVersion
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
@@ -275,13 +275,13 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	etcdClient := NewEtcdClient()
 	storageVersions := make(map[string]string)
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
 	storageVersions[""] = testapi.Default.Version()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
-	storageVersions["experimental"] = testapi.Experimental.Version()
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, testapi.Experimental.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

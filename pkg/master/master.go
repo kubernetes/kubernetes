@@ -985,18 +985,21 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("jobs/status"):                  jobStatusStorage,
 	}
 
+	expMeta := latest.GroupOrDie("experimental")
+
 	return &apiserver.APIGroupVersion{
-		Root: m.apiGroupPrefix + "/" + latest.GroupOrDie("experimental").Group,
+		Root: m.apiGroupPrefix,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  latest.GroupOrDie("experimental").RESTMapper,
-		Codec:   latest.GroupOrDie("experimental").Codec,
-		Linker:  latest.GroupOrDie("experimental").SelfLinker,
-		Storage: storage,
-		Version: latest.GroupOrDie("experimental").Version,
+		Mapper:        expMeta.RESTMapper,
+		Codec:         expMeta.Codec,
+		Linker:        expMeta.SelfLinker,
+		Storage:       storage,
+		Version:       expMeta.GroupVersion,
+		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

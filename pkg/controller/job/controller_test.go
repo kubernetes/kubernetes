@@ -205,7 +205,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 	for name, tc := range testCases {
 		// job manager setup
-		client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
+		client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 		manager := NewJobController(client)
 		fakePodControl := FakePodControl{err: tc.podControllerError}
 		manager.podControl = &fakePodControl
@@ -269,7 +269,7 @@ func TestControllerSyncJob(t *testing.T) {
 }
 
 func TestSyncJobDeleted(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -289,7 +289,7 @@ func TestSyncJobDeleted(t *testing.T) {
 }
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -319,7 +319,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 }
 
 func TestJobPodLookup(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
@@ -399,7 +399,7 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 // TestSyncJobExpectations tests that a pod cannot sneak in between counting active pods
 // and checking expectations.
 func TestSyncJobExpectations(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl

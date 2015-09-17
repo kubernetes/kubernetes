@@ -64,10 +64,10 @@ func init() {
 	if _, ok := Groups[""]; !ok {
 		// TODO: The second latest.GroupOrDie("").Version will be latest.GroupVersion after we
 		// have multiple group support
-		Groups[""] = TestGroup{"", latest.GroupOrDie("").Version, latest.GroupOrDie("").Version}
+		Groups[""] = TestGroup{"", latest.GroupOrDie("").Version, latest.GroupOrDie("").GroupVersion}
 	}
 	if _, ok := Groups["experimental"]; !ok {
-		Groups["experimental"] = TestGroup{"experimental", latest.GroupOrDie("experimental").Version, latest.GroupOrDie("experimental").Version}
+		Groups["experimental"] = TestGroup{"experimental", latest.GroupOrDie("experimental").Version, latest.GroupOrDie("experimental").GroupVersion}
 	}
 
 	Default = Groups[""]
@@ -91,14 +91,14 @@ func (g TestGroup) GroupAndVersion() string {
 func (g TestGroup) Codec() runtime.Codec {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.GroupVersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.Codec
 	}
 	if g.Group == "experimental" {
-		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.GroupVersionUnderTest)
 		if err != nil {
 			panic(err)
 		}

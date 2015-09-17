@@ -289,11 +289,11 @@ func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
 	expAPIGroup := master.experimental(&config)
-	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix+"/"+latest.GroupOrDie("experimental").Group)
+	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").GroupVersion)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
