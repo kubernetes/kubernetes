@@ -79,8 +79,9 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
 	currentReplicas := scale.Status.Replicas
-	currentConsumption, err := a.metricsClient.ResourceConsumption(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.Target.Resource,
-		scale.Status.Selector)
+	currentConsumption, err := a.metricsClient.
+		ResourceConsumption(hpa.Spec.ScaleRef.Namespace).
+		Get(hpa.Spec.Target.Resource, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
