@@ -580,7 +580,7 @@ func TestResourceTuple(t *testing.T) {
 			errFn: expectNoErr,
 		},
 		"valid multiple with namespaced and non-namespaced types": {
-			args:  []string{"minions/foo", "pod/bar"},
+			args:  []string{"nodes/foo", "pod/bar"},
 			errFn: expectNoErr,
 		},
 		"mixed arg types": {
@@ -621,7 +621,6 @@ func TestResourceTuple(t *testing.T) {
 					"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 					"/namespaces/test/pods/bar": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 					"/nodes/foo":                runtime.EncodeOrDie(testapi.Default.Codec(), &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
-					"/minions/foo":              runtime.EncodeOrDie(testapi.Default.Codec(), &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
 				}
 			}
 
