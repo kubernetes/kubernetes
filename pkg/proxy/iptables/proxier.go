@@ -127,7 +127,6 @@ type serviceInfo struct {
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeSeconds int
-	endpoints           []string
 	// Deprecated, but required for back-compat (including e2e)
 	externalIPs []string
 }
@@ -145,6 +144,7 @@ func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 type Proxier struct {
 	mu                          sync.Mutex // protects the following fields
 	serviceMap                  map[proxy.ServicePortName]*serviceInfo
+	endpointsMap                map[proxy.ServicePortName][]string
 	portsMap                    map[localPort]closeable
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
@@ -194,6 +194,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 
 	return &Proxier{
 		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
+		endpointsMap:  make(map[proxy.ServicePortName][]string),
 		portsMap:      make(map[localPort]closeable),
 		syncPeriod:    syncPeriod,
 		iptables:      ipt,
@@ -302,7 +303,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 				continue
 			}
 			if exists {
-				//Something changed.
+				// Something changed.
 				glog.V(3).Infof("Something changed for service %q: removing it", serviceName)
 				delete(proxier.serviceMap, serviceName)
 			}
@@ -324,10 +325,9 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 		}
 	}
 
-	for name, info := range proxier.serviceMap {
-		// Check for servicePorts that were not in this update and have no endpoints.
-		// This helps prevent unnecessarily removing and adding services.
-		if !activeServices[name] && info.endpoints == nil {
+	// Remove services missing from the update.
+	for name := range proxier.serviceMap {
+		if !activeServices[name] {
 			glog.V(1).Infof("Removing service %q", name)
 			delete(proxier.serviceMap, name)
 		}
@@ -342,7 +342,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
-	registeredEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
+	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 
 	// Update endpoints for services.
 	for i := range allEndpoints {
@@ -364,33 +364,21 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 		for portname := range portsToEndpoints {
 			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
-			state, exists := proxier.serviceMap[svcPort]
-			if !exists || state == nil {
-				state = newServiceInfo(svcPort)
-				proxier.serviceMap[svcPort] = state
-			}
-			curEndpoints := []string{}
-			if state != nil {
-				curEndpoints = state.endpoints
-			}
+			curEndpoints := proxier.endpointsMap[svcPort]
 			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
-
 			if len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
-				glog.V(1).Infof("Setting endpoints for %s to %+v", svcPort, newEndpoints)
-				state.endpoints = newEndpoints
+				glog.V(1).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
+				proxier.endpointsMap[svcPort] = newEndpoints
 			}
-			registeredEndpoints[svcPort] = true
+			activeEndpoints[svcPort] = true
 		}
 	}
+
 	// Remove endpoints missing from the update.
-	for service, info := range proxier.serviceMap {
-		// if missing from update and not already set by previous endpoints event
-		if _, exists := registeredEndpoints[service]; !exists && info.endpoints != nil {
-			glog.V(2).Infof("Removing endpoints for %s", service)
-			// Set the endpoints to nil, we will check for this in OnServiceUpdate so that we
-			// only remove ServicePorts that have no endpoints and were not in the service update,
-			// that way we only remove ServicePorts that were not in both.
-			proxier.serviceMap[service].endpoints = nil
+	for name := range proxier.endpointsMap {
+		if !activeEndpoints[name] {
+			glog.V(2).Infof("Removing endpoints for %q", name)
+			delete(proxier.endpointsMap, name)
 		}
 	}
 
@@ -661,7 +649,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// can group rules together.
 		endpoints := make([]string, 0)
 		endpointChains := make([]utiliptables.Chain, 0)
-		for _, ep := range svcInfo.endpoints {
+		for _, ep := range proxier.endpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
 			endpointChain := servicePortEndpointChainName(svcName, protocol, ep)
 			endpointChains = append(endpointChains, endpointChain)
