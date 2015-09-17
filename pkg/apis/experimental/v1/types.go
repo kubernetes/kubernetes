@@ -82,10 +82,10 @@ type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
 	// and will set the desired number of pods by modyfying its spec.
 	ScaleRef *SubresourceReference `json:"scaleRef"`
-	// MinCount is the lower limit for the number of pods that can be set by the autoscaler.
-	MinCount int `json:"minCount"`
-	// MaxCount is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinCount.
-	MaxCount int `json:"maxCount"`
+	// MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.
+	MinReplicas int `json:"minReplicas"`
+	// MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
+	MaxReplicas int `json:"maxReplicas"`
 	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
 	// Currently two types of resources are supported: "cpu" and "memory".
 	Target ResourceConsumption `json:"target"`

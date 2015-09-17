@@ -957,8 +957,8 @@ func deepCopy_experimental_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscale
 	} else {
 		out.ScaleRef = nil
 	}
-	out.MinCount = in.MinCount
-	out.MaxCount = in.MaxCount
+	out.MinReplicas = in.MinReplicas
+	out.MaxReplicas = in.MaxReplicas
 	if err := deepCopy_experimental_ResourceConsumption(in.Target, &out.Target, c); err != nil {
 		return err
 	}
