@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -287,9 +288,11 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 	}
 
 	mounter := mount.New()
+	var writer io.Writer = &io.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
 		mounter = mount.NewNsenterMounter()
+		writer = &io.NsenterWriter{}
 	}
 
 	tlsOptions, err := s.InitializeTLS()
@@ -384,6 +387,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		SyncFrequency:                  s.SyncFrequency,
 		SystemContainer:                s.SystemContainer,
 		TLSOptions:                     tlsOptions,
+		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(),
 	}, nil
 }
@@ -592,6 +596,7 @@ func SimpleKubelet(client *client.Client,
 		DockerFreeDiskMB: 256,
 		RootFreeDiskMB:   256,
 	}
+
 	kcfg := KubeletConfig{
 		Address:                   net.ParseIP(address),
 		CAdvisorInterface:         cadvisorInterface,
@@ -630,6 +635,7 @@ func SimpleKubelet(client *client.Client,
 		SyncFrequency:     syncFrequency,
 		SystemContainer:   "",
 		TLSOptions:        tlsOptions,
+		Writer:            &io.StdWriter{},
 		VolumePlugins:     volumePlugins,
 	}
 	return &kcfg
@@ -812,6 +818,7 @@ type KubeletConfig struct {
 	SyncFrequency                  time.Duration
 	SystemContainer                string
 	TLSOptions                     *kubelet.TLSOptions
+	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
 }
 
@@ -873,6 +880,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RktPath,
 		kc.RktStage1Image,
 		kc.Mounter,
+		kc.Writer,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
