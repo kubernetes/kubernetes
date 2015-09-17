@@ -417,7 +417,7 @@ func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.Ser
 // getServiceAccount returns the ServiceAccount referenced by the given secret. If the secret is not
 // of type ServiceAccountToken, or if the referenced ServiceAccount does not exist, nil is returned
 func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMiss bool) (*api.ServiceAccount, error) {
-	name, uid := serviceAccountNameAndUID(secret)
+	name, _ := serviceAccountNameAndUID(secret)
 	if len(name) == 0 {
 		return nil, nil
 	}
@@ -430,15 +430,10 @@ func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMis
 
 	for _, obj := range namespaceAccounts {
 		serviceAccount := obj.(*api.ServiceAccount)
-		if name != serviceAccount.Name {
-			// Name must match
-			continue
+
+		if IsServiceAccountToken(secret, serviceAccount) {
+			return serviceAccount, nil
 		}
-		if len(uid) > 0 && uid != string(serviceAccount.UID) {
-			// If UID is specified, it must match
-			continue
-		}
-		return serviceAccount, nil
 	}
 
 	if fetchOnCacheMiss {
@@ -449,11 +444,10 @@ func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMis
 		if err != nil {
 			return nil, err
 		}
-		if len(uid) > 0 && uid != string(serviceAccount.UID) {
-			// If UID is specified, it must match
-			return nil, nil
+
+		if IsServiceAccountToken(secret, serviceAccount) {
+			return serviceAccount, nil
 		}
-		return serviceAccount, nil
 	}
 
 	return nil, nil
@@ -471,16 +465,10 @@ func (e *TokensController) listTokenSecrets(serviceAccount *api.ServiceAccount) 
 	items := []*api.Secret{}
 	for _, obj := range namespaceSecrets {
 		secret := obj.(*api.Secret)
-		name, uid := serviceAccountNameAndUID(secret)
-		if name != serviceAccount.Name {
-			// Name must match
-			continue
+
+		if IsServiceAccountToken(secret, serviceAccount) {
+			items = append(items, secret)
 		}
-		if len(uid) > 0 && uid != string(serviceAccount.UID) {
-			// If UID is specified, it must match
-			continue
-		}
-		items = append(items, secret)
 	}
 	return items, nil
 }

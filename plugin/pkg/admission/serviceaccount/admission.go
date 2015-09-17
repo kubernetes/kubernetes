@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
@@ -273,20 +274,10 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAcco
 	tokens := []*api.Secret{}
 	for _, obj := range index {
 		token := obj.(*api.Secret)
-		if token.Type != api.SecretTypeServiceAccountToken {
-			continue
+
+		if serviceaccount.IsServiceAccountToken(token, serviceAccount) {
+			tokens = append(tokens, token)
 		}
-		name := token.Annotations[api.ServiceAccountNameKey]
-		uid := token.Annotations[api.ServiceAccountUIDKey]
-		if name != serviceAccount.Name {
-			// Name must match
-			continue
-		}
-		if len(uid) > 0 && uid != string(serviceAccount.UID) {
-			// If UID is set, it must match
-			continue
-		}
-		tokens = append(tokens, token)
 	}
 	return tokens, nil
 }
