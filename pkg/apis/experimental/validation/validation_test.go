@@ -613,7 +613,7 @@ func TestValidateDeployment(t *testing.T) {
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()
 	invalidRecreateDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type:          experimental.DeploymentRecreate,
+		Type:          experimental.RecreateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{},
 	}
 	errorCases["rollingUpdate should be nil when strategy type is Recreate"] = invalidRecreateDeployment
@@ -621,7 +621,7 @@ func TestValidateDeployment(t *testing.T) {
 	// MaxSurge should be in the form of 20%.
 	invalidMaxSurgeDeployment := validDeployment()
 	invalidMaxSurgeDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type: experimental.DeploymentRollingUpdate,
+		Type: experimental.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxSurge: util.NewIntOrStringFromString("20Percent"),
 		},
@@ -631,7 +631,7 @@ func TestValidateDeployment(t *testing.T) {
 	// MaxSurge and MaxUnavailable cannot both be zero.
 	invalidRollingUpdateDeployment := validDeployment()
 	invalidRollingUpdateDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type: experimental.DeploymentRollingUpdate,
+		Type: experimental.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxSurge:       util.NewIntOrStringFromString("0%"),
 			MaxUnavailable: util.NewIntOrStringFromInt(0),
@@ -642,7 +642,7 @@ func TestValidateDeployment(t *testing.T) {
 	// MaxUnavailable should not be more than 100%.
 	invalidMaxUnavailableDeployment := validDeployment()
 	invalidMaxUnavailableDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type: experimental.DeploymentRollingUpdate,
+		Type: experimental.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxUnavailable: util.NewIntOrStringFromString("110%"),
 		},
