@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -30,6 +32,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+)
+
+const (
+	updateRetryPeriod  = 5 * time.Second
+	updateRetryTimeout = 30 * time.Second
 )
 
 var _ = Describe("Daemon set", func() {
@@ -61,7 +68,18 @@ func clearNodeLabels(c *client.Client) error {
 	for _, node := range nodeList.Items {
 		if len(node.Labels) != 0 {
 			node.Labels = map[string]string{}
-			newNode, err := nodeClient.Update(&node)
+			var newNode *api.Node
+			err = wait.Poll(updateRetryPeriod, updateRetryTimeout, func() (bool, error) {
+				newNode, err = nodeClient.Update(&node)
+				if err == nil {
+					return true, err
+				}
+				if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == unversioned.StatusReasonConflict {
+					Logf("failed to update node due to resource version conflict")
+					return false, nil
+				}
+				return false, err
+			})
 			if err != nil {
 				return err
 			} else if len(newNode.Labels) != 0 {
@@ -214,7 +232,18 @@ func testDaemonSets(f *Framework) {
 	nodeList, err := nodeClient.List(labels.Everything(), fields.Everything())
 	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 	nodeList.Items[0].Labels = nodeSelector
-	newNode, err := nodeClient.Update(&nodeList.Items[0])
+	var newNode *api.Node
+	err = wait.Poll(updateRetryPeriod, updateRetryTimeout, func() (bool, error) {
+		newNode, err = nodeClient.Update(&nodeList.Items[0])
+		if err == nil {
+			return true, err
+		}
+		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == unversioned.StatusReasonConflict {
+			Logf("failed to update node due to resource version conflict")
+			return false, nil
+		}
+		return false, err
+	})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(newNode.Labels)).To(Equal(1))
 	err = wait.Poll(retryInterval, retryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{newNode.Name}))
@@ -224,7 +253,17 @@ func testDaemonSets(f *Framework) {
 	newNode, err = nodeClient.Get(newNode.Name)
 	Expect(err).NotTo(HaveOccurred(), "error getting node")
 	newNode.Labels = map[string]string{}
-	newNode, err = nodeClient.Update(newNode)
+	err = wait.Poll(updateRetryPeriod, updateRetryTimeout, func() (bool, error) {
+		newNode, err = nodeClient.Update(newNode)
+		if err == nil {
+			return true, err
+		}
+		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == unversioned.StatusReasonConflict {
+			Logf("failed to update node due to resource version conflict")
+			return false, nil
+		}
+		return false, err
+	})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, complexLabel))).
 		NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
