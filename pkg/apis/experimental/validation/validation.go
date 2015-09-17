@@ -227,9 +227,9 @@ func ValidateDeploymentStrategy(strategy *experimental.DeploymentStrategy, field
 		return allErrs
 	}
 	switch strategy.Type {
-	case experimental.DeploymentRecreate:
-		allErrs = append(allErrs, errs.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+experimental.DeploymentRecreate))
-	case experimental.DeploymentRollingUpdate:
+	case experimental.RecreateDeploymentStrategyType:
+		allErrs = append(allErrs, errs.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+experimental.RecreateDeploymentStrategyType))
+	case experimental.RollingUpdateDeploymentStrategyType:
 		allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, "rollingUpdate")...)
 	}
 	return allErrs

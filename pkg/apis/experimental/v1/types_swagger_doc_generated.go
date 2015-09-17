@@ -126,7 +126,7 @@ func (DeploymentStatus) SwaggerDoc() map[string]string {
 var map_DeploymentStrategy = map[string]string{
 	"":              "DeploymentStrategy describes how to replace existing pods with new ones.",
 	"type":          "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
-	"rollingUpdate": "Rolling update config params. Present only if DeploymentType = RollingUpdate.",
+	"rollingUpdate": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
 }
 
 func (DeploymentStrategy) SwaggerDoc() map[string]string {

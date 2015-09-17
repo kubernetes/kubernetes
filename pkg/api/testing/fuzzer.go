@@ -124,9 +124,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(j *experimental.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
-			strategyTypes := []experimental.DeploymentType{experimental.DeploymentRecreate, experimental.DeploymentRollingUpdate}
+			strategyTypes := []experimental.DeploymentStrategyType{experimental.RecreateDeploymentStrategyType, experimental.RollingUpdateDeploymentStrategyType}
 			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
-			if j.Type != experimental.DeploymentRollingUpdate {
+			if j.Type != experimental.RollingUpdateDeploymentStrategyType {
 				j.RollingUpdate = nil
 			} else {
 				rollingUpdate := experimental.RollingUpdateDeployment{}

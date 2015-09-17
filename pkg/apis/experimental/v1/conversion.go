@@ -246,7 +246,7 @@ func convert_experimental_DeploymentStrategy_To_v1_DeploymentStrategy(in *experi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DeploymentStrategy))(in)
 	}
-	out.Type = DeploymentType(in.Type)
+	out.Type = DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(RollingUpdateDeployment)
 		if err := convert_experimental_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
@@ -262,7 +262,7 @@ func convert_v1_DeploymentStrategy_To_experimental_DeploymentStrategy(in *Deploy
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStrategy))(in)
 	}
-	out.Type = experimental.DeploymentType(in.Type)
+	out.Type = experimental.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(experimental.RollingUpdateDeployment)
 		if err := convert_v1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
