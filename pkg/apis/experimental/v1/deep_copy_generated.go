@@ -368,6 +368,26 @@ func deepCopy_v1_ListMeta(in v1.ListMeta, out *v1.ListMeta, c *conversion.Cloner
 	return nil
 }
 
+func deepCopy_v1_LoadBalancerIngress(in v1.LoadBalancerIngress, out *v1.LoadBalancerIngress, c *conversion.Cloner) error {
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func deepCopy_v1_LoadBalancerStatus(in v1.LoadBalancerStatus, out *v1.LoadBalancerStatus, c *conversion.Cloner) error {
+	if in.Ingress != nil {
+		out.Ingress = make([]v1.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := deepCopy_v1_LoadBalancerIngress(in.Ingress[i], &out.Ingress[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_LocalObjectReference(in v1.LocalObjectReference, out *v1.LocalObjectReference, c *conversion.Cloner) error {
 	out.Name = in.Name
 	return nil
@@ -998,6 +1018,93 @@ func deepCopy_v1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus,
 	return nil
 }
 
+func deepCopy_v1_Ingress(in Ingress, out *Ingress, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_IngressSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_IngressStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_IngressBackend(in IngressBackend, out *IngressBackend, c *conversion.Cloner) error {
+	out.ServiceName = in.ServiceName
+	out.ServiceProtocol = in.ServiceProtocol
+	out.ServicePort = in.ServicePort
+	return nil
+}
+
+func deepCopy_v1_IngressList(in IngressList, out *IngressList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Ingress, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_Ingress(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_IngressMap(in IngressMap, out *IngressMap, c *conversion.Cloner) error {
+	out.Host = in.Host
+	if in.Paths != nil {
+		out.Paths = make([]IngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := deepCopy_v1_IngressPath(in.Paths[i], &out.Paths[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_IngressPath(in IngressPath, out *IngressPath, c *conversion.Cloner) error {
+	out.Path = in.Path
+	if err := deepCopy_v1_IngressBackend(in.Backend, &out.Backend, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_IngressSpec(in IngressSpec, out *IngressSpec, c *conversion.Cloner) error {
+	if in.PathMap != nil {
+		out.PathMap = make([]IngressMap, len(in.PathMap))
+		for i := range in.PathMap {
+			if err := deepCopy_v1_IngressMap(in.PathMap[i], &out.PathMap[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PathMap = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_IngressStatus(in IngressStatus, out *IngressStatus, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LoadBalancerStatus(in.LoadBalancer, &out.LoadBalancer, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_v1_Job(in Job, out *Job, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1311,6 +1418,8 @@ func init() {
 		deepCopy_v1_ISCSIVolumeSource,
 		deepCopy_v1_Lifecycle,
 		deepCopy_v1_ListMeta,
+		deepCopy_v1_LoadBalancerIngress,
+		deepCopy_v1_LoadBalancerStatus,
 		deepCopy_v1_LocalObjectReference,
 		deepCopy_v1_NFSVolumeSource,
 		deepCopy_v1_ObjectFieldSelector,
@@ -1343,6 +1452,13 @@ func init() {
 		deepCopy_v1_HorizontalPodAutoscalerList,
 		deepCopy_v1_HorizontalPodAutoscalerSpec,
 		deepCopy_v1_HorizontalPodAutoscalerStatus,
+		deepCopy_v1_Ingress,
+		deepCopy_v1_IngressBackend,
+		deepCopy_v1_IngressList,
+		deepCopy_v1_IngressMap,
+		deepCopy_v1_IngressPath,
+		deepCopy_v1_IngressSpec,
+		deepCopy_v1_IngressStatus,
 		deepCopy_v1_Job,
 		deepCopy_v1_JobCondition,
 		deepCopy_v1_JobList,

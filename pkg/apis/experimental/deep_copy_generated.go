@@ -351,6 +351,26 @@ func deepCopy_api_ListMeta(in api.ListMeta, out *api.ListMeta, c *conversion.Clo
 	return nil
 }
 
+func deepCopy_api_LoadBalancerIngress(in api.LoadBalancerIngress, out *api.LoadBalancerIngress, c *conversion.Cloner) error {
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func deepCopy_api_LoadBalancerStatus(in api.LoadBalancerStatus, out *api.LoadBalancerStatus, c *conversion.Cloner) error {
+	if in.Ingress != nil {
+		out.Ingress = make([]api.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := deepCopy_api_LoadBalancerIngress(in.Ingress[i], &out.Ingress[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
 func deepCopy_api_LocalObjectReference(in api.LocalObjectReference, out *api.LocalObjectReference, c *conversion.Cloner) error {
 	out.Name = in.Name
 	return nil
@@ -986,6 +1006,93 @@ func deepCopy_experimental_HorizontalPodAutoscalerStatus(in HorizontalPodAutosca
 	return nil
 }
 
+func deepCopy_experimental_Ingress(in Ingress, out *Ingress, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_experimental_IngressSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_experimental_IngressStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_experimental_IngressBackend(in IngressBackend, out *IngressBackend, c *conversion.Cloner) error {
+	out.ServiceName = in.ServiceName
+	out.ServiceProtocol = in.ServiceProtocol
+	out.ServicePort = in.ServicePort
+	return nil
+}
+
+func deepCopy_experimental_IngressList(in IngressList, out *IngressList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Ingress, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_experimental_Ingress(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_experimental_IngressMap(in IngressMap, out *IngressMap, c *conversion.Cloner) error {
+	out.Host = in.Host
+	if in.Paths != nil {
+		out.Paths = make([]IngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := deepCopy_experimental_IngressPath(in.Paths[i], &out.Paths[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func deepCopy_experimental_IngressPath(in IngressPath, out *IngressPath, c *conversion.Cloner) error {
+	out.Path = in.Path
+	if err := deepCopy_experimental_IngressBackend(in.Backend, &out.Backend, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_experimental_IngressSpec(in IngressSpec, out *IngressSpec, c *conversion.Cloner) error {
+	if in.PathMap != nil {
+		out.PathMap = make([]IngressMap, len(in.PathMap))
+		for i := range in.PathMap {
+			if err := deepCopy_experimental_IngressMap(in.PathMap[i], &out.PathMap[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PathMap = nil
+	}
+	return nil
+}
+
+func deepCopy_experimental_IngressStatus(in IngressStatus, out *IngressStatus, c *conversion.Cloner) error {
+	if err := deepCopy_api_LoadBalancerStatus(in.LoadBalancer, &out.LoadBalancer, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_experimental_Job(in Job, out *Job, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1288,6 +1395,8 @@ func init() {
 		deepCopy_api_ISCSIVolumeSource,
 		deepCopy_api_Lifecycle,
 		deepCopy_api_ListMeta,
+		deepCopy_api_LoadBalancerIngress,
+		deepCopy_api_LoadBalancerStatus,
 		deepCopy_api_LocalObjectReference,
 		deepCopy_api_NFSVolumeSource,
 		deepCopy_api_ObjectFieldSelector,
@@ -1321,6 +1430,13 @@ func init() {
 		deepCopy_experimental_HorizontalPodAutoscalerList,
 		deepCopy_experimental_HorizontalPodAutoscalerSpec,
 		deepCopy_experimental_HorizontalPodAutoscalerStatus,
+		deepCopy_experimental_Ingress,
+		deepCopy_experimental_IngressBackend,
+		deepCopy_experimental_IngressList,
+		deepCopy_experimental_IngressMap,
+		deepCopy_experimental_IngressPath,
+		deepCopy_experimental_IngressSpec,
+		deepCopy_experimental_IngressStatus,
 		deepCopy_experimental_Job,
 		deepCopy_experimental_JobCondition,
 		deepCopy_experimental_JobList,
