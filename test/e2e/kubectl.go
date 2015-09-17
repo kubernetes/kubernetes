@@ -364,7 +364,6 @@ var _ = Describe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
-			serviceTimeout := 60 * time.Second
 
 			By("creating Redis RC")
 			runKubectl("create", "-f", controllerJson, nsFlag)
@@ -375,7 +374,10 @@ var _ = Describe("Kubectl client", func() {
 				endpointFound := false
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
 					endpoints, err := c.Endpoints(ns).Get(name)
-					Expect(err).NotTo(HaveOccurred())
+					if err != nil {
+						Logf("Get endpoints failed (%v elapsed, ignoring for %v): %v", time.Since(t), poll, err)
+						continue
+					}
 
 					uidToPort := getContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
@@ -383,7 +385,7 @@ var _ = Describe("Kubectl client", func() {
 						continue
 					}
 					if len(uidToPort) > 1 {
-						Fail("To many endpoints found")
+						Fail("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
 						if port[0] != redisPort {
@@ -413,13 +415,13 @@ var _ = Describe("Kubectl client", func() {
 
 			By("exposing RC")
 			runKubectl("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			waitForService(c, ns, "rm2", true, poll, serviceTimeout)
-			validateService("rm2", 1234, serviceTimeout)
+			waitForService(c, ns, "rm2", true, poll, serviceStartTimeout)
+			validateService("rm2", 1234, serviceStartTimeout)
 
 			By("exposing service")
 			runKubectl("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			waitForService(c, ns, "rm3", true, poll, serviceTimeout)
-			validateService("rm3", 2345, serviceTimeout)
+			waitForService(c, ns, "rm3", true, poll, serviceStartTimeout)
+			validateService("rm3", 2345, serviceStartTimeout)
 		})
 	})
 
