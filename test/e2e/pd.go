@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -268,11 +268,11 @@ func createPD() (string, error) {
 		}
 		return pdName, nil
 	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(cloudprovider.Volumes)
 		if !ok {
 			return "", fmt.Errorf("Provider does not support volumes")
 		}
-		volumeOptions := &aws_cloud.VolumeOptions{}
+		volumeOptions := &cloudprovider.VolumeOptions{}
 		volumeOptions.CapacityMB = 10 * 1024
 		return volumes.CreateVolume(volumeOptions)
 	}
@@ -290,7 +290,7 @@ func deletePD(pdName string) error {
 		}
 		return err
 	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(cloudprovider.Volumes)
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
@@ -307,7 +307,7 @@ func detachPD(hostName, pdName string) error {
 		// TODO: make this hit the compute API directly.
 		return exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
 	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(cloudprovider.Volumes)
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}

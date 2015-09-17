@@ -212,6 +212,11 @@ func (gce *GCECloud) Routes() (cloudprovider.Routes, bool) {
 	return gce, true
 }
 
+// Volumes returns an implementation of Volumes for Google Compute Engine.
+func (gce *GCECloud) Volumes() (cloudprovider.Volumes, bool) {
+	return nil, false
+}
+
 func makeHostURL(projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",

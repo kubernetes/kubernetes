@@ -37,6 +37,8 @@ type Interface interface {
 	Clusters() (Clusters, bool)
 	// Routes returns a routes interface along with whether the interface is supported.
 	Routes() (Routes, bool)
+	// Volumes returns a volumes interface along with whether the interface is supported.
+	Volumes() (Volumes, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
 }
@@ -139,6 +141,24 @@ type Routes interface {
 	// Delete the specified managed route
 	// Route should be as returned by ListRoutes
 	DeleteRoute(clusterName string, route *Route) error
+}
+
+// Volumes is an interface for managing cloud-provisioned volumes
+type Volumes interface {
+	// Attach the disk to the specified instance
+	// instanceName can be empty to mean "the instance on which we are running"
+	// Returns the device (e.g. /dev/xvdf) where we attached the volume
+	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
+	// Detach the disk from the specified instance
+	// instanceName can be empty to mean "the instance on which we are running"
+	DetachDisk(instanceName string, volumeName string) error
+	// Create a volume with the specified options
+	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
+	DeleteVolume(volumeName string) error
+}
+
+type VolumeOptions struct {
+	CapacityMB int
 }
 
 var InstanceNotFound = errors.New("instance not found")

@@ -115,6 +115,11 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }
 
+// Volumes returns an implementation of Volumes for Amazon Web Services.
+func (f *FakeCloud) Volumes() (cloudprovider.Volumes, bool) {
+	return f, true
+}
+
 // GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
 func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
 	status := &api.LoadBalancerStatus{}
@@ -242,5 +247,21 @@ func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) 
 		return f.Err
 	}
 	delete(f.RouteMap, name)
+	return nil
+}
+
+func (f *FakeCloud) AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error) {
+	return "/some/fake/path", nil
+}
+
+func (f *FakeCloud) DetachDisk(instanceName string, volumeName string) error {
+	return nil
+}
+
+func (f *FakeCloud) CreateVolume(volumeOptions *cloudprovider.VolumeOptions) (volumeName string, err error) {
+	return "foo", nil
+}
+
+func (f *FakeCloud) DeleteVolume(volumeName string) error {
 	return nil
 }

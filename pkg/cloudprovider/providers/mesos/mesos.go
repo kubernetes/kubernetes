@@ -119,6 +119,11 @@ func (c *MesosCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
+// Volumes returns an implementation of Volumes for Mesos
+func (gce *MesosCloud) Volumes() (cloudprovider.Volumes, bool) {
+	return nil, false
+}
+
 // ProviderName returns the cloud provider ID.
 func (c *MesosCloud) ProviderName() string {
 	return ProviderName

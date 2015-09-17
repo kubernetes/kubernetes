@@ -111,6 +111,11 @@ func (v *VagrantCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
+// Volumes returns an implementation of Volumes for VagrantCloud
+func (os *VagrantCloud) Volumes() (cloudprovider.Volumes, bool) {
+	return nil, false
+}
+
 // getInstanceByAddress retuns
 func (v *VagrantCloud) getInstanceByAddress(address string) (*SaltMinion, error) {
 	token, err := v.saltLogin()
