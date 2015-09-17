@@ -314,8 +314,8 @@ type PersistentVolumeSource struct {
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty"`
 	// HostPath represents a directory on the host.
 	// Provisioned by a developer or tester.
-	// This is useful for development and testing only.
-	// On-host storage is not supported in any way.
+	// This is useful for single-node development and testing only!
+	// On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
 	HostPath *HostPathVolumeSource `json:"hostPath,omitempty"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and
@@ -388,12 +388,9 @@ const (
 	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
 	// The volume plugin must support Recycling.
 	PersistentVolumeReclaimRecycle PersistentVolumeReclaimPolicy = "Recycle"
-
 	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
 	// The volume plugin must support Deletion.
-	// TODO: implement w/ DeletableVolumePlugin
-	// PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
-
+	PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
 	// PersistentVolumeReclaimRetain means the volume will left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"

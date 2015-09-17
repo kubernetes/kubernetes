@@ -99,12 +99,13 @@ func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume
 			return fmt.Errorf("PersistentVolume[%s] phase is %s, expected %s.  Skipping.", pv.Name, latest.Status.Phase, api.VolumeReleased)
 		}
 
-		// handleRecycle blocks until completion
+		// both handleRecycle and handleDelete block until completion
 		// TODO: allow parallel recycling operations to increase throughput
-		// TODO implement handleDelete in a separate PR w/ cloud volumes
 		switch pv.Spec.PersistentVolumeReclaimPolicy {
 		case api.PersistentVolumeReclaimRecycle:
 			err = recycler.handleRecycle(pv)
+		case api.PersistentVolumeReclaimDelete:
+			err = recycler.handleDelete(pv)
 		case api.PersistentVolumeReclaimRetain:
 			glog.V(5).Infof("Volume %s is set to retain after release.  Skipping.\n", pv.Name)
 		default:
@@ -161,6 +162,49 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	return nil
 }
 
+func (recycler *PersistentVolumeRecycler) handleDelete(pv *api.PersistentVolume) error {
+	glog.V(5).Infof("Deleting PersistentVolume[%s]\n", pv.Name)
+
+	currentPhase := pv.Status.Phase
+	nextPhase := currentPhase
+
+	spec := volume.NewSpecFromPersistentVolume(pv, false)
+	plugin, err := recycler.pluginMgr.FindDeletablePluginBySpec(spec)
+	if err != nil {
+		return fmt.Errorf("Could not find deletable volume plugin for spec: %+v", err)
+	}
+	deleter, err := plugin.NewDeleter(spec)
+	if err != nil {
+		return fmt.Errorf("could not obtain Deleter for spec: %+v", err)
+	}
+	// blocks until completion
+	err = deleter.Delete()
+	if err != nil {
+		glog.Errorf("PersistentVolume[%s] failed deletion: %+v", pv.Name, err)
+		pv.Status.Message = fmt.Sprintf("Deletion error: %s", err)
+		nextPhase = api.VolumeFailed
+	} else {
+		glog.V(5).Infof("PersistentVolume[%s] successfully deleted through plugin\n", pv.Name)
+		// after successful deletion through the plugin, we can also remove the PV from the cluster
+		err = recycler.client.DeletePersistentVolume(pv)
+		if err != nil {
+			return fmt.Errorf("error deleting persistent volume: %+v", err)
+		}
+	}
+
+	if currentPhase != nextPhase {
+		glog.V(5).Infof("PersistentVolume[%s] changing phase from %s to %s\n", pv.Name, currentPhase, nextPhase)
+		pv.Status.Phase = nextPhase
+		_, err := recycler.client.UpdatePersistentVolumeStatus(pv)
+		if err != nil {
+			// Rollback to previous phase
+			pv.Status.Phase = currentPhase
+		}
+	}
+
+	return nil
+}
+
 // Run starts this recycler's control loops
 func (recycler *PersistentVolumeRecycler) Run() {
 	glog.V(5).Infof("Starting PersistentVolumeRecycler\n")
@@ -183,6 +227,7 @@ func (recycler *PersistentVolumeRecycler) Stop() {
 type recyclerClient interface {
 	GetPersistentVolume(name string) (*api.PersistentVolume, error)
 	UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error)
+	DeletePersistentVolume(volume *api.PersistentVolume) error
 	UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 }
 
@@ -200,6 +245,10 @@ func (c *realRecyclerClient) GetPersistentVolume(name string) (*api.PersistentVo
 
 func (c *realRecyclerClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
 	return c.client.PersistentVolumes().Update(volume)
+}
+
+func (c *realRecyclerClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
+	return c.client.PersistentVolumes().Delete(volume.Name)
 }
 
 func (c *realRecyclerClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {

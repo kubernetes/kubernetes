@@ -17,12 +17,15 @@ limitations under the License.
 package host_path
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -64,7 +67,7 @@ func TestGetAccessModes(t *testing.T) {
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	pluginHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, volume.VolumeConfig{}}}, pluginHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -80,6 +83,63 @@ func TestRecycler(t *testing.T) {
 	}
 	if err := recycler.Recycle(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
+	}
+}
+
+func TestDeleter(t *testing.T) {
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	defer os.RemoveAll(tempPath)
+	err := os.MkdirAll(tempPath, 0750)
+	if err != nil {
+		t.Fatal("Failed to create tmp directory for deleter: %v", err)
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
+	plug, err := plugMgr.FindDeletablePluginBySpec(spec)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	deleter, err := plug.NewDeleter(spec)
+	if err != nil {
+		t.Errorf("Failed to make a new Deleter: %v", err)
+	}
+	if deleter.GetPath() != tempPath {
+		t.Errorf("Expected %s but got %s", tempPath, deleter.GetPath())
+	}
+	if err := deleter.Delete(); err != nil {
+		t.Errorf("Mock Recycler expected to return nil but got %s", err)
+	}
+	if exists, _ := util.FileExists("foo"); exists {
+		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
+	}
+}
+
+func TestDeleterTempDir(t *testing.T) {
+	tests := map[string]struct {
+		expectedFailure bool
+		path            string
+	}{
+		"just-tmp": {true, "/tmp"},
+		"not-tmp":  {true, "/nottmp"},
+		"good-tmp": {false, "/tmp/scratch"},
+	}
+
+	for name, test := range tests {
+		plugMgr := volume.VolumePluginMgr{}
+		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+		spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: test.path}}}}}
+		plug, _ := plugMgr.FindDeletablePluginBySpec(spec)
+		deleter, _ := plug.NewDeleter(spec)
+		err := deleter.Delete()
+		if err == nil && test.expectedFailure {
+			t.Errorf("Expected failure for test '%s' but got nil err", name)
+		}
+		if err != nil && !test.expectedFailure {
+			t.Errorf("Unexpected failure for test '%s': %v", name, err)
+		}
 	}
 }
 
