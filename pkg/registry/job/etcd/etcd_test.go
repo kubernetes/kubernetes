@@ -89,20 +89,25 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	completions := 2
+	two := 2
 	test.TestUpdate(
 		// valid
 		validNewJob(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*experimental.Job)
-			object.Spec.Completions = &completions
+			object.Spec.Parallelism = &two
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*experimental.Job)
 			object.Spec.Selector = map[string]string{}
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*experimental.Job)
+			object.Spec.Completions = &two
 			return object
 		},
 	)
