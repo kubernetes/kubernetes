@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -107,7 +107,7 @@ func TestValidatesHostParameter(t *testing.T) {
 }
 
 func TestDoRequestBearer(t *testing.T) {
-	status := &api.Status{Status: api.StatusFailure}
+	status := &unversioned.Status{Status: unversioned.StatusFailure}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   400,
@@ -136,7 +136,7 @@ func TestDoRequestBearer(t *testing.T) {
 }
 
 func TestDoRequestWithoutPassword(t *testing.T) {
-	status := &api.Status{Status: api.StatusFailure}
+	status := &unversioned.Status{Status: unversioned.StatusFailure}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   400,
@@ -175,7 +175,7 @@ func TestDoRequestWithoutPassword(t *testing.T) {
 }
 
 func TestDoRequestSuccess(t *testing.T) {
-	status := &api.Status{Status: api.StatusSuccess}
+	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -212,12 +212,12 @@ func TestDoRequestSuccess(t *testing.T) {
 }
 
 func TestDoRequestFailed(t *testing.T) {
-	status := &api.Status{
+	status := &unversioned.Status{
 		Code:    http.StatusNotFound,
-		Status:  api.StatusFailure,
-		Reason:  api.StatusReasonNotFound,
+		Status:  unversioned.StatusFailure,
+		Reason:  unversioned.StatusReasonNotFound,
 		Message: " \"\" not found",
-		Details: &api.StatusDetails{},
+		Details: &unversioned.StatusDetails{},
 	}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
 	fakeHandler := util.FakeHandler{
@@ -250,7 +250,7 @@ func TestDoRequestFailed(t *testing.T) {
 }
 
 func TestDoRequestCreated(t *testing.T) {
-	status := &api.Status{Status: api.StatusSuccess}
+	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   201,

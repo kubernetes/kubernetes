@@ -37,6 +37,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -3041,7 +3042,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	kubeClient.AddReactor("create", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
 		// Return an error on create.
 		return true, &api.Node{}, &apierrors.StatusError{
-			ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
+			ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonAlreadyExists},
 		}
 	})
 	kubeClient.AddReactor("get", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {

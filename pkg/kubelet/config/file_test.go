@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -78,7 +79,7 @@ func TestReadPodsFromFile(t *testing.T) {
 		{
 			desc: "Simple pod",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},

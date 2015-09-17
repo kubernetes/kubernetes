@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -84,7 +85,7 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 func testData() (*api.PodList, *api.ServiceList) {
 	grace := int64(30)
 	pods := &api.PodList{
-		ListMeta: api.ListMeta{
+		ListMeta: unversioned.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []api.Pod{
@@ -107,7 +108,7 @@ func testData() (*api.PodList, *api.ServiceList) {
 		},
 	}
 	svc := &api.ServiceList{
-		ListMeta: api.ListMeta{
+		ListMeta: unversioned.ListMeta{
 			ResourceVersion: "16",
 		},
 		Items: []api.Service{

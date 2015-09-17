@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -281,7 +282,7 @@ func TestRunExposeServiceFromFile(t *testing.T) {
 		},
 		input: &api.Service{
 			ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-			TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			Spec: api.ServiceSpec{
 				Selector: map[string]string{"app": "go"},
 			},
@@ -289,7 +290,7 @@ func TestRunExposeServiceFromFile(t *testing.T) {
 		flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test"},
 		output: &api.Service{
 			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
-			TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{
 					{

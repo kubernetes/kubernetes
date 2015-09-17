@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 )
 
@@ -35,7 +36,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Errorf("unexpected version %v", version)
 	}
 
-	daemonSetList := experimental.DaemonSetList{ListMeta: api.ListMeta{ResourceVersion: "10"}}
+	daemonSetList := experimental.DaemonSetList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
 	version, err = accessor.ResourceVersion(&daemonSetList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

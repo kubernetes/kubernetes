@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -163,7 +164,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		}
 	}
 
-	return &api.Status{Status: api.StatusSuccess}, nil
+	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
