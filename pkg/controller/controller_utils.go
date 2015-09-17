@@ -318,11 +318,11 @@ func (r RealPodControl) CreateReplicaOnNode(namespace string, ds *experimental.D
 	}
 	pod.Spec.NodeName = nodeName
 	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(ds, "failedCreate", "Error creating: %v", err)
+		r.Recorder.Eventf(ds, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pod replica: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v created pod %v", ds.Name, newPod.Name)
-		r.Recorder.Eventf(ds, "successfulCreate", "Created pod: %v", newPod.Name)
+		r.Recorder.Eventf(ds, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
 
 	return nil
