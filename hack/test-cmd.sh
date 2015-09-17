@@ -127,7 +127,7 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-KUBE_API_VERSIONS="v1,experimental/v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,experimental/v1alpha1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -829,7 +829,7 @@ kube_api_versions=(
   v1
 )
 for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1,experimental/v1" runTests "${version}"
+  KUBE_API_VERSIONS="v1,experimental/v1alpha1" runTests "${version}"
 done
 
 kube::log::status "TEST PASSED"

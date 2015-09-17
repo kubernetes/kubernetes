@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"reflect"
@@ -31,12 +31,12 @@ func addConversionFuncs() {
 	err := api.Scheme.AddConversionFuncs(
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_v1_PodSpec_To_api_PodSpec,
-		convert_experimental_DeploymentSpec_To_v1_DeploymentSpec,
-		convert_v1_DeploymentSpec_To_experimental_DeploymentSpec,
-		convert_experimental_DeploymentStrategy_To_v1_DeploymentStrategy,
-		convert_v1_DeploymentStrategy_To_experimental_DeploymentStrategy,
-		convert_experimental_RollingUpdateDeployment_To_v1_RollingUpdateDeployment,
-		convert_v1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment,
+		convert_experimental_DeploymentSpec_To_v1alpha1_DeploymentSpec,
+		convert_v1alpha1_DeploymentSpec_To_experimental_DeploymentSpec,
+		convert_experimental_DeploymentStrategy_To_v1alpha1_DeploymentStrategy,
+		convert_v1alpha1_DeploymentStrategy_To_experimental_DeploymentStrategy,
+		convert_experimental_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment,
+		convert_v1alpha1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -182,7 +182,7 @@ func convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	return nil
 }
 
-func convert_experimental_DeploymentSpec_To_v1_DeploymentSpec(in *experimental.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
+func convert_experimental_DeploymentSpec_To_v1alpha1_DeploymentSpec(in *experimental.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DeploymentSpec))(in)
 	}
@@ -204,7 +204,7 @@ func convert_experimental_DeploymentSpec_To_v1_DeploymentSpec(in *experimental.D
 	} else {
 		out.Template = nil
 	}
-	if err := convert_experimental_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := convert_experimental_DeploymentStrategy_To_v1alpha1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	out.UniqueLabelKey = new(string)
@@ -212,7 +212,7 @@ func convert_experimental_DeploymentSpec_To_v1_DeploymentSpec(in *experimental.D
 	return nil
 }
 
-func convert_v1_DeploymentSpec_To_experimental_DeploymentSpec(in *DeploymentSpec, out *experimental.DeploymentSpec, s conversion.Scope) error {
+func convert_v1alpha1_DeploymentSpec_To_experimental_DeploymentSpec(in *DeploymentSpec, out *experimental.DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentSpec))(in)
 	}
@@ -235,7 +235,7 @@ func convert_v1_DeploymentSpec_To_experimental_DeploymentSpec(in *DeploymentSpec
 	} else {
 		out.Template = nil
 	}
-	if err := convert_v1_DeploymentStrategy_To_experimental_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := convert_v1alpha1_DeploymentStrategy_To_experimental_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	if in.UniqueLabelKey != nil {
@@ -244,14 +244,14 @@ func convert_v1_DeploymentSpec_To_experimental_DeploymentSpec(in *DeploymentSpec
 	return nil
 }
 
-func convert_experimental_DeploymentStrategy_To_v1_DeploymentStrategy(in *experimental.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
+func convert_experimental_DeploymentStrategy_To_v1alpha1_DeploymentStrategy(in *experimental.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DeploymentStrategy))(in)
 	}
 	out.Type = DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(RollingUpdateDeployment)
-		if err := convert_experimental_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		if err := convert_experimental_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	} else {
@@ -260,14 +260,14 @@ func convert_experimental_DeploymentStrategy_To_v1_DeploymentStrategy(in *experi
 	return nil
 }
 
-func convert_v1_DeploymentStrategy_To_experimental_DeploymentStrategy(in *DeploymentStrategy, out *experimental.DeploymentStrategy, s conversion.Scope) error {
+func convert_v1alpha1_DeploymentStrategy_To_experimental_DeploymentStrategy(in *DeploymentStrategy, out *experimental.DeploymentStrategy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStrategy))(in)
 	}
 	out.Type = experimental.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(experimental.RollingUpdateDeployment)
-		if err := convert_v1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		if err := convert_v1alpha1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	} else {
@@ -276,7 +276,7 @@ func convert_v1_DeploymentStrategy_To_experimental_DeploymentStrategy(in *Deploy
 	return nil
 }
 
-func convert_experimental_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *experimental.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
+func convert_experimental_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment(in *experimental.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.RollingUpdateDeployment))(in)
 	}
@@ -296,7 +296,7 @@ func convert_experimental_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(
 	return nil
 }
 
-func convert_v1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment(in *RollingUpdateDeployment, out *experimental.RollingUpdateDeployment, s conversion.Scope) error {
+func convert_v1alpha1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment(in *RollingUpdateDeployment, out *experimental.RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RollingUpdateDeployment))(in)
 	}

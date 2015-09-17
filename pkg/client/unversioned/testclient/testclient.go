@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -39,7 +38,7 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 	}
 
 	fakeClient := &Fake{}
-	fakeClient.AddReactor("*", "*", ObjectReaction(o, latest.GroupOrDie("").RESTMapper))
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, api.RESTMapper))
 
 	return fakeClient
 }

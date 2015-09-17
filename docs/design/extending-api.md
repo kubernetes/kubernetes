@@ -114,7 +114,7 @@ For example, if a user creates:
 ```yaml
 metadata:
   name: cron-tab.example.com
-apiVersion: experimental/v1
+apiVersion: experimental/v1alpha1
 kind: ThirdPartyResource
 description: "A specification of a Pod to run on a cron style schedule"
 versions:

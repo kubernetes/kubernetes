@@ -58,10 +58,13 @@ func init() {
 		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
 	}
 	var versions []string
+	var groupVersions []string
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
 		versions = append(versions, apiutil.GetVersion(registeredGroupVersions[i]))
+		groupVersions = append(groupVersions, registeredGroupVersions[i])
 	}
 	groupMeta.Versions = versions
+	groupMeta.GroupVersions = groupVersions
 
 	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 
@@ -89,7 +92,7 @@ func init() {
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")
 
-	mapper := api.NewDefaultRESTMapper("api", versions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapper("", versions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 	groupMeta.RESTMapper = mapper
