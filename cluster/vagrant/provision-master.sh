@@ -254,6 +254,19 @@ pushd /kube-install
   ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
 popd
 
+# Enable Fedora Cockpit on host to support Kubernetes administration
+# Access it by going to <master-ip>:9090 and login as vagrant/vagrant
+if ! which /usr/libexec/cockpit-ws &>/dev/null; then
+  
+  pushd /etc/yum.repos.d
+    wget https://copr.fedoraproject.org/coprs/sgallagh/cockpit-preview/repo/fedora-21/sgallagh-cockpit-preview-fedora-21.repo
+    yum install -y cockpit cockpit-kubernetes  
+  popd
+
+  systemctl enable cockpit.socket
+  systemctl start cockpit.socket
+fi
+
 # we will run provision to update code each time we test, so we do not want to do salt installs each time
 if ! which salt-master &>/dev/null; then
 

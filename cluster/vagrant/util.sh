@@ -260,13 +260,21 @@ function verify-cluster {
     # ensures KUBECONFIG is set
     get-kubeconfig-basicauth
     echo
-    echo "Kubernetes cluster is running.  The master is running at:"
+    echo "Kubernetes cluster is running."
+    echo
+    echo "The master is running at:"
     echo
     echo "  https://${MASTER_IP}"
     echo
+    echo "Administer and visualize its resources using Cockpit:"
+    echo
+    echo "  https://${MASTER_IP}:9090"
+    echo
+    echo "For more information on Cockpit, visit http://cockpit-project.org"
+    echo 
     echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
-    )
+  )
 }
 
 # Instantiate a kubernetes cluster
