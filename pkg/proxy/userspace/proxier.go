@@ -761,7 +761,7 @@ func iptablesInit(ipt iptables.Interface) error {
 	// the NodePort would take priority (incorrectly).
 	// This is unlikely (and would only affect outgoing traffic from the cluster to the load balancer, which seems
 	// doubly-unlikely), but we need to be careful to keep the rules in the right order.
-	args := []string{ /* service-cluster-ip-range matching could go here */ }
+	args := []string{ /* service-cluster-ip-range matching could go here */}
 	args = append(args, "-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules")
 	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPortalChain); err != nil {
 		return err

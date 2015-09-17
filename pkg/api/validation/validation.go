@@ -1718,6 +1718,7 @@ func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 }
 
 var supportedNamespaceNetworkPolicy = sets.NewString(string(api.NamespaceNetworkPolicyOpen), string(api.NamespaceNetworkPolicyClosed))
+
 func validateNamespaceNetworkPolicy(networkPolicy string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 

@@ -611,8 +611,8 @@ func (NamespaceList) SwaggerDoc() map[string]string {
 }
 
 var map_NamespaceSpec = map[string]string{
-	"":           "NamespaceSpec describes the attributes on a Namespace.",
-	"finalizers": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
+	"":                          "NamespaceSpec describes the attributes on a Namespace.",
+	"finalizers":                "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
 	"experimentalNetworkPolicy": "NetworkPolicy indicates who is authorized to access pods in the namespace. Must be either Open or Closed. Defaults to Open.",
 }
 

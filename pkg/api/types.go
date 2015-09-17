@@ -1517,10 +1517,10 @@ type NodeList struct {
 type NamespaceNetworkPolicy string
 
 // These are the valid network policies of a namespace
-const(
-    // Closed namespaces are only accessible by pods within the namespace
+const (
+	// Closed namespaces are only accessible by pods within the namespace
 	NamespaceNetworkPolicyClosed NamespaceNetworkPolicy = "Closed"
-    // Open namespaces are accessible from any namespace
+	// Open namespaces are accessible from any namespace
 	NamespaceNetworkPolicyOpen NamespaceNetworkPolicy = "Open"
 )
 

@@ -26,10 +26,10 @@ import (
 )
 
 type NamespaceRegistry struct {
-	mu      sync.Mutex
-	List    api.NamespaceList
+	mu        sync.Mutex
+	List      api.NamespaceList
 	Namespace *api.Namespace
-	Err     error
+	Err       error
 
 	DeletedID string
 	GottenID  string
@@ -81,7 +81,7 @@ func (r *NamespaceRegistry) CreateNamespace(ctx api.Context, ns *api.Namespace) 
 	r.Namespace = new(api.Namespace)
 	*r.Namespace = *ns
 	r.List.Items = append(r.List.Items, *ns)
-	return  r.Err
+	return r.Err
 }
 
 func (r *NamespaceRegistry) DeleteNamespace(ctx api.Context, id string) error {
@@ -108,4 +108,3 @@ func (r *NamespaceRegistry) WatchNamespaces(ctx api.Context, label labels.Select
 
 	return nil, r.Err
 }
-

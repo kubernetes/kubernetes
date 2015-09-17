@@ -32,13 +32,13 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/registry/namespace"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
@@ -118,7 +118,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		}
 	}
 
-	if service.Spec.Type == api.ServiceTypeNamespaceIP{
+	if service.Spec.Type == api.ServiceTypeNamespaceIP {
 		nsPolicy, err := rs.GetNamespaceNetworkPolicy(string(service.ObjectMeta.Namespace))
 		if err != nil {
 			return nil, err

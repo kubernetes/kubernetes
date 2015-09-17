@@ -3182,14 +3182,14 @@ func TestValidateNamespace(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: api.NamespaceSpec{
-				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
+				Finalizers:    []api.FinalizerName{"example.com/something", "example.com/other"},
 				NetworkPolicy: api.NamespaceNetworkPolicyOpen,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
 			Spec: api.NamespaceSpec{
-				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
+				Finalizers:    []api.FinalizerName{"example.com/something", "example.com/other"},
 				NetworkPolicy: api.NamespaceNetworkPolicyClosed,
 			},
 		},
