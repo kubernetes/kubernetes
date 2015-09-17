@@ -109,7 +109,7 @@ func DescriberFor(group string, kind string, c *client.Client) (Describer, bool)
 	var ok bool
 
 	switch group {
-	case "api":
+	case "":
 		f, ok = describerMap(c)[kind]
 	case "experimental":
 		f, ok = expDescriberMap(c)[kind]

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	_ "k8s.io/kubernetes/pkg/apis/experimental"
-	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
 
 	flag "github.com/spf13/pflag"
 )
@@ -90,10 +90,16 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := sets.NewString(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
+
+	codec, err := testapi.GetCodecForObject(item)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	version := testapi.Default.Version()
 	if !set.Has(version) {
 		fuzzInternalObject(t, version, item, seed)
-		roundTrip(t, testapi.Default.Codec(), item)
+		roundTrip(t, codec, item)
 	}
 }
 

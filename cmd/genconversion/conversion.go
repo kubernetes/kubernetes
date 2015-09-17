@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/experimental"
-	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -94,7 +94,7 @@ func main() {
 	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(version, "")
-	for _, knownType := range api.Scheme.KnownTypes(version) {
+	for _, knownType := range api.Scheme.KnownTypes(*groupVersion) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}
