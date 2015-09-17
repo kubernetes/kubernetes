@@ -112,6 +112,7 @@ __custom_func() {
 	valid_resources = `Valid resource types include:
    * pods (aka 'po')
    * replicationcontrollers (aka 'rc')
+   * daemonsets (aka 'ds')
    * services (aka 'svc')
    * events (aka 'ev')
    * nodes (aka 'no')

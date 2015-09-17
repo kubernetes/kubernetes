@@ -69,6 +69,7 @@ func describerMap(c *client.Client) map[string]Describer {
 	m := map[string]Describer{
 		"Pod": &PodDescriber{c},
 		"ReplicationController": &ReplicationControllerDescriber{c},
+		"DaemonSet":             &DaemonSetDescriber{c},
 		"Secret":                &SecretDescriber{c},
 		"Service":               &ServiceDescriber{c},
 		"ServiceAccount":        &ServiceAccountDescriber{c},
@@ -128,6 +129,7 @@ func init() {
 		describePod,
 		describeService,
 		describeReplicationController,
+		describeDaemonSet,
 		describeNode,
 		describeNamespace,
 	)
@@ -823,7 +825,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForReplicationController(pc, controller)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, controller.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -889,6 +891,52 @@ func describeJob(job *experimental.Job, events *api.EventList) (string, error) {
 		if job.Spec.Template != nil {
 			describeVolumes(job.Spec.Template.Spec.Volumes, out)
 		}
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+// DaemonSetDescriber generates information about a daemon set and the pods it has created.
+type DaemonSetDescriber struct {
+	client.Interface
+}
+
+func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
+	dc := d.Experimental().DaemonSets(namespace)
+	pc := d.Pods(namespace)
+
+	daemon, err := dc.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, daemon.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
+
+	events, _ := d.Events(namespace).Search(daemon)
+
+	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
+}
+
+func describeDaemonSet(daemon *experimental.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
+		if daemon.Spec.Template != nil {
+			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
+		} else {
+			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
+		}
+		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Selector))
+		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(daemon.Labels))
+		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
+		fmt.Fprintf(out, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
+		fmt.Fprintf(out, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
+		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1347,6 +1395,30 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 	}
 }
 
+// Get all daemon set whose selectors would match a given set of labels.
+// TODO: Move this to pkg/client and ideally implement it server-side (instead
+// of getting all DS's and searching through them manually).
+// TODO: write an interface for controllers and fuse getReplicationControllersForLabels
+// and getDaemonSetsForLabels.
+func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]experimental.DaemonSet, error) {
+	// Get all daemon sets
+	// TODO: this needs a namespace scope as argument
+	dss, err := c.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error getting daemon set: %v", err)
+	}
+
+	// Find the ones that match labelsToMatch.
+	var matchingDaemonSets []experimental.DaemonSet
+	for _, ds := range dss.Items {
+		selector := labels.SelectorFromSet(ds.Spec.Selector)
+		if selector.Matches(labelsToMatch) {
+			matchingDaemonSets = append(matchingDaemonSets, ds)
+		}
+	}
+	return matchingDaemonSets, nil
+}
+
 // Get all replication controllers whose selectors would match a given set of
 // labels.
 // TODO Move this to pkg/client and ideally implement it server-side (instead
@@ -1384,8 +1456,8 @@ func printReplicationControllersByLabels(matchingRCs []api.ReplicationController
 	return list
 }
 
-func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, succeeded, failed int, err error) {
-	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector), fields.Everything())
+func getPodStatusForController(c client.PodInterface, selector map[string]string) (running, waiting, succeeded, failed int, err error) {
+	rcPods, err := c.List(labels.SelectorFromSet(selector), fields.Everything())
 	if err != nil {
 		return
 	}
