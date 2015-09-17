@@ -129,7 +129,6 @@ var _ = Describe("Networking", func() {
 
 		// Clean up service
 		defer func() {
-			defer GinkgoRecover()
 			By("Cleaning up the service")
 			if err = f.Client.Services(f.Namespace.Name).Delete(svc.Name); err != nil {
 				Failf("unable to delete svc %v: %v", svc.Name, err)
@@ -166,7 +165,6 @@ var _ = Describe("Networking", func() {
 
 		// Clean up the pods
 		defer func() {
-			defer GinkgoRecover()
 			By("Cleaning up the webserver pods")
 			for _, podName := range podNames {
 				if err = f.Client.Pods(f.Namespace.Name).Delete(podName, nil); err != nil {
