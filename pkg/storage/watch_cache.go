@@ -250,6 +250,20 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 	if size > 0 {
 		oldest = w.cache[w.startIndex%w.capacity].resourceVersion
 	}
+	if resourceVersion == 0 {
+		// resourceVersion = 0 means that we don't require any specific starting point
+		// and we would like to start watching from ~now.
+		// However, to keep backward compatibility, we additionally need to return the
+		// current state and only then start watching from that point.
+		//
+		// TODO: In v2 api, we should stop returning the current state - #13969.
+		allItems := w.store.List()
+		result := make([]watchCacheEvent, len(allItems))
+		for i, item := range allItems {
+			result[i] = watchCacheEvent{Type: watch.Added, Object: item.(runtime.Object)}
+		}
+		return result, nil
+	}
 	if resourceVersion < oldest {
 		return nil, fmt.Errorf("too old resource version: %d (%d)", resourceVersion, oldest)
 	}
