@@ -52,7 +52,7 @@ More advanced consumers may wish to provide their own transport via a http.Round
     }
     client, err := client.New(config)
 
-The RESTClient type implements the Kubernetes API conventions (see `docs/api-conventions.md`)
+The RESTClient type implements the Kubernetes API conventions (see `docs/devel/api-conventions.md`)
 for a given API path and is intended for use by consumers implementing their own Kubernetes
 compatible APIs.
 */
