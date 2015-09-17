@@ -61,6 +61,12 @@ There are several requirements for the submit queue to work:
 
 Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/kubernetes/contrib/tree/master/submit-queue/whitelist.txt).
 
+Automation
+----------
+
+We use a variety of automation to manage pull requests.  This automation is described in detail
+[elsewhere.](automation.md)
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.md?pixel)]()
