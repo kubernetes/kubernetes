@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
@@ -260,7 +261,7 @@ func (r *SimpleReactor) React(action Action) (bool, runtime.Object, error) {
 	return r.Reaction(action)
 }
 
-// SimpleWatchReactor is a Reactor.  Each reaction function is attached to a given verb,resource tuple.  "*" in either field matches everything for that value.
+// SimpleWatchReactor is a WatchReactor.  Each reaction function is attached to a given resource.  "*" matches everything for that value.
 // For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions
 type SimpleWatchReactor struct {
 	Resource string
@@ -278,5 +279,26 @@ func (r *SimpleWatchReactor) Handles(action Action) bool {
 }
 
 func (r *SimpleWatchReactor) React(action Action) (bool, watch.Interface, error) {
+	return r.Reaction(action)
+}
+
+// SimpleProxyReactor is a ProxyReactor.  Each reaction function is attached to a given resource.  "*" matches everything for that value.
+// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions.
+type SimpleProxyReactor struct {
+	Resource string
+
+	Reaction ProxyReactionFunc
+}
+
+func (r *SimpleProxyReactor) Handles(action Action) bool {
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	if !resourceCovers {
+		return false
+	}
+
+	return true
+}
+
+func (r *SimpleProxyReactor) React(action Action) (bool, client.ResponseWrapper, error) {
 	return r.Reaction(action)
 }

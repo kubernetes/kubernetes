@@ -488,6 +488,14 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		if containerStatus, found := statuses[container.Name]; found {
 			reason, ok := dm.reasonCache.Get(uid, container.Name)
 			if ok && reason == kubecontainer.ErrCrashLoopBackOff.Error() {
+				// We need to increment the restart count if we are going to
+				// move the current state to last terminated state.
+				if containerStatus.State.Terminated != nil {
+					lastObservedTime, ok := lastObservedTime[container.Name]
+					if !ok || containerStatus.State.Terminated.FinishedAt.After(lastObservedTime.Time) {
+						containerStatus.RestartCount += 1
+					}
+				}
 				containerStatus.LastTerminationState = containerStatus.State
 				containerStatus.State.Waiting = &api.ContainerStateWaiting{Reason: reason}
 				containerStatus.State.Running = nil
@@ -585,13 +593,24 @@ func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[docker.
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
 			protocol = "/tcp"
 		}
+
 		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
 		exposedPorts[dockerPort] = struct{}{}
-		portBindings[dockerPort] = []docker.PortBinding{
-			{
-				HostPort: strconv.Itoa(exteriorPort),
-				HostIP:   port.HostIP,
-			},
+
+		hostBinding := docker.PortBinding{
+			HostPort: strconv.Itoa(exteriorPort),
+			HostIP:   port.HostIP,
+		}
+
+		// Allow multiple host ports bind to same docker port
+		if existedBindings, ok := portBindings[dockerPort]; ok {
+			// If a docker port already map to a host port, just append the host ports
+			portBindings[dockerPort] = append(existedBindings, hostBinding)
+		} else {
+			// Otherwise, it's fresh new port binding
+			portBindings[dockerPort] = []docker.PortBinding{
+				hostBinding,
+			}
 		}
 	}
 	return exposedPorts, portBindings
@@ -604,7 +623,8 @@ func (dm *DockerManager) runContainer(
 	ref *api.ObjectReference,
 	netMode string,
 	ipcMode string,
-	utsMode string) (string, error) {
+	utsMode string,
+	pidMode string) (string, error) {
 
 	dockerName := KubeletContainerName{
 		PodFullName:   kubecontainer.GetPodFullName(pod),
@@ -634,7 +654,7 @@ func (dm *DockerManager) runContainer(
 	}
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
-		data, err := latest.Codec.Encode(pod)
+		data, err := latest.GroupOrDie("").Codec.Encode(pod)
 		if err != nil {
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
 		} else {
@@ -721,6 +741,7 @@ func (dm *DockerManager) runContainer(
 		NetworkMode:  netMode,
 		IpcMode:      ipcMode,
 		UTSMode:      utsMode,
+		PidMode:      pidMode,
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
 		Memory:     memoryLimit,
 		MemorySwap: -1,
@@ -1338,7 +1359,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if err = latest.Codec.DecodeInto([]byte(body), pod); err == nil {
+		if err = latest.GroupOrDie("").Codec.DecodeInto([]byte(body), pod); err == nil {
 			name := labels[kubernetesContainerLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {
@@ -1369,7 +1390,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode string) (kubeletTypes.DockerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode string, pidMode string) (kubeletTypes.DockerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1389,7 +1410,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if pod.Spec.HostNetwork {
 		utsMode = "host"
 	}
-	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode)
+	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode)
 	if err != nil {
 		return "", err
 	}
@@ -1521,7 +1542,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 
-	id, err := dm.runContainerInPod(pod, container, netNamespace, "")
+	id, err := dm.runContainerInPod(pod, container, netNamespace, "", getPidMode(pod))
 	if err != nil {
 		return "", err
 	}
@@ -1533,7 +1554,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
 // - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
 //   Additionally if it is true then containersToKeep have to be empty
-// - infraContainerId have to be set iff startInfraContainer is false. It stores dockerID of running Infra Container
+// - infraContainerId have to be set if and only if startInfraContainer is false. It stores dockerID of running Infra Container
 // - containersToStart keeps indices of Specs of containers that have to be started.
 // - containersToKeep stores mapping from dockerIDs of running containers to indices of their Specs for containers that
 //   should be kept running. If startInfraContainer is false then it contains an entry for infraContainerId (mapped to -1).
@@ -1791,7 +1812,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode)
+		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod))
 		dm.updateReasonCache(pod, container, err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
@@ -1903,4 +1924,13 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 	}
 	dm.clearReasonCache(pod, container)
 	return false
+}
+
+// getPidMode returns the pid mode to use on the docker container based on pod.Spec.HostPID.
+func getPidMode(pod *api.Pod) string {
+	pidMode := ""
+	if pod.Spec.HostPID {
+		pidMode = "host"
+	}
+	return pidMode
 }

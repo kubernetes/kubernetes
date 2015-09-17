@@ -25,9 +25,12 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
+	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+
+	"github.com/golang/glog"
 )
 
 // ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.
@@ -41,15 +44,41 @@ func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin
 	// Each plugin can make use of VolumeConfig.  The single arg to this func contains *all* enumerated
 	// CLI flags meant to configure volume plugins.  From that single config, create an instance of volume.VolumeConfig
 	// for a specific plugin and pass that instance to the plugin's ProbeVolumePlugins(config) func.
-	hostPathConfig := volume.VolumeConfig{
-	// transfer attributes from VolumeConfig to this instance of volume.VolumeConfig
-	}
-	nfsConfig := volume.VolumeConfig{
-	// TODO transfer config.PersistentVolumeRecyclerTimeoutNFS and other flags to this instance of VolumeConfig
-	// Configuring recyclers will be done in a follow-up PR
-	}
 
+	// HostPath recycling is for testing and development purposes only!
+	hostPathConfig := volume.VolumeConfig{
+		RecyclerMinimumTimeout:   flags.PersistentVolumeRecyclerMinimumTimeoutHostPath,
+		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutHostPath,
+		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+	}
+	if err := attemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, &hostPathConfig); err != nil {
+		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", err)
+	}
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
+
+	nfsConfig := volume.VolumeConfig{
+		RecyclerMinimumTimeout:   flags.PersistentVolumeRecyclerMinimumTimeoutNFS,
+		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutNFS,
+		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+	}
+	if err := attemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, &nfsConfig); err != nil {
+		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", err)
+	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
+
 	return allPlugins
+}
+
+// attemptToLoadRecycler tries decoding a pod from a filepath for use as a recycler for a volume.
+// If successful, this method will set the recycler on the config.
+// If unsucessful, an error is returned.
+func attemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
+	if path != "" {
+		recyclerPod, err := io.LoadPodFromFile(path)
+		if err != nil {
+			return err
+		}
+		config.RecyclerPodTemplate = recyclerPod
+	}
+	return nil
 }

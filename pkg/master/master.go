@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -118,7 +117,7 @@ type Config struct {
 	EnableProfiling       bool
 	EnableWatchCache      bool
 	APIPrefix             string
-	ExpAPIPrefix          string
+	APIGroupPrefix        string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -196,7 +195,7 @@ type Master struct {
 	enableProfiling       bool
 	enableWatchCache      bool
 	apiPrefix             string
-	expAPIPrefix          string
+	apiGroupPrefix        string
 	corsAllowedOriginList []string
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
@@ -355,7 +354,7 @@ func New(c *Config) *Master {
 		enableProfiling:       c.EnableProfiling,
 		enableWatchCache:      c.EnableWatchCache,
 		apiPrefix:             c.APIPrefix,
-		expAPIPrefix:          c.ExpAPIPrefix,
+		apiGroupPrefix:        c.APIGroupPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
@@ -576,7 +575,7 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
+		apiserver.AddApiWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", []string{expVersion.Version})
 		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
@@ -617,7 +616,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.GroupOrDie("").RESTMapper, "api")
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -747,12 +746,12 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
 		Root: m.apiPrefix,
 
-		Mapper: latest.RESTMapper,
+		Mapper: latest.GroupOrDie("").RESTMapper,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
-		Linker:    latest.SelfLinker,
+		Linker:    latest.GroupOrDie("").SelfLinker,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -807,9 +806,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
+		Mapper:  thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version),
+		Codec:   latest.GroupOrDie("experimental").Codec,
+		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
 		Version: version,
 
@@ -841,17 +840,17 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root: m.expAPIPrefix,
+		Root: m.apiGroupPrefix + "/" + latest.GroupOrDie("experimental").Group,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  explatest.RESTMapper,
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
+		Mapper:  latest.GroupOrDie("experimental").RESTMapper,
+		Codec:   latest.GroupOrDie("experimental").Codec,
+		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
-		Version: explatest.Version,
+		Version: latest.GroupOrDie("experimental").Version,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

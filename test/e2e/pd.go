@@ -342,7 +342,7 @@ func testPDPod(diskName, targetHost string, readOnly bool, numContainers int) *a
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.Version,
+			APIVersion: latest.GroupOrDie("").Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: "pd-test-" + string(util.NewUUID()),

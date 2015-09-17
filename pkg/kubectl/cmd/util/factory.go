@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -86,6 +87,8 @@ type Factory struct {
 	DefaultNamespace func() (string, bool, error)
 	// Returns the generator for the provided generator name
 	Generator func(name string) (kubectl.Generator, bool)
+	// Check whether the kind of resources could be exposed
+	CanBeExposed func(kind string) error
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -246,6 +249,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			generator, ok := generators[name]
 			return generator, ok
 		},
+		CanBeExposed: func(kind string) error {
+			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
+		},
 	}
 }
 
@@ -353,7 +362,11 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	//       instead of trying everything.
 	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version, c.cacheDir)
+		g, err := latest.Group("experimental")
+		if err != nil {
+			return err
+		}
+		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "apis"+"/"+g.Group, version, c.cacheDir)
 		if errExp == nil {
 			return nil
 		}

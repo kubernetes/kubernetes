@@ -308,6 +308,11 @@ func (e *endpointController) syncService(key string) {
 				glog.V(4).Infof("Failed to find a host IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
+			if pod.DeletionTimestamp != nil {
+				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
+				continue
+			}
+
 			if !api.IsPodReady(pod) {
 				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
 				continue

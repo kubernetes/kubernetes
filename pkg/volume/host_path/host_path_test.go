@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -63,8 +63,8 @@ func TestGetAccessModes(t *testing.T) {
 
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	volumeHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler}}, volumeHost)
+	pluginHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -158,7 +158,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	o.Add(pv)
 	o.Add(claim)
 	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, latest.RESTMapper))
+	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", client, nil))

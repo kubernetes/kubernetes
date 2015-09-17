@@ -11,6 +11,8 @@ MAINTAINER Alex Robinson "arob@google.com"
 
 # Disable prompts from apt.
 ENV DEBIAN_FRONTEND noninteractive
+# Keeps unneeded configs from being installed along with fluentd.
+ENV DO_NOT_INSTALL_CATCH_ALL_CONFIG true
 
 RUN apt-get -q update && \
     apt-get install -y curl && \

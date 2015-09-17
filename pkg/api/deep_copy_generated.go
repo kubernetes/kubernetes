@@ -322,6 +322,11 @@ func deepCopy_api_ContainerStatus(in ContainerStatus, out *ContainerStatus, c *c
 	return nil
 }
 
+func deepCopy_api_DaemonEndpoint(in DaemonEndpoint, out *DaemonEndpoint, c *conversion.Cloner) error {
+	out.Port = in.Port
+	return nil
+}
+
 func deepCopy_api_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -914,6 +919,13 @@ func deepCopy_api_NodeCondition(in NodeCondition, out *NodeCondition, c *convers
 	return nil
 }
 
+func deepCopy_api_NodeDaemonEndpoints(in NodeDaemonEndpoints, out *NodeDaemonEndpoints, c *conversion.Cloner) error {
+	if err := deepCopy_api_DaemonEndpoint(in.KubeletEndpoint, &out.KubeletEndpoint, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_api_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -975,6 +987,9 @@ func deepCopy_api_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Clone
 		}
 	} else {
 		out.Addresses = nil
+	}
+	if err := deepCopy_api_NodeDaemonEndpoints(in.DaemonEndpoints, &out.DaemonEndpoints, c); err != nil {
+		return err
 	}
 	if err := deepCopy_api_NodeSystemInfo(in.NodeInfo, &out.NodeInfo, c); err != nil {
 		return err
@@ -1431,6 +1446,7 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -2238,6 +2254,7 @@ func init() {
 		deepCopy_api_ContainerStateTerminated,
 		deepCopy_api_ContainerStateWaiting,
 		deepCopy_api_ContainerStatus,
+		deepCopy_api_DaemonEndpoint,
 		deepCopy_api_DeleteOptions,
 		deepCopy_api_DownwardAPIVolumeFile,
 		deepCopy_api_DownwardAPIVolumeSource,
@@ -2279,6 +2296,7 @@ func init() {
 		deepCopy_api_Node,
 		deepCopy_api_NodeAddress,
 		deepCopy_api_NodeCondition,
+		deepCopy_api_NodeDaemonEndpoints,
 		deepCopy_api_NodeList,
 		deepCopy_api_NodeSpec,
 		deepCopy_api_NodeStatus,

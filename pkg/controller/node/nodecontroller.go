@@ -417,7 +417,7 @@ func (nc *NodeController) recordNodeStatusChange(node *api.Node, new_status stri
 }
 
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
-// is entitled, state of current and last observed Ready Condition, and an error if it ocured.
+// is entitled, state of current and last observed Ready Condition, and an error if it occurred.
 func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, api.NodeCondition, *api.NodeCondition, error) {
 	var err error
 	var gracePeriod time.Duration
@@ -515,7 +515,8 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
 				Type:               api.NodeReady,
 				Status:             api.ConditionUnknown,
-				Reason:             fmt.Sprintf("Kubelet never posted node status."),
+				Reason:             "NodeStatusNeverUpdated",
+				Message:            fmt.Sprintf("Kubelet never posted node status."),
 				LastHeartbeatTime:  node.CreationTimestamp,
 				LastTransitionTime: nc.now(),
 			})
@@ -524,7 +525,8 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 				node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), lastReadyCondition)
 			if lastReadyCondition.Status != api.ConditionUnknown {
 				readyCondition.Status = api.ConditionUnknown
-				readyCondition.Reason = fmt.Sprintf("Kubelet stopped posting node status.")
+				readyCondition.Reason = "NodeStatusUnknown"
+				readyCondition.Message = fmt.Sprintf("Kubelet stopped posting node status.")
 				// LastProbeTime is the last time we heard from kubelet.
 				readyCondition.LastHeartbeatTime = lastReadyCondition.LastHeartbeatTime
 				readyCondition.LastTransitionTime = nc.now()
@@ -569,12 +571,15 @@ func (nc *NodeController) evictPods(nodeName string) bool {
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
 // returns true if an eviction was queued.
 func (nc *NodeController) cancelPodEviction(nodeName string) bool {
-	glog.V(2).Infof("Cancelling pod Eviction on Node: %v", nodeName)
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.podEvictor.Remove(nodeName)
 	wasTerminating := nc.terminationEvictor.Remove(nodeName)
-	return wasDeleting || wasTerminating
+	if wasDeleting || wasTerminating {
+		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", nodeName)
+		return true
+	}
+	return false
 }
 
 // deletePods will delete all pods from master running on given node, and return true

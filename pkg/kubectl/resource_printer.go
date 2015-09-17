@@ -380,9 +380,11 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
+var jobColumns = []string{"JOB", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "SUCCESSFUL"}
 var serviceColumns = []string{"NAME", "CLUSTER_IP", "EXTERNAL_IP", "PORT(S)", "SELECTOR", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
+var daemonSetColumns = []string{"NAME", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "NODE-SELECTOR"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
@@ -405,6 +407,10 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podTemplateColumns, printPodTemplateList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
+	h.Handler(daemonSetColumns, printDaemonSet)
+	h.Handler(daemonSetColumns, printDaemonSetList)
+	h.Handler(jobColumns, printJob)
+	h.Handler(jobColumns, printJobList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(endpointColumns, printEndpoints)
@@ -655,7 +661,6 @@ func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, withNamespa
 func printReplicationController(controller *api.ReplicationController, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	name := controller.Name
 	namespace := controller.Namespace
-
 	containers := controller.Spec.Template.Spec.Containers
 	var firstContainer api.Container
 	if len(containers) > 0 {
@@ -701,6 +706,33 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, controller := range list.Items {
 		if err := printReplicationController(&controller, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printJob(job *experimental.Job, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	containers := job.Spec.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer = containers[0]
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
+		job.Name,
+		firstContainer.Name,
+		firstContainer.Image,
+		labels.FormatLabels(job.Spec.Selector),
+		job.Status.Successful)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func printJobList(list *experimental.JobList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, job := range list.Items {
+		if err := printJob(&job, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}
@@ -775,6 +807,60 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, svc := range list.Items {
 		if err := printService(&svc, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printDaemonSet(ds *experimental.DaemonSet, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	name := ds.Name
+	namespace := ds.Namespace
+
+	containers := ds.Spec.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
+	}
+
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",
+		name,
+		firstContainer.Name,
+		firstContainer.Image,
+		labels.FormatLabels(ds.Spec.Selector),
+		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
+	); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, appendLabels(ds.Labels, columnLabels)); err != nil {
+		return err
+	}
+
+	// Lay out all the other containers on separate lines.
+	extraLinePrefix := "\t"
+	if withNamespace {
+		extraLinePrefix = "\t\t"
+	}
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s%s\t%s\t%s\t%s", extraLinePrefix, container.Name, container.Image, "", "")
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printDaemonSetList(list *experimental.DaemonSetList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, ds := range list.Items {
+		if err := printDaemonSet(&ds, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

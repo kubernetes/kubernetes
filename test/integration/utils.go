@@ -66,7 +66,7 @@ func deleteAllEtcdKeys() {
 }
 
 func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

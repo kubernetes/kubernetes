@@ -224,9 +224,9 @@ type DeploymentSpec struct {
 
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
-	Type DeploymentType `json:"type,omitempty"`
+	Type DeploymentStrategyType `json:"type,omitempty"`
 
-	// Rolling update config params. Present only if DeploymentType =
+	// Rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
@@ -234,14 +234,14 @@ type DeploymentStrategy struct {
 	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty"`
 }
 
-type DeploymentType string
+type DeploymentStrategyType string
 
 const (
 	// Kill all existing pods before creating new ones.
-	DeploymentRecreate DeploymentType = "Recreate"
+	RecreateDeploymentStrategyType DeploymentStrategyType = "Recreate"
 
 	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
-	DeploymentRollingUpdate DeploymentType = "RollingUpdate"
+	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
 // Spec to control the desired behavior of rolling update.

@@ -70,7 +70,7 @@ type KubeletServer struct {
 	AllowPrivileged                bool
 	APIServerList                  []string
 	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
-	CadvisorPort                   uint
+	CAdvisorPort                   uint
 	CertDirectory                  string
 	CgroupRoot                     string
 	CloudConfigFile                string
@@ -93,6 +93,7 @@ type KubeletServer struct {
 	HealthzPort                    int
 	HostnameOverride               string
 	HostNetworkSources             string
+	HostPIDSources                 string
 	HTTPCheckFrequency             time.Duration
 	ImageGCHighThresholdPercent    int
 	ImageGCLowThresholdPercent     int
@@ -156,7 +157,7 @@ func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
 		Address:                     net.ParseIP("0.0.0.0"),
 		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		CadvisorPort:                4194,
+		CAdvisorPort:                4194,
 		CertDirectory:               "/var/run/kubernetes",
 		CgroupRoot:                  "",
 		ConfigureCBR0:               false,
@@ -170,6 +171,7 @@ func NewKubeletServer() *KubeletServer {
 		HealthzBindAddress:          net.ParseIP("127.0.0.1"),
 		HealthzPort:                 10248,
 		HostNetworkSources:          kubelet.FileSource,
+		HostPIDSources:              kubelet.FileSource,
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
@@ -222,6 +224,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RootDirectory, "root-dir", s.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
 	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
+	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. For all sources use \"*\" [default=\"file\"]")
 	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	fs.IntVar(&s.RegistryBurst, "registry-burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0")
 	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited. [default=0.0]")
@@ -234,7 +237,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
-	fs.UintVar(&s.CadvisorPort, "cadvisor-port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.UintVar(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
@@ -274,6 +277,11 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 // is not valid.  It will not start any background processes.
 func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 	hostNetworkSources, err := kubelet.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
+	if err != nil {
+		return nil, err
+	}
+
+	hostPIDSources, err := kubelet.GetValidatedSources(strings.Split(s.HostPIDSources, ","))
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +330,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 	return &KubeletConfig{
 		Address:                   s.Address,
 		AllowPrivileged:           s.AllowPrivileged,
-		CadvisorInterface:         nil, // launches background processes, not set here
+		CAdvisorInterface:         nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
 		ClusterDNS:                s.ClusterDNS,
@@ -342,6 +350,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		FileCheckFrequency:        s.FileCheckFrequency,
 		HostnameOverride:          s.HostnameOverride,
 		HostNetworkSources:        hostNetworkSources,
+		HostPIDSources:            hostPIDSources,
 		HTTPCheckFrequency:        s.HTTPCheckFrequency,
 		ImageGCPolicy:             imageGCPolicy,
 		KubeClient:                nil,
@@ -407,12 +416,12 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		kcfg.Cloud = cloud
 	}
 
-	if kcfg.CadvisorInterface == nil {
-		ca, err := cadvisor.New(s.CadvisorPort)
+	if kcfg.CAdvisorInterface == nil {
+		ca, err := cadvisor.New(s.CAdvisorPort)
 		if err != nil {
 			return err
 		}
-		kcfg.CadvisorInterface = ca
+		kcfg.CAdvisorInterface = ca
 	}
 
 	util.ReallyCrash = s.ReallyCrashForTesting
@@ -585,7 +594,7 @@ func SimpleKubelet(client *client.Client,
 	}
 	kcfg := KubeletConfig{
 		Address:                   net.ParseIP(address),
-		CadvisorInterface:         cadvisorInterface,
+		CAdvisorInterface:         cadvisorInterface,
 		CgroupRoot:                "",
 		Cloud:                     cloud,
 		ConfigFile:                configFilePath,
@@ -673,6 +682,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 
 	privilegedSources := capabilities.PrivilegedSources{
 		HostNetworkSources: kcfg.HostNetworkSources,
+		HostPIDSources:     kcfg.HostPIDSources,
 	}
 	capabilities.Setup(kcfg.AllowPrivileged, privilegedSources, 0)
 
@@ -745,7 +755,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
-	CadvisorInterface              cadvisor.Interface
+	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface
 	ClusterDNS                     net.IP
@@ -766,6 +776,7 @@ type KubeletConfig struct {
 	Hostname                       string
 	HostnameOverride               string
 	HostNetworkSources             []string
+	HostPIDSources                 []string
 	HTTPCheckFrequency             time.Duration
 	ImageGCPolicy                  kubelet.ImageGCPolicy
 	KubeClient                     *client.Client
@@ -821,6 +832,10 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		MaxContainers:      kc.MaxContainerCount,
 	}
 
+	daemonEndpoints := &api.NodeDaemonEndpoints{
+		KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
+	}
+
 	pc = makePodSourceConfig(kc)
 	k, err = kubelet.NewMainKubelet(
 		kc.Hostname,
@@ -846,7 +861,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.NetworkPluginName,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
-		kc.CadvisorInterface,
+		kc.CAdvisorInterface,
 		kc.ImageGCPolicy,
 		kc.DiskSpacePolicy,
 		kc.Cloud,
@@ -865,7 +880,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.MaxPods,
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
-		kc.CPUCFSQuota)
+		kc.CPUCFSQuota,
+		daemonEndpoints)
 
 	if err != nil {
 		return nil, nil, err

@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -92,7 +92,7 @@ func TestHelperDelete(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client := &client.FakeRESTClient{
+		client := &fake.RESTClient{
 			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
@@ -131,7 +131,7 @@ func TestHelperCreate(t *testing.T) {
 	grace := int64(30)
 	tests := []struct {
 		Resp     *http.Response
-		RespFunc client.HTTPClientFunc
+		RespFunc fake.HTTPClientFunc
 		HttpErr  error
 		Modify   bool
 		Object   runtime.Object
@@ -183,7 +183,7 @@ func TestHelperCreate(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		client := &client.FakeRESTClient{
+		client := &fake.RESTClient{
 			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
@@ -269,7 +269,7 @@ func TestHelperGet(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client := &client.FakeRESTClient{
+		client := &fake.RESTClient{
 			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
@@ -340,7 +340,7 @@ func TestHelperList(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client := &client.FakeRESTClient{
+		client := &fake.RESTClient{
 			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
@@ -386,7 +386,7 @@ func TestHelperReplace(t *testing.T) {
 	grace := int64(30)
 	tests := []struct {
 		Resp      *http.Response
-		RespFunc  client.HTTPClientFunc
+		RespFunc  fake.HTTPClientFunc
 		HttpErr   error
 		Overwrite bool
 		Object    runtime.Object
@@ -443,7 +443,7 @@ func TestHelperReplace(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		client := &client.FakeRESTClient{
+		client := &fake.RESTClient{
 			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,

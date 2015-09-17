@@ -123,7 +123,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 	return &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.Version,
+			APIVersion: latest.GroupOrDie("").Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,

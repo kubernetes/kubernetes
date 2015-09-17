@@ -363,6 +363,14 @@ func convert_api_ContainerStatus_To_v1_ContainerStatus(in *api.ContainerStatus, 
 	return nil
 }
 
+func convert_api_DaemonEndpoint_To_v1_DaemonEndpoint(in *api.DaemonEndpoint, out *DaemonEndpoint, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.DaemonEndpoint))(in)
+	}
+	out.Port = in.Port
+	return nil
+}
+
 func convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *DeleteOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.DeleteOptions))(in)
@@ -1059,6 +1067,16 @@ func convert_api_NodeCondition_To_v1_NodeCondition(in *api.NodeCondition, out *N
 	return nil
 }
 
+func convert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints(in *api.NodeDaemonEndpoints, out *NodeDaemonEndpoints, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeDaemonEndpoints))(in)
+	}
+	if err := convert_api_DaemonEndpoint_To_v1_DaemonEndpoint(&in.KubeletEndpoint, &out.KubeletEndpoint, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NodeList))(in)
@@ -1129,6 +1147,9 @@ func convert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeStatus
 		}
 	} else {
 		out.Addresses = nil
+	}
+	if err := convert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints(&in.DaemonEndpoints, &out.DaemonEndpoints, s); err != nil {
+		return err
 	}
 	if err := convert_api_NodeSystemInfo_To_v1_NodeSystemInfo(&in.NodeInfo, &out.NodeInfo, s); err != nil {
 		return err
@@ -2767,6 +2788,14 @@ func convert_v1_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus, out 
 	return nil
 }
 
+func convert_v1_DaemonEndpoint_To_api_DaemonEndpoint(in *DaemonEndpoint, out *api.DaemonEndpoint, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonEndpoint))(in)
+	}
+	out.Port = in.Port
+	return nil
+}
+
 func convert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *api.DeleteOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeleteOptions))(in)
@@ -3463,6 +3492,16 @@ func convert_v1_NodeCondition_To_api_NodeCondition(in *NodeCondition, out *api.N
 	return nil
 }
 
+func convert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints(in *NodeDaemonEndpoints, out *api.NodeDaemonEndpoints, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*NodeDaemonEndpoints))(in)
+	}
+	if err := convert_v1_DaemonEndpoint_To_api_DaemonEndpoint(&in.KubeletEndpoint, &out.KubeletEndpoint, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeList))(in)
@@ -3533,6 +3572,9 @@ func convert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus
 		}
 	} else {
 		out.Addresses = nil
+	}
+	if err := convert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints(&in.DaemonEndpoints, &out.DaemonEndpoints, s); err != nil {
+		return err
 	}
 	if err := convert_v1_NodeSystemInfo_To_api_NodeSystemInfo(&in.NodeInfo, &out.NodeInfo, s); err != nil {
 		return err
@@ -4851,6 +4893,7 @@ func init() {
 		convert_api_ContainerState_To_v1_ContainerState,
 		convert_api_ContainerStatus_To_v1_ContainerStatus,
 		convert_api_Container_To_v1_Container,
+		convert_api_DaemonEndpoint_To_v1_DaemonEndpoint,
 		convert_api_DeleteOptions_To_v1_DeleteOptions,
 		convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
 		convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource,
@@ -4891,6 +4934,7 @@ func init() {
 		convert_api_Namespace_To_v1_Namespace,
 		convert_api_NodeAddress_To_v1_NodeAddress,
 		convert_api_NodeCondition_To_v1_NodeCondition,
+		convert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints,
 		convert_api_NodeList_To_v1_NodeList,
 		convert_api_NodeSpec_To_v1_NodeSpec,
 		convert_api_NodeStatus_To_v1_NodeStatus,
@@ -4968,6 +5012,7 @@ func init() {
 		convert_v1_ContainerState_To_api_ContainerState,
 		convert_v1_ContainerStatus_To_api_ContainerStatus,
 		convert_v1_Container_To_api_Container,
+		convert_v1_DaemonEndpoint_To_api_DaemonEndpoint,
 		convert_v1_DeleteOptions_To_api_DeleteOptions,
 		convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
 		convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource,
@@ -5008,6 +5053,7 @@ func init() {
 		convert_v1_Namespace_To_api_Namespace,
 		convert_v1_NodeAddress_To_api_NodeAddress,
 		convert_v1_NodeCondition_To_api_NodeCondition,
+		convert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints,
 		convert_v1_NodeList_To_api_NodeList,
 		convert_v1_NodeSpec_To_api_NodeSpec,
 		convert_v1_NodeStatus_To_api_NodeStatus,

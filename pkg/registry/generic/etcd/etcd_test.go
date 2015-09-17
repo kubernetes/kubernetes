@@ -84,6 +84,9 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 			return podPrefix
 		},
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
+			if _, ok := api.NamespaceFrom(ctx); !ok {
+				return "", fmt.Errorf("namespace is required")
+			}
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
@@ -126,11 +129,11 @@ func (everythingMatcher) MatchesSingle() (string, bool) {
 
 func TestEtcdList(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "bar"},
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "bar"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -148,10 +151,14 @@ func TestEtcdList(t *testing.T) {
 		},
 	}
 
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	noNamespaceContext := api.NewContext()
+
 	table := map[string]struct {
 		in      tools.EtcdResponseWithError
 		m       generic.Matcher
 		out     runtime.Object
+		context api.Context
 		succeed bool
 	}{
 		"empty": {
@@ -194,6 +201,16 @@ func TestEtcdList(t *testing.T) {
 			out:     &api.PodList{Items: []api.Pod{*podA}},
 			succeed: true,
 		},
+		"normalFilteredNoNamespace": {
+			in: tools.EtcdResponseWithError{
+				R: normalListResp,
+				E: nil,
+			},
+			m:       setMatcher{sets.NewString("foo")},
+			out:     &api.PodList{Items: []api.Pod{*podA}},
+			context: noNamespaceContext,
+			succeed: true,
+		},
 		"normalFilteredMatchMultiple": {
 			in: tools.EtcdResponseWithError{
 				R: normalListResp,
@@ -206,23 +223,28 @@ func TestEtcdList(t *testing.T) {
 	}
 
 	for name, item := range table {
+		ctx := testContext
+		if item.context != nil {
+			ctx = item.context
+		}
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		if name, ok := item.m.MatchesSingle(); ok {
-			key, err := registry.KeyFunc(api.NewContext(), name)
-			if err != nil {
-				t.Errorf("Couldn't create key for %v", name)
-				continue
+			if key, err := registry.KeyFunc(ctx, name); err == nil {
+				key = etcdtest.AddPrefix(key)
+				fakeClient.Data[key] = item.in
+			} else {
+				key := registry.KeyRootFunc(ctx)
+				key = etcdtest.AddPrefix(key)
+				fakeClient.Data[key] = item.in
 			}
-			key = etcdtest.AddPrefix(key)
-			fakeClient.Data[key] = item.in
 		} else {
-			key, _ := registry.KeyFunc(api.NewContext(), name)
+			key := registry.KeyRootFunc(ctx)
 			key = etcdtest.AddPrefix(key)
 			fakeClient.Data[key] = item.in
 		}
-		list, err := registry.ListPredicate(api.NewContext(), item.m)
+		list, err := registry.ListPredicate(ctx, item.m)
 		if e, a := item.succeed, err == nil; e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
+			t.Errorf("%v: expected %v, got %v: %v", name, e, a, err)
 			continue
 		}
 		if e, a := item.out, list; !api.Semantic.DeepDerivative(e, a) {
@@ -233,11 +255,11 @@ func TestEtcdList(t *testing.T) {
 
 func TestEtcdCreate(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 
@@ -256,6 +278,8 @@ func TestEtcdCreate(t *testing.T) {
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
 
 	table := map[string]struct {
 		existing tools.EtcdResponseWithError
@@ -282,7 +306,7 @@ func TestEtcdCreate(t *testing.T) {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
-		obj, err := registry.Create(api.NewDefaultContext(), item.toCreate)
+		obj, err := registry.Create(testContext, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
@@ -310,15 +334,15 @@ func TestEtcdCreate(t *testing.T) {
 
 func TestEtcdUpdate(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault, ResourceVersion: "1"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "1"},
 		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 	podAWithResourceVersion := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault, ResourceVersion: "3"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "3"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -369,6 +393,8 @@ func TestEtcdUpdate(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
+	testContext := api.WithNamespace(api.NewContext(), "test")
+
 	table := map[string]struct {
 		existing                 tools.EtcdResponseWithError
 		expect                   tools.EtcdResponseWithError
@@ -418,7 +444,7 @@ func TestEtcdUpdate(t *testing.T) {
 		registry.UpdateStrategy.(*testRESTStrategy).allowUnconditionalUpdate = item.allowUnconditionalUpdate
 		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
-		obj, _, err := registry.Update(api.NewDefaultContext(), item.toUpdate)
+		obj, _, err := registry.Update(testContext, item.toUpdate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
@@ -446,7 +472,7 @@ func TestEtcdUpdate(t *testing.T) {
 
 func TestEtcdGet(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo", ResourceVersion: "1"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -485,11 +511,13 @@ func TestEtcdGet(t *testing.T) {
 		},
 	}
 
+	testContext := api.WithNamespace(api.NewContext(), "test")
+
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
-		got, err := registry.Get(api.NewContext(), key)
+		got, err := registry.Get(testContext, key)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
@@ -522,6 +550,8 @@ func TestEtcdDelete(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
+	testContext := api.WithNamespace(api.NewContext(), "test")
+
 	key := "foo"
 
 	table := map[string]struct {
@@ -545,7 +575,7 @@ func TestEtcdDelete(t *testing.T) {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
-		obj, err := registry.Delete(api.NewContext(), key, nil)
+		obj, err := registry.Delete(testContext, key, nil)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v (%#v)", name, err, obj)
 		}
@@ -560,23 +590,41 @@ func TestEtcdDelete(t *testing.T) {
 }
 
 func TestEtcdWatch(t *testing.T) {
-	table := map[string]generic.Matcher{
-		"single": setMatcher{sets.NewString("foo")},
-		"multi":  setMatcher{sets.NewString("foo", "bar")},
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	noNamespaceContext := api.NewContext()
+
+	table := map[string]struct {
+		generic.Matcher
+		context api.Context
+	}{
+		"single": {
+			Matcher: setMatcher{sets.NewString("foo")},
+		},
+		"multi": {
+			Matcher: setMatcher{sets.NewString("foo", "bar")},
+		},
+		"singleNoNamespace": {
+			Matcher: setMatcher{sets.NewString("foo")},
+			context: noNamespaceContext,
+		},
 	}
 
 	for name, m := range table {
+		ctx := testContext
+		if m.context != nil {
+			ctx = m.context
+		}
 		podA := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
-				Namespace:       api.NamespaceDefault,
+				Namespace:       "test",
 				ResourceVersion: "1",
 			},
 			Spec: api.PodSpec{NodeName: "machine"},
 		}
 		respWithPodA := &etcd.Response{
 			Node: &etcd.Node{
-				Key:           "/registry/pods/default/foo",
+				Key:           "/registry/pods/test/foo",
 				Value:         runtime.EncodeOrDie(testapi.Default.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
@@ -585,7 +633,7 @@ func TestEtcdWatch(t *testing.T) {
 		}
 
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
-		wi, err := registry.WatchPredicate(api.NewContext(), m, "1")
+		wi, err := registry.WatchPredicate(ctx, m, "1")
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", name, err)
 			continue

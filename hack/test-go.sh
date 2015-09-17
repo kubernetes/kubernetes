@@ -28,15 +28,16 @@ kube::test::find_dirs() {
     cd ${KUBE_ROOT}
     find . -not \( \
         \( \
-          -wholename './output' \
-          -o -wholename './_output' \
-          -o -wholename './release' \
-          -o -wholename './target' \
-          -o -wholename '*/Godeps/*' \
-          -o -wholename './release*' \
-          -o -wholename '*/contrib/podex/*' \
-          -o -wholename '*/test/e2e/*' \
-          -o -wholename '*/test/integration/*' \
+          -path './_artifacts/*' \
+          -o -path './_output/*' \
+          -o -path './_gopath/*' \
+          -o -path './Godeps/*' \
+          -o -path './contrib/podex/*' \
+          -o -path './output/*' \
+          -o -path './release/*' \
+          -o -path './target/*' \
+          -o -path './test/e2e/*' \
+          -o -path './test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
@@ -136,7 +137,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  local KUBE_TEST_API_NO_SLASH=echo "${KUBE_TEST_API//\//-}"
+  local KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API//\//-}"
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
 }
 
@@ -283,7 +284,7 @@ for (( i=0, j=0; ; )); do
   # KUBE_TEST_API sets the version of each group to be tested. KUBE_API_VERSIONS
   # register the groups/versions as supported by k8s. So KUBE_API_VERSIONS
   # needs to be the superset of KUBE_TEST_API.
-  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1,experimental/v1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then

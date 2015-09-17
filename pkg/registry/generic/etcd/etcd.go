@@ -150,28 +150,28 @@ func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selecto
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
 	trace := util.NewTrace("List " + reflect.TypeOf(list).String())
+	filterFunc := e.filterAndDecorateFunction(m)
 	defer trace.LogIfLong(600 * time.Millisecond)
 	if name, ok := m.MatchesSingle(); ok {
-		trace.Step("About to read single object")
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
+		if key, err := e.KeyFunc(ctx, name); err == nil {
+			trace.Step("About to read single object")
+			err := e.Storage.GetToList(key, filterFunc, list)
+			trace.Step("Object extracted")
+			if err != nil {
+				return nil, err
+			}
+			return list, nil
 		}
-		err = e.Storage.GetToList(key, list)
-		trace.Step("Object extracted")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		trace.Step("About to list directory")
-		err := e.Storage.List(e.KeyRootFunc(ctx), list)
-		trace.Step("List extracted")
-		if err != nil {
-			return nil, err
-		}
+		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
-	defer trace.Step("List filtered")
-	return generic.FilterList(list, m, generic.DecoratorFunc(e.Decorator))
+
+	trace.Step("About to list directory")
+	err := e.Storage.List(e.KeyRootFunc(ctx), filterFunc, list)
+	trace.Step("List extracted")
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 // Create inserts a new item according to the unique key from the object.
@@ -449,8 +449,23 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 	if err != nil {
 		return nil, err
 	}
+	filterFunc := e.filterAndDecorateFunction(m)
 
-	filterFunc := func(obj runtime.Object) bool {
+	if name, ok := m.MatchesSingle(); ok {
+		if key, err := e.KeyFunc(ctx, name); err == nil {
+			if err != nil {
+				return nil, err
+			}
+			return e.Storage.Watch(key, version, filterFunc)
+		}
+		// if we cannot extract a key based on the current context, the optimization is skipped
+	}
+
+	return e.Storage.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
+}
+
+func (e *Etcd) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {
+	return func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)
@@ -464,16 +479,6 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 		}
 		return matches
 	}
-
-	if name, ok := m.MatchesSingle(); ok {
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		return e.Storage.Watch(key, version, filterFunc)
-	}
-
-	return e.Storage.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error

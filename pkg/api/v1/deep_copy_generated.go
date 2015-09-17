@@ -337,6 +337,11 @@ func deepCopy_v1_ContainerStatus(in ContainerStatus, out *ContainerStatus, c *co
 	return nil
 }
 
+func deepCopy_v1_DaemonEndpoint(in DaemonEndpoint, out *DaemonEndpoint, c *conversion.Cloner) error {
+	out.Port = in.Port
+	return nil
+}
+
 func deepCopy_v1_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -913,6 +918,13 @@ func deepCopy_v1_NodeCondition(in NodeCondition, out *NodeCondition, c *conversi
 	return nil
 }
 
+func deepCopy_v1_NodeDaemonEndpoints(in NodeDaemonEndpoints, out *NodeDaemonEndpoints, c *conversion.Cloner) error {
+	if err := deepCopy_v1_DaemonEndpoint(in.KubeletEndpoint, &out.KubeletEndpoint, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_v1_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -974,6 +986,9 @@ func deepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 		}
 	} else {
 		out.Addresses = nil
+	}
+	if err := deepCopy_v1_NodeDaemonEndpoints(in.DaemonEndpoints, &out.DaemonEndpoints, c); err != nil {
+		return err
 	}
 	if err := deepCopy_v1_NodeSystemInfo(in.NodeInfo, &out.NodeInfo, c); err != nil {
 		return err
@@ -1431,6 +1446,7 @@ func deepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -2240,6 +2256,7 @@ func init() {
 		deepCopy_v1_ContainerStateTerminated,
 		deepCopy_v1_ContainerStateWaiting,
 		deepCopy_v1_ContainerStatus,
+		deepCopy_v1_DaemonEndpoint,
 		deepCopy_v1_DeleteOptions,
 		deepCopy_v1_DownwardAPIVolumeFile,
 		deepCopy_v1_DownwardAPIVolumeSource,
@@ -2281,6 +2298,7 @@ func init() {
 		deepCopy_v1_Node,
 		deepCopy_v1_NodeAddress,
 		deepCopy_v1_NodeCondition,
+		deepCopy_v1_NodeDaemonEndpoints,
 		deepCopy_v1_NodeList,
 		deepCopy_v1_NodeSpec,
 		deepCopy_v1_NodeStatus,

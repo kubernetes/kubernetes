@@ -50,11 +50,11 @@ func addDefaultingFuncs() {
 				*obj.Spec.Replicas = 1
 			}
 			strategy := &obj.Spec.Strategy
-			// Set default DeploymentType as RollingUpdate.
+			// Set default DeploymentStrategyType as RollingUpdate.
 			if strategy.Type == "" {
-				strategy.Type = DeploymentRollingUpdate
+				strategy.Type = RollingUpdateDeploymentStrategyType
 			}
-			if strategy.Type == DeploymentRollingUpdate {
+			if strategy.Type == RollingUpdateDeploymentStrategyType {
 				if strategy.RollingUpdate == nil {
 					rollingUpdate := RollingUpdateDeployment{}
 					strategy.RollingUpdate = &rollingUpdate

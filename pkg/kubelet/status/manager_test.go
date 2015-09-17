@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package status
 
 import (
 	"fmt"
@@ -37,8 +37,8 @@ var testPod *api.Pod = &api.Pod{
 	},
 }
 
-func newTestStatusManager() *statusManager {
-	return newStatusManager(&testclient.Fake{})
+func newTestManager() *manager {
+	return NewManager(&testclient.Fake{}).(*manager)
 }
 
 func generateRandomMessage() string {
@@ -66,7 +66,7 @@ func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []
 	}
 }
 
-func verifyUpdates(t *testing.T, manager *statusManager, expectedUpdates int) {
+func verifyUpdates(t *testing.T, manager *manager, expectedUpdates int) {
 	// Consume all updates in the channel.
 	numUpdates := 0
 	for {
@@ -89,7 +89,7 @@ func verifyUpdates(t *testing.T, manager *statusManager, expectedUpdates int) {
 }
 
 func TestNewStatus(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 1)
 
@@ -100,7 +100,7 @@ func TestNewStatus(t *testing.T) {
 }
 
 func TestNewStatusPreservesPodStartTime(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
@@ -121,14 +121,14 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 }
 
 func TestChangedStatus(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 2)
 }
 
 func TestChangedStatusKeepsStartTime(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	now := util.Now()
 	firstStatus := getRandomPodStatus()
 	firstStatus.StartTime = &now
@@ -145,7 +145,7 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 }
 
 func TestUnchangedStatus(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	podStatus := getRandomPodStatus()
 	syncer.SetPodStatus(testPod, podStatus)
 	syncer.SetPodStatus(testPod, podStatus)
@@ -153,7 +153,7 @@ func TestUnchangedStatus(t *testing.T) {
 }
 
 func TestSyncBatchIgnoresNotFound(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	err := syncer.syncBatch()
 	if err != nil {
@@ -165,7 +165,7 @@ func TestSyncBatchIgnoresNotFound(t *testing.T) {
 }
 
 func TestSyncBatch(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	syncer.kubeClient = testclient.NewSimpleFake(testPod)
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	err := syncer.syncBatch()
@@ -180,7 +180,7 @@ func TestSyncBatch(t *testing.T) {
 }
 
 func TestSyncBatchChecksMismatchedUID(t *testing.T) {
-	syncer := newTestStatusManager()
+	syncer := newTestManager()
 	testPod.UID = "first"
 	differentPod := *testPod
 	differentPod.UID = "second"

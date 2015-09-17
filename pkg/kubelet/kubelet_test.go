@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -105,10 +106,11 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.nodeLister = testNodeLister{}
 	kubelet.readinessManager = kubecontainer.NewReadinessManager()
 	kubelet.recorder = fakeRecorder
-	kubelet.statusManager = newStatusManager(fakeKubeClient)
+	kubelet.statusManager = status.NewManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
+	kubelet.daemonEndpoints = &api.NodeDaemonEndpoints{}
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
 	podManager, fakeMirrorClient := newFakePodManager()

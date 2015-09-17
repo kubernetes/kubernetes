@@ -214,12 +214,21 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 			encounteredError = true
 		} else {
 			if err = ipt.DeleteChain(iptables.TableNAT, c); err != nil {
-				glog.Errorf("Error flushing userspace chain: %v", err)
+				glog.Errorf("Error deleting userspace chain: %v", err)
 				encounteredError = true
 			}
 		}
 	}
 	return encounteredError
+}
+
+// Sync is called to immediately synchronize the proxier state to iptables
+func (proxier *Proxier) Sync() {
+	if err := iptablesInit(proxier.iptables); err != nil {
+		glog.Errorf("Failed to ensure iptables: %v", err)
+	}
+	proxier.ensurePortals()
+	proxier.cleanupStaleStickySessions()
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
@@ -229,11 +238,7 @@ func (proxier *Proxier) SyncLoop() {
 	for {
 		<-t.C
 		glog.V(6).Infof("Periodic sync")
-		if err := iptablesInit(proxier.iptables); err != nil {
-			glog.Errorf("Failed to ensure iptables: %v", err)
-		}
-		proxier.ensurePortals()
-		proxier.cleanupStaleStickySessions()
+		proxier.Sync()
 	}
 }
 

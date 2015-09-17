@@ -980,10 +980,13 @@ type PodSpec struct {
 	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
 	// requirements.
 	NodeName string `json:"nodeName,omitempty"`
-	// Uses the host's network namespace. If this option is set, the ports that will be
+	// Use the host's network namespace. If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false.
 	HostNetwork bool `json:"hostNetwork,omitempty"`
+	// Use the host's pid namespace.
+	// Optional: Default to false.
+	HostPID bool `json:"hostPID,omitempty"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
@@ -1366,23 +1369,35 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty"`
 }
 
+// DaemonEndpoint contains information about a single Daemon endpoint.
+type DaemonEndpoint struct {
+	// Port number of the given endpoint.
+	Port int `json:port`
+}
+
+// NodeDaemonEndpoints lists ports opened by daemons running on the Node.
+type NodeDaemonEndpoints struct {
+	// Endpoint on which Kubelet is listening.
+	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty"`
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
-	// MachineID is the machine-id reported by the node
+	// Machine ID reported by the node.
 	MachineID string `json:"machineID"`
-	// SystemUUID is the system-uuid reported by the node
+	// System UUID reported by the node.
 	SystemUUID string `json:"systemUUID"`
-	// BootID is the boot-id reported by the node
+	// Boot ID reported by the node.
 	BootID string `json:"bootID"`
-	// Kernel version reported by the node
+	// Kernel Version reported by the node.
 	KernelVersion string `json:"kernelVersion"`
-	// OS image used reported by the node
+	// OS Image reported by the node.
 	OsImage string `json:"osImage"`
-	// Container runtime version reported by the node
+	// ContainerRuntime Version reported by the node.
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
-	// Kubelet version reported by the node
+	// Kubelet Version reported by the node.
 	KubeletVersion string `json:"kubeletVersion"`
-	// Kube-proxy version reported by the node
+	// KubeProxy Version reported by the node.
 	KubeProxyVersion string `json:"kubeProxyVersion"`
 }
 
@@ -1396,7 +1411,9 @@ type NodeStatus struct {
 	Conditions []NodeCondition `json:"conditions,omitempty"`
 	// Queried from cloud provider, if available.
 	Addresses []NodeAddress `json:"addresses,omitempty"`
-	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
+	// Endpoints of daemons running on the Node.
+	DaemonEndpoints NodeDaemonEndpoints `json:"daemonEndpoints,omitempty"`
+	// Set of ids/uuids to uniquely identify the node.
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }
 

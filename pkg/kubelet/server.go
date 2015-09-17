@@ -347,7 +347,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher", response))
 		return
 	}
-	fw := flushwriter.Wrap(response)
+	fw := flushwriter.Wrap(response.ResponseWriter)
 	response.Header().Set("Transfer-Encoding", "chunked")
 	response.WriteHeader(http.StatusOK)
 	err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, previous, fw, fw)
@@ -364,7 +364,7 @@ func encodePods(pods []*api.Pod) (data []byte, err error) {
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
-	return latest.Codec.Encode(podList)
+	return latest.GroupOrDie("").Codec.Encode(podList)
 }
 
 // getPods returns a list of pods bound to the Kubelet and their spec.
