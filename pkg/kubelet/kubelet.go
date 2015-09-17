@@ -1424,7 +1424,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, runningPods []*kubeco
 		}
 
 		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
-		if err := util.RemoveAllSkipMountPoints(kl.getPodDir(uid)); err != nil {
+		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
 			errlist = append(errlist, err)
 		}
 	}
