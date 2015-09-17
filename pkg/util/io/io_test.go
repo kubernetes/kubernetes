@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package io
+package io_test
 
 import (
 	"fmt"
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"os"
 	"testing"
@@ -36,11 +37,11 @@ func TestSavePodToFile(t *testing.T) {
 	path := fmt.Sprintf("/tmp/kube-io-test-%s", uuid.New())
 	defer os.Remove(path)
 
-	if err := SavePodToFile(pod, path, 777); err != nil {
+	if err := io.SavePodToFile(pod, path, 777); err != nil {
 		t.Fatalf("failed to save pod to file: %v", err)
 	}
 
-	podFromFile, err := LoadPodFromFile(path)
+	podFromFile, err := io.LoadPodFromFile(path)
 	if err != nil {
 		t.Fatalf("failed to load pod from file: %v", err)
 	}

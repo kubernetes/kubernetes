@@ -79,8 +79,8 @@ func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, mounter)
+func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter())
 }
 
 func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Builder, error) {
@@ -106,8 +106,8 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mou
 	}, nil
 }
 
-func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, mounter)
+func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter())
 }
 
 func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {

@@ -249,7 +249,7 @@ func TestNewBuilder(t *testing.T) {
 		}
 		spec := &volume.Spec{Volume: &api.Volume{VolumeSource: item.podVolume}}
 		pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-		builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+		builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 
 		if !item.expectedFailure {
 			if err != nil {
@@ -304,7 +304,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 	}
 	spec := &volume.Spec{Volume: &api.Volume{VolumeSource: podVolume}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+	builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 	if builder != nil {
 		t.Errorf("Expected a nil builder if the claim wasn't bound")
 	}
