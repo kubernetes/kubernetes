@@ -30,7 +30,7 @@ import (
 // certain fields with metadata that indicates whether the elements of JSON
 // lists should be merged or replaced.
 //
-// For more information, see the PATCH section of docs/api-conventions.md.
+// For more information, see the PATCH section of docs/devel/api-conventions.md.
 //
 // Some of the content of this package was borrowed with minor adaptations from
 // evanphx/json-patch and openshift/origin.
