@@ -889,7 +889,6 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 		// Create container.
 		"create", "start", "inspect_container",
 	})
-
 	fakeDocker.Lock()
 
 	found := false
@@ -1728,7 +1727,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 
 	// Inject the creation failure error to docker.
-	failureReason := "creation failure"
+	failureReason := "RunContainerError"
 	fakeDocker.Errors = map[string]error{
 		"create": fmt.Errorf("%s", failureReason),
 	}
@@ -1786,7 +1785,7 @@ func TestGetPodPullImageFailureReason(t *testing.T) {
 	puller := dm.dockerPuller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
 	// Inject the pull image failure error.
-	failureReason := "pull image faiulre"
+	failureReason := "PullImageError"
 	puller.ErrorsToInject = []error{fmt.Errorf("%s", failureReason)}
 
 	pod := &api.Pod{
