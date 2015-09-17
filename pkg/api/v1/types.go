@@ -2650,7 +2650,7 @@ type ThirdPartyResource struct {
 type ThirdPartyResourceList struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://docs.k8s.io/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of schema objects.
