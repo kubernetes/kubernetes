@@ -93,8 +93,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 	usageRatio := float64(currentConsumption.Quantity.MilliValue()) / float64(hpa.Spec.Target.Quantity.MilliValue())
 	desiredReplicas := int(math.Ceil(usageRatio * float64(currentReplicas)))
 
-	if desiredReplicas < hpa.Spec.MinCount {
-		desiredReplicas = hpa.Spec.MinCount
+	if desiredReplicas < hpa.Spec.MinReplicas {
+		desiredReplicas = hpa.Spec.MinReplicas
 	}
 
 	// TODO: remove when pod ideling is done.
@@ -102,8 +102,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		desiredReplicas = 1
 	}
 
-	if desiredReplicas > hpa.Spec.MaxCount {
-		desiredReplicas = hpa.Spec.MaxCount
+	if desiredReplicas > hpa.Spec.MaxReplicas {
+		desiredReplicas = hpa.Spec.MaxReplicas
 	}
 	now := time.Now()
 	rescale := false

@@ -54,8 +54,8 @@ type fakeResponseWrapper struct {
 }
 
 type testCase struct {
-	minCount        int
-	maxCount        int
+	minReplicas     int
+	maxReplicas     int
 	initialReplicas int
 	desiredReplicas int
 	targetResource  api.ResourceName
@@ -92,9 +92,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 							Namespace:   namespace,
 							Subresource: "scale",
 						},
-						MinCount: tc.minCount,
-						MaxCount: tc.maxCount,
-						Target:   experimental.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
+						MinReplicas: tc.minReplicas,
+						MaxReplicas: tc.maxReplicas,
+						Target:      experimental.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
 					},
 				},
 			},
@@ -204,8 +204,8 @@ func (tc *testCase) runTest(t *testing.T) {
 
 func TestCPU(t *testing.T) {
 	tc := testCase{
-		minCount:        1,
-		maxCount:        5,
+		minReplicas:     1,
+		maxReplicas:     5,
 		initialReplicas: 1,
 		desiredReplicas: 2,
 		targetResource:  api.ResourceCPU,
@@ -217,8 +217,8 @@ func TestCPU(t *testing.T) {
 
 func TestMemory(t *testing.T) {
 	tc := testCase{
-		minCount:        1,
-		maxCount:        5,
+		minReplicas:     1,
+		maxReplicas:     5,
 		initialReplicas: 1,
 		desiredReplicas: 2,
 		targetResource:  api.ResourceMemory,
@@ -230,8 +230,8 @@ func TestMemory(t *testing.T) {
 
 func TestScaleUp(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        6,
+		minReplicas:     2,
+		maxReplicas:     6,
 		initialReplicas: 3,
 		desiredReplicas: 5,
 		targetResource:  api.ResourceMemory,
@@ -243,8 +243,8 @@ func TestScaleUp(t *testing.T) {
 
 func TestScaleDown(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        6,
+		minReplicas:     2,
+		maxReplicas:     6,
 		initialReplicas: 5,
 		desiredReplicas: 3,
 		targetResource:  api.ResourceCPU,
@@ -256,8 +256,8 @@ func TestScaleDown(t *testing.T) {
 
 func TestTolerance(t *testing.T) {
 	tc := testCase{
-		minCount:        1,
-		maxCount:        5,
+		minReplicas:     1,
+		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 3,
 		targetResource:  api.ResourceMemory,
@@ -267,10 +267,10 @@ func TestTolerance(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestMinCount(t *testing.T) {
+func TestMinReplicas(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        5,
+		minReplicas:     2,
+		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 2,
 		targetResource:  api.ResourceMemory,
@@ -280,10 +280,10 @@ func TestMinCount(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestMaxCount(t *testing.T) {
+func TestMaxReplicas(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        5,
+		minReplicas:     2,
+		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 5,
 		targetResource:  api.ResourceMemory,
@@ -295,8 +295,8 @@ func TestMaxCount(t *testing.T) {
 
 func TestSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        6,
+		minReplicas:     2,
+		maxReplicas:     6,
 		initialReplicas: 4,
 		desiredReplicas: 4,
 		targetResource:  api.ResourceMemory,
@@ -308,8 +308,8 @@ func TestSuperfluousMetrics(t *testing.T) {
 
 func TestMissingMetrics(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        6,
+		minReplicas:     2,
+		maxReplicas:     6,
 		initialReplicas: 4,
 		desiredReplicas: 4,
 		targetResource:  api.ResourceMemory,
@@ -321,8 +321,8 @@ func TestMissingMetrics(t *testing.T) {
 
 func TestEmptyMetrics(t *testing.T) {
 	tc := testCase{
-		minCount:        2,
-		maxCount:        6,
+		minReplicas:     2,
+		maxReplicas:     6,
 		initialReplicas: 4,
 		desiredReplicas: 4,
 		targetResource:  api.ResourceMemory,
@@ -334,8 +334,8 @@ func TestEmptyMetrics(t *testing.T) {
 
 func TestEventCreated(t *testing.T) {
 	tc := testCase{
-		minCount:        1,
-		maxCount:        5,
+		minReplicas:     1,
+		maxReplicas:     5,
 		initialReplicas: 1,
 		desiredReplicas: 2,
 		targetResource:  api.ResourceCPU,
@@ -348,8 +348,8 @@ func TestEventCreated(t *testing.T) {
 
 func TestEventNotCreated(t *testing.T) {
 	tc := testCase{
-		minCount:        1,
-		maxCount:        5,
+		minReplicas:     1,
+		maxReplicas:     5,
 		initialReplicas: 2,
 		desiredReplicas: 2,
 		targetResource:  api.ResourceCPU,
