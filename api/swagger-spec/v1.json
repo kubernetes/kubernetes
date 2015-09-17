@@ -12097,7 +12097,7 @@
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "HostPath represents a directory on the host. Provisioned by a developer or tester. This is useful for development and testing only. On-host storage is not supported in any way. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
+      "description": "HostPath represents a directory on the host. Provisioned by a developer or tester. This is useful for single-node development and testing only! On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
      },
      "glusterfs": {
       "$ref": "v1.GlusterfsVolumeSource",
