@@ -37,6 +37,7 @@ import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -320,7 +321,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 
 	if inspectResult.State.Running {
 		result.status.State.Running = &api.ContainerStateRunning{
-			StartedAt: util.NewTime(inspectResult.State.StartedAt),
+			StartedAt: unversioned.NewTime(inspectResult.State.StartedAt),
 		}
 		if containerName == PodInfraContainerName {
 			if inspectResult.NetworkSettings != nil {
@@ -353,8 +354,8 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 			Message:  message,
 			Reason:   reason,
 
-			StartedAt:   util.NewTime(inspectResult.State.StartedAt),
-			FinishedAt:  util.NewTime(inspectResult.State.FinishedAt),
+			StartedAt:   unversioned.NewTime(inspectResult.State.StartedAt),
+			FinishedAt:  unversioned.NewTime(inspectResult.State.FinishedAt),
 			ContainerID: DockerPrefix + dockerID,
 		}
 		if tPath != "" {
@@ -386,7 +387,7 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	manifest := pod.Spec
 
 	oldStatuses := make(map[string]api.ContainerStatus, len(pod.Spec.Containers))
-	lastObservedTime := make(map[string]util.Time, len(pod.Spec.Containers))
+	lastObservedTime := make(map[string]unversioned.Time, len(pod.Spec.Containers))
 	// Record the last time we observed a container termination.
 	for _, status := range pod.Status.ContainerStatuses {
 		oldStatuses[status.Name] = status
@@ -1304,7 +1305,7 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 		}
 	}
 	glog.V(2).Infof("Killing container %q with %d second grace period", name, gracePeriod)
-	start := util.Now()
+	start := unversioned.Now()
 
 	if pod != nil && container != nil && container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		glog.V(4).Infof("Running preStop hook for container %q", name)
@@ -1322,7 +1323,7 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 		case <-done:
 			glog.V(4).Infof("preStop hook for container %q completed", name)
 		}
-		gracePeriod -= int64(util.Now().Sub(start.Time).Seconds())
+		gracePeriod -= int64(unversioned.Now().Sub(start.Time).Seconds())
 	}
 
 	dm.readinessManager.RemoveReadiness(ID)
@@ -1337,9 +1338,9 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 		return nil
 	}
 	if err == nil {
-		glog.V(2).Infof("Container %q exited after %s", name, util.Now().Sub(start.Time))
+		glog.V(2).Infof("Container %q exited after %s", name, unversioned.Now().Sub(start.Time))
 	} else {
-		glog.V(2).Infof("Container %q termination failed after %s: %v", name, util.Now().Sub(start.Time), err)
+		glog.V(2).Infof("Container %q termination failed after %s: %v", name, unversioned.Now().Sub(start.Time), err)
 	}
 	ref, ok := dm.containerRefManager.GetRef(ID)
 	if !ok {
@@ -1878,7 +1879,7 @@ func getUidFromUser(id string) string {
 }
 
 func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus api.PodStatus, backOff *util.Backoff) bool {
-	var ts util.Time
+	var ts unversioned.Time
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.Name != container.Name {
 			continue

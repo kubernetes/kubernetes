@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/groupcache/lru"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type history struct {
@@ -29,7 +29,7 @@ type history struct {
 	Count int
 
 	// The time at which the event was first recorded.
-	FirstTimestamp util.Time
+	FirstTimestamp unversioned.Time
 
 	// The unique name of the first occurrence of this event
 	Name string

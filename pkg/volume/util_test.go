@@ -18,11 +18,11 @@ package volume
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"strings"
 )
 
 func TestRecyclerSuccess(t *testing.T) {

@@ -254,11 +254,11 @@ var _ = Describe("Density", func() {
 			if itArg.runLatencyTest {
 				Logf("Schedling additional Pods to measure startup latencies")
 
-				createTimes := make(map[string]util.Time, 0)
+				createTimes := make(map[string]unversioned.Time, 0)
 				nodes := make(map[string]string, 0)
-				scheduleTimes := make(map[string]util.Time, 0)
-				runTimes := make(map[string]util.Time, 0)
-				watchTimes := make(map[string]util.Time, 0)
+				scheduleTimes := make(map[string]unversioned.Time, 0)
+				runTimes := make(map[string]unversioned.Time, 0)
+				watchTimes := make(map[string]unversioned.Time, 0)
 
 				var mutex sync.Mutex
 				checkPod := func(p *api.Pod) {
@@ -268,10 +268,10 @@ var _ = Describe("Density", func() {
 
 					if p.Status.Phase == api.PodRunning {
 						if _, found := watchTimes[p.Name]; !found {
-							watchTimes[p.Name] = util.Now()
+							watchTimes[p.Name] = unversioned.Now()
 							createTimes[p.Name] = p.CreationTimestamp
 							nodes[p.Name] = p.Spec.NodeName
-							var startTime util.Time
+							var startTime unversioned.Time
 							for _, cs := range p.Status.ContainerStatuses {
 								if cs.State.Running != nil {
 									if startTime.Before(cs.State.Running.StartedAt) {
@@ -279,7 +279,7 @@ var _ = Describe("Density", func() {
 									}
 								}
 							}
-							if startTime != util.NewTime(time.Time{}) {
+							if startTime != unversioned.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
 								Failf("Pod %v is reported to be running, but none of its containers is", p.Name)

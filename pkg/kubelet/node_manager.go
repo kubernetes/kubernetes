@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -406,7 +407,7 @@ func (nm *realNodeManager) setNodeStatus(node *api.Node) error {
 	// Check whether network is configured properly
 	networkConfigured := nm.infoGetter.NetworkConfigured()
 
-	currentTime := util.Now()
+	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
 	if containerRuntimeUp && networkConfigured {

@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -351,8 +352,8 @@ func newCondition() experimental.JobCondition {
 	return experimental.JobCondition{
 		Type:               experimental.JobComplete,
 		Status:             api.ConditionTrue,
-		LastProbeTime:      util.Now(),
-		LastTransitionTime: util.Now(),
+		LastProbeTime:      unversioned.Now(),
+		LastTransitionTime: unversioned.Now(),
 	}
 }
 

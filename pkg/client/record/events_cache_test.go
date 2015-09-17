@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestAddOrUpdateEventNoExisting(t *testing.T) {
 	// Arrange
-	eventTime := util.Now()
+	eventTime := unversioned.Now()
 	event := api.Event{
 		Reason:  "my reasons are many",
 		Message: "my message is love",
@@ -54,8 +54,8 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 
 func TestAddOrUpdateEventExisting(t *testing.T) {
 	// Arrange
-	event1Time := util.Unix(2324, 2342)
-	event2Time := util.Now()
+	event1Time := unversioned.Unix(2324, 2342)
+	event2Time := unversioned.Now()
 	event1 := api.Event{
 		Reason:  "something happened",
 		Message: "can you believe it?",
@@ -139,7 +139,7 @@ func TestGetEventNoExisting(t *testing.T) {
 
 func TestGetEventExisting(t *testing.T) {
 	// Arrange
-	eventTime := util.Now()
+	eventTime := unversioned.Now()
 	event := api.Event{
 		Reason:  "do I exist",
 		Message: "I do, oh my",
