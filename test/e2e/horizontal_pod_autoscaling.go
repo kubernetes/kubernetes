@@ -171,9 +171,9 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
 				Namespace:   rc.framework.Namespace.Name,
 				Subresource: subresource,
 			},
-			MinCount: 1,
-			MaxCount: 5,
-			Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
+			MinReplicas: 1,
+			MaxReplicas: 5,
+			Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
 		},
 	}
 	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
@@ -194,9 +194,9 @@ func createMemoryHorizontalPodAutoscaler(rc *ResourceConsumer, memory string) {
 				Namespace:   rc.framework.Namespace.Name,
 				Subresource: subresource,
 			},
-			MinCount: 1,
-			MaxCount: 5,
-			Target:   experimental.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
+			MinReplicas: 1,
+			MaxReplicas: 5,
+			Target:      experimental.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
 		},
 	}
 	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
