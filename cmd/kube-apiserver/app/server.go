@@ -292,6 +292,7 @@ func (s *APIServer) Run(_ []string) error {
 		// TODO(vmarmol): Implement support for HostNetworkSources.
 		PrivilegedSources: capabilities.PrivilegedSources{
 			HostNetworkSources: []string{},
+			HostPIDSources:     []string{},
 		},
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})

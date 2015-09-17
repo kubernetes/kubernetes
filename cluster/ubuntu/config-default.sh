@@ -35,7 +35,7 @@ export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-192.168.3.0/24}  # f
 export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny
+export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,DenyEscalatingExec,SecurityContextDeny
 
 SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
 
