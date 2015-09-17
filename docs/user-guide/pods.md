@@ -120,7 +120,9 @@ An example flow:
 1. User sends command to delete Pod, with default grace period (30s)
 2. The Pod in the API server is updated with the time beyond which the Pod is considered "dead" along with the grace period.
 3. Pod shows up as "Terminating" when listed in client commands
-4. (simultaneous with 3) When the Kubelet sees that a Pod has been marked as terminating because the time in 2 has been set, the processes in the Pod are immediately sent the TERM signal.
+4. (simultaneous with 3) When the Kubelet sees that a Pod has been marked as terminating because the time in 2 has been set, it begins the pod shutdown process.
+  1. If the pod has defined a [preStop hook](container-environment.md#hook-details), it is invoked inside of the pod. If the `preStop` hook is still running after the grace period expires, step 2 is then invoked with a small (2 second) extended grace period.
+  2. The processes in the Pod are sent the TERM signal.
 5. (simultaneous with 3), Pod is removed from endpoints list for service, and are no longer considered part of the set of running pods for replication controllers. Pods that shutdown slowly can continue to serve traffic as load balancers (like the service proxy) remove them from their rotations.
 6. When the grace period expires, any processes still running in the Pod are killed with SIGKILL.
 7. The Kubelet will finish deleting the Pod on the API server by setting grace period 0 (immediate deletion). The Pod disappears from the API and is no longer visible from the client.
