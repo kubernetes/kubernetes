@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
   - name: netexec
-    image: gcr.io/google_containers/netexec:1.1
+    image: gcr.io/google_containers/netexec:1.3.1
     ports:
     - containerPort: 8080
     - containerPort: 8081

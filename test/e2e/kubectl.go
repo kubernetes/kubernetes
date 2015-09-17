@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
@@ -56,6 +57,10 @@ const (
 	frontendSelector         = "name=frontend"
 	redisMasterSelector      = "name=redis-master"
 	redisSlaveSelector       = "name=redis-slave"
+	goproxyContainer         = "goproxy"
+	goproxyPodSelector       = "name=goproxy"
+	netexecContainer         = "netexec"
+	netexecPodSelector       = "name=netexec"
 	kubectlProxyPort         = 8011
 	guestbookStartupTimeout  = 10 * time.Minute
 	guestbookResponseTimeout = 3 * time.Minute
@@ -154,7 +159,6 @@ var _ = Describe("Kubectl client", func() {
 			By("creating the pod")
 			runKubectl("create", "-f", podPath, fmt.Sprintf("--namespace=%v", ns))
 			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
-
 		})
 		AfterEach(func() {
 			cleanup(podPath, ns, simplePodSelector)
@@ -176,12 +180,12 @@ var _ = Describe("Kubectl client", func() {
 			}
 
 			// pretend that we're a user in an interactive shell
-			r, c, err := newBlockingReader("echo hi\nexit\n")
+			r, closer, err := newBlockingReader("echo hi\nexit\n")
 			if err != nil {
 				Failf("Error creating blocking reader: %v", err)
 			}
 			// NOTE this is solely for test cleanup!
-			defer c.Close()
+			defer closer.Close()
 
 			By("executing a command in the container with pseudo-interactive stdin")
 			execOutput = newKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "bash").
@@ -189,6 +193,163 @@ var _ = Describe("Kubectl client", func() {
 				exec()
 			if e, a := "hi", execOutput; e != a {
 				Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
+			}
+		})
+
+		It("should support exec through an HTTP proxy", func() {
+			// Note: We are skipping local since we want to verify an apiserver with HTTPS.
+			// At this time local only supports plain HTTP.
+			SkipIfProviderIs("local")
+			// Fail if the variable isn't set
+			if testContext.Host == "" {
+				Failf("--host variable must be set to the full URI to the api server on e2e run.")
+			}
+			apiServer := testContext.Host
+			// If there is no api in URL try to add it
+			if !strings.Contains(apiServer, ":443/api") {
+				apiServer = apiServer + ":443/api"
+			}
+
+			// Get the kube/config
+			testWorkspace := os.Getenv("WORKSPACE")
+			if testWorkspace == "" {
+				// Not running in jenkins, assume "HOME"
+				testWorkspace = os.Getenv("HOME")
+			}
+
+			testKubectlPath := testContext.KubectlPath
+			// If no path is given then default to Jenkins e2e expected path
+			if testKubectlPath == "" || testKubectlPath == "kubectl" {
+				testKubectlPath = filepath.Join(testWorkspace, "kubernetes", "platforms", "linux", "amd64", "kubectl")
+			}
+			// Get the kubeconfig path
+			kubeConfigFilePath := testContext.KubeConfig
+			if kubeConfigFilePath == "" {
+				// Fall back to the jenkins e2e location
+				kubeConfigFilePath = filepath.Join(testWorkspace, ".kube", "config")
+			}
+
+			_, err := os.Stat(kubeConfigFilePath)
+			if err != nil {
+				Failf("kube config path could not be accessed. Error=%s", err)
+			}
+			// start exec-proxy-tester container
+			netexecPodPath := filepath.Join(testContext.RepoRoot, "test/images/netexec/pod.yaml")
+			runKubectl("create", "-f", netexecPodPath, fmt.Sprintf("--namespace=%v", ns))
+			checkPodsRunningReady(c, ns, []string{netexecContainer}, podStartTimeout)
+			// Clean up
+			defer cleanup(netexecPodPath, ns, netexecPodSelector)
+			// Upload kubeconfig
+			type NetexecOutput struct {
+				Output string `json:"output"`
+				Error  string `json:"error"`
+			}
+
+			var uploadConfigOutput NetexecOutput
+			// Upload the kubeconfig file
+			By("uploading kubeconfig to netexec")
+			pipeConfigReader, postConfigBodyWriter, err := newStreamingUpload(kubeConfigFilePath)
+			if err != nil {
+				Failf("unable to create streaming upload. Error: %s", err)
+			}
+
+			resp, err := c.Post().
+				Prefix("proxy").
+				Namespace(ns).
+				Name("netexec").
+				Resource("pods").
+				Suffix("upload").
+				SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
+				Body(pipeConfigReader).
+				Do().Raw()
+			if err != nil {
+				Failf("Unable to upload kubeconfig to the remote exec server due to error: %s", err)
+			}
+
+			if err := json.Unmarshal(resp, &uploadConfigOutput); err != nil {
+				Failf("Unable to read the result from the netexec server. Error: %s", err)
+			}
+			kubecConfigRemotePath := uploadConfigOutput.Output
+
+			// Upload
+			pipeReader, postBodyWriter, err := newStreamingUpload(testContext.KubectlPath)
+			if err != nil {
+				Failf("unable to create streaming upload. Error: %s", err)
+			}
+
+			By("uploading kubectl to netexec")
+			var uploadOutput NetexecOutput
+			// Upload the kubectl binary
+			resp, err = c.Post().
+				Prefix("proxy").
+				Namespace(ns).
+				Name("netexec").
+				Resource("pods").
+				Suffix("upload").
+				SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
+				Body(pipeReader).
+				Do().Raw()
+			if err != nil {
+				Failf("Unable to upload kubectl binary to the remote exec server due to error: %s", err)
+			}
+
+			if err := json.Unmarshal(resp, &uploadOutput); err != nil {
+				Failf("Unable to read the result from the netexec server. Error: %s", err)
+			}
+			uploadBinaryName := uploadOutput.Output
+			// Verify that we got the expected response back in the body
+			if !strings.HasPrefix(uploadBinaryName, "/uploads/") {
+				Failf("Unable to upload kubectl binary to remote exec server. /uploads/ not in response. Response: %s", uploadBinaryName)
+			}
+
+			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
+				By("Running kubectl in netexec via an HTTP proxy using " + proxyVar)
+				// start the proxy container
+				goproxyPodPath := filepath.Join(testContext.RepoRoot, "test/images/goproxy/pod.yaml")
+				runKubectl("create", "-f", goproxyPodPath, fmt.Sprintf("--namespace=%v", ns))
+				checkPodsRunningReady(c, ns, []string{goproxyContainer}, podStartTimeout)
+
+				// get the proxy address
+				goproxyPod, err := c.Pods(ns).Get(goproxyContainer)
+				if err != nil {
+					Failf("Unable to get the goproxy pod. Error: %s", err)
+				}
+				proxyAddr := fmt.Sprintf("http://%s:8080", goproxyPod.Status.PodIP)
+
+				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
+				// Execute kubectl on remote exec server.
+				netexecShellOutput, err := c.Post().
+					Prefix("proxy").
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					Suffix("shell").
+					Param("shellCommand", shellCommand).
+					Do().Raw()
+				if err != nil {
+					Failf("Unable to execute kubectl binary on the remote exec server due to error: %s", err)
+				}
+
+				var netexecOuput NetexecOutput
+				if err := json.Unmarshal(netexecShellOutput, &netexecOuput); err != nil {
+					Failf("Unable to read the result from the netexec server. Error: %s", err)
+				}
+
+				// Verify we got the normal output captured by the exec server
+				expectedExecOutput := "running in container\n"
+				if netexecOuput.Output != expectedExecOutput {
+					Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, netexecOuput.Output)
+				}
+
+				// Verify the proxy server logs saw the connection
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimRight(strings.TrimLeft(testContext.Host, "https://"), "/api"))
+				proxyLog := runKubectl("log", "goproxy", fmt.Sprintf("--namespace=%v", ns))
+
+				if !strings.Contains(proxyLog, expectedProxyLog) {
+					Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
+				}
+				// Clean up the goproxyPod
+				cleanup(goproxyPodPath, ns, goproxyPodSelector)
 			}
 		})
 
@@ -992,4 +1153,44 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 	}
 	w.Write([]byte(s))
 	return r, w, nil
+}
+
+// newStreamingUpload creates a new http.Request that will stream POST
+// a file to a URI.
+func newStreamingUpload(filePath string) (*io.PipeReader, *multipart.Writer, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r, w := io.Pipe()
+
+	postBodyWriter := multipart.NewWriter(w)
+
+	go streamingUpload(file, filepath.Base(filePath), postBodyWriter, w)
+	return r, postBodyWriter, err
+}
+
+// streamingUpload streams a file via a pipe through a multipart.Writer.
+// Generally one should use newStreamingUpload instead of calling this directly.
+func streamingUpload(file *os.File, fileName string, postBodyWriter *multipart.Writer, w *io.PipeWriter) {
+	defer GinkgoRecover()
+	defer file.Close()
+	defer w.Close()
+
+	// Set up the form file
+	fileWriter, err := postBodyWriter.CreateFormFile("file", fileName)
+	if err != nil {
+		Failf("Unable to to write file at %s to buffer. Error: %s", fileName, err)
+	}
+
+	// Copy kubectl binary into the file writer
+	if _, err := io.Copy(fileWriter, file); err != nil {
+		Failf("Unable to to copy file at %s into the file writer. Error: %s", fileName, err)
+	}
+
+	// Nothing more should be written to this instance of the postBodyWriter
+	if err := postBodyWriter.Close(); err != nil {
+		Failf("Unable to close the writer for file upload. Error: %s", err)
+	}
 }
