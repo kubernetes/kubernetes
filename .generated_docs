@@ -15,6 +15,7 @@ docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-create.1
 docs/man/man1/kubectl-delete.1
 docs/man/man1/kubectl-describe.1
+docs/man/man1/kubectl-edit.1
 docs/man/man1/kubectl-exec.1
 docs/man/man1/kubectl-expose.1
 docs/man/man1/kubectl-get.1
@@ -47,6 +48,7 @@ docs/user-guide/kubectl/kubectl_config_view.md
 docs/user-guide/kubectl/kubectl_create.md
 docs/user-guide/kubectl/kubectl_delete.md
 docs/user-guide/kubectl/kubectl_describe.md
+docs/user-guide/kubectl/kubectl_edit.md
 docs/user-guide/kubectl/kubectl_exec.md
 docs/user-guide/kubectl/kubectl_expose.md
 docs/user-guide/kubectl/kubectl_get.md
