@@ -258,7 +258,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
-	pathParam := ws.PathParameter("path:*", "path to the resource").DataType("string")
+	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 	params := []*restful.Parameter{}
 	actions := []action{}
 

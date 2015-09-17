@@ -3095,7 +3095,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -3125,7 +3125,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -3155,7 +3155,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -3185,7 +3185,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -3215,7 +3215,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -3245,7 +3245,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -5128,7 +5128,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -5166,7 +5166,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -5204,7 +5204,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -5242,7 +5242,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -5280,7 +5280,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -5318,7 +5318,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -6432,7 +6432,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -6478,7 +6478,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -6524,7 +6524,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -6570,7 +6570,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -6616,7 +6616,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -6662,7 +6662,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -10426,7 +10426,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -10464,7 +10464,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -10502,7 +10502,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -10540,7 +10540,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -10578,7 +10578,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
@@ -10616,7 +10616,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "path:*",
+        "name": "path",
         "description": "path to the resource",
         "required": true,
         "allowMultiple": false
