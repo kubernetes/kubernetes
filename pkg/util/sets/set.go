@@ -121,6 +121,29 @@ func (s1 String) Union(s2 String) String {
 	return result
 }
 
+// Intersection returns a new set which includes the item in BOTH s1 and s2
+// For example:
+// s1 = {1, 2}
+// s2 = {2, 3}
+// s1.Intersection(s2) = {2}
+func (s1 String) Intersection(s2 String) String {
+	var walk, other String
+	result := NewString()
+	if s1.Len() < s2.Len() {
+		walk = s1
+		other = s2
+	} else {
+		walk = s2
+		other = s1
+	}
+	for key := range walk {
+		if other.Has(key) {
+			result.Insert(key)
+		}
+	}
+	return result
+}
+
 // IsSuperset returns true if and only if s1 is a superset of s2.
 func (s1 String) IsSuperset(s2 String) bool {
 	for item := range s2 {
