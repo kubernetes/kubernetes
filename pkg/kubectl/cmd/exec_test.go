@@ -45,6 +45,7 @@ func (f *fakeRemoteExecutor) Execute(req *client.Request, config *client.Config,
 func TestPodAndContainer(t *testing.T) {
 	tests := []struct {
 		args              []string
+		argsLenAtDash     int
 		p                 *ExecOptions
 		name              string
 		expectError       bool
@@ -53,43 +54,65 @@ func TestPodAndContainer(t *testing.T) {
 		expectedArgs      []string
 	}{
 		{
-			p:           &ExecOptions{},
-			expectError: true,
-			name:        "empty",
+			p:             &ExecOptions{},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "empty",
 		},
 		{
-			p:           &ExecOptions{PodName: "foo"},
-			expectError: true,
-			name:        "no cmd",
+			p:             &ExecOptions{PodName: "foo"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "no cmd",
 		},
 		{
-			p:           &ExecOptions{PodName: "foo", ContainerName: "bar"},
-			expectError: true,
-			name:        "no cmd, w/ container",
+			p:             &ExecOptions{PodName: "foo", ContainerName: "bar"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "no cmd, w/ container",
 		},
 		{
-			p:            &ExecOptions{PodName: "foo"},
-			args:         []string{"cmd"},
-			expectedPod:  "foo",
-			expectedArgs: []string{"cmd"},
-			name:         "pod in flags",
+			p:             &ExecOptions{PodName: "foo"},
+			args:          []string{"cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "pod in flags",
 		},
 		{
-			p:           &ExecOptions{},
-			args:        []string{"foo"},
-			expectError: true,
-			name:        "no cmd, w/o flags",
+			p:             &ExecOptions{},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: 0,
+			expectError:   true,
+			name:          "no pod, pod name is behind dash",
 		},
 		{
-			p:            &ExecOptions{},
-			args:         []string{"foo", "cmd"},
-			expectedPod:  "foo",
-			expectedArgs: []string{"cmd"},
-			name:         "cmd, w/o flags",
+			p:             &ExecOptions{},
+			args:          []string{"foo"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "no cmd, w/o flags",
+		},
+		{
+			p:             &ExecOptions{},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "cmd, w/o flags",
+		},
+		{
+			p:             &ExecOptions{},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: 1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "cmd, cmd is behind dash",
 		},
 		{
 			p:                 &ExecOptions{ContainerName: "bar"},
 			args:              []string{"foo", "cmd"},
+			argsLenAtDash:     -1,
 			expectedPod:       "foo",
 			expectedContainer: "bar",
 			expectedArgs:      []string{"cmd"},
@@ -107,7 +130,7 @@ func TestPodAndContainer(t *testing.T) {
 
 		cmd := &cobra.Command{}
 		options := test.p
-		err := options.Complete(f, cmd, test.args)
+		err := options.Complete(f, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("unexpected non-error (%s)", test.name)
 		}
@@ -186,7 +209,8 @@ func TestExec(t *testing.T) {
 			Executor:      ex,
 		}
 		cmd := &cobra.Command{}
-		if err := params.Complete(f, cmd, []string{"test", "command"}); err != nil {
+		args := []string{"test", "command"}
+		if err := params.Complete(f, cmd, args, -1); err != nil {
 			t.Fatal(err)
 		}
 		err := params.Run()

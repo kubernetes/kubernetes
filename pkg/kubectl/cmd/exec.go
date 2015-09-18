@@ -58,7 +58,8 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			argsLenAtDash := cmd.ArgsLenAtDash()
+			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
 			cmdutil.CheckErr(options.Validate())
 			cmdutil.CheckErr(options.Run())
 		},
@@ -103,8 +104,9 @@ type ExecOptions struct {
 }
 
 // Complete verifies command line arguments and loads data from the command environment
-func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
-	if len(p.PodName) == 0 && len(argsIn) == 0 {
+func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+	// Let kubectl exec follow rules for `--`, see #13004 issue
+	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
 		return cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 	if len(p.PodName) != 0 {
