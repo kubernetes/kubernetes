@@ -523,19 +523,20 @@ func FileExists(filename string) (bool, error) {
 // borrowed from ioutil.ReadDir
 // ReadDir reads the directory named by dirname and returns
 // a list of directory entries, minus those with lstat errors
-func ReadDirNoExit(dirname string) ([]os.FileInfo, error) {
+func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
 	if dirname == "" {
 		dirname = "."
 	}
 
 	f, err := os.Open(dirname)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer f.Close()
 
 	names, err := f.Readdirnames(-1)
 	list := make([]os.FileInfo, 0, len(names))
+	errs := make([]error, 0, len(names))
 	for _, filename := range names {
 		fip, lerr := os.Lstat(dirname + "/" + filename)
 		if os.IsNotExist(lerr) {
@@ -543,11 +544,10 @@ func ReadDirNoExit(dirname string) ([]os.FileInfo, error) {
 			// Just treat it as if it didn't exist.
 			continue
 		}
-		// if lstat fails, fip is nil
-		if fip != nil {
-			list = append(list, fip)
-		}
+
+		list = append(list, fip)
+		errs = append(errs, lerr)
 	}
 
-	return list, nil
+	return list, errs, nil
 }
