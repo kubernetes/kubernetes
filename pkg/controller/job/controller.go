@@ -361,6 +361,7 @@ func getStatus(pods []api.Pod) (successful, unsuccessful int) {
 }
 
 func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessful int, job *experimental.Job) int {
+	var activeLock sync.Mutex
 	active := len(activePods)
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
@@ -389,7 +390,9 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q", jobKey)
 					jm.expectations.DeletionObserved(jobKey)
 					util.HandleError(err)
+					activeLock.Lock()
 					active++
+					activeLock.Unlock()
 				}
 			}(i)
 		}
@@ -417,7 +420,9 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q", jobKey)
 					jm.expectations.CreationObserved(jobKey)
 					util.HandleError(err)
+					activeLock.Lock()
 					active--
+					activeLock.Unlock()
 				}
 			}()
 		}
