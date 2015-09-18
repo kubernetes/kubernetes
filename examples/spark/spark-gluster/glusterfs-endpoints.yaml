@@ -1,0 +1,14 @@
+kind: Endpoints
+apiVersion: v1
+metadata: 
+  name: glusterfs-cluster
+subsets: 
+  - addresses: 
+      - ip: 192.168.58.218
+    ports: 
+      - port: 1
+  - addresses: 
+      - ip: 192.168.58.219
+    ports: 
+      - port: 1
+

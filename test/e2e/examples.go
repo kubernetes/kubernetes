@@ -201,6 +201,35 @@ var _ = Describe("Examples e2e", func() {
 			})
 		})
 	})
+	Describe("[Skipped][Example]Spark-Glusterfs", func() {
+		It("should start spark-master, endpoints, and workers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "spark", "spark-gluster", file)
+			}
+			endpointsYaml := mkpath("glusterfs-endpoints.yaml")
+			serviceYaml := mkpath("spark-master-service.yaml")
+			masterYaml := mkpath("spark-master.yaml")
+			workerControllerYaml := mkpath("spark-worker-rc.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			By("starting master")
+			runKubectl("create", "-f", endpointsYaml, nsFlag)
+			runKubectl("create", "-f", masterYaml, nsFlag)
+			runKubectl("create", "-f", serviceYaml, nsFlag)
+			runKubectl("create", "-f", workerControllerYaml, nsFlag)
+			err := waitForPodRunningInNamespace(c, "spark-master", ns)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = lookForStringInLog(ns, "spark-master", "spark-master", "Starting Spark master at", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting workers")
+			runKubectl("create", "-f", workerControllerYaml, nsFlag)
+			ScaleRC(c, ns, "spark-worker-controller", 2, true)
+			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
 
 	Describe("[Skipped][Example]Cassandra", func() {
 		It("should create and scale cassandra", func() {
