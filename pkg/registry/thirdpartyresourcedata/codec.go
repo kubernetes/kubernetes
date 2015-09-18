@@ -220,6 +220,9 @@ func encodeToJSON(obj *experimental.ThirdPartyResourceData) ([]byte, error) {
 	return json.Marshal(objMap)
 }
 
+func (t *thirdPartyResourceDataCodec) Version() string {
+	return "ThirdpartyResourceDataCodec does not have a version"
+}
 func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, err error) {
 	switch obj := obj.(type) {
 	case *experimental.ThirdPartyResourceData:
