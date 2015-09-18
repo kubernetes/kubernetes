@@ -44,6 +44,8 @@ cluster/saltbase/salt/kube-proxy/default:    {% set api_servers_with_port = api_
 cluster/saltbase/salt/kube-proxy/default:  {% set api_servers_with_port = api_servers + ":7080" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 docs/admin/salt.md:`api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
 docs/admin/salt.md:`etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
 docs/admin/salt.md:`hostname_override` | (Optional) Mapped to the kubelet hostname-override
