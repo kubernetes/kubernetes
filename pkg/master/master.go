@@ -826,7 +826,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
 	daemonSetStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
-	deploymentStorage := deploymentetcd.NewREST(c.ExpDatabaseStorage)
+	deploymentStorage := deploymentetcd.NewStorage(c.ExpDatabaseStorage)
 	jobStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
 
 	storage := map[string]rest.Storage{
@@ -835,7 +835,8 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
 		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
 		strings.ToLower("daemonsets"):                   daemonSetStorage,
-		strings.ToLower("deployments"):                  deploymentStorage,
+		strings.ToLower("deployments"):                  deploymentStorage.Deployment,
+		strings.ToLower("deployments/scale"):            deploymentStorage.Scale,
 		strings.ToLower("jobs"):                         jobStorage,
 	}
 
