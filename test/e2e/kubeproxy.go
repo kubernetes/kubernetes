@@ -45,7 +45,7 @@ const (
 	nodeHttpPort            = 32080
 	nodeUdpPort             = 32081
 	loadBalancerHttpPort    = 100
-	imageName               = "gcr.io/google_containers/netexec:1.0"
+	netexecImageName        = "gcr.io/google_containers/netexec:1.0"
 	testPodName             = "test-container-pod"
 	nodePortServiceName     = "node-port-service"
 	loadBalancerServiceName = "load-balancer-service"
@@ -286,7 +286,7 @@ func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string) *api.Po
 			Containers: []api.Container{
 				{
 					Name:            "webserver",
-					Image:           imageName,
+					Image:           netexecImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"/netexec",
@@ -329,7 +329,7 @@ func (config *KubeProxyTestConfig) createTestPodSpec() *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:            "webserver",
-					Image:           imageName,
+					Image:           netexecImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"/netexec",
