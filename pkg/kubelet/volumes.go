@@ -154,12 +154,19 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 	for _, volumeKindDir := range volumeKindDirs {
 		volumeKind := volumeKindDir.Name()
 		volumeKindPath := path.Join(podVolDir, volumeKind)
-		volumeNameDirs, err := util.ReadDirNoExit(volumeKindPath)
+		// ioutil.ReadDir exits without returning any healthy dir when encountering the first lstat error
+		// but skipping dirs means no cleanup for healthy volumes. switching to a no-exit api solves this problem
+		volumeNameDirs, volumeNameDirsStat, err := util.ReadDirNoExit(volumeKindPath)
 		if err != nil {
 			return []*volumeTuple{}, fmt.Errorf("could not read directory %s: %v", volumeKindPath, err)
 		}
-		for _, volumeNameDir := range volumeNameDirs {
-			volumes = append(volumes, &volumeTuple{Kind: volumeKind, Name: volumeNameDir.Name()})
+		for i, volumeNameDir := range volumeNameDirs {
+			if volumeNameDir != nil {
+				volumes = append(volumes, &volumeTuple{Kind: volumeKind, Name: volumeNameDir.Name()})
+			} else {
+				lerr := volumeNameDirsStat[i]
+				glog.Errorf("Could not read directory %s: %v", podVolDir, lerr)
+			}
 		}
 	}
 	return volumes, nil
