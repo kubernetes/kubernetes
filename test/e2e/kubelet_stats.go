@@ -281,6 +281,7 @@ func formatResourceUsageStats(nodeName string, containerStats map[string]*contai
 func nodeProxyRequest(c *client.Client, node, endpoint string) client.Result {
 	return c.Get().
 		Prefix("proxy").
+		GroupVersion(client.ClientGroupVersion()).
 		Resource("nodes").
 		Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
 		Suffix(endpoint).

@@ -737,6 +737,7 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 		}
 		body, err := r.c.Get().
 			Prefix("proxy").
+			GroupVersion(client.ClientGroupVersion()).
 			Namespace(r.ns).
 			Resource("pods").
 			Name(string(pod.Name)).
@@ -1074,6 +1075,7 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		err = nil
 		logs, err = c.Get().
 			Prefix("proxy").
+			GroupVersion(client.ClientGroupVersion()).
 			Resource("nodes").
 			Name(podStatus.Spec.NodeName).
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
