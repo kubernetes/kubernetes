@@ -257,7 +257,7 @@ func TestPullWithJSONError(t *testing.T) {
 		"Bad gateway": {
 			"ubuntu",
 			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
-			"because the registry is temporarily unavailable",
+			kubecontainer.RegistryUnavailable.Error(),
 		},
 	}
 	for i, test := range tests {
