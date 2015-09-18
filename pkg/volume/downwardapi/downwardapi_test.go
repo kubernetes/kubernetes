@@ -600,7 +600,8 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 
 	labels := map[string]string{
 		"key1": "value1",
-		"key2": "value2"}
+		"key2": "value2",
+	}
 
 	fake := testclient.NewSimpleFake(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -613,42 +614,48 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "this//labels", FieldRef: api.ObjectFieldSelector{
-						FieldPath: "metadata.labels"}},
-				}}},
+					{
+						Path: "this//labels",
+						FieldRef: api.ObjectFieldSelector{
+							FieldPath: "metadata.labels",
+						},
+					},
+				},
+			},
+		},
 	}
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
+
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
 	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
-
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
-	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+		t.Fatalf("Failed to make a new Builder: %v", err)
+	} else if builder == nil {
+		t.Fatalf("Got a nil Builder")
 	}
 
 	volumePath := builder.GetPath()
+	defer CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
+
 	err = builder.SetUp()
 	if err != nil {
-		t.Errorf("Failed to setup volume: %v", err)
+		t.Fatalf("Failed to setup volume: %v", err)
 	}
 
-	var data []byte
-	data, err = ioutil.ReadFile(path.Join(volumePath, "this/labels"))
+	data, err := ioutil.ReadFile(path.Join(volumePath, "this/labels"))
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
 
 	if sortLines(string(data)) != sortLines(formatMap(labels)) {
 		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
 	}
-	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 }
