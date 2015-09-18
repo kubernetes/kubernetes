@@ -2432,9 +2432,8 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *u
 		return nil
 	}
 	var status unversioned.Status
-	_, err = extractBody(response, &status)
-	if err != nil {
-		t.Fatalf("unexpected error on %s %s: %v", method, url, err)
+	if body, err := extractBody(response, &status); err != nil {
+		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
 		return nil
 	}
 	if code != response.StatusCode {
@@ -2470,7 +2469,10 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w, false)
 	}))
 	defer server.Close()
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
+	// We send a 200 status code before we encode the object, so we expect OK, but there will
+	// still be an error object.  This seems ok, the alternative is to validate the object before
+	// encoding, but this really should never happen, so it's wasted compute for every API request.
+	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusOK)
 	if status.Reason != unversioned.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}

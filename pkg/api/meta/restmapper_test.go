@@ -18,6 +18,7 @@ package meta
 
 import (
 	"errors"
+	"io"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/runtime"
@@ -27,6 +28,10 @@ type fakeCodec struct{}
 
 func (fakeCodec) Encode(runtime.Object) ([]byte, error) {
 	return []byte{}, nil
+}
+
+func (fakeCodec) EncodeToStream(runtime.Object, io.Writer) error {
+	return nil
 }
 
 func (fakeCodec) Decode([]byte) (runtime.Object, error) {
