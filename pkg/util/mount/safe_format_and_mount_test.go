@@ -65,7 +65,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:    "ext4",
 			mountErrs: []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
-				{"file", []string{"-L", "--special-files", "/dev/foo"}, "ext4 filesystem", nil},
+				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "ext4", nil},
 			},
 			expectedError: fmt.Errorf("unknown filesystem type '(null)'"),
 		},
@@ -73,7 +73,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:    "ext4",
 			mountErrs: []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
-				{"file", []string{"-L", "--special-files", "/dev/foo"}, "data", nil},
+				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
 				{"mkfs.ext4", []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
 			},
 			expectedError: fmt.Errorf("formatting failed"),
@@ -82,7 +82,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:    "ext4",
 			mountErrs: []error{fmt.Errorf("unknown filesystem type '(null)'"), fmt.Errorf("Still cannot mount")},
 			execScripts: []ExecArgs{
-				{"file", []string{"-L", "--special-files", "/dev/foo"}, "data", nil},
+				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
 				{"mkfs.ext4", []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", "/dev/foo"}, "", nil},
 			},
 			expectedError: fmt.Errorf("Still cannot mount"),
@@ -91,7 +91,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:    "ext4",
 			mountErrs: []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
-				{"file", []string{"-L", "--special-files", "/dev/foo"}, "data", nil},
+				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
 				{"mkfs.ext4", []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", "/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
@@ -100,7 +100,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:    "ext3",
 			mountErrs: []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
-				{"file", []string{"-L", "--special-files", "/dev/foo"}, "data", nil},
+				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
 				{"mkfs.ext3", []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", "/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
