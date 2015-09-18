@@ -449,6 +449,10 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	glog.V(3).Infof("Syncing iptables rules")
 
+	// reset update flag
+	proxier.haveReceivedEndpointsUpdate = false
+	proxier.haveReceivedServiceUpdate = false
+
 	// Ensure main chains and rules are installed.
 	inputChains := []utiliptables.Chain{utiliptables.ChainOutput, utiliptables.ChainPrerouting}
 	// Link the services chain.
