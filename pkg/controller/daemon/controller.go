@@ -214,11 +214,13 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *experimental.Dae
 		glog.V(4).Infof("No daemon sets found for pod %v, daemon set controller will avoid syncing", pod.Name)
 		return nil
 	}
-	// More than two items in this list indicates user error. If two daemon
-	// sets overlap, sort by creation timestamp, subsort by name, then pick
-	// the first.
-	glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
-	sort.Sort(byCreationTimestamp(sets))
+	if len(sets) > 1 {
+		// More than two items in this list indicates user error. If two daemon
+		// sets overlap, sort by creation timestamp, subsort by name, then pick
+		// the first.
+		glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
+		sort.Sort(byCreationTimestamp(sets))
+	}
 	return &sets[0]
 }
 
