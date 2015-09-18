@@ -11853,10 +11853,10 @@
     "id": "v1.DaemonEndpoint",
     "description": "DaemonEndpoint contains information about a single Daemon endpoint.",
     "required": [
-     "Port"
+     "port"
     ],
     "properties": {
-     "Port": {
+     "port": {
       "type": "integer",
       "format": "int32",
       "description": "Port number of the given endpoint."

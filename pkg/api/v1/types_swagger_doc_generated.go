@@ -226,7 +226,7 @@ func (ContainerStatus) SwaggerDoc() map[string]string {
 
 var map_DaemonEndpoint = map[string]string{
 	"":     "DaemonEndpoint contains information about a single Daemon endpoint.",
-	"Port": "Port number of the given endpoint.",
+	"port": "Port number of the given endpoint.",
 }
 
 func (DaemonEndpoint) SwaggerDoc() map[string]string {
