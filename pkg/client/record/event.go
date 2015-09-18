@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -64,7 +65,7 @@ type EventRecorder interface {
 	Eventf(object runtime.Object, reason, messageFmt string, args ...interface{})
 
 	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
-	PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{})
+	PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{})
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
@@ -238,7 +239,7 @@ type recorderImpl struct {
 	*watch.Broadcaster
 }
 
-func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp util.Time, reason, message string) {
+func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
@@ -252,19 +253,19 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp uti
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, reason, message string) {
-	recorder.generateEvent(object, util.Now(), reason, message)
+	recorder.generateEvent(object, unversioned.Now(), reason, message)
 }
 
 func (recorder *recorderImpl) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
 	recorder.Event(object, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
+func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
 	recorder.generateEvent(object, timestamp, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 func makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
-	t := util.Now()
+	t := unversioned.Now()
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = api.NamespaceDefault

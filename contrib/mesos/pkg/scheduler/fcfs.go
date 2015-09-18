@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"fmt"
+
 	log "github.com/golang/glog"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"

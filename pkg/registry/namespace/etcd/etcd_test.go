@@ -21,13 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
@@ -129,7 +129,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	key := etcdtest.AddPrefix("namespaces/foo")
 	ctx := api.NewContext()
-	now := util.Now()
+	now := unversioned.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "foo",
@@ -152,7 +152,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	key := etcdtest.AddPrefix("namespaces/foo")
 	ctx := api.NewContext()
-	now := util.Now()
+	now := unversioned.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "foo",

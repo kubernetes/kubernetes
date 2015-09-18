@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type Foo struct {
@@ -66,7 +65,7 @@ func TestCodec(t *testing.T) {
 			obj: &Foo{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "bar",
-					CreationTimestamp: util.Time{time.Unix(100, 0)},
+					CreationTimestamp: unversioned.Time{time.Unix(100, 0)},
 				},
 				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
 			},

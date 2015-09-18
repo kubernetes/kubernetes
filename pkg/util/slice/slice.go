@@ -18,8 +18,9 @@ limitations under the License.
 package slice
 
 import (
-	utilrand "k8s.io/kubernetes/pkg/util/rand"
 	"sort"
+
+	utilrand "k8s.io/kubernetes/pkg/util/rand"
 )
 
 // CopyStrings copies the contents of the specified string slice

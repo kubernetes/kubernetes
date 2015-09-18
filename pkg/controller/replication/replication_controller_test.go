@@ -969,7 +969,7 @@ func TestOverlappingRCs(t *testing.T) {
 		var controllers []*api.ReplicationController
 		for j := 1; j < 10; j++ {
 			controllerSpec := newReplicationController(1)
-			controllerSpec.CreationTimestamp = util.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
+			controllerSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
 			controllerSpec.Name = string(util.NewUUID())
 			controllers = append(controllers, controllerSpec)
 		}

@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 var testPod *api.Pod = &api.Pod{
@@ -109,8 +109,8 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 		},
 		Status: api.PodStatus{},
 	}
-	now := util.Now()
-	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	now := unversioned.Now()
+	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
 	pod.Status.StartTime = &startTime
 	syncer.SetPodStatus(pod, getRandomPodStatus())
 
@@ -129,7 +129,7 @@ func TestChangedStatus(t *testing.T) {
 
 func TestChangedStatusKeepsStartTime(t *testing.T) {
 	syncer := newTestManager()
-	now := util.Now()
+	now := unversioned.Now()
 	firstStatus := getRandomPodStatus()
 	firstStatus.StartTime = &now
 	syncer.SetPodStatus(testPod, firstStatus)

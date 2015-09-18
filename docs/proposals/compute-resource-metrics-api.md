@@ -161,7 +161,7 @@ type MetricsWindows map[time.Duration]DerivedMetrics
 
 type DerivedMetrics struct {
 	// End time of all the time windows in Metrics
-	EndTime util.Time `json:"endtime"`
+	EndTime unversioned.Time `json:"endtime"`
 
 	Mean       ResourceUsage `json:"mean"`
 	Max        ResourceUsage `json:"max"`

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // rest implements a RESTStorage for namespaces against etcd
@@ -95,7 +95,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// upon first request to delete, we switch the phase to start namespace termination
 	if namespace.DeletionTimestamp.IsZero() {
-		now := util.Now()
+		now := unversioned.Now()
 		namespace.DeletionTimestamp = &now
 		namespace.Status.Phase = api.NamespaceTerminating
 		result, _, err := r.status.Update(ctx, namespace)

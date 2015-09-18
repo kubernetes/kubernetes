@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestNamespaceStrategy(t *testing.T) {
@@ -71,7 +71,7 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("Namespaces should not allow create on update")
 	}
-	now := util.Now()
+	now := unversioned.Now()
 	oldNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},

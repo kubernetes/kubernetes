@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type Tester struct {
@@ -370,7 +369,7 @@ func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
 
 func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
-	now := util.Now()
+	now := unversioned.Now()
 	objectMeta.UID = "bad-uid"
 	objectMeta.CreationTimestamp = now
 

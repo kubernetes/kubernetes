@@ -52,6 +52,15 @@ func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.Lis
 	return nil
 }
 
+func deepCopy_unversioned_Time(in unversioned.Time, out *unversioned.Time, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.Time); err != nil {
+		return err
+	} else {
+		out.Time = newVal.(time.Time)
+	}
+	return nil
+}
+
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
@@ -401,12 +410,12 @@ func deepCopy_v1_ObjectMeta(in v1.ObjectMeta, out *v1.ObjectMeta, c *conversion.
 	out.UID = in.UID
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
-	if err := deepCopy_util_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
+	if err := deepCopy_unversioned_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
 		return err
 	}
 	if in.DeletionTimestamp != nil {
-		out.DeletionTimestamp = new(util.Time)
-		if err := deepCopy_util_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
+		out.DeletionTimestamp = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
 			return err
 		}
 	} else {
@@ -990,8 +999,8 @@ func deepCopy_v1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus,
 		out.CurrentConsumption = nil
 	}
 	if in.LastScaleTimestamp != nil {
-		out.LastScaleTimestamp = new(util.Time)
-		if err := deepCopy_util_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
+		out.LastScaleTimestamp = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
 			return err
 		}
 	} else {
@@ -1019,10 +1028,10 @@ func deepCopy_v1_Job(in Job, out *Job, c *conversion.Cloner) error {
 func deepCopy_v1_JobCondition(in JobCondition, out *JobCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
-	if err := deepCopy_util_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+	if err := deepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
 		return err
 	}
-	if err := deepCopy_util_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+	if err := deepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
 		return err
 	}
 	out.Reason = in.Reason
@@ -1094,16 +1103,16 @@ func deepCopy_v1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) e
 		out.Conditions = nil
 	}
 	if in.StartTime != nil {
-		out.StartTime = new(util.Time)
-		if err := deepCopy_util_Time(*in.StartTime, out.StartTime, c); err != nil {
+		out.StartTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.StartTime, out.StartTime, c); err != nil {
 			return err
 		}
 	} else {
 		out.StartTime = nil
 	}
 	if in.CompletionTime != nil {
-		out.CompletionTime = new(util.Time)
-		if err := deepCopy_util_Time(*in.CompletionTime, out.CompletionTime, c); err != nil {
+		out.CompletionTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.CompletionTime, out.CompletionTime, c); err != nil {
 			return err
 		}
 	} else {
@@ -1280,19 +1289,11 @@ func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *co
 	return nil
 }
 
-func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) error {
-	if newVal, err := c.DeepCopy(in.Time); err != nil {
-		return err
-	} else {
-		out.Time = newVal.(time.Time)
-	}
-	return nil
-}
-
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_resource_Quantity,
 		deepCopy_unversioned_ListMeta,
+		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		deepCopy_v1_Capabilities,
@@ -1362,7 +1363,6 @@ func init() {
 		deepCopy_v1_ThirdPartyResourceDataList,
 		deepCopy_v1_ThirdPartyResourceList,
 		deepCopy_util_IntOrString,
-		deepCopy_util_Time,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

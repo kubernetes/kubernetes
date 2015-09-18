@@ -24,10 +24,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"log"
 )
 
 // TODO:

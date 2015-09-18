@@ -104,7 +104,7 @@ type ObjectMeta struct {
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
 	// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
-	CreationTimestamp util.Time `json:"creationTimestamp,omitempty"`
+	CreationTimestamp unversioned.Time `json:"creationTimestamp,omitempty"`
 
 	// DeletionTimestamp is the time after which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
@@ -115,7 +115,7 @@ type ObjectMeta struct {
 	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
 	// signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet
 	// will send a hard termination signal to the container.
-	DeletionTimestamp *util.Time `json:"deletionTimestamp,omitempty"`
+	DeletionTimestamp *unversioned.Time `json:"deletionTimestamp,omitempty"`
 
 	// DeletionGracePeriodSeconds records the graceful deletion value set when graceful deletion
 	// was requested. Represents the most recent grace period, and may only be shortened once set.
@@ -814,17 +814,17 @@ type ContainerStateWaiting struct {
 }
 
 type ContainerStateRunning struct {
-	StartedAt util.Time `json:"startedAt,omitempty"`
+	StartedAt unversioned.Time `json:"startedAt,omitempty"`
 }
 
 type ContainerStateTerminated struct {
-	ExitCode    int       `json:"exitCode"`
-	Signal      int       `json:"signal,omitempty"`
-	Reason      string    `json:"reason,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	StartedAt   util.Time `json:"startedAt,omitempty"`
-	FinishedAt  util.Time `json:"finishedAt,omitempty"`
-	ContainerID string    `json:"containerID,omitempty"`
+	ExitCode    int              `json:"exitCode"`
+	Signal      int              `json:"signal,omitempty"`
+	Reason      string           `json:"reason,omitempty"`
+	Message     string           `json:"message,omitempty"`
+	StartedAt   unversioned.Time `json:"startedAt,omitempty"`
+	FinishedAt  unversioned.Time `json:"finishedAt,omitempty"`
+	ContainerID string           `json:"containerID,omitempty"`
 }
 
 // ContainerState holds a possible state of container.
@@ -980,7 +980,7 @@ type PodStatus struct {
 
 	// Date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.
-	StartTime *util.Time `json:"startTime,omitempty"`
+	StartTime *unversioned.Time `json:"startTime,omitempty"`
 
 	// The list has one entry per container in the manifest. Each entry is
 	// currently the output of `docker inspect`. This output format is *not*
@@ -1415,8 +1415,8 @@ const (
 type NodeCondition struct {
 	Type               NodeConditionType `json:"type"`
 	Status             ConditionStatus   `json:"status"`
-	LastHeartbeatTime  util.Time         `json:"lastHeartbeatTime,omitempty"`
-	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty"`
+	LastHeartbeatTime  unversioned.Time  `json:"lastHeartbeatTime,omitempty"`
+	LastTransitionTime unversioned.Time  `json:"lastTransitionTime,omitempty"`
 	Reason             string            `json:"reason,omitempty"`
 	Message            string            `json:"message,omitempty"`
 }
@@ -1693,10 +1693,10 @@ type Event struct {
 	Source EventSource `json:"source,omitempty"`
 
 	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
-	FirstTimestamp util.Time `json:"firstTimestamp,omitempty"`
+	FirstTimestamp unversioned.Time `json:"firstTimestamp,omitempty"`
 
 	// The time at which the most recent occurrence of this event was recorded.
-	LastTimestamp util.Time `json:"lastTimestamp,omitempty"`
+	LastTimestamp unversioned.Time `json:"lastTimestamp,omitempty"`
 
 	// The number of times this event has occurred.
 	Count int `json:"count,omitempty"`

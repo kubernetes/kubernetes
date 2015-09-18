@@ -18,13 +18,14 @@ package io_test
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
-	"os"
-	"testing"
 )
 
 func TestSavePodToFile(t *testing.T) {

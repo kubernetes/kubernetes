@@ -372,12 +372,12 @@ func deepCopy_api_ObjectMeta(in api.ObjectMeta, out *api.ObjectMeta, c *conversi
 	out.UID = in.UID
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
-	if err := deepCopy_util_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
+	if err := deepCopy_unversioned_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
 		return err
 	}
 	if in.DeletionTimestamp != nil {
-		out.DeletionTimestamp = new(util.Time)
-		if err := deepCopy_util_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
+		out.DeletionTimestamp = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
 			return err
 		}
 	} else {
@@ -753,6 +753,15 @@ func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.Lis
 	return nil
 }
 
+func deepCopy_unversioned_Time(in unversioned.Time, out *unversioned.Time, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.Time); err != nil {
+		return err
+	} else {
+		out.Time = newVal.(time.Time)
+	}
+	return nil
+}
+
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
@@ -978,8 +987,8 @@ func deepCopy_experimental_HorizontalPodAutoscalerStatus(in HorizontalPodAutosca
 		out.CurrentConsumption = nil
 	}
 	if in.LastScaleTimestamp != nil {
-		out.LastScaleTimestamp = new(util.Time)
-		if err := deepCopy_util_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
+		out.LastScaleTimestamp = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
 			return err
 		}
 	} else {
@@ -1007,10 +1016,10 @@ func deepCopy_experimental_Job(in Job, out *Job, c *conversion.Cloner) error {
 func deepCopy_experimental_JobCondition(in JobCondition, out *JobCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
-	if err := deepCopy_util_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+	if err := deepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
 		return err
 	}
-	if err := deepCopy_util_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+	if err := deepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
 		return err
 	}
 	out.Reason = in.Reason
@@ -1082,16 +1091,16 @@ func deepCopy_experimental_JobStatus(in JobStatus, out *JobStatus, c *conversion
 		out.Conditions = nil
 	}
 	if in.StartTime != nil {
-		out.StartTime = new(util.Time)
-		if err := deepCopy_util_Time(*in.StartTime, out.StartTime, c); err != nil {
+		out.StartTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.StartTime, out.StartTime, c); err != nil {
 			return err
 		}
 	} else {
 		out.StartTime = nil
 	}
 	if in.CompletionTime != nil {
-		out.CompletionTime = new(util.Time)
-		if err := deepCopy_util_Time(*in.CompletionTime, out.CompletionTime, c); err != nil {
+		out.CompletionTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.CompletionTime, out.CompletionTime, c); err != nil {
 			return err
 		}
 	} else {
@@ -1258,15 +1267,6 @@ func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *co
 	return nil
 }
 
-func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) error {
-	if newVal, err := c.DeepCopy(in.Time); err != nil {
-		return err
-	} else {
-		out.Time = newVal.(time.Time)
-	}
-	return nil
-}
-
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_api_AWSElasticBlockStoreVolumeSource,
@@ -1308,6 +1308,7 @@ func init() {
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
 		deepCopy_unversioned_ListMeta,
+		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_experimental_APIVersion,
 		deepCopy_experimental_DaemonSet,
@@ -1340,7 +1341,6 @@ func init() {
 		deepCopy_experimental_ThirdPartyResourceDataList,
 		deepCopy_experimental_ThirdPartyResourceList,
 		deepCopy_util_IntOrString,
-		deepCopy_util_Time,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
