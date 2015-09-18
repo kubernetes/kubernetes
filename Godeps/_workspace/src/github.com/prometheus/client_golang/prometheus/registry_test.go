@@ -69,12 +69,12 @@ func testHandler(t testing.TB) {
 			{
 				Label: []*dto.LabelPair{
 					{
-						Name:  proto.String("externallabelname"),
-						Value: proto.String("externalval1"),
-					},
-					{
 						Name:  proto.String("externalconstname"),
 						Value: proto.String("externalconstvalue"),
+					},
+					{
+						Name:  proto.String("externallabelname"),
+						Value: proto.String("externalval1"),
 					},
 				},
 				Counter: &dto.Counter{
@@ -100,19 +100,19 @@ func testHandler(t testing.TB) {
 	externalMetricFamilyAsBytes := externalBuf.Bytes()
 	externalMetricFamilyAsText := []byte(`# HELP externalname externaldocstring
 # TYPE externalname counter
-externalname{externallabelname="externalval1",externalconstname="externalconstvalue"} 1
+externalname{externalconstname="externalconstvalue",externallabelname="externalval1"} 1
 `)
 	externalMetricFamilyAsProtoText := []byte(`name: "externalname"
 help: "externaldocstring"
 type: COUNTER
 metric: <
   label: <
-    name: "externallabelname"
-    value: "externalval1"
-  >
-  label: <
     name: "externalconstname"
     value: "externalconstvalue"
+  >
+  label: <
+    name: "externallabelname"
+    value: "externalval1"
   >
   counter: <
     value: 1
@@ -120,7 +120,7 @@ metric: <
 >
 
 `)
-	externalMetricFamilyAsProtoCompactText := []byte(`name:"externalname" help:"externaldocstring" type:COUNTER metric:<label:<name:"externallabelname" value:"externalval1" > label:<name:"externalconstname" value:"externalconstvalue" > counter:<value:1 > > 
+	externalMetricFamilyAsProtoCompactText := []byte(`name:"externalname" help:"externaldocstring" type:COUNTER metric:<label:<name:"externalconstname" value:"externalconstvalue" > label:<name:"externallabelname" value:"externalval1" > counter:<value:1 > > 
 `)
 
 	expectedMetricFamily := &dto.MetricFamily{

@@ -19,6 +19,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+const separatorByte byte = 255
+
 // A Metric models a single sample value with its meta data being exported to
 // Prometheus. Implementers of Metric in this package inclued Gauge, Counter,
 // Untyped, and Summary. Users can implement their own Metric types, but that
