@@ -132,6 +132,7 @@ GCE_FLAKY_TESTS=(
 GCE_SLOW_TESTS=(
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
+    "KubeProxy\sshould\stest\skube-proxy"             # 15 min,       file: kubeproxy.go,            issue: #14204
     )
 
 # Tests which are not able to be run in parallel.
