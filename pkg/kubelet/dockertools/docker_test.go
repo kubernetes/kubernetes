@@ -284,6 +284,12 @@ func TestPullWithSecrets(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	dockerConfigJson := map[string]map[string]map[string]string{"auths": dockerCfg}
+	dockerConfigJsonContent, err := json.Marshal(dockerConfigJson)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	tests := map[string]struct {
 		imageName           string
 		passedSecrets       []api.Secret
@@ -311,6 +317,12 @@ func TestPullWithSecrets(t *testing.T) {
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
+		},
+		"builtin keyring secrets, but use passed with new docker config": {
+			"ubuntu",
+			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
