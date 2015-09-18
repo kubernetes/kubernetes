@@ -137,7 +137,7 @@ GCE_SLOW_TESTS=(
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
     "Etcd"
-    "NetworkingNew"
+    "Networking"
     "Nodes\sNetwork"
     "Nodes\sResize"
     "MaxPods"
