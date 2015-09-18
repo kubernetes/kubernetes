@@ -95,8 +95,8 @@ func TestListWatchesCanList(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
-		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
+		c := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		lw := NewListWatchFromClient(c, item.resource, client.ClientGroupVersion(), item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.List()
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -161,8 +161,8 @@ func TestListWatchesCanWatch(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
-		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
+		c := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		lw := NewListWatchFromClient(c, item.resource, client.ClientGroupVersion(), item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)

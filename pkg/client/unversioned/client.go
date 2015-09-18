@@ -28,6 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const (
+	clientGroupVersion = "v1"
+)
+
 // Interface holds the methods for clients of Kubernetes,
 // an interface to allow mock testing.
 type Interface interface {
@@ -198,4 +202,8 @@ func IsTimeout(err error) bool {
 
 func (c *Client) Experimental() ExperimentalInterface {
 	return c.ExperimentalClient
+}
+
+func ClientGroupVersion() string {
+	return clientGroupVersion
 }

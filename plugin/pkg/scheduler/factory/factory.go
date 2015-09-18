@@ -226,7 +226,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 // Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{client.PodHost: ""}.AsSelector())
+	return cache.NewListWatchFromClient(factory.Client, "pods", client.ClientGroupVersion(), api.NamespaceAll, fields.Set{client.PodHost: ""}.AsSelector())
 }
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -241,7 +241,7 @@ func parseSelectorOrDie(s string) fields.Selector {
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
+	return cache.NewListWatchFromClient(factory.Client, "pods", client.ClientGroupVersion(), api.NamespaceAll,
 		parseSelectorOrDie(client.PodHost+"!="))
 }
 
@@ -249,17 +249,17 @@ func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// TODO: Filter out nodes that doesn't have NodeReady condition.
 	fields := fields.Set{client.NodeUnschedulable: "false"}.AsSelector()
-	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)
+	return cache.NewListWatchFromClient(factory.Client, "nodes", client.ClientGroupVersion(), api.NamespaceAll, fields)
 }
 
 // Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client, "services", client.ClientGroupVersion(), api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to controllers.
 func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "replicationControllers", api.NamespaceAll, parseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client, "replicationControllers", client.ClientGroupVersion(), api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
@@ -279,7 +279,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			backoff.wait(podID)
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
-			err := factory.Client.Get().Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
+			err := factory.Client.Get().GroupVersion(client.ClientGroupVersion()).Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
@@ -319,7 +319,7 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	glog.V(2).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+	return b.Post().GroupVersion(client.ClientGroupVersion()).Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 	// TODO: use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
 }

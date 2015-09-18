@@ -54,6 +54,7 @@ func newServices(c *Client, namespace string) *services {
 func (c *services) List(selector labels.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.r.Get().
+		GroupVersion(clientGroupVersion).
 		Namespace(c.ns).
 		Resource("services").
 		LabelsSelectorParam(selector).
@@ -65,33 +66,34 @@ func (c *services) List(selector labels.Selector) (result *api.ServiceList, err 
 // Get returns information about a particular service.
 func (c *services) Get(name string) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Get().Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
+	err = c.r.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
+	err = c.r.Post().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
 func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	err = c.r.Put().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
+	return c.r.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("services").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
 func (c *services) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
+		GroupVersion(clientGroupVersion).
 		Namespace(c.ns).
 		Resource("services").
 		Param("resourceVersion", resourceVersion).
@@ -104,6 +106,7 @@ func (c *services) Watch(label labels.Selector, field fields.Selector, resourceV
 func (c *services) ProxyGet(name, path string, params map[string]string) ResponseWrapper {
 	request := c.r.Get().
 		Prefix("proxy").
+		GroupVersion(clientGroupVersion).
 		Namespace(c.ns).
 		Resource("services").
 		Name(name).

@@ -98,6 +98,13 @@ type Request struct {
 
 	apiVersion string
 
+	// group/version
+	group      string
+	version    string
+	setGroup   bool
+	setVersion bool
+	setAbspath bool
+
 	// output
 	err  error
 	body io.Reader
@@ -223,6 +230,7 @@ func (r *Request) UnversionedPath(segments ...string) *Request {
 		}
 	}
 	r.path = path.Join(append([]string{upath}, segments...)...)
+	r.setAbspath = true
 	return r
 }
 
@@ -238,6 +246,35 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	} else {
 		r.path = path.Join(segments...)
 	}
+	r.setAbspath = true
+	return r
+}
+
+// Group
+func (r *Request) Group(group string) *Request {
+	r.group = group
+	r.setGroup = true
+	return r
+}
+
+// Version
+func (r *Request) Version(version string) *Request {
+	r.version = version
+	r.setVersion = true
+	return r
+}
+
+// GroupVersion reads in a group/version string and set the group and version
+func (r *Request) GroupVersion(groupVersion string) *Request {
+	groupAndVersion := strings.Split(groupVersion, "/")
+	if len(groupAndVersion) == 1 {
+		r.version = groupAndVersion[0]
+	} else {
+		r.group = groupAndVersion[0]
+		r.version = groupAndVersion[1]
+	}
+	r.setGroup = true
+	r.setVersion = true
 	return r
 }
 
@@ -663,6 +700,10 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}
 	if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
 		return fmt.Errorf("an empty namespace may not be set during creation")
+	}
+
+	if !r.setAbspath && (!r.setGroup || !r.setVersion) {
+		return fmt.Errorf("either absPath or group/version should be set")
 	}
 
 	client := r.client

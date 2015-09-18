@@ -43,9 +43,10 @@ type Getter interface {
 }
 
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
-func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
+func NewListWatchFromClient(c Getter, resource, groupVersion, namespace string, fieldSelector fields.Selector) *ListWatch {
 	listFunc := func() (runtime.Object, error) {
 		return c.Get().
+			GroupVersion(groupVersion).
 			Namespace(namespace).
 			Resource(resource).
 			FieldsSelectorParam(fieldSelector).
@@ -55,6 +56,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 	watchFunc := func(resourceVersion string) (watch.Interface, error) {
 		return c.Get().
 			Prefix("watch").
+			GroupVersion(groupVersion).
 			Namespace(namespace).
 			Resource(resource).
 			FieldsSelectorParam(fieldSelector).

@@ -27,8 +27,8 @@ import (
 
 // NewSourceAPIserver creates config source that watches for changes to the services and endpoints.
 func NewSourceAPI(c *client.Client, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
-	servicesLW := cache.NewListWatchFromClient(c, "services", api.NamespaceAll, fields.Everything())
-	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", api.NamespaceAll, fields.Everything())
+	servicesLW := cache.NewListWatchFromClient(c, "services", client.ClientGroupVersion(), api.NamespaceAll, fields.Everything())
+	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", client.ClientGroupVersion(), api.NamespaceAll, fields.Everything())
 
 	newServicesSourceApiFromLW(servicesLW, period, servicesChan)
 	newEndpointsSourceApiFromLW(endpointsLW, period, endpointsChan)

@@ -56,40 +56,40 @@ func newDeployments(c *ExperimentalClient, namespace string) *deployments {
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *deployments) List(label labels.Selector, field fields.Selector) (result *experimental.DeploymentList, err error) {
 	result = &experimental.DeploymentList{}
-	err = c.client.Get().Namespace(c.ns).Resource("deployments").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.client.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("deployments").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *deployments) Get(name string) (result *experimental.Deployment, err error) {
 	result = &experimental.Deployment{}
-	err = c.client.Get().Namespace(c.ns).Resource("deployments").Name(name).Do().Into(result)
+	err = c.client.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("deployments").Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Do().Error()
+		return c.client.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("deployments").Name(name).Do().Error()
 	}
 	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
 	if err != nil {
 		return err
 	}
-	return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Body(body).Do().Error()
+	return c.client.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("deployments").Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Create(deployment *experimental.Deployment) (result *experimental.Deployment, err error) {
 	result = &experimental.Deployment{}
-	err = c.client.Post().Namespace(c.ns).Resource("deployments").Body(deployment).Do().Into(result)
+	err = c.client.Post().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("deployments").Body(deployment).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Update(deployment *experimental.Deployment) (result *experimental.Deployment, err error) {
 	result = &experimental.Deployment{}
-	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(deployment).Do().Into(result)
+	err = c.client.Put().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(deployment).Do().Into(result)
 	return
 }
 
@@ -97,6 +97,7 @@ func (c *deployments) Update(deployment *experimental.Deployment) (result *exper
 func (c *deployments) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
+		GroupVersion(clientGroupVersion).
 		Namespace(c.ns).
 		Resource("deployments").
 		Param("resourceVersion", resourceVersion).
