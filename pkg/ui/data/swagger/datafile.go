@@ -59,7 +59,7 @@ func (fi bindata_file_info) Sys() interface{} {
 	return nil
 }
 
-var _third_party_swagger_ui_license = []byte(`Copyright 2014 Reverb Technologies, Inc.
+var _third_party_swagger_ui_license = []byte(`Copyright 2015 Reverb Technologies, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
