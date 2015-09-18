@@ -19,6 +19,7 @@ package conversion
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 )
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
@@ -52,6 +53,14 @@ import (
 func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []byte, err error) {
 	obj = maybeCopy(obj)
 	v, _ := EnforcePtr(obj) // maybeCopy guarantees a pointer
+
+	// Don't encode an object defined in the unversioned package, unless if the
+	// destVersion is v1, encode it to v1 for backward compatibility.
+	pkg := path.Base(v.Type().PkgPath())
+	if pkg == "unversioned" && destVersion != "v1" {
+		return s.encodeUnversionedObject(obj)
+	}
+
 	if _, registered := s.typeToVersion[v.Type()]; !registered {
 		return nil, fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
 	}
@@ -100,5 +109,23 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		return nil, err
 	}
 
+	return data, nil
+}
+
+func (s *Scheme) encodeUnversionedObject(obj interface{}) (data []byte, err error) {
+	_, objKind, err := s.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.SetVersionAndKind("", objKind, obj); err != nil {
+		return nil, err
+	}
+	data, err = json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// Version and Kind should be blank in memory. Reset them, since it's
+	// possible that we modified a user object and not a copy above.
+	err = s.SetVersionAndKind("", "", obj)
 	return data, nil
 }
