@@ -638,7 +638,7 @@ func (gce *GCECloud) CreateTargetHttpProxy(urlMap *compute.UrlMap, name string) 
 
 // SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
 func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
-	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{urlMap.SelfLink}).Do()
+	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{UrlMap: urlMap.SelfLink}).Do()
 	if err != nil {
 		return err
 	}
@@ -679,7 +679,7 @@ func (gce *GCECloud) CreateGlobalForwardingRule(proxy *compute.TargetHttpProxy, 
 
 // SetProxyForGlobalForwardingRule links the given TargetHttpProxy with the given GlobalForwardingRule.
 func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, proxy *compute.TargetHttpProxy) error {
-	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{proxy.SelfLink}).Do()
+	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{Target: proxy.SelfLink}).Do()
 	if err != nil {
 		return err
 	}
@@ -785,7 +785,7 @@ func (gce *GCECloud) AddInstancesToInstanceGroup(name string, instanceNames []st
 	// Adding the same instance twice will result in a 4xx error
 	instances := []*compute.InstanceReference{}
 	for _, ins := range instanceNames {
-		instances = append(instances, &compute.InstanceReference{makeHostURL(gce.projectID, gce.zone, ins)})
+		instances = append(instances, &compute.InstanceReference{Instance: makeHostURL(gce.projectID, gce.zone, ins)})
 	}
 	op, err := gce.service.InstanceGroups.AddInstances(
 		gce.projectID, gce.zone, name,
@@ -807,7 +807,7 @@ func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, instanceNames
 	instances := []*compute.InstanceReference{}
 	for _, ins := range instanceNames {
 		instanceLink := makeHostURL(gce.projectID, gce.zone, ins)
-		instances = append(instances, &compute.InstanceReference{instanceLink})
+		instances = append(instances, &compute.InstanceReference{Instance: instanceLink})
 	}
 	op, err := gce.service.InstanceGroups.RemoveInstances(
 		gce.projectID, gce.zone, name,
@@ -833,7 +833,7 @@ func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int6
 		}
 	}
 	glog.Infof("Adding port %v to instance group %v with %d ports", port, ig.Name, len(ig.NamedPorts))
-	namedPort := compute.NamedPort{fmt.Sprintf("port%v", port), port}
+	namedPort := compute.NamedPort{Name: fmt.Sprintf("port%v", port), Port: port}
 	ig.NamedPorts = append(ig.NamedPorts, &namedPort)
 	op, err := gce.service.InstanceGroups.SetNamedPorts(
 		gce.projectID, gce.zone, ig.Name,

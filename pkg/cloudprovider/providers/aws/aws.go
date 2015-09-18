@@ -1288,7 +1288,7 @@ func (self *AWSCloud) findVPCID() (string, error) {
 	metadata := self.awsServices.Metadata()
 	macsBytes, err := metadata.GetMetaData("network/interfaces/macs/")
 	if err != nil {
-		return "", fmt.Errorf("Could not list interfaces of the instance", err)
+		return "", fmt.Errorf("Could not list interfaces of the instance: %v", err)
 	}
 
 	// loop over interfaces, first vpc id returned wins
