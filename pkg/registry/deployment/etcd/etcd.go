@@ -17,7 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -27,6 +31,22 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
+
+// DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
+type DeploymentStorage struct {
+	Deployment *REST
+	Scale      *ScaleREST
+}
+
+func NewStorage(s storage.Interface) DeploymentStorage {
+	deploymentRest := NewREST(s)
+	deploymentRegistry := deployment.NewRegistry(deploymentRest)
+
+	return DeploymentStorage{
+		Deployment: deploymentRest,
+		Scale:      &ScaleREST{registry: &deploymentRegistry},
+	}
+}
 
 type REST struct {
 	*etcdgeneric.Etcd
@@ -68,4 +88,70 @@ func NewREST(s storage.Interface) *REST {
 		Storage: s,
 	}
 	return &REST{store}
+}
+
+type ScaleREST struct {
+	registry *deployment.Registry
+}
+
+// ScaleREST implements Patcher
+var _ = rest.Patcher(&ScaleREST{})
+
+// New creates a new Scale object
+func (r *ScaleREST) New() runtime.Object {
+	return &experimental.Scale{}
+}
+
+func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	deployment, err := (*r.registry).GetDeployment(ctx, name)
+	if err != nil {
+		return nil, errors.NewNotFound("scale", name)
+	}
+	return &experimental.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              name,
+			Namespace:         deployment.Namespace,
+			CreationTimestamp: deployment.CreationTimestamp,
+		},
+		Spec: experimental.ScaleSpec{
+			Replicas: deployment.Spec.Replicas,
+		},
+		Status: experimental.ScaleStatus{
+			Replicas: deployment.Status.Replicas,
+			Selector: deployment.Spec.Selector,
+		},
+	}, nil
+}
+
+func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	if obj == nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+	}
+	scale, ok := obj.(*experimental.Scale)
+	if !ok {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+	}
+	deployment, err := (*r.registry).GetDeployment(ctx, scale.Name)
+	if err != nil {
+		return nil, false, errors.NewNotFound("scale", scale.Name)
+	}
+	deployment.Spec.Replicas = scale.Spec.Replicas
+	deployment, err = (*r.registry).UpdateDeployment(ctx, deployment)
+	if err != nil {
+		return nil, false, errors.NewConflict("scale", scale.Name, err)
+	}
+	return &experimental.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              deployment.Name,
+			Namespace:         deployment.Namespace,
+			CreationTimestamp: deployment.CreationTimestamp,
+		},
+		Spec: experimental.ScaleSpec{
+			Replicas: deployment.Spec.Replicas,
+		},
+		Status: experimental.ScaleStatus{
+			Replicas: deployment.Status.Replicas,
+			Selector: deployment.Spec.Selector,
+		},
+	}, false, nil
 }
