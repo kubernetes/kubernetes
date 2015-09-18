@@ -3229,7 +3229,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 
 		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
 		if err != nil {
-			t.Errorf("unexpected error: %v (%s)", test.name)
+			t.Errorf("unexpected error: %v (%s)", err, test.name)
 		}
 		if !reflect.DeepEqual(shaper.ResetCIDRs, test.expectResetCIDRs) {
 			t.Errorf("[%s]\nexpected: %v, saw: %v", test.name, test.expectResetCIDRs, shaper.ResetCIDRs)

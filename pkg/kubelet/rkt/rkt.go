@@ -1270,7 +1270,7 @@ func (r *runtime) getImageByName(imageName string) (*kubecontainer.Image, error)
 	case 2:
 		break
 	default:
-		return nil, fmt.Errorf("invalid image name: %q, requires 'name[:version]'")
+		return nil, fmt.Errorf("invalid image name: %q, requires 'name[:version]'", imageName)
 	}
 
 	for _, img := range images {

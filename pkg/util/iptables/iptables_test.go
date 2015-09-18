@@ -673,7 +673,7 @@ func TestReload(t *testing.T) {
 			// EnsureChain
 			func() ([]byte, error) { return []byte{}, nil },
 			// EnsureRule abc check
-			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{Status: 1} },
 			// EnsureRule abc
 			func() ([]byte, error) { return []byte{}, nil },
 
@@ -681,7 +681,7 @@ func TestReload(t *testing.T) {
 			// EnsureChain
 			func() ([]byte, error) { return []byte{}, nil },
 			// EnsureRule abc check
-			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{Status: 1} },
 			// EnsureRule abc
 			func() ([]byte, error) { return []byte{}, nil },
 		},

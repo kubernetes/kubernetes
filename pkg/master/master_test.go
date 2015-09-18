@@ -54,7 +54,7 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*Master, Config, *assert.Assertions) {
 	master := Master{}
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
@@ -64,7 +64,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
-	return master, config, assert.New(t)
+	return &master, config, assert.New(t)
 }
 
 // TestNew verifies that the New function returns a Master
@@ -437,7 +437,7 @@ type FooList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
-	items []Foo `json:"items"`
+	Items []Foo `json:"items"`
 }
 
 func initThirdParty(t *testing.T, version string) (*tools.FakeEtcdClient, *httptest.Server, *assert.Assertions) {
