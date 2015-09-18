@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -169,7 +170,7 @@ func (r *runtime) getContainerStatus(container ContainerStatus, image, imageID s
 
 		status.State = api.ContainerState{
 			Running: &api.ContainerStateRunning{
-				StartedAt: util.Time{runningStartedAt},
+				StartedAt: unversioned.NewTime(runningStartedAt),
 			},
 		}
 	case StatusPending:
@@ -196,8 +197,8 @@ func (r *runtime) getContainerStatus(container ContainerStatus, image, imageID s
 				ExitCode:   container.Terminated.ExitCode,
 				Reason:     container.Terminated.Reason,
 				Message:    container.Terminated.Message,
-				StartedAt:  util.Time{terminatedStartedAt},
-				FinishedAt: util.Time{terminatedFinishedAt},
+				StartedAt:  unversioned.NewTime(terminatedStartedAt),
+				FinishedAt: unversioned.NewTime(terminatedFinishedAt),
 			},
 		}
 	default:
@@ -257,8 +258,8 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 
 		podID, podName, podNamespace, err := r.parseHyperPodFullName(podInfo.podName)
 		if err != nil {
-			glog.Errorf("Hyper: can't parse pod name %s", podInfo.podName)
-			return nil, err
+			glog.Errorf("Hyper: pod %s is not managed by kubelet", podInfo.podName)
+			continue
 		}
 
 		pod.ID = types.UID(podID)
@@ -428,7 +429,6 @@ func (r *runtime) buildHyperPod(pod *api.Pod, pullSecrets []api.Secret) ([]byte,
 	glog.V(5).Infof("Hyper: pod limit vcpu=%v mem=%vMiB", podResource[KEY_VCPU], podResource[KEY_MEMORY])
 
 	// other params required
-	specMap[KEY_TYPE] = TYPE_POD
 	specMap[KEY_ID] = r.buildHyperPodFullName(string(pod.UID), string(pod.Name), string(pod.Namespace))
 	specMap[KEY_TTY] = true
 
@@ -689,7 +689,7 @@ func (r *runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 // default, it returns a snapshot of the container log. Set 'follow' to true to
 // stream the log. Set 'follow' to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
-func (r *runtime) GetContainerLogs(pod *api.Pod, containerID string, tail string, follow bool, stdout, stderr io.Writer) error {
+func (r *runtime) GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
 	// TODO: get container logs for hyper
 	return fmt.Errorf("Hyper: GetContainerLogs unimplemented")
 }
