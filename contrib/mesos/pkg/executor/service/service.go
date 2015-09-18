@@ -44,6 +44,7 @@ import (
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
+	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 
@@ -168,11 +169,13 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		mounter = &mount.NsenterMounter{}
 	}
 
+	var writer utilio.Writer = &utilio.StdWriter{}
 	var dockerExecHandler dockertools.ExecHandler
 	switch s.DockerExecHandlerName {
 	case "native":
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	case "nsenter":
+		writer = &utilio.NsenterWriter{}
 		dockerExecHandler = &dockertools.NsenterExecHandler{}
 	default:
 		log.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
@@ -229,6 +232,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		DockerExecHandler:         dockerExecHandler,
 		ResolverConfig:            s.ResolverConfig,
 		CPUCFSQuota:               s.CPUCFSQuota,
+		Writer:                    writer,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
