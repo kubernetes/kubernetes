@@ -3062,6 +3062,30 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"default request value 800m is greater than default limit value 500m",
 		},
+		"invalid spec maxLimitRequestRatio less than 1": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypePod,
+						MaxLimitRequestRatio: getResourceList("800m", ""),
+					},
+				},
+			}},
+			"maxLimitRequestRatio 800m is less than 1",
+		},
+		"invalid spec maxLimitRequestRatio greater than max/min": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypeContainer,
+						Max:                  getResourceList("", "2Gi"),
+						Min:                  getResourceList("", "512Mi"),
+						MaxLimitRequestRatio: getResourceList("", "10"),
+					},
+				},
+			}},
+			"maxLimitRequestRatio 10 is greater than max/min = 4.000000",
+		},
 	}
 
 	for k, v := range errorCases {
