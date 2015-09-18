@@ -241,7 +241,7 @@ func (s *CMServer) Run(_ []string) error {
 	go daemon.NewDaemonSetsController(kubeClient).
 		Run(s.ConcurrentDSCSyncs, util.NeverStop)
 
-	go job.NewJobManager(kubeClient).
+	go job.NewJobController(kubeClient).
 		Run(s.ConcurrentJobSyncs, util.NeverStop)
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
