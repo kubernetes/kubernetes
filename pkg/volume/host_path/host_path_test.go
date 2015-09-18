@@ -91,7 +91,7 @@ func TestDeleter(t *testing.T) {
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
-		t.Fatal("Failed to create tmp directory for deleter: %v", err)
+		t.Fatalf("Failed to create tmp directory for deleter: %v", err)
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
