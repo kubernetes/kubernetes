@@ -349,6 +349,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"spark-worker-controller": &api.ReplicationController{},
 			"spark-driver":            &api.Pod{},
 		},
+		"../examples/spark/spark-gluster": {
+			"spark-master-service":    &api.Service{},
+			"spark-master-controller": &api.ReplicationController{},
+			"spark-worker-controller": &api.ReplicationController{},
+			"glusterfs-endpoints":     &api.Endpoints{},
+		},
 		"../examples/storm": {
 			"storm-nimbus-service":    &api.Service{},
 			"storm-nimbus":            &api.Pod{},
