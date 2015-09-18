@@ -153,7 +153,10 @@ func (jm *JobController) getPodJob(pod *api.Pod) *experimental.Job {
 		glog.V(4).Infof("No jobs found for pod %v, job controller will avoid syncing", pod.Name)
 		return nil
 	}
-	// TODO: add sorting and rethink the overlaping controllers, internally and with RCs
+	if len(jobs) > 1 {
+		glog.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels)
+		sort.Sort(byCreationTimestamp(jobs))
+	}
 	return &jobs[0]
 }
 
@@ -444,4 +447,17 @@ func filterPods(pods []api.Pod, phase api.PodPhase) int {
 		}
 	}
 	return result
+}
+
+// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
+type byCreationTimestamp []experimental.Job
+
+func (o byCreationTimestamp) Len() int      { return len(o) }
+func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o byCreationTimestamp) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
