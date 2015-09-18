@@ -127,8 +127,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  util.Time{},
-					LastTransitionTime: util.Time{},
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
@@ -175,8 +175,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
 		t.Errorf("unexpected zero last transition timestamp")
 	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastHeartbeatTime = unversioned.Time{}
+	updatedNode.Status.Conditions[0].LastTransitionTime = unversioned.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
@@ -199,8 +199,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletReady",
 						Message:            fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 				},
 				Capacity: api.ResourceList{
@@ -234,8 +234,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  util.Time{}, // placeholder
-					LastTransitionTime: util.Time{}, // placeholder
+					LastHeartbeatTime:  unversioned.Time{}, // placeholder
+					LastTransitionTime: unversioned.Time{}, // placeholder
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
@@ -278,15 +278,15 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		t.Errorf("unexpected object type")
 	}
 	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastHeartbeatTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
-		t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
+	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastHeartbeatTime.Rfc3339Copy().UTC(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
+		t.Errorf("expected \n%v\n, got \n%v", unversioned.Now(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
-	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
+	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy().UTC(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
 		t.Errorf("expected \n%#v\n, got \n%#v", updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy(),
-			util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
+			unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastHeartbeatTime = unversioned.Time{}
+	updatedNode.Status.Conditions[0].LastTransitionTime = unversioned.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
 	}
@@ -325,8 +325,8 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletNotReady",
 					Message:            fmt.Sprintf("container runtime is down"),
-					LastHeartbeatTime:  util.Time{},
-					LastTransitionTime: util.Time{},
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
@@ -375,8 +375,8 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
 		t.Errorf("unexpected zero last transition timestamp")
 	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastHeartbeatTime = unversioned.Time{}
+	updatedNode.Status.Conditions[0].LastTransitionTime = unversioned.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}

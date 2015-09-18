@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -153,7 +154,7 @@ func (e *contentRemainingError) Error() string {
 // deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
 // of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
 // are guaranteed to be gone.
-func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namespace string, before util.Time) (estimate int64, err error) {
+func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namespace string, before unversioned.Time) (estimate int64, err error) {
 	err = deleteServiceAccounts(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
@@ -334,12 +335,12 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deletePods(kubeClient client.Interface, ns string, before util.Time) (int64, error) {
+func deletePods(kubeClient client.Interface, ns string, before unversioned.Time) (int64, error) {
 	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return 0, err
 	}
-	expired := util.Now().After(before.Time)
+	expired := unversioned.Now().After(before.Time)
 	var deleteOptions *api.DeleteOptions
 	if expired {
 		deleteOptions = api.NewDeleteOptions(0)

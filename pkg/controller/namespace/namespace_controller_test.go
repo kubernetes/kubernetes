@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -72,7 +72,7 @@ func TestFinalize(t *testing.T) {
 
 func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 	mockClient := &testclient.Fake{}
-	now := util.Now()
+	now := unversioned.Now()
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test",

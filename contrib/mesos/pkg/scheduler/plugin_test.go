@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	kutil "k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
 	log "github.com/golang/glog"
@@ -273,7 +272,7 @@ func (o *EventObserver) Event(object runtime.Object, reason, message string) {
 func (o *EventObserver) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
 	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
-func (o *EventObserver) PastEventf(object runtime.Object, timestamp kutil.Time, reason, messageFmt string, args ...interface{}) {
+func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
 	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
 

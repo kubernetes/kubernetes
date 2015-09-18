@@ -118,7 +118,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
 	// This is used by the autoscaler to controll how often the number of pods is changed.
-	LastScaleTimestamp *util.Time `json:"lastScaleTimestamp,omitempty"`
+	LastScaleTimestamp *unversioned.Time `json:"lastScaleTimestamp,omitempty"`
 }
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
@@ -421,12 +421,12 @@ type JobStatus struct {
 	// StartTime represents time when the job was acknowledged by the Job Manager.
 	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	StartTime *util.Time `json:"startTime,omitempty"`
+	StartTime *unversioned.Time `json:"startTime,omitempty"`
 
 	// CompletionTime represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	CompletionTime *util.Time `json:"completionTime,omitempty"`
+	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
 
 	// Active is the number of actively running pods.
 	Active int `json:"active,omitempty"`
@@ -454,9 +454,9 @@ type JobCondition struct {
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
-	LastProbeTime util.Time `json:"lastProbeTime,omitempty"`
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
 	// Last time the condition transit from one status to another.
-	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
 	// (brief) reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
 	// Human readable message indicating details about last transition.

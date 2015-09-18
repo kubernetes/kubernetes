@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -171,7 +172,7 @@ func TestListFromMemory(t *testing.T) {
 	for _, item := range result.Items {
 		// unset fields that are set by the infrastructure
 		item.ObjectMeta.ResourceVersion = ""
-		item.ObjectMeta.CreationTimestamp = util.Time{}
+		item.ObjectMeta.CreationTimestamp = unversioned.Time{}
 
 		var expected *api.Pod
 		switch item.ObjectMeta.Name {
@@ -268,7 +269,7 @@ func TestWatch(t *testing.T) {
 			// unset fields that are set by the infrastructure
 			obj := event.Object.(*api.Pod)
 			obj.ObjectMeta.ResourceVersion = ""
-			obj.ObjectMeta.CreationTimestamp = util.Time{}
+			obj.ObjectMeta.CreationTimestamp = unversioned.Time{}
 			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
 				t.Errorf("expected: %#v, got: %#v", e, a)
 			}
@@ -295,7 +296,7 @@ func TestWatch(t *testing.T) {
 			// unset fields that are set by the infrastructure
 			obj := event.Object.(*api.Pod)
 			obj.ObjectMeta.ResourceVersion = ""
-			obj.ObjectMeta.CreationTimestamp = util.Time{}
+			obj.ObjectMeta.CreationTimestamp = unversioned.Time{}
 			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
 				t.Errorf("expected: %#v, got: %#v", e, a)
 			}
@@ -468,7 +469,7 @@ func TestFiltering(t *testing.T) {
 			// unset fields that are set by the infrastructure
 			obj := event.Object.(*api.Pod)
 			obj.ObjectMeta.ResourceVersion = ""
-			obj.ObjectMeta.CreationTimestamp = util.Time{}
+			obj.ObjectMeta.CreationTimestamp = unversioned.Time{}
 			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
 				t.Errorf("expected: %#v, got: %#v", e, a)
 			}

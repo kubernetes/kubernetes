@@ -17,9 +17,10 @@ limitations under the License.
 package cache
 
 import (
+	"time"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
-	"time"
 )
 
 // ExpirationCache implements the store interface
