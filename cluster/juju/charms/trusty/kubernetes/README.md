@@ -77,7 +77,7 @@ The command above does few things for you:
   deployment environment (machine 0).
 - Deploys the Juju GUI to your environment onto the bootstrap node.
 - Provisions 4 machines, and deploys the Kubernetes services on top of
-  them (Kubernetes-master, two Kubernetes minions using flannel, and etcd).
+  them (Kubernetes-master, two Kubernetes nodes using flannel, and etcd).
 - Orchestrates the relations among the services, and exits.
 
 Now you should have a running Kubernetes. Run `juju status
