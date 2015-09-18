@@ -455,7 +455,8 @@ function prepare-push() {
     fi
   else
     # Run build.sh to get the required release 
-    KUBE_VERSION=${KUBE_VERSION} "${KUBE_ROOT}/cluster/ubuntu/build.sh"
+    export KUBE_VERSION
+    "${KUBE_ROOT}/cluster/ubuntu/build.sh"
   fi
 }
 
