@@ -19,6 +19,7 @@ package runtime
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"reflect"
 
@@ -432,6 +433,10 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 // config files.
 func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
 	return s.raw.EncodeToVersion(obj, destVersion)
+}
+
+func (s *Scheme) EncodeToVersionStream(obj Object, destVersion string, stream io.Writer) error {
+	return s.raw.EncodeToVersionStream(obj, destVersion, stream)
 }
 
 // Decode converts a YAML or JSON string back into a pointer to an api object.

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -219,40 +220,49 @@ const template = `{
   "items": [ %s ]
 }`
 
-func encodeToJSON(obj *experimental.ThirdPartyResourceData) ([]byte, error) {
+func encodeToJSON(obj *experimental.ThirdPartyResourceData, stream io.Writer) error {
 	var objOut interface{}
 	if err := json.Unmarshal(obj.Data, &objOut); err != nil {
-		return nil, err
+		return err
 	}
 	objMap, ok := objOut.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("unexpected type: %v", objOut)
+		return fmt.Errorf("unexpected type: %v", objOut)
 	}
 	objMap["metadata"] = obj.ObjectMeta
-	return json.Marshal(objMap)
+	encoder := json.NewEncoder(stream)
+	return encoder.Encode(objMap)
 }
 
-func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, err error) {
+func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) ([]byte, error) {
+	buff := &bytes.Buffer{}
+	if err := t.EncodeToStream(obj, buff); err != nil {
+		return nil, err
+	}
+	return buff.Bytes(), nil
+}
+
+func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream io.Writer) (err error) {
 	switch obj := obj.(type) {
 	case *experimental.ThirdPartyResourceData:
-		return encodeToJSON(obj)
+		return encodeToJSON(obj, stream)
 	case *experimental.ThirdPartyResourceDataList:
 		// TODO: There must be a better way to do this...
-		buff := &bytes.Buffer{}
 		dataStrings := make([]string, len(obj.Items))
 		for ix := range obj.Items {
-			data, err := encodeToJSON(&obj.Items[ix])
+			buff := &bytes.Buffer{}
+			err := encodeToJSON(&obj.Items[ix], buff)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			dataStrings[ix] = string(data)
+			dataStrings[ix] = buff.String()
 		}
-		fmt.Fprintf(buff, template, t.kind+"List", strings.Join(dataStrings, ","))
-		return buff.Bytes(), nil
+		fmt.Fprintf(stream, template, t.kind+"List", strings.Join(dataStrings, ","))
+		return nil
 	case *unversioned.Status:
-		return t.delegate.Encode(obj)
+		return t.delegate.EncodeToStream(obj, stream)
 	default:
-		return nil, fmt.Errorf("unexpected object to encode: %#v", obj)
+		return fmt.Errorf("unexpected object to encode: %#v", obj)
 	}
 }
 
