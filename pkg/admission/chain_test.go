@@ -99,7 +99,7 @@ func TestAdmit(t *testing.T) {
 	}
 	for _, test := range tests {
 		err := test.chain.Admit(NewAttributesRecord(nil, "", "", "", "", "", test.operation, nil))
-		accepted := (err == nil)
+		accepted := bool(err == nil)
 		if accepted != test.accept {
 			t.Errorf("%s: unexpected result of admit call: %v\n", test.name, accepted)
 		}
