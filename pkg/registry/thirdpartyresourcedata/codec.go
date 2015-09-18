@@ -266,15 +266,18 @@ type thirdPartyResourceDataCreator struct {
 }
 
 func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.Object, err error) {
-	if t.version != version {
-		return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
-	}
 	switch kind {
 	case "ThirdPartyResourceData":
+		if t.version != version {
+			return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+		}
 		return &experimental.ThirdPartyResourceData{}, nil
 	case "ThirdPartyResourceDataList":
+		if t.version != version {
+			return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+		}
 		return &experimental.ThirdPartyResourceDataList{}, nil
 	default:
-		return t.delegate.New(latest.GroupOrDie("experimental").Version, kind)
+		return t.delegate.New(version, kind)
 	}
 }

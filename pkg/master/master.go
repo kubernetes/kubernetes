@@ -939,11 +939,12 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version, group),
-		Codec:   thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
-		Linker:  latest.GroupOrDie("experimental").SelfLinker,
-		Storage: storage,
-		Version: version,
+		Mapper:        thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version, group),
+		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
+		Linker:        latest.GroupOrDie("experimental").SelfLinker,
+		Storage:       storage,
+		Version:       version,
+		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Context: m.requestContextMapper,
 

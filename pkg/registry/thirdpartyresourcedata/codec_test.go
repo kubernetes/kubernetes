@@ -24,7 +24,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type Foo struct {
@@ -131,5 +133,51 @@ func TestCodec(t *testing.T) {
 		if !reflect.DeepEqual(&output2, test.obj) {
 			t.Errorf("[%s]\nexpected\n%v\nsaw\n%v\n", test.name, test.obj, &output2)
 		}
+	}
+}
+
+func TestCreater(t *testing.T) {
+	creater := NewObjectCreator("creater version", api.Scheme)
+	tests := []struct {
+		name        string
+		version     string
+		kind        string
+		expectedObj runtime.Object
+		expectErr   bool
+	}{
+		{
+			name:        "valid ThirdPartyResourceData creation",
+			version:     "creater version",
+			kind:        "ThirdPartyResourceData",
+			expectedObj: &experimental.ThirdPartyResourceData{},
+			expectErr:   false,
+		},
+		{
+			name:        "invalid ThirdPartyResourceData creation",
+			version:     "invalid version",
+			kind:        "ThirdPartyResourceData",
+			expectedObj: nil,
+			expectErr:   true,
+		},
+		{
+			name:        "valid ListOptions creation",
+			version:     "v1",
+			kind:        "ListOptions",
+			expectedObj: &v1.ListOptions{},
+			expectErr:   false,
+		},
+	}
+	for _, test := range tests {
+		out, err := creater.New(test.version, test.kind)
+		if err != nil && !test.expectErr {
+			t.Errorf("[%s] unexpected error: %v", test.name, err)
+		}
+		if err == nil && test.expectErr {
+			t.Errorf("[%s] unexpected non-error", test.name)
+		}
+		if !reflect.DeepEqual(test.expectedObj, out) {
+			t.Errorf("[%s] unexpected error: expect: %v, got: %v", test.expectedObj, out)
+		}
+
 	}
 }
