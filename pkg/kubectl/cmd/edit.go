@@ -279,7 +279,6 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		// loop again and edit the remaining items
 		infos = results.edit
 	}
-	return nil
 }
 
 // print json file (such as patch file) content for debugging

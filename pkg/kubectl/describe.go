@@ -1298,7 +1298,7 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	fmt.Fprintf(out, "Allocated resources:\n  (Total limits may be over 100%%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ────────────\t──────────\t───────────────\t─────────────\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nonTerminatedPods)
 	if err != nil {
