@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
@@ -476,6 +477,26 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 		if str == "" {
 			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", name)
 		}
+	}
+}
 
+func TestDescribeDeployment(t *testing.T) {
+	fake := testclient.NewSimpleFake(&experimental.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: experimental.DeploymentSpec{
+			Template: &api.PodTemplateSpec{},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := DeploymentDescriber{c}
+	out, err := d.Describe("foo", "bar")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") {
+		t.Errorf("unexpected out: %s", out)
 	}
 }

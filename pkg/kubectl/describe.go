@@ -35,6 +35,7 @@ import (
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
+	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -88,6 +89,7 @@ func expDescriberMap(c *client.Client) map[string]Describer {
 		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{c},
 		"DaemonSet":               &DaemonSetDescriber{c},
 		"Job":                     &JobDescriber{c},
+		"Deployment":              &DeploymentDescriber{c},
 	}
 }
 
@@ -478,7 +480,11 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		fmt.Fprintf(out, "Reason:\t%s\n", pod.Status.Reason)
 		fmt.Fprintf(out, "Message:\t%s\n", pod.Status.Message)
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
-		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
+		var matchingRCs []*api.ReplicationController
+		for _, rc := range rcs {
+			matchingRCs = append(matchingRCs, &rc)
+		}
+		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(matchingRCs))
 		fmt.Fprintf(out, "Containers:\n")
 		describeContainers(pod, out)
 		if len(pod.Status.Conditions) > 0 {
@@ -1395,6 +1401,44 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 	}
 }
 
+// DeploymentDescriber generates information about a deployment.
+type DeploymentDescriber struct {
+	client.Interface
+}
+
+func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) {
+	d, err := dd.Experimental().Deployments(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", d.ObjectMeta.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
+		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(d.Labels))
+		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(d.Spec.Selector))
+		fmt.Fprintf(out, "Replicas:\t%d updated / %d total\n", d.Status.UpdatedReplicas, d.Spec.Replicas)
+		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
+		if d.Spec.Strategy.RollingUpdate != nil {
+			ru := d.Spec.Strategy.RollingUpdate
+			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge, %d min ready seconds\n", ru.MaxUnavailable.String(), ru.MaxSurge.String(), ru.MinReadySeconds)
+		}
+		oldRCs, err := deploymentUtil.GetOldRCs(*d, dd)
+		if err == nil {
+			fmt.Fprintf(out, "OldReplicationControllers:\t%s\n", printReplicationControllersByLabels(oldRCs))
+		}
+		newRC, err := deploymentUtil.GetNewRC(*d, dd)
+		if err == nil {
+			var newRCs []*api.ReplicationController
+			if newRC != nil {
+				newRCs = append(newRCs, newRC)
+			}
+			fmt.Fprintf(out, "NewReplicationController:\t%s\n", printReplicationControllersByLabels(newRCs))
+		}
+		return nil
+	})
+}
+
 // Get all daemon set whose selectors would match a given set of labels.
 // TODO: Move this to pkg/client and ideally implement it server-side (instead
 // of getting all DS's and searching through them manually).
@@ -1442,7 +1486,7 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 	return matchingRCs, nil
 }
 
-func printReplicationControllersByLabels(matchingRCs []api.ReplicationController) string {
+func printReplicationControllersByLabels(matchingRCs []*api.ReplicationController) string {
 	// Format the matching RC's into strings.
 	var rcStrings []string
 	for _, controller := range matchingRCs {
