@@ -30,7 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -347,31 +347,46 @@ func (r *runtime) buildHyperPod(pod *api.Pod, pullSecrets []api.Secret) ([]byte,
 		if len(container.Args) > 0 {
 			c[KEY_CONTAINER_ARGS] = container.Args
 		}
-		if len(container.Env) > 0 {
-			c[KEY_ENVS] = container.Env
+
+		opts, err := r.generator.GenerateRunContainerOptions(pod, &container)
+		if err != nil {
+			return nil, err
 		}
 
-		if len(container.Ports) > 0 {
-			var ports []map[string]interface{}
-			for _, port := range container.Ports {
-				p := make(map[string]interface{})
-				p[KEY_CONTAINER_PORT] = port.ContainerPort
-				if port.HostPort != 0 {
-					p[KEY_HOST_PORT] = port.HostPort
-				}
-				if port.Protocol != "" {
-					p[KEY_PROTOCOL] = port.Protocol
-				}
-				ports = append(ports, p)
+		// dns
+		if len(opts.DNS) > 0 {
+			c[KEY_DNS] = opts.DNS
+		}
+
+		// envs
+		envs := make([]map[string]string, 0, 1)
+		for _, e := range opts.Envs {
+			envs = append(envs, map[string]string{
+				"env":   e.Name,
+				"value": e.Value,
+			})
+		}
+		c[KEY_ENVS] = envs
+
+		// port-mappings
+		var ports []map[string]interface{}
+		for _, mapping := range opts.PortMappings {
+			p := make(map[string]interface{})
+			p[KEY_CONTAINER_PORT] = mapping.ContainerPort
+			if mapping.HostPort != 0 {
+				p[KEY_HOST_PORT] = mapping.HostPort
 			}
-			c[KEY_PORTS] = ports
+			p[KEY_PROTOCOL] = mapping.Protocol
+			ports = append(ports, p)
 		}
+		c[KEY_PORTS] = ports
 
-		if len(container.VolumeMounts) > 0 {
+		// volumes
+		if len(opts.Mounts) > 0 {
 			var containerVolumes []map[string]interface{}
-			for _, volume := range container.VolumeMounts {
+			for _, volume := range opts.Mounts {
 				v := make(map[string]interface{})
-				v[KEY_MOUNTPATH] = volume.MountPath
+				v[KEY_MOUNTPATH] = volume.ContainerPath
 				v[KEY_VOLUME] = volume.Name
 				v[KEY_READONLY] = volume.ReadOnly
 				containerVolumes = append(containerVolumes, v)

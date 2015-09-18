@@ -48,6 +48,7 @@ const (
 	KEY_IMAGEID        = "imageId"
 	KEY_IMAGENAME      = "imageName"
 	KEY_ITEM           = "item"
+	KEY_DNS            = "dns"
 	KEY_MEMORY         = "memory"
 	KEY_POD_ARGS       = "podArgs"
 	KEY_POD_ID         = "podId"
