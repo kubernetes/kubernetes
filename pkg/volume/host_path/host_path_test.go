@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
@@ -155,7 +156,7 @@ func TestCreater(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	creater, err := plug.NewCreater(volume.VolumeOptions{CapacityMB: 100})
+	creater, err := plug.NewCreater(volume.VolumeOptions{CapacityMB: 100, PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete})
 	if err != nil {
 		t.Errorf("Failed to make a new Creater: %v", err)
 	}
@@ -166,6 +167,18 @@ func TestCreater(t *testing.T) {
 	if pv.Spec.HostPath.Path == "" {
 		t.Errorf("Expected pv.Spec.HostPath.Path to not be empty: %#v", pv)
 	}
+	expectedCapacity := resource.NewQuantity(100*1024*1024, resource.BinarySI)
+	actualCapacity := pv.Spec.Capacity[api.ResourceStorage]
+	expectedAmt := expectedCapacity.Value()
+	actualAmt := actualCapacity.Value()
+	if expectedAmt != actualAmt {
+		t.Errorf("Expected capacity %+v but got %+v", expectedAmt, actualAmt)
+	}
+
+	if pv.Spec.PersistentVolumeReclaimPolicy != api.PersistentVolumeReclaimDelete {
+		t.Errorf("Expected reclaim policy %+v but got %+v", api.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+	}
+
 	os.RemoveAll(pv.Spec.HostPath.Path)
 }
 

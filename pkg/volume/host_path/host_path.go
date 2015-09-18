@@ -120,6 +120,9 @@ func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, err
 }
 
 func (plugin *hostPathPlugin) NewCreater(options volume.VolumeOptions) (volume.Creater, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
 	return plugin.newCreaterFunc(options, plugin.host)
 }
 
@@ -252,6 +255,8 @@ func (r *hostPathCreater) Create() (*api.PersistentVolume, error) {
 			},
 		},
 		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: r.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   r.options.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", r.options.CapacityMB)),
 			},

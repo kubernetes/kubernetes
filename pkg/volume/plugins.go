@@ -38,8 +38,16 @@ type VolumeOptions struct {
 	// This is a temporary measure in order to set the rootContext of tmpfs mounts correctly.
 	// it will be replaced and expanded on by future SecurityContext work.
 	RootContext string
+
+	// The attributes below are required by volume.Creater
+	// perhaps CreaterVolumeOptions struct?
+
 	// CapacityMB is the size in MB of a volume.
 	CapacityMB int
+	// AccessModes of a volume
+	AccessModes []api.PersistentVolumeAccessMode
+	// Reclamation policy for a persistent volume
+	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -98,7 +106,7 @@ type DeletableVolumePlugin interface {
 	NewDeleter(spec *Spec) (Deleter, error)
 }
 
-// CreatableVolumePlugin is an extended interface of VolumePlugin and is used to create persistent volumes for the cluster.
+// CreatableVolumePlugin is an extended interface of VolumePlugin and is used to create volumes for the cluster.
 type CreatableVolumePlugin interface {
 	VolumePlugin
 	// NewCreater creates a new volume.Creater which knows how to create PersistentVolumes in accordance with
