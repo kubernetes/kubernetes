@@ -1448,6 +1448,7 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 		max := map[string]resource.Quantity{}
 		defaults := map[string]resource.Quantity{}
 		defaultRequests := map[string]resource.Quantity{}
+		maxLimitRequestRatios := map[string]resource.Quantity{}
 
 		for k, q := range limit.Max {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].max[%s]", i, k))...)
@@ -1480,8 +1481,10 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 			}
 		}
 
-		for k := range limit.MaxLimitRequestRatio {
+		for k, q := range limit.MaxLimitRequestRatio {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].maxLimitRequestRatio[%s]", i, k))...)
+			keys.Insert(string(k))
+			maxLimitRequestRatios[string(k)] = q
 		}
 
 		for k := range keys {
@@ -1489,6 +1492,7 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 			maxQuantity, maxQuantityFound := max[k]
 			defaultQuantity, defaultQuantityFound := defaults[k]
 			defaultRequestQuantity, defaultRequestQuantityFound := defaultRequests[k]
+			maxRatio, maxRatioFound := maxLimitRequestRatios[k]
 
 			if minQuantityFound && maxQuantityFound && minQuantity.Cmp(maxQuantity) > 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].min[%s]", i, k), minQuantity, fmt.Sprintf("min value %s is greater than max value %s", minQuantity.String(), maxQuantity.String())))
@@ -1512,6 +1516,23 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 
 			if defaultQuantityFound && maxQuantityFound && defaultQuantity.Cmp(maxQuantity) > 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].default[%s]", i, k), maxQuantity, fmt.Sprintf("default value %s is greater than max value %s", defaultQuantity.String(), maxQuantity.String())))
+			}
+			if maxRatioFound && maxRatio.Cmp(*resource.NewQuantity(1, resource.DecimalSI)) < 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].maxLimitRequestRatio[%s]", i, k), maxRatio, fmt.Sprintf("maxLimitRequestRatio %s is less than 1", maxRatio.String())))
+			}
+			if maxRatioFound && minQuantityFound && maxQuantityFound {
+				maxRatioValue := float64(maxRatio.Value())
+				minQuantityValue := minQuantity.Value()
+				maxQuantityValue := maxQuantity.Value()
+				if maxRatio.Value() < resource.MaxMilliValue && minQuantityValue < resource.MaxMilliValue && maxQuantityValue < resource.MaxMilliValue {
+					maxRatioValue = float64(maxRatio.MilliValue()) / 1000
+					minQuantityValue = minQuantity.MilliValue()
+					maxQuantityValue = maxQuantity.MilliValue()
+				}
+				maxRatioLimit := float64(maxQuantityValue) / float64(minQuantityValue)
+				if maxRatioValue > maxRatioLimit {
+					allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].maxLimitRequestRatio[%s]", i, k), maxRatio, fmt.Sprintf("maxLimitRequestRatio %s is greater than max/min = %f", maxRatio.String(), maxRatioLimit)))
+				}
 			}
 		}
 	}
