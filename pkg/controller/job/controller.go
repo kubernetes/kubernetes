@@ -286,12 +286,12 @@ func (jm *JobController) syncJob(key string) error {
 
 	obj, exists, err := jm.jobStore.Store.GetByKey(key)
 	if !exists {
-		glog.Infof("Job has been deleted %v", key)
+		glog.V(4).Infof("Job has been deleted: %v", key)
 		jm.expectations.DeleteExpectations(key)
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve job %v from store: %v", key, err)
+		glog.Errorf("Unable to retrieve job %v from store: %v", key, err)
 		jm.queue.Add(key)
 		return err
 	}
@@ -299,7 +299,7 @@ func (jm *JobController) syncJob(key string) error {
 	if !jm.podStoreSynced() {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(replicationcontroller.PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing job %v", job.Name)
+		glog.V(4).Infof("Waiting for pods controller to sync, requeuing job %v", job.Name)
 		jm.enqueueController(&job)
 		return nil
 	}
@@ -338,7 +338,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Unsuccessful = unsuccessful
 
 		if err := jm.updateHandler(&job); err != nil {
-			glog.V(2).Infof("Failed to update job %v, requeuing", job.Name)
+			glog.Errorf("Failed to update job %v, requeuing", job.Name)
 			jm.enqueueController(&job)
 		}
 	}
@@ -373,7 +373,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 	if active > parallelism {
 		diff := active - parallelism
 		jm.expectations.ExpectDeletions(jobKey, diff)
-		glog.V(2).Infof("Too many pods running job %q, need %d, deleting %d", jobKey, parallelism, diff)
+		glog.V(4).Infof("Too many pods running job %q, need %d, deleting %d", jobKey, parallelism, diff)
 		// Sort the pods in the order such that not-ready < ready, unscheduled
 		// < scheduled, and pending < running. This ensures that we delete pods
 		// in the earlier stages whenever possible.
@@ -386,10 +386,9 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 			go func(ix int) {
 				defer wait.Done()
 				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name); err != nil {
+					defer util.HandleError(err)
 					// Decrement the expected number of deletes because the informer won't observe this deletion
-					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q", jobKey)
 					jm.expectations.DeletionObserved(jobKey)
-					util.HandleError(err)
 					activeLock.Lock()
 					active++
 					activeLock.Unlock()
@@ -407,7 +406,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 		}
 		diff -= active
 		jm.expectations.ExpectCreations(jobKey, diff)
-		glog.V(2).Infof("Too few pods running job %q, need %d, creating %d", jobKey, parallelism, diff)
+		glog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, parallelism, diff)
 
 		active += diff
 		wait := sync.WaitGroup{}
@@ -416,10 +415,9 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 			go func() {
 				defer wait.Done()
 				if err := jm.podControl.CreatePods(job.Namespace, job.Spec.Template, job); err != nil {
+					defer util.HandleError(err)
 					// Decrement the expected number of creates because the informer won't observe this pod
-					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q", jobKey)
 					jm.expectations.CreationObserved(jobKey)
-					util.HandleError(err)
 					activeLock.Lock()
 					active--
 					activeLock.Unlock()
