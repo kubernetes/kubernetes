@@ -21,7 +21,7 @@ import "hash/fnv"
 // An Untyped metric works the same as a Gauge. The only difference is that to
 // no type information is implied.
 //
-// To create Gauge instances, use NewUntyped.
+// To create Untyped instances, use NewUntyped.
 type Untyped interface {
 	Metric
 	Collector
