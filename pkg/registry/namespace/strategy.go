@@ -76,6 +76,7 @@ func (namespaceStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
+	newNamespace.Spec.NetworkPolicy = oldNamespace.Spec.NetworkPolicy
 	newNamespace.Status = oldNamespace.Status
 }
 
