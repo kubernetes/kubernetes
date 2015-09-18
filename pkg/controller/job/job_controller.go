@@ -321,14 +321,11 @@ func (jm *JobManager) syncJob(key string) error {
 
 	activePods := controller.FilterActivePods(podList.Items)
 	active := len(activePods)
-	successful, unsuccessful := getStatus(jobKey, job.Spec.Template.Spec.RestartPolicy, podList.Items)
+	successful, unsuccessful := getStatus(podList.Items)
 	if jobNeedsSync {
 		active = jm.manageJob(activePods, successful, unsuccessful, &job)
 	}
 	completions := successful
-	if job.Spec.Template.Spec.RestartPolicy == api.RestartPolicyNever {
-		completions += unsuccessful
-	}
 	if completions == *job.Spec.Completions {
 		job.Status.Conditions = append(job.Status.Conditions, newCondition())
 	}
@@ -356,11 +353,9 @@ func newCondition() experimental.JobCondition {
 	}
 }
 
-func getStatus(jobKey string, restartPolicy api.RestartPolicy, pods []api.Pod) (successful, unsuccessful int) {
+func getStatus(pods []api.Pod) (successful, unsuccessful int) {
 	successful = filterPods(pods, api.PodSucceeded)
-	if restartPolicy == api.RestartPolicyNever {
-		unsuccessful = filterPods(pods, api.PodFailed)
-	}
+	unsuccessful = filterPods(pods, api.PodFailed)
 	return
 }
 
@@ -402,10 +397,6 @@ func (jm *JobManager) manageJob(activePods []*api.Pod, successful, unsuccessful 
 	} else if active < parallelism {
 		// how many executions are left to run
 		diff := *job.Spec.Completions - successful
-		// for RestartPolicyNever we need to count unsuccessful pods as well
-		if job.Spec.Template.Spec.RestartPolicy == api.RestartPolicyNever {
-			diff -= unsuccessful
-		}
 		// limit to parallelism and count active pods as well
 		if diff > parallelism {
 			diff = parallelism
