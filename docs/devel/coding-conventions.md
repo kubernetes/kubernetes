@@ -65,19 +65,19 @@ Testing conventions
   - Unit tests must pass on OS X and Windows platforms - if you use Linux specific features, your test case must either be skipped on windows or compiled out (skipped is better when running Linux specific commands, compiled out is required when your code does not compile on Windows).
 
 Directory and file conventions
-    - Avoid package sprawl. Find an appropriate subdirectory for new packages. (See [#4851](http://issues.k8s.io/4851) for discussion.)
-      - Libraries with no more appropriate home belong in new package subdirectories of pkg/util
-    - Avoid general utility packages. Packages called "util" are suspect. Instead, derive a name that describes your desired function. For example, the utility functions dealing with waiting for operations are in the "wait" package and include functionality like Poll. So the full name is wait.Poll
-    - Go source files and directories use underscores, not dashes
-      - Package directories should generally avoid using separators as much as possible (when packages are multiple words, they usually should be in nested subdirectories).
-    - Document directories and filenames should use dashes rather than underscores
-    - Contrived examples that illustrate system features belong in /docs/user-guide or /docs/admin, depending on whether it is a feature primarily intended for users that deploy applications or cluster administrators, respectively. Actual application examples belong in /examples.
-      - Examples should also illustrate [best practices for using the system](../user-guide/config-best-practices.md)
-    - Third-party code
-      - Third-party Go code is managed using Godeps
-      - Other third-party code belongs in /third_party
-      - Third-party code must include licenses
-      - This includes modified third-party code and excerpts, as well
+  - Avoid package sprawl. Find an appropriate subdirectory for new packages. (See [#4851](http://issues.k8s.io/4851) for discussion.)
+    - Libraries with no more appropriate home belong in new package subdirectories of pkg/util
+  - Avoid general utility packages. Packages called "util" are suspect. Instead, derive a name that describes your desired function. For example, the utility functions dealing with waiting for operations are in the "wait" package and include functionality like Poll. So the full name is wait.Poll
+  - Go source files and directories use underscores, not dashes
+    - Package directories should generally avoid using separators as much as possible (when packages are multiple words, they usually should be in nested subdirectories).
+  - Document directories and filenames should use dashes rather than underscores
+  - Contrived examples that illustrate system features belong in /docs/user-guide or /docs/admin, depending on whether it is a feature primarily intended for users that deploy applications or cluster administrators, respectively. Actual application examples belong in /examples.
+    - Examples should also illustrate [best practices for using the system](../user-guide/config-best-practices.md)
+  - Third-party code
+    - Third-party Go code is managed using Godeps
+    - Other third-party code belongs in /third_party
+    - Third-party code must include licenses
+    - This includes modified third-party code and excerpts, as well
 
 Coding advice
   - Go
