@@ -2074,7 +2074,7 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 // extractMetricSamples parses the prometheus metric samples from the input string.
 func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	dec, err := expfmt.NewDecoder(strings.NewReader(metricsBlob),
-		http.Header{"Content-Type": []string{"text/plain"}}) // FIXME
+		http.Header{"Content-Type": []string{"text/plain"}})
 	if err != nil {
 		return nil, err
 	}
