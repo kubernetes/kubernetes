@@ -128,6 +128,14 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			testName:      "memory-not-allowed-with-different-format",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100M"), getResourceList("", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
+			resourceName:  api.ResourceMemory,
+			hard:          resource.MustParse("500Mi"),
+			expectedError: true,
+		},
+		{
 			testName:      "memory-no-request",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
