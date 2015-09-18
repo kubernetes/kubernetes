@@ -140,16 +140,18 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		}
 
 		masterConfig = &master.Config{
-			DatabaseStorage:    etcdStorage,
-			ExpDatabaseStorage: expEtcdStorage,
-			KubeletClient:      client.FakeKubeletClient{},
-			EnableLogsSupport:  false,
-			EnableProfiling:    true,
-			EnableUISupport:    false,
-			APIPrefix:          "/api",
-			APIGroupPrefix:     "/apis",
-			Authorizer:         apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:   admit.NewAlwaysAdmit(),
+			DatabaseStorage:      etcdStorage,
+			ExpDatabaseStorage:   expEtcdStorage,
+			KubeletClient:        client.FakeKubeletClient{},
+			EnableExp:            true,
+			EnableLogsSupport:    false,
+			EnableProfiling:      true,
+			EnableSwaggerSupport: true,
+			EnableUISupport:      false,
+			APIPrefix:            "/api",
+			APIGroupPrefix:       "/apis",
+			Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:     admit.NewAlwaysAdmit(),
 		}
 	} else {
 		etcdStorage = masterConfig.DatabaseStorage
