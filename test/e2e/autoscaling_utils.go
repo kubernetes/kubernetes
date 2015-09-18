@@ -203,7 +203,6 @@ func (rc *ResourceConsumer) CleanUp() {
 	rc.stopMem <- 0
 	expectNoError(DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
 	expectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
-	expectNoError(rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(rc.name, api.NewDeleteOptions(0)))
 }
 
 func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, replicas int, cpuLimitMillis, memLimitMb int64) {
