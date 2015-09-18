@@ -28,15 +28,15 @@ import (
 )
 
 const (
-	consumptionTimeInSeconds = 30
-	sleepTime                = 30 * time.Second
-	requestSizeInMillicores  = 100
-	requestSizeInMegabytes   = 100
-	port                     = 80
-	targetPort               = 8080
-	timeoutRC                = 120 * time.Second
-	image                    = "gcr.io/google_containers/resource_consumer:beta"
-	rcIsNil                  = "ERROR: replicationController = nil"
+	dynamicConsumptionTimeInSeconds = 30
+	staticConsumptionTimeInSeconds  = 3600
+	dynamicRequestSizeInMillicores  = 100
+	dynamicRequestSizeInMegabytes   = 100
+	port                            = 80
+	targetPort                      = 8080
+	timeoutRC                       = 120 * time.Second
+	image                           = "gcr.io/google_containers/resource_consumer:beta"
+	rcIsNil                         = "ERROR: replicationController = nil"
 )
 
 /*
@@ -48,12 +48,24 @@ rc.ConsumeCPU(300)
 // ... check your assumption here
 */
 type ResourceConsumer struct {
-	name      string
-	framework *Framework
-	cpu       chan int
-	mem       chan int
-	stopCPU   chan int
-	stopMem   chan int
+	name                     string
+	framework                *Framework
+	cpu                      chan int
+	mem                      chan int
+	stopCPU                  chan int
+	stopMem                  chan int
+	consumptionTimeInSeconds int
+	sleepTime                time.Duration
+	requestSizeInMillicores  int
+	requestSizeInMegabytes   int
+}
+
+func NewDynamicResourceConsumer(name string, replicas, initCPU, initMemory int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	return newResourceConsumer(name, replicas, initCPU, initMemory, dynamicConsumptionTimeInSeconds, dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, cpuLimit, memLimit, framework)
+}
+
+func NewStaticResourceConsumer(name string, replicas, initCPU, initMemory int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	return newResourceConsumer(name, replicas, initCPU, initMemory, staticConsumptionTimeInSeconds, initCPU/replicas, initMemory/replicas, cpuLimit, memLimit, framework)
 }
 
 /*
@@ -63,15 +75,19 @@ initMemory argument is in megabytes
 memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
-func NewResourceConsumer(name string, replicas, initCPU, initMemory int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+func newResourceConsumer(name string, replicas, initCPU, initMemory, consumptionTimeInSeconds, requestSizeInMillicores, requestSizeInMegabytes int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
 	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
-		name:      name,
-		framework: framework,
-		cpu:       make(chan int),
-		mem:       make(chan int),
-		stopCPU:   make(chan int),
-		stopMem:   make(chan int),
+		name:                     name,
+		framework:                framework,
+		cpu:                      make(chan int),
+		mem:                      make(chan int),
+		stopCPU:                  make(chan int),
+		stopMem:                  make(chan int),
+		consumptionTimeInSeconds: consumptionTimeInSeconds,
+		sleepTime:                time.Duration(consumptionTimeInSeconds) * time.Second,
+		requestSizeInMillicores:  requestSizeInMillicores,
+		requestSizeInMegabytes:   requestSizeInMegabytes,
 	}
 	go rc.makeConsumeCPURequests()
 	rc.ConsumeCPU(initCPU)
@@ -93,18 +109,22 @@ func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	var count int
 	var rest int
+	sleepTime := time.Duration(0)
 	for {
 		select {
 		case millicores := <-rc.cpu:
-			count = millicores / requestSizeInMillicores
-			rest = millicores - count*requestSizeInMillicores
+			if rc.requestSizeInMillicores != 0 {
+				count = millicores / rc.requestSizeInMillicores
+			}
+			rest = millicores - count*rc.requestSizeInMillicores
 		case <-time.After(sleepTime):
 			if count > 0 {
-				rc.sendConsumeCPURequests(count, requestSizeInMillicores, consumptionTimeInSeconds)
+				rc.sendConsumeCPURequests(count, rc.requestSizeInMillicores, rc.consumptionTimeInSeconds)
 			}
 			if rest > 0 {
-				go rc.sendOneConsumeCPURequest(rest, consumptionTimeInSeconds)
+				go rc.sendOneConsumeCPURequest(rest, rc.consumptionTimeInSeconds)
 			}
+			sleepTime = rc.sleepTime
 		case <-rc.stopCPU:
 			return
 		}
@@ -114,18 +134,22 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	var count int
 	var rest int
+	sleepTime := time.Duration(0)
 	for {
 		select {
 		case megabytes := <-rc.mem:
-			count = megabytes / requestSizeInMegabytes
-			rest = megabytes - count*requestSizeInMegabytes
+			if rc.requestSizeInMegabytes != 0 {
+				count = megabytes / rc.requestSizeInMegabytes
+			}
+			rest = megabytes - count*rc.requestSizeInMegabytes
 		case <-time.After(sleepTime):
 			if count > 0 {
-				rc.sendConsumeMemRequests(count, requestSizeInMegabytes, consumptionTimeInSeconds)
+				rc.sendConsumeMemRequests(count, rc.requestSizeInMegabytes, rc.consumptionTimeInSeconds)
 			}
 			if rest > 0 {
-				go rc.sendOneConsumeMemRequest(rest, consumptionTimeInSeconds)
+				go rc.sendOneConsumeMemRequest(rest, rc.consumptionTimeInSeconds)
 			}
+			sleepTime = rc.sleepTime
 		case <-rc.stopMem:
 			return
 		}
