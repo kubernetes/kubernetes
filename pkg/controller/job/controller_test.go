@@ -218,7 +218,7 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		// job manager setup
 		client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
-		manager := NewJobManager(client)
+		manager := NewJobController(client)
 		fakePodControl := FakePodControl{err: tc.podControllerError}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
@@ -282,7 +282,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 func TestSyncJobDeleted(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
-	manager := NewJobManager(client)
+	manager := NewJobController(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -302,7 +302,7 @@ func TestSyncJobDeleted(t *testing.T) {
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
-	manager := NewJobManager(client)
+	manager := NewJobController(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -332,7 +332,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 
 func TestJobPodLookup(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
-	manager := NewJobManager(client)
+	manager := NewJobController(client)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
 		job *experimental.Job
@@ -412,7 +412,7 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 // and checking expectations.
 func TestSyncJobExpectations(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Experimental.Version()})
-	manager := NewJobManager(client)
+	manager := NewJobController(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -449,7 +449,7 @@ func TestWatchJobs(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	client := &testclient.Fake{}
 	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobManager(client)
+	manager := NewJobController(client)
 	manager.podStoreSynced = alwaysReady
 
 	var testJob experimental.Job
@@ -512,7 +512,7 @@ func TestWatchPods(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	client := &testclient.Fake{}
 	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobManager(client)
+	manager := NewJobController(client)
 	manager.podStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store
