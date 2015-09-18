@@ -33,12 +33,12 @@ import (
 
 const basePath = "/tmp/fake"
 
-func formatMap(m map[string]string) string {
-	var l string
+func formatMap(m map[string]string) (fmtstr string) {
 	for key, value := range m {
-		l += key + "=" + fmt.Sprintf("%q", value) + "\n"
+		fmtstr += fmt.Sprintf("%v=%q\n", key, value)
 	}
-	return l
+
+	return
 }
 
 func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
