@@ -17,6 +17,11 @@ limitations under the License.
 // Package unversioned contains API types that are common to all versions.
 package unversioned
 
+type RawData struct {
+	DataAPIVersion string
+	Data           []byte
+}
+
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
 // Structures that are versioned or persisted should inline TypeMeta.
@@ -33,6 +38,8 @@ type TypeMeta struct {
 	// may reject unrecognized values.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
 	APIVersion string `json:"apiVersion,omitempty"`
+
+	Raw *RawData
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and

@@ -52,6 +52,19 @@ func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.Lis
 	return nil
 }
 
+func deepCopy_unversioned_RawData(in unversioned.RawData, out *unversioned.RawData, c *conversion.Cloner) error {
+	out.DataAPIVersion = in.DataAPIVersion
+	if in.Data != nil {
+		out.Data = make([]uint8, len(in.Data))
+		for i := range in.Data {
+			out.Data[i] = in.Data[i]
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
 func deepCopy_unversioned_Time(in unversioned.Time, out *unversioned.Time, c *conversion.Cloner) error {
 	if newVal, err := c.DeepCopy(in.Time); err != nil {
 		return err
@@ -64,6 +77,14 @@ func deepCopy_unversioned_Time(in unversioned.Time, out *unversioned.Time, c *co
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
+	if in.Raw != nil {
+		out.Raw = new(unversioned.RawData)
+		if err := deepCopy_unversioned_RawData(*in.Raw, out.Raw, c); err != nil {
+			return err
+		}
+	} else {
+		out.Raw = nil
+	}
 	return nil
 }
 
@@ -1433,6 +1454,7 @@ func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_resource_Quantity,
 		deepCopy_unversioned_ListMeta,
+		deepCopy_unversioned_RawData,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,

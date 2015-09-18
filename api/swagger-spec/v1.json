@@ -11016,6 +11016,7 @@
     "id": "v1.Binding",
     "description": "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
     "required": [
+     "Raw",
      "target"
     ],
     "properties": {
@@ -11027,6 +11028,9 @@
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
+     "Raw": {
+      "$ref": "unversioned.RawData"
+     },
      "metadata": {
       "$ref": "v1.ObjectMeta",
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
@@ -11036,6 +11040,28 @@
       "description": "The target object that you want to bind to the standard object."
      }
     }
+   },
+   "unversioned.RawData": {
+    "id": "unversioned.RawData",
+    "required": [
+     "DataAPIVersion",
+     "Data"
+    ],
+    "properties": {
+     "DataAPIVersion": {
+      "type": "string"
+     },
+     "Data": {
+      "type": "array",
+      "items": {
+       "$ref": "integer"
+      }
+     }
+    }
+   },
+   "integer": {
+    "id": "integer",
+    "properties": {}
    },
    "v1.ObjectMeta": {
     "id": "v1.ObjectMeta",
@@ -11131,6 +11157,7 @@
     "id": "v1.ComponentStatusList",
     "description": "Status of all the conditions for the component as a list of ComponentStatus objects.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11141,6 +11168,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11172,6 +11202,9 @@
    "v1.ComponentStatus": {
     "id": "v1.ComponentStatus",
     "description": "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -11180,6 +11213,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -11224,6 +11260,7 @@
     "id": "v1.EndpointsList",
     "description": "EndpointsList is a list of endpoints.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11234,6 +11271,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11252,6 +11292,7 @@
     "id": "v1.Endpoints",
     "description": "Endpoints is a collection of endpoints that implement the actual service. Example:\n  Name: \"mysvc\",\n  Subsets: [\n    {\n      Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n      Ports: [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n    },\n    {\n      Addresses: [{\"ip\": \"10.10.3.3\"}],\n      Ports: [{\"name\": \"a\", \"port\": 93}, {\"name\": \"b\", \"port\": 76}]\n    },\n ]",
     "required": [
+     "Raw",
      "subsets"
     ],
     "properties": {
@@ -11262,6 +11303,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -11362,6 +11406,9 @@
    "unversioned.Status": {
     "id": "unversioned.Status",
     "description": "Status is a return value for calls that don't return other objects.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -11370,6 +11417,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11446,6 +11496,7 @@
     "id": "v1.DeleteOptions",
     "description": "DeleteOptions may be provided when deleting an API object",
     "required": [
+     "Raw",
      "gracePeriodSeconds"
     ],
     "properties": {
@@ -11456,6 +11507,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "gracePeriodSeconds": {
       "type": "integer",
@@ -11468,6 +11522,7 @@
     "id": "v1.EventList",
     "description": "EventList is a list of events.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11478,6 +11533,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11496,6 +11554,7 @@
     "id": "v1.Event",
     "description": "Event is a report of an event somewhere in the cluster.",
     "required": [
+     "Raw",
      "metadata",
      "involvedObject"
     ],
@@ -11507,6 +11566,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -11561,6 +11623,7 @@
     "id": "v1.LimitRangeList",
     "description": "LimitRangeList is a list of LimitRange items.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11571,6 +11634,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11588,6 +11654,9 @@
    "v1.LimitRange": {
     "id": "v1.LimitRange",
     "description": "LimitRange sets resource usage limits for each kind of resource in a Namespace.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -11596,6 +11665,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -11657,6 +11729,7 @@
     "id": "v1.NamespaceList",
     "description": "NamespaceList is a list of Namespaces.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11667,6 +11740,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11684,6 +11760,9 @@
    "v1.Namespace": {
     "id": "v1.Namespace",
     "description": "Namespace provides a scope for Names. Use of multiple namespaces is optional.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -11692,6 +11771,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -11738,6 +11820,7 @@
     "id": "v1.NodeList",
     "description": "NodeList is the whole list of all Nodes which have been registered with master.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11748,6 +11831,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -11765,6 +11851,9 @@
    "v1.Node": {
     "id": "v1.Node",
     "description": "Node is a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -11773,6 +11862,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -11974,6 +12066,7 @@
     "id": "v1.PersistentVolumeClaimList",
     "description": "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -11984,6 +12077,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -12001,6 +12097,9 @@
    "v1.PersistentVolumeClaim": {
     "id": "v1.PersistentVolumeClaim",
     "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -12009,6 +12108,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -12088,6 +12190,7 @@
     "id": "v1.PersistentVolumeList",
     "description": "PersistentVolumeList is a list of PersistentVolume items.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -12098,6 +12201,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -12115,6 +12221,9 @@
    "v1.PersistentVolume": {
     "id": "v1.PersistentVolume",
     "description": "PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -12123,6 +12232,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -12512,6 +12624,7 @@
     "id": "v1.PodList",
     "description": "PodList is a list of Pods.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -12522,6 +12635,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -12539,6 +12655,9 @@
    "v1.Pod": {
     "id": "v1.Pod",
     "description": "Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -12547,6 +12666,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -13389,6 +13511,7 @@
     "id": "v1.PodTemplateList",
     "description": "PodTemplateList is a list of PodTemplates.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -13399,6 +13522,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -13416,6 +13542,9 @@
    "v1.PodTemplate": {
     "id": "v1.PodTemplate",
     "description": "PodTemplate describes a template for creating copies of a predefined pod.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -13424,6 +13553,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -13453,6 +13585,7 @@
     "id": "v1.ReplicationControllerList",
     "description": "ReplicationControllerList is a collection of replication controllers.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -13463,6 +13596,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -13480,6 +13616,9 @@
    "v1.ReplicationController": {
     "id": "v1.ReplicationController",
     "description": "ReplicationController represents the configuration of a replication controller.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -13488,6 +13627,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -13545,6 +13687,7 @@
     "id": "v1.ResourceQuotaList",
     "description": "ResourceQuotaList is a list of ResourceQuota items.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -13555,6 +13698,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -13572,6 +13718,9 @@
    "v1.ResourceQuota": {
     "id": "v1.ResourceQuota",
     "description": "ResourceQuota sets aggregate quota restrictions enforced per namespace",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -13580,6 +13729,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -13623,6 +13775,7 @@
     "id": "v1.SecretList",
     "description": "SecretList is a list of Secret.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -13633,6 +13786,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -13650,6 +13806,9 @@
    "v1.Secret": {
     "id": "v1.Secret",
     "description": "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -13658,6 +13817,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -13677,6 +13839,7 @@
     "id": "v1.ServiceAccountList",
     "description": "ServiceAccountList is a list of ServiceAccount objects",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -13687,6 +13850,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -13704,6 +13870,9 @@
    "v1.ServiceAccount": {
     "id": "v1.ServiceAccount",
     "description": "ServiceAccount binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -13712,6 +13881,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -13737,6 +13909,7 @@
     "id": "v1.ServiceList",
     "description": "ServiceList holds a list of services.",
     "required": [
+     "Raw",
      "items"
     ],
     "properties": {
@@ -13747,6 +13920,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -13764,6 +13940,9 @@
    "v1.Service": {
     "id": "v1.Service",
     "description": "Service is a named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.",
+    "required": [
+     "Raw"
+    ],
     "properties": {
      "kind": {
       "type": "string",
@@ -13772,6 +13951,9 @@
      "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "Raw": {
+      "$ref": "unversioned.RawData"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",

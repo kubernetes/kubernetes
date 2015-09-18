@@ -20,7 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"reflect"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
+
+func getRawData(obj interface{}) *unversioned.RawData {
+	return reflect.ValueOf(obj).Elem().FieldByName("Raw").Interface().(*unversioned.RawData)
+}
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
@@ -63,6 +70,10 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 
 	if _, registered := s.typeToVersion[v.Type()]; !registered {
 		return nil, fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
+	}
+	raw := getRawData(obj)
+	if raw != nil && raw.DataAPIVersion == destVersion {
+		return raw.Data, nil
 	}
 
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)

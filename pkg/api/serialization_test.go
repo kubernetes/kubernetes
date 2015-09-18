@@ -231,6 +231,18 @@ func BenchmarkDecode(b *testing.B) {
 	}
 }
 
+func BenchmarkRoundTrip(b *testing.B) {
+	pod := api.Pod{}
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer.Fuzz(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
+
+	for i := 0; i < b.N; i++ {
+		obj, _ := testapi.Default.Codec().Decode(data)
+		_, _ = testapi.Default.Codec().Encode(obj)
+	}
+}
+
 func BenchmarkDecodeInto(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
