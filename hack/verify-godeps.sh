@@ -70,7 +70,7 @@ preload-dep "github.com/prometheus" "client_golang" "692492e54b553a81013254cc1fb
 echo "Download finished"
 
 # copy the contents of your kube directory into the nice clean place
-_kubetmp="${_tmpdir}/src/k8s.io/"
+_kubetmp="${_tmpdir}/src/k8s.io"
 mkdir -p "${_kubetmp}"
 #should create ${_kubectmp}/kubernetes
 git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
@@ -78,17 +78,25 @@ _kubetmp="${_kubetmp}/kubernetes"
 
 # destroy godeps in our COPY of the kube tree
 pushd "${_kubetmp}" > /dev/null
-rm -rf ./Godeps
+  rm -rf ./Godeps
 
-# for some reason the kube tree needs to be a git repo for the godep tool to run. Doesn't make sense
-git init > /dev/null 2>&1
+  # for some reason the kube tree needs to be a git repo for the godep tool to run. Doesn't make sense
+  git init > /dev/null 2>&1
 
-# recreate the Godeps using the nice clean set we just downloaded
-"${GODEP}" save ./...
+  # recreate the Godeps using the nice clean set we just downloaded
+  "${GODEP}" save -t ./...
 popd > /dev/null
 
-# Check for any (meaninful) differences between the godeps in the tree and this nice clean one we just built
-if ! _out="$(diff -NIaupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/ ${_kubetmp}/Godeps/)"; then
+if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
+  echo "Your Godeps.json is different:"
+  echo "${_out}"
+  exit 1
+fi
+
+# Godeps/_workstapces/src/github.com/fsouza/go-dockerclient/testing/data/symlink'
+# is an intentionally broken symlink. Linux can use --no-dereference. OS X cannot.
+# So we --exclude='symlink' so diff -r doesn't die following a bad symlink.
+if ! _out="$(diff -Naupr --exclude='symlink' ${KUBE_ROOT}/Godeps/_workspace/src ${_kubetmp}/Godeps/_workspace/src)"; then
   echo "Your godeps changes are not reproducable"
   echo "${_out}"
   exit 1
