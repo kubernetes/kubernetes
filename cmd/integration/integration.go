@@ -508,7 +508,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 	if err != nil {
 		glog.Fatalf("Failed creating selflinktest service: %v", err)
 	}
-	err = c.Get().GroupVersion(client.ClientGroupVersion()).RequestURI(svc.SelfLink).Do().Into(svc)
+	err = c.Get().GroupVersion(client.Core).RequestURI(svc.SelfLink).Do().Into(svc)
 	if err != nil {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
@@ -518,7 +518,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
 
-	err = c.Get().GroupVersion(client.ClientGroupVersion()).RequestURI(svcList.SelfLink).Do().Into(svcList)
+	err = c.Get().GroupVersion(client.Core).RequestURI(svcList.SelfLink).Do().Into(svcList)
 	if err != nil {
 		glog.Fatalf("Failed listing services with supplied self link '%v': %v", svcList.SelfLink, err)
 	}
@@ -530,7 +530,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 			continue
 		}
 		found = true
-		err = c.Get().GroupVersion(client.ClientGroupVersion()).RequestURI(item.SelfLink).Do().Into(svc)
+		err = c.Get().GroupVersion(client.Core).RequestURI(item.SelfLink).Do().Into(svc)
 		if err != nil {
 			glog.Fatalf("Failed listing service with supplied self link '%v': %v", item.SelfLink, err)
 		}
@@ -681,7 +681,7 @@ func runPatchTest(c *client.Client) {
 
 	execPatch := func(pt api.PatchType, body []byte) error {
 		return c.Patch(pt).
-			GroupVersion(client.ClientGroupVersion()).
+			GroupVersion(client.Core).
 			Resource(resource).
 			Namespace(api.NamespaceDefault).
 			Name(name).

@@ -320,12 +320,12 @@ func buildDNSNameString(labels ...string) string {
 
 // Returns a cache.ListWatch that gets all changes to services.
 func createServiceLW(kubeClient *kclient.Client) *kcache.ListWatch {
-	return kcache.NewListWatchFromClient(kubeClient, "services", kclient.ClientGroupVersion(), kapi.NamespaceAll, kSelector.Everything())
+	return kcache.NewListWatchFromClient(kubeClient, "services", kclient.Core, kapi.NamespaceAll, kSelector.Everything())
 }
 
 // Returns a cache.ListWatch that gets all changes to endpoints.
 func createEndpointsLW(kubeClient *kclient.Client) *kcache.ListWatch {
-	return kcache.NewListWatchFromClient(kubeClient, "endpoints", kclient.ClientGroupVersion(), kapi.NamespaceAll, kSelector.Everything())
+	return kcache.NewListWatchFromClient(kubeClient, "endpoints", kclient.Core, kapi.NamespaceAll, kSelector.Everything())
 }
 
 func (ks *kube2sky) newService(obj interface{}) {

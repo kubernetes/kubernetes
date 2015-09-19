@@ -54,7 +54,7 @@ func newEndpoints(c *Client, namespace string) *endpoints {
 // Create creates a new endpoint.
 func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	err := c.r.Post().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
+	err := c.r.Post().GroupVersion(Core).Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
@@ -62,7 +62,7 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.r.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(c.ns).
 		Resource("endpoints").
 		LabelsSelectorParam(selector).
@@ -74,20 +74,20 @@ func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, e
 // Get returns information about the endpoints for a particular service.
 func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.r.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
+	err = c.r.Get().GroupVersion(Core).Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the endpoint, and returns an error if one occurs
 func (c *endpoints) Delete(name string) error {
-	return c.r.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("endpoints").Name(name).Do().Error()
+	return c.r.Delete().GroupVersion(Core).Namespace(c.ns).Resource("endpoints").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
 func (c *endpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Param("resourceVersion", resourceVersion).
@@ -102,7 +102,7 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
 	}
 	err := c.r.Put().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(endpoints.Name).

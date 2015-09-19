@@ -28,8 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+type GroupVersion string
+
 const (
-	clientGroupVersion = "v1"
+	// A list of group version constants that logically belong to the high level client
+	Core         = GroupVersion("v1")
+	Experimental = GroupVersion("experimental/v1alpha1")
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -202,8 +206,4 @@ func IsTimeout(err error) bool {
 
 func (c *Client) Experimental() ExperimentalInterface {
 	return c.ExperimentalClient
-}
-
-func ClientGroupVersion() string {
-	return clientGroupVersion
 }

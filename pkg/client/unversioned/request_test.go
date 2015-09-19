@@ -729,7 +729,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	defer testServer.Close()
 	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
-		GroupVersion(testapi.Default.GroupAndVersion()).
+		GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).
 		Prefix("foo", "bar").
 		Suffix("baz").
 		Timeout(time.Second).
@@ -770,7 +770,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 
 	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
 	_, err := c.Verb("POST").
-		GroupVersion(testapi.Default.GroupAndVersion()).
+		GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).
 		Prefix("foo", "bar").
 		Suffix("baz").
 		Timeout(time.Second).
@@ -828,7 +828,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
-		GroupVersion(testapi.Default.GroupAndVersion()).
+		GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).
 		Resource("bar").
 		Name("baz").
 		Prefix("foo").
@@ -871,7 +871,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
-		GroupVersion(testapi.Default.GroupAndVersion()).
+		GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).
 		Suffix("baz").
 		Name("bar").
 		Resource("foo").
@@ -929,7 +929,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
 	wasCreated := true
 	obj, err := c.Verb("POST").
-		GroupVersion(testapi.Default.GroupAndVersion()).
+		GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).
 		Prefix("foo/bar", "baz").
 		Timeout(time.Second).
 		Body(file.Name()).
@@ -977,7 +977,7 @@ func TestWasCreated(t *testing.T) {
 	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
 	wasCreated := false
 	obj, err := c.Verb("PUT").
-		GroupVersion(testapi.Default.GroupAndVersion()).
+		GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).
 		Prefix("foo/bar", "baz").
 		Timeout(time.Second).
 		Body(reqBodyExpected).

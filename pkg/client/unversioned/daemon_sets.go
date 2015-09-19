@@ -52,41 +52,41 @@ var _ DaemonSetInterface = &daemonSets{}
 
 func (c *daemonSets) List(selector labels.Selector) (result *experimental.DaemonSetList, err error) {
 	result = &experimental.DaemonSetList{}
-	err = c.r.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("daemonsets").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().GroupVersion(Core).Namespace(c.ns).Resource("daemonsets").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular daemon set.
 func (c *daemonSets) Get(name string) (result *experimental.DaemonSet, err error) {
 	result = &experimental.DaemonSet{}
-	err = c.r.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("daemonsets").Name(name).Do().Into(result)
+	err = c.r.Get().GroupVersion(Core).Namespace(c.ns).Resource("daemonsets").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new daemon set.
 func (c *daemonSets) Create(daemon *experimental.DaemonSet) (result *experimental.DaemonSet, err error) {
 	result = &experimental.DaemonSet{}
-	err = c.r.Post().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("daemonsets").Body(daemon).Do().Into(result)
+	err = c.r.Post().GroupVersion(Core).Namespace(c.ns).Resource("daemonsets").Body(daemon).Do().Into(result)
 	return
 }
 
 // Update updates an existing daemon set.
 func (c *daemonSets) Update(daemon *experimental.DaemonSet) (result *experimental.DaemonSet, err error) {
 	result = &experimental.DaemonSet{}
-	err = c.r.Put().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).Body(daemon).Do().Into(result)
+	err = c.r.Put().GroupVersion(Core).Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).Body(daemon).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing daemon set.
 func (c *daemonSets) Delete(name string) error {
-	return c.r.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("daemonsets").Name(name).Do().Error()
+	return c.r.Delete().GroupVersion(Core).Namespace(c.ns).Resource("daemonsets").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested daemon sets.
 func (c *daemonSets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Param("resourceVersion", resourceVersion).

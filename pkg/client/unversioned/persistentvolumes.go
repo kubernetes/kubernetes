@@ -52,7 +52,7 @@ func newPersistentVolumes(c *Client) *persistentVolumes {
 func (c *persistentVolumes) List(label labels.Selector, field fields.Selector) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Resource("persistentVolumes").
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -64,13 +64,13 @@ func (c *persistentVolumes) List(label labels.Selector, field fields.Selector) (
 
 func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Get().GroupVersion(clientGroupVersion).Resource("persistentVolumes").Name(name).Do().Into(result)
+	err = c.client.Get().GroupVersion(Core).Resource("persistentVolumes").Name(name).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumes) Create(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Post().GroupVersion(clientGroupVersion).Resource("persistentVolumes").Body(volume).Do().Into(result)
+	err = c.client.Post().GroupVersion(Core).Resource("persistentVolumes").Body(volume).Do().Into(result)
 	return
 }
 
@@ -80,24 +80,24 @@ func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.Pe
 		err = fmt.Errorf("invalid update object, missing resource version: %v", volume)
 		return
 	}
-	err = c.client.Put().GroupVersion(clientGroupVersion).Resource("persistentVolumes").Name(volume.Name).Body(volume).Do().Into(result)
+	err = c.client.Put().GroupVersion(Core).Resource("persistentVolumes").Name(volume.Name).Body(volume).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumes) UpdateStatus(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Put().GroupVersion(clientGroupVersion).Resource("persistentVolumes").Name(volume.Name).SubResource("status").Body(volume).Do().Into(result)
+	err = c.client.Put().GroupVersion(Core).Resource("persistentVolumes").Name(volume.Name).SubResource("status").Body(volume).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumes) Delete(name string) error {
-	return c.client.Delete().GroupVersion(clientGroupVersion).Resource("persistentVolumes").Name(name).Do().Error()
+	return c.client.Delete().GroupVersion(Core).Resource("persistentVolumes").Name(name).Do().Error()
 }
 
 func (c *persistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Resource("persistentVolumes").
 		Param("resourceVersion", resourceVersion).
 		LabelsSelectorParam(label).

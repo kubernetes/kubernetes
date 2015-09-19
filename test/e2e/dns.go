@@ -134,7 +134,7 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, c *clien
 		for _, fileName := range fileNames {
 			if _, err := c.Get().
 				Prefix("proxy").
-				GroupVersion(client.ClientGroupVersion()).
+				GroupVersion(client.Core).
 				Resource("pods").
 				Namespace(pod.Namespace).
 				Name(pod.Name).

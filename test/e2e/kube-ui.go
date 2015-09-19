@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -54,6 +55,7 @@ var _ = Describe("kube-ui", func() {
 			err := f.Client.Get().
 				Namespace(uiNamespace).
 				Prefix("proxy").
+				GroupVersion(client.Core).
 				Resource("services").
 				Name(uiServiceName).
 				Timeout(singleCallTimeout).

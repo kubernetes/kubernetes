@@ -55,14 +55,14 @@ func newPodTemplates(c *Client, namespace string) *podTemplates {
 // List takes label and field selectors, and returns the list of podTemplates that match those selectors.
 func (c *podTemplates) List(label labels.Selector, field fields.Selector) (result *api.PodTemplateList, err error) {
 	result = &api.PodTemplateList{}
-	err = c.r.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("podTemplates").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().GroupVersion(Core).Namespace(c.ns).Resource("podTemplates").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the podTemplate, and returns the corresponding PodTemplate object, and an error if it occurs
 func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
-	err = c.r.Get().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("podTemplates").Name(name).Do().Into(result)
+	err = c.r.Get().GroupVersion(Core).Namespace(c.ns).Resource("podTemplates").Name(name).Do().Into(result)
 	return
 }
 
@@ -70,26 +70,26 @@ func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 	// TODO: to make this reusable in other client libraries
 	if options == nil {
-		return c.r.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("podTemplates").Name(name).Do().Error()
+		return c.r.Delete().GroupVersion(Core).Namespace(c.ns).Resource("podTemplates").Name(name).Do().Error()
 	}
 	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
 	if err != nil {
 		return err
 	}
-	return c.r.Delete().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("podTemplates").Name(name).Body(body).Do().Error()
+	return c.r.Delete().GroupVersion(Core).Namespace(c.ns).Resource("podTemplates").Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a podTemplate.  Returns the server's representation of the podTemplate, and an error, if it occurs.
 func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
-	err = c.r.Post().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("podTemplates").Body(podTemplate).Do().Into(result)
+	err = c.r.Post().GroupVersion(Core).Namespace(c.ns).Resource("podTemplates").Body(podTemplate).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a podTemplate to update.  Returns the server's representation of the podTemplate, and an error, if it occurs.
 func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
-	err = c.r.Put().GroupVersion(clientGroupVersion).Namespace(c.ns).Resource("podTemplates").Name(podTemplate.Name).Body(podTemplate).Do().Into(result)
+	err = c.r.Put().GroupVersion(Core).Namespace(c.ns).Resource("podTemplates").Name(podTemplate.Name).Body(podTemplate).Do().Into(result)
 	return
 }
 
@@ -97,7 +97,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 func (c *podTemplates) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(c.ns).
 		Resource("podTemplates").
 		Param("resourceVersion", resourceVersion).

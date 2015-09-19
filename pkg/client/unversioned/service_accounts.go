@@ -53,7 +53,7 @@ func newServiceAccounts(c *Client, ns string) ServiceAccountsInterface {
 func (s *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
 	result := &api.ServiceAccount{}
 	err := s.client.Post().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		Body(serviceAccount).
@@ -68,7 +68,7 @@ func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*a
 	result := &api.ServiceAccountList{}
 
 	err := s.client.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		LabelsSelectorParam(label).
@@ -83,7 +83,7 @@ func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*a
 func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
 	result := &api.ServiceAccount{}
 	err := s.client.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		Name(name).
@@ -97,7 +97,7 @@ func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
 func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		Param("resourceVersion", resourceVersion).
@@ -108,7 +108,7 @@ func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, re
 
 func (s *serviceAccounts) Delete(name string) error {
 	return s.client.Delete().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		Name(name).
@@ -119,7 +119,7 @@ func (s *serviceAccounts) Delete(name string) error {
 func (s *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
 	result = &api.ServiceAccount{}
 	err = s.client.Put().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		Name(serviceAccount.Name).

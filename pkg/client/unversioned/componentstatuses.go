@@ -47,7 +47,7 @@ func newComponentStatuses(c *Client) *componentStatuses {
 func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		Resource("componentStatuses").
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -59,6 +59,6 @@ func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (
 
 func (c *componentStatuses) Get(name string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
-	err = c.client.Get().GroupVersion(clientGroupVersion).Resource("componentStatuses").Name(name).Do().Into(result)
+	err = c.client.Get().GroupVersion(Core).Resource("componentStatuses").Name(name).Do().Into(result)
 	return
 }

@@ -19,6 +19,7 @@ package resource
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -39,7 +40,7 @@ type Helper struct {
 	// True if the resource type is scoped to namespaces
 	NamespaceScoped bool
 	// The group/version pair of this resource
-	GroupVersion string
+	GroupVersion kclient.GroupVersion
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -50,7 +51,7 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 		Codec:           mapping.Codec,
 		Versioner:       mapping.MetadataAccessor,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
-		GroupVersion:    mapping.APIVersion, // should get this from mapping
+		GroupVersion:    kclient.GroupVersion(mapping.APIVersion),
 	}
 }
 

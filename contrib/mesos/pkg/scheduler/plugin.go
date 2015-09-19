@@ -844,7 +844,7 @@ func parseSelectorOrDie(s string) fields.Selector {
 
 // createAllPodsLW returns a listWatch that finds all pods
 func createAllPodsLW(cl *client.Client) *cache.ListWatch {
-	return cache.NewListWatchFromClient(cl, "pods", client.ClientGroupVersion(), api.NamespaceAll, parseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(cl, "pods", client.Core, api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 // Consumes *api.Pod, produces *Pod; the k8s reflector wants to push *api.Pod

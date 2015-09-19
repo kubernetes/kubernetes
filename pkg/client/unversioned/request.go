@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -98,9 +99,10 @@ type Request struct {
 
 	apiVersion string
 
-	// group/version
-	group      string
-	version    string
+	// group/version are set by the Group/Version/GroupVersion methods
+	group   string
+	version string
+	// a request is only valid when either group/version or absPath is set
 	setGroup   bool
 	setVersion bool
 	setAbspath bool
@@ -250,30 +252,25 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	return r
 }
 
-// Group
+// Group reads in a group string and sets the group
 func (r *Request) Group(group string) *Request {
 	r.group = group
 	r.setGroup = true
 	return r
 }
 
-// Version
+// Version reads in a version string and sets the version
 func (r *Request) Version(version string) *Request {
 	r.version = version
 	r.setVersion = true
 	return r
 }
 
-// GroupVersion reads in a group/version string and set the group and version
-func (r *Request) GroupVersion(groupVersion string) *Request {
-	groupAndVersion := strings.Split(groupVersion, "/")
-	if len(groupAndVersion) == 1 {
-		r.version = groupAndVersion[0]
-	} else {
-		r.group = groupAndVersion[0]
-		r.version = groupAndVersion[1]
-	}
+// GroupVersion reads in a GroupVersion (a group/version string) and sets the group and version
+func (r *Request) GroupVersion(groupVersion GroupVersion) *Request {
+	r.group = apiutil.GetGroup(string(groupVersion))
 	r.setGroup = true
+	r.version = apiutil.GetVersion(string(groupVersion))
 	r.setVersion = true
 	return r
 }

@@ -70,7 +70,7 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Post().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
@@ -90,7 +90,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Put().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
@@ -104,7 +104,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		LabelsSelectorParam(label).
@@ -118,7 +118,7 @@ func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventL
 func (e *events) Get(name string) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Get().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Name(name).
@@ -131,7 +131,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 func (e *events) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Param("resourceVersion", resourceVersion).
@@ -168,7 +168,7 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 // Delete deletes an existing event.
 func (e *events) Delete(name string) error {
 	return e.client.Delete().
-		GroupVersion(clientGroupVersion).
+		GroupVersion(Core).
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Name(name).

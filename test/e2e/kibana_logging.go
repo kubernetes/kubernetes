@@ -82,7 +82,7 @@ func ClusterLevelLoggingWithKibana(f *Framework) {
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		// Query against the root URL for Kibana.
 		_, err = f.Client.Get().
-			GroupVersion(client.ClientGroupVersion()).
+			GroupVersion(client.Core).
 			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").

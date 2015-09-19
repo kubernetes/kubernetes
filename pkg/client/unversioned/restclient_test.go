@@ -126,7 +126,7 @@ func TestDoRequestBearer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	err = c.Get().GroupVersion(testapi.Default.GroupAndVersion()).Do().Error()
+	err = c.Get().GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).Do().Error()
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestDoRequestWithoutPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().GroupVersion(testapi.Default.GroupAndVersion()).Prefix("test").Do().Raw()
+	body, err := c.Get().GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).Prefix("test").Do().Raw()
 	if err == nil {
 		t.Fatalf("Unexpected non-error")
 	}
@@ -194,7 +194,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().GroupVersion(testapi.Default.GroupAndVersion()).Prefix("test").Do().Raw()
+	body, err := c.Get().GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).Prefix("test").Do().Raw()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestDoRequestFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().GroupVersion(testapi.Default.GroupAndVersion()).Do().Raw()
+	body, err := c.Get().GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).Do().Raw()
 	if err == nil || body != nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
@@ -270,7 +270,7 @@ func TestDoRequestCreated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().GroupVersion(testapi.Default.GroupAndVersion()).Prefix("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().GroupVersion(GroupVersion(testapi.Default.GroupAndVersion())).Prefix("test").Do().WasCreated(&created).Raw()
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
