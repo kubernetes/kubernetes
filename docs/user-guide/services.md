@@ -392,7 +392,7 @@ If you set the `spec.type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
 Node will proxy that port (the same port number on every Node) into your `Service`.
 Here is an example of a `Service` definition of type `"NodePort"` that can be issued using the
-[`kubectl run`] (https://cloud.google.com/container-engine/docs/kubectl/create) command.
+[`kubectl run`] (https://cloud.google.com/container-engine/docs/kubectl/run) command.
 
 ```json
 {
