@@ -1550,6 +1550,14 @@ func convert_api_PodCondition_To_v1_PodCondition(in *api.PodCondition, out *PodC
 	}
 	out.Type = PodConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
+	if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
@@ -3912,6 +3920,14 @@ func convert_v1_PodCondition_To_api_PodCondition(in *PodCondition, out *api.PodC
 	}
 	out.Type = api.PodConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
+	if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
