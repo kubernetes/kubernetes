@@ -459,11 +459,8 @@ configure cloud environments that are not fully supported by Kubernetes, or even
 
 ### Type LoadBalancer
 
-On cloud providers which support external load balancers, setting the `type`
-field to `"LoadBalancer"` will provision a load balancer for your `Service`.
-The actual creation of the load balancer happens asynchronously, and
-information about the provisioned balancer will be published in the `Service`'s
-`status.loadBalancer` field.  For example:
+On cloud providers which support external load balancers, setting the `type` field to `"LoadBalancer"` will provision a load balancer for your `Service`.
+The actual creation of the load balancer happens asynchronously, and information about the provisioned balancer will be published in the `Service`'s `status.loadBalancer` field.  For example:
 
 ```json
 {
