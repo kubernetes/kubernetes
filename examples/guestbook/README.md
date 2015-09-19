@@ -577,7 +577,7 @@ redis-slave       10.0.21.92       <none>            6379/TCP      app-redis,rol
 
 You'll want to set up your guestbook service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, using the `type: LoadBalancer` spec.
 
-More generally, Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#external-services).
+More generally, Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#publishing-services---service-types).
 
 If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should shortly see it listed as well, e.g. like this:
 
