@@ -133,7 +133,7 @@ ELB has some restrictions: it requires that all nodes listen on a single port,
 and it acts as a forwarding proxy (i.e. the source IP is not preserved).  To
 work with these restrictions, in Kubernetes, [LoadBalancer
 services](../user-guide/services.html#type-loadbalancer) are exposed as
-[NodePort services](../user-guide/services.html#type-nodeport).  Then
+[NodePort services](../user-guide/services.md#type-nodeport).  Then
 kube-proxy listens externally on the cluster-wide port that's assigned to
 NodePort services and forwards traffic to the corresponding pods.  So ELB is
 configured to proxy traffic on the public port (e.g. port 80) to the NodePort
@@ -195,7 +195,7 @@ The kube-up script does a number of things in AWS:
 * Creates an S3 bucket (`AWS_S3_BUCKET`) and then copies the Kubernetes distribution
   and the salt scripts into it.  They are made world-readable and the HTTP URLs
 are passed to instances; this is how Kubernetes code gets onto the machines.
-* Creates two IAM profiles based on templates in [cluster/aws/templates/iam](../../cluster/aws/templates/iam):
+* Creates two IAM profiles based on templates in [cluster/aws/templates/iam](../../cluster/aws/templates/iam/):
     * `kubernetes-master` is used by the master
     * `kubernetes-minion` is used by nodes.
 * Creates an AWS SSH key named `kubernetes-<fingerprint>`.  Fingerprint here is
