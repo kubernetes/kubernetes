@@ -61,13 +61,12 @@
 // It also exports some stats about the HTTP usage of the /metrics
 // endpoint. (See the Handler function for more detail.)
 //
-// Two more advanced metric types are the Summary and Histogram.
+// A more advanced metric type is the Summary.
 //
-// In addition to the fundamental metric types Gauge, Counter, Summary, and
-// Histogram, a very important part of the Prometheus data model is the
-// partitioning of samples along dimensions called labels, which results in
-// metric vectors. The fundamental types are GaugeVec, CounterVec, SummaryVec,
-// and HistogramVec.
+// In addition to the fundamental metric types Gauge, Counter, and Summary, a
+// very important part of the Prometheus data model is the partitioning of
+// samples along dimensions called labels, which results in metric vectors. The
+// fundamental types are GaugeVec, CounterVec, and SummaryVec.
 //
 // Those are all the parts needed for basic usage. Detailed documentation and
 // examples are provided below.
