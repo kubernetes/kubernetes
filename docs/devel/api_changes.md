@@ -157,7 +157,7 @@ type Frobber struct {
 	Height int           `json:"height"`
 	Width  int           `json:"width"`
 	Param  string        `json:"param"`  // the first param
-	ExtraParams []string `json:"params"` // additional params
+	ExtraParams []string `json:"extraParams"` // additional params
 }
 ```
 
