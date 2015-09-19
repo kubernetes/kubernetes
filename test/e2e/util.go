@@ -50,8 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
+	"github.com/prometheus/client_golang/extraction"
+	"github.com/prometheus/client_golang/model"
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -1817,6 +1817,34 @@ type LatencyMetric struct {
 	Latency  time.Duration
 }
 
+// latencyMetricIngestor implements extraction.Ingester
+type latencyMetricIngester []LatencyMetric
+
+func (l *latencyMetricIngester) Ingest(samples model.Samples) error {
+	for _, sample := range samples {
+		// Example line:
+		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
+			continue
+		}
+
+		resource := string(sample.Metric["resource"])
+		verb := string(sample.Metric["verb"])
+		latency := sample.Value
+		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+		if err != nil {
+			return err
+		}
+		*l = append(*l, LatencyMetric{
+			verb,
+			resource,
+			quantile,
+			time.Duration(int64(latency)) * time.Microsecond,
+		})
+	}
+	return nil
+}
+
 // LatencyMetricByLatency implements sort.Interface for []LatencyMetric based on
 // the latency field.
 type LatencyMetricByLatency []LatencyMetric
@@ -1830,37 +1858,9 @@ func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	samples, err := extractMetricSamples(body)
-	if err != nil {
-		return nil, err
-	}
-
-	var metrics []LatencyMetric
-	for _, sample := range samples {
-		// Example line:
-		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
-			continue
-		}
-
-		resource := string(sample.Metric["resource"])
-		verb := string(sample.Metric["verb"])
-		latency := sample.Value
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return metrics, err
-		}
-
-		metrics = append(metrics, LatencyMetric{
-			verb,
-			resource,
-			quantile,
-			time.Duration(int64(latency)) * time.Microsecond,
-		})
-	}
-
-	return metrics, nil
+	var ingester latencyMetricIngester
+	err = extraction.Processor004.ProcessSingle(strings.NewReader(body), &ingester, &extraction.ProcessOptions{})
+	return ingester, err
 }
 
 // Prints summary metrics for request types with latency above threshold
@@ -2069,30 +2069,4 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 		Logf("Waiting for cluster size %d, current size %d, not ready nodes %d", size, numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
-}
-
-// extractMetricSamples parses the prometheus metric samples from the input string.
-func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
-	dec, err := expfmt.NewDecoder(strings.NewReader(metricsBlob),
-		http.Header{"Content-Type": []string{"text/plain"}})
-	if err != nil {
-		return nil, err
-	}
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
-	}
-
-	var samples []*model.Sample
-	for {
-		var v model.Vector
-		if err = decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return samples, nil
-			}
-			return nil, err
-		}
-		samples = append(samples, v...)
-	}
 }

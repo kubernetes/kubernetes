@@ -29,7 +29,6 @@ import (
 	"time"
 
 	cadvisor "github.com/google/cadvisor/info/v1"
-	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -39,6 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/prometheus/client_golang/extraction"
+	"github.com/prometheus/client_golang/model"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -61,13 +63,10 @@ func (a KubeletMetricByLatency) Len() int           { return len(a) }
 func (a KubeletMetricByLatency) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KubeletMetricByLatency) Less(i, j int) bool { return a[i].Latency > a[j].Latency }
 
-// ParseKubeletMetrics reads metrics from the kubelet server running on the given node
-func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
-	samples, err := extractMetricSamples(metricsBlob)
-	if err != nil {
-		return nil, err
-	}
+// KubeletMetricIngester implements extraction.Ingester
+type kubeletMetricIngester []KubeletMetric
 
+func (k *kubeletMetricIngester) Ingest(samples model.Samples) error {
 	acceptedMethods := sets.NewString(
 		metrics.PodWorkerLatencyKey,
 		metrics.PodWorkerStartLatencyKey,
@@ -79,7 +78,6 @@ func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
 		metrics.DockerErrorsKey,
 	)
 
-	var kms []KubeletMetric
 	for _, sample := range samples {
 		const prefix = metrics.KubeletSubsystem + "_"
 		metricName := string(sample.Metric[model.MetricNameLabel])
@@ -107,14 +105,16 @@ func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
 			}
 		}
 
-		kms = append(kms, KubeletMetric{
-			operation,
-			method,
-			quantile,
-			time.Duration(int64(latency)) * time.Microsecond,
-		})
+		*k = append(*k, KubeletMetric{operation, method, quantile, time.Duration(int64(latency)) * time.Microsecond})
 	}
-	return kms, nil
+	return nil
+}
+
+// ReadKubeletMetrics reads metrics from the kubelet server running on the given node
+func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
+	var ingester kubeletMetricIngester
+	err := extraction.Processor004.ProcessSingle(strings.NewReader(metricsBlob), &ingester, &extraction.ProcessOptions{})
+	return ingester, err
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
