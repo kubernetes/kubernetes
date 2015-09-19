@@ -420,11 +420,10 @@ Kubernetes will provide the port that it picked, in the kubectl command's respon
 'query' the service using the following command.That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
 
 ```bash
-kubectl get service -o template <NAME_OF_YOUR_SERVICE> -t={{.spec.ports}}
+kubectl get service -o template <NAME_OF_YOUR_SERVICE> --template={{.spec.ports}}
 ```
 
-On the other hand, if you want to create a `Service` that is going to listen on a specific port number, you can specify a value in the `spec.ports[*].nodePort` field on your create command, the system will allocate you that port or else the API transaction will fail (i.e. you need to take care about possible port collisions yourself).
-The value you specify must be in the configured range for node ports. 
+On the other hand, if you want to create a `Service` that is going to listen on a specific port number, you can specify a value in the `spec.ports[*].nodePort` field on your create command, the system will allocate you that port or else the API transaction will fail (i.e. you need to take care about possible port collisions yourself).The value you specify must be in the configured range for node ports. 
 
 Here is an example of a `Service` definition of type `"NodePort"` with a predefined port (33000) that can be issued using the [`kubectl run`] (https://cloud.google.com/container-engine/docs/kubectl/run) command.
 
