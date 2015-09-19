@@ -33,7 +33,7 @@ type Counter interface {
 
 	// Set is used to set the Counter to an arbitrary value. It is only used
 	// if you have to transfer a value from an external counter into this
-	// Prometheus metrics. Do not use it for regular handling of a
+	// Prometheus metric. Do not use it for regular handling of a
 	// Prometheus counter (as it can be used to break the contract of
 	// monotonically increasing values).
 	Set(float64)
