@@ -392,6 +392,9 @@ func ExampleSummaryVec() {
 		temps.WithLabelValues("lithobates-catesbeianus").Observe(32 + math.Floor(100*math.Cos(float64(i)*0.11))/10)
 	}
 
+	// Create a Summary without any observations.
+	temps.WithLabelValues("leiopelma-hochstetteri")
+
 	// Just for demonstration, let's check the state of the summary vector
 	// by (ab)using its Collect method and the Write method of its elements
 	// (which is usually only used by Prometheus internally - code like the
@@ -413,6 +416,26 @@ func ExampleSummaryVec() {
 
 	// Output:
 	// [label: <
+	//   name: "species"
+	//   value: "leiopelma-hochstetteri"
+	// >
+	// summary: <
+	//   sample_count: 0
+	//   sample_sum: 0
+	//   quantile: <
+	//     quantile: 0.5
+	//     value: nan
+	//   >
+	//   quantile: <
+	//     quantile: 0.9
+	//     value: nan
+	//   >
+	//   quantile: <
+	//     quantile: 0.99
+	//     value: nan
+	//   >
+	// >
+	//  label: <
 	//   name: "species"
 	//   value: "lithobates-catesbeianus"
 	// >
@@ -453,6 +476,56 @@ func ExampleSummaryVec() {
 	//   >
 	// >
 	// ]
+}
+
+func ExampleConstSummary() {
+	desc := prometheus.NewDesc(
+		"http_request_duration_seconds",
+		"A summary of the HTTP request durations.",
+		[]string{"code", "method"},
+		prometheus.Labels{"owner": "example"},
+	)
+
+	// Create a constant summary from values we got from a 3rd party telemetry system.
+	s := prometheus.MustNewConstSummary(
+		desc,
+		4711, 403.34,
+		map[float64]float64{0.5: 42.3, 0.9: 323.3},
+		"200", "get",
+	)
+
+	// Just for demonstration, let's check the state of the summary by
+	// (ab)using its Write method (which is usually only used by Prometheus
+	// internally).
+	metric := &dto.Metric{}
+	s.Write(metric)
+	fmt.Println(proto.MarshalTextString(metric))
+
+	// Output:
+	// label: <
+	//   name: "code"
+	//   value: "200"
+	// >
+	// label: <
+	//   name: "method"
+	//   value: "get"
+	// >
+	// label: <
+	//   name: "owner"
+	//   value: "example"
+	// >
+	// summary: <
+	//   sample_count: 4711
+	//   sample_sum: 403.34
+	//   quantile: <
+	//     quantile: 0.5
+	//     value: 42.3
+	//   >
+	//   quantile: <
+	//     quantile: 0.9
+	//     value: 323.3
+	//   >
+	// >
 }
 
 func ExampleHistogram() {
@@ -497,6 +570,64 @@ func ExampleHistogram() {
 	//   bucket: <
 	//     cumulative_count: 816
 	//     upper_bound: 40
+	//   >
+	// >
+}
+
+func ExampleConstHistogram() {
+	desc := prometheus.NewDesc(
+		"http_request_duration_seconds",
+		"A histogram of the HTTP request durations.",
+		[]string{"code", "method"},
+		prometheus.Labels{"owner": "example"},
+	)
+
+	// Create a constant histogram from values we got from a 3rd party telemetry system.
+	h := prometheus.MustNewConstHistogram(
+		desc,
+		4711, 403.34,
+		map[float64]uint64{25: 121, 50: 2403, 100: 3221, 200: 4233},
+		"200", "get",
+	)
+
+	// Just for demonstration, let's check the state of the histogram by
+	// (ab)using its Write method (which is usually only used by Prometheus
+	// internally).
+	metric := &dto.Metric{}
+	h.Write(metric)
+	fmt.Println(proto.MarshalTextString(metric))
+
+	// Output:
+	// label: <
+	//   name: "code"
+	//   value: "200"
+	// >
+	// label: <
+	//   name: "method"
+	//   value: "get"
+	// >
+	// label: <
+	//   name: "owner"
+	//   value: "example"
+	// >
+	// histogram: <
+	//   sample_count: 4711
+	//   sample_sum: 403.34
+	//   bucket: <
+	//     cumulative_count: 121
+	//     upper_bound: 25
+	//   >
+	//   bucket: <
+	//     cumulative_count: 2403
+	//     upper_bound: 50
+	//   >
+	//   bucket: <
+	//     cumulative_count: 3221
+	//     upper_bound: 100
+	//   >
+	//   bucket: <
+	//     cumulative_count: 4233
+	//     upper_bound: 200
 	//   >
 	// >
 }
