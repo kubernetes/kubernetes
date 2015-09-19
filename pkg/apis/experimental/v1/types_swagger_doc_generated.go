@@ -178,6 +178,76 @@ func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscalerStatus
 }
 
+var map_Ingress = map[string]string{
+	"":         "An Ingress is a way to give services externally-reachable urls. Each Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Status is the current state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (Ingress) SwaggerDoc() map[string]string {
+	return map_Ingress
+}
+
+var map_IngressBackend = map[string]string{
+	"":            "IngressBackend describes all endpoints for a given Service, port and protocol.",
+	"serviceRef":  "Specifies the referenced service.",
+	"servicePort": "Specifies the port of the referenced service.",
+	"protocol":    "Specifies the protocol of the referenced service.",
+}
+
+func (IngressBackend) SwaggerDoc() map[string]string {
+	return map_IngressBackend
+}
+
+var map_IngressList = map[string]string{
+	"":         "IngressList is a collection of Ingress.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is the list of Ingress.",
+}
+
+func (IngressList) SwaggerDoc() map[string]string {
+	return map_IngressList
+}
+
+var map_IngressPath = map[string]string{
+	"":        "IngressPath associates a path regex with an IngressBackend. Incoming urls matching the Path are forwarded to the Backend.",
+	"path":    "Path is a regex matched against the url of an incoming request.",
+	"backend": "Define the referenced service endpoint which the traffic will be forwarded to.",
+}
+
+func (IngressPath) SwaggerDoc() map[string]string {
+	return map_IngressPath
+}
+
+var map_IngressRule = map[string]string{
+	"":      "IngressRule represents the rules mapping the paths under a specified host to the related backend services.",
+	"host":  "Host is the fully qualified domain name of a network host, or its IP address as a set of four decimal digit groups separated by \".\". Conforms to RFC 1738.",
+	"paths": "Paths describe a list of load-balancer rules under the specified host.",
+}
+
+func (IngressRule) SwaggerDoc() map[string]string {
+	return map_IngressRule
+}
+
+var map_IngressSpec = map[string]string{
+	"":      "IngressSpec describes the Ingress the user wishes to exist.",
+	"rules": "A list of rules used to configure the Ingress. http://<host>:<port>/<path>?<searchpart> -> IngressBackend Where parts of the url conform to RFC 1738.",
+}
+
+func (IngressSpec) SwaggerDoc() map[string]string {
+	return map_IngressSpec
+}
+
+var map_IngressStatus = map[string]string{
+	"":             "IngressStatus describe the current state of the Ingress.",
+	"loadBalancer": "LoadBalancer contains the current status of the load-balancer.",
+}
+
+func (IngressStatus) SwaggerDoc() map[string]string {
+	return map_IngressStatus
+}
+
 var map_Job = map[string]string{
 	"":         "Job represents the configuration of a single job.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
