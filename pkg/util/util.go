@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -189,6 +190,25 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 		intstr.IntVal = 0
 		c.Fuzz(&intstr.StrVal)
 	}
+}
+
+func GetIntOrPercentValue(intStr *IntOrString) (int, bool, error) {
+	switch intStr.Kind {
+	case IntstrInt:
+		return intStr.IntVal, false, nil
+	case IntstrString:
+		s := strings.Replace(intStr.StrVal, "%", "", -1)
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, false, fmt.Errorf("invalid value %q: %v", intStr.StrVal, err)
+		}
+		return v, true, nil
+	}
+	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
+}
+
+func GetValueFromPercent(percent int, value int) int {
+	return int(math.Ceil(float64(percent) * (float64(value)) / 100))
 }
 
 // Takes a list of strings and compiles them into a list of regular expressions
