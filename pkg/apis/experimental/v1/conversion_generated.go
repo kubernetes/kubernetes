@@ -428,6 +428,32 @@ func convert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *v1.Lifecycle,
 	return nil
 }
 
+func convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalancerIngress, out *v1.LoadBalancerIngress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerIngress))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *api.LoadBalancerStatus, out *v1.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]v1.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
 func convert_api_LocalObjectReference_To_v1_LocalObjectReference(in *api.LocalObjectReference, out *v1.LocalObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LocalObjectReference))(in)
@@ -1208,6 +1234,32 @@ func convert_v1_Lifecycle_To_api_Lifecycle(in *v1.Lifecycle, out *api.Lifecycle,
 	return nil
 }
 
+func convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(in *v1.LoadBalancerIngress, out *api.LoadBalancerIngress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.LoadBalancerIngress))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(in *v1.LoadBalancerStatus, out *api.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]api.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
 func convert_v1_LocalObjectReference_To_api_LocalObjectReference(in *v1.LocalObjectReference, out *api.LocalObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.LocalObjectReference))(in)
@@ -1814,6 +1866,118 @@ func convert_experimental_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutos
 	return nil
 }
 
+func convert_experimental_Ingress_To_v1_Ingress(in *experimental.Ingress, out *Ingress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.Ingress))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_experimental_IngressSpec_To_v1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_experimental_IngressStatus_To_v1_IngressStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_experimental_IngressBackend_To_v1_IngressBackend(in *experimental.IngressBackend, out *IngressBackend, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressBackend))(in)
+	}
+	if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ServiceRef, &out.ServiceRef, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
+		return err
+	}
+	out.Protocol = v1.Protocol(in.Protocol)
+	return nil
+}
+
+func convert_experimental_IngressList_To_v1_IngressList(in *experimental.IngressList, out *IngressList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Ingress, len(in.Items))
+		for i := range in.Items {
+			if err := convert_experimental_Ingress_To_v1_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressPath_To_v1_IngressPath(in *experimental.IngressPath, out *IngressPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressPath))(in)
+	}
+	out.Path = in.Path
+	if err := convert_experimental_IngressBackend_To_v1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_experimental_IngressRule_To_v1_IngressRule(in *experimental.IngressRule, out *IngressRule, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressRule))(in)
+	}
+	out.Host = in.Host
+	if in.Paths != nil {
+		out.Paths = make([]IngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := convert_experimental_IngressPath_To_v1_IngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressSpec_To_v1_IngressSpec(in *experimental.IngressSpec, out *IngressSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressSpec))(in)
+	}
+	if in.Rules != nil {
+		out.Rules = make([]IngressRule, len(in.Rules))
+		for i := range in.Rules {
+			if err := convert_experimental_IngressRule_To_v1_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressStatus_To_v1_IngressStatus(in *experimental.IngressStatus, out *IngressStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressStatus))(in)
+	}
+	if err := convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_experimental_Job_To_v1_Job(in *experimental.Job, out *Job, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.Job))(in)
@@ -2330,6 +2494,118 @@ func convert_v1_HorizontalPodAutoscalerStatus_To_experimental_HorizontalPodAutos
 	return nil
 }
 
+func convert_v1_Ingress_To_experimental_Ingress(in *Ingress, out *experimental.Ingress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Ingress))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_IngressSpec_To_experimental_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_IngressStatus_To_experimental_IngressStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_IngressBackend_To_experimental_IngressBackend(in *IngressBackend, out *experimental.IngressBackend, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressBackend))(in)
+	}
+	if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ServiceRef, &out.ServiceRef, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
+		return err
+	}
+	out.Protocol = api.Protocol(in.Protocol)
+	return nil
+}
+
+func convert_v1_IngressList_To_experimental_IngressList(in *IngressList, out *experimental.IngressList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]experimental.Ingress, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Ingress_To_experimental_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_IngressPath_To_experimental_IngressPath(in *IngressPath, out *experimental.IngressPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressPath))(in)
+	}
+	out.Path = in.Path
+	if err := convert_v1_IngressBackend_To_experimental_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_IngressRule_To_experimental_IngressRule(in *IngressRule, out *experimental.IngressRule, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressRule))(in)
+	}
+	out.Host = in.Host
+	if in.Paths != nil {
+		out.Paths = make([]experimental.IngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := convert_v1_IngressPath_To_experimental_IngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func convert_v1_IngressSpec_To_experimental_IngressSpec(in *IngressSpec, out *experimental.IngressSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressSpec))(in)
+	}
+	if in.Rules != nil {
+		out.Rules = make([]experimental.IngressRule, len(in.Rules))
+		for i := range in.Rules {
+			if err := convert_v1_IngressRule_To_experimental_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
+	return nil
+}
+
+func convert_v1_IngressStatus_To_experimental_IngressStatus(in *IngressStatus, out *experimental.IngressStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressStatus))(in)
+	}
+	if err := convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1_Job_To_experimental_Job(in *Job, out *experimental.Job, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Job))(in)
@@ -2643,6 +2919,8 @@ func init() {
 		convert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
 		convert_api_Lifecycle_To_v1_Lifecycle,
+		convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
+		convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		convert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector,
@@ -2671,6 +2949,13 @@ func init() {
 		convert_experimental_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
 		convert_experimental_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
 		convert_experimental_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
+		convert_experimental_IngressBackend_To_v1_IngressBackend,
+		convert_experimental_IngressList_To_v1_IngressList,
+		convert_experimental_IngressPath_To_v1_IngressPath,
+		convert_experimental_IngressRule_To_v1_IngressRule,
+		convert_experimental_IngressSpec_To_v1_IngressSpec,
+		convert_experimental_IngressStatus_To_v1_IngressStatus,
+		convert_experimental_Ingress_To_v1_Ingress,
 		convert_experimental_JobCondition_To_v1_JobCondition,
 		convert_experimental_JobList_To_v1_JobList,
 		convert_experimental_JobSpec_To_v1_JobSpec,
@@ -2718,12 +3003,21 @@ func init() {
 		convert_v1_HorizontalPodAutoscaler_To_experimental_HorizontalPodAutoscaler,
 		convert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,
+		convert_v1_IngressBackend_To_experimental_IngressBackend,
+		convert_v1_IngressList_To_experimental_IngressList,
+		convert_v1_IngressPath_To_experimental_IngressPath,
+		convert_v1_IngressRule_To_experimental_IngressRule,
+		convert_v1_IngressSpec_To_experimental_IngressSpec,
+		convert_v1_IngressStatus_To_experimental_IngressStatus,
+		convert_v1_Ingress_To_experimental_Ingress,
 		convert_v1_JobCondition_To_experimental_JobCondition,
 		convert_v1_JobList_To_experimental_JobList,
 		convert_v1_JobSpec_To_experimental_JobSpec,
 		convert_v1_JobStatus_To_experimental_JobStatus,
 		convert_v1_Job_To_experimental_Job,
 		convert_v1_Lifecycle_To_api_Lifecycle,
+		convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
+		convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector,
