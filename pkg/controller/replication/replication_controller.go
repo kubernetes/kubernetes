@@ -75,23 +75,22 @@ type ReplicationManager struct {
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(rcKey string) error
 
-	// podStoreSynced returns true if the pod store has been synced at least once.
-	// Added as a member to the struct to allow injection for testing.
-	podStoreSynced func() bool
-
 	// A TTLCache of pod creates/deletes each rc expects to see
 	expectations controller.ControllerExpectationsInterface
 
 	// A store of replication controllers, populated by the rcController
 	rcStore cache.StoreToReplicationControllerLister
-
-	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
 	// Watches changes to all replication controllers
 	rcController *framework.Controller
+	// A store of pods, populated by the podController
+	podStore cache.StoreToPodLister
 	// Watches changes to all pods
 	podController *framework.Controller
-	// Controllers that need to be updated
+	// podStoreSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	podStoreSynced func() bool
+
+	// Controllers that need to be synced
 	queue *workqueue.Type
 }
 
@@ -126,12 +125,18 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				// We only really need to do this when spec changes, but for correctness it is safer to
-				// periodically double check. It is overkill for 2 reasons:
-				// 1. Status.Replica updates will cause a sync
-				// 2. Every 30s we will get a full resync (this will happen anyway every 5 minutes when pods relist)
-				// However, it shouldn't be that bad as rcs that haven't met expectations won't sync, and all
-				// the listing is done using local stores.
+				// You might imagine that we only really need to enqueue the
+				// controller when Spec changes, but it is safer to sync any
+				// time this function is triggered. That way a full informer
+				// resync can requeue any controllers that don't yet have pods
+				// but whose last attempts at creating a pod have failed (since
+				// we don't block on creation of pods) instead of those
+				// controllers stalling indefinitely. Enqueueing every time
+				// does result in some spurious syncs (like when Status.Replica
+				// is updated and the watch notification from it retriggers
+				// this function), but in general extra resyncs shouldn't be
+				// that bad as rcs that haven't met expectations yet won't
+				// sync, and all the listing is done using local stores.
 				oldRC := old.(*api.ReplicationController)
 				curRC := cur.(*api.ReplicationController)
 				if oldRC.Status.Replicas != curRC.Status.Replicas {
