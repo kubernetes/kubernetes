@@ -120,10 +120,10 @@ function clear-kubeconfig() {
 
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" delete rc --all
-  "${kubectl}" delete pods --all
-  "${kubectl}" delete svc --all
-  "${kubectl}" delete pvc --all
+  "${kubectl}" delete rc --all || true
+  "${kubectl}" delete pods --all || true
+  "${kubectl}" delete svc --all || true
+  "${kubectl}" delete pvc --all || true
 }
 
 # Gets username, password for the current-context in kubeconfig, if they exist.
