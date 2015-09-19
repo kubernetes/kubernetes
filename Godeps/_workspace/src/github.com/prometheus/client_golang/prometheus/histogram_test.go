@@ -124,10 +124,6 @@ func BenchmarkHistogramWrite8(b *testing.B) {
 var testBuckets = []float64{-2, -1, -0.5, 0, 0.5, 1, 2, math.Inf(+1)}
 
 func TestHistogramConcurrency(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping test in short mode.")
-	}
-	
 	rand.Seed(42)
 
 	it := func(n uint32) bool {
@@ -202,10 +198,6 @@ func TestHistogramConcurrency(t *testing.T) {
 }
 
 func TestHistogramVecConcurrency(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping test in short mode.")
-	}
-
 	rand.Seed(42)
 
 	objectives := make([]float64, 0, len(DefObjectives))
