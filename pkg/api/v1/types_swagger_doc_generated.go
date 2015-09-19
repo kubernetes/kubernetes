@@ -898,9 +898,13 @@ func (PodAttachOptions) SwaggerDoc() map[string]string {
 }
 
 var map_PodCondition = map[string]string{
-	"":       "PodCondition contains details for the current condition of this pod.",
-	"type":   "Type is the type of the condition. Currently only Ready. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions",
-	"status": "Status is the status of the condition. Can be True, False, Unknown. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions",
+	"":                   "PodCondition contains details for the current condition of this pod.",
+	"type":               "Type is the type of the condition. Currently only Ready. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions",
+	"status":             "Status is the status of the condition. Can be True, False, Unknown. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions",
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, one-word, CamelCase reason for the condition's last transition.",
+	"message":            "Human-readable message indicating details about last transition.",
 }
 
 func (PodCondition) SwaggerDoc() map[string]string {

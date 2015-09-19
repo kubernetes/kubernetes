@@ -13139,16 +13139,20 @@
       "description": "Status is the status of the condition. Can be True, False, Unknown. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions"
      },
      "lastProbeTime": {
-      "type": "string"
+      "type": "string",
+      "description": "Last time we probed the condition."
      },
      "lastTransitionTime": {
-      "type": "string"
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
      },
      "reason": {
-      "type": "string"
+      "type": "string",
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition."
      },
      "message": {
-      "type": "string"
+      "type": "string",
+      "description": "Human-readable message indicating details about last transition."
      }
     }
    },
