@@ -6,12 +6,24 @@ ul, ul ul {
 	padding: 0;
 	list-style: none;
 }
+.navbuttonarrow {
+    position: fixed;
+    top: 70px;
+    height: 73px;
+    width: 40px;
+    padding-top: $searchboxpadding;
+    padding-left: $searchboxpadding;
+    padding-bottom: $searchboxpadding;
+    background: white;
+    z-index: $zNav;
+    img {
+        margin-top: 11px;
+        margin-left: $searchboxpadding - 1px;
+    }
+}
 #wrapper {
 	position: fixed;
-	top: 155px;
-	left: 0px;
-	float:left;
-	width: 250px;
+	left: 3px;
 	bottom: 0px;
 	overflow: auto;
 	padding-bottom: 20px;
@@ -91,23 +103,23 @@ ul, ul ul {
     font-weight: normal;
 	margin-left:.6em;
 }
-
 #gcse-searchbox {
-  background-color: #fff;
-  padding: 13px;
-  position: fixed;
-  z-index: 1;
+    position: fixed;
+    top: 70px;
+    height: $searchboxheight;
+    padding: $searchboxpadding;
+    background: $white;
+    z-index: $zNav;
 }
-
 /* Restore gcse default styles. */
 /* TODO: Don't overwrite root styles. This should not be necessary. */
 .gcse-wrapper * {
-  -webkit-box-sizing: content-box;
-  box-sizing: content-box;
+    -webkit-box-sizing: content-box;
+    box-sizing: content-box;
 }
 .gcse-wrapper .gsc-cursor-page.gsc-cursor-current-page {
-  color: #fff !important;
+    color: #fff !important;
 }
 .gcse-wrapper b {
-  font-weight: bold;
+    font-weight: bold;
 }

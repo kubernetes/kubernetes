@@ -104,3 +104,9 @@ $fontsMuli: 'Roboto', sans-serif;
 $zContent: 100;
 $zModal: 1000;
 $zNav: 500;
+
+// Variables so that the settings in navigation.scss, md.scss, sm.scss, and xs.scss keep in sync
+// Searcbox padding
+$searchboxpadding: 13px;
+// Height of searchbox (47px) plus padding top and bottom
+$searchboxheight: ($searchboxpadding * 2) + 47px;
