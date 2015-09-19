@@ -22,7 +22,7 @@ import (
 
 func TestGetRegion(t *testing.T) {
 	gce := &GCECloud{
-		zone: "us-central1-b",
+		zone: "us-central1-f",
 	}
 	zones, ok := gce.Zones()
 	if !ok {

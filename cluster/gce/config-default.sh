@@ -17,7 +17,7 @@
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
-ZONE=${KUBE_GCE_ZONE:-us-central1-b}
+ZONE=${KUBE_GCE_ZONE:-us-central1-f}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-1}
 MINION_SIZE=${MINION_SIZE:-n1-standard-1}
 NUM_MINIONS=${NUM_MINIONS:-4}
