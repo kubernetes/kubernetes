@@ -54,6 +54,7 @@ install:
   - ./hack/verify-generated-conversions.sh
   - ./hack/verify-generated-deep-copies.sh
   - ./hack/verify-generated-docs.sh
+  - ./hack/verify-generated-swagger-docs.sh
   - ./hack/verify-swagger-spec.sh
   - ./hack/verify-linkcheck.sh
 
