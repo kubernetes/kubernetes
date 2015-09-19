@@ -37,7 +37,7 @@ This document provides high-level insight into how Kubernetes works on AWS and
 maps to AWS objects.  We assume that you are familiar with AWS.
 
 We encourage you to use [kube-up](../getting-started-guides/aws.md) (or
-[CloudFormation](../getting-started-guides/aws-coreos.md) to create clusters on
+[CloudFormation](../getting-started-guides/aws-coreos.md)) to create clusters on
 AWS. We recommend that you avoid manual configuration but are aware that
 sometimes it's the only option.
 
@@ -63,7 +63,7 @@ kube-proxy relays traffic between the nodes etc).
 By default on AWS:
 
 * Instances run Ubuntu 15.04 (the official AMI).  It includes a sufficiently
-  modern kernel that parise well with Docker and doesn't require a
+  modern kernel that pairs well with Docker and doesn't require a
   reboot.  (The default SSH user is `ubuntu` for this and other ubuntu images.)
 * By default we run aufs over ext4 as the filesystem / container storage on the
   nodes (mostly because this is what GCE uses).
@@ -73,39 +73,36 @@ kube-up.
 
 ### Storage
 
-AWS supports persistent volumes by using [Elastic Block Store
-(EBS)](../user-guide/volumes.md#awselasticblockstore).  These can then be
+AWS supports persistent volumes by using [Elastic Block Store (EBS)](../user-guide/volumes.md#awselasticblockstore).  These can then be
 attached to pods that should store persistent data (e.g. if you're running a
 database).
 
-By default, nodes in AWS use `[instance
-storage](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html)'
+By default, nodes in AWS use [instance storage](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html)
 unless you create pods with persistent volumes
-`[(EBS)](../user-guide/volumes.md#awselasticblockstore)`.  In general,
-Kubernetes containers do not have persistent storage unless you attach a
-persistent volume, and so nodes on AWS use instance storage.  Instance
-storage is cheaper, often faster, and historically more reliable.  This does
-mean that you should pick an instance type that has sufficient instance
-storage, unless you can make do with whatever space is left on your root
-partition.
+[(EBS)](../user-guide/volumes.md#awselasticblockstore).  In general, Kubernetes
+containers do not have persistent storage unless you attach a persistent
+volume, and so nodes on AWS use instance storage.  Instance storage is cheaper,
+often faster, and historically more reliable.  This does mean that you should
+pick an instance type that has sufficient instance storage, unless you can make
+do with whatever space is left on your root partition.
 
-Note: Master uses a persistent volume ([etcd](architecture.html#etcd)) to track
-its state but similar to the nodes, container are mostly run against instance
+Note: The master uses a persistent volume ([etcd](architecture.md#etcd)) to track
+its state but similar to the nodes, containers are mostly run against instance
 storage, except that we repoint some important data onto the peristent volume.
 
-The default storage driver for Docker images is aufs.  Passing the environment
-variable `DOCKER_STORAGE=btrfs` is also a good choice for a filesystem.  btrfs
+The default storage driver for Docker images is aufs.  Specifying btrfs (by passing the environment
+variable `DOCKER_STORAGE=btrfs` to kube-up) is also a good choice for a filesystem.  btrfs
 is relatively reliable with Docker and has improved its reliability with modern
 kernels.  It can easily span multiple volumes, which is particularly useful
 when we are using an instance type with multiple ephemeral instance disks.
 
 ### AutoScaling
 
-Nodes (except for the master) are run in an
-`[AutoScalingGroup](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html)
+Nodes (but not the master) are run in an
+[AutoScalingGroup](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html)
 on AWS.  Currently auto-scaling (e.g. based on CPU) is not actually enabled
 ([#11935](http://issues.k8s.io/11935)).  Instead, the auto-scaling group means
-that AWS will relaunch any non-master nodes that are terminated.
+that AWS will relaunch any nodes that are terminated.
 
 We do not currently run the master in an AutoScalingGroup, but we should
 ([#11934](http://issues.k8s.io/11934)).
@@ -134,9 +131,9 @@ pods.
 
 ELB has some restrictions: it requires that all nodes listen on a single port,
 and it acts as a forwarding proxy (i.e. the source IP is not preserved).  To
-work with these restrictions, in Kubernetes, `[LoadBalancer
-services](../user-guide/services.html#type-loadbalancer)` are exposed as
-`[NodePort services](../user-guide/services.html#type-nodeport)`.  Then
+work with these restrictions, in Kubernetes, [LoadBalancer
+services](../user-guide/services.html#type-loadbalancer) are exposed as
+[NodePort services](../user-guide/services.html#type-nodeport).  Then
 kube-proxy listens externally on the cluster-wide port that's assigned to
 NodePort services and forwards traffic to the corresponding pods.  So ELB is
 configured to proxy traffic on the public port (e.g. port 80) to the NodePort
@@ -155,18 +152,18 @@ will likely have to open the port in the node security group
 
 kube-proxy sets up two IAM roles, one for the master called
 [kubernetes-master](../../cluster/aws/templates/iam/kubernetes-master-policy.json)
-and one for the non-master nodes called
+and one for the nodes called
 [kubernetes-minion](../../cluster/aws/templates/iam/kubernetes-minion-policy.json).
 
 The master is responsible for creating ELBs and configuring them, as well as
 setting up advanced VPC routing.  Currently it has blanket permissions on EC2,
 along with rights to create and destroy ELBs.
 
-The (non-master) nodes do not need a lot of access to the AWS APIs.  They need to download
+The nodes do not need a lot of access to the AWS APIs.  They need to download
 a distribution file, and then are responsible for attaching and detaching EBS
 volumes from itself.
 
-The (non-master) node policy is relatively minimal.  The master policy is probably overly
+The node policy is relatively minimal.  The master policy is probably overly
 permissive.  The security concious may want to lock-down the IAM policies
 further ([#11936](http://issues.k8s.io/11936)).
 
@@ -198,9 +195,9 @@ The kube-up script does a number of things in AWS:
 * Creates an S3 bucket (`AWS_S3_BUCKET`) and then copies the Kubernetes distribution
   and the salt scripts into it.  They are made world-readable and the HTTP URLs
 are passed to instances; this is how Kubernetes code gets onto the machines.
-* Creates two IAM profiles based on templates in `cluster/aws/templates/iam`:
-    * `kubernetes-master` is used by the master node
-    * `kubernetes-minion` is used by non-master nodes.
+* Creates two IAM profiles based on templates in [cluster/aws/templates/iam](../../cluster/aws/templates/iam):
+    * `kubernetes-master` is used by the master
+    * `kubernetes-minion` is used by nodes.
 * Creates an AWS SSH key named `kubernetes-<fingerprint>`.  Fingerprint here is
   the OpenSSH key fingerprint, so that multiple users can run the script with
 different keys and their keys will not collide (with near-certainty). It will
@@ -215,22 +212,22 @@ one there.  (With the default ubuntu images, if you have to SSH in: the user is
 * Creates a subnet (with a CIDR of 172.20.0.0/24) in the AZ `KUBE_AWS_ZONE`
   (defaults to us-west-2a).  Currently, each Kubernetes cluster runs in a
 single AZ on AWS. Although, there are two philosophies in discussion on how to
-achieve High Availability (HA):  
+achieve High Availability (HA):
      * cluster-per-AZ: An independent cluster for each AZ, where each cluster
-       is entirely separate. 
-     * cross-AZ-clusters: A single cluster spans multiple AZs. 
+       is entirely separate.
+     * cross-AZ-clusters: A single cluster spans multiple AZs.
 The debate is open here, where cluster-per-AZ is discussed as more robust but
-cross-AZ-clusters are more convenient. 
+cross-AZ-clusters are more convenient.
 * Associates the subnet to the route table
-* Creates security groups for the master node (`kubernetes-master-<clusterid>`)
-  and the non-master nodes (`kubernetes-minion-<clusterid>`)
+* Creates security groups for the master (`kubernetes-master-<clusterid>`)
+  and the nodes (`kubernetes-minion-<clusterid>`)
 * Configures security groups so that masters and nodes can communicate. This
   includes intercommunication between masters and nodes, opening SSH publicly
 for both masters and nodes, and opening port 443 on the master for the HTTPS
 API endpoints.
-* Creates an EBS volume for the master node of size `MASTER_DISK_SIZE` and type
+* Creates an EBS volume for the master of size `MASTER_DISK_SIZE` and type
   `MASTER_DISK_TYPE`
-* Launches a master node with a fixed IP address (172.20.0.9) that is also
+* Launches a master with a fixed IP address (172.20.0.9) that is also
   configured for the security group and all the necessary IAM credentials. An
 instance script is used to pass vital configuration information to Salt. Note:
 The hope is that over time we can reduce the amount of configuration
@@ -251,17 +248,17 @@ is not required.
 
 
 If attempting this configuration manually, I highly recommend following along
-with the kube-up script, and being sure to tag everything with a
-`KubernetesCluster`=`<clusterid>` tag.  Also, passing the right configuration
-options to Salt when not using the script is tricky: the plan here is to
-simplify this by having Kubernetes take on more node configuration, and even
-potentially remove Salt altogether.
+with the kube-up script, and being sure to tag everything with a tag with name
+`KubernetesCluster` and value set to a unique cluster-id.  Also, passing the
+right configuration options to Salt when not using the script is tricky: the
+plan here is to simplify this by having Kubernetes take on more node
+configuration, and even potentially remove Salt altogether.
 
 
 ### Manual infrastructure creation
 
 While this work is not yet complete, advanced users might choose to manually
-certain AWS objects while still making use of the kube-up script (to configure
+create certain AWS objects while still making use of the kube-up script (to configure
 Salt, for example).  These objects can currently be manually created:
 
 * Set the `AWS_S3_BUCKET` environment variable to use an existing S3 bucket.
