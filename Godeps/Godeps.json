@@ -154,7 +154,7 @@
 		},
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
-			"Comment": "v1.0.3-2-g71acacd",
+			"Comment": "v1.0.4",
 			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
 		},
 		{
@@ -516,6 +516,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
+			"Comment": "v0.0.1-99-g8e7dc10",
 			"Rev": "8e7dc108ab3a1ab6ce6d922bbaff5657b88e8e49"
 		},
 		{
