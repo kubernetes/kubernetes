@@ -2,6 +2,7 @@
 package endpoints
 
 //go:generate go run ../model/cli/gen-endpoints/main.go endpoints.json endpoints_map.go
+//go:generate gofmt -s -w endpoints_map.go
 
 import "strings"
 
