@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/internal/protocol/rest"
-
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/internal/protocol/rest"
 )
 
 const (
@@ -34,18 +34,17 @@ var ignoredHeaders = map[string]bool{
 }
 
 type signer struct {
-	Request         *http.Request
-	Time            time.Time
-	ExpireTime      time.Duration
-	ServiceName     string
-	Region          string
-	AccessKeyID     string
-	SecretAccessKey string
-	SessionToken    string
-	Query           url.Values
-	Body            io.ReadSeeker
-	Debug           uint
-	Logger          io.Writer
+	Request     *http.Request
+	Time        time.Time
+	ExpireTime  time.Duration
+	ServiceName string
+	Region      string
+	CredValues  credentials.Value
+	Credentials *credentials.Credentials
+	Query       url.Values
+	Body        io.ReadSeeker
+	Debug       aws.LogLevelType
+	Logger      aws.Logger
 
 	isPresign          bool
 	formattedTime      string
@@ -65,21 +64,16 @@ type signer struct {
 // Will sign the requests with the service config's Credentials object
 // Signing is skipped if the credentials is the credentials.AnonymousCredentials
 // object.
-func Sign(req *aws.Request) {
+func Sign(req *request.Request) {
 	// If the request does not need to be signed ignore the signing of the
 	// request if the AnonymousCredentials object is used.
 	if req.Service.Config.Credentials == credentials.AnonymousCredentials {
 		return
 	}
-	creds, err := req.Service.Config.Credentials.Get()
-	if err != nil {
-		req.Error = err
-		return
-	}
 
 	region := req.Service.SigningRegion
 	if region == "" {
-		region = req.Service.Config.Region
+		region = aws.StringValue(req.Service.Config.Region)
 	}
 
 	name := req.Service.SigningName
@@ -88,53 +82,86 @@ func Sign(req *aws.Request) {
 	}
 
 	s := signer{
-		Request:         req.HTTPRequest,
-		Time:            req.Time,
-		ExpireTime:      req.ExpireTime,
-		Query:           req.HTTPRequest.URL.Query(),
-		Body:            req.Body,
-		ServiceName:     name,
-		Region:          region,
-		AccessKeyID:     creds.AccessKeyID,
-		SecretAccessKey: creds.SecretAccessKey,
-		SessionToken:    creds.SessionToken,
-		Debug:           req.Service.Config.LogLevel,
-		Logger:          req.Service.Config.Logger,
+		Request:     req.HTTPRequest,
+		Time:        req.Time,
+		ExpireTime:  req.ExpireTime,
+		Query:       req.HTTPRequest.URL.Query(),
+		Body:        req.Body,
+		ServiceName: name,
+		Region:      region,
+		Credentials: req.Service.Config.Credentials,
+		Debug:       req.Service.Config.LogLevel.Value(),
+		Logger:      req.Service.Config.Logger,
 	}
-	s.sign()
-	return
+
+	req.Error = s.sign()
 }
 
-func (v4 *signer) sign() {
+func (v4 *signer) sign() error {
 	if v4.ExpireTime != 0 {
 		v4.isPresign = true
 	}
 
+	if v4.isRequestSigned() {
+		if !v4.Credentials.IsExpired() {
+			// If the request is already signed, and the credentials have not
+			// expired yet ignore the signing request.
+			return nil
+		}
+
+		// The credentials have expired for this request. The current signing
+		// is invalid, and needs to be request because the request will fail.
+		if v4.isPresign {
+			v4.removePresign()
+			// Update the request's query string to ensure the values stays in
+			// sync in the case retrieving the new credentials fails.
+			v4.Request.URL.RawQuery = v4.Query.Encode()
+		}
+	}
+
+	var err error
+	v4.CredValues, err = v4.Credentials.Get()
+	if err != nil {
+		return err
+	}
+
 	if v4.isPresign {
 		v4.Query.Set("X-Amz-Algorithm", authHeaderPrefix)
-		if v4.SessionToken != "" {
-			v4.Query.Set("X-Amz-Security-Token", v4.SessionToken)
+		if v4.CredValues.SessionToken != "" {
+			v4.Query.Set("X-Amz-Security-Token", v4.CredValues.SessionToken)
 		} else {
 			v4.Query.Del("X-Amz-Security-Token")
 		}
-	} else if v4.SessionToken != "" {
-		v4.Request.Header.Set("X-Amz-Security-Token", v4.SessionToken)
+	} else if v4.CredValues.SessionToken != "" {
+		v4.Request.Header.Set("X-Amz-Security-Token", v4.CredValues.SessionToken)
 	}
 
 	v4.build()
 
-	if v4.Debug > 0 {
-		out := v4.Logger
-		fmt.Fprintf(out, "---[ CANONICAL STRING  ]-----------------------------\n")
-		fmt.Fprintln(out, v4.canonicalString)
-		fmt.Fprintf(out, "---[ STRING TO SIGN ]--------------------------------\n")
-		fmt.Fprintln(out, v4.stringToSign)
-		if v4.isPresign {
-			fmt.Fprintf(out, "---[ SIGNED URL ]--------------------------------\n")
-			fmt.Fprintln(out, v4.Request.URL)
-		}
-		fmt.Fprintf(out, "-----------------------------------------------------\n")
+	if v4.Debug.Matches(aws.LogDebugWithSigning) {
+		v4.logSigningInfo()
 	}
+
+	return nil
+}
+
+const logSignInfoMsg = `DEBUG: Request Signiture:
+---[ CANONICAL STRING  ]-----------------------------
+%s
+---[ STRING TO SIGN ]--------------------------------
+%s%s
+-----------------------------------------------------`
+const logSignedURLMsg = `
+---[ SIGNED URL ]------------------------------------
+%s`
+
+func (v4 *signer) logSigningInfo() {
+	signedURLMsg := ""
+	if v4.isPresign {
+		signedURLMsg = fmt.Sprintf(logSignedURLMsg, v4.Request.URL.String())
+	}
+	msg := fmt.Sprintf(logSignInfoMsg, v4.canonicalString, v4.stringToSign, signedURLMsg)
+	v4.Logger.Log(msg)
 }
 
 func (v4 *signer) build() {
@@ -152,7 +179,7 @@ func (v4 *signer) build() {
 		v4.Request.URL.RawQuery += "&X-Amz-Signature=" + v4.signature
 	} else {
 		parts := []string{
-			authHeaderPrefix + " Credential=" + v4.AccessKeyID + "/" + v4.credentialString,
+			authHeaderPrefix + " Credential=" + v4.CredValues.AccessKeyID + "/" + v4.credentialString,
 			"SignedHeaders=" + v4.signedHeaders,
 			"Signature=" + v4.signature,
 		}
@@ -182,7 +209,7 @@ func (v4 *signer) buildCredentialString() {
 	}, "/")
 
 	if v4.isPresign {
-		v4.Query.Set("X-Amz-Credential", v4.AccessKeyID+"/"+v4.credentialString)
+		v4.Query.Set("X-Amz-Credential", v4.CredValues.AccessKeyID+"/"+v4.credentialString)
 	}
 }
 
@@ -269,7 +296,7 @@ func (v4 *signer) buildStringToSign() {
 }
 
 func (v4 *signer) buildSignature() {
-	secret := v4.SecretAccessKey
+	secret := v4.CredValues.SecretAccessKey
 	date := makeHmac([]byte("AWS4"+secret), []byte(v4.formattedShortTime))
 	region := makeHmac(date, []byte(v4.Region))
 	service := makeHmac(region, []byte(v4.ServiceName))
@@ -293,6 +320,29 @@ func (v4 *signer) bodyDigest() string {
 	return hash
 }
 
+// isRequestSigned returns if the request is currently signed or presigned
+func (v4 *signer) isRequestSigned() bool {
+	if v4.isPresign && v4.Query.Get("X-Amz-Signature") != "" {
+		return true
+	}
+	if v4.Request.Header.Get("Authorization") != "" {
+		return true
+	}
+
+	return false
+}
+
+// unsign removes signing flags for both signed and presigned requests.
+func (v4 *signer) removePresign() {
+	v4.Query.Del("X-Amz-Algorithm")
+	v4.Query.Del("X-Amz-Signature")
+	v4.Query.Del("X-Amz-Security-Token")
+	v4.Query.Del("X-Amz-Date")
+	v4.Query.Del("X-Amz-Expires")
+	v4.Query.Del("X-Amz-Credential")
+	v4.Query.Del("X-Amz-SignedHeaders")
+}
+
 func makeHmac(key []byte, data []byte) []byte {
 	hash := hmac.New(sha256.New, key)
 	hash.Write(data)
@@ -306,21 +356,10 @@ func makeSha256(data []byte) []byte {
 }
 
 func makeSha256Reader(reader io.ReadSeeker) []byte {
-	packet := make([]byte, 4096)
 	hash := sha256.New()
-
 	start, _ := reader.Seek(0, 1)
 	defer reader.Seek(start, 0)
 
-	for {
-		n, err := reader.Read(packet)
-		if n > 0 {
-			hash.Write(packet[0:n])
-		}
-		if err == io.EOF || n == 0 {
-			break
-		}
-	}
-
+	io.Copy(hash, reader)
 	return hash.Sum(nil)
 }
