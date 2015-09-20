@@ -1261,8 +1261,8 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 		} else {
 			fmt.Fprintf(out, "<not available>\n")
 		}
-		fmt.Fprintf(out, "Min pods:\t%d\n", hpa.Spec.MinCount)
-		fmt.Fprintf(out, "Max pods:\t%d\n", hpa.Spec.MaxCount)
+		fmt.Fprintf(out, "Min pods:\t%d\n", hpa.Spec.MinReplicas)
+		fmt.Fprintf(out, "Max pods:\t%d\n", hpa.Spec.MaxReplicas)
 
 		// TODO: switch to scale subresource once the required code is submitted.
 		if strings.ToLower(hpa.Spec.ScaleRef.Kind) == "replicationcontroller" {

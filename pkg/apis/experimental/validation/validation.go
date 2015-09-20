@@ -40,11 +40,11 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 
 func validateHorizontalPodAutoscalerSpec(autoscaler experimental.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if autoscaler.MinCount < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("minCount", autoscaler.MinCount, `must be non-negative`))
+	if autoscaler.MinReplicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, `must be non-negative`))
 	}
-	if autoscaler.MaxCount < autoscaler.MinCount {
-		allErrs = append(allErrs, errs.NewFieldInvalid("maxCount", autoscaler.MaxCount, `must be bigger or equal to minCount`))
+	if autoscaler.MaxReplicas < autoscaler.MinReplicas {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
 	if autoscaler.ScaleRef == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired("scaleRef"))

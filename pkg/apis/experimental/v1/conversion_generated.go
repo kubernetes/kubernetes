@@ -1772,8 +1772,8 @@ func convert_experimental_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutosca
 	} else {
 		out.ScaleRef = nil
 	}
-	out.MinCount = in.MinCount
-	out.MaxCount = in.MaxCount
+	out.MinReplicas = in.MinReplicas
+	out.MaxReplicas = in.MaxReplicas
 	if err := convert_experimental_ResourceConsumption_To_v1_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -2400,8 +2400,8 @@ func convert_v1_HorizontalPodAutoscalerSpec_To_experimental_HorizontalPodAutosca
 	} else {
 		out.ScaleRef = nil
 	}
-	out.MinCount = in.MinCount
-	out.MaxCount = in.MaxCount
+	out.MinReplicas = in.MinReplicas
+	out.MaxReplicas = in.MaxReplicas
 	if err := convert_v1_ResourceConsumption_To_experimental_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
