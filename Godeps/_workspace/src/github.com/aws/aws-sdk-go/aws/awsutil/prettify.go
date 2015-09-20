@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-// StringValue returns the string representation of a value.
-func StringValue(i interface{}) string {
+// Prettify returns the string representation of a value.
+func Prettify(i interface{}) string {
 	var buf bytes.Buffer
-	stringValue(reflect.ValueOf(i), 0, &buf)
+	prettify(reflect.ValueOf(i), 0, &buf)
 	return buf.String()
 }
 
-// stringValue will recursively walk value v to build a textual
+// prettify will recursively walk value v to build a textual
 // representation of the value.
-func stringValue(v reflect.Value, indent int, buf *bytes.Buffer) {
+func prettify(v reflect.Value, indent int, buf *bytes.Buffer) {
 	for v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
@@ -52,7 +52,7 @@ func stringValue(v reflect.Value, indent int, buf *bytes.Buffer) {
 			val := v.FieldByName(n)
 			buf.WriteString(strings.Repeat(" ", indent+2))
 			buf.WriteString(n + ": ")
-			stringValue(val, indent+2, buf)
+			prettify(val, indent+2, buf)
 
 			if i < len(names)-1 {
 				buf.WriteString(",\n")
@@ -68,7 +68,7 @@ func stringValue(v reflect.Value, indent int, buf *bytes.Buffer) {
 		buf.WriteString("[" + nl)
 		for i := 0; i < v.Len(); i++ {
 			buf.WriteString(id2)
-			stringValue(v.Index(i), indent+2, buf)
+			prettify(v.Index(i), indent+2, buf)
 
 			if i < v.Len()-1 {
 				buf.WriteString("," + nl)
@@ -82,7 +82,7 @@ func stringValue(v reflect.Value, indent int, buf *bytes.Buffer) {
 		for i, k := range v.MapKeys() {
 			buf.WriteString(strings.Repeat(" ", indent+2))
 			buf.WriteString(k.String() + ": ")
-			stringValue(v.MapIndex(k), indent+2, buf)
+			prettify(v.MapIndex(k), indent+2, buf)
 
 			if i < v.Len()-1 {
 				buf.WriteString(",\n")
