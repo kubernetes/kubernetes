@@ -1,4 +1,4 @@
-package aws
+package request_test
 
 import (
 	"bytes"
@@ -7,13 +7,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/internal/apierr"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,7 @@ func body(str string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(str)))
 }
 
-func unmarshal(req *Request) {
+func unmarshal(req *request.Request) {
 	defer req.HTTPResponse.Body.Close()
 	if req.Data != nil {
 		json.NewDecoder(req.HTTPResponse.Body).Decode(req.Data)
@@ -33,15 +34,15 @@ func unmarshal(req *Request) {
 	return
 }
 
-func unmarshalError(req *Request) {
+func unmarshalError(req *request.Request) {
 	bodyBytes, err := ioutil.ReadAll(req.HTTPResponse.Body)
 	if err != nil {
-		req.Error = apierr.New("UnmarshaleError", req.HTTPResponse.Status, err)
+		req.Error = awserr.New("UnmarshaleError", req.HTTPResponse.Status, err)
 		return
 	}
 	if len(bodyBytes) == 0 {
-		req.Error = apierr.NewRequestError(
-			apierr.New("UnmarshaleError", req.HTTPResponse.Status, fmt.Errorf("empty body")),
+		req.Error = awserr.NewRequestFailure(
+			awserr.New("UnmarshaleError", req.HTTPResponse.Status, fmt.Errorf("empty body")),
 			req.HTTPResponse.StatusCode,
 			"",
 		)
@@ -49,11 +50,11 @@ func unmarshalError(req *Request) {
 	}
 	var jsonErr jsonErrorResponse
 	if err := json.Unmarshal(bodyBytes, &jsonErr); err != nil {
-		req.Error = apierr.New("UnmarshaleError", "JSON unmarshal", err)
+		req.Error = awserr.New("UnmarshaleError", "JSON unmarshal", err)
 		return
 	}
-	req.Error = apierr.NewRequestError(
-		apierr.New(jsonErr.Code, jsonErr.Message, nil),
+	req.Error = awserr.NewRequestFailure(
+		awserr.New(jsonErr.Code, jsonErr.Message, nil),
 		req.HTTPResponse.StatusCode,
 		"",
 	)
@@ -68,22 +69,22 @@ type jsonErrorResponse struct {
 func TestRequestRecoverRetry5xx(t *testing.T) {
 	reqNum := 0
 	reqs := []http.Response{
-		http.Response{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
-		http.Response{StatusCode: 501, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
-		http.Response{StatusCode: 200, Body: body(`{"data":"valid"}`)},
+		{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
+		{StatusCode: 501, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
+		{StatusCode: 200, Body: body(`{"data":"valid"}`)},
 	}
 
-	s := NewService(&Config{MaxRetries: 10})
+	s := service.New(aws.NewConfig().WithMaxRetries(10))
 	s.Handlers.Validate.Clear()
 	s.Handlers.Unmarshal.PushBack(unmarshal)
 	s.Handlers.UnmarshalError.PushBack(unmarshalError)
 	s.Handlers.Send.Clear() // mock sending
-	s.Handlers.Send.PushBack(func(r *Request) {
+	s.Handlers.Send.PushBack(func(r *request.Request) {
 		r.HTTPResponse = &reqs[reqNum]
 		reqNum++
 	})
 	out := &testData{}
-	r := NewRequest(s, &Operation{Name: "Operation"}, nil, out)
+	r := s.NewRequest(&request.Operation{Name: "Operation"}, nil, out)
 	err := r.Send()
 	assert.Nil(t, err)
 	assert.Equal(t, 2, int(r.RetryCount))
@@ -94,22 +95,22 @@ func TestRequestRecoverRetry5xx(t *testing.T) {
 func TestRequestRecoverRetry4xxRetryable(t *testing.T) {
 	reqNum := 0
 	reqs := []http.Response{
-		http.Response{StatusCode: 400, Body: body(`{"__type":"Throttling","message":"Rate exceeded."}`)},
-		http.Response{StatusCode: 429, Body: body(`{"__type":"ProvisionedThroughputExceededException","message":"Rate exceeded."}`)},
-		http.Response{StatusCode: 200, Body: body(`{"data":"valid"}`)},
+		{StatusCode: 400, Body: body(`{"__type":"Throttling","message":"Rate exceeded."}`)},
+		{StatusCode: 429, Body: body(`{"__type":"ProvisionedThroughputExceededException","message":"Rate exceeded."}`)},
+		{StatusCode: 200, Body: body(`{"data":"valid"}`)},
 	}
 
-	s := NewService(&Config{MaxRetries: 10})
+	s := service.New(aws.NewConfig().WithMaxRetries(10))
 	s.Handlers.Validate.Clear()
 	s.Handlers.Unmarshal.PushBack(unmarshal)
 	s.Handlers.UnmarshalError.PushBack(unmarshalError)
 	s.Handlers.Send.Clear() // mock sending
-	s.Handlers.Send.PushBack(func(r *Request) {
+	s.Handlers.Send.PushBack(func(r *request.Request) {
 		r.HTTPResponse = &reqs[reqNum]
 		reqNum++
 	})
 	out := &testData{}
-	r := NewRequest(s, &Operation{Name: "Operation"}, nil, out)
+	r := s.NewRequest(&request.Operation{Name: "Operation"}, nil, out)
 	err := r.Send()
 	assert.Nil(t, err)
 	assert.Equal(t, 2, int(r.RetryCount))
@@ -118,16 +119,16 @@ func TestRequestRecoverRetry4xxRetryable(t *testing.T) {
 
 // test that retries don't occur for 4xx status codes with a response type that can't be retried
 func TestRequest4xxUnretryable(t *testing.T) {
-	s := NewService(&Config{MaxRetries: 10})
+	s := service.New(aws.NewConfig().WithMaxRetries(10))
 	s.Handlers.Validate.Clear()
 	s.Handlers.Unmarshal.PushBack(unmarshal)
 	s.Handlers.UnmarshalError.PushBack(unmarshalError)
 	s.Handlers.Send.Clear() // mock sending
-	s.Handlers.Send.PushBack(func(r *Request) {
+	s.Handlers.Send.PushBack(func(r *request.Request) {
 		r.HTTPResponse = &http.Response{StatusCode: 401, Body: body(`{"__type":"SignatureDoesNotMatch","message":"Signature does not match."}`)}
 	})
 	out := &testData{}
-	r := NewRequest(s, &Operation{Name: "Operation"}, nil, out)
+	r := s.NewRequest(&request.Operation{Name: "Operation"}, nil, out)
 	err := r.Send()
 	assert.NotNil(t, err)
 	if e, ok := err.(awserr.RequestFailure); ok {
@@ -142,28 +143,28 @@ func TestRequest4xxUnretryable(t *testing.T) {
 
 func TestRequestExhaustRetries(t *testing.T) {
 	delays := []time.Duration{}
-	sleepDelay = func(delay time.Duration) {
+	sleepDelay := func(delay time.Duration) {
 		delays = append(delays, delay)
 	}
 
 	reqNum := 0
 	reqs := []http.Response{
-		http.Response{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
-		http.Response{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
-		http.Response{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
-		http.Response{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
+		{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
+		{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
+		{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
+		{StatusCode: 500, Body: body(`{"__type":"UnknownError","message":"An error occurred."}`)},
 	}
 
-	s := NewService(&Config{MaxRetries: -1})
+	s := service.New(aws.NewConfig().WithMaxRetries(aws.DefaultRetries).WithSleepDelay(sleepDelay))
 	s.Handlers.Validate.Clear()
 	s.Handlers.Unmarshal.PushBack(unmarshal)
 	s.Handlers.UnmarshalError.PushBack(unmarshalError)
 	s.Handlers.Send.Clear() // mock sending
-	s.Handlers.Send.PushBack(func(r *Request) {
+	s.Handlers.Send.PushBack(func(r *request.Request) {
 		r.HTTPResponse = &reqs[reqNum]
 		reqNum++
 	})
-	r := NewRequest(s, &Operation{Name: "Operation"}, nil, nil)
+	r := s.NewRequest(&request.Operation{Name: "Operation"}, nil, nil)
 	err := r.Send()
 	assert.NotNil(t, err)
 	if e, ok := err.(awserr.RequestFailure); ok {
@@ -174,18 +175,25 @@ func TestRequestExhaustRetries(t *testing.T) {
 	assert.Equal(t, "UnknownError", err.(awserr.Error).Code())
 	assert.Equal(t, "An error occurred.", err.(awserr.Error).Message())
 	assert.Equal(t, 3, int(r.RetryCount))
-	assert.True(t, reflect.DeepEqual([]time.Duration{30 * time.Millisecond, 60 * time.Millisecond, 120 * time.Millisecond}, delays))
+
+	expectDelays := []struct{ min, max time.Duration }{{30, 59}, {60, 118}, {120, 236}}
+	for i, v := range delays {
+		min := expectDelays[i].min * time.Millisecond
+		max := expectDelays[i].max * time.Millisecond
+		assert.True(t, min <= v && v <= max,
+			"Expect delay to be within range, i:%d, v:%s, min:%s, max:%s", i, v, min, max)
+	}
 }
 
 // test that the request is retried after the credentials are expired.
 func TestRequestRecoverExpiredCreds(t *testing.T) {
 	reqNum := 0
 	reqs := []http.Response{
-		http.Response{StatusCode: 400, Body: body(`{"__type":"ExpiredTokenException","message":"expired token"}`)},
-		http.Response{StatusCode: 200, Body: body(`{"data":"valid"}`)},
+		{StatusCode: 400, Body: body(`{"__type":"ExpiredTokenException","message":"expired token"}`)},
+		{StatusCode: 200, Body: body(`{"data":"valid"}`)},
 	}
 
-	s := NewService(&Config{MaxRetries: 10, Credentials: credentials.NewStaticCredentials("AKID", "SECRET", "")})
+	s := service.New(&aws.Config{MaxRetries: aws.Int(10), Credentials: credentials.NewStaticCredentials("AKID", "SECRET", "")})
 	s.Handlers.Validate.Clear()
 	s.Handlers.Unmarshal.PushBack(unmarshal)
 	s.Handlers.UnmarshalError.PushBack(unmarshalError)
@@ -193,21 +201,21 @@ func TestRequestRecoverExpiredCreds(t *testing.T) {
 	credExpiredBeforeRetry := false
 	credExpiredAfterRetry := false
 
-	s.Handlers.AfterRetry.PushBack(func(r *Request) {
-		credExpiredAfterRetry = r.Config.Credentials.IsExpired()
+	s.Handlers.AfterRetry.PushBack(func(r *request.Request) {
+		credExpiredAfterRetry = r.Service.Config.Credentials.IsExpired()
 	})
 
 	s.Handlers.Sign.Clear()
-	s.Handlers.Sign.PushBack(func(r *Request) {
-		r.Config.Credentials.Get()
+	s.Handlers.Sign.PushBack(func(r *request.Request) {
+		r.Service.Config.Credentials.Get()
 	})
 	s.Handlers.Send.Clear() // mock sending
-	s.Handlers.Send.PushBack(func(r *Request) {
+	s.Handlers.Send.PushBack(func(r *request.Request) {
 		r.HTTPResponse = &reqs[reqNum]
 		reqNum++
 	})
 	out := &testData{}
-	r := NewRequest(s, &Operation{Name: "Operation"}, nil, out)
+	r := s.NewRequest(&request.Operation{Name: "Operation"}, nil, out)
 	err := r.Send()
 	assert.Nil(t, err)
 

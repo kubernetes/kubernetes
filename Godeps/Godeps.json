@@ -49,58 +49,53 @@
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/internal/apierr",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/endpoints",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/ec2query",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/query",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/rest",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/xml/xmlutil",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/signer/v4",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/autoscaling",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/ec2",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/elb",
-			"Comment": "v0.6.0-7-gcea3a42",
-			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+			"Comment": "v0.9.9",
+			"Rev": "c4ae871ffc03691a7b039fa751a1e7afee56e920"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
