@@ -83,9 +83,9 @@ func TestReadAWSCloudConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
-		var metadata AWSMetadata
+		var metadata EC2Metadata
 		if test.aws != nil {
-			metadata = test.aws.Metadata()
+			metadata, _ = test.aws.Metadata()
 		}
 		cfg, err := readAWSCloudConfig(test.reader, metadata)
 		if test.expectError {
@@ -166,8 +166,8 @@ func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 	return s.asg, nil
 }
 
-func (s *FakeAWSServices) Metadata() AWSMetadata {
-	return s.metadata
+func (s *FakeAWSServices) Metadata() (EC2Metadata, error) {
+	return s.metadata, nil
 }
 
 func TestFilterTags(t *testing.T) {
@@ -313,31 +313,31 @@ type FakeMetadata struct {
 	aws *FakeAWSServices
 }
 
-func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
+func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 	networkInterfacesPrefix := "network/interfaces/macs/"
 	if key == "placement/availability-zone" {
-		return []byte(self.aws.availabilityZone), nil
+		return self.aws.availabilityZone, nil
 	} else if key == "instance-id" {
-		return []byte(self.aws.instanceId), nil
+		return self.aws.instanceId, nil
 	} else if key == "local-hostname" {
-		return []byte(self.aws.privateDnsName), nil
+		return self.aws.privateDnsName, nil
 	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
 		if key == networkInterfacesPrefix {
-			return []byte(strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n"), nil
+			return strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n", nil
 		} else {
 			keySplit := strings.Split(key, "/")
 			macParam := keySplit[3]
 			if len(keySplit) == 5 && keySplit[4] == "vpc-id" {
 				for i, macElem := range self.aws.networkInterfacesMacs {
 					if macParam == macElem {
-						return []byte(self.aws.networkInterfacesVpcIDs[i]), nil
+						return self.aws.networkInterfacesVpcIDs[i], nil
 					}
 				}
 			}
-			return nil, nil
+			return "", nil
 		}
 	} else {
-		return nil, nil
+		return "", nil
 	}
 }
 
