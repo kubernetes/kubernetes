@@ -18,7 +18,6 @@ package job
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -29,7 +28,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -41,43 +39,6 @@ import (
 const controllerTimeout = 500 * time.Millisecond
 
 var alwaysReady = func() bool { return true }
-
-type FakePodControl struct {
-	podSpec       []api.PodTemplateSpec
-	deletePodName []string
-	lock          sync.Mutex
-	err           error
-}
-
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if f.err != nil {
-		return f.err
-	}
-	f.podSpec = append(f.podSpec, *spec)
-	return nil
-}
-
-func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return nil
-}
-
-func (f *FakePodControl) DeletePod(namespace string, podName string) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if f.err != nil {
-		return f.err
-	}
-	f.deletePodName = append(f.deletePodName, podName)
-	return nil
-}
-func (f *FakePodControl) clear() {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.deletePodName = []string{}
-	f.podSpec = []api.PodTemplateSpec{}
-}
 
 func newJob(parallelism, completions int) *experimental.Job {
 	return &experimental.Job{
@@ -207,7 +168,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// job manager setup
 		client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 		manager := NewJobController(client)
-		fakePodControl := FakePodControl{err: tc.podControllerError}
+		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
 		var actual *experimental.Job
@@ -236,11 +197,11 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 
 		// validate created/deleted pods
-		if len(fakePodControl.podSpec) != tc.expectedCreations {
-			t.Errorf("%s: unexpected number of creates.  Expected %d, saw %d\n", name, tc.expectedCreations, len(fakePodControl.podSpec))
+		if len(fakePodControl.Templates) != tc.expectedCreations {
+			t.Errorf("%s: unexpected number of creates.  Expected %d, saw %d\n", name, tc.expectedCreations, len(fakePodControl.Templates))
 		}
-		if len(fakePodControl.deletePodName) != tc.expectedDeletions {
-			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.deletePodName))
+		if len(fakePodControl.DeletePodName) != tc.expectedDeletions {
+			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
 		}
 		// validate status
 		if actual.Status.Active != tc.expectedActive {
@@ -271,7 +232,7 @@ func TestControllerSyncJob(t *testing.T) {
 func TestSyncJobDeleted(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
-	fakePodControl := FakePodControl{}
+	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.updateHandler = func(job *experimental.Job) error { return nil }
@@ -280,18 +241,18 @@ func TestSyncJobDeleted(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
 	}
-	if len(fakePodControl.podSpec) != 0 {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.podSpec))
+	if len(fakePodControl.Templates) != 0 {
+		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.Templates))
 	}
-	if len(fakePodControl.deletePodName) != 0 {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.deletePodName))
+	if len(fakePodControl.DeletePodName) != 0 {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
 	}
 }
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
-	fakePodControl := FakePodControl{}
+	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.updateHandler = func(job *experimental.Job) error { return fmt.Errorf("Fake error") }
@@ -401,7 +362,7 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 func TestSyncJobExpectations(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewJobController(client)
-	fakePodControl := FakePodControl{}
+	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.updateHandler = func(job *experimental.Job) error { return nil }
@@ -420,11 +381,11 @@ func TestSyncJobExpectations(t *testing.T) {
 		},
 	}
 	manager.syncJob(getKey(job, t))
-	if len(fakePodControl.podSpec) != 0 {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.podSpec))
+	if len(fakePodControl.Templates) != 0 {
+		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.Templates))
 	}
-	if len(fakePodControl.deletePodName) != 0 {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.deletePodName))
+	if len(fakePodControl.DeletePodName) != 0 {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
 	}
 }
 
