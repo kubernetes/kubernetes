@@ -74,10 +74,6 @@ func init() {
 
 	// Register Unversioned types
 	Scheme.AddKnownTypes("", &unversioned.Status{})
-
-	// Legacy names are supported
-	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
-	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
