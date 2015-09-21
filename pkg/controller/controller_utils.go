@@ -223,6 +223,34 @@ func NewControllerExpectations() *ControllerExpectations {
 	return &ControllerExpectations{cache.NewTTLStore(ExpKeyFunc, ExpectationsTimeout)}
 }
 
+// RCControlInterface is an interface that knows how to add or delete
+// replication controllers, as well as increment or decrement them. It is used
+// by the deployment controller to ease testing of actions that it takes.
+// @TODO Decide if we want to use this or use the kube client directly.
+type RCControlInterface interface {
+	// CreateRC creates a new replication controller.
+	CreateRC(controller *api.ReplicationController) (*api.ReplicationController, error)
+	// ChangeReplicaCount increments or decrements a replication controller by
+	// a given amount. For decrementing, use negative numbers.
+	AdjustReplicaCount(controller *api.ReplicationController, count int) error
+}
+
+// RealPodControl is the default implementation of PodControllerInterface.
+type RealRCControl struct {
+	KubeClient client.Interface
+	Recorder   record.EventRecorder
+}
+
+func (r RealRCControl) CreateRC(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	return r.KubeClient.ReplicationControllers(controller.Namespace).Create(controller)
+}
+
+func (r RealRCControl) AdjustReplicaCount(controller *api.ReplicationController, count int) error {
+	controller.Spec.Replicas += count
+	_, err := r.KubeClient.ReplicationControllers(controller.Namespace).Update(controller)
+	return err
+}
+
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
