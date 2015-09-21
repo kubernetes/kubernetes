@@ -431,7 +431,7 @@ function kube-down {
       else
         echo "unsupported role for ${i}"
       fi
-        # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
+      # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
       ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
