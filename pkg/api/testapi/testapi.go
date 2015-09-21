@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/experimental/install"
 
@@ -207,4 +208,22 @@ func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 
 func (g TestGroup) RESTMapper() meta.RESTMapper {
 	return latest.GroupOrDie(g.Group).RESTMapper
+}
+
+// Get codec based on runtime.Object
+func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
+	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected encoding error: %v", err)
+	}
+	// TODO: caesarxuchao: we should detect which group an object belongs to
+	// by using the version returned by Schem.ObjectVersionAndKind() once we
+	// split the schemes for internal objects.
+	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
+	for _, group := range Groups {
+		if api.Scheme.Recognizes(group.GroupAndVersion(), kind) {
+			return group.Codec(), nil
+		}
+	}
+	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
