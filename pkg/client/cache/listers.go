@@ -191,6 +191,60 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	return
 }
 
+// StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
+type StoreToDeploymentLister struct {
+	Store
+}
+
+// Exists checks if the given deployment exists in the store.
+func (s *StoreToDeploymentLister) Exists(deployment *extensions.Deployment) (bool, error) {
+	_, exists, err := s.Store.Get(deployment)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToDeploymentLister lists all deployments in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToDeploymentLister) List() (deployments []extensions.Deployment, err error) {
+	for _, c := range s.Store.List() {
+		deployments = append(deployments, *(c.(*extensions.Deployment)))
+	}
+	return deployments, nil
+}
+
+// GetDeploymentsForRC returns a list of deployments managing a replication controller. Returns an error only if no matching deployments are found.
+func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationController) (deployments []extensions.Deployment, err error) {
+	var selector labels.Selector
+	var d extensions.Deployment
+
+	if len(rc.Labels) == 0 {
+		err = fmt.Errorf("No controllers found for replication controller %v because it has no labels", rc.Name)
+		return
+	}
+
+	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
+	for _, m := range s.Store.List() {
+		d = *m.(*extensions.Deployment)
+		if d.Namespace != rc.Namespace {
+			continue
+		}
+		labelSet := labels.Set(d.Spec.Selector)
+		selector = labels.Set(d.Spec.Selector).AsSelector()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(rc.Labels)) {
+			continue
+		}
+		deployments = append(deployments, d)
+	}
+	if len(deployments) == 0 {
+		err = fmt.Errorf("Could not find deployments set for replication controller %s in namespace %s with labels: %v", rc.Name, rc.Namespace, rc.Labels)
+	}
+	return
+}
+
 // StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
 type StoreToDaemonSetLister struct {
 	Store
