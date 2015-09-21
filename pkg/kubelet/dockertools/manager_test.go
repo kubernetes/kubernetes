@@ -2067,3 +2067,20 @@ func TestGetPidMode(t *testing.T) {
 		t.Errorf("expected host pid mode for pod but got %v", pidMode)
 	}
 }
+
+func TestGetIPCMode(t *testing.T) {
+	// test false
+	pod := &api.Pod{}
+	ipcMode := getIPCMode(pod, "")
+
+	if ipcMode != "" {
+		t.Errorf("expected empty ipc mode for pod but got %v", ipcMode)
+	}
+
+	// test true
+	pod.Spec.HostIPC = true
+	ipcMode = getIPCMode(pod, "")
+	if ipcMode != "host" {
+		t.Errorf("expected host ipc mode for pod but got %v", ipcMode)
+	}
+}
