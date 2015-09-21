@@ -63,6 +63,7 @@ import (
 	utilErrors "k8s.io/kubernetes/pkg/util/errors"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -200,6 +201,23 @@ func NewMainKubelet(
 	}
 	serviceLister := &cache.StoreToServiceLister{Store: serviceStore}
 
+	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	if kubeClient != nil {
+		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
+		// than an interface. There is no way to construct a list+watcher using resource name.
+		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
+		listWatch := &cache.ListWatch{
+			ListFunc: func() (runtime.Object, error) {
+				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
+			},
+			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
+				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
+			},
+		}
+		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
+	}
+	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
+
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
 	// TODO: what is namespace for node?
@@ -242,6 +260,7 @@ func NewMainKubelet(
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
+		nodeLister:                     nodeLister,
 		runtimeMutex:                   sync.Mutex{},
 		runtimeUpThreshold:             maxWaitForContainerRuntime,
 		lastTimestampRuntimeUp:         time.Time{},
@@ -390,6 +409,11 @@ type serviceLister interface {
 	List() (api.ServiceList, error)
 }
 
+type nodeLister interface {
+	List() (machines api.NodeList, err error)
+	GetNodeInfo(id string) (*api.Node, error)
+}
+
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname       string
@@ -432,6 +456,7 @@ type Kubelet struct {
 
 	masterServiceNamespace string
 	serviceLister          serviceLister
+	nodeLister             nodeLister
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -677,6 +702,13 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 		}
 	}
 	return pods, nil
+}
+
+func (kl *Kubelet) GetNode() (*api.Node, error) {
+	if kl.standaloneMode {
+		return nil, errors.New("no node entry for kubelet in standalone mode")
+	}
+	return kl.nodeLister.GetNodeInfo(kl.nodeName)
 }
 
 // Starts garbage collection threads.
@@ -1660,7 +1692,7 @@ func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
 	if kl.standaloneMode {
 		return true
 	}
-	node, err := kl.nodeManager.GetNode()
+	node, err := kl.GetNode()
 	if err != nil {
 		glog.Errorf("error getting node: %v", err)
 		return true
@@ -1959,7 +1991,11 @@ func (kl *Kubelet) GetHostname() string {
 
 // Returns host IP or nil in case of error.
 func (kl *Kubelet) GetHostIP() (net.IP, error) {
-	return kl.nodeManager.GetHostIP()
+	node, err := kl.GetNode()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get node: %v", err)
+	}
+	return nodeutil.GetNodeHostIP(node)
 }
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
@@ -2261,7 +2297,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	if !kl.standaloneMode {
-		hostIP, err := kl.nodeManager.GetHostIP()
+		hostIP, err := kl.GetHostIP()
 		if err != nil {
 			glog.V(4).Infof("Cannot get host IP: %v", err)
 		} else {

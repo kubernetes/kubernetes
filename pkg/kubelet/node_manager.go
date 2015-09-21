@@ -16,8 +16,10 @@ limitations under the License.
 
 package kubelet
 
+// Note: if you change code in this file, you might need to change code in
+// contrib/mesos/pkg/executor/.
+
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -34,13 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -57,16 +54,12 @@ type infoGetter interface {
 
 type nodeManager interface {
 	Start()
-	GetNode() (*api.Node, error)
 	GetPodCIDR() string
-	GetHostIP() (net.IP, error)
 }
 
 type realNodeManager struct {
 	// apiserver client.
 	client client.Interface
-
-	nodeLister nodeLister
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
@@ -133,59 +126,16 @@ func newRealNodeManager(client client.Interface, cloud cloudprovider.Interface, 
 	}
 }
 
-type nodeLister interface {
-	List() (machines api.NodeList, err error)
-	GetNodeInfo(id string) (*api.Node, error)
-}
-
 func (nm *realNodeManager) Start() {
-	if nm.client == nil {
-		return
+	if nm.client != nil {
+		go util.Until(nm.syncNodeStatus, nm.nodeStatusUpdateFrequency, util.NeverStop)
 	}
-	nm.setNodeLister()
-	go util.Until(nm.syncNodeStatus, nm.nodeStatusUpdateFrequency, util.NeverStop)
 }
 
 func (nm *realNodeManager) GetPodCIDR() string {
 	nm.lock.RLock()
 	defer nm.lock.RUnlock()
 	return nm.podCIDR
-}
-
-func (nm *realNodeManager) GetNode() (*api.Node, error) {
-	if nm.client == nil {
-		return nil, errors.New("unable to get node entry because apiserver client is nil")
-	}
-	return nm.nodeLister.GetNodeInfo(nm.nodeName)
-}
-
-// Returns host IP or nil in case of error.
-func (nm *realNodeManager) GetHostIP() (net.IP, error) {
-	if nm.client == nil {
-		return nil, errors.New("unable to get node entry because apiserver client is nil")
-	}
-	node, err := nm.GetNode()
-	if err != nil {
-		return nil, fmt.Errorf("cannot get node: %v", err)
-	}
-	return nodeutil.GetNodeHostIP(node)
-}
-
-func (nm *realNodeManager) setNodeLister() {
-	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
-	// than an interface. There is no way to construct a list+watcher using resource name.
-	fieldSelector := fields.Set{client.ObjectNameField: nm.nodeName}.AsSelector()
-	listWatch := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			return nm.client.Nodes().List(labels.Everything(), fieldSelector)
-		},
-		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			return nm.client.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
-		},
-	}
-	cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
-	nm.nodeLister = &cache.StoreToNodeLister{Store: nodeStore}
 }
 
 // syncNodeStatus should be called periodically from a goroutine.
