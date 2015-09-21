@@ -1,0 +1,12 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "id": "example",
+  "port": 8000,
+  "labels": {
+     "name": "nginx"
+  },
+  "selector": {
+     "name": "nginx"
+  }
+}

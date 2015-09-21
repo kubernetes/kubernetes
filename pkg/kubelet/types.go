@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,10 @@ package kubelet
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
-const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
-const ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
+const ConfigSourceAnnotationKey = "kubernetes/config.source"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
@@ -38,21 +36,6 @@ const (
 	REMOVE
 	// Pods with the given ids have been updated in this source
 	UPDATE
-
-	// These constants identify the sources of pods
-	// Updates from a file
-	FileSource = "file"
-	// Updates from querying a web page
-	HTTPSource = "http"
-	// Updates from Kubernetes API Server
-	ApiserverSource = "api"
-	// Updates from all sources
-	AllSource = "*"
-
-	// Used for ConfigMirrorAnnotationKey.
-	MirrorType = "mirror"
-
-	NamespaceDefault = api.NamespaceDefault
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
@@ -65,26 +48,11 @@ const (
 // functionally similar, this helps our unit tests properly check that the correct PodUpdates
 // are generated.
 type PodUpdate struct {
-	Pods   []*api.Pod
-	Op     PodOperation
-	Source string
+	Pods []api.BoundPod
+	Op   PodOperation
 }
 
-// Gets all validated sources from the specified sources.
-func GetValidatedSources(sources []string) ([]string, error) {
-	validated := make([]string, 0, len(sources))
-	for _, source := range sources {
-		switch source {
-		case AllSource:
-			return []string{FileSource, HTTPSource, ApiserverSource}, nil
-		case FileSource, HTTPSource, ApiserverSource:
-			validated = append(validated, source)
-			break
-		case "":
-			break
-		default:
-			return []string{}, fmt.Errorf("unknown pod source %q", source)
-		}
-	}
-	return validated, nil
+// GetPodFullName returns a name that uniquely identifies a pod across all config sources.
+func GetPodFullName(pod *api.BoundPod) string {
+	return fmt.Sprintf("%s.%s.%s", pod.Name, pod.Namespace, pod.Annotations[ConfigSourceAnnotationKey])
 }

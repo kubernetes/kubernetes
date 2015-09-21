@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ log_level: debug
 log_level_logfile: debug
 EOF
 
-hostnamef=$(uname -n)
+hostnamef=$(hostname -f)
 apt-get install -y ipcalc
 netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
 network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')

@@ -12,9 +12,6 @@ GODEPS_PKG_DIR = Godeps/_workspace/pkg
 KUBE_GOFLAGS = $(GOFLAGS)
 export KUBE_GOFLAGS
 
-KUBE_GOLDFLAGS = $(GOLDFLAGS)
-export KUBE_GOLDFLAGS
-
 # Build code.
 #
 # Args:
@@ -22,7 +19,6 @@ export KUBE_GOLDFLAGS
 #     package, the build will produce executable files under $(OUT_DIR)/go/bin.
 #     If not specified, "everything" will be built.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make
@@ -32,27 +28,6 @@ all:
 	hack/build-go.sh $(WHAT)
 .PHONY: all
 
-# Runs all the presubmission verifications.
-#
-# Args:
-#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
-#
-# Example:
-#   make verify
-#   make verify BRANCH=branch_x
-verify:
-	hack/verify-gofmt.sh
-	hack/verify-boilerplate.sh
-	hack/verify-description.sh
-	hack/verify-generated-conversions.sh
-	hack/verify-generated-deep-copies.sh
-	hack/verify-generated-docs.sh
-	hack/verify-swagger-spec.sh
-	hack/verify-linkcheck.sh
-	hack/verify-flags-underscore.py
-	hack/verify-godeps.sh $(BRANCH)
-.PHONY: verify
-
 # Build and run tests.
 #
 # Args:
@@ -60,7 +35,6 @@ verify:
 #     directories will be run.  If not specified, "everything" will be tested.
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make check
@@ -74,7 +48,7 @@ check test:
 #
 # Example:
 #   make test_integration
-test_integration:
+test_integration test_integ:
 	hack/test-integration.sh
 .PHONY: test_integration test_integ
 
@@ -104,7 +78,6 @@ clean:
 #     vetted.
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make vet

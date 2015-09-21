@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,10 @@ package api
 import (
 	"errors"
 	"fmt"
-	"net/url"
-	"strings"
+	"regexp"
 
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 var (
@@ -32,6 +31,8 @@ var (
 	ErrNoSelfLink = errors.New("selfLink was empty, can't make reference")
 )
 
+var versionFromSelfLink = regexp.MustCompile("/api/([^/]*)/")
+
 // ForTesting_ReferencesAllowBlankSelfLinks can be set to true in tests to avoid
 // "ErrNoSelfLink" errors.
 var ForTesting_ReferencesAllowBlankSelfLinks = false
@@ -39,7 +40,6 @@ var ForTesting_ReferencesAllowBlankSelfLinks = false
 // GetReference returns an ObjectReference which refers to the given
 // object, or an error if the object doesn't follow the conventions
 // that would allow this.
-// TODO: should take a meta.Interface see http://issue.k8s.io/7127
 func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
@@ -52,41 +52,23 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// if the object referenced is actually persisted, we can just get kind from meta
-	// if we are building an object reference to something not yet persisted, we should fallback to scheme
-	kind := meta.Kind()
-	if kind == "" {
-		_, kind, err = Scheme.ObjectVersionAndKind(obj)
-		if err != nil {
-			return nil, err
-		}
+	_, kind, err := Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, err
 	}
-
-	// if the object referenced is actually persisted, we can also get version from meta
-	version := meta.APIVersion()
-	if version == "" {
-		selfLink := meta.SelfLink()
-		if selfLink == "" {
-			if ForTesting_ReferencesAllowBlankSelfLinks {
-				version = "testing"
-			} else {
-				return nil, ErrNoSelfLink
-			}
+	version := ""
+	parsedSelfLink := versionFromSelfLink.FindStringSubmatch(meta.SelfLink())
+	if len(parsedSelfLink) < 2 {
+		if ForTesting_ReferencesAllowBlankSelfLinks {
+			version = "testing"
+		} else if meta.SelfLink() == "" {
+			return nil, ErrNoSelfLink
 		} else {
-			selfLinkUrl, err := url.Parse(selfLink)
-			if err != nil {
-				return nil, err
-			}
-			// example paths: /<prefix>/<version>/*
-			parts := strings.Split(selfLinkUrl.Path, "/")
-			if len(parts) < 3 {
-				return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", selfLink, version)
-			}
-			version = parts[2]
+			return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", meta.SelfLink(), version)
 		}
+	} else {
+		version = parsedSelfLink[1]
 	}
-
 	return &ObjectReference{
 		Kind:            kind,
 		APIVersion:      version,

@@ -1,9 +1,0 @@
- digraph k8petstore {
-          
-    USERS -> publicIP_proxy -> web_server;
-    bps_data_generator -> web_server [arrowhead = crow, label = "http://$FRONTEND_SERVICE_HOST:3000/rpush/k8petstore/{name..address..,product=..."];
-    external -> web_server [arrowhead = crow, label="  http://$FRONTEND_SERVICE_HOST/k8petstore/llen:3000"];
-    web_server -> redis_master [label=" RESP : k8petstore, llen"];
-    redis_master -> redis_slave [arrowhead = crow] [label="replication (one-way)"];
-}
-                                            

@@ -1,3 +1,8 @@
-delete_cadvisor_manifest:
-  file.absent:
-    - name: /etc/kubernetes/manifests/cadvisor.manifest
+/etc/kubernetes/manifests/cadvisor.manifest:
+  file.managed:
+    - source: salt://cadvisor/cadvisor.manifest
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - dir_mode: 755

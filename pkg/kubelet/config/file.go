@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,44 +18,43 @@ limitations under the License.
 package config
 
 import (
+	"crypto/sha1"
+	"encoding/base32"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet"
-	"k8s.io/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
 
 type sourceFile struct {
-	path     string
-	nodeName string
-	updates  chan<- interface{}
+	path    string
+	updates chan<- interface{}
 }
 
-func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(path string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceFile{
-		path:     path,
-		nodeName: nodeName,
-		updates:  updates,
+		path:    path,
+		updates: updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
-	go util.Until(config.run, period, util.NeverStop)
+	go util.Forever(config.run, period)
 }
 
 func (s *sourceFile) run() {
 	if err := s.extractFromPath(); err != nil {
 		glog.Errorf("Unable to read config path %q: %v", s.path, err)
 	}
-}
-
-func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
-	return applyDefaults(pod, source, true, s.nodeName)
 }
 
 func (s *sourceFile) extractFromPath() error {
@@ -65,25 +64,23 @@ func (s *sourceFile) extractFromPath() error {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{}, Op: kubelet.SET, Source: kubelet.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
 	switch {
 	case statInfo.Mode().IsDir():
-		pods, err := s.extractFromDir(path)
+		pods, err := extractFromDir(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{Pods: pods, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
 
 	case statInfo.Mode().IsRegular():
-		pod, err := s.extractFromFile(path)
+		pod, err := extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{pod}, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -92,16 +89,16 @@ func (s *sourceFile) extractFromPath() error {
 	return nil
 }
 
-// Get as many pod configs as we can from a directory. Return an error if and only if something
-// prevented us from reading anything at all. Do not return an error if only some files
+// Get as many pod configs as we can from a directory.  Return an error iff something
+// prevented us from reading anything at all.  Do not return an error if only some files
 // were problematic.
-func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
+func extractFromDir(name string) ([]api.BoundPod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]*api.Pod, 0)
+	pods := make([]api.BoundPod, 0)
 	if len(dirents) == 0 {
 		return pods, nil
 	}
@@ -118,7 +115,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
 		case statInfo.Mode().IsDir():
 			glog.V(1).Infof("Not recursing into config path %q", path)
 		case statInfo.Mode().IsRegular():
-			pod, err := s.extractFromFile(path)
+			pod, err := extractFromFile(path)
 			if err != nil {
 				glog.V(1).Infof("Can't process config file %q: %v", path, err)
 			} else {
@@ -131,7 +128,9 @@ func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
 	return pods, nil
 }
 
-func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) {
+func extractFromFile(filename string) (api.BoundPod, error) {
+	var pod api.BoundPod
+
 	glog.V(3).Infof("Reading config file %q", filename)
 	file, err := os.Open(filename)
 	if err != nil {
@@ -144,18 +143,42 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 		return pod, err
 	}
 
-	defaultFn := func(pod *api.Pod) error {
-		return s.applyDefaults(pod, filename)
+	manifest := &api.ContainerManifest{}
+	// TODO: use api.Scheme.DecodeInto
+	if err := yaml.Unmarshal(data, manifest); err != nil {
+		return pod, fmt.Errorf("can't unmarshal file %q: %v", filename, err)
 	}
 
-	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)
-	if parsed {
-		if podErr != nil {
-			return pod, podErr
-		}
-		return pod, nil
+	if err := api.Scheme.Convert(manifest, &pod); err != nil {
+		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
 	}
 
-	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as pod(%v).\n",
-		filename, string(data), podErr)
+	pod.Name = simpleSubdomainSafeHash(filename)
+	if len(pod.UID) == 0 {
+		pod.UID = simpleSubdomainSafeHash(filename)
+	}
+	if len(pod.Namespace) == 0 {
+		pod.Namespace = api.NamespaceDefault
+	}
+
+	if glog.V(4) {
+		glog.Infof("Got pod from file %q: %#v", filename, pod)
+	} else {
+		glog.V(1).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.Name, pod.UID)
+	}
+	return pod, nil
+}
+
+var simpleSubdomainSafeEncoding = base32.NewEncoding("0123456789abcdefghijklmnopqrstuv")
+var unsafeDNSLabelReplacement = regexp.MustCompile("[^a-z0-9]+")
+
+// simpleSubdomainSafeHash generates a pod name for the given path that is
+// suitable as a subdomain label.
+func simpleSubdomainSafeHash(path string) string {
+	name := strings.ToLower(filepath.Base(path))
+	name = unsafeDNSLabelReplacement.ReplaceAllString(name, "")
+	hasher := sha1.New()
+	hasher.Write([]byte(path))
+	sha := simpleSubdomainSafeEncoding.EncodeToString(hasher.Sum(nil))
+	return fmt.Sprintf("%.15s%.30s", name, sha)
 }

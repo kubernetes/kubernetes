@@ -1,4 +1,4 @@
-{% if pillar.get('is_systemd') %}
+{% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/kubelet' %}
 {% else %}
 {% set environment_file = '/etc/default/kubelet' %}
@@ -19,39 +19,13 @@
     - group: root
     - mode: 755
 
-# The default here is that this file is blank. If this is the case, the kubelet
-# won't be able to parse it as JSON and it will not be able to publish events
-# to the apiserver. You'll see a single error line in the kubelet start up file
-# about this.
-/var/lib/kubelet/kubeconfig:
-  file.managed:
-    - source: salt://kubelet/kubeconfig
-    - user: root
-    - group: root
-    - mode: 400
-    - makedirs: true
+{% if grains['os_family'] == 'RedHat' %}
 
-
-{% if pillar.get('is_systemd') %}
-
-{{ pillar.get('systemd_system_path') }}/kubelet.service:
+/usr/lib/systemd/system/kubelet.service:
   file.managed:
     - source: salt://kubelet/kubelet.service
     - user: root
     - group: root
-
-# The service.running block below doesn't work reliably
-# Instead we run our script which e.g. does a systemd daemon-reload
-# But we keep the service block below, so it can be used by dependencies
-# TODO: Fix this
-fix-service-kubelet:
-  cmd.wait:
-    - name: /opt/kubernetes/helpers/services bounce kubelet
-    - watch:
-      - file: /usr/local/bin/kubelet
-      - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
-      - file: {{ environment_file }}
-      - file: /var/lib/kubelet/kubeconfig
 
 {% else %}
 
@@ -64,18 +38,36 @@ fix-service-kubelet:
 
 {% endif %}
 
+# The default here is that this file is blank.  If this is the case, the kubelet
+# won't be able to parse it as JSON and it'll not be able to publish events to
+# the apiserver.  You'll see a single error line in the kubelet start up file
+# about this.
+/var/lib/kubelet/kubernetes_auth:
+  file.managed:
+    - source: salt://kubelet/kubernetes_auth
+    - user: root
+    - group: root
+    - mode: 400
+    - makedirs: true
+
 kubelet:
+  group.present:
+    - system: True
+  user.present:
+    - system: True
+    - gid_from_name: True
+    - shell: /sbin/nologin
+    - home: /var/lib/kubelet
+    - groups:
+      - docker
+    - require:
+      - group: kubelet
   service.running:
     - enable: True
     - watch:
       - file: /usr/local/bin/kubelet
-{% if pillar.get('is_systemd') %}
-      - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
-{% else %}
+{% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/kubelet
 {% endif %}
-{% if grains['os_family'] == 'RedHat' %}
-      - file: /usr/lib/systemd/system/kubelet.service
-{% endif %}
-      - file: {{ environment_file }}
-      - file: /var/lib/kubelet/kubeconfig
+      - file: /var/lib/kubelet/kubernetes_auth
+

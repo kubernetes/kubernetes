@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ echo "master: $KUBE_MASTER" > /etc/salt/minion.d/master.conf
 #
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+  minion_ip: $(ip route get 1.1.1.1 | awk '{print $7}')
   roles:
     - kubernetes-pool
     - kubernetes-pool-vsphere

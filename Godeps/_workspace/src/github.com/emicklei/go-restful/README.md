@@ -47,13 +47,11 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - Filters for intercepting the request &#8594; response flow on Service or Route level
 - Request-scoped variables using attributes
 - Containers for WebServices on different HTTP endpoints
-- Content encoding (gzip,deflate) of request and response payloads
+- Content encoding (gzip,deflate) of responses
 - Automatic responses on OPTIONS (using a filter)
 - Automatic CORS request handling (using a filter)
 - API declaration for Swagger UI (see swagger package)
 - Panic recovery to produce HTTP 500, customizable using RecoverHandler(...)
-- Route errors produce HTTP 404/405/406/415 errors, customizable using ServiceErrorHandler(...)
-- Configurable (trace) logging
 	
 ### Resources
 
@@ -65,8 +63,8 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - [gopkg.in](https://gopkg.in/emicklei/go-restful.v1)
 - [showcase: Mora - MongoDB REST Api server](https://github.com/emicklei/mora)
 
-[![Build Status](https://drone.io/github.com/emicklei/go-restful/status.png)](https://drone.io/github.com/emicklei/go-restful/latest)
+[![Build Status](https://drone.io/github.com/emicklei/go-restful/status.png)](https://drone.io/github.com/emicklei/go-restful/latest)[![library users](https://sourcegraph.com/api/repos/github.com/emicklei/go-restful/badges/library-users.png)](https://sourcegraph.com/github.com/emicklei/go-restful) [![authors](https://sourcegraph.com/api/repos/github.com/emicklei/go-restful/badges/authors.png)](https://sourcegraph.com/github.com/emicklei/go-restful) [![xrefs](https://sourcegraph.com/api/repos/github.com/emicklei/go-restful/badges/xrefs.png)](https://sourcegraph.com/github.com/emicklei/go-restful)
 
-(c) 2012 - 2015, http://ernestmicklei.com. MIT License
+(c) 2012 - 2014, http://ernestmicklei.com. MIT License
 
 Type ```git shortlog -s``` for a full list of contributors.

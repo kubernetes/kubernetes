@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,17 +20,10 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	docker "github.com/fsouza/go-dockerclient"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
 type listContainersResult struct {
@@ -73,39 +66,15 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 }
 
 func TestRunOnce(t *testing.T) {
-	cadvisor := &cadvisor.Mock{}
-	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-
-	podManager, _ := newFakePodManager()
-	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
-
-	kb := &Kubelet{
-		rootDirectory:       "/tmp/kubelet",
-		recorder:            &record.FakeRecorder{},
-		cadvisor:            cadvisor,
-		statusManager:       status.NewManager(nil),
-		containerRefManager: kubecontainer.NewRefManager(),
-		readinessManager:    kubecontainer.NewReadinessManager(),
-		podManager:          podManager,
-		nodeManager:         &fakeNodeManager{},
-		os:                  kubecontainer.FakeOS{},
-		volumeManager:       newVolumeManager(),
-		diskSpaceManager:    diskSpaceManager,
-	}
-	kb.containerManager, _ = newContainerManager(cadvisor, "", "", "")
-
-	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	if err := kb.setupDataDirs(); err != nil {
-		t.Errorf("Failed to init data dirs: %v", err)
-	}
+	kb := &Kubelet{}
 	podContainers := []docker.APIContainers{
 		{
-			Names:  []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
+			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo.new.test"},
 			ID:     "1234",
 			Status: "running",
 		},
 		{
-			Names:  []string{"/k8s_net_foo.new.test_abcdefgh_42"},
+			Names:  []string{"/k8s_net_foo.new.test_"},
 			ID:     "9876",
 			Status: "running",
 		},
@@ -117,69 +86,32 @@ func TestRunOnce(t *testing.T) {
 			{label: "list pod container", containers: []docker.APIContainers{}},
 			{label: "syncPod", containers: podContainers},
 			{label: "list pod container", containers: podContainers},
-			{label: "list pod container", containers: podContainers},
 		},
 		inspectContainersResults: []inspectContainersResult{
 			{
 				label: "syncPod",
 				container: docker.Container{
 					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
+					State:  docker.State{Running: true},
 				},
 			},
 			{
 				label: "syncPod",
 				container: docker.Container{
 					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
+					State:  docker.State{Running: true},
 				},
 			},
 		},
 		t: t,
 	}
-
-	kb.containerRuntime = dockertools.NewFakeDockerManager(
-		kb.dockerClient,
-		kb.recorder,
-		kb.readinessManager,
-		kb.containerRefManager,
-		&cadvisorApi.MachineInfo{},
-		dockertools.PodInfraContainerImage,
-		0,
-		0,
-		"",
-		kubecontainer.FakeOS{},
-		kb.networkPlugin,
-		kb,
-		nil)
-
-	pods := []*api.Pod{
+	kb.dockerPuller = &dockertools.FakeDockerPuller{}
+	results, err := kb.runOnce([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -187,9 +119,7 @@ func TestRunOnce(t *testing.T) {
 				},
 			},
 		},
-	}
-	podManager.SetPods(pods)
-	results, err := kb.runOnce(pods, time.Millisecond)
+	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

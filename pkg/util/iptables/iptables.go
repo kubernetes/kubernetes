@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,58 +18,28 @@ package iptables
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/coreos/go-semver/semver"
-	godbus "github.com/godbus/dbus"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	utilexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/sets"
-)
-
-type RulePosition string
-
-const (
-	Prepend RulePosition = "-I"
-	Append  RulePosition = "-A"
 )
 
 // An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
-	// FlushChain clears the specified chain.  If the chain did not exist, return error.
+	// FlushChain clears the specified chain.
 	FlushChain(table Table, chain Chain) error
-	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
-	DeleteChain(table Table, chain Chain) error
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
-	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
+	EnsureRule(table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
-	// TODO: (BenTheElder) Unit-Test Save/SaveAll, Restore/RestoreAll
-	// Save calls `iptables-save` for table.
-	Save(table Table) ([]byte, error)
-	// SaveAll calls `iptables-save`.
-	SaveAll() ([]byte, error)
-	// Restore runs `iptables-restore` passing data through a temporary file.
-	// table is the Table to restore
-	// data should be formatted like the output of Save()
-	// flush sets the presence of the "--noflush" flag. see: FlushFlag
-	// counters sets the "--counters" flag. see: RestoreCountersFlag
-	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
-	// RestoreAll is the same as Restore except that no table is specified.
-	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
-	// AddReloadFunc adds a function to call on iptables reload
-	AddReloadFunc(reloadFunc func())
-	// Destroy cleans up resources used by the Interface
-	Destroy()
 }
 
 type Protocol byte
@@ -93,97 +63,16 @@ const (
 	ChainOutput      Chain = "OUTPUT"
 )
 
-const (
-	cmdIptablesSave    string = "iptables-save"
-	cmdIptablesRestore string = "iptables-restore"
-	cmdIptables        string = "iptables"
-	cmdIp6tables       string = "ip6tables"
-)
-
-// Option flag for Restore
-type RestoreCountersFlag bool
-
-const RestoreCounters RestoreCountersFlag = true
-const NoRestoreCounters RestoreCountersFlag = false
-
-// Option flag for Restore
-type FlushFlag bool
-
-const FlushTables FlushFlag = true
-const NoFlushTables FlushFlag = false
-
-// Versions of iptables less than this do not support the -C / --check flag
-// (test whether a rule exists).
-const MinCheckVersion = "1.4.11"
-
-// Minimum iptables versions supporting the -w and -w2 flags
-const MinWaitVersion = "1.4.20"
-const MinWait2Version = "1.4.22"
-
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
 	mu       sync.Mutex
 	exec     utilexec.Interface
-	dbus     utildbus.Interface
 	protocol Protocol
-	hasCheck bool
-	waitFlag []string
-
-	reloadFuncs []func()
-	signal      chan *godbus.Signal
 }
 
 // New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
-	vstring, err := GetIptablesVersionString(exec)
-	if err != nil {
-		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
-		vstring = MinCheckVersion
-	}
-	runner := &runner{
-		exec:     exec,
-		dbus:     dbus,
-		protocol: protocol,
-		hasCheck: getIptablesHasCheckCommand(vstring),
-		waitFlag: getIptablesWaitFlag(vstring),
-	}
-	runner.connectToFirewallD()
-	return runner
-}
-
-// Destroy is part of Interface.
-func (runner *runner) Destroy() {
-	if runner.signal != nil {
-		runner.signal <- nil
-	}
-}
-
-const (
-	firewalldName      = "org.fedoraproject.FirewallD1"
-	firewalldPath      = "/org/fedoraproject/FirewallD1"
-	firewalldInterface = "org.fedoraproject.FirewallD1"
-)
-
-// Connects to D-Bus and listens for FirewallD start/restart. (On non-FirewallD-using
-// systems, this is effectively a no-op; we listen for the signals, but they will never be
-// emitted, so reload() will never be called.)
-func (runner *runner) connectToFirewallD() {
-	bus, err := runner.dbus.SystemBus()
-	if err != nil {
-		glog.V(1).Info("Could not connect to D-Bus system bus: %s", err)
-		return
-	}
-
-	rule := fmt.Sprintf("type='signal',sender='%s',path='%s',interface='%s',member='Reloaded'", firewalldName, firewalldPath, firewalldInterface)
-	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
-
-	rule = fmt.Sprintf("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus',arg0='%s'", firewalldName)
-	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
-
-	runner.signal = make(chan *godbus.Signal, 10)
-	bus.Signal(runner.signal)
-
-	go runner.dbusSignalHandler(bus)
+func New(exec utilexec.Interface, protocol Protocol) Interface {
+	return &runner{exec: exec, protocol: protocol}
 }
 
 // EnsureChain is part of Interface.
@@ -219,23 +108,8 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 	return nil
 }
 
-// DeleteChain is part of Interface.
-func (runner *runner) DeleteChain(table Table, chain Chain) error {
-	fullArgs := makeFullArgs(table, chain)
-
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// TODO: we could call iptable -S first, ignore the output and check for non-zero return (more like DeleteRule)
-	out, err := runner.run(opDeleteChain, fullArgs)
-	if err != nil {
-		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
-	}
-	return nil
-}
-
 // EnsureRule is part of Interface.
-func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error) {
+func (runner *runner) EnsureRule(table Table, chain Chain, args ...string) (bool, error) {
 	fullArgs := makeFullArgs(table, chain, args...)
 
 	runner.mu.Lock()
@@ -248,7 +122,7 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 	if exists {
 		return true, nil
 	}
-	out, err := runner.run(operation(position), fullArgs)
+	out, err := runner.run(opAppendRule, fullArgs)
 	if err != nil {
 		return false, fmt.Errorf("error appending rule: %v: %s", err, out)
 	}
@@ -280,92 +154,19 @@ func (runner *runner) IsIpv6() bool {
 	return runner.protocol == ProtocolIpv6
 }
 
-// Save is part of Interface.
-func (runner *runner) Save(table Table) ([]byte, error) {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// run and return
-	args := []string{"-t", string(table)}
-	return runner.exec.Command(cmdIptablesSave, args...).CombinedOutput()
-}
-
-// SaveAll is part of Interface.
-func (runner *runner) SaveAll() ([]byte, error) {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// run and return
-	return runner.exec.Command(cmdIptablesSave, []string{}...).CombinedOutput()
-}
-
-// Restore is part of Interface.
-func (runner *runner) Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
-	// setup args
-	args := []string{"-T", string(table)}
-	return runner.restoreInternal(args, data, flush, counters)
-}
-
-// RestoreAll is part of Interface.
-func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
-	// setup args
-	args := make([]string, 0)
-	return runner.restoreInternal(args, data, flush, counters)
-}
-
-// restoreInternal is the shared part of Restore/RestoreAll
-func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	if !flush {
-		args = append(args, "--noflush")
-	}
-	if counters {
-		args = append(args, "--counters")
-	}
-	// create temp file through which to pass data
-	temp, err := ioutil.TempFile("", "kube-temp-iptables-restore-")
-	if err != nil {
-		return err
-	}
-	// make sure we delete the temp file
-	defer os.Remove(temp.Name())
-	// Put the filename at the end of args.
-	// NOTE: the filename must be at the end.
-	// See: https://git.netfilter.org/iptables/commit/iptables-restore.c?id=e6869a8f59d779ff4d5a0984c86d80db70784962
-	args = append(args, temp.Name())
-	if err != nil {
-		return err
-	}
-	// write data to the file
-	_, err = temp.Write(data)
-	temp.Close()
-	if err != nil {
-		return err
-	}
-	// run the command and return the output or an error including the output and error
-	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v (%s)", err, b)
-	}
-	return nil
-}
-
 func (runner *runner) iptablesCommand() string {
 	if runner.IsIpv6() {
-		return cmdIp6tables
+		return "ip6tables"
 	} else {
-		return cmdIptables
+		return "iptables"
 	}
 }
 
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
 	iptablesCmd := runner.iptablesCommand()
 
-	fullArgs := append(runner.waitFlag, string(op))
-	fullArgs = append(fullArgs, args...)
-	glog.V(4).Infof("running iptables %s %v", string(op), args)
+	fullArgs := append([]string{string(op)}, args...)
+	glog.V(1).Infof("running iptables %s %v", string(op), args)
 	return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 	// Don't log err here - callers might not think it is an error.
 }
@@ -373,7 +174,12 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
-	if runner.hasCheck {
+	checkPresent, err := getIptablesHasCheckCommand(runner.exec)
+	if err != nil {
+		glog.Warning("Error checking iptables version, assuming version at least 1.4.11: %v", err)
+		checkPresent = true
+	}
+	if checkPresent {
 		return runner.checkRuleUsingCheck(makeFullArgs(table, chain, args...))
 	} else {
 		return runner.checkRuleWithoutCheck(table, chain, args...)
@@ -385,46 +191,49 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 // of hack and half-measures.  We should nix this ASAP.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
 	glog.V(1).Infof("running iptables-save -t %s", string(table))
-	out, err := runner.exec.Command(cmdIptablesSave, "-t", string(table)).CombinedOutput()
+	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
 
-	// Sadly, iptables has inconsistent quoting rules for comments. Just remove all quotes.
-	// Also, quoted multi-word comments (which are counted as a single arg)
-	// will be unpacked into multiple args,
-	// in order to compare against iptables-save output (which will be split at whitespace boundary)
-	// e.g. a single arg('"this must be before the NodePort rules"') will be unquoted and unpacked into 7 args.
-	var argsCopy []string
-	for i := range args {
-		tmpField := strings.Trim(args[i], "\"")
-		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
+	// Sadly, iptables has inconsistent quoting rules for comments.
+	// Just unquote any arg that is wrapped in quotes.
+	argsCopy := make([]string, len(args))
+	copy(argsCopy, args)
+	for i := range argsCopy {
+		unquote(&argsCopy[i])
 	}
-	argset := sets.NewString(argsCopy...)
+	argset := util.NewStringSet(argsCopy...)
 
 	for _, line := range strings.Split(string(out), "\n") {
 		var fields = strings.Fields(line)
 
 		// Check that this is a rule for the correct chain, and that it has
 		// the correct number of argument (+2 for "-A <chain name>")
-		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(argsCopy)+2 {
+		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(args)+2 {
 			continue
 		}
 
 		// Sadly, iptables has inconsistent quoting rules for comments.
-		// Just remove all quotes.
+		// Just unquote any arg that is wrapped in quotes.
 		for i := range fields {
-			fields[i] = strings.Trim(fields[i], "\"")
+			unquote(&fields[i])
 		}
 
 		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
-		if sets.NewString(fields...).IsSuperset(argset) {
+		if util.NewStringSet(fields...).IsSuperset(argset) {
 			return true, nil
 		}
 		glog.V(5).Infof("DBG: fields is not a superset of args: fields=%v  args=%v", fields, args)
 	}
 
 	return false, nil
+}
+
+func unquote(strp *string) {
+	if len(*strp) >= 2 && (*strp)[0] == '"' && (*strp)[len(*strp)-1] == '"' {
+		*strp = strings.TrimPrefix(strings.TrimSuffix(*strp, `"`), `"`)
+	}
 }
 
 // Executes the rule check using the "-C" flag
@@ -448,7 +257,6 @@ type operation string
 const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
-	opDeleteChain operation = "-X"
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
@@ -459,111 +267,67 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 }
 
 // Checks if iptables has the "-C" flag
-func getIptablesHasCheckCommand(vstring string) bool {
-	minVersion, err := semver.NewVersion(MinCheckVersion)
+func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
+	vstring, err := getIptablesVersionString(exec)
 	if err != nil {
-		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinCheckVersion, err)
-		return true
+		return false, err
 	}
-	version, err := semver.NewVersion(vstring)
+
+	v1, v2, v3, err := extractIptablesVersion(vstring)
 	if err != nil {
-		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
-		return true
+		return false, err
 	}
-	if version.LessThan(*minVersion) {
-		return false
-	}
-	return true
+
+	return iptablesHasCheckCommand(v1, v2, v3), nil
 }
 
-// Checks if iptables version has a "wait" flag
-func getIptablesWaitFlag(vstring string) []string {
-	version, err := semver.NewVersion(vstring)
-	if err != nil {
-		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
-		return nil
+// getIptablesVersion returns the first three components of the iptables version.
+// e.g. "iptables v1.3.66" would return (1, 3, 66, nil)
+func extractIptablesVersion(str string) (int, int, int, error) {
+	versionMatcher := regexp.MustCompile("v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+	result := versionMatcher.FindStringSubmatch(str)
+	if result == nil {
+		return 0, 0, 0, fmt.Errorf("no iptables version found in string: %s", str)
 	}
 
-	minVersion, err := semver.NewVersion(MinWaitVersion)
+	v1, err := strconv.Atoi(result[1])
 	if err != nil {
-		glog.Errorf("MinWaitVersion (%s) is not a valid version string: %v", MinWaitVersion, err)
-		return nil
-	}
-	if version.LessThan(*minVersion) {
-		return nil
+		return 0, 0, 0, err
 	}
 
-	minVersion, err = semver.NewVersion(MinWait2Version)
+	v2, err := strconv.Atoi(result[2])
 	if err != nil {
-		glog.Errorf("MinWait2Version (%s) is not a valid version string: %v", MinWait2Version, err)
-		return nil
+		return 0, 0, 0, err
 	}
-	if version.LessThan(*minVersion) {
-		return []string{"-w"}
-	} else {
-		return []string{"-w2"}
+
+	v3, err := strconv.Atoi(result[3])
+	if err != nil {
+		return 0, 0, 0, err
 	}
+
+	return v1, v2, v3, nil
 }
 
-// GetIptablesVersionString runs "iptables --version" to get the version string
-// in the form "X.X.X"
-func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
-	// this doesn't access mutable state so we don't need to use the interface / runner
-	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
+// Runs "iptables --version" to get the version string
+func getIptablesVersionString(exec utilexec.Interface) (string, error) {
+	bytes, err := exec.Command("iptables", "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
-	versionMatcher := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9]+)")
-	match := versionMatcher.FindStringSubmatch(string(bytes))
-	if match == nil {
-		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
-	}
-	return match[1], nil
+
+	return string(bytes), nil
 }
 
-// goroutine to listen for D-Bus signals
-func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
-	firewalld := bus.Object(firewalldName, firewalldPath)
-
-	for s := range runner.signal {
-		if s == nil {
-			// Unregister
-			bus.Signal(runner.signal)
-			return
-		}
-
-		switch s.Name {
-		case "org.freedesktop.DBus.NameOwnerChanged":
-			name := s.Body[0].(string)
-			new_owner := s.Body[2].(string)
-
-			if name != firewalldName || len(new_owner) == 0 {
-				continue
-			}
-
-			// FirewallD startup (specifically the part where it deletes
-			// all existing iptables rules) may not yet be complete when
-			// we get this signal, so make a dummy request to it to
-			// synchronize.
-			firewalld.Call(firewalldInterface+".getDefaultZone", 0)
-
-			runner.reload()
-		case firewalldInterface + ".Reloaded":
-			runner.reload()
-		}
+// Checks if an iptables version is after 1.4.11, when --check was added
+func iptablesHasCheckCommand(v1 int, v2 int, v3 int) bool {
+	if v1 > 1 {
+		return true
 	}
-}
-
-// AddReloadFunc is part of Interface
-func (runner *runner) AddReloadFunc(reloadFunc func()) {
-	runner.reloadFuncs = append(runner.reloadFuncs, reloadFunc)
-}
-
-// runs all reload funcs to re-sync iptables rules
-func (runner *runner) reload() {
-	glog.V(1).Infof("reloading iptables rules")
-
-	for _, f := range runner.reloadFuncs {
-		f()
+	if v1 == 1 && v2 > 4 {
+		return true
 	}
+	if v1 == 1 && v2 == 4 && v3 >= 11 {
+		return true
+	}
+	return false
 }

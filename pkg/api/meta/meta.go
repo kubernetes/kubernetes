@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// Accessor takes an arbitrary object pointer and returns meta.Interface.
+// Accessor takes an arbitary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
@@ -71,32 +70,6 @@ func Accessor(obj interface{}) (Interface, error) {
 		}
 	}
 
-	return a, nil
-}
-
-// TypeAccessor returns an interface that allows retrieving and modifying the APIVersion
-// and Kind of an in-memory internal object.
-// TODO: this interface is used to test code that does not have ObjectMeta or ListMeta
-// in round tripping (objects which can use apiVersion/kind, but do not fit the Kube
-// api conventions).
-func TypeAccessor(obj interface{}) (TypeInterface, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), t, v.Interface())
-	}
-
-	typeMeta := v.FieldByName("TypeMeta")
-	if !typeMeta.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded TypeMeta type", t)
-	}
-	a := &genericAccessor{}
-	if err := extractFromTypeMeta(typeMeta, a); err != nil {
-		return nil, fmt.Errorf("unable to find type fields on %#v: %v", typeMeta, err)
-	}
 	return a, nil
 }
 
@@ -178,24 +151,7 @@ func (resourceAccessor) SetName(obj runtime.Object, name string) error {
 	return nil
 }
 
-func (resourceAccessor) GenerateName(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	return accessor.GenerateName(), nil
-}
-
-func (resourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
-	accessor, err := Accessor(obj)
-	if err != nil {
-		return err
-	}
-	accessor.SetGenerateName(name)
-	return nil
-}
-
-func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
+func (resourceAccessor) UID(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -203,7 +159,7 @@ func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
 	return accessor.UID(), nil
 }
 
-func (resourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
+func (resourceAccessor) SetUID(obj runtime.Object, uid string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -285,8 +241,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 type genericAccessor struct {
 	namespace       *string
 	name            *string
-	generateName    *string
-	uid             *types.UID
+	uid             *string
 	apiVersion      *string
 	kind            *string
 	resourceVersion *string
@@ -323,28 +278,14 @@ func (a genericAccessor) SetName(name string) {
 	*a.name = name
 }
 
-func (a genericAccessor) GenerateName() string {
-	if a.generateName == nil {
-		return ""
-	}
-	return *a.generateName
-}
-
-func (a genericAccessor) SetGenerateName(generateName string) {
-	if a.generateName == nil {
-		return
-	}
-	*a.generateName = generateName
-}
-
-func (a genericAccessor) UID() types.UID {
+func (a genericAccessor) UID() string {
 	if a.uid == nil {
 		return ""
 	}
 	return *a.uid
 }
 
-func (a genericAccessor) SetUID(uid types.UID) {
+func (a genericAccessor) SetUID(uid string) {
 	if a.uid == nil {
 		return
 	}
@@ -405,12 +346,36 @@ func (a genericAccessor) SetAnnotations(annotations map[string]string) {
 	*a.annotations = annotations
 }
 
-// extractFromTypeMeta extracts pointers to version and kind fields from an object
-func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
+// fieldPtr puts the address of fieldName, which must be a member of v,
+// into dest, which must be an address of a variable to which this field's
+// address can be assigned.
+func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+	}
+	v, err := conversion.EnforcePtr(dest)
+	if err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "Kind", &a.kind); err != nil {
+	field = field.Addr()
+	if field.Type().AssignableTo(v.Type()) {
+		v.Set(field)
+		return nil
+	}
+	if field.Type().ConvertibleTo(v.Type()) {
+		v.Set(field.Convert(v.Type()))
+		return nil
+	}
+	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
+}
+
+// extractFromTypeMeta extracts pointers to version and kind fields from an object
+func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
+	if err := fieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
+		return err
+	}
+	if err := fieldPtr(v, "Kind", &a.kind); err != nil {
 		return err
 	}
 	return nil
@@ -418,28 +383,25 @@ func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 
 // extractFromObjectMeta extracts pointers to metadata fields from an object
 func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "Namespace", &a.namespace); err != nil {
+	if err := fieldPtr(v, "Namespace", &a.namespace); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
+	if err := fieldPtr(v, "Name", &a.name); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "GenerateName", &a.generateName); err != nil {
+	if err := fieldPtr(v, "UID", &a.uid); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {
+	if err := fieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
+	if err := fieldPtr(v, "SelfLink", &a.selfLink); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
+	if err := fieldPtr(v, "Labels", &a.labels); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "Labels", &a.labels); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Annotations", &a.annotations); err != nil {
+	if err := fieldPtr(v, "Annotations", &a.annotations); err != nil {
 		return err
 	}
 	return nil
@@ -447,10 +409,10 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 
 // extractFromObjectMeta extracts pointers to metadata fields from a list object
 func extractFromListMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
+	if err := fieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
+	if err := fieldPtr(v, "SelfLink", &a.selfLink); err != nil {
 		return err
 	}
 	return nil

@@ -1,13 +1,10 @@
 package etcd
 
-//go:generate codecgen -o response.generated.go response.go
-
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/ugorji/go/codec"
 )
 
 const (
@@ -31,7 +28,6 @@ var (
 		http.StatusNotFound:           true,
 		http.StatusPreconditionFailed: true,
 		http.StatusForbidden:          true,
-		http.StatusUnauthorized:       true,
 	}
 )
 
@@ -43,7 +39,7 @@ func (rr *RawResponse) Unmarshal() (*Response, error) {
 
 	resp := new(Response)
 
-	err := codec.NewDecoderBytes(rr.Body, new(codec.JsonHandle)).Decode(resp)
+	err := json.Unmarshal(rr.Body, resp)
 
 	if err != nil {
 		return nil, err

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,39 +17,27 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path"
 	"reflect"
-	"sort"
+	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/container"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
-	"k8s.io/kubernetes/pkg/volume"
-	_ "k8s.io/kubernetes/pkg/volume/host_path"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/fsouza/go-dockerclient"
+	"github.com/google/cadvisor/info"
+	"github.com/stretchr/testify/mock"
 )
 
 func init() {
@@ -57,165 +45,48 @@ func init() {
 	util.ReallyCrash = true
 }
 
-const testKubeletHostname = "127.0.0.1"
+func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools.FakeDockerClient) {
+	fakeEtcdClient := tools.NewFakeEtcdClient(t)
+	fakeDocker := &dockertools.FakeDockerClient{}
 
-type fakeHTTP struct {
-	url string
-	err error
-}
-
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
-	return nil, f.err
-}
-
-type TestKubelet struct {
-	kubelet          *Kubelet
-	fakeRuntime      *kubecontainer.FakeRuntime
-	fakeCadvisor     *cadvisor.Mock
-	fakeKubeClient   *testclient.Fake
-	fakeMirrorClient *fakeMirrorClient
-	fakeNodeManager  *fakeNodeManager
-}
-
-func newTestKubelet(t *testing.T) *TestKubelet {
-	fakeRuntime := &kubecontainer.FakeRuntime{}
-	fakeRuntime.VersionInfo = "1.15"
-	fakeRecorder := &record.FakeRecorder{}
-	fakeKubeClient := &testclient.Fake{}
 	kubelet := &Kubelet{}
-	kubelet.kubeClient = fakeKubeClient
-	kubelet.os = kubecontainer.FakeOS{}
-
-	kubelet.hostname = testKubeletHostname
-	kubelet.nodeName = testKubeletHostname
-	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
-	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
-		t.Fatalf("can't make a temp rootdir: %v", err)
-	} else {
-		kubelet.rootDirectory = tempDir
-	}
-	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
-	}
-	kubelet.sourcesReady = func() bool { return true }
-	kubelet.masterServiceNamespace = api.NamespaceDefault
-	kubelet.serviceLister = testServiceLister{}
-
-	kubelet.readinessManager = kubecontainer.NewReadinessManager()
-	kubelet.recorder = fakeRecorder
-	kubelet.statusManager = status.NewManager(fakeKubeClient)
-	if err := kubelet.setupDataDirs(); err != nil {
-		t.Fatalf("can't initialize kubelet data dirs: %v", err)
-	}
-	fakeNodeManager := &fakeNodeManager{}
-	kubelet.nodeManager = fakeNodeManager
-	mockCadvisor := &cadvisor.Mock{}
-	kubelet.cadvisor = mockCadvisor
-	podManager, fakeMirrorClient := newFakePodManager()
-	kubelet.podManager = podManager
-	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
-	if err != nil {
-		t.Fatalf("can't initialize disk space manager: %v", err)
-	}
-	kubelet.diskSpaceManager = diskSpaceManager
-
-	kubelet.containerRuntime = fakeRuntime
-	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
-	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn:    kubelet.syncPod,
-		runtimeCache: kubelet.runtimeCache,
-		t:            t,
-	}
-	kubelet.volumeManager = newVolumeManager()
-	kubelet.containerManager, _ = newContainerManager(mockCadvisor, "", "", "")
-	kubelet.networkConfigured = true
-	fakeClock := &util.FakeClock{Time: time.Now()}
-	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
-	kubelet.backOff.Clock = fakeClock
-	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeNodeManager}
+	kubelet.dockerClient = fakeDocker
+	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
+	kubelet.etcdClient = fakeEtcdClient
+	kubelet.rootDirectory = "/tmp/kubelet"
+	kubelet.podWorkers = newPodWorkers()
+	return kubelet, fakeEtcdClient, fakeDocker
 }
 
-func newTestPods(count int) []*api.Pod {
-	pods := make([]*api.Pod, count)
-	for i := 0; i < count; i++ {
-		pods[i] = &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: fmt.Sprintf("pod%d", i),
-			},
+func verifyCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
+	err := fakeDocker.AssertCalls(calls)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
+	invalid := len(actual) != len(expected)
+	if !invalid {
+		for ix, value := range actual {
+			if expected[ix] != value {
+				invalid = true
+			}
 		}
 	}
-	return pods
+	if invalid {
+		t.Errorf("Expected: %#v, Actual: %#v", expected, actual)
+	}
+}
+
+func verifyBoolean(t *testing.T, expected, value bool) {
+	if expected != value {
+		t.Errorf("Unexpected boolean.  Expected %t.  Found %t", expected, value)
+	}
 }
 
 func TestKubeletDirs(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	root := kubelet.rootDirectory
-
-	var exp, got string
-
-	got = kubelet.getPodsDir()
-	exp = path.Join(root, "pods")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPluginsDir()
-	exp = path.Join(root, "plugins")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPluginDir("foobar")
-	exp = path.Join(root, "plugins/foobar")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodDir("abc123")
-	exp = path.Join(root, "pods/abc123")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodVolumesDir("abc123")
-	exp = path.Join(root, "pods/abc123/volumes")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodVolumeDir("abc123", "plugin", "foobar")
-	exp = path.Join(root, "pods/abc123/volumes/plugin/foobar")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodPluginsDir("abc123")
-	exp = path.Join(root, "pods/abc123/plugins")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodPluginDir("abc123", "foobar")
-	exp = path.Join(root, "pods/abc123/plugins/foobar")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodContainerDir("abc123", "def456")
-	exp = path.Join(root, "pods/abc123/containers/def456")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-}
-
-func TestKubeletDirsCompat(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
+	kubelet, _, _ := newTestKubelet(t)
 	root := kubelet.rootDirectory
 	if err := os.MkdirAll(root, 0750); err != nil {
 		t.Fatalf("can't mkdir(%q): %s", root, err)
@@ -223,146 +94,210 @@ func TestKubeletDirsCompat(t *testing.T) {
 
 	var exp, got string
 
-	// Old-style pod dir.
-	if err := os.MkdirAll(fmt.Sprintf("%s/oldpod", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-	// New-style pod dir.
-	if err := os.MkdirAll(fmt.Sprintf("%s/pods/newpod", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-	// Both-style pod dir.
-	if err := os.MkdirAll(fmt.Sprintf("%s/bothpod", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-	if err := os.MkdirAll(fmt.Sprintf("%s/pods/bothpod", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-
-	got = kubelet.getPodDir("oldpod")
-	exp = path.Join(root, "oldpod")
+	got = kubelet.GetPodsDir()
+	exp = root
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.getPodDir("newpod")
-	exp = path.Join(root, "pods/newpod")
+	got = kubelet.GetPodDir("abc123")
+	exp = path.Join(root, "abc123")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.getPodDir("bothpod")
-	exp = path.Join(root, "pods/bothpod")
+	got = kubelet.GetPodVolumesDir("abc123")
+	exp = path.Join(root, "abc123/volumes")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.getPodDir("neitherpod")
-	exp = path.Join(root, "pods/neitherpod")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	root = kubelet.getPodDir("newpod")
-
-	// Old-style container dir.
-	if err := os.MkdirAll(fmt.Sprintf("%s/oldctr", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-	// New-style container dir.
-	if err := os.MkdirAll(fmt.Sprintf("%s/containers/newctr", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-	// Both-style container dir.
-	if err := os.MkdirAll(fmt.Sprintf("%s/bothctr", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-	if err := os.MkdirAll(fmt.Sprintf("%s/containers/bothctr", root), 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
-
-	got = kubelet.getPodContainerDir("newpod", "oldctr")
-	exp = path.Join(root, "oldctr")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodContainerDir("newpod", "newctr")
-	exp = path.Join(root, "containers/newctr")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodContainerDir("newpod", "bothctr")
-	exp = path.Join(root, "containers/bothctr")
-	if got != exp {
-		t.Errorf("expected %q', got %q", exp, got)
-	}
-
-	got = kubelet.getPodContainerDir("newpod", "neitherctr")
-	exp = path.Join(root, "containers/neitherctr")
+	got = kubelet.GetPodContainerDir("abc123", "def456")
+	exp = path.Join(root, "abc123/def456")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 }
 
-var emptyPodUIDs map[types.UID]SyncPodType
-
-func TestSyncLoopTimeUpdate(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	kubelet := testKubelet.kubelet
-
-	loopTime1 := kubelet.LatestLoopEntryTime()
-	if !loopTime1.IsZero() {
-		t.Errorf("Unexpected sync loop time: %s, expected 0", loopTime1)
+func TestKillContainerWithError(t *testing.T) {
+	fakeDocker := &dockertools.FakeDockerClient{
+		Err: fmt.Errorf("sample error"),
+		ContainerList: []docker.APIContainers{
+			{
+				ID:    "1234",
+				Names: []string{"/k8s_foo_qux_1234"},
+			},
+			{
+				ID:    "5678",
+				Names: []string{"/k8s_bar_qux_5678"},
+			},
+		},
 	}
-
-	kubelet.syncLoopIteration(make(chan PodUpdate), kubelet)
-	loopTime2 := kubelet.LatestLoopEntryTime()
-	if loopTime2.IsZero() {
-		t.Errorf("Unexpected sync loop time: 0, expected non-zero value.")
+	kubelet, _, _ := newTestKubelet(t)
+	kubelet.dockerClient = fakeDocker
+	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	if err == nil {
+		t.Errorf("expected error, found nil")
 	}
-	kubelet.syncLoopIteration(make(chan PodUpdate), kubelet)
-	loopTime3 := kubelet.LatestLoopEntryTime()
-	if !loopTime3.After(loopTime1) {
-		t.Errorf("Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
-	}
+	verifyCalls(t, fakeDocker, []string{"stop"})
 }
 
-func TestSyncLoopAbort(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	kubelet.lastTimestampRuntimeUp = time.Now()
-	kubelet.networkConfigured = true
-
-	ch := make(chan PodUpdate)
-	close(ch)
-
-	// sanity check (also prevent this test from hanging in the next step)
-	ok := kubelet.syncLoopIteration(ch, kubelet)
-	if ok {
-		t.Fatalf("expected syncLoopIteration to return !ok since update chan was closed")
+func TestKillContainer(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			ID:    "1234",
+			Names: []string{"/k8s_foo_qux_1234"},
+		},
+		{
+			ID:    "5678",
+			Names: []string{"/k8s_bar_qux_5678"},
+		},
+	}
+	fakeDocker.Container = &docker.Container{
+		Name: "foobar",
 	}
 
-	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
-	kubelet.syncLoop(ch, kubelet)
+	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	verifyCalls(t, fakeDocker, []string{"stop"})
 }
 
-func TestSyncPodsStartPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	pods := []*api.Pod{
+type channelReader struct {
+	list [][]api.BoundPod
+	wg   sync.WaitGroup
+}
+
+func startReading(channel <-chan interface{}) *channelReader {
+	cr := &channelReader{}
+	cr.wg.Add(1)
+	go func() {
+		for {
+			update, ok := <-channel
+			if !ok {
+				break
+			}
+			cr.list = append(cr.list, update.(PodUpdate).Pods)
+		}
+		cr.wg.Done()
+	}()
+	return cr
+}
+
+func (cr *channelReader) GetList() [][]api.BoundPod {
+	cr.wg.Wait()
+	return cr.list
+}
+
+func TestSyncPodsDoesNothing(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	container := api.Container{Name: "bar"}
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// format is k8s_<container-id>_<pod-fullname>
+			Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo.new.test"},
+			ID:    "1234",
+		},
+		{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					container,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+	verifyCalls(t, fakeDocker, []string{"list", "list", "inspect_container", "inspect_container"})
+}
+
+func TestSyncPodsWithTerminationLog(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	container := api.Container{
+		Name: "bar",
+		TerminationMessagePath: "/dev/somepath",
+	}
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:         "0123-45-67-89ab-cdef",
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					container,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+	verifyCalls(t, fakeDocker, []string{
+		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+
+	fakeDocker.Lock()
+	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
+	if !matchString(t, kubelet.GetPodContainerDir("0123-45-67-89ab-cdef", "bar")+"/k8s_bar\\.[a-f0-9]", parts[0]) {
+		t.Errorf("Unexpected host path: %s", parts[0])
+	}
+	if parts[1] != "/dev/somepath" {
+		t.Errorf("Unexpected container path: %s", parts[1])
+	}
+	fakeDocker.Unlock()
+}
+
+// drainWorkers waits until all workers are done.  Should only used for testing.
+func (kl *Kubelet) drainWorkers() {
+	for {
+		kl.podWorkers.lock.Lock()
+		length := len(kl.podWorkers.workers)
+		kl.podWorkers.lock.Unlock()
+		if length == 0 {
+			return
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+}
+
+func matchString(t *testing.T, pattern, str string) bool {
+	match, err := regexp.MatchString(pattern, str)
+	if err != nil {
+		t.Logf("unexpected error: %v", err)
+	}
+	return match
+}
+
+func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.networkContainerImage = "custom_image_name"
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -370,127 +305,463 @@ func TestSyncPodsStartPod(t *testing.T) {
 				},
 			},
 		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodSyncs(pods)
-	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+
+	fakeDocker.Lock()
+
+	found := false
+	for _, c := range fakeDocker.ContainerList {
+		if c.Image == "custom_image_name" && strings.HasPrefix(c.Names[0], "/k8s_net") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Custom net container not found: %v", fakeDocker.ContainerList)
+	}
+
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "k8s_net\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[1]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 }
 
-func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
-	ready := false
-
-	testKubelet := newTestKubelet(t)
-	fakeRuntime := testKubelet.fakeRuntime
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	kubelet.sourcesReady = func() bool { return ready }
-
-	fakeRuntime.PodList = []*kubecontainer.Pod{
+func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
+	puller.HasImages = []string{}
+	kubelet.networkContainerImage = "custom_image_name"
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			ID:   "12345678",
-			Name: "foo", Namespace: "new",
-			Containers: []*kubecontainer.Container{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+
+	fakeDocker.Lock()
+
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", ""}) {
+		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
+	}
+
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "k8s_net\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[1]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+}
+
+func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "inspect_container", "list", "create", "start"})
+
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 1 ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+}
+
+func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeHttp := fakeHTTP{}
+	kubelet.httpClient = &fakeHttp
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "bar",
+						Lifecycle: &api.Lifecycle{
+							PostStart: &api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Host: "foo",
+									Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+									Path: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "inspect_container", "list", "create", "start"})
+
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 1 ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("Unexpected handler: %s", fakeHttp.url)
+	}
+}
+
+func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// format is k8s_<container-id>_<pod-fullname>
+			Names: []string{"/k8s_bar_foo.new.test"},
+			ID:    "1234",
+		},
+	}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "stop", "create", "start", "list", "list", "inspect_container", "list", "create", "start"})
+
+	// A map iteration is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+	}
+	fakeDocker.Lock()
+	if len(fakeDocker.Stopped) != 1 || !expectedToStop[fakeDocker.Stopped[0]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+	fakeDocker.Unlock()
+}
+
+func TestSyncPodsDeletes(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_foo_bar.new.test"},
+			ID:    "1234",
+		},
+		{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+		{
+			Names: []string{"foo"},
+			ID:    "4567",
+		},
+	}
+	err := kubelet.SyncPods([]api.BoundPod{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+
+	// A map iteration is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+		"9876": true,
+	}
+	if len(fakeDocker.Stopped) != 2 ||
+		!expectedToStop[fakeDocker.Stopped[0]] ||
+		!expectedToStop[fakeDocker.Stopped[1]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+}
+
+func TestSyncPodDeletesDuplicate(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	dockerContainers := dockertools.DockerContainers{
+		"1234": &docker.APIContainers{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_foo_bar.new.test_1"},
+			ID:    "1234",
+		},
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s_net_bar.new.test_"},
+			ID:    "9876",
+		},
+		"4567": &docker.APIContainers{
+			// Duplicate for the same container.
+			Names: []string{"/k8s_foo_bar.new.test_2"},
+			ID:    "4567",
+		},
+		"2304": &docker.APIContainers{
+			// Container for another pod, untouched.
+			Names: []string{"/k8s_baz_fiz.new.test_6"},
+			ID:    "2304",
+		},
+	}
+	err := kubelet.syncPod(&api.BoundPod{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "bar",
+			Namespace:   "new",
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo"},
+			},
+		},
+	}, dockerContainers)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	verifyCalls(t, fakeDocker, []string{"list", "stop"})
+
+	// Expect one of the duplicates to be killed.
+	if len(fakeDocker.Stopped) != 1 || (len(fakeDocker.Stopped) != 0 && fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+}
+
+type FalseHealthChecker struct{}
+
+func (f *FalseHealthChecker) HealthCheck(podFullName, podUUID string, state api.PodState, container api.Container) (health.Status, error) {
+	return health.Unhealthy, nil
+}
+
+func (f *FalseHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return true
+}
+
+func TestSyncPodBadHash(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.healthChecker = &FalseHealthChecker{}
+	dockerContainers := dockertools.DockerContainers{
+		"1234": &docker.APIContainers{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_bar.1234_foo.new.test"},
+			ID:    "1234",
+		},
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.syncPod(&api.BoundPod{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "foo",
+			Namespace:   "new",
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
 				{Name: "bar"},
 			},
 		},
+	}, dockerContainers)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-	kubelet.HandlePodCleanups()
-	// Sources are not ready yet. Don't remove any pods.
-	fakeRuntime.AssertKilledPods([]string{})
 
-	ready = true
-	kubelet.HandlePodCleanups()
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list", "create", "start"})
 
-	// Sources are ready. Remove unwanted pods.
-	fakeRuntime.AssertKilledPods([]string{"12345678"})
+	// A map interation is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+		"9876": true,
+	}
+	if len(fakeDocker.Stopped) != 2 ||
+		(!expectedToStop[fakeDocker.Stopped[0]] &&
+			!expectedToStop[fakeDocker.Stopped[1]]) {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+}
+
+func TestSyncPodUnhealthy(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.healthChecker = &FalseHealthChecker{}
+	dockerContainers := dockertools.DockerContainers{
+		"1234": &docker.APIContainers{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_bar_foo.new.test"},
+			ID:    "1234",
+		},
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.syncPod(&api.BoundPod{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "foo",
+			Namespace:   "new",
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar",
+					LivenessProbe: &api.LivenessProbe{
+					// Always returns healthy == false
+					},
+				},
+			},
+		},
+	}, dockerContainers)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list", "create", "start"})
+
+	// A map interation is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+		"9876": true,
+	}
+	if len(fakeDocker.Stopped) != 2 ||
+		(!expectedToStop[fakeDocker.Stopped[0]] &&
+			expectedToStop[fakeDocker.Stopped[0]]) {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+}
+
+func TestMakeEnvVariables(t *testing.T) {
+	container := api.Container{
+		Env: []api.EnvVar{
+			{
+				Name:  "foo",
+				Value: "bar",
+			},
+			{
+				Name:  "baz",
+				Value: "blah",
+			},
+		},
+	}
+	vars := makeEnvironmentVariables(&container)
+	if len(vars) != len(container.Env) {
+		t.Errorf("Vars don't match.  Expected: %#v Found: %#v", container.Env, vars)
+	}
+	for ix, env := range container.Env {
+		value := fmt.Sprintf("%s=%s", env.Name, env.Value)
+		if value != vars[ix] {
+			t.Errorf("Unexpected value: %s.  Expected: %s", vars[ix], value)
+		}
+	}
 }
 
 func TestMountExternalVolumes(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{PluginName: "fake", Host: nil}}, &volumeHost{kubelet})
-
-	pod := api.Pod{
+	kubelet, _, _ := newTestKubelet(t)
+	pod := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "test",
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
 				{
-					Name:         "vol1",
-					VolumeSource: api.VolumeSource{},
+					Name: "host-dir",
+					Source: &api.VolumeSource{
+						HostDir: &api.HostDir{"/dir/path"},
+					},
 				},
 			},
 		},
 	}
-	podVolumes, err := kubelet.mountExternalVolumes(&pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
-	}
-	expectedPodVolumes := []string{"vol1"}
+	podVolumes, _ := kubelet.mountExternalVolumes(&pod)
+	expectedPodVolumes := make(volumeMap)
+	expectedPodVolumes["host-dir"] = &volume.HostDir{"/dir/path"}
 	if len(expectedPodVolumes) != len(podVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
 	}
-	for _, name := range expectedPodVolumes {
+	for name, expectedVolume := range expectedPodVolumes {
 		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
+			t.Errorf("api.BoundPod volumes map is missing key: %s. %#v", expectedVolume, podVolumes)
 		}
 	}
 }
 
-func TestGetPodVolumesFromDisk(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
-	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
-
-	volsOnDisk := []struct {
-		podUID  types.UID
-		volName string
-	}{
-		{"pod1", "vol1"},
-		{"pod1", "vol2"},
-		{"pod2", "vol1"},
-	}
-
-	expectedPaths := []string{}
-	for i := range volsOnDisk {
-		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
-		fv.SetUp()
-		expectedPaths = append(expectedPaths, fv.GetPath())
-	}
-
-	volumesFound := kubelet.getPodVolumesFromDisk()
-	if len(volumesFound) != len(expectedPaths) {
-		t.Errorf("Expected to find %d cleaners, got %d", len(expectedPaths), len(volumesFound))
-	}
-	for _, ep := range expectedPaths {
-		found := false
-		for _, cl := range volumesFound {
-			if ep == cl.GetPath() {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Could not find a volume with path %s", ep)
-		}
-	}
-}
-
-type stubVolume struct {
-	path string
-}
-
-func (f *stubVolume) GetPath() string {
-	return f.path
-}
-
-func TestMakeVolumeMounts(t *testing.T) {
+func TestMakeVolumesAndBinds(t *testing.T) {
 	container := api.Container{
 		VolumeMounts: []api.VolumeMount{
 			{
@@ -516,74 +787,208 @@ func TestMakeVolumeMounts(t *testing.T) {
 		},
 	}
 
-	podVolumes := kubecontainer.VolumeMap{
-		"disk":  &stubVolume{"/mnt/disk"},
-		"disk4": &stubVolume{"/mnt/host"},
-		"disk5": &stubVolume{"/var/lib/kubelet/podID/volumes/empty/disk5"},
+	pod := api.BoundPod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "pod",
+			Namespace: "test",
+		},
 	}
 
-	mounts := makeMounts(&container, podVolumes)
+	podVolumes := volumeMap{
+		"disk":  &volume.HostDir{"/mnt/disk"},
+		"disk4": &volume.HostDir{"/mnt/host"},
+		"disk5": &volume.EmptyDir{"disk5", "podID", "/var/lib/kubelet"},
+	}
 
-	expectedMounts := []kubecontainer.Mount{
-		{
-			"disk",
-			"/mnt/path",
-			"/mnt/disk",
-			false,
-		},
-		{
-			"disk",
-			"/mnt/path3",
-			"/mnt/disk",
-			true,
-		},
-		{
-			"disk4",
-			"/mnt/path4",
-			"/mnt/host",
-			false,
-		},
-		{
-			"disk5",
-			"/mnt/path5",
-			"/var/lib/kubelet/podID/volumes/empty/disk5",
-			false,
+	binds := makeBinds(&pod, &container, podVolumes)
+
+	expectedBinds := []string{
+		"/mnt/disk:/mnt/path",
+		"/mnt/disk:/mnt/path3:ro",
+		"/mnt/host:/mnt/path4",
+		"/var/lib/kubelet/podID/volumes/empty/disk5:/mnt/path5",
+	}
+
+	if len(binds) != len(expectedBinds) {
+		t.Errorf("Unexpected binds: Expected %#v got %#v.  Container was: %#v", expectedBinds, binds, container)
+	}
+	verifyStringArrayEquals(t, binds, expectedBinds)
+}
+
+func TestMakePortsAndBindings(t *testing.T) {
+	container := api.Container{
+		Ports: []api.Port{
+			{
+				ContainerPort: 80,
+				HostPort:      8080,
+				HostIP:        "127.0.0.1",
+			},
+			{
+				ContainerPort: 443,
+				HostPort:      443,
+				Protocol:      "tcp",
+			},
+			{
+				ContainerPort: 444,
+				HostPort:      444,
+				Protocol:      "udp",
+			},
+			{
+				ContainerPort: 445,
+				HostPort:      445,
+				Protocol:      "foobar",
+			},
 		},
 	}
-	if !reflect.DeepEqual(mounts, expectedMounts) {
-		t.Errorf("Unexpected mounts: Expected %#v got %#v.  Container was: %#v", expectedMounts, mounts, container)
+	exposedPorts, bindings := makePortsAndBindings(&container)
+	if len(container.Ports) != len(exposedPorts) ||
+		len(container.Ports) != len(bindings) {
+		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
 	}
+	for key, value := range bindings {
+		switch value[0].HostPort {
+		case "8080":
+			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+			if value[0].HostIp != "127.0.0.1" {
+				t.Errorf("Unexpected host IP: %s", value[0].HostIp)
+			}
+		case "443":
+			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+			if value[0].HostIp != "" {
+				t.Errorf("Unexpected host IP: %s", value[0].HostIp)
+			}
+		case "444":
+			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+			if value[0].HostIp != "" {
+				t.Errorf("Unexpected host IP: %s", value[0].HostIp)
+			}
+		case "445":
+			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+			if value[0].HostIp != "" {
+				t.Errorf("Unexpected host IP: %s", value[0].HostIp)
+			}
+		}
+	}
+}
+
+func TestCheckHostPortConflicts(t *testing.T) {
+	successCaseAll := []api.BoundPod{
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 82}}}}}},
+	}
+	successCaseNew := api.BoundPod{
+		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 83}}}}},
+	}
+	expected := append(successCaseAll, successCaseNew)
+	if actual := filterHostPortConflicts(expected); !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Expected %#v, Got %#v", expected, actual)
+	}
+
+	failureCaseAll := []api.BoundPod{
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 82}}}}}},
+	}
+	failureCaseNew := api.BoundPod{
+		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}},
+	}
+	if actual := filterHostPortConflicts(append(failureCaseAll, failureCaseNew)); !reflect.DeepEqual(failureCaseAll, actual) {
+		t.Errorf("Expected %#v, Got %#v", expected, actual)
+	}
+}
+
+func TestFieldPath(t *testing.T) {
+	pod := &api.BoundPod{Spec: api.PodSpec{Containers: []api.Container{
+		{Name: "foo"},
+		{Name: "bar"},
+		{Name: "baz"},
+	}}}
+	table := map[string]struct {
+		pod       *api.BoundPod
+		container *api.Container
+		path      string
+		success   bool
+	}{
+		"basic":            {pod, &api.Container{Name: "foo"}, "spec.containers[0]", true},
+		"basic2":           {pod, &api.Container{Name: "baz"}, "spec.containers[2]", true},
+		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers[0]", true},
+		"missing":          {pod, &api.Container{Name: "qux"}, "", false},
+	}
+
+	for name, item := range table {
+		res, err := fieldPath(item.pod, item.container)
+		if item.success == false {
+			if err == nil {
+				t.Errorf("%v: unexpected non-error", name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", name, err)
+			continue
+		}
+		if e, a := item.path, res; e != a {
+			t.Errorf("%v: wanted %v, got %v", name, e, a)
+		}
+	}
+}
+
+type mockCadvisorClient struct {
+	mock.Mock
+}
+
+// ContainerInfo is a mock implementation of CadvisorInterface.ContainerInfo.
+func (c *mockCadvisorClient) ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	args := c.Called(name, req)
+	return args.Get(0).(*info.ContainerInfo), args.Error(1)
+}
+
+// DockerContainer is a mock implementation of CadvisorInterface.DockerContainer.
+func (c *mockCadvisorClient) DockerContainer(name string, req *info.ContainerInfoRequest) (info.ContainerInfo, error) {
+	args := c.Called(name, req)
+	return args.Get(0).(info.ContainerInfo), args.Error(1)
+}
+
+// MachineInfo is a mock implementation of CadvisorInterface.MachineInfo.
+func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
+	args := c.Called()
+	return args.Get(0).(*info.MachineInfo), args.Error(1)
 }
 
 func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := cadvisorApi.ContainerInfo{
-		ContainerReference: cadvisorApi.ContainerReference{
+	containerInfo := info.ContainerInfo{
+		ContainerReference: info.ContainerReference{
 			Name: containerPath,
 		},
 	}
 
-	testKubelet := newTestKubelet(t)
-	fakeRuntime := testKubelet.fakeRuntime
-	kubelet := testKubelet.kubelet
-	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
-	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor := &mockCadvisorClient{}
+	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
-	fakeRuntime.PodList = []*kubecontainer.Pod{
+
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.cadvisorClient = mockCadvisor
+	fakeDocker.ContainerList = []docker.APIContainers{
 		{
-			ID:        "12345678",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{
-					Name: "foo",
-					ID:   types.UID(containerID),
-				},
-			},
+			ID: containerID,
+			// pod id: qux
+			// container id: foo
+			Names: []string{"/k8s_foo_qux_1234"},
 		},
 	}
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
+
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -593,79 +998,73 @@ func TestGetContainerInfo(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetRawContainerInfoRoot(t *testing.T) {
+func TestGetRootInfo(t *testing.T) {
 	containerPath := "/"
-	containerInfo := &cadvisorApi.ContainerInfo{
-		ContainerReference: cadvisorApi.ContainerReference{
+	containerInfo := &info.ContainerInfo{
+		ContainerReference: info.ContainerReference{
 			Name: containerPath,
 		},
 	}
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
+	fakeDocker := dockertools.FakeDockerClient{}
+
+	mockCadvisor := &mockCadvisorClient{}
+	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
-	_, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, false)
+	kubelet := Kubelet{
+		dockerClient:   &fakeDocker,
+		dockerPuller:   &dockertools.FakeDockerPuller{},
+		cadvisorClient: mockCadvisor,
+		podWorkers:     newPodWorkers(),
+	}
+
+	// If the container name is an empty string, then it means the root container.
+	_, err := kubelet.GetRootInfo(cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetRawContainerInfoSubcontainers(t *testing.T) {
-	containerPath := "/kubelet"
-	containerInfo := map[string]*cadvisorApi.ContainerInfo{
-		containerPath: {
-			ContainerReference: cadvisorApi.ContainerReference{
-				Name: containerPath,
-			},
-		},
-		"/kubelet/sub": {
-			ContainerReference: cadvisorApi.ContainerReference{
-				Name: "/kubelet/sub",
-			},
+func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			ID: "foobar",
+			// pod id: qux
+			// container id: foo
+			Names: []string{"/k8s_foo_qux_uuid_1234"},
 		},
 	}
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
-	mockCadvisor.On("SubcontainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
-	result, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, true)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	stats, _ := kubelet.GetContainerInfo("qux", "uuid", "foo", nil)
+	// When there's no cAdvisor, the stats should be either nil or empty
+	if stats == nil {
+		return
 	}
-	if len(result) != 2 {
-		t.Errorf("Expected 2 elements, received: %+v", result)
-	}
-	mockCadvisor.AssertExpectations(t)
 }
 
 func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime := testKubelet.fakeRuntime
-	cadvisorApiFailure := fmt.Errorf("cAdvisor failure")
-	containerInfo := cadvisorApi.ContainerInfo{}
-	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
-	fakeRuntime.PodList = []*kubecontainer.Pod{
+
+	containerInfo := info.ContainerInfo{}
+	mockCadvisor := &mockCadvisorClient{}
+	cadvisorReq := &info.ContainerInfoRequest{}
+	expectedErr := fmt.Errorf("some error")
+	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, expectedErr)
+
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.cadvisorClient = mockCadvisor
+	fakeDocker.ContainerList = []docker.APIContainers{
 		{
-			ID:        "uuid",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{Name: "foo",
-					ID: types.UID(containerID),
-				},
-			},
+			ID: containerID,
+			// pod id: qux
+			// container id: foo
+			Names: []string{"/k8s_foo_qux_uuid_1234"},
 		},
 	}
-	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
+
+	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", cadvisorReq)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
@@ -673,18 +1072,18 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 		t.Errorf("expect error but received nil error")
 		return
 	}
-	if err.Error() != cadvisorApiFailure.Error() {
-		t.Errorf("wrong error message. expect %v, got %v", cadvisorApiFailure, err)
+	if err.Error() != expectedErr.Error() {
+		t.Errorf("wrong error message. expect %v, got %v", err, expectedErr)
 	}
 	mockCadvisor.AssertExpectations(t)
 }
 
 func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	mockCadvisor := &mockCadvisorClient{}
+
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.cadvisorClient = mockCadvisor
+	fakeDocker.ContainerList = []docker.APIContainers{}
 
 	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if stats != nil {
@@ -693,86 +1092,10 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime := testKubelet.fakeRuntime
-	expectedErr := fmt.Errorf("List containers error")
-	fakeRuntime.Err = expectedErr
-
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
-	if err == nil {
-		t.Errorf("expected error from dockertools, got none")
-	}
-	if err.Error() != expectedErr.Error() {
-		t.Errorf("expected error %v got %v", expectedErr.Error(), err.Error())
-	}
-	if stats != nil {
-		t.Errorf("non-nil stats when dockertools failed")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoWithNoContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
-	if err == nil {
-		t.Errorf("expected error from cadvisor client, got none")
-	}
-	if err != ErrContainerNotFound {
-		t.Errorf("expected error %v, got %v", ErrContainerNotFound.Error(), err.Error())
-	}
-	if stats != nil {
-		t.Errorf("non-nil stats when dockertools returned no containers")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	fakeRuntime := testKubelet.fakeRuntime
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
-			ID:        "12345678",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{Name: "bar",
-					ID: types.UID("fakeID"),
-				},
-			}},
-	}
-
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
-	if err == nil {
-		t.Errorf("Expected error from cadvisor client, got none")
-	}
-	if err != ErrContainerNotFound {
-		t.Errorf("Expected error %v, got %v", ErrContainerNotFound.Error(), err.Error())
-	}
-	if stats != nil {
-		t.Errorf("non-nil stats when dockertools returned no containers")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
 type fakeContainerCommandRunner struct {
-	Cmd    []string
-	ID     string
-	PodID  types.UID
-	E      error
-	Stdin  io.Reader
-	Stdout io.WriteCloser
-	Stderr io.WriteCloser
-	TTY    bool
-	Port   uint16
-	Stream io.ReadWriteCloser
+	Cmd []string
+	ID  string
+	E   error
 }
 
 func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]byte, error) {
@@ -781,34 +1104,17 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 	return []byte{}, f.E
 }
 
-func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
-	f.Cmd = cmd
-	f.ID = id
-	f.Stdin = in
-	f.Stdout = out
-	f.Stderr = err
-	f.TTY = tty
-	return f.E
-}
-
-func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	f.PodID = pod.ID
-	f.Port = port
-	f.Stream = stream
-	return nil
-}
-
 func TestRunInContainerNoSuchPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "nsFoo"
+	podNamespace := "etcd"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"})
@@ -821,2503 +1127,530 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
 	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, _, fakeDocker := newTestKubelet(t)
 	kubelet.runner = &fakeCommandRunner
 
 	containerID := "abc1234"
-	fakeRuntime.PodList = []*kubecontainer.Pod{
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+
+	fakeDocker.ContainerList = []docker.APIContainers{
 		{
-			ID:        "12345678",
-			Name:      "podFoo",
-			Namespace: "nsFoo",
-			Containers: []*kubecontainer.Container{
-				{Name: "containerFoo",
-					ID: types.UID(containerID),
-				},
-			},
+			ID:    containerID,
+			Names: []string{"/k8s_" + containerName + "_" + podName + "." + podNamespace + ".test_1234"},
 		},
 	}
+
 	cmd := []string{"ls"}
-	_, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
+	_, err := kubelet.RunInContainer(
+		GetPodFullName(&api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Name:        podName,
+				Namespace:   podNamespace,
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+		}),
+		"",
+		containerName,
+		cmd)
 	if fakeCommandRunner.ID != containerID {
-		t.Errorf("unexpected Name: %s", fakeCommandRunner.ID)
+		t.Errorf("unexected Name: %s", fakeCommandRunner.ID)
 	}
 	if !reflect.DeepEqual(fakeCommandRunner.Cmd, cmd) {
-		t.Errorf("unexpected command: %s", fakeCommandRunner.Cmd)
+		t.Errorf("unexpected commnd: %s", fakeCommandRunner.Cmd)
 	}
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-func TestParseResolvConf(t *testing.T) {
-	testCases := []struct {
-		data        string
-		nameservers []string
-		searches    []string
-	}{
-		{"", []string{}, []string{}},
-		{" ", []string{}, []string{}},
-		{"\n", []string{}, []string{}},
-		{"\t\n\t", []string{}, []string{}},
-		{"#comment\n", []string{}, []string{}},
-		{" #comment\n", []string{}, []string{}},
-		{"#comment\n#comment", []string{}, []string{}},
-		{"#comment\nnameserver", []string{}, []string{}},
-		{"#comment\nnameserver\nsearch", []string{}, []string{}},
-		{"nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{" nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"\tnameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}},
-		{"search foo", []string{}, []string{"foo"}},
-		{"search foo bar", []string{}, []string{"foo", "bar"}},
-		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}},
-		{"search foo\nsearch bar", []string{}, []string{"bar"}},
-		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}},
-		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}},
-		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}},
-	}
-	for i, tc := range testCases {
-		ns, srch, err := parseResolvConf(strings.NewReader(tc.data))
-		if err != nil {
-			t.Errorf("expected success, got %v", err)
-			continue
-		}
-		if !reflect.DeepEqual(ns, tc.nameservers) {
-			t.Errorf("[%d] expected nameservers %#v, got %#v", i, tc.nameservers, ns)
-		}
-		if !reflect.DeepEqual(srch, tc.searches) {
-			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
-		}
-	}
-}
-
-func TestDNSConfigurationParams(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-
-	clusterNS := "203.0.113.1"
-	kubelet.clusterDomain = "kubernetes.io"
-	kubelet.clusterDNS = net.ParseIP(clusterNS)
-
-	pods := newTestPods(2)
-	pods[0].Spec.DNSPolicy = api.DNSClusterFirst
-	pods[1].Spec.DNSPolicy = api.DNSDefault
-
-	options := make([]*kubecontainer.RunContainerOptions, 2)
-	for i, pod := range pods {
-		var err error
-		kubelet.volumeManager.SetVolumes(pod.UID, make(kubecontainer.VolumeMap, 0))
-		options[i], err = kubelet.GenerateRunContainerOptions(pod, &api.Container{})
-		if err != nil {
-			t.Fatalf("failed to generate container options: %v", err)
-		}
-	}
-	if len(options[0].DNS) != 1 || options[0].DNS[0] != clusterNS {
-		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[0].DNS)
-	}
-	if len(options[0].DNSSearch) == 0 || options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
-		t.Errorf("expected search %s, got %+v", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
-	}
-	if len(options[1].DNS) != 1 || options[1].DNS[0] != "127.0.0.1" {
-		t.Errorf("expected nameserver 127.0.0.1, got %+v", options[1].DNS)
-	}
-	if len(options[1].DNSSearch) != 1 || options[1].DNSSearch[0] != "." {
-		t.Errorf("expected search \".\", got %+v", options[1].DNSSearch)
-	}
-
-	kubelet.resolverConfig = "/etc/resolv.conf"
-	for i, pod := range pods {
-		var err error
-		options[i], err = kubelet.GenerateRunContainerOptions(pod, &api.Container{})
-		if err != nil {
-			t.Fatalf("failed to generate container options: %v", err)
-		}
-	}
-	t.Logf("nameservers %+v", options[1].DNS)
-	if len(options[0].DNS) != len(options[1].DNS)+1 {
-		t.Errorf("expected prepend of cluster nameserver, got %+v", options[0].DNS)
-	} else if options[0].DNS[0] != clusterNS {
-		t.Errorf("expected nameserver %s, got %v", clusterNS, options[0].DNS[0])
-	}
-	if len(options[0].DNSSearch) != len(options[1].DNSSearch)+3 {
-		t.Errorf("expected prepend of cluster domain, got %+v", options[0].DNSSearch)
-	} else if options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
-		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
-	}
-}
-
-type testServiceLister struct {
-	services []api.Service
-}
-
-func (ls testServiceLister) List() (api.ServiceList, error) {
-	return api.ServiceList{
-		Items: ls.services,
-	}, nil
-}
-
-type envs []kubecontainer.EnvVar
-
-func (e envs) Len() int {
-	return len(e)
-}
-
-func (e envs) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
-
-func (e envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
-
-func TestMakeEnvironmentVariables(t *testing.T) {
-	services := []api.Service{
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: api.NamespaceDefault},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8081,
-				}},
-				ClusterIP: "1.2.3.1",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test1"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8083,
-				}},
-				ClusterIP: "1.2.3.3",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8084,
-				}},
-				ClusterIP: "1.2.3.4",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8085,
-				}},
-				ClusterIP: "1.2.3.5",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8085,
-				}},
-				ClusterIP: "None",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8085,
-				}},
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8086,
-				}},
-				ClusterIP: "1.2.3.6",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8088,
-				}},
-				ClusterIP: "1.2.3.8",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8088,
-				}},
-				ClusterIP: "None",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8088,
-				}},
-				ClusterIP: "",
-			},
-		},
-	}
-
-	testCases := []struct {
-		name            string                 // the name of the test case
-		ns              string                 // the namespace to generate environment for
-		container       *api.Container         // the container to use
-		masterServiceNs string                 // the namespace to read master service info from
-		nilLister       bool                   // whether the lister should be nil
-		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
-	}{
-		{
-			name: "api server = Y, kubelet = Y",
-			ns:   "test1",
-			container: &api.Container{
-				Env: []api.EnvVar{
-					{Name: "FOO", Value: "BAR"},
-					{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
-					{Name: "TEST_SERVICE_PORT", Value: "8083"},
-					{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
-					{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
-					{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
-					{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
-					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
-				},
-			},
-			masterServiceNs: api.NamespaceDefault,
-			nilLister:       false,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "FOO", Value: "BAR"},
-				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
-				{Name: "TEST_SERVICE_PORT", Value: "8083"},
-				{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
-				{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
-				{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
-				{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
-				{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
-				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
-				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
-				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
-			},
-		},
-		{
-			name: "api server = Y, kubelet = N",
-			ns:   "test1",
-			container: &api.Container{
-				Env: []api.EnvVar{
-					{Name: "FOO", Value: "BAR"},
-					{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
-					{Name: "TEST_SERVICE_PORT", Value: "8083"},
-					{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
-					{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
-					{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
-					{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
-					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
-				},
-			},
-			masterServiceNs: api.NamespaceDefault,
-			nilLister:       true,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "FOO", Value: "BAR"},
-				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
-				{Name: "TEST_SERVICE_PORT", Value: "8083"},
-				{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
-				{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
-				{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
-				{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
-				{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
-			},
-		},
-		{
-			name: "api server = N; kubelet = Y",
-			ns:   "test1",
-			container: &api.Container{
-				Env: []api.EnvVar{
-					{Name: "FOO", Value: "BAZ"},
-				},
-			},
-			masterServiceNs: api.NamespaceDefault,
-			nilLister:       false,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "FOO", Value: "BAZ"},
-				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
-				{Name: "TEST_SERVICE_PORT", Value: "8083"},
-				{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
-				{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
-				{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
-				{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
-				{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
-				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
-				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
-				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
-			},
-		},
-		{
-			name: "master service in pod ns",
-			ns:   "test2",
-			container: &api.Container{
-				Env: []api.EnvVar{
-					{Name: "FOO", Value: "ZAP"},
-				},
-			},
-			masterServiceNs: "kubernetes",
-			nilLister:       false,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "FOO", Value: "ZAP"},
-				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.5"},
-				{Name: "TEST_SERVICE_PORT", Value: "8085"},
-				{Name: "TEST_PORT", Value: "tcp://1.2.3.5:8085"},
-				{Name: "TEST_PORT_8085_TCP", Value: "tcp://1.2.3.5:8085"},
-				{Name: "TEST_PORT_8085_TCP_PROTO", Value: "tcp"},
-				{Name: "TEST_PORT_8085_TCP_PORT", Value: "8085"},
-				{Name: "TEST_PORT_8085_TCP_ADDR", Value: "1.2.3.5"},
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.4"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8084"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.4:8084"},
-				{Name: "KUBERNETES_PORT_8084_TCP", Value: "tcp://1.2.3.4:8084"},
-				{Name: "KUBERNETES_PORT_8084_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8084_TCP_PORT", Value: "8084"},
-				{Name: "KUBERNETES_PORT_8084_TCP_ADDR", Value: "1.2.3.4"},
-			},
-		},
-		{
-			name:            "pod in master service ns",
-			ns:              "kubernetes",
-			container:       &api.Container{},
-			masterServiceNs: "kubernetes",
-			nilLister:       false,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "NOT_SPECIAL_SERVICE_HOST", Value: "1.2.3.8"},
-				{Name: "NOT_SPECIAL_SERVICE_PORT", Value: "8088"},
-				{Name: "NOT_SPECIAL_PORT", Value: "tcp://1.2.3.8:8088"},
-				{Name: "NOT_SPECIAL_PORT_8088_TCP", Value: "tcp://1.2.3.8:8088"},
-				{Name: "NOT_SPECIAL_PORT_8088_TCP_PROTO", Value: "tcp"},
-				{Name: "NOT_SPECIAL_PORT_8088_TCP_PORT", Value: "8088"},
-				{Name: "NOT_SPECIAL_PORT_8088_TCP_ADDR", Value: "1.2.3.8"},
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
-			},
-		},
-		{
-			name: "downward api pod",
-			ns:   "downward-api",
-			container: &api.Container{
-				Env: []api.EnvVar{
-					{
-						Name: "POD_NAME",
-						ValueFrom: &api.EnvVarSource{
-							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
-								FieldPath:  "metadata.name",
-							},
-						},
-					},
-					{
-						Name: "POD_NAMESPACE",
-						ValueFrom: &api.EnvVarSource{
-							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
-								FieldPath:  "metadata.namespace",
-							},
-						},
-					},
-					{
-						Name: "POD_IP",
-						ValueFrom: &api.EnvVarSource{
-							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
-								FieldPath:  "status.podIP",
-							},
-						},
-					},
-				},
-			},
-			masterServiceNs: "nothing",
-			nilLister:       true,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "POD_NAME", Value: "dapi-test-pod-name"},
-				{Name: "POD_NAMESPACE", Value: "downward-api"},
-				{Name: "POD_IP", Value: "1.2.3.4"},
-			},
-		},
-		{
-			name: "env expansion",
-			ns:   "test1",
-			container: &api.Container{
-				Env: []api.EnvVar{
-					{
-						Name:  "TEST_LITERAL",
-						Value: "test-test-test",
-					},
-					{
-						Name: "POD_NAME",
-						ValueFrom: &api.EnvVarSource{
-							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
-								FieldPath:  "metadata.name",
-							},
-						},
-					},
-					{
-						Name:  "OUT_OF_ORDER_TEST",
-						Value: "$(OUT_OF_ORDER_TARGET)",
-					},
-					{
-						Name:  "OUT_OF_ORDER_TARGET",
-						Value: "FOO",
-					},
-					{
-						Name: "EMPTY_VAR",
-					},
-					{
-						Name:  "EMPTY_TEST",
-						Value: "foo-$(EMPTY_VAR)",
-					},
-					{
-						Name:  "POD_NAME_TEST2",
-						Value: "test2-$(POD_NAME)",
-					},
-					{
-						Name:  "POD_NAME_TEST3",
-						Value: "$(POD_NAME_TEST2)-3",
-					},
-					{
-						Name:  "LITERAL_TEST",
-						Value: "literal-$(TEST_LITERAL)",
-					},
-					{
-						Name:  "SERVICE_VAR_TEST",
-						Value: "$(TEST_SERVICE_HOST):$(TEST_SERVICE_PORT)",
-					},
-					{
-						Name:  "TEST_UNDEFINED",
-						Value: "$(UNDEFINED_VAR)",
-					},
-				},
-			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{
-					Name:  "TEST_LITERAL",
-					Value: "test-test-test",
-				},
-				{
-					Name:  "POD_NAME",
-					Value: "dapi-test-pod-name",
-				},
-				{
-					Name:  "POD_NAME_TEST2",
-					Value: "test2-dapi-test-pod-name",
-				},
-				{
-					Name:  "POD_NAME_TEST3",
-					Value: "test2-dapi-test-pod-name-3",
-				},
-				{
-					Name:  "LITERAL_TEST",
-					Value: "literal-test-test-test",
-				},
-				{
-					Name:  "TEST_SERVICE_HOST",
-					Value: "1.2.3.3",
-				},
-				{
-					Name:  "TEST_SERVICE_PORT",
-					Value: "8083",
-				},
-				{
-					Name:  "TEST_PORT",
-					Value: "tcp://1.2.3.3:8083",
-				},
-				{
-					Name:  "TEST_PORT_8083_TCP",
-					Value: "tcp://1.2.3.3:8083",
-				},
-				{
-					Name:  "TEST_PORT_8083_TCP_PROTO",
-					Value: "tcp",
-				},
-				{
-					Name:  "TEST_PORT_8083_TCP_PORT",
-					Value: "8083",
-				},
-				{
-					Name:  "TEST_PORT_8083_TCP_ADDR",
-					Value: "1.2.3.3",
-				},
-				{
-					Name:  "SERVICE_VAR_TEST",
-					Value: "1.2.3.3:8083",
-				},
-				{
-					Name:  "OUT_OF_ORDER_TEST",
-					Value: "$(OUT_OF_ORDER_TARGET)",
-				},
-				{
-					Name:  "OUT_OF_ORDER_TARGET",
-					Value: "FOO",
-				},
-				{
-					Name:  "TEST_UNDEFINED",
-					Value: "$(UNDEFINED_VAR)",
-				},
-				{
-					Name: "EMPTY_VAR",
-				},
-				{
-					Name:  "EMPTY_TEST",
-					Value: "foo-",
-				},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		testKubelet := newTestKubelet(t)
-		kl := testKubelet.kubelet
-		kl.masterServiceNamespace = tc.masterServiceNs
-		if tc.nilLister {
-			kl.serviceLister = nil
-		} else {
-			kl.serviceLister = testServiceLister{services}
-		}
-
-		testPod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Namespace: tc.ns,
-				Name:      "dapi-test-pod-name",
-			},
-		}
-		testPod.Status.PodIP = "1.2.3.4"
-
-		result, err := kl.makeEnvironmentVariables(testPod, tc.container)
-		if err != nil {
-			t.Errorf("[%v] Unexpected error: %v", tc.name, err)
-		}
-
-		sort.Sort(envs(result))
-		sort.Sort(envs(tc.expectedEnvs))
-
-		if !reflect.DeepEqual(result, tc.expectedEnvs) {
-			t.Errorf("%d: [%v] Unexpected env entries; expected {%v}, got {%v}", i, tc.name, tc.expectedEnvs, result)
-		}
-	}
-}
-
-func runningState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-}
-func stoppedState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{},
-		},
-	}
-}
-func succeededState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-}
-func failedState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
-}
-
-func TestPodPhaseWithRestartAlways(t *testing.T) {
-	desiredState := api.PodSpec{
-		NodeName: "machine",
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicyAlways,
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{&api.Pod{Spec: desiredState, Status: api.PodStatus{}}, api.PodPending, "waiting"},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-						runningState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"all running",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						stoppedState("containerA"),
-						stoppedState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"all stopped with restart always",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-						stoppedState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"mixed state #1 with restart always",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-					},
-				},
-			},
-			api.PodPending,
-			"mixed state #2 with restart always",
-		},
-	}
-	for _, test := range tests {
-		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-		}
-	}
-}
-
-func TestPodPhaseWithRestartNever(t *testing.T) {
-	desiredState := api.PodSpec{
-		NodeName: "machine",
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicyNever,
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{&api.Pod{Spec: desiredState, Status: api.PodStatus{}}, api.PodPending, "waiting"},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-						runningState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"all running with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						succeededState("containerA"),
-						succeededState("containerB"),
-					},
-				},
-			},
-			api.PodSucceeded,
-			"all succeeded with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						failedState("containerA"),
-						failedState("containerB"),
-					},
-				},
-			},
-			api.PodFailed,
-			"all failed with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-						succeededState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"mixed state #1 with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-					},
-				},
-			},
-			api.PodPending,
-			"mixed state #2 with restart never",
-		},
-	}
-	for _, test := range tests {
-		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-		}
-	}
-}
-
-func TestPodPhaseWithRestartOnFailure(t *testing.T) {
-	desiredState := api.PodSpec{
-		NodeName: "machine",
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicyOnFailure,
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{&api.Pod{Spec: desiredState, Status: api.PodStatus{}}, api.PodPending, "waiting"},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-						runningState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"all running with restart onfailure",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						succeededState("containerA"),
-						succeededState("containerB"),
-					},
-				},
-			},
-			api.PodSucceeded,
-			"all succeeded with restart onfailure",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						failedState("containerA"),
-						failedState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"all failed with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-						succeededState("containerB"),
-					},
-				},
-			},
-			api.PodRunning,
-			"mixed state #1 with restart onfailure",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						runningState("containerA"),
-					},
-				},
-			},
-			api.PodPending,
-			"mixed state #2 with restart onfailure",
-		},
-	}
-	for _, test := range tests {
-		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-		}
-	}
-}
-
-func getReadyStatus(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name:  cName,
-		Ready: true,
-	}
-}
-func getNotReadyStatus(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name:  cName,
-		Ready: false,
-	}
-}
-func getReadyCondition(status api.ConditionStatus, transitionTime unversioned.Time, reason, message string) []api.PodCondition {
-	return []api.PodCondition{{
-		Type:               api.PodReady,
-		Status:             status,
-		LastTransitionTime: transitionTime,
-		Reason:             reason,
-		Message:            message,
-	}}
-}
-
-func TestGetPodReadyCondition(t *testing.T) {
-	transitionTime := unversioned.Now()
-	tests := []struct {
-		spec              *api.PodSpec
-		containerStatuses []api.ContainerStatus
-		existingStatus    *api.PodStatus
-		expected          []api.PodCondition
-		clearTimestamp    bool
-	}{
-		{
-			spec:              nil,
-			containerStatuses: nil,
-			existingStatus:    nil,
-			expected:          getReadyCondition(api.ConditionFalse, transitionTime, "UnknownContainerStatuses", ""),
-			clearTimestamp:    true,
-		},
-		{
-			spec:              nil,
-			containerStatuses: nil,
-			existingStatus: &api.PodStatus{
-				Conditions: getReadyCondition(api.ConditionFalse, transitionTime, "", ""),
-			},
-			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "UnknownContainerStatuses", ""),
-			clearTimestamp: false,
-		},
-		{
-			spec:              &api.PodSpec{},
-			containerStatuses: []api.ContainerStatus{},
-			existingStatus:    nil,
-			expected:          getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
-			clearTimestamp:    true,
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{},
-			existingStatus:    nil,
-			expected:          getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unknown status: [1234]"),
-			clearTimestamp:    true,
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-			},
-			existingStatus: nil,
-			expected:       getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
-			clearTimestamp: true,
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-					{Name: "5678"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-				getReadyStatus("5678"),
-			},
-			existingStatus: nil,
-			expected:       getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
-			clearTimestamp: true,
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-					{Name: "5678"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-			},
-			existingStatus: nil,
-			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unknown status: [5678]"),
-			clearTimestamp: true,
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-					{Name: "5678"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-				getNotReadyStatus("5678"),
-			},
-			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unready status: [5678]"),
-			clearTimestamp: true,
-		},
-	}
-
-	for i, test := range tests {
-		condition := getPodReadyCondition(test.spec, test.containerStatuses, test.existingStatus)
-		if test.clearTimestamp {
-			condition[0].LastTransitionTime = transitionTime
-			test.expected[0].LastTransitionTime = transitionTime
-		}
-		condition[0].LastProbeTime = unversioned.Time{}
-		if !reflect.DeepEqual(condition, test.expected) {
-			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
-		}
-	}
-}
-
-func TestExecInContainerNoSuchPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
+func TestRunHandlerExec(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet.runner = &fakeCommandRunner
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
-
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerID := "containerFoo"
-	err := kubelet.ExecInContainer(
-		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
-		"",
-		containerID,
-		[]string{"ls"},
-		nil,
-		nil,
-		nil,
-		false,
-	)
-	if err == nil {
-		t.Fatal("unexpected non-error")
-	}
-	if fakeCommandRunner.ID != "" {
-		t.Fatal("unexpected invocation of runner.ExecInContainer")
-	}
-}
-
-func TestExecInContainerNoSuchContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, _, fakeDocker := newTestKubelet(t)
 	kubelet.runner = &fakeCommandRunner
 
+	containerID := "abc1234"
 	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerID := "containerFoo"
-	fakeRuntime.PodList = []*kubecontainer.Pod{
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+
+	fakeDocker.ContainerList = []docker.APIContainers{
 		{
-			ID:        "12345678",
-			Name:      podName,
-			Namespace: podNamespace,
-			Containers: []*kubecontainer.Container{
+			ID:    containerID,
+			Names: []string{"/k8s_" + containerName + "_" + podName + "." + podNamespace + "_1234"},
+		},
+	}
+
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{
+				Exec: &api.ExecAction{
+					Command: []string{"ls", "-a"},
+				},
+			},
+		},
+	}
+	err := kubelet.runHandler(podName+"."+podNamespace, "", &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeCommandRunner.ID != containerID ||
+		!reflect.DeepEqual(container.Lifecycle.PostStart.Exec.Command, fakeCommandRunner.Cmd) {
+		t.Errorf("unexpected commands: %v", fakeCommandRunner)
+	}
+}
+
+type fakeHTTP struct {
+	url string
+	err error
+}
+
+func (f *fakeHTTP) Get(url string) (*http.Response, error) {
+	f.url = url
+	return nil, f.err
+}
+
+func TestRunHandlerHttp(t *testing.T) {
+	fakeHttp := fakeHTTP{}
+
+	kubelet, _, _ := newTestKubelet(t)
+	kubelet.httpClient = &fakeHttp
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Host: "foo",
+					Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+					Path: "bar",
+				},
+			},
+		},
+	}
+	err := kubelet.runHandler(podName+"."+podNamespace, "", &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+}
+
+func TestNewHandler(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+	handler := &api.Handler{
+		HTTPGet: &api.HTTPGetAction{
+			Host: "foo",
+			Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+			Path: "bar",
+		},
+	}
+	actionHandler := kubelet.newActionHandler(handler)
+	if actionHandler == nil {
+		t.Error("unexpected nil action handler.")
+	}
+
+	handler = &api.Handler{
+		Exec: &api.ExecAction{
+			Command: []string{"ls", "-l"},
+		},
+	}
+	actionHandler = kubelet.newActionHandler(handler)
+	if actionHandler == nil {
+		t.Error("unexpected nil action handler.")
+	}
+
+	handler = &api.Handler{}
+	actionHandler = kubelet.newActionHandler(handler)
+	if actionHandler != nil {
+		t.Errorf("unexpected non-nil action handler: %v", actionHandler)
+	}
+}
+
+func TestSyncPodEventHandlerFails(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.httpClient = &fakeHTTP{
+		err: fmt.Errorf("test error"),
+	}
+	dockerContainers := dockertools.DockerContainers{
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.syncPod(&api.BoundPod{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "foo",
+			Namespace:   "new",
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
 				{Name: "bar",
-					ID: "barID"},
-			},
-		},
-	}
-
-	err := kubelet.ExecInContainer(
-		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      podName,
-			Namespace: podNamespace,
-		}}),
-		"",
-		containerID,
-		[]string{"ls"},
-		nil,
-		nil,
-		nil,
-		false,
-	)
-	if err == nil {
-		t.Fatal("unexpected non-error")
-	}
-	if fakeCommandRunner.ID != "" {
-		t.Fatal("unexpected invocation of runner.ExecInContainer")
-	}
-}
-
-type fakeReadWriteCloser struct{}
-
-func (f *fakeReadWriteCloser) Write(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (f *fakeReadWriteCloser) Read(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (f *fakeReadWriteCloser) Close() error {
-	return nil
-}
-
-func TestExecInContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet.runner = &fakeCommandRunner
-
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerID := "containerFoo"
-	command := []string{"ls"}
-	stdin := &bytes.Buffer{}
-	stdout := &fakeReadWriteCloser{}
-	stderr := &fakeReadWriteCloser{}
-	tty := true
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
-			ID:        "12345678",
-			Name:      podName,
-			Namespace: podNamespace,
-			Containers: []*kubecontainer.Container{
-				{Name: containerID,
-					ID: types.UID(containerID),
-				},
-			},
-		},
-	}
-
-	err := kubelet.ExecInContainer(
-		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      podName,
-			Namespace: podNamespace,
-		}}),
-		"",
-		containerID,
-		[]string{"ls"},
-		stdin,
-		stdout,
-		stderr,
-		tty,
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	if e, a := containerID, fakeCommandRunner.ID; e != a {
-		t.Fatalf("container name: expected %q, got %q", e, a)
-	}
-	if e, a := command, fakeCommandRunner.Cmd; !reflect.DeepEqual(e, a) {
-		t.Fatalf("command: expected '%v', got '%v'", e, a)
-	}
-	if e, a := stdin, fakeCommandRunner.Stdin; e != a {
-		t.Fatalf("stdin: expected %#v, got %#v", e, a)
-	}
-	if e, a := stdout, fakeCommandRunner.Stdout; e != a {
-		t.Fatalf("stdout: expected %#v, got %#v", e, a)
-	}
-	if e, a := stderr, fakeCommandRunner.Stderr; e != a {
-		t.Fatalf("stderr: expected %#v, got %#v", e, a)
-	}
-	if e, a := tty, fakeCommandRunner.TTY; e != a {
-		t.Fatalf("tty: expected %t, got %t", e, a)
-	}
-}
-
-func TestPortForwardNoSuchPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet.runner = &fakeCommandRunner
-
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	var port uint16 = 5000
-
-	err := kubelet.PortForward(
-		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
-		"",
-		port,
-		nil,
-	)
-	if err == nil {
-		t.Fatal("unexpected non-error")
-	}
-	if fakeCommandRunner.ID != "" {
-		t.Fatal("unexpected invocation of runner.PortForward")
-	}
-}
-
-func TestPortForward(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	podID := types.UID("12345678")
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
-			ID:        podID,
-			Name:      podName,
-			Namespace: podNamespace,
-			Containers: []*kubecontainer.Container{
-				{
-					Name: "foo",
-					ID:   "containerFoo",
-				},
-			},
-		},
-	}
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet.runner = &fakeCommandRunner
-
-	var port uint16 = 5000
-	stream := &fakeReadWriteCloser{}
-	err := kubelet.PortForward(
-		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      podName,
-			Namespace: podNamespace,
-		}}),
-		"",
-		port,
-		stream,
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	if e, a := podID, fakeCommandRunner.PodID; e != a {
-		t.Fatalf("container id: expected %q, got %q", e, a)
-	}
-	if e, a := port, fakeCommandRunner.Port; e != a {
-		t.Fatalf("port: expected %v, got %v", e, a)
-	}
-	if e, a := stream, fakeCommandRunner.Stream; e != a {
-		t.Fatalf("stream: expected %v, got %v", e, a)
-	}
-}
-
-// Tests that identify the host port conflicts are detected correctly.
-func TestGetHostPortConflicts(t *testing.T) {
-	pods := []*api.Pod{
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}}},
-	}
-	// Pods should not cause any conflict.
-	if hasHostPortConflicts(pods) {
-		t.Errorf("expected no conflicts, Got conflicts")
-	}
-
-	expected := &api.Pod{
-		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
-	}
-	// The new pod should cause conflict and be reported.
-	pods = append(pods, expected)
-	if !hasHostPortConflicts(pods) {
-		t.Errorf("expected no conflict, Got no conflicts")
-	}
-}
-
-// Tests that we handle port conflicts correctly by setting the failed status in status map.
-func TestHandlePortConflicts(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kl := testKubelet.kubelet
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-
-	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "123456789",
-				Name:      "newpod",
-				Namespace: "foo",
-			},
-			Spec: spec,
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "987654321",
-				Name:      "oldpod",
-				Namespace: "foo",
-			},
-			Spec: spec,
-		},
-	}
-	// Make sure the Pods are in the reverse order of creation time.
-	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
-	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
-	// The newer pod should be rejected.
-	conflictedPod := pods[0]
-
-	kl.HandlePodAdditions(pods)
-	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(conflictedPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", conflictedPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
-}
-
-// Tests that we handle not matching labels selector correctly by setting the failed status in status map.
-func TestHandleNodeSelector(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeNodeManager.node = &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}}
-
-	kl := testKubelet.kubelet
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "123456789",
-				Name:      "podA",
-				Namespace: "foo",
-			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "A"}},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "987654321",
-				Name:      "podB",
-				Namespace: "foo",
-			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "B"}},
-		},
-	}
-	// The first pod should be rejected.
-	notfittingPod := pods[0]
-
-	kl.HandlePodAdditions(pods)
-	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
-}
-
-// Tests that we handle exceeded resources correctly by setting the failed status in status map.
-func TestHandleMemExceeded(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kl := testKubelet.kubelet
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{MemoryCapacity: 100}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-
-	spec := api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
-		Requests: api.ResourceList{
-			"memory": resource.MustParse("90"),
-		},
-	}}}}
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "123456789",
-				Name:      "newpod",
-				Namespace: "foo",
-			},
-			Spec: spec,
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "987654321",
-				Name:      "oldpod",
-				Namespace: "foo",
-			},
-			Spec: spec,
-		},
-	}
-	// Make sure the Pods are in the reverse order of creation time.
-	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
-	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
-	// The newer pod should be rejected.
-	notfittingPod := pods[0]
-
-	kl.HandlePodAdditions(pods)
-	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
-}
-
-// TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
-func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-
-	kl := testKubelet.kubelet
-	pods := []*api.Pod{
-		{ObjectMeta: api.ObjectMeta{Name: "pod1", UID: "1234"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{ObjectMeta: api.ObjectMeta{Name: "pod2", UID: "4567"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-	}
-	podToTest := pods[1]
-	// Run once to populate the status map.
-	kl.HandlePodAdditions(pods)
-	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); !found {
-		t.Fatalf("expected to have status cached for pod2")
-	}
-	// Sync with empty pods so that the entry in status map will be removed.
-	kl.podManager.SetPods([]*api.Pod{})
-	kl.HandlePodCleanups()
-	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
-		t.Fatalf("expected to not have status cached for pod2")
-	}
-}
-
-func TestValidatePodStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	testCases := []struct {
-		podPhase api.PodPhase
-		success  bool
-	}{
-		{api.PodRunning, true},
-		{api.PodSucceeded, true},
-		{api.PodFailed, true},
-		{api.PodPending, false},
-		{api.PodUnknown, false},
-	}
-
-	for i, tc := range testCases {
-		err := kubelet.validatePodPhase(&api.PodStatus{Phase: tc.podPhase})
-		if tc.success {
-			if err != nil {
-				t.Errorf("[case %d]: unexpected failure - %v", i, err)
-			}
-		} else if err == nil {
-			t.Errorf("[case %d]: unexpected success", i)
-		}
-	}
-}
-
-func TestValidateContainerStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	containerName := "x"
-	testCases := []struct {
-		statuses []api.ContainerStatus
-		success  bool
-	}{
-		{
-			statuses: []api.ContainerStatus{
-				{
-					Name: containerName,
-					State: api.ContainerState{
-						Running: &api.ContainerStateRunning{},
-					},
-					LastTerminationState: api.ContainerState{
-						Terminated: &api.ContainerStateTerminated{},
+					Lifecycle: &api.Lifecycle{
+						PostStart: &api.Handler{
+							HTTPGet: &api.HTTPGetAction{
+								Host: "does.no.exist",
+								Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+								Path: "bar",
+							},
+						},
 					},
 				},
 			},
-			success: true,
 		},
-		{
-			statuses: []api.ContainerStatus{
-				{
-					Name: containerName,
-					State: api.ContainerState{
-						Terminated: &api.ContainerStateTerminated{},
-					},
-				},
-			},
-			success: true,
-		},
-		{
-			statuses: []api.ContainerStatus{
-				{
-					Name: containerName,
-					State: api.ContainerState{
-						Waiting: &api.ContainerStateWaiting{},
-					},
-				},
-			},
-			success: false,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := kubelet.validateContainerStatus(&api.PodStatus{
-			ContainerStatuses: tc.statuses,
-		}, containerName, false)
-		if tc.success {
-			if err != nil {
-				t.Errorf("[case %d]: unexpected failure - %v", i, err)
-			}
-		} else if err == nil {
-			t.Errorf("[case %d]: unexpected success", i)
-		}
-	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
-		ContainerStatuses: testCases[0].statuses,
-	}, "blah", false); err == nil {
-		t.Errorf("expected error with invalid container name")
-	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
-		ContainerStatuses: testCases[0].statuses,
-	}, containerName, true); err != nil {
-		t.Errorf("unexpected error with for previous terminated container - %v", err)
-	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
-		ContainerStatuses: testCases[1].statuses,
-	}, containerName, true); err == nil {
-		t.Errorf("expected error with for previous terminated container")
-	}
-}
-
-func TestCreateMirrorPod(t *testing.T) {
-	for _, updateType := range []SyncPodType{SyncPodCreate, SyncPodUpdate} {
-		testKubelet := newTestKubelet(t)
-		kl := testKubelet.kubelet
-		manager := testKubelet.fakeMirrorClient
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "bar",
-				Namespace: "foo",
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "file",
-				},
-			},
-		}
-		pods := []*api.Pod{pod}
-		kl.podManager.SetPods(pods)
-		err := kl.syncPod(pod, nil, container.Pod{}, updateType)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		podFullName := kubecontainer.GetPodFullName(pod)
-		if !manager.HasPod(podFullName) {
-			t.Errorf("expected mirror pod %q to be created", podFullName)
-		}
-		if manager.NumOfPods() != 1 || !manager.HasPod(podFullName) {
-			t.Errorf("expected one mirror pod %q, got %v", podFullName, manager.GetPods())
-		}
-	}
-}
-
-func TestDeleteOutdatedMirrorPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kl := testKubelet.kubelet
-	manager := testKubelet.fakeMirrorClient
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "ns",
-			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: "file",
-			},
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "1234", Image: "foo"},
-			},
-		},
-	}
-	// Mirror pod has an outdated spec.
-	mirrorPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "11111111",
-			Name:      "foo",
-			Namespace: "ns",
-			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: "api",
-				ConfigMirrorAnnotationKey: "mirror",
-			},
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "1234", Image: "bar"},
-			},
-		},
-	}
-
-	pods := []*api.Pod{pod, mirrorPod}
-	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{}, SyncPodUpdate)
+	}, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	name := kubecontainer.GetPodFullName(pod)
-	creates, deletes := manager.GetCounts(name)
-	if creates != 0 || deletes != 1 {
-		t.Errorf("expected 0 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
+
+	verifyCalls(t, fakeDocker, []string{"list", "list", "create", "start", "stop"})
+
+	if len(fakeDocker.Stopped) != 1 {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 }
 
-func TestDeleteOrphanedMirrorPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kl := testKubelet.kubelet
-	manager := testKubelet.fakeMirrorClient
-	orphanPods := []*api.Pod{
+func TestKubeletGarbageCollection(t *testing.T) {
+	tests := []struct {
+		containers       []docker.APIContainers
+		containerDetails map[string]*docker.Container
+		expectedRemoved  []string
+	}{
 		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "pod1",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "api",
-					ConfigMirrorAnnotationKey: "mirror",
+			containers: []docker.APIContainers{
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "1876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "2876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "3876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "4876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "5876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "6876",
 				},
 			},
+			containerDetails: map[string]*docker.Container{
+				"1876": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1876",
+					Created: time.Now(),
+				},
+			},
+			expectedRemoved: []string{"1876"},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345679",
-				Name:      "pod2",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "api",
-					ConfigMirrorAnnotationKey: "mirror",
+			containers: []docker.APIContainers{
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "1876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "2876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "3876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "4876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "5876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "6876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "7876",
+				},
+			},
+			containerDetails: map[string]*docker.Container{
+				"1876": {
+					State: docker.State{
+						Running: true,
+					},
+					ID:      "1876",
+					Created: time.Now(),
+				},
+				"2876": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2876",
+					Created: time.Now(),
+				},
+			},
+			expectedRemoved: []string{"2876"},
+		},
+		{
+			containers: []docker.APIContainers{
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "1876",
 				},
 			},
 		},
 	}
-
-	kl.podManager.SetPods(orphanPods)
-	// Sync with an empty pod list to delete all mirror pods.
-	kl.HandlePodCleanups()
-	if manager.NumOfPods() != 0 {
-		t.Errorf("expected zero mirror pods, got %v", manager.GetPods())
-	}
-	for _, pod := range orphanPods {
-		name := kubecontainer.GetPodFullName(pod)
-		creates, deletes := manager.GetCounts(name)
-		if creates != 0 || deletes != 1 {
-			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)
+	for _, test := range tests {
+		kubelet, _, fakeDocker := newTestKubelet(t)
+		kubelet.maxContainerCount = 5
+		fakeDocker.ContainerList = test.containers
+		fakeDocker.ContainerMap = test.containerDetails
+		fakeDocker.Container = &docker.Container{ID: "error", Created: time.Now()}
+		err := kubelet.GarbageCollectContainers()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(fakeDocker.Removed, test.expectedRemoved) {
+			t.Errorf("expected: %v, got: %v", test.expectedRemoved, fakeDocker.Removed)
 		}
 	}
 }
 
-func TestGetContainerInfoForMirrorPods(t *testing.T) {
-	// pods contain one static and one mirror pod with the same name but
-	// different UIDs.
-	pods := []*api.Pod{
+func TestPurgeOldest(t *testing.T) {
+	created := time.Now()
+	tests := []struct {
+		ids              []string
+		containerDetails map[string]*docker.Container
+		expectedRemoved  []string
+	}{
+		{
+			ids: []string{"1", "2", "3", "4", "5"},
+			containerDetails: map[string]*docker.Container{
+				"1": {
+					State: docker.State{
+						Running: true,
+					},
+					ID:      "1",
+					Created: created,
+				},
+				"2": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2",
+					Created: created.Add(time.Second),
+				},
+				"3": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "3",
+					Created: created.Add(time.Second),
+				},
+				"4": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "4",
+					Created: created.Add(time.Second),
+				},
+				"5": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "5",
+					Created: created.Add(time.Second),
+				},
+			},
+		},
+		{
+			ids: []string{"1", "2", "3", "4", "5", "6"},
+			containerDetails: map[string]*docker.Container{
+				"1": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1",
+					Created: created.Add(time.Second),
+				},
+				"2": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2",
+					Created: created.Add(time.Millisecond),
+				},
+				"3": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "3",
+					Created: created.Add(time.Second),
+				},
+				"4": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "4",
+					Created: created.Add(time.Second),
+				},
+				"5": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "5",
+					Created: created.Add(time.Second),
+				},
+				"6": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "6",
+					Created: created.Add(time.Second),
+				},
+			},
+			expectedRemoved: []string{"2"},
+		},
+		{
+			ids: []string{"1", "2", "3", "4", "5", "6", "7"},
+			containerDetails: map[string]*docker.Container{
+				"1": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1",
+					Created: created.Add(time.Second),
+				},
+				"2": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2",
+					Created: created.Add(time.Millisecond),
+				},
+				"3": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "3",
+					Created: created.Add(time.Second),
+				},
+				"4": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "4",
+					Created: created.Add(time.Second),
+				},
+				"5": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "5",
+					Created: created.Add(time.Second),
+				},
+				"6": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "6",
+					Created: created.Add(time.Microsecond),
+				},
+				"7": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "7",
+					Created: created.Add(time.Second),
+				},
+			},
+			expectedRemoved: []string{"2", "6"},
+		},
+	}
+	for _, test := range tests {
+		kubelet, _, fakeDocker := newTestKubelet(t)
+		kubelet.maxContainerCount = 5
+		fakeDocker.ContainerMap = test.containerDetails
+		kubelet.purgeOldest(test.ids)
+		if !reflect.DeepEqual(fakeDocker.Removed, test.expectedRemoved) {
+			t.Errorf("expected: %v, got: %v", test.expectedRemoved, fakeDocker.Removed)
+		}
+	}
+}
+
+func TestSyncPodsWithPullPolicy(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
+	puller.HasImages = []string{"existing_one", "want:latest"}
+	kubelet.networkContainerImage = "custom_image_name"
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:       "1234",
-				Name:      "qux",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "file",
-				},
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
-					{Name: "foo"},
+					{Name: "bar", Image: "pull_always_image", ImagePullPolicy: api.PullAlways},
+					{Name: "bar1", Image: "pull_never_image", ImagePullPolicy: api.PullNever},
+					{Name: "bar2", Image: "pull_if_not_present_image", ImagePullPolicy: api.PullIfNotPresent},
+					{Name: "bar3", Image: "existing_one", ImagePullPolicy: api.PullIfNotPresent},
+					{Name: "bar4", Image: "want:latest", ImagePullPolicy: api.PullIfNotPresent},
 				},
 			},
 		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "5678",
-				Name:      "qux",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "api",
-					ConfigMirrorAnnotationKey: "mirror",
-				},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "foo"},
-				},
-			},
-		},
-	}
-
-	containerID := "ab2cdf"
-	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := cadvisorApi.ContainerInfo{
-		ContainerReference: cadvisorApi.ContainerReference{
-			Name: containerPath,
-		},
-	}
-
-	testKubelet := newTestKubelet(t)
-	fakeRuntime := testKubelet.fakeRuntime
-	mockCadvisor := testKubelet.fakeCadvisor
-	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
-	kubelet := testKubelet.kubelet
-
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
-			ID:        "1234",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{
-					Name: "foo",
-					ID:   types.UID(containerID),
-				},
-			},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	// Use the mirror pod UID to retrieve the stats.
-	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
+	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if stats == nil {
-		t.Fatalf("stats should not be nil")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
+	kubelet.drainWorkers()
 
-func TestDoNotCacheStatusForStaticPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
+	fakeDocker.Lock()
 
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "staticFoo",
-				Namespace: "new",
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "file",
-				},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar"},
-				},
-			},
-		},
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "pull_always_image", "pull_if_not_present_image", "want:latest"}) {
+		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
 	}
 
-	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodSyncs(kubelet.podManager.GetPods())
-	status, ok := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	if ok {
-		t.Errorf("unexpected status %#v found for static pod %q", status, pods[0].UID)
+	if len(fakeDocker.Created) != 6 {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
-}
-
-func TestHostNetworkAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{ApiserverSource, FileSource},
-		},
-	})
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: FileSource,
-			},
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "foo"},
-			},
-			HostNetwork: true,
-		},
-	}
-	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
-	if err != nil {
-		t.Errorf("expected pod infra creation to succeed: %v", err)
-	}
-}
-
-func TestHostNetworkDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{},
-		},
-	})
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: FileSource,
-			},
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "foo"},
-			},
-			HostNetwork: true,
-		},
-	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
-	if err == nil {
-		t.Errorf("expected pod infra creation to fail")
-	}
-}
-
-func TestPrivilegeContainerAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		AllowPrivileged: true,
-	})
-	privileged := true
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "foo", SecurityContext: &api.SecurityContext{Privileged: &privileged}},
-			},
-		},
-	}
-	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
-	if err != nil {
-		t.Errorf("expected pod infra creation to succeed: %v", err)
-	}
-}
-
-func TestPrivilegeContainerDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		AllowPrivileged: false,
-	})
-	privileged := true
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "foo", SecurityContext: &api.SecurityContext{Privileged: &privileged}},
-			},
-		},
-	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
-	if err == nil {
-		t.Errorf("expected pod infra creation to fail")
-	}
-}
-
-func TestFilterOutTerminatedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	pods := newTestPods(5)
-	pods[0].Status.Phase = api.PodFailed
-	pods[1].Status.Phase = api.PodSucceeded
-	pods[2].Status.Phase = api.PodRunning
-	pods[3].Status.Phase = api.PodPending
-
-	expected := []*api.Pod{pods[2], pods[3], pods[4]}
-	kubelet.podManager.SetPods(pods)
-	actual := kubelet.filterOutTerminatedPods(pods)
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
-	}
-}
-
-func TestMakePortMappings(t *testing.T) {
-	tests := []struct {
-		container            *api.Container
-		expectedPortMappings []kubecontainer.PortMapping
-	}{
-		{
-			&api.Container{
-				Name: "fooContainer",
-				Ports: []api.ContainerPort{
-					{
-						Protocol:      api.ProtocolTCP,
-						ContainerPort: 80,
-						HostPort:      8080,
-						HostIP:        "127.0.0.1",
-					},
-					{
-						Protocol:      api.ProtocolTCP,
-						ContainerPort: 443,
-						HostPort:      4343,
-						HostIP:        "192.168.0.1",
-					},
-					{
-						Name:          "foo",
-						Protocol:      api.ProtocolUDP,
-						ContainerPort: 555,
-						HostPort:      5555,
-					},
-					{
-						Name:          "foo", // Duplicated, should be ignored.
-						Protocol:      api.ProtocolUDP,
-						ContainerPort: 888,
-						HostPort:      8888,
-					},
-					{
-						Protocol:      api.ProtocolTCP, // Duplicated, should be ignored.
-						ContainerPort: 80,
-						HostPort:      8888,
-					},
-				},
-			},
-			[]kubecontainer.PortMapping{
-				{
-					Name:          "fooContainer-TCP:80",
-					Protocol:      api.ProtocolTCP,
-					ContainerPort: 80,
-					HostPort:      8080,
-					HostIP:        "127.0.0.1",
-				},
-				{
-					Name:          "fooContainer-TCP:443",
-					Protocol:      api.ProtocolTCP,
-					ContainerPort: 443,
-					HostPort:      4343,
-					HostIP:        "192.168.0.1",
-				},
-				{
-					Name:          "fooContainer-foo",
-					Protocol:      api.ProtocolUDP,
-					ContainerPort: 555,
-					HostPort:      5555,
-					HostIP:        "",
-				},
-			},
-		},
-	}
-
-	for i, tt := range tests {
-		actual := makePortMappings(tt.container)
-		if !reflect.DeepEqual(tt.expectedPortMappings, actual) {
-			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedPortMappings, actual)
-		}
-	}
-}
-
-func TestIsPodPastActiveDeadline(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	pods := newTestPods(5)
-
-	exceededActiveDeadlineSeconds := int64(30)
-	notYetActiveDeadlineSeconds := int64(120)
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
-	pods[0].Status.StartTime = &startTime
-	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
-	pods[1].Status.StartTime = &startTime
-	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
-	tests := []struct {
-		pod      *api.Pod
-		expected bool
-	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}, {pods[4], false}}
-
-	kubelet.podManager.SetPods(pods)
-	for i, tt := range tests {
-		actual := kubelet.pastActiveDeadline(tt.pod)
-		if actual != tt.expected {
-			t.Errorf("[%d] expected %#v, got %#v", i, tt.expected, actual)
-		}
-	}
-}
-
-func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	fakeRuntime := testKubelet.fakeRuntime
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	kubelet := testKubelet.kubelet
-
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
-	exceededActiveDeadlineSeconds := int64(30)
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "bar",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "foo"},
-				},
-				ActiveDeadlineSeconds: &exceededActiveDeadlineSeconds,
-			},
-			Status: api.PodStatus{
-				StartTime: &startTime,
-			},
-		},
-	}
-
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
-			ID:        "12345678",
-			Name:      "bar",
-			Namespace: "new",
-			Containers: []*kubecontainer.Container{
-				{Name: "foo"},
-			},
-		},
-	}
-
-	// Let the pod worker sets the status to fail after this sync.
-	kubelet.HandlePodUpdates(pods)
-	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	if !found {
-		t.Errorf("expected to found status for pod %q", pods[0].UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q, ot %q.", api.PodFailed, status.Phase)
-	}
-}
-
-func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	fakeRuntime := testKubelet.fakeRuntime
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	kubelet := testKubelet.kubelet
-
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
-	exceededActiveDeadlineSeconds := int64(300)
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "bar",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "foo"},
-				},
-				ActiveDeadlineSeconds: &exceededActiveDeadlineSeconds,
-			},
-			Status: api.PodStatus{
-				StartTime: &startTime,
-			},
-		},
-	}
-
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
-			ID:        "12345678",
-			Name:      "bar",
-			Namespace: "new",
-			Containers: []*kubecontainer.Container{
-				{Name: "foo"},
-			},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodUpdates(pods)
-	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	if !found {
-		t.Errorf("expected to found status for pod %q", pods[0].UID)
-	}
-	if status.Phase == api.PodFailed {
-		t.Fatalf("expected pod status to not be %q", status.Phase)
-	}
-}
-
-func TestDeletePodDirsForDeletedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kl := testKubelet.kubelet
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "pod1",
-				Namespace: "ns",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345679",
-				Name:      "pod2",
-				Namespace: "ns",
-			},
-		},
-	}
-
-	kl.podManager.SetPods(pods)
-	// Sync to create pod directories.
-	kl.HandlePodSyncs(kl.podManager.GetPods())
-	for i := range pods {
-		if !dirExists(kl.getPodDir(pods[i].UID)) {
-			t.Errorf("expected directory to exist for pod %d", i)
-		}
-	}
-
-	// Pod 1 has been deleted and no longer exists.
-	kl.podManager.SetPods([]*api.Pod{pods[0]})
-	kl.HandlePodCleanups()
-	if !dirExists(kl.getPodDir(pods[0].UID)) {
-		t.Errorf("expected directory to exist for pod 0")
-	}
-	if dirExists(kl.getPodDir(pods[1].UID)) {
-		t.Errorf("expected directory to be deleted for pod 1")
-	}
-}
-
-func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*api.Pod, podsToCheck []*api.Pod, shouldExist bool) {
-	kl := testKubelet.kubelet
-
-	kl.podManager.SetPods(pods)
-	kl.HandlePodSyncs(pods)
-	kl.HandlePodCleanups()
-	for i, pod := range podsToCheck {
-		exist := dirExists(kl.getPodDir(pod.UID))
-		if shouldExist && !exist {
-			t.Errorf("expected directory to exist for pod %d", i)
-		} else if !shouldExist && exist {
-			t.Errorf("expected directory to be removed for pod %d", i)
-		}
-	}
-}
-
-func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kl := testKubelet.kubelet
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "pod1",
-				Namespace: "ns",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345679",
-				Name:      "pod2",
-				Namespace: "ns",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345680",
-				Name:      "pod3",
-				Namespace: "ns",
-			},
-		},
-	}
-
-	syncAndVerifyPodDir(t, testKubelet, pods, pods, true)
-	// Pod 1 failed, and pod 2 succeeded. None of the pod directories should be
-	// deleted.
-	kl.statusManager.SetPodStatus(pods[1], api.PodStatus{Phase: api.PodFailed})
-	kl.statusManager.SetPodStatus(pods[2], api.PodStatus{Phase: api.PodSucceeded})
-	syncAndVerifyPodDir(t, testKubelet, pods, pods, true)
-}
-
-func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	runningPod := &kubecontainer.Pod{
-		ID:        "12345678",
-		Name:      "pod1",
-		Namespace: "ns",
-	}
-	apiPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       runningPod.ID,
-			Name:      runningPod.Name,
-			Namespace: runningPod.Namespace,
-		},
-	}
-	// Sync once to create pod directory; confirm that the pod directory has
-	// already been created.
-	pods := []*api.Pod{apiPod}
-	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, true)
-
-	// Pretend the pod is deleted from apiserver, but is still active on the node.
-	// The pod directory should not be removed.
-	pods = []*api.Pod{}
-	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{runningPod}
-	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, true)
-
-	// The pod is deleted and also not active on the node. The pod directory
-	// should be removed.
-	pods = []*api.Pod{}
-	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{}
-	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, false)
-}
-
-func TestCleanupBandwidthLimits(t *testing.T) {
-	tests := []struct {
-		status           *api.PodStatus
-		pods             []*api.Pod
-		inputCIDRs       []string
-		expectResetCIDRs []string
-		cacheStatus      bool
-		expectedCalls    []string
-		name             string
-	}{
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetPodStatus"},
-			name:             "pod running",
-		},
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{},
-			cacheStatus:      true,
-			name:             "pod running with cache",
-		},
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodFailed,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetPodStatus"},
-			name:             "pod not running",
-		},
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodFailed,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{},
-			cacheStatus:      true,
-			name:             "pod not running with cache",
-		},
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "no bandwidth limits",
-		},
-	}
-	for _, test := range tests {
-		shaper := &bandwidth.FakeShaper{
-			CIDRs: test.inputCIDRs,
-		}
-
-		testKube := newTestKubelet(t)
-		testKube.kubelet.shaper = shaper
-		testKube.fakeRuntime.PodStatus = *test.status
-
-		if test.cacheStatus {
-			for _, pod := range test.pods {
-				testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
-			}
-		}
-
-		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
-		if err != nil {
-			t.Errorf("unexpected error: %v (%s)", test.name)
-		}
-		if !reflect.DeepEqual(shaper.ResetCIDRs, test.expectResetCIDRs) {
-			t.Errorf("[%s]\nexpected: %v, saw: %v", test.name, test.expectResetCIDRs, shaper.ResetCIDRs)
-		}
-
-		if test.cacheStatus {
-			if len(testKube.fakeRuntime.CalledFunctions) != 0 {
-				t.Errorf("unexpected function calls: %v", testKube.fakeRuntime.CalledFunctions)
-			}
-		} else if !reflect.DeepEqual(testKube.fakeRuntime.CalledFunctions, test.expectedCalls) {
-			t.Errorf("[%s], expected %v, saw %v", test.name, test.expectedCalls, testKube.fakeRuntime.CalledFunctions)
-		}
-	}
-}
-
-func TestExtractBandwidthResources(t *testing.T) {
-	four, _ := resource.ParseQuantity("4M")
-	ten, _ := resource.ParseQuantity("10M")
-	twenty, _ := resource.ParseQuantity("20M")
-	tests := []struct {
-		pod             *api.Pod
-		expectedIngress *resource.Quantity
-		expectedEgress  *resource.Quantity
-		expectError     bool
-	}{
-		{
-			pod: &api.Pod{},
-		},
-		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Annotations: map[string]string{
-						"kubernetes.io/ingress-bandwidth": "10M",
-					},
-				},
-			},
-			expectedIngress: ten,
-		},
-		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Annotations: map[string]string{
-						"kubernetes.io/egress-bandwidth": "10M",
-					},
-				},
-			},
-			expectedEgress: ten,
-		},
-		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Annotations: map[string]string{
-						"kubernetes.io/ingress-bandwidth": "4M",
-						"kubernetes.io/egress-bandwidth":  "20M",
-					},
-				},
-			},
-			expectedIngress: four,
-			expectedEgress:  twenty,
-		},
-		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Annotations: map[string]string{
-						"kubernetes.io/ingress-bandwidth": "foo",
-					},
-				},
-			},
-			expectError: true,
-		},
-	}
-	for _, test := range tests {
-		ingress, egress, err := extractBandwidthResources(test.pod)
-		if test.expectError {
-			if err == nil {
-				t.Errorf("unexpected non-error")
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		if !reflect.DeepEqual(ingress, test.expectedIngress) {
-			t.Errorf("expected: %v, saw: %v", ingress, test.expectedIngress)
-		}
-		if !reflect.DeepEqual(egress, test.expectedEgress) {
-			t.Errorf("expected: %v, saw: %v", egress, test.expectedEgress)
-		}
-	}
+	fakeDocker.Unlock()
 }

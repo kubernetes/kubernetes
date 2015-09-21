@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,22 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +build integration
+
 package integration
 
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apiserver"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -63,29 +54,4 @@ func deleteAllEtcdKeys() {
 		}
 	}
 
-}
-
-func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	m := master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableProfiling:       true,
-		EnableUISupport:       false,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-	})
-
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-
-	return m, s
 }

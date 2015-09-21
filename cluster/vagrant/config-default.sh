@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,84 +16,31 @@
 
 ## Contains configuration values for interacting with the Vagrant cluster
 
-# Number of minions in the cluster
-NUM_MINIONS=${NUM_MINIONS-"1"}
-export NUM_MINIONS
+# NUMBER OF MINIONS IN THE CLUSTER
+NUM_MINIONS=${KUBERNETES_NUM_MINIONS-"3"}
 
-# The IP of the master
-export MASTER_IP=${MASTER_IP-"10.245.1.2"}
-export KUBE_MASTER_IP=${MASTER_IP}
+# IP LOCATIONS FOR INTERACTING WITH THE MASTER
+export KUBE_MASTER_IP="10.245.1.2"
 
-export INSTANCE_PREFIX="kubernetes"
-export MASTER_NAME="${INSTANCE_PREFIX}-master"
+INSTANCE_PREFIX=kubernetes
+MASTER_NAME="${INSTANCE_PREFIX}-master"
+MASTER_TAG="${INSTANCE_PREFIX}-master"
+MINION_TAG="${INSTANCE_PREFIX}-minion"
+# Unable to use hostnames yet because DNS is not in cluster, so we revert external look-up name to use the minion IP
+#MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 
-# Should the master serve as a node
-REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
-
-# Map out the IPs, names and container subnets of each minion
-export MINION_IP_BASE=${MINION_IP_BASE-"10.245.1."}
-MINION_CONTAINER_SUBNET_BASE="10.246"
-MASTER_CONTAINER_NETMASK="255.255.255.0"
-MASTER_CONTAINER_ADDR="${MINION_CONTAINER_SUBNET_BASE}.0.1"
-MASTER_CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.1/24"
-CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.0/16"
+# IP LOCATIONS FOR INTERACTING WITH THE MINIONS
+MINION_IP_BASE="10.245.2."
 for ((i=0; i < NUM_MINIONS; i++)) do
-  MINION_IPS[$i]="${MINION_IP_BASE}$((i+3))"
-  MINION_NAMES[$i]="${INSTANCE_PREFIX}-minion-$((i+1))"
-  MINION_CONTAINER_SUBNETS[$i]="${MINION_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"
-  MINION_CONTAINER_ADDRS[$i]="${MINION_CONTAINER_SUBNET_BASE}.$((i+1)).1"
-  MINION_CONTAINER_NETMASKS[$i]="255.255.255.0"
-  VAGRANT_MINION_NAMES[$i]="minion-$((i+1))"
+  KUBE_MINION_IP_ADDRESSES[$i]="${MINION_IP_BASE}$[$i+2]"
+  MINION_IP[$i]="${MINION_IP_BASE}$[$i+2]"
+  MINION_NAMES[$i]="${MINION_IP[$i]}"
+  VAGRANT_MINION_NAMES[$i]="minion-$[$i+1]"
 done
 
-SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
-
-# Since this isn't exposed on the network, default to a simple user/passwd
-MASTER_USER=vagrant
-MASTER_PASSWD=vagrant
-
-# Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING=false
+ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch
-
-# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING=false
-ELASTICSEARCH_LOGGING_REPLICAS=1
-
-# Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup
-#   influxdb - Heapster, InfluxDB, and Grafana
-#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
-
-# Extra options to set on the Docker command line.  This is useful for setting
-# --insecure-registry for local registries, or globally configuring selinux options
-# TODO Enable selinux when Fedora 21 repositories get an updated docker package
-#   see https://bugzilla.redhat.com/show_bug.cgi?id=1216151
-#EXTRA_DOCKER_OPTS="-b=cbr0 --selinux-enabled --insecure-registry 10.0.0.0/8"
-EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
-
-# Flag to tell the kubelet to enable CFS quota support
-ENABLE_CPU_CFS_QUOTA="${KUBE_ENABLE_CPU_CFS_QUOTA:-true}"
-
-# Optional: Install cluster DNS.
-ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
-DNS_SERVER_IP="10.247.0.10"
-DNS_DOMAIN="cluster.local"
-DNS_REPLICAS=1
-
-# Optional: Install Kubernetes UI
-ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
-
-# Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
-#RUNTIME_CONFIG=""
-RUNTIME_CONFIG="api/v1"
-
-# Determine extra certificate names for master
-octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-((octets[3]+=1))
-service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
-MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"

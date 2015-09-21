@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ type DockerConfigProvider interface {
 	Provide() DockerConfig
 }
 
-// A DockerConfigProvider that simply reads the .dockercfg file
+// A DockerConfigProvider that simply reads the .dockersfg file
 type defaultDockerConfigProvider struct{}
 
 // init registers our default provider, which simply reads the .dockercfg file.
@@ -68,7 +68,7 @@ func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
-		glog.V(4).Infof("Unable to parse Docker config file: %v", err)
+		glog.V(1).Infof("Unable to parse Docker config file: %v", err)
 	}
 	return DockerConfig{}
 }

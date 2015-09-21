@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,12 +20,12 @@ import (
 	"encoding/json"
 	"io"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // Encoder implements the json.Encoder interface for io.Writers that
-// should serialize WatchEvent objects into JSON. It will encode any object
+// should serialize watchEvent objects into JSON. It will encode any object
 // registered in the supplied codec and return an error otherwies.
 type Encoder struct {
 	w       io.Writer

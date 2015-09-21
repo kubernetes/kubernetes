@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,126 +22,92 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestErrorNew(t *testing.T) {
 	err := NewAlreadyExists("test", "1")
 	if !IsAlreadyExists(err) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonAlreadyExists)
+		t.Errorf("expected to be %s", api.StatusReasonAlreadyExists)
 	}
 	if IsConflict(err) {
-		t.Errorf("expected to not be %s", unversioned.StatusReasonConflict)
+		t.Errorf("expected to not be %s", api.StatusReasonConflict)
 	}
 	if IsNotFound(err) {
-		t.Errorf(fmt.Sprintf("expected to not be %s", unversioned.StatusReasonNotFound))
+		t.Errorf(fmt.Sprintf("expected to not be %s", api.StatusReasonNotFound))
 	}
 	if IsInvalid(err) {
-		t.Errorf("expected to not be %s", unversioned.StatusReasonInvalid)
-	}
-	if IsBadRequest(err) {
-		t.Errorf("expected to not be %s", unversioned.StatusReasonBadRequest)
-	}
-	if IsForbidden(err) {
-		t.Errorf("expected to not be %s", unversioned.StatusReasonForbidden)
-	}
-	if IsServerTimeout(err) {
-		t.Errorf("expected to not be %s", unversioned.StatusReasonServerTimeout)
-	}
-	if IsMethodNotSupported(err) {
-		t.Errorf("expected to not be %s", unversioned.StatusReasonMethodNotAllowed)
+		t.Errorf("expected to not be %s", api.StatusReasonInvalid)
 	}
 
 	if !IsConflict(NewConflict("test", "2", errors.New("message"))) {
 		t.Errorf("expected to be conflict")
 	}
 	if !IsNotFound(NewNotFound("test", "3")) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonNotFound)
+		t.Errorf("expected to be %s", api.StatusReasonNotFound)
 	}
 	if !IsInvalid(NewInvalid("test", "2", nil)) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonInvalid)
-	}
-	if !IsBadRequest(NewBadRequest("reason")) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonBadRequest)
-	}
-	if !IsForbidden(NewForbidden("test", "2", errors.New("reason"))) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonForbidden)
-	}
-	if !IsUnauthorized(NewUnauthorized("reason")) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonUnauthorized)
-	}
-	if !IsServerTimeout(NewServerTimeout("test", "reason", 0)) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonServerTimeout)
-	}
-	if time, ok := SuggestsClientDelay(NewServerTimeout("test", "doing something", 10)); time != 10 || !ok {
-		t.Errorf("expected to be %s", unversioned.StatusReasonServerTimeout)
-	}
-	if time, ok := SuggestsClientDelay(NewTimeoutError("test reason", 10)); time != 10 || !ok {
-		t.Errorf("expected to be %s", unversioned.StatusReasonTimeout)
-	}
-	if !IsMethodNotSupported(NewMethodNotSupported("foo", "delete")) {
-		t.Errorf("expected to be %s", unversioned.StatusReasonMethodNotAllowed)
+		t.Errorf("expected to be %s", api.StatusReasonInvalid)
 	}
 }
 
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     *fielderrors.ValidationError
-		Details *unversioned.StatusDetails
+		Err     *ValidationError
+		Details *api.StatusDetails
 	}{
 		{
-			fielderrors.NewFieldDuplicate("field[0].name", "bar"),
-			&unversioned.StatusDetails{
+			NewFieldDuplicate("field[0].name", "bar"),
+			&api.StatusDetails{
 				Kind: "kind",
-				Name: "name",
-				Causes: []unversioned.StatusCause{{
-					Type:  unversioned.CauseTypeFieldValueDuplicate,
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueDuplicate,
 					Field: "field[0].name",
 				}},
 			},
 		},
 		{
-			fielderrors.NewFieldInvalid("field[0].name", "bar", "detail"),
-			&unversioned.StatusDetails{
+			NewFieldInvalid("field[0].name", "bar", "detail"),
+			&api.StatusDetails{
 				Kind: "kind",
-				Name: "name",
-				Causes: []unversioned.StatusCause{{
-					Type:  unversioned.CauseTypeFieldValueInvalid,
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueInvalid,
 					Field: "field[0].name",
 				}},
 			},
 		},
 		{
-			fielderrors.NewFieldNotFound("field[0].name", "bar"),
-			&unversioned.StatusDetails{
+			NewFieldNotFound("field[0].name", "bar"),
+			&api.StatusDetails{
 				Kind: "kind",
-				Name: "name",
-				Causes: []unversioned.StatusCause{{
-					Type:  unversioned.CauseTypeFieldValueNotFound,
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueNotFound,
 					Field: "field[0].name",
 				}},
 			},
 		},
 		{
-			fielderrors.NewFieldValueNotSupported("field[0].name", "bar", nil),
-			&unversioned.StatusDetails{
+			NewFieldNotSupported("field[0].name", "bar"),
+			&api.StatusDetails{
 				Kind: "kind",
-				Name: "name",
-				Causes: []unversioned.StatusCause{{
-					Type:  unversioned.CauseTypeFieldValueNotSupported,
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueNotSupported,
 					Field: "field[0].name",
 				}},
 			},
 		},
 		{
-			fielderrors.NewFieldRequired("field[0].name"),
-			&unversioned.StatusDetails{
+			NewFieldRequired("field[0].name", "bar"),
+			&api.StatusDetails{
 				Kind: "kind",
-				Name: "name",
-				Causes: []unversioned.StatusCause{{
-					Type:  unversioned.CauseTypeFieldValueRequired,
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueRequired,
 					Field: "field[0].name",
 				}},
 			},
@@ -149,10 +115,10 @@ func TestNewInvalid(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
-		expected.Causes[0].Message = vErr.ErrorBody()
-		err := NewInvalid("kind", "name", fielderrors.ValidationErrorList{vErr})
+		expected.Causes[0].Message = vErr.Error()
+		err := NewInvalid("kind", "name", ValidationErrorList{vErr})
 		status := err.(*StatusError).ErrStatus
-		if status.Code != 422 || status.Reason != unversioned.StatusReasonInvalid {
+		if status.Code != 422 || status.Reason != api.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)
 		}
 		if !reflect.DeepEqual(expected, status.Details) {
@@ -162,7 +128,7 @@ func TestNewInvalid(t *testing.T) {
 }
 
 func Test_reasonForError(t *testing.T) {
-	if e, a := unversioned.StatusReasonUnknown, reasonForError(nil); e != a {
+	if e, a := api.StatusReasonUnknown, reasonForError(nil); e != a {
 		t.Errorf("unexpected reason type: %#v", a)
 	}
 }
@@ -176,7 +142,7 @@ func TestFromObject(t *testing.T) {
 		obj     runtime.Object
 		message string
 	}{
-		{&unversioned.Status{Message: "foobar"}, "foobar"},
+		{&api.Status{Message: "foobar"}, "foobar"},
 		{&TestType{}, "unexpected object: &{}"},
 	}
 

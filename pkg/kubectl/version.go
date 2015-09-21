@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,18 +21,19 @@ import (
 	"io"
 	"os"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
-func GetServerVersion(w io.Writer, kubeClient client.Interface) {
+func GetVersion(w io.Writer, kubeClient client.Interface) {
 	serverVersion, err := kubeClient.ServerVersion()
 	if err != nil {
-		fmt.Printf("Couldn't read server version from server: %v\n", err)
+		fmt.Printf("Couldn't read version from server: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(w, "Server Version: %#v\n", *serverVersion)
+	GetClientVersion(w)
+	fmt.Fprintf(w, "Server Version: %#v\n", serverVersion)
 }
 
 func GetClientVersion(w io.Writer) {

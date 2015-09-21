@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,27 +25,15 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-
-if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
-    source "${KUBE_ROOT}/cluster/env.sh"
-fi
-
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-echo "... Starting cluster using provider: $KUBERNETES_PROVIDER" >&2
+echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
 
-echo "... calling verify-prereqs" >&2
 verify-prereqs
-
-echo "... calling kube-up" >&2
 kube-up
 
-echo "... calling validate-cluster" >&2
-validate-cluster
+"${KUBE_ROOT}/cluster/validate-cluster.sh"
+setup-monitoring
 
-echo -e "Done, listing cluster services:\n" >&2
-"${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
-echo
-
-exit 0
+echo "Done"

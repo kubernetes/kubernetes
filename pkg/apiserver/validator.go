@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,14 @@ limitations under the License.
 package apiserver
 
 import (
-	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
-	"time"
 
-	"k8s.io/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -33,65 +32,91 @@ type httpGet interface {
 	Get(url string) (*http.Response, error)
 }
 
-type ValidatorFn func([]byte) error
-
 type Server struct {
-	Addr        string
-	Port        int
-	Path        string
-	EnableHTTPS bool
-	Validate    ValidatorFn
+	Addr string
+	Port int
+	Path string
 }
 
-type ServerStatus struct {
-	Component  string       `json:"component,omitempty"`
-	Health     string       `json:"health,omitempty"`
-	HealthCode probe.Result `json:"healthCode,omitempty"`
-	Msg        string       `json:"msg,omitempty"`
-	Err        string       `json:"err,omitempty"`
+// validator is responsible for validating the cluster and serving
+type validator struct {
+	// a list of servers to health check
+	servers func() map[string]Server
+	client  httpGet
 }
 
-// TODO: can this use pkg/probe/http
-func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string, error) {
-	var client *http.Client
-	scheme := "http://"
-	if server.EnableHTTPS {
-		// TODO(roberthbailey): The servers that use HTTPS are currently the
-		// kubelets, and we should be using a standard kubelet client library
-		// to talk to them rather than a separate http client.
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-		}
-
-		client = &http.Client{Transport: transport}
-		scheme = "https://"
-	} else {
-		client = &http.Client{Transport: rt}
-	}
-
-	resp, err := client.Get(scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path)
+func (s *Server) check(client httpGet) (health.Status, string, error) {
+	resp, err := client.Get("http://" + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
 	if err != nil {
-		return probe.Unknown, "", err
+		return health.Unknown, "", err
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return probe.Unknown, string(data), err
+		return health.Unknown, string(data), err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return probe.Failure, string(data),
+		return health.Unhealthy, string(data),
 			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
 	}
-	if server.Validate != nil {
-		if err := server.Validate(data); err != nil {
-			return probe.Failure, string(data), err
+	return health.Healthy, string(data), nil
+}
+
+type ServerStatus struct {
+	Component  string        `json:"component,omitempty"`
+	Health     string        `json:"health,omitempty"`
+	HealthCode health.Status `json:"healthCode,omitempty"`
+	Msg        string        `json:"msg,omitempty"`
+	Err        string        `json:"err,omitempty"`
+}
+
+func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	reply := []ServerStatus{}
+	for name, server := range v.servers() {
+		status, msg, err := server.check(v.client)
+		var errorMsg string
+		if err != nil {
+			errorMsg = err.Error()
+		} else {
+			errorMsg = "nil"
 		}
+		reply = append(reply, ServerStatus{name, status.String(), status, msg, errorMsg})
 	}
-	return probe.Success, string(data), nil
+	data, err := json.MarshalIndent(reply, "", "  ")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+// NewValidator creates a validator for a set of servers.
+func NewValidator(servers func() map[string]Server) (http.Handler, error) {
+	return &validator{
+		servers: servers,
+		client:  &http.Client{},
+	}, nil
+}
+
+func makeTestValidator(servers map[string]string, get httpGet) (http.Handler, error) {
+	result := map[string]Server{}
+	for name, value := range servers {
+		host, port, err := net.SplitHostPort(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid server spec: %s (%v)", value, err)
+		}
+		val, err := strconv.Atoi(port)
+		if err != nil {
+			return nil, fmt.Errorf("invalid server spec: %s (%v)", port, err)
+		}
+		result[name] = Server{Addr: host, Port: val, Path: "/healthz"}
+	}
+
+	v, e := NewValidator(func() map[string]Server { return result })
+	if e == nil {
+		v.(*validator).client = get
+	}
+	return v, e
 }

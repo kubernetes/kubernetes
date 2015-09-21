@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,20 +17,18 @@ limitations under the License.
 package validation
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // ValidateEvent makes sure that the event makes sense.
 func ValidateEvent(event *api.Event) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	// TODO: There is no namespace required for node.
-	if event.InvolvedObject.Kind != "Node" &&
-		event.Namespace != event.InvolvedObject.Namespace {
+	if event.Namespace != event.InvolvedObject.Namespace {
 		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
 	}
-	if !validation.IsDNS1123Subdomain(event.Namespace) {
+	if !util.IsDNSSubdomain(event.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", event.Namespace, ""))
 	}
 	return allErrs

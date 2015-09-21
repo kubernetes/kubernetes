@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/azure/${KUBE_CONFIG_FILE-"config-default.sh"}"
-source "${KUBE_ROOT}/cluster/common.sh"
 
 function azure_call {
     local -a params=()
@@ -146,18 +145,18 @@ function upload-server-tars() {
     echo "==> SERVER_BINARY_TAR_URL: $SERVER_BINARY_TAR_URL"
     echo "==> SALT_TAR_URL: $SALT_TAR_URL"
 
-    echo "--> Checking storage exists..."
+    echo "--> Checking storage exsists..."
     if [[ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
     grep data)" ]]; then
         echo "--> Creating storage..."
-        azure_call storage account create -l "$AZ_LOCATION" $AZ_STG --type LRS
+        azure_call storage account create -l "$AZ_LOCATION" $AZ_STG
     fi
 
     echo "--> Getting storage key..."
     stg_key=$(azure_call storage account keys list $AZ_STG --json | \
         json_val '["primaryKey"]')
 
-    echo "--> Checking storage container exists..."
+    echo "--> Checking storage container exsists..."
     if [[ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
       $CONTAINER 2>/dev/null | grep data)" ]]; then
         echo "--> Creating storage container..."
@@ -242,6 +241,47 @@ function detect-master () {
     echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
+# Ensure that we have a password created for validating to the master.  Will
+# read from $HOME/.kubernetres_auth if available.
+#
+# Vars set:
+#   KUBE_USER
+#   KUBE_PASSWORD
+function get-password {
+    local file="$HOME/.kubernetes_auth"
+    if [[ -r "$file" ]]; then
+        KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
+        KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
+        return
+    fi
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+
+    # Remove this code, since in all use cases I can see, we are overwriting this
+    # at cluster creation time.
+    cat << EOF > "$file"
+{
+  "User": "$KUBE_USER",
+  "Password": "$KUBE_PASSWORD"
+}
+EOF
+    chmod 0600 "$file"
+}
+
+# Generate authentication token for admin user. Will
+# read from $HOME/.kubernetes_auth if available.
+#
+# Vars set:
+#   KUBE_ADMIN_TOKEN
+function get-admin-token {
+    local file="$HOME/.kubernetes_auth"
+    if [[ -r "$file" ]]; then
+        KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
+        return
+    fi
+    KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
+}
+
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -254,7 +294,7 @@ function kube-up {
 
     ensure-temp-dir
 
-    gen-kube-basicauth
+    get-password
     python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
         -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
     local htpasswd
@@ -303,13 +343,11 @@ function kube-up {
         echo "mkdir -p /var/cache/kubernetes-install"
         echo "cd /var/cache/kubernetes-install"
         echo "readonly MASTER_NAME='${MASTER_NAME}'"
-        echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
         echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
         echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
-        echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
+        echo "readonly PORTAL_NET='${PORTAL_NET}'"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
@@ -325,14 +363,16 @@ function kube-up {
             -subj "/CN=azure-ssh-key"
     fi
 
-    if [[ -z "$(azure_call network vnet show "$AZ_VNET" 2>/dev/null | grep data)" ]]; then
+    if [[ -z "$(azure_call network vnet show $AZ_VNET 2>/dev/null | grep data)" ]]; then
+        #azure network vnet create with $AZ_SUBNET
+        #FIXME not working
         echo error create vnet $AZ_VNET with subnet $AZ_SUBNET
         exit 1
     fi
 
     echo "--> Starting VM"
     azure_call vm create \
-        -w "$AZ_VNET" \
+        -w $AZ_VNET \
         -n $MASTER_NAME \
         -l "$AZ_LOCATION" \
         -t $AZ_SSH_CERT \
@@ -359,7 +399,7 @@ function kube-up {
 
         echo "--> Starting VM"
         azure_call vm create \
-            -c -w "$AZ_VNET" \
+            -c -w $AZ_VNET \
             -n ${MINION_NAMES[$i]} \
             -l "$AZ_LOCATION" \
             -t $AZ_SSH_CERT \
@@ -369,7 +409,7 @@ function kube-up {
             $AZ_CS $AZ_IMAGE $USER
     done
 
-    echo "--> Creating endpoint"
+    echo "--> Createing endpoint"
     azure_call vm endpoint create $MASTER_NAME 443
 
     detect-master > /dev/null
@@ -384,7 +424,7 @@ function kube-up {
     echo
 
     until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-        --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
+        --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
         printf "."
         sleep 2
     done
@@ -392,50 +432,57 @@ function kube-up {
     printf "\n"
     echo "Kubernetes cluster created."
 
-    export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
-    export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
-    export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
-    export CONTEXT="azure_${INSTANCE_PREFIX}"
+    local kube_cert=".kubecfg.crt"
+    local kube_key=".kubecfg.key"
+    local ca_cert=".kubernetes.ca.crt"
 
     # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
     # config file.  Distribute the same way the htpasswd is done.
 (umask 077
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
+        sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
+        sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
+        sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
 
-    create-kubeconfig
+    cat << EOF > ~/.kubernetes_auth
+{
+  "User": "$KUBE_USER",
+  "Password": "$KUBE_PASSWORD",
+  "CAFile": "$HOME/$ca_cert",
+  "CertFile": "$HOME/$kube_cert",
+  "KeyFile": "$HOME/$kube_key"
+}
+EOF
+
+    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
+        "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
 )
 
+    # Wait for salt on the minions
+    sleep 30
+
     echo "Sanity checking cluster..."
-    echo
-    echo "  This will continually check the minions to ensure docker is"
-    echo "  installed. This is usually a good indicator that salt has"
-    echo "  successfully  provisioned. This might loop forever if there was"
-    echo "  some uncaught error during start up."
-    echo
     # Basic sanity checking
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         # Make sure docker is installed
         echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
-        until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
-            $AZ_CS.cloudapp.net which docker > /dev/null 2>&1; do
-            printf "."
-            sleep 2
-        done
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
+            $AZ_CS.cloudapp.net which docker > /dev/null || {
+            echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
+            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo "cluster. (sorry!)" >&2
+            exit 1
+        }
     done
 
-    # ensures KUBECONFIG is set
-    get-kubeconfig-basicauth
     echo
     echo "Kubernetes cluster is running.  The master is running at:"
     echo
     echo "  https://${KUBE_MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ${KUBECONFIG}."
+    echo "The user name and password to use is located in ~/.kubernetes_auth."
     echo
 }
 
@@ -474,14 +521,14 @@ function kube-down {
 #    echo "sudo salt --force-color '*' state.highstate"
 #   ) | gcutil ssh --project "$PROJECT" --zone "$ZONE" "$KUBE_MASTER" sudo bash
 
-#  get-kubeconfig-basicauth
+#  get-password
 
 #  echo
 #  echo "Kubernetes cluster is running.  The master is running at:"
 #  echo
 #  echo "  https://${KUBE_MASTER_IP}"
 # echo
-#  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
+#  echo "The user name and password to use is located in ~/.kubernetes_auth."
 #  echo
 
 #}
@@ -510,7 +557,11 @@ function restart-kube-proxy {
     ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
-# Restart the kube-proxy on the master ($1)
-function restart-apiserver {
-    ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+# Setup monitoring using heapster and InfluxDB
+function setup-monitoring {
+    echo "not implemented"  >/dev/null
+}
+
+function teardown-monitoring {
+    echo "not implemented"  >/dev/null
 }

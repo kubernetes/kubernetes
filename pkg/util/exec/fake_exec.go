@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 type FakeExec struct {
 	CommandScript []FakeCommandAction
 	CommandCalls  int
-	LookPathFunc  func(string) (string, error)
 }
 
 type FakeCommandAction func(cmd string, args ...string) Cmd
@@ -36,10 +35,6 @@ func (fake *FakeExec) Command(cmd string, args ...string) Cmd {
 	i := fake.CommandCalls
 	fake.CommandCalls++
 	return fake.CommandScript[i](cmd, args...)
-}
-
-func (fake *FakeExec) LookPath(file string) (string, error) {
-	return fake.LookPathFunc(file)
 }
 
 // A simple scripted Cmd type.
