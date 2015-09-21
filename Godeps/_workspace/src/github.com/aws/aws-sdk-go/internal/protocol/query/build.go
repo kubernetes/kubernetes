@@ -6,19 +6,19 @@ package query
 import (
 	"net/url"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/internal/apierr"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/internal/protocol/query/queryutil"
 )
 
 // Build builds a request for an AWS Query service.
-func Build(r *aws.Request) {
+func Build(r *request.Request) {
 	body := url.Values{
 		"Action":  {r.Operation.Name},
 		"Version": {r.Service.APIVersion},
 	}
 	if err := queryutil.Parse(body, r.Params, false); err != nil {
-		r.Error = apierr.New("Marshal", "failed encoding Query request", err)
+		r.Error = awserr.New("SerializationError", "failed encoding Query request", err)
 		return
 	}
 

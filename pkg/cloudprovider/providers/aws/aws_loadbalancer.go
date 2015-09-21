@@ -138,7 +138,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
 						continue
 					}
-					if orEmpty(actual.SSLCertificateID) != orEmpty(expected.SSLCertificateID) {
+					if orEmpty(actual.SSLCertificateId) != orEmpty(expected.SSLCertificateId) {
 						continue
 					}
 					found = i
@@ -257,12 +257,12 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(region string, loadBalancer *el
 func (s *AWSCloud) ensureLoadBalancerInstances(elbClient ELB, loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
 	expected := sets.NewString()
 	for _, instance := range instances {
-		expected.Insert(orEmpty(instance.InstanceID))
+		expected.Insert(orEmpty(instance.InstanceId))
 	}
 
 	actual := sets.NewString()
 	for _, lbInstance := range lbInstances {
-		actual.Insert(orEmpty(lbInstance.InstanceID))
+		actual.Insert(orEmpty(lbInstance.InstanceId))
 	}
 
 	additions := expected.Difference(actual)
@@ -271,14 +271,14 @@ func (s *AWSCloud) ensureLoadBalancerInstances(elbClient ELB, loadBalancerName s
 	addInstances := []*elb.Instance{}
 	for instanceId := range additions {
 		addInstance := &elb.Instance{}
-		addInstance.InstanceID = aws.String(instanceId)
+		addInstance.InstanceId = aws.String(instanceId)
 		addInstances = append(addInstances, addInstance)
 	}
 
 	removeInstances := []*elb.Instance{}
 	for instanceId := range removals {
 		removeInstance := &elb.Instance{}
-		removeInstance.InstanceID = aws.String(instanceId)
+		removeInstance.InstanceId = aws.String(instanceId)
 		removeInstances = append(removeInstances, removeInstance)
 	}
 
