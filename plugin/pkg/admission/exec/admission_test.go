@@ -36,8 +36,8 @@ func TestAdmission(t *testing.T) {
 	hostPIDPod := validPod("hostPID")
 	hostPIDPod.Spec.HostPID = true
 
-	//	hostIPCPod := validPod("hostIPC")
-	//	hostIPCPod.Spec.HostIPC = true
+	hostIPCPod := validPod("hostIPC")
+	hostIPCPod.Spec.HostIPC = true
 
 	testCases := map[string]struct {
 		pod          *api.Pod
@@ -51,10 +51,10 @@ func TestAdmission(t *testing.T) {
 			shouldAccept: false,
 			pod:          hostPIDPod,
 		},
-		//		"hostIPC": {
-		//			shouldAccept: false,
-		//			pod: hostIPCPod,
-		//		},
+		"hostIPC": {
+			shouldAccept: false,
+			pod:          hostIPCPod,
+		},
 		"non privileged": {
 			shouldAccept: true,
 			pod:          validPod("nonPrivileged"),
@@ -132,8 +132,8 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 	hostPIDPod := validPod("hostPID")
 	hostPIDPod.Spec.HostPID = true
 
-	//	hostIPCPod := validPod("hostIPC")
-	//	hostIPCPod.Spec.HostIPC = true
+	hostIPCPod := validPod("hostIPC")
+	hostIPCPod.Spec.HostIPC = true
 
 	testCases := map[string]struct {
 		pod          *api.Pod
@@ -147,10 +147,10 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 			shouldAccept: true,
 			pod:          hostPIDPod,
 		},
-		//		"hostIPC": {
-		//			shouldAccept: true,
-		//			pod: hostIPCPod,
-		//		},
+		"hostIPC": {
+			shouldAccept: true,
+			pod:          hostIPCPod,
+		},
 		"non privileged": {
 			shouldAccept: true,
 			pod:          validPod("nonPrivileged"),
