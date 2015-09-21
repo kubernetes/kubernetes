@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -109,7 +108,6 @@ type KubernetesExecutor struct {
 	lock                 sync.RWMutex
 	sourcename           string
 	client               *client.Client
-	events               <-chan watch.Event
 	done                 chan struct{}                     // signals shutdown
 	outgoing             chan func() (mesos.Status, error) // outgoing queue to the mesos driver
 	dockerClient         dockertools.DockerInterface
@@ -131,7 +129,6 @@ type Config struct {
 	Updates              chan<- interface{} // to send pod config updates to the kubelet
 	SourceName           string
 	APIClient            *client.Client
-	Watch                watch.Interface
 	Docker               dockertools.DockerInterface
 	ShutdownAlert        func()
 	SuicideTimeout       time.Duration
@@ -167,20 +164,6 @@ func New(config Config) *KubernetesExecutor {
 		podStatusFunc:        config.PodStatusFunc,
 		initialRegComplete:   make(chan struct{}),
 		staticPodsConfigPath: config.StaticPodsConfigPath,
-	}
-
-	//TODO(jdef) do something real with these events..
-	if config.Watch != nil {
-		events := config.Watch.ResultChan()
-		if events != nil {
-			go func() {
-				for e := range events {
-					// e ~= watch.Event { ADDED, *api.Event }
-					log.V(1).Info(e)
-				}
-			}()
-			k.events = events
-		}
 	}
 
 	// watch pods from the given pod ListWatch
