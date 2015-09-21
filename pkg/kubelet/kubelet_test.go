@@ -336,6 +336,9 @@ func TestSyncLoopAbort(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.lastTimestampRuntimeUp = time.Now()
 	kubelet.networkConfigured = true
+	// The syncLoop waits on time.After(resyncInterval), set it really big so that we don't race for
+	// the channel close
+	kubelet.resyncInterval = time.Second * 30
 
 	ch := make(chan PodUpdate)
 	close(ch)
