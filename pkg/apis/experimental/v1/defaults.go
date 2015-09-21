@@ -76,6 +76,19 @@ func addDefaultingFuncs() {
 			}
 		},
 		func(obj *Job) {
+			var labels map[string]string
+			if obj.Spec.Template != nil {
+				labels = obj.Spec.Template.Labels
+			}
+			// TODO: support templates defined elsewhere when we support them in the API
+			if labels != nil {
+				if len(obj.Spec.Selector) == 0 {
+					obj.Spec.Selector = labels
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
 			if obj.Spec.Completions == nil {
 				completions := 1
 				obj.Spec.Completions = &completions

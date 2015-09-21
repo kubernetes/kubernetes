@@ -407,7 +407,7 @@ type JobSpec struct {
 	Completions *int `json:"completions,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
-	Selector map[string]string `json:"selector"`
+	Selector map[string]string `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
