@@ -95,7 +95,7 @@ type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetContainerRuntimeVersion() (kubecontainer.Version, error)
 	GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error)
-	GetMachineInfo() (*cadvisorApi.MachineInfo, error)
+	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetRunningPods() ([]*api.Pod, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -407,7 +407,7 @@ func (s *Server) getLogs(request *restful.Request, response *restful.Response) {
 
 // getSpec handles spec requests against the Kubelet.
 func (s *Server) getSpec(request *restful.Request, response *restful.Response) {
-	info, err := s.host.GetMachineInfo()
+	info, err := s.host.GetCachedMachineInfo()
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
