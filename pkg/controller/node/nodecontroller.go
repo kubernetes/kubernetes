@@ -37,9 +37,7 @@ import (
 )
 
 var (
-	ErrRegistration   = errors.New("unable to register all nodes.")
-	ErrQueryIPAddress = errors.New("unable to query IP address.")
-	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
+	ErrCloudInstance = errors.New("cloud provider doesn't support instances.")
 )
 
 const (

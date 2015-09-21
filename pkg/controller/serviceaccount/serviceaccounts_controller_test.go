@@ -17,36 +17,16 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type serverResponse struct {
 	statusCode int
 	obj        interface{}
-}
-
-func makeTestServer(t *testing.T, namespace string, serviceAccountResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakeServiceAccountsHandler := util.FakeHandler{
-		StatusCode:   serviceAccountResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), serviceAccountResponse.obj.(runtime.Object)),
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle(testapi.Default.ResourcePath("serviceAccounts", namespace, ""), &fakeServiceAccountsHandler)
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		t.Errorf("unexpected request: %v", req.RequestURI)
-		res.WriteHeader(http.StatusNotFound)
-	})
-	return httptest.NewServer(mux), &fakeServiceAccountsHandler
 }
 
 func TestServiceAccountCreation(t *testing.T) {

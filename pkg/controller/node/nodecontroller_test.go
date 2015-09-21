@@ -19,7 +19,6 @@ package nodecontroller
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -664,35 +663,6 @@ func newNode(name string) *api.Node {
 
 func newPod(name, host string) *api.Pod {
 	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{NodeName: host}}
-}
-
-func sortedNodeNames(nodes []*api.Node) []string {
-	nodeNames := []string{}
-	for _, node := range nodes {
-		nodeNames = append(nodeNames, node.Name)
-	}
-	sort.Strings(nodeNames)
-	return nodeNames
-}
-
-func sortedNodeAddresses(nodes []*api.Node) []string {
-	nodeAddresses := []string{}
-	for _, node := range nodes {
-		for _, addr := range node.Status.Addresses {
-			nodeAddresses = append(nodeAddresses, addr.Address)
-		}
-	}
-	sort.Strings(nodeAddresses)
-	return nodeAddresses
-}
-
-func sortedNodeExternalIDs(nodes []*api.Node) []string {
-	nodeExternalIDs := []string{}
-	for _, node := range nodes {
-		nodeExternalIDs = append(nodeExternalIDs, node.Spec.ExternalID)
-	}
-	sort.Strings(nodeExternalIDs)
-	return nodeExternalIDs
 }
 
 func contains(node *api.Node, nodes []*api.Node) bool {

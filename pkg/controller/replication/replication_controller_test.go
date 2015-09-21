@@ -19,7 +19,6 @@ package replicationcontroller
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
@@ -32,12 +31,10 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -177,51 +174,6 @@ func replicationControllerResourceName() string {
 type serverResponse struct {
 	statusCode int
 	obj        interface{}
-}
-
-func makeTestServer(t *testing.T, namespace, name string, podResponse, controllerResponse, updateResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakePodHandler := util.FakeHandler{
-		StatusCode:   podResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), podResponse.obj.(runtime.Object)),
-	}
-	fakeControllerHandler := util.FakeHandler{
-		StatusCode:   controllerResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), controllerResponse.obj.(runtime.Object)),
-	}
-	fakeUpdateHandler := util.FakeHandler{
-		StatusCode:   updateResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), updateResponse.obj.(runtime.Object)),
-	}
-	mux := http.NewServeMux()
-	mux.Handle(testapi.Default.ResourcePath("pods", namespace, ""), &fakePodHandler)
-	mux.Handle(testapi.Default.ResourcePath(replicationControllerResourceName(), "", ""), &fakeControllerHandler)
-	if namespace != "" {
-		mux.Handle(testapi.Default.ResourcePath(replicationControllerResourceName(), namespace, ""), &fakeControllerHandler)
-	}
-	if name != "" {
-		mux.Handle(testapi.Default.ResourcePath(replicationControllerResourceName(), namespace, name), &fakeUpdateHandler)
-	}
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		t.Errorf("unexpected request: %v", req.RequestURI)
-		res.WriteHeader(http.StatusNotFound)
-	})
-	return httptest.NewServer(mux), &fakeUpdateHandler
-}
-
-func startManagerAndWait(manager *ReplicationManager, pods int, t *testing.T) chan struct{} {
-	stopCh := make(chan struct{})
-	go manager.Run(1, stopCh)
-	err := wait.Poll(10*time.Millisecond, 100*time.Millisecond, func() (bool, error) {
-		podList, err := manager.podStore.List(labels.Everything())
-		if err != nil {
-			return false, err
-		}
-		return len(podList) == pods, nil
-	})
-	if err != nil {
-		t.Errorf("Failed to observe %d pods in 100ms", pods)
-	}
-	return stopCh
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
