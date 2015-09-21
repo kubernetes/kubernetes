@@ -62,7 +62,7 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 			additions := expected.Difference(actual)
 			removals := actual.Difference(expected)
 
-			if len(removals) != 0 {
+			if removals.Len() != 0 {
 				request := &elb.DetachLoadBalancerFromSubnetsInput{}
 				request.LoadBalancerName = aws.String(name)
 				request.Subnets = stringSetToPointers(removals)
@@ -74,7 +74,7 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 				dirty = true
 			}
 
-			if len(additions) != 0 {
+			if additions.Len() != 0 {
 				request := &elb.AttachLoadBalancerToSubnetsInput{}
 				request.LoadBalancerName = aws.String(name)
 				request.Subnets = stringSetToPointers(additions)
@@ -259,14 +259,14 @@ func (s *AWSCloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstan
 	removals := actual.Difference(expected)
 
 	addInstances := []*elb.Instance{}
-	for instanceId := range additions {
+	for _, instanceId := range additions.List() {
 		addInstance := &elb.Instance{}
 		addInstance.InstanceID = aws.String(instanceId)
 		addInstances = append(addInstances, addInstance)
 	}
 
 	removeInstances := []*elb.Instance{}
-	for instanceId := range removals {
+	for _, instanceId := range removals.List() {
 		removeInstance := &elb.Instance{}
 		removeInstance.InstanceID = aws.String(instanceId)
 		removeInstances = append(removeInstances, removeInstance)
