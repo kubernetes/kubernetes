@@ -1927,3 +1927,85 @@ func getPidMode(pod *api.Pod) string {
 	}
 	return pidMode
 }
+
+func (dm *DockerManager) getContainers(listType listContainersType) ([]*kubecontainer.Container, error) {
+	containers, err := GetKubeletManagedContainers(dm.client, listType)
+	if err != nil {
+		return nil, err
+	}
+	runtimeContainers := []*kubecontainer.Container{}
+	for _, c := range containers {
+		converted, err := toRuntimeContainer(c)
+		if err != nil {
+			glog.Errorf("Error examining the container: %v", err)
+			continue
+		}
+		runtimeContainers = append(runtimeContainers, converted)
+	}
+	return runtimeContainers, nil
+}
+
+func (dm *DockerManager) GetRunningContainers() ([]*kubecontainer.Container, error) {
+	return dm.getContainers(listRunning)
+}
+
+func (dm *DockerManager) GetTerminatedContainers() ([]*kubecontainer.Container, error) {
+	return dm.getContainers(listExited)
+}
+
+func (dm *DockerManager) GetAllContainers() ([]*kubecontainer.Container, error) {
+	return dm.getContainers(listAll)
+}
+
+// A helper function to Get the pod/container information from the name of the
+// container.
+func GetPodInfoFromDockerContainerName(rawName string) (*kubecontainer.Pod, string, uint64, error) {
+	dockerName, hash, err := ParseDockerName(rawName)
+	if err != nil {
+		return &kubecontainer.Pod{}, "", 0, fmt.Errorf("parse docker container name %q error: %v", rawName, err)
+	}
+	name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+	if err != nil {
+		return &kubecontainer.Pod{}, "", 0, fmt.Errorf("parse pod full name %q error: %v", dockerName.PodFullName, err)
+	}
+
+	return &kubecontainer.Pod{ID: dockerName.PodUID, Name: name, Namespace: namespace}, dockerName.ContainerName, hash, nil
+}
+
+type ContainerExaminationResult struct {
+	Pod              *kubecontainer.Pod
+	IsInfraContainer bool
+}
+
+// TODO(yujuhong): Refactor this function to share code with or replace
+// inspectContainer(). Note that this function doesn't handle tPath.
+func (dm *DockerManager) ExamineContainer(dockerID string) (*ContainerExaminationResult, error) {
+	result := &ContainerExaminationResult{}
+	iResult, err := dm.client.InspectContainer(dockerID)
+	if err != nil {
+		return result, err
+	}
+	if iResult == nil {
+		// Why did we not get an error?
+		return result, fmt.Errorf("Empty inspect result for container %q", dockerID)
+	}
+
+	glog.V(5).Infof("ExamineContainer: %+v", *iResult)
+	pod, containerName, hash, err := GetPodInfoFromDockerContainerName(iResult.Name)
+	if err != nil {
+		glog.Infof("ExamineContainer: unable to get pod infor from docker name:%v", err)
+		return result, err
+	}
+	result.Pod = pod
+	result.IsInfraContainer = (containerName == PodInfraContainerName)
+
+	pod.Containers = []*kubecontainer.Container{{
+		ID:      types.UID(dockerID),
+		Name:    containerName,
+		Image:   iResult.Config.Image,
+		Created: iResult.Created.Unix(),
+		Hash:    hash,
+	}}
+
+	return result, nil
+}

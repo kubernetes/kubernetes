@@ -322,6 +322,14 @@ func (f *FakeDockerClient) RemoveImage(image string) error {
 	return err
 }
 
+func (f *FakeDockerClient) AddEventListener(listener chan<- *docker.APIEvents) error {
+	return nil
+}
+
+func (f *FakeDockerClient) RemoveEventListener(listener chan *docker.APIEvents) error {
+	return nil
+}
+
 // FakeDockerPuller is a stub implementation of DockerPuller.
 type FakeDockerPuller struct {
 	sync.Mutex
