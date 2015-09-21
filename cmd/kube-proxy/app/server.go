@@ -50,21 +50,21 @@ import (
 
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
-	BindAddress         net.IP
-	HealthzPort         int
-	HealthzBindAddress  net.IP
-	OOMScoreAdj         int
-	ResourceContainer   string
-	Master              string
-	Kubeconfig          string
-	PortRange           util.PortRange
-	Recorder            record.EventRecorder
-	HostnameOverride    string
-	ForceUserspaceProxy bool
-	SyncPeriod          time.Duration
-	nodeRef             *api.ObjectReference // Reference to this node.
-	MasqueradeAll       bool
-	CleanupAndExit      bool
+	BindAddress        net.IP
+	HealthzPort        int
+	HealthzBindAddress net.IP
+	OOMScoreAdj        int
+	ResourceContainer  string
+	Master             string
+	Kubeconfig         string
+	PortRange          util.PortRange
+	Recorder           record.EventRecorder
+	HostnameOverride   string
+	ProxyMode          string
+	SyncPeriod         time.Duration
+	nodeRef            *api.ObjectReference // Reference to this node.
+	MasqueradeAll      bool
+	CleanupAndExit     bool
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -90,10 +90,24 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
-	fs.BoolVar(&s.ForceUserspaceProxy, "legacy-userspace-proxy", true, "Use the legacy userspace proxy (instead of the pure iptables proxy).")
+	fs.StringVar(&s.ProxyMode, "proxy-mode", "", "Which proxy mode to use: 'userspace' (older, stable) or 'iptables' (experimental). If blank, look at the Node object on the Kubernetes API and respect the '"+experimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently userspace, but may change in future versions).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 5*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
 	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
+}
+
+const (
+	proxyModeUserspace              = "userspace"
+	proxyModeIptables               = "iptables"
+	experimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
+)
+
+func checkKnownProxyMode(proxyMode string) bool {
+	switch proxyMode {
+	case "", proxyModeUserspace, proxyModeIptables:
+		return true
+	}
+	return false
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -149,15 +163,15 @@ func (s *ProxyServer) Run(_ []string) error {
 	}
 
 	// Add event recorder
-	Hostname := nodeutil.GetHostname(s.HostnameOverride)
+	hostname := nodeutil.GetHostname(s.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
-	s.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: Hostname})
+	s.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: hostname})
 	eventBroadcaster.StartRecordingToSink(client.Events(""))
 
 	s.nodeRef = &api.ObjectReference{
 		Kind:      "Node",
-		Name:      Hostname,
-		UID:       types.UID(Hostname),
+		Name:      hostname,
+		UID:       types.UID(hostname),
 		Namespace: "",
 	}
 
@@ -171,17 +185,21 @@ func (s *ProxyServer) Run(_ []string) error {
 	dbus := utildbus.New()
 	ipt := utiliptables.New(execer, dbus, protocol)
 
-	shouldUseIptables := false
-	if !s.ForceUserspaceProxy {
+	if !checkKnownProxyMode(s.ProxyMode) {
+		glog.Fatalf("Unknown proxy-mode flag: %s", s.ProxyMode)
+	}
+
+	useIptablesProxy := false
+	if mayTryIptablesProxy(s.ProxyMode, client.Nodes(), hostname) {
 		var err error
 		// guaranteed false on error, error only necessary for debugging
-		shouldUseIptables, err = iptables.ShouldUseIptablesProxier()
+		useIptablesProxy, err = iptables.ShouldUseIptablesProxier()
 		if err != nil {
 			glog.Errorf("Can't determine whether to use iptables proxy, using userspace proxier: %v", err)
 		}
 	}
 
-	if shouldUseIptables {
+	if useIptablesProxy {
 		glog.V(2).Info("Using iptables Proxier.")
 
 		proxierIptables, err := iptables.NewProxier(ipt, execer, s.SyncPeriod, s.MasqueradeAll)
@@ -193,7 +211,6 @@ func (s *ProxyServer) Run(_ []string) error {
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
 		userspace.CleanupLeftovers(ipt)
-
 	} else {
 		glog.V(2).Info("Using userspace Proxier.")
 		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
@@ -245,6 +262,44 @@ func (s *ProxyServer) Run(_ []string) error {
 	// Just loop forever for now...
 	proxier.SyncLoop()
 	return nil
+}
+
+type nodeGetter interface {
+	Get(hostname string) (*api.Node, error)
+}
+
+func mayTryIptablesProxy(proxyMode string, client nodeGetter, hostname string) bool {
+	if proxyMode == proxyModeIptables {
+		glog.V(1).Infof("Flag proxy-mode allows iptables proxy")
+		return true
+	} else if proxyMode != "" {
+		glog.V(1).Infof("Flag proxy-mode=%q forbids iptables proxy", proxyMode)
+		return false
+	}
+	// proxyMode == "" - choose the best option.
+	if client == nil {
+		glog.Errorf("Not trying iptables proxy: nodeGetter is nil")
+		return false
+	}
+	node, err := client.Get(hostname)
+	if err != nil {
+		glog.Errorf("Not trying iptables proxy: can't get Node %q: %v", hostname, err)
+		return false
+	}
+	if node == nil {
+		glog.Errorf("Not trying iptables proxy: got nil Node %q", hostname)
+		return false
+	}
+	proxyMode, found := node.Annotations[experimentalProxyModeAnnotation]
+	if found {
+		glog.V(1).Infof("Found experimental annotation %q = %q", experimentalProxyModeAnnotation, proxyMode)
+	}
+	if proxyMode == proxyModeIptables {
+		glog.V(1).Infof("Annotation allows iptables proxy")
+		return true
+	}
+	glog.V(1).Infof("Not trying iptables proxy: %+v", node)
+	return false
 }
 
 func (s *ProxyServer) birthCry() {
