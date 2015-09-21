@@ -406,6 +406,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -522,6 +523,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -590,6 +592,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -677,6 +680,7 @@ func TestBobIsForbidden(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -738,6 +742,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -818,6 +823,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -933,6 +939,7 @@ func TestKindAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1035,6 +1042,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
