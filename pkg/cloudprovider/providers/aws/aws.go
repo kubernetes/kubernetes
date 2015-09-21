@@ -172,6 +172,7 @@ type InstanceGroupInfo interface {
 type AWSCloud struct {
 	awsServices      AWSServices
 	ec2              EC2
+	elb              ELB
 	asg              ASG
 	cfg              *AWSCloudConfig
 	availabilityZone string
@@ -183,8 +184,6 @@ type AWSCloud struct {
 	selfAWSInstance *awsInstance
 
 	mutex sync.Mutex
-	// Protects elbClients
-	elbClients map[string]ELB
 }
 
 type AWSCloudConfig struct {
@@ -234,23 +233,6 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 
 func (p *awsSDKProvider) Metadata() AWSMetadata {
 	return &awsSdkMetadata{}
-}
-
-// Builds an ELB client for the specified region
-func (s *AWSCloud) getELBClient(regionName string) (ELB, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	elbClient, found := s.elbClients[regionName]
-	if !found {
-		var err error
-		elbClient, err = s.awsServices.LoadBalancing(regionName)
-		if err != nil {
-			return nil, err
-		}
-		s.elbClients[regionName] = elbClient
-	}
-	return elbClient, nil
 }
 
 func stringPointerArray(orig []string) []*string {
@@ -566,6 +548,11 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		return nil, fmt.Errorf("error creating AWS EC2 client: %v", err)
 	}
 
+	elb, err := awsServices.LoadBalancing(regionName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS ELB client: %v", err)
+	}
+
 	asg, err := awsServices.Autoscaling(regionName)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
@@ -574,11 +561,11 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	awsCloud := &AWSCloud{
 		awsServices:      awsServices,
 		ec2:              ec2,
+		elb:              elb,
 		asg:              asg,
 		cfg:              cfg,
 		region:           regionName,
 		availabilityZone: zone,
-		elbClients:       map[string]ELB{},
 	}
 
 	filterTags := map[string]string{}
@@ -1240,16 +1227,11 @@ func (v *AWSCloud) Release(name string) error {
 }
 
 // Gets the current load balancer state
-func (s *AWSCloud) describeLoadBalancer(region, name string) (*elb.LoadBalancerDescription, error) {
-	elbClient, err := s.getELBClient(region)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *AWSCloud) describeLoadBalancer(name string) (*elb.LoadBalancerDescription, error) {
 	request := &elb.DescribeLoadBalancersInput{}
 	request.LoadBalancerNames = []*string{&name}
 
-	response, err := elbClient.DescribeLoadBalancers(request)
+	response, err := s.elb.DescribeLoadBalancers(request)
 	if err != nil {
 		if awsError, ok := err.(awserr.Error); ok {
 			if awsError.Code() == "LoadBalancerNotFound" {
@@ -1613,11 +1595,6 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
 
-	elbClient, err := s.getELBClient(region)
-	if err != nil {
-		return nil, err
-	}
-
 	if affinity != api.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
@@ -1720,12 +1697,12 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 	}
 
 	// Build the load balancer itself
-	loadBalancer, err := s.ensureLoadBalancer(region, name, listeners, subnetIDs, securityGroupIDs)
+	loadBalancer, err := s.ensureLoadBalancer(name, listeners, subnetIDs, securityGroupIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.ensureLoadBalancerHealthCheck(region, loadBalancer, listeners)
+	err = s.ensureLoadBalancerHealthCheck(loadBalancer, listeners)
 	if err != nil {
 		return nil, err
 	}
@@ -1736,7 +1713,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		return nil, err
 	}
 
-	err = s.ensureLoadBalancerInstances(elbClient, orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
+	err = s.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
 		glog.Warning("Error registering instances with the load balancer: %v", err)
 		return nil, err
@@ -1752,7 +1729,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 // GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
 func (s *AWSCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
-	lb, err := s.describeLoadBalancer(region, name)
+	lb, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1912,12 +1889,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 
 // EnsureTCPLoadBalancerDeleted implements TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
-	elbClient, err := s.getELBClient(region)
-	if err != nil {
-		return err
-	}
-
-	lb, err := s.describeLoadBalancer(region, name)
+	lb, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return err
 	}
@@ -1941,7 +1913,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 		request := &elb.DeleteLoadBalancerInput{}
 		request.LoadBalancerName = lb.LoadBalancerName
 
-		_, err = elbClient.DeleteLoadBalancer(request)
+		_, err = s.elb.DeleteLoadBalancer(request)
 		if err != nil {
 			// TODO: Check if error was because load balancer was concurrently deleted
 			glog.Error("error deleting load balancer: ", err)
@@ -2012,12 +1984,7 @@ func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) er
 		return err
 	}
 
-	elbClient, err := s.getELBClient(region)
-	if err != nil {
-		return err
-	}
-
-	lb, err := s.describeLoadBalancer(region, name)
+	lb, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return err
 	}
@@ -2026,7 +1993,7 @@ func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) er
 		return fmt.Errorf("Load balancer not found")
 	}
 
-	err = s.ensureLoadBalancerInstances(elbClient, orEmpty(lb.LoadBalancerName), lb.Instances, instances)
+	err = s.ensureLoadBalancerInstances(orEmpty(lb.LoadBalancerName), lb.Instances, instances)
 	if err != nil {
 		return nil
 	}
