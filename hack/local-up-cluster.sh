@@ -220,6 +220,7 @@ function start_apiserver {
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg} ${runtime_config}\
       --v=${LOG_LEVEL} \
+      --runtime-config=experimental/v1=true \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
@@ -240,6 +241,7 @@ function start_controller_manager {
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
     sudo -E "${GO_OUT}/kube-controller-manager" \
       --v=${LOG_LEVEL} \
+      --enable-deployment-controller \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
