@@ -52,6 +52,11 @@ const (
 	pluginRecoveryDelay = 100 * time.Millisecond // delay after scheduler plugin crashes, before we resume scheduling
 )
 
+const (
+	FailedScheduling = "FailedScheduling"
+	Scheduled        = "Scheduled"
+)
+
 // scheduler abstraction to allow for easier unit testing
 type schedulerInterface interface {
 	sync.Locker // synchronize scheduler plugin operations
@@ -757,7 +762,7 @@ func (s *schedulingPlugin) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister) // call kubeScheduler.Schedule
 	if err != nil {
 		log.V(1).Infof("Failed to schedule: %+v", pod)
-		s.config.Recorder.Eventf(pod, "FailedScheduling", "Error scheduling: %v", err)
+		s.config.Recorder.Eventf(pod, FailedScheduling, "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -770,11 +775,11 @@ func (s *schedulingPlugin) scheduleOne() {
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		log.V(1).Infof("Failed to bind pod: %+v", err)
-		s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
+		s.config.Recorder.Eventf(pod, FailedScheduling, "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	s.config.Recorder.Eventf(pod, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	s.config.Recorder.Eventf(pod, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
 }
 
 // this pod may be out of sync with respect to the API server registry:
