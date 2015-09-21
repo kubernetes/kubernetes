@@ -52,4 +52,7 @@ func TestRouteBuilder(t *testing.T) {
 	if r.Consumes[0] != json {
 		t.Error("consumes invalid")
 	}
+	if r.Operation != "dummy" {
+		t.Error("Operation not set")
+	}
 }

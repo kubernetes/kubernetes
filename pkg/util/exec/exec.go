@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,9 @@ type Interface interface {
 	// Command returns a Cmd instance which can be used to run a single command.
 	// This follows the pattern of package os/exec.
 	Command(cmd string, args ...string) Cmd
+
+	// LookPath wraps os/exec.LookPath
+	LookPath(file string) (string, error)
 }
 
 // Cmd is an interface that presents an API that is very similar to Cmd from os/exec.
@@ -60,6 +63,11 @@ func New() Interface {
 // Command is part of the Interface interface.
 func (executor *executor) Command(cmd string, args ...string) Cmd {
 	return (*cmdWrapper)(osexec.Command(cmd, args...))
+}
+
+// LookPath is part of the Interface interface
+func (executor *executor) LookPath(file string) (string, error) {
+	return osexec.LookPath(file)
 }
 
 // Wraps exec.Cmd so we can capture errors.

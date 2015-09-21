@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,4 +31,4 @@ MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_MEMORY_MB=1024
 MINION_CPU=1
 
-PORTAL_NET="10.244.240.0/20"
+SERVICE_CLUSTER_IP_RANGE="10.244.240.0/20"  # formerly PORTAL_NET

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,21 +17,30 @@ limitations under the License.
 package apiserver
 
 import (
-	"fmt"
 	"net/http"
+	"sort"
+
+	"k8s.io/kubernetes/pkg/api"
 
 	"github.com/emicklei/go-restful"
 )
 
-// handleIndex is the root index page for Kubernetes.
-func handleIndex(req *restful.Request, resp *restful.Response) {
-	// TODO: use restful's Request/Response methods
-	if req.Request.URL.Path != "/" && req.Request.URL.Path != "/index.html" {
-		notFound(resp.ResponseWriter, req.Request)
-		return
+func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
+			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
+			// We want to to return a 404 status with a list of all valid paths, incase of an invalid URL request.
+			status = http.StatusNotFound
+		}
+		var handledPaths []string
+		// Extract the paths handled using restful.WebService
+		for _, ws := range container.RegisteredWebServices() {
+			handledPaths = append(handledPaths, ws.RootPath())
+		}
+		// Extract the paths handled using mux handler.
+		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
+		sort.Strings(handledPaths)
+		writeRawJSON(status, api.RootPaths{Paths: handledPaths}, w)
 	}
-	resp.ResponseWriter.WriteHeader(http.StatusOK)
-	// TODO: serve this out of a file
-	data := "<html><body>Welcome to Kubernetes</body></html>"
-	fmt.Fprint(resp.ResponseWriter, data)
 }

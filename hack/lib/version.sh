@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,12 +50,20 @@ kube::version::get_version_vars() {
 
     # Use git describe to find the version based on annotated tags.
     if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+      # This translates the "git describe" to an actual semver.org
+      # compatible semantic version that looks something like this:
+      #   v1.1.0-alpha.0.6+84c76d1142ea4d
+      #
+      # TODO: We continue calling this "git version" because so many
+      # downstream consumers are expecting it there.
+      KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{14\}\)$/.\1\+\2/")
       if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
         # so use our idea of "dirty" from git status instead.
         KUBE_GIT_VERSION+="-dirty"
       fi
+
 
       # Try to match the "git describe" output to a regex to try to extract
       # the "major" and "minor" versions and whether this is the exact tagged
@@ -99,6 +107,20 @@ kube::version::load_version_vars() {
   source "${version_file}"
 }
 
+# golang 1.5 wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
+kube::version::ldflag() {
+  local key=${1}
+  local val=${2}
+
+  GO_VERSION=($(go version))
+
+  if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.5') ]]; then
+    echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key} ${val}"
+  else
+    echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
+  fi
+}
+
 # Prints the value that needs to be passed to the -ldflags parameter of go build
 # in order to set the Kubernetes based on the git tree status.
 kube::version::ldflags() {
@@ -106,18 +128,18 @@ kube::version::ldflags() {
 
   local -a ldflags=()
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
+    ldflags+=($(kube::version::ldflag "gitCommit" "${KUBE_GIT_COMMIT}"))
+    ldflags+=($(kube::version::ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"))
   fi
 
   if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}")
+    ldflags+=($(kube::version::ldflag "gitVersion" "${KUBE_GIT_VERSION}"))
   fi
 
   if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
     ldflags+=(
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${KUBE_GIT_MAJOR}"
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${KUBE_GIT_MINOR}"
+      $(kube::version::ldflag "gitMajor" "${KUBE_GIT_MAJOR}")
+      $(kube::version::ldflag "gitMinor" "${KUBE_GIT_MINOR}")
     )
   fi
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,30 +19,56 @@ package watch
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime"
 )
+
+// FullChannelBehavior controls how the Broadcaster reacts if a watcher's watch
+// channel is full.
+type FullChannelBehavior int
+
+const (
+	WaitIfChannelFull FullChannelBehavior = iota
+	DropIfChannelFull
+)
+
+// Buffer the incoming queue a little bit even though it should rarely ever accumulate
+// anything, just in case a few events are received in such a short window that
+// Broadcaster can't move them onto the watchers' queues fast enough.
+const incomingQueueLength = 25
 
 // Broadcaster distributes event notifications among any number of watchers. Every event
 // is delivered to every watcher.
 type Broadcaster struct {
 	lock sync.Mutex
 
-	watchers    map[int64]*broadcasterWatcher
-	nextWatcher int64
+	watchers     map[int64]*broadcasterWatcher
+	nextWatcher  int64
+	distributing sync.WaitGroup
 
 	incoming chan Event
+
+	// How large to make watcher's channel.
+	watchQueueLength int
+	// If one of the watch channels is full, don't wait for it to become empty.
+	// Instead just deliver it to the watchers that do have space in their
+	// channels and move on to the next event.
+	// It's more fair to do this on a per-watcher basis than to do it on the
+	// "incoming" channel, which would allow one slow watcher to prevent all
+	// other watchers from getting new events.
+	fullChannelBehavior FullChannelBehavior
 }
 
-// NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue.
-// When queueLength is 0, Action will block until any prior event has been
-// completely distributed. It is guaranteed that events will be distibuted in the
-// order in which they ocurr, but the order in which a single event is distributed
-// among all of the watchers is unspecified.
-func NewBroadcaster(queueLength int) *Broadcaster {
+// NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
+// It is guaranteed that events will be distributed in the order in which they occur,
+// but the order in which a single event is distributed among all of the watchers is unspecified.
+func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
-		watchers: map[int64]*broadcasterWatcher{},
-		incoming: make(chan Event, queueLength),
+		watchers:            map[int64]*broadcasterWatcher{},
+		incoming:            make(chan Event, incomingQueueLength),
+		watchQueueLength:    queueLength,
+		fullChannelBehavior: fullChannelBehavior,
 	}
+	m.distributing.Add(1)
 	go m.loop()
 	return m
 }
@@ -56,12 +82,38 @@ func (m *Broadcaster) Watch() Interface {
 	id := m.nextWatcher
 	m.nextWatcher++
 	w := &broadcasterWatcher{
-		result:  make(chan Event),
+		result:  make(chan Event, m.watchQueueLength),
 		stopped: make(chan struct{}),
 		id:      id,
 		m:       m,
 	}
 	m.watchers[id] = w
+	return w
+}
+
+// WatchWithPrefix adds a new watcher to the list and returns an Interface for it. It sends
+// queuedEvents down the new watch before beginning to send ordinary events from Broadcaster.
+// The returned watch will have a queue length that is at least large enough to accommodate
+// all of the items in queuedEvents.
+func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	id := m.nextWatcher
+	m.nextWatcher++
+	length := m.watchQueueLength
+	if n := len(queuedEvents) + 1; n > length {
+		length = n
+	}
+	w := &broadcasterWatcher{
+		result:  make(chan Event, length),
+		stopped: make(chan struct{}),
+		id:      id,
+		m:       m,
+	}
+	m.watchers[id] = w
+	for _, e := range queuedEvents {
+		w.result <- e
+	}
 	return w
 }
 
@@ -96,12 +148,17 @@ func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 }
 
 // Shutdown disconnects all watchers (but any queued events will still be distributed).
-// You must not call Action after calling Shutdown.
+// You must not call Action or Watch* after calling Shutdown. This call blocks
+// until all events have been distributed through the outbound channels. Note
+// that since they can be buffered, this means that the watchers might not
+// have received the data yet as it can remain sitting in the buffered
+// channel.
 func (m *Broadcaster) Shutdown() {
 	close(m.incoming)
+	m.distributing.Wait()
 }
 
-// loop recieves from m.incoming and distributes to all watchers.
+// loop receives from m.incoming and distributes to all watchers.
 func (m *Broadcaster) loop() {
 	// Deliberately not catching crashes here. Yes, bring down the process if there's a
 	// bug in watch.Broadcaster.
@@ -113,16 +170,27 @@ func (m *Broadcaster) loop() {
 		m.distribute(event)
 	}
 	m.closeAll()
+	m.distributing.Done()
 }
 
 // distribute sends event to all watchers. Blocking.
 func (m *Broadcaster) distribute(event Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	for _, w := range m.watchers {
-		select {
-		case w.result <- event:
-		case <-w.stopped:
+	if m.fullChannelBehavior == DropIfChannelFull {
+		for _, w := range m.watchers {
+			select {
+			case w.result <- event:
+			case <-w.stopped:
+			default: // Don't block if the event can't be queued.
+			}
+		}
+	} else {
+		for _, w := range m.watchers {
+			select {
+			case w.result <- event:
+			case <-w.stopped:
+			}
 		}
 	}
 }

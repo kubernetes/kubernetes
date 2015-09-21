@@ -1,0 +1,1943 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="68cm"
+   height="56cm"
+   viewBox="-55 -75 1348 1117"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="architecture.svg"
+   inkscape:export-filename="D:\Work\PaaS\V1R2\Kubernetes\Src\kubernetes\docs\design\architecture.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
+  <metadata
+     id="metadata738">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs736" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1680"
+     inkscape:window-height="988"
+     id="namedview734"
+     showgrid="false"
+     inkscape:zoom="0.33640324"
+     inkscape:cx="1204.7244"
+     inkscape:cy="992.12598"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <g
+     id="g4">
+    <rect
+       style="fill: #ffffff"
+       x="662"
+       y="192"
+       width="630"
+       height="381"
+       id="rect6" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="662"
+       y="192"
+       width="630"
+       height="381"
+       id="rect8" />
+  </g>
+  <g
+     id="g10">
+    <rect
+       style="fill: #ffffff"
+       x="688"
+       y="321"
+       width="580"
+       height="227"
+       id="rect12" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="688"
+       y="321"
+       width="580"
+       height="227"
+       id="rect14" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="687"
+     y="224"
+     id="text16">
+    <tspan
+       x="687"
+       y="224"
+       id="tspan18">Node</tspan>
+  </text>
+  <g
+     id="g20">
+    <rect
+       style="fill: #ffffff"
+       x="723.2"
+       y="235"
+       width="69.6"
+       height="38"
+       id="rect22" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="723.2"
+       y="235"
+       width="69.6"
+       height="38"
+       id="rect24" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="758"
+       y="258.8"
+       id="text26">
+      <tspan
+         x="758"
+         y="258.8"
+         id="tspan28">kubelet</tspan>
+    </text>
+  </g>
+  <g
+     id="g30">
+    <rect
+       style="fill: #ffffff"
+       x="720.2"
+       y="368.1"
+       width="148"
+       height="133"
+       id="rect32" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="720.2"
+       y="368.1"
+       width="148"
+       height="133"
+       id="rect34" />
+  </g>
+  <g
+     id="g36">
+    <rect
+       style="fill: #ffffff"
+       x="760.55"
+       y="438.1"
+       width="89.3"
+       height="38"
+       id="rect38" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="760.55"
+       y="438.1"
+       width="89.3"
+       height="38"
+       id="rect40" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="805.2"
+       y="461.9"
+       id="text42">
+      <tspan
+         x="805.2"
+         y="461.9"
+         id="tspan44">container</tspan>
+    </text>
+  </g>
+  <g
+     id="g46">
+    <rect
+       style="fill: #ffffff"
+       x="749.8"
+       y="428.2"
+       width="89.3"
+       height="38"
+       id="rect48" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="749.8"
+       y="428.2"
+       width="89.3"
+       height="38"
+       id="rect50" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="794.45"
+       y="452"
+       id="text52">
+      <tspan
+         x="794.45"
+         y="452"
+         id="tspan54">container</tspan>
+    </text>
+  </g>
+  <g
+     id="g56">
+    <rect
+       style="fill: #ffffff"
+       x="739.4"
+       y="418.3"
+       width="89.3"
+       height="38"
+       id="rect58" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="739.4"
+       y="418.3"
+       width="89.3"
+       height="38"
+       id="rect60" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="784.05"
+       y="442.1"
+       id="text62">
+      <tspan
+         x="784.05"
+         y="442.1"
+         id="tspan64">cAdvisor</tspan>
+    </text>
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="794.2"
+     y="434.6"
+     id="text66">
+    <tspan
+       x="794.2"
+       y="434.6"
+       id="tspan68" />
+  </text>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="742.2"
+     y="394.6"
+     id="text70">
+    <tspan
+       x="742.2"
+       y="394.6"
+       id="tspan72">Pod</tspan>
+  </text>
+  <g
+     id="g74">
+    <g
+       id="g76">
+      <rect
+         style="fill: #ffffff"
+         x="1108.6"
+         y="368.1"
+         width="148"
+         height="133"
+         id="rect78" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1108.6"
+         y="368.1"
+         width="148"
+         height="133"
+         id="rect80" />
+    </g>
+    <g
+       id="g82">
+      <rect
+         style="fill: #ffffff"
+         x="1148.95"
+         y="438.1"
+         width="89.3"
+         height="38"
+         id="rect84" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1148.95"
+         y="438.1"
+         width="89.3"
+         height="38"
+         id="rect86" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="1193.6"
+         y="461.9"
+         id="text88">
+        <tspan
+           x="1193.6"
+           y="461.9"
+           id="tspan90">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g92">
+      <rect
+         style="fill: #ffffff"
+         x="1138.2"
+         y="428.2"
+         width="89.3"
+         height="38"
+         id="rect94" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1138.2"
+         y="428.2"
+         width="89.3"
+         height="38"
+         id="rect96" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="1182.85"
+         y="452"
+         id="text98">
+        <tspan
+           x="1182.85"
+           y="452"
+           id="tspan100">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g102">
+      <rect
+         style="fill: #ffffff"
+         x="1127.8"
+         y="418.3"
+         width="89.3"
+         height="38"
+         id="rect104" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1127.8"
+         y="418.3"
+         width="89.3"
+         height="38"
+         id="rect106" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="1172.45"
+         y="442.1"
+         id="text108">
+        <tspan
+           x="1172.45"
+           y="442.1"
+           id="tspan110">container</tspan>
+      </text>
+    </g>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="1182.6"
+       y="434.6"
+       id="text112">
+      <tspan
+         x="1182.6"
+         y="434.6"
+         id="tspan114" />
+    </text>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="1130.6"
+       y="394.6"
+       id="text116">
+      <tspan
+         x="1130.6"
+         y="394.6"
+         id="tspan118">Pod</tspan>
+    </text>
+  </g>
+  <g
+     id="g120">
+    <g
+       id="g122">
+      <rect
+         style="fill: #ffffff"
+         x="902.9"
+         y="368.1"
+         width="148"
+         height="133"
+         id="rect124" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="902.9"
+         y="368.1"
+         width="148"
+         height="133"
+         id="rect126" />
+    </g>
+    <g
+       id="g128">
+      <rect
+         style="fill: #ffffff"
+         x="943.25"
+         y="438.1"
+         width="89.3"
+         height="38"
+         id="rect130" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="943.25"
+         y="438.1"
+         width="89.3"
+         height="38"
+         id="rect132" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="987.9"
+         y="461.9"
+         id="text134">
+        <tspan
+           x="987.9"
+           y="461.9"
+           id="tspan136">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g138">
+      <rect
+         style="fill: #ffffff"
+         x="932.5"
+         y="428.2"
+         width="89.3"
+         height="38"
+         id="rect140" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="932.5"
+         y="428.2"
+         width="89.3"
+         height="38"
+         id="rect142" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="977.15"
+         y="452"
+         id="text144">
+        <tspan
+           x="977.15"
+           y="452"
+           id="tspan146">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g148">
+      <rect
+         style="fill: #ffffff"
+         x="922.1"
+         y="418.3"
+         width="89.3"
+         height="38"
+         id="rect150" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="922.1"
+         y="418.3"
+         width="89.3"
+         height="38"
+         id="rect152" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="966.75"
+         y="442.1"
+         id="text154">
+        <tspan
+           x="966.75"
+           y="442.1"
+           id="tspan156">container</tspan>
+      </text>
+    </g>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="976.9"
+       y="434.6"
+       id="text158">
+      <tspan
+         x="976.9"
+         y="434.6"
+         id="tspan160" />
+    </text>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="924.9"
+       y="394.6"
+       id="text162">
+      <tspan
+         x="924.9"
+         y="394.6"
+         id="tspan164">Pod</tspan>
+    </text>
+  </g>
+  <g
+     id="g166">
+    <rect
+       style="fill: #ffffff"
+       x="949.748"
+       y="228"
+       width="57.1"
+       height="38"
+       id="rect168" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="949.748"
+       y="228"
+       width="57.1"
+       height="38"
+       id="rect170" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="978.298"
+       y="251.8"
+       id="text172">
+      <tspan
+         x="978.298"
+         y="251.8"
+         id="tspan174">Proxy</tspan>
+    </text>
+  </g>
+  <g
+     id="g176">
+    <rect
+       style="fill: #ffffff"
+       x="126.911"
+       y="92.49"
+       width="189.4"
+       height="38"
+       id="rect178" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="126.911"
+       y="92.49"
+       width="189.4"
+       height="38"
+       id="rect180" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="221.611"
+       y="116.29"
+       id="text182">
+      <tspan
+         x="221.611"
+         y="116.29"
+         id="tspan184">kubectl (user commands)</tspan>
+    </text>
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="142.476"
+     y="866.282"
+     id="text186">
+    <tspan
+       x="142.476"
+       y="866.282"
+       id="tspan188" />
+  </text>
+  <g
+     id="g190">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="758"
+       y1="273"
+       x2="782.332"
+       y2="408.717"
+       id="line192" />
+    <polygon
+       style="fill: #000000"
+       points="783.655,416.099 776.969,407.138 782.332,408.717 786.812,405.374 "
+       id="polygon194" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="783.655,416.099 776.969,407.138 782.332,408.717 786.812,405.374 "
+       id="polygon196" />
+  </g>
+  <g
+     id="g198">
+    <rect
+       style="fill: #ffffff"
+       x="942.576"
+       y="75.6768"
+       width="70.2"
+       height="38"
+       id="rect200" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="942.576"
+       y="75.6768"
+       width="70.2"
+       height="38"
+       id="rect202" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="977.676"
+       y="99.4768"
+       id="text204">
+      <tspan
+         x="977.676"
+         y="99.4768"
+         id="tspan206">Firewall</tspan>
+    </text>
+  </g>
+  <g
+     id="g208">
+    <path
+       style="fill: #ffffff"
+       d="M 949.242 -47.953 C 939.87,-48.2618 921.694,-41.7773 924.25,-27.8819 C 926.806,-13.9865 939.018,-10.8988 944.13,-14.9129 C 949.242,-18.9271 936.178,4.54051 961.17,10.7162 C 986.161,16.8919 998.941,7.01079 995.249,-0.0912821 C 991.557,-7.19336 1017.12,16.5832 1029.04,2.99658 C 1040.97,-10.59 1016.83,-23.5589 1021.94,-21.7062 C 1027.06,-19.8535 1042.68,-22.3237 1037.56,-45.4827 C 1032.45,-68.6416 986.445,-50.7321 991.557,-54.1287 C 996.669,-57.5253 983.889,-74.5086 967.986,-71.112 C 952.082,-67.7153 950.954,-61.5516 949.25,-47.965 L 949.242,-47.953z"
+       id="path210" />
+    <path
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       d="M 949.242 -47.953 C 939.87,-48.2618 921.694,-41.7773 924.25,-27.8819 C 926.806,-13.9865 939.018,-10.8988 944.13,-14.9129 C 949.242,-18.9271 936.178,4.54051 961.17,10.7162 C 986.161,16.8919 998.941,7.01079 995.249,-0.0912821 C 991.557,-7.19336 1017.12,16.5832 1029.04,2.99658 C 1040.97,-10.59 1016.83,-23.5589 1021.94,-21.7062 C 1027.06,-19.8535 1042.68,-22.3237 1037.56,-45.4827 C 1032.45,-68.6416 986.445,-50.7321 991.557,-54.1287 C 996.669,-57.5253 983.889,-74.5086 967.986,-71.112 C 952.082,-67.7153 950.954,-61.5516 949.25,-47.965 L 949.242,-47.953"
+       id="path212" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="985.428"
+       y="-22.3971"
+       id="text214">
+      <tspan
+         x="985.428"
+         y="-22.3971"
+         id="tspan216">Internet</tspan>
+    </text>
+  </g>
+  <g
+     id="g218">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="975.985"
+       y1="12.703"
+       x2="977.415"
+       y2="65.9442"
+       id="line220" />
+    <polygon
+       style="fill: #000000"
+       points="977.616,73.4415 972.349,63.5793 977.415,65.9442 982.346,63.3109 "
+       id="polygon222" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="977.616,73.4415 972.349,63.5793 977.415,65.9442 982.346,63.3109 "
+       id="polygon224" />
+  </g>
+  <g
+     id="g226">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="977.676"
+       y1="113.677"
+       x2="978.245"
+       y2="218.264"
+       id="line228" />
+    <polygon
+       style="fill: #000000"
+       points="978.286,225.764 973.232,215.791 978.245,218.264 983.231,215.737 "
+       id="polygon230" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="978.286,225.764 973.232,215.791 978.245,218.264 983.231,215.737 "
+       id="polygon232" />
+  </g>
+  <g
+     id="g234">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="978.298"
+       y1="266"
+       x2="977.033"
+       y2="358.365"
+       id="line236" />
+    <polygon
+       style="fill: #000000"
+       points="976.931,365.864 972.068,355.797 977.033,358.365 982.067,355.934 "
+       id="polygon238" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="976.931,365.864 972.068,355.797 977.033,358.365 982.067,355.934 "
+       id="polygon240" />
+  </g>
+  <g
+     id="g242">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="992.572"
+       y1="266"
+       x2="1174.02"
+       y2="363.492"
+       id="line244" />
+    <polygon
+       style="fill: #000000"
+       points="1180.63,367.042 1169.45,366.713 1174.02,363.492 1174.19,357.904 "
+       id="polygon246" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="1180.63,367.042 1169.45,366.713 1174.02,363.492 1174.19,357.904 "
+       id="polygon248" />
+  </g>
+  <g
+     id="g250">
+    <rect
+       style="fill: #ffffff"
+       x="-54"
+       y="370.5"
+       width="562"
+       height="383.25"
+       id="rect252" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="-54"
+       y="370.5"
+       width="562"
+       height="383.25"
+       id="rect254" />
+  </g>
+  <g
+     id="g256">
+    <rect
+       style="fill: #ffffff"
+       x="-30"
+       y="416.75"
+       width="364"
+       height="146"
+       id="rect258" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="-30"
+       y="416.75"
+       width="364"
+       height="146"
+       id="rect260" />
+  </g>
+  <g
+     id="g262">
+    <rect
+       style="fill: #ffffff"
+       x="128"
+       y="598.318"
+       width="189"
+       height="54"
+       id="rect264" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="128"
+       y="598.318"
+       width="189"
+       height="54"
+       id="rect266" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="222.5"
+       y="622.118"
+       id="text268">
+      <tspan
+         x="222.5"
+         y="622.118"
+         id="tspan270">controller manager</tspan>
+      <tspan
+         x="222.5"
+         y="638.118"
+         id="tspan272">(replication controller etc.)</tspan>
+    </text>
+  </g>
+  <g
+     id="g274">
+    <rect
+       style="fill: #ffffff"
+       x="15.8884"
+       y="622.914"
+       width="86.15"
+       height="38"
+       id="rect276" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="15.8884"
+       y="622.914"
+       width="86.15"
+       height="38"
+       id="rect278" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="58.9634"
+       y="646.714"
+       id="text280">
+      <tspan
+         x="58.9634"
+         y="646.714"
+         id="tspan282">Scheduler</tspan>
+    </text>
+  </g>
+  <g
+     id="g284">
+    <rect
+       style="fill: #ffffff"
+       x="1.162"
+       y="599.318"
+       width="86.15"
+       height="38"
+       id="rect286" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="1.162"
+       y="599.318"
+       width="86.15"
+       height="38"
+       id="rect288" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="44.237"
+       y="623.118"
+       id="text290">
+      <tspan
+         x="44.237"
+         y="623.118"
+         id="tspan292">Scheduler</tspan>
+    </text>
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="-34.876"
+     y="699.256"
+     id="text294">
+    <tspan
+       x="-34.876"
+       y="699.256"
+       id="tspan296">Master components</tspan>
+    <tspan
+       x="-34.876"
+       y="715.256"
+       id="tspan298">Colocated, or spread across machines,</tspan>
+    <tspan
+       x="-34.876"
+       y="731.256"
+       id="tspan300">as dictated by cluster size.</tspan>
+  </text>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="370.886"
+     y="731.5"
+     id="text302">
+    <tspan
+       x="370.886"
+       y="731.5"
+       id="tspan304" />
+  </text>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="370.886"
+     y="731.5"
+     id="text306">
+    <tspan
+       x="370.886"
+       y="731.5"
+       id="tspan308" />
+  </text>
+  <g
+     id="g310">
+    <rect
+       style="fill: #ffffff"
+       x="136.717"
+       y="468.5"
+       width="172.175"
+       height="70"
+       id="rect312" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="136.717"
+       y="468.5"
+       width="172.175"
+       height="70"
+       id="rect314" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="222.804"
+       y="492.3"
+       id="text316">
+      <tspan
+         x="222.804"
+         y="492.3"
+         id="tspan318">REST</tspan>
+      <tspan
+         x="222.804"
+         y="508.3"
+         id="tspan320">(pods, services,</tspan>
+      <tspan
+         x="222.804"
+         y="524.3"
+         id="tspan322">rep. controllers)</tspan>
+    </text>
+  </g>
+  <g
+     id="g324">
+    <rect
+       style="fill: #ffffff"
+       x="165.958"
+       y="389.5"
+       width="115"
+       height="54"
+       id="rect326" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="165.958"
+       y="389.5"
+       width="115"
+       height="54"
+       id="rect328" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="223.458"
+       y="413.3"
+       id="text330">
+      <tspan
+         x="223.458"
+         y="413.3"
+         id="tspan332">authentication</tspan>
+      <tspan
+         x="223.458"
+         y="429.3"
+         id="tspan334">authorization</tspan>
+    </text>
+  </g>
+  <g
+     id="g336">
+    <rect
+       style="fill: #ffffff"
+       x="-0.65"
+       y="476.5"
+       width="91.3"
+       height="54"
+       id="rect338" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="-0.65"
+       y="476.5"
+       width="91.3"
+       height="54"
+       id="rect340" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="45"
+       y="500.3"
+       id="text342">
+      <tspan
+         x="45"
+         y="500.3"
+         id="tspan344">scheduling</tspan>
+      <tspan
+         x="45"
+         y="516.3"
+         id="tspan346">actuator</tspan>
+    </text>
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="-13"
+     y="436.75"
+     id="text348">
+    <tspan
+       x="-13"
+       y="436.75"
+       id="tspan350">APIs</tspan>
+  </text>
+  <g
+     id="g352">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="44.237"
+       y1="599.318"
+       x2="44.8921"
+       y2="540.235"
+       id="line354" />
+    <polygon
+       style="fill: #000000"
+       points="44.9752,532.736 49.864,542.791 44.8921,540.235 39.8647,542.68 "
+       id="polygon356" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="44.9752,532.736 49.864,542.791 44.8921,540.235 39.8647,542.68 "
+       id="polygon358" />
+  </g>
+  <g
+     id="g360">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="44.237"
+       y1="599.318"
+       x2="170.878"
+       y2="542.486"
+       id="line362" />
+    <polygon
+       style="fill: #000000"
+       points="177.72,539.416 170.644,548.071 170.878,542.486 166.55,538.948 "
+       id="polygon364" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="177.72,539.416 170.644,548.071 170.878,542.486 166.55,538.948 "
+       id="polygon366" />
+  </g>
+  <g
+     id="g368">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="222.5"
+       y1="598.318"
+       x2="222.755"
+       y2="548.236"
+       id="line370" />
+    <polygon
+       style="fill: #000000"
+       points="222.793,540.736 227.742,550.761 222.755,548.236 217.742,550.71 "
+       id="polygon372" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="222.793,540.736 227.742,550.761 222.755,548.236 217.742,550.71 "
+       id="polygon374" />
+  </g>
+  <g
+     id="g376">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="223.458"
+       y1="443.5"
+       x2="223.059"
+       y2="458.767"
+       id="line378" />
+    <polygon
+       style="fill: #000000"
+       points="222.862,466.265 218.126,456.137 223.059,458.767 228.122,456.399 "
+       id="polygon380" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="222.862,466.265 218.126,456.137 223.059,458.767 228.122,456.399 "
+       id="polygon382" />
+  </g>
+  <g
+     id="g384">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="313.554"
+       y1="548.463"
+       x2="366.76"
+       y2="662.181"
+       id="line386" />
+    <polygon
+       style="fill: #000000"
+       points="318.082,546.344 309.316,539.406 309.025,550.582 "
+       id="polygon388" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="318.082,546.344 309.316,539.406 309.025,550.582 "
+       id="polygon390" />
+    <polygon
+       style="fill: #000000"
+       points="369.938,668.975 361.172,662.036 366.76,662.181 370.229,657.798 "
+       id="polygon392" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="369.938,668.975 361.172,662.036 366.76,662.181 370.229,657.798 "
+       id="polygon394" />
+  </g>
+  <g
+     id="g396">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="221.612"
+       y1="130.49"
+       x2="223.389"
+       y2="379.764"
+       id="line398" />
+    <polygon
+       style="fill: #000000"
+       points="223.442,387.264 218.371,377.3 223.389,379.764 228.371,377.229 "
+       id="polygon400" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="223.442,387.264 218.371,377.3 223.389,379.764 228.371,377.229 "
+       id="polygon402" />
+  </g>
+  <g
+     id="g404">
+    <path
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       d="M 319.892 503.5 C 392.964,503.5 639.13,254 713.464,254"
+       id="path406" />
+    <polygon
+       style="fill: #000000"
+       points="319.892,498.5 309.892,503.5 319.892,508.5 "
+       id="polygon408" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="319.892,498.5 309.892,503.5 319.892,508.5 "
+       id="polygon410" />
+    <polygon
+       style="fill: #000000"
+       points="720.964,254 710.964,259 713.464,254 710.964,249 "
+       id="polygon412" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="720.964,254 710.964,259 713.464,254 710.964,249 "
+       id="polygon414" />
+  </g>
+  <g
+     id="g416">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="90.65"
+       y1="503.5"
+       x2="126.981"
+       y2="503.5"
+       id="line418" />
+    <polygon
+       style="fill: #000000"
+       points="134.481,503.5 124.481,508.5 126.981,503.5 124.481,498.5 "
+       id="polygon420" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="134.481,503.5 124.481,508.5 126.981,503.5 124.481,498.5 "
+       id="polygon422" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="221.612"
+     y="111.49"
+     id="text424">
+    <tspan
+       x="221.612"
+       y="111.49"
+       id="tspan426" />
+  </text>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="1209"
+     y="339.5"
+     id="text428">
+    <tspan
+       x="1209"
+       y="339.5"
+       id="tspan430">docker</tspan>
+  </text>
+  <g
+     id="g432">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="793.753"
+       y1="272.636"
+       x2="968.266"
+       y2="363.6"
+       id="line434" />
+    <polygon
+       style="fill: #000000"
+       points="974.917,367.066 963.738,366.878 968.266,363.6 968.361,358.01 "
+       id="polygon436" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="974.917,367.066 963.738,366.878 968.266,363.6 968.361,358.01 "
+       id="polygon438" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="978"
+     y="434.5"
+     id="text440">
+    <tspan
+       x="978"
+       y="434.5"
+       id="tspan442">..</tspan>
+  </text>
+  <text
+     font-size="27.0933"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="1067"
+     y="437"
+     id="text444">
+    <tspan
+       x="1067"
+       y="437"
+       id="tspan446">...</tspan>
+  </text>
+  <g
+     id="g448">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="792.8"
+       y1="273"
+       x2="1173.14"
+       y2="365.792"
+       id="line450" />
+    <polygon
+       style="fill: #000000"
+       points="1180.43,367.57 1169.53,370.057 1173.14,365.792 1171.9,360.342 "
+       id="polygon452" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="1180.43,367.57 1169.53,370.057 1173.14,365.792 1171.9,360.342 "
+       id="polygon454" />
+  </g>
+  <g
+     id="g456">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="792.8"
+       y1="273"
+       x2="794.057"
+       y2="358.365"
+       id="line458" />
+    <polygon
+       style="fill: #000000"
+       points="794.167,365.864 789.02,355.939 794.057,358.365 799.019,355.792 "
+       id="polygon460" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="794.167,365.864 789.02,355.939 794.057,358.365 799.019,355.792 "
+       id="polygon462" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="720"
+     y="220"
+     id="text464">
+    <tspan
+       x="720"
+       y="220"
+       id="tspan466" />
+  </text>
+  <g
+     id="g468">
+    <rect
+       style="fill: #ffffff"
+       x="660"
+       y="660"
+       width="630"
+       height="381"
+       id="rect470" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="660"
+       y="660"
+       width="630"
+       height="381"
+       id="rect472" />
+  </g>
+  <g
+     id="g474">
+    <rect
+       style="fill: #ffffff"
+       x="686"
+       y="789"
+       width="580"
+       height="227"
+       id="rect476" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="686"
+       y="789"
+       width="580"
+       height="227"
+       id="rect478" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="685"
+     y="692"
+     id="text480">
+    <tspan
+       x="685"
+       y="692"
+       id="tspan482">Node</tspan>
+  </text>
+  <g
+     id="g484">
+    <rect
+       style="fill: #ffffff"
+       x="721.2"
+       y="703"
+       width="69.6"
+       height="38"
+       id="rect486" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="721.2"
+       y="703"
+       width="69.6"
+       height="38"
+       id="rect488" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="756"
+       y="726.8"
+       id="text490">
+      <tspan
+         x="756"
+         y="726.8"
+         id="tspan492">kubelet</tspan>
+    </text>
+  </g>
+  <g
+     id="g494">
+    <rect
+       style="fill: #ffffff"
+       x="718.2"
+       y="836.1"
+       width="148"
+       height="133"
+       id="rect496" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="718.2"
+       y="836.1"
+       width="148"
+       height="133"
+       id="rect498" />
+  </g>
+  <g
+     id="g500">
+    <rect
+       style="fill: #ffffff"
+       x="758.55"
+       y="906.1"
+       width="89.3"
+       height="38"
+       id="rect502" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="758.55"
+       y="906.1"
+       width="89.3"
+       height="38"
+       id="rect504" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="803.2"
+       y="929.9"
+       id="text506">
+      <tspan
+         x="803.2"
+         y="929.9"
+         id="tspan508">container</tspan>
+    </text>
+  </g>
+  <g
+     id="g510">
+    <rect
+       style="fill: #ffffff"
+       x="747.8"
+       y="896.2"
+       width="89.3"
+       height="38"
+       id="rect512" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="747.8"
+       y="896.2"
+       width="89.3"
+       height="38"
+       id="rect514" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="792.45"
+       y="920"
+       id="text516">
+      <tspan
+         x="792.45"
+         y="920"
+         id="tspan518">container</tspan>
+    </text>
+  </g>
+  <g
+     id="g520">
+    <rect
+       style="fill: #ffffff"
+       x="737.4"
+       y="886.3"
+       width="89.3"
+       height="38"
+       id="rect522" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="737.4"
+       y="886.3"
+       width="89.3"
+       height="38"
+       id="rect524" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="782.05"
+       y="910.1"
+       id="text526">
+      <tspan
+         x="782.05"
+         y="910.1"
+         id="tspan528">cAdvisor</tspan>
+    </text>
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="792.2"
+     y="902.6"
+     id="text530">
+    <tspan
+       x="792.2"
+       y="902.6"
+       id="tspan532" />
+  </text>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="740.2"
+     y="862.6"
+     id="text534">
+    <tspan
+       x="740.2"
+       y="862.6"
+       id="tspan536">Pod</tspan>
+  </text>
+  <g
+     id="g538">
+    <g
+       id="g540">
+      <rect
+         style="fill: #ffffff"
+         x="1106.6"
+         y="836.1"
+         width="148"
+         height="133"
+         id="rect542" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1106.6"
+         y="836.1"
+         width="148"
+         height="133"
+         id="rect544" />
+    </g>
+    <g
+       id="g546">
+      <rect
+         style="fill: #ffffff"
+         x="1146.95"
+         y="906.1"
+         width="89.3"
+         height="38"
+         id="rect548" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1146.95"
+         y="906.1"
+         width="89.3"
+         height="38"
+         id="rect550" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="1191.6"
+         y="929.9"
+         id="text552">
+        <tspan
+           x="1191.6"
+           y="929.9"
+           id="tspan554">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g556">
+      <rect
+         style="fill: #ffffff"
+         x="1136.2"
+         y="896.2"
+         width="89.3"
+         height="38"
+         id="rect558" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1136.2"
+         y="896.2"
+         width="89.3"
+         height="38"
+         id="rect560" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="1180.85"
+         y="920"
+         id="text562">
+        <tspan
+           x="1180.85"
+           y="920"
+           id="tspan564">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g566">
+      <rect
+         style="fill: #ffffff"
+         x="1125.8"
+         y="886.3"
+         width="89.3"
+         height="38"
+         id="rect568" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="1125.8"
+         y="886.3"
+         width="89.3"
+         height="38"
+         id="rect570" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="1170.45"
+         y="910.1"
+         id="text572">
+        <tspan
+           x="1170.45"
+           y="910.1"
+           id="tspan574">container</tspan>
+      </text>
+    </g>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="1180.6"
+       y="902.6"
+       id="text576">
+      <tspan
+         x="1180.6"
+         y="902.6"
+         id="tspan578" />
+    </text>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="1128.6"
+       y="862.6"
+       id="text580">
+      <tspan
+         x="1128.6"
+         y="862.6"
+         id="tspan582">Pod</tspan>
+    </text>
+  </g>
+  <g
+     id="g584">
+    <g
+       id="g586">
+      <rect
+         style="fill: #ffffff"
+         x="900.9"
+         y="836.1"
+         width="148"
+         height="133"
+         id="rect588" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="900.9"
+         y="836.1"
+         width="148"
+         height="133"
+         id="rect590" />
+    </g>
+    <g
+       id="g592">
+      <rect
+         style="fill: #ffffff"
+         x="941.25"
+         y="906.1"
+         width="89.3"
+         height="38"
+         id="rect594" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="941.25"
+         y="906.1"
+         width="89.3"
+         height="38"
+         id="rect596" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="985.9"
+         y="929.9"
+         id="text598">
+        <tspan
+           x="985.9"
+           y="929.9"
+           id="tspan600">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g602">
+      <rect
+         style="fill: #ffffff"
+         x="930.5"
+         y="896.2"
+         width="89.3"
+         height="38"
+         id="rect604" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="930.5"
+         y="896.2"
+         width="89.3"
+         height="38"
+         id="rect606" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="975.15"
+         y="920"
+         id="text608">
+        <tspan
+           x="975.15"
+           y="920"
+           id="tspan610">container</tspan>
+      </text>
+    </g>
+    <g
+       id="g612">
+      <rect
+         style="fill: #ffffff"
+         x="920.1"
+         y="886.3"
+         width="89.3"
+         height="38"
+         id="rect614" />
+      <rect
+         style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+         x="920.1"
+         y="886.3"
+         width="89.3"
+         height="38"
+         id="rect616" />
+      <text
+         font-size="12.8"
+         style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+         x="964.75"
+         y="910.1"
+         id="text618">
+        <tspan
+           x="964.75"
+           y="910.1"
+           id="tspan620">container</tspan>
+      </text>
+    </g>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="974.9"
+       y="902.6"
+       id="text622">
+      <tspan
+         x="974.9"
+         y="902.6"
+         id="tspan624" />
+    </text>
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="922.9"
+       y="862.6"
+       id="text626">
+      <tspan
+         x="922.9"
+         y="862.6"
+         id="tspan628">Pod</tspan>
+    </text>
+  </g>
+  <g
+     id="g630">
+    <rect
+       style="fill: #ffffff"
+       x="947.748"
+       y="696"
+       width="57.1"
+       height="38"
+       id="rect632" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="947.748"
+       y="696"
+       width="57.1"
+       height="38"
+       id="rect634" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="976.298"
+       y="719.8"
+       id="text636">
+      <tspan
+         x="976.298"
+         y="719.8"
+         id="tspan638">Proxy</tspan>
+    </text>
+  </g>
+  <g
+     id="g640">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="756"
+       y1="741"
+       x2="780.332"
+       y2="876.717"
+       id="line642" />
+    <polygon
+       style="fill: #000000"
+       points="781.655,884.099 774.969,875.138 780.332,876.717 784.812,873.374 "
+       id="polygon644" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="781.655,884.099 774.969,875.138 780.332,876.717 784.812,873.374 "
+       id="polygon646" />
+  </g>
+  <g
+     id="g648">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="976.298"
+       y1="734"
+       x2="975.033"
+       y2="826.365"
+       id="line650" />
+    <polygon
+       style="fill: #000000"
+       points="974.931,833.864 970.068,823.797 975.033,826.365 980.067,823.934 "
+       id="polygon652" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="974.931,833.864 970.068,823.797 975.033,826.365 980.067,823.934 "
+       id="polygon654" />
+  </g>
+  <g
+     id="g656">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="990.572"
+       y1="734"
+       x2="1172.02"
+       y2="831.492"
+       id="line658" />
+    <polygon
+       style="fill: #000000"
+       points="1178.63,835.042 1167.45,834.713 1172.02,831.492 1172.19,825.904 "
+       id="polygon660" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="1178.63,835.042 1167.45,834.713 1172.02,831.492 1172.19,825.904 "
+       id="polygon662" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="1207"
+     y="807.5"
+     id="text664">
+    <tspan
+       x="1207"
+       y="807.5"
+       id="tspan666">docker</tspan>
+  </text>
+  <g
+     id="g668">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="791.753"
+       y1="740.636"
+       x2="966.266"
+       y2="831.6"
+       id="line670" />
+    <polygon
+       style="fill: #000000"
+       points="972.917,835.066 961.738,834.878 966.266,831.6 966.361,826.01 "
+       id="polygon672" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="972.917,835.066 961.738,834.878 966.266,831.6 966.361,826.01 "
+       id="polygon674" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="976"
+     y="902.5"
+     id="text676">
+    <tspan
+       x="976"
+       y="902.5"
+       id="tspan678">..</tspan>
+  </text>
+  <text
+     font-size="27.0933"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="1065"
+     y="905"
+     id="text680">
+    <tspan
+       x="1065"
+       y="905"
+       id="tspan682">...</tspan>
+  </text>
+  <g
+     id="g684">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="790.8"
+       y1="741"
+       x2="1171.14"
+       y2="833.792"
+       id="line686" />
+    <polygon
+       style="fill: #000000"
+       points="1178.43,835.57 1167.53,838.057 1171.14,833.792 1169.9,828.342 "
+       id="polygon688" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="1178.43,835.57 1167.53,838.057 1171.14,833.792 1169.9,828.342 "
+       id="polygon690" />
+  </g>
+  <g
+     id="g692">
+    <line
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x1="790.8"
+       y1="741"
+       x2="792.057"
+       y2="826.365"
+       id="line694" />
+    <polygon
+       style="fill: #000000"
+       points="792.167,833.864 787.02,823.939 792.057,826.365 797.019,823.792 "
+       id="polygon696" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="792.167,833.864 787.02,823.939 792.057,826.365 797.019,823.792 "
+       id="polygon698" />
+  </g>
+  <text
+     font-size="12.8"
+     style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal"
+     x="718"
+     y="688"
+     id="text700">
+    <tspan
+       x="718"
+       y="688"
+       id="tspan702" />
+  </text>
+  <g
+     id="g704">
+    <path
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       d="M 319.892 521 C 392.964,521 637.13,722 711.464,722"
+       id="path706" />
+    <polygon
+       style="fill: #000000"
+       points="319.892,516 309.892,521 319.892,526 "
+       id="polygon708" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="319.892,516 309.892,521 319.892,526 "
+       id="polygon710" />
+    <polygon
+       style="fill: #000000"
+       points="718.964,722 708.964,727 711.464,722 708.964,717 "
+       id="polygon712" />
+    <polygon
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       points="718.964,722 708.964,727 711.464,722 708.964,717 "
+       id="polygon714" />
+  </g>
+  <g
+     id="g716">
+    <rect
+       style="fill: #ffffff"
+       x="282.774"
+       y="671"
+       width="176.225"
+       height="121"
+       id="rect718" />
+    <rect
+       style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000"
+       x="282.774"
+       y="671"
+       width="176.225"
+       height="121"
+       id="rect720" />
+    <text
+       font-size="12.8"
+       style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal"
+       x="370.886"
+       y="704.3"
+       id="text722">
+      <tspan
+         x="370.886"
+         y="704.3"
+         id="tspan724">Distributed</tspan>
+      <tspan
+         x="370.886"
+         y="720.3"
+         id="tspan726">Watchable</tspan>
+      <tspan
+         x="370.886"
+         y="736.3"
+         id="tspan728">Storage</tspan>
+      <tspan
+         x="370.886"
+         y="752.3"
+         id="tspan730" />
+      <tspan
+         x="370.886"
+         y="768.3"
+         id="tspan732">(implemented via etcd)</tspan>
+    </text>
+  </g>
+</svg>

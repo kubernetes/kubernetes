@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,4 +35,24 @@ MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
 
-PORTAL_NET="10.250.0.0/16"
+SERVICE_CLUSTER_IP_RANGE="10.250.0.0/16"  # formerly PORTAL_NET
+
+# Optional: Install node logging
+ENABLE_NODE_LOGGING=false
+LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=false
+ELASTICSEARCH_LOGGING_REPLICAS=1
+
+# Optional: Cluster monitoring to setup as part of the cluster bring up:
+#   none     - No cluster monitoring setup 
+#   influxdb - Heapster, InfluxDB, and Grafana 
+#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
+
+# Optional: Install Kubernetes UI
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota

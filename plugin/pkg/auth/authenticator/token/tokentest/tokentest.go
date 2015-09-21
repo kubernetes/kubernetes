@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ limitations under the License.
 
 package tokentest
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+import "k8s.io/kubernetes/pkg/auth/user"
 
 type TokenAuthenticator struct {
 	Tokens map[string]*user.DefaultInfo

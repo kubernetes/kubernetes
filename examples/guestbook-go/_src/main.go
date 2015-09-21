@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,11 +27,14 @@ import (
 	"github.com/xyproto/simpleredis"
 )
 
-var pool *simpleredis.ConnectionPool
+var (
+	masterPool *simpleredis.ConnectionPool
+	slavePool  *simpleredis.ConnectionPool
+)
 
 func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 	key := mux.Vars(req)["key"]
-	list := simpleredis.NewList(pool, key)
+	list := simpleredis.NewList(slavePool, key)
 	members := HandleError(list.GetAll()).([]string)
 	membersJSON := HandleError(json.MarshalIndent(members, "", "  ")).([]byte)
 	rw.Write(membersJSON)
@@ -40,13 +43,13 @@ func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
 	key := mux.Vars(req)["key"]
 	value := mux.Vars(req)["value"]
-	list := simpleredis.NewList(pool, key)
+	list := simpleredis.NewList(masterPool, key)
 	HandleError(nil, list.Add(value))
 	ListRangeHandler(rw, req)
 }
 
 func InfoHandler(rw http.ResponseWriter, req *http.Request) {
-	info := HandleError(pool.Get(0).Do("INFO")).([]byte)
+	info := HandleError(masterPool.Get(0).Do("INFO")).([]byte)
 	rw.Write(info)
 }
 
@@ -71,8 +74,10 @@ func HandleError(result interface{}, err error) (r interface{}) {
 }
 
 func main() {
-	pool = simpleredis.NewConnectionPoolHost(os.Getenv("REDIS_MASTER_SERVICE_HOST") + ":" + os.Getenv("REDIS_MASTER_SERVICE_PORT"))
-	defer pool.Close()
+	masterPool = simpleredis.NewConnectionPoolHost("redis-master:6379")
+	defer masterPool.Close()
+	slavePool = simpleredis.NewConnectionPoolHost("redis-slave:6379")
+	defer slavePool.Close()
 
 	r := mux.NewRouter()
 	r.Path("/lrange/{key}").Methods("GET").HandlerFunc(ListRangeHandler)

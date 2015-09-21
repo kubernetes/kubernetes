@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,187 +19,43 @@ package config
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 )
 
-// ServicesWatcher is capable of listing and watching for changes to services across ALL namespaces
-type ServicesWatcher interface {
-	List(label labels.Selector) (*api.ServiceList, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+// NewSourceAPIserver creates config source that watches for changes to the services and endpoints.
+func NewSourceAPI(c *client.Client, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
+	servicesLW := cache.NewListWatchFromClient(c, "services", api.NamespaceAll, fields.Everything())
+	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", api.NamespaceAll, fields.Everything())
+
+	newServicesSourceApiFromLW(servicesLW, period, servicesChan)
+	newEndpointsSourceApiFromLW(endpointsLW, period, endpointsChan)
 }
 
-// EndpointsWatcher is capable of listing and watching for changes to endpoints across ALL namespaces
-type EndpointsWatcher interface {
-	List(label labels.Selector) (*api.EndpointsList, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
-}
-
-// SourceAPI implements a configuration source for services and endpoints that
-// uses the client watch API to efficiently detect changes.
-type SourceAPI struct {
-	servicesWatcher  ServicesWatcher
-	endpointsWatcher EndpointsWatcher
-
-	services  chan<- ServiceUpdate
-	endpoints chan<- EndpointsUpdate
-
-	waitDuration      time.Duration
-	reconnectDuration time.Duration
-}
-
-// NewSourceAPI creates a config source that watches for changes to the services and endpoints.
-func NewSourceAPI(servicesWatcher ServicesWatcher, endpointsWatcher EndpointsWatcher, period time.Duration, services chan<- ServiceUpdate, endpoints chan<- EndpointsUpdate) *SourceAPI {
-	config := &SourceAPI{
-		servicesWatcher:  servicesWatcher,
-		endpointsWatcher: endpointsWatcher,
-		services:         services,
-		endpoints:        endpoints,
-
-		waitDuration: period,
-		// prevent hot loops if the server starts to misbehave
-		reconnectDuration: time.Second * 1,
-	}
-	serviceVersion := ""
-	go util.Forever(func() {
-		config.runServices(&serviceVersion)
-		time.Sleep(wait.Jitter(config.reconnectDuration, 0.0))
-	}, period)
-	endpointVersion := ""
-	go util.Forever(func() {
-		config.runEndpoints(&endpointVersion)
-		time.Sleep(wait.Jitter(config.reconnectDuration, 0.0))
-	}, period)
-	return config
-}
-
-// runServices loops forever looking for changes to services.
-func (s *SourceAPI) runServices(resourceVersion *string) {
-	if len(*resourceVersion) == 0 {
-		services, err := s.servicesWatcher.List(labels.Everything())
-		if err != nil {
-			glog.Errorf("Unable to load services: %v", err)
-			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
-			return
+func newServicesSourceApiFromLW(servicesLW cache.ListerWatcher, period time.Duration, servicesChan chan<- ServiceUpdate) {
+	servicesPush := func(objs []interface{}) {
+		var services []api.Service
+		for _, o := range objs {
+			services = append(services, *(o.(*api.Service)))
 		}
-		*resourceVersion = services.ResourceVersion
-		s.services <- ServiceUpdate{Op: SET, Services: services.Items}
+		servicesChan <- ServiceUpdate{Op: SET, Services: services}
 	}
 
-	watcher, err := s.servicesWatcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
-	if err != nil {
-		glog.Errorf("Unable to watch for services changes: %v", err)
-		time.Sleep(wait.Jitter(s.waitDuration, 0.0))
-		return
-	}
-	defer watcher.Stop()
-
-	ch := watcher.ResultChan()
-	handleServicesWatch(resourceVersion, ch, s.services)
+	serviceQueue := cache.NewUndeltaStore(servicesPush, cache.MetaNamespaceKeyFunc)
+	cache.NewReflector(servicesLW, &api.Service{}, serviceQueue, period).Run()
 }
 
-// handleServicesWatch loops over an event channel and delivers config changes to an update channel.
-func handleServicesWatch(resourceVersion *string, ch <-chan watch.Event, updates chan<- ServiceUpdate) {
-	for {
-		select {
-		case event, ok := <-ch:
-			if !ok {
-				glog.V(4).Infof("WatchServices channel closed")
-				return
-			}
-
-			if event.Object == nil {
-				glog.Errorf("Got nil over WatchServices channel")
-				return
-			}
-			var service *api.Service
-			switch obj := event.Object.(type) {
-			case *api.Service:
-				service = obj
-			case *api.Status:
-				glog.Warningf("Got error status on WatchServices channel: %+v", obj)
-				return
-			default:
-				glog.Errorf("Got unexpected object over WatchServices channel: %+v", obj)
-				return
-			}
-
-			*resourceVersion = service.ResourceVersion
-
-			switch event.Type {
-			case watch.Added, watch.Modified:
-				updates <- ServiceUpdate{Op: ADD, Services: []api.Service{*service}}
-
-			case watch.Deleted:
-				updates <- ServiceUpdate{Op: REMOVE, Services: []api.Service{*service}}
-			}
+func newEndpointsSourceApiFromLW(endpointsLW cache.ListerWatcher, period time.Duration, endpointsChan chan<- EndpointsUpdate) {
+	endpointsPush := func(objs []interface{}) {
+		var endpoints []api.Endpoints
+		for _, o := range objs {
+			endpoints = append(endpoints, *(o.(*api.Endpoints)))
 		}
-	}
-}
-
-// runEndpoints loops forever looking for changes to endpoints.
-func (s *SourceAPI) runEndpoints(resourceVersion *string) {
-	if len(*resourceVersion) == 0 {
-		endpoints, err := s.endpointsWatcher.List(labels.Everything())
-		if err != nil {
-			glog.Errorf("Unable to load endpoints: %v", err)
-			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
-			return
-		}
-		*resourceVersion = endpoints.ResourceVersion
-		s.endpoints <- EndpointsUpdate{Op: SET, Endpoints: endpoints.Items}
+		endpointsChan <- EndpointsUpdate{Op: SET, Endpoints: endpoints}
 	}
 
-	watcher, err := s.endpointsWatcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
-	if err != nil {
-		glog.Errorf("Unable to watch for endpoints changes: %v", err)
-		time.Sleep(wait.Jitter(s.waitDuration, 0.0))
-		return
-	}
-	defer watcher.Stop()
-
-	ch := watcher.ResultChan()
-	handleEndpointsWatch(resourceVersion, ch, s.endpoints)
-}
-
-// handleEndpointsWatch loops over an event channel and delivers config changes to an update channel.
-func handleEndpointsWatch(resourceVersion *string, ch <-chan watch.Event, updates chan<- EndpointsUpdate) {
-	for {
-		select {
-		case event, ok := <-ch:
-			if !ok {
-				glog.V(4).Infof("WatchEndpoints channel closed")
-				return
-			}
-
-			if event.Object == nil {
-				glog.Errorf("Got nil over WatchEndpoints channel")
-				return
-			}
-			var endpoints *api.Endpoints
-			switch obj := event.Object.(type) {
-			case *api.Endpoints:
-				endpoints = obj
-			case *api.Status:
-				glog.Warningf("Got error status on WatchEndpoints channel: %+v", obj)
-				return
-			default:
-				glog.Errorf("Got unexpected object over WatchEndpoints channel: %+v", obj)
-				return
-			}
-			*resourceVersion = endpoints.ResourceVersion
-
-			switch event.Type {
-			case watch.Added, watch.Modified:
-				updates <- EndpointsUpdate{Op: ADD, Endpoints: []api.Endpoints{*endpoints}}
-
-			case watch.Deleted:
-				updates <- EndpointsUpdate{Op: REMOVE, Endpoints: []api.Endpoints{*endpoints}}
-			}
-		}
-	}
+	endpointQueue := cache.NewUndeltaStore(endpointsPush, cache.MetaNamespaceKeyFunc)
+	cache.NewReflector(endpointsLW, &api.Endpoints{}, endpointQueue, period).Run()
 }

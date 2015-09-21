@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
@@ -25,28 +26,55 @@ var Scheme = runtime.NewScheme()
 
 func init() {
 	Scheme.AddKnownTypes("",
-		&PodList{},
 		&Pod{},
+		&PodList{},
+		&PodStatusResult{},
+		&PodTemplate{},
+		&PodTemplateList{},
 		&ReplicationControllerList{},
 		&ReplicationController{},
 		&ServiceList{},
 		&Service{},
 		&NodeList{},
 		&Node{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Binding{},
 		&Event{},
 		&EventList{},
-		&ContainerManifest{},
-		&ContainerManifestList{},
-		&BoundPod{},
-		&BoundPods{},
 		&List{},
+		&LimitRange{},
+		&LimitRangeList{},
+		&ResourceQuota{},
+		&ResourceQuotaList{},
+		&Namespace{},
+		&NamespaceList{},
+		&ServiceAccount{},
+		&ServiceAccountList{},
+		&Secret{},
+		&SecretList{},
+		&PersistentVolume{},
+		&PersistentVolumeList{},
+		&PersistentVolumeClaim{},
+		&PersistentVolumeClaimList{},
+		&DeleteOptions{},
+		&ListOptions{},
+		&PodAttachOptions{},
+		&PodLogOptions{},
+		&PodExecOptions{},
+		&PodProxyOptions{},
+		&ComponentStatus{},
+		&ComponentStatusList{},
+		&SerializedReference{},
+		&RangeAllocation{},
+		&ThirdPartyResource{},
+		&ThirdPartyResourceList{},
+		&ThirdPartyResourceData{},
 	)
+
+	// Register Unversioned types
+	Scheme.AddKnownTypes("", &unversioned.Status{})
+
 	// Legacy names are supported
 	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
 	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
@@ -54,6 +82,9 @@ func init() {
 
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
+func (*PodStatusResult) IsAnAPIObject()           {}
+func (*PodTemplate) IsAnAPIObject()               {}
+func (*PodTemplateList) IsAnAPIObject()           {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}
@@ -63,13 +94,33 @@ func (*EndpointsList) IsAnAPIObject()             {}
 func (*Node) IsAnAPIObject()                      {}
 func (*NodeList) IsAnAPIObject()                  {}
 func (*Binding) IsAnAPIObject()                   {}
-func (*Status) IsAnAPIObject()                    {}
-func (*ServerOp) IsAnAPIObject()                  {}
-func (*ServerOpList) IsAnAPIObject()              {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
-func (*ContainerManifest) IsAnAPIObject()         {}
-func (*ContainerManifestList) IsAnAPIObject()     {}
-func (*BoundPod) IsAnAPIObject()                  {}
-func (*BoundPods) IsAnAPIObject()                 {}
 func (*List) IsAnAPIObject()                      {}
+func (*LimitRange) IsAnAPIObject()                {}
+func (*LimitRangeList) IsAnAPIObject()            {}
+func (*ResourceQuota) IsAnAPIObject()             {}
+func (*ResourceQuotaList) IsAnAPIObject()         {}
+func (*Namespace) IsAnAPIObject()                 {}
+func (*NamespaceList) IsAnAPIObject()             {}
+func (*ServiceAccount) IsAnAPIObject()            {}
+func (*ServiceAccountList) IsAnAPIObject()        {}
+func (*Secret) IsAnAPIObject()                    {}
+func (*SecretList) IsAnAPIObject()                {}
+func (*PersistentVolume) IsAnAPIObject()          {}
+func (*PersistentVolumeList) IsAnAPIObject()      {}
+func (*PersistentVolumeClaim) IsAnAPIObject()     {}
+func (*PersistentVolumeClaimList) IsAnAPIObject() {}
+func (*DeleteOptions) IsAnAPIObject()             {}
+func (*ListOptions) IsAnAPIObject()               {}
+func (*PodAttachOptions) IsAnAPIObject()          {}
+func (*PodLogOptions) IsAnAPIObject()             {}
+func (*PodExecOptions) IsAnAPIObject()            {}
+func (*PodProxyOptions) IsAnAPIObject()           {}
+func (*ComponentStatus) IsAnAPIObject()           {}
+func (*ComponentStatusList) IsAnAPIObject()       {}
+func (*SerializedReference) IsAnAPIObject()       {}
+func (*RangeAllocation) IsAnAPIObject()           {}
+func (*ThirdPartyResource) IsAnAPIObject()        {}
+func (*ThirdPartyResourceList) IsAnAPIObject()    {}
+func (*ThirdPartyResourceData) IsAnAPIObject()    {}

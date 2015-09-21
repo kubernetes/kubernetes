@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vsphere/config-common.sh"
 source "${KUBE_ROOT}/cluster/vsphere/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 # Detect the IP for the master
 #
@@ -168,32 +169,6 @@ function upload-server-tars {
   done
 }
 
-# Ensure that we have a password created for validating to the master. Will
-# read from $HOME/.kubernetes_auth if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
-  fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Store password for reuse.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
-}
-
 # Run command over ssh
 function kube-ssh {
   local host="$1"
@@ -275,7 +250,7 @@ function kube-up {
 
   ensure-temp-dir
 
-  get-password
+  gen-kube-basicauth
   python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
     -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
   local htpasswd
@@ -289,11 +264,14 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/hostname.sh"
     echo "cd /home/kube/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
-    echo "readonly PORTAL_NET='${PORTAL_NET}'"
-    echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
+    echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
+    echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
+    echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
+    echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     echo "readonly SERVER_BINARY_TAR='${SERVER_BINARY_TAR##*/}'"
     echo "readonly SALT_TAR='${SALT_TAR##*/}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
@@ -351,7 +329,7 @@ function kube-up {
 
   printf "Waiting for ${KUBE_MASTER} to become available..."
   until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
       printf "."
       sleep 2
   done
@@ -367,6 +345,24 @@ function kube-up {
     done
     printf " OK\n"
   done
+
+  echo "Kubernetes cluster created."
+
+  # TODO use token instead of basic auth
+  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export CONTEXT="vsphere_${INSTANCE_PREFIX}"
+
+  (
+    umask 077
+
+    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
+    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
+    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
+
+    create-kubeconfig
+  )
 
   echo
   echo "Sanity checking cluster..."
@@ -385,38 +381,15 @@ function kube-up {
       }
   done
 
+  # ensures KUBECONFIG is set
+  get-kubeconfig-basicauth
   echo
   echo "Kubernetes cluster is running. The master is running at:"
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ${KUBECONFIG}"
   echo
-
-  local kube_cert=".kubecfg.crt"
-  local kube_key=".kubecfg.key"
-  local ca_cert=".kubernetes.ca.crt"
-
-  (
-    umask 077
-
-    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
-
-    cat << EOF > ~/.kubernetes_auth
-    {
-      "User": "$KUBE_USER",
-      "Password": "$KUBE_PASSWORD",
-      "CAFile": "$HOME/$ca_cert",
-      "CertFile": "$HOME/$kube_cert",
-      "KeyFile": "$HOME/$kube_key"
-    }
-EOF
-
-    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-      "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
-  )
 }
 
 # Delete a kubernetes cluster
@@ -449,14 +422,14 @@ function kube-push {
     echo "sudo salt --force-color '*' state.highstate"
   ) | kube-ssh "${KUBE_MASTER_IP}"
 
-  get-password
+  get-kubeconfig-basicauth
 
   echo
   echo "Kubernetes cluster is running.  The master is running at:"
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
   echo
 }
 
@@ -473,12 +446,4 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
 	echo "TODO"
-}
-
-function setup-monitoring {
-    echo "TODO"
-}
-
-function teardown-monitoring {
-  echo "TODO"
 }

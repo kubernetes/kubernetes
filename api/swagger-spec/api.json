@@ -1,0 +1,28 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "",
+  "basePath": "https://10.10.10.10:6443",
+  "resourcePath": "/api",
+  "apis": [
+   {
+    "path": "/api",
+    "description": "get available API versions",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "get available API versions",
+      "nickname": "getAPIVersions",
+      "parameters": [],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {}
+ }

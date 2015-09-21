@@ -1,0 +1,97 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {"name":"etcd-server"},
+"spec":{
+    "hostNetwork": true,
+    "containers":[
+    {
+    "name": "etcd-container",
+    "image": "quay.io/coreos/etcd",
+    "command": [
+          "/etcd","--name","NODE_NAME",
+	      "--initial-advertise-peer-urls",  "http://NODE_IP:2380",
+	      "--listen-peer-urls",     	"http://NODE_IP:2380",
+	      "--advertise-client-urls",    	"http://NODE_IP:2379",
+	      "-initial-cluster", "kube0.ha=http://192.168.4.100:2380",
+	      "--listen-client-urls",   	"http://127.0.0.1:2379,http://NODE_IP:2379",
+          "--data-dir","/var/etcd/data"
+    ],
+    "ports":[
+        {
+            "name": "serverport", "containerPort": 2380, "hostPort": 2380
+        },
+        {
+            "name": "clientport","containerPort": 4001, "hostPort": 4001
+        }
+    ],
+    "volumeMounts": [
+        { "name": "varetcd",
+        "mountPath": "/var/etcd",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharessl",
+        "mountPath": "/usr/share/ssl",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "usrssl",
+        "mountPath": "/usr/ssl",
+        "readOnly": true},
+        { "name": "usrlibssl",
+        "mountPath": "/usr/lib/ssl",
+        "readOnly": true},
+        { "name": "usrlocalopenssl",
+        "mountPath": "/usr/local/openssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpkitls",
+        "mountPath": "/etc/pki/tls",
+        "readOnly": true}
+        ]
+       }
+],
+"volumes":[
+  { "name": "varetcd",
+    "hostPath": {
+        "path": "/var/etcd/data"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/pki/tls/certs"}
+  },
+  { "name": "usrsharessl",
+    "hostPath": {
+        "path": "/usr/share/ssl"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "usrssl",
+    "hostPath": {
+        "path": "/usr/ssl"}
+  },
+  { "name": "usrlibssl",
+    "hostPath": {
+        "path": "/usr/lib/ssl"}
+  },
+  { "name": "usrlocalopenssl",
+    "hostPath": {
+        "path": "/usr/local/openssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpkitls",
+    "hostPath": {
+        "path": "/etc/pki/tls"}
+  }
+]
+}}

@@ -50,6 +50,20 @@ func TestCapturePanic(t *testing.T) {
 	}
 }
 
+func TestCapturePanicWithEncoded(t *testing.T) {
+	tearDown()
+	Add(newPanicingService())
+	DefaultContainer.EnableContentEncoding(true)
+	httpRequest, _ := http.NewRequest("GET", "http://here.com/fire", nil)
+	httpRequest.Header.Set("Accept", "*/*")
+	httpRequest.Header.Set("Accept-Encoding", "gzip")
+	httpWriter := httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if 500 != httpWriter.Code {
+		t.Error("500 expected on fire, got", httpWriter.Code)
+	}
+}
+
 func TestNotFound(t *testing.T) {
 	tearDown()
 	httpRequest, _ := http.NewRequest("GET", "http://here.com/missing", nil)
@@ -85,6 +99,64 @@ func TestSelectedRoutePath_Issue100(t *testing.T) {
 	}
 }
 
+func TestContentType415_Issue170(t *testing.T) {
+	tearDown()
+	Add(newGetOnlyJsonOnlyService())
+	httpRequest, _ := http.NewRequest("GET", "http://here.com/get", nil)
+	httpWriter := httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if 200 != httpWriter.Code {
+		t.Errorf("Expected 200, got %d", httpWriter.Code)
+	}
+}
+
+func TestContentType415_POST_Issue170(t *testing.T) {
+	tearDown()
+	Add(newPostOnlyJsonOnlyService())
+	httpRequest, _ := http.NewRequest("POST", "http://here.com/post", nil)
+	httpRequest.Header.Set("Content-Type", "application/json")
+	httpWriter := httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if 200 != httpWriter.Code {
+		t.Errorf("Expected 200, got %d", httpWriter.Code)
+	}
+}
+
+// go test -v -test.run TestContentType406PlainJson ...restful
+func TestContentType406PlainJson(t *testing.T) {
+	tearDown()
+	TraceLogger(testLogger{t})
+	Add(newGetPlainTextOrJsonService())
+	httpRequest, _ := http.NewRequest("GET", "http://here.com/get", nil)
+	httpRequest.Header.Set("Accept", "text/plain")
+	httpWriter := httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if got, want := httpWriter.Code, 200; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// go test -v -test.run TestContentTypeOctet_Issue170 ...restful
+func TestContentTypeOctet_Issue170(t *testing.T) {
+	tearDown()
+	Add(newGetConsumingOctetStreamService())
+	// with content-type
+	httpRequest, _ := http.NewRequest("GET", "http://here.com/get", nil)
+	httpRequest.Header.Set("Content-Type", MIME_OCTET)
+	httpWriter := httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if 200 != httpWriter.Code {
+		t.Errorf("Expected 200, got %d", httpWriter.Code)
+	}
+	// without content-type
+	httpRequest, _ = http.NewRequest("GET", "http://here.com/get", nil)
+	httpWriter = httptest.NewRecorder()
+	DefaultContainer.dispatch(httpWriter, httpRequest)
+	if 200 != httpWriter.Code {
+		t.Errorf("Expected 200, got %d", httpWriter.Code)
+	}
+}
+
 func newPanicingService() *WebService {
 	ws := new(WebService).Path("")
 	ws.Route(ws.GET("/fire").To(doPanic))
@@ -94,6 +166,34 @@ func newPanicingService() *WebService {
 func newGetOnlyService() *WebService {
 	ws := new(WebService).Path("")
 	ws.Route(ws.GET("/get").To(doPanic))
+	return ws
+}
+
+func newPostOnlyJsonOnlyService() *WebService {
+	ws := new(WebService).Path("")
+	ws.Consumes("application/json")
+	ws.Route(ws.POST("/post").To(doNothing))
+	return ws
+}
+
+func newGetOnlyJsonOnlyService() *WebService {
+	ws := new(WebService).Path("")
+	ws.Consumes("application/json")
+	ws.Route(ws.GET("/get").To(doNothing))
+	return ws
+}
+
+func newGetPlainTextOrJsonService() *WebService {
+	ws := new(WebService).Path("")
+	ws.Produces("text/plain", "application/json")
+	ws.Route(ws.GET("/get").To(doNothing))
+	return ws
+}
+
+func newGetConsumingOctetStreamService() *WebService {
+	ws := new(WebService).Path("")
+	ws.Consumes("application/octet-stream")
+	ws.Route(ws.GET("/get").To(doNothing))
 	return ws
 }
 
@@ -112,4 +212,7 @@ func selectedRouteChecker(req *Request, resp *Response) {
 func doPanic(req *Request, resp *Response) {
 	println("lightning...")
 	panic("fire")
+}
+
+func doNothing(req *Request, resp *Response) {
 }

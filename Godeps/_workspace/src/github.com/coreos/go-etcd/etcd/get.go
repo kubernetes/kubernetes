@@ -18,9 +18,14 @@ func (c *Client) Get(key string, sort, recursive bool) (*Response, error) {
 }
 
 func (c *Client) RawGet(key string, sort, recursive bool) (*RawResponse, error) {
+	var q bool
+	if c.config.Consistency == STRONG_CONSISTENCY {
+		q = true
+	}
 	ops := Options{
 		"recursive": recursive,
 		"sorted":    sort,
+		"quorum":    q,
 	}
 
 	return c.get(key, ops)

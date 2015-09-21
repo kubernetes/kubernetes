@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,14 +23,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
@@ -41,165 +42,122 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-	factory := NewConfigFactory(client)
-	factory.Create(nil, nil)
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	factory := NewConfigFactory(client, nil)
+	factory.Create()
 }
 
-func TestCreateLists(t *testing.T) {
-	factory := NewConfigFactory(nil)
-	table := []struct {
-		location string
-		factory  func() *listWatch
-	}{
-		// Minion
-		{
-			location: "/api/" + testapi.Version() + "/minions?fields=",
-			factory:  factory.createMinionLW,
-		},
-		// Assigned pod
-		{
-			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host!%3D",
-			factory:  factory.createAssignedPodLW,
-		},
-		// Unassigned pod
-		{
-			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host%3D",
-			factory:  factory.createUnassignedPodLW,
-		},
+// Test configures a scheduler from a policies defined in a file
+// It combines some configurable predicate/priorities with some pre-defined ones
+func TestCreateFromConfig(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	factory := NewConfigFactory(client, nil)
+
+	// Pre-register some predicate and priority functions
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterFitPredicate("PredicateTwo", PredicateTwo)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+
+	configData = []byte(`{
+		"kind" : "Policy",
+		"apiVersion" : "v1",
+		"predicates" : [
+			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
+			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
+			{"name" : "PredicateOne"},
+			{"name" : "PredicateTwo"}
+		],
+		"priorities" : [
+			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "PriorityOne", "weight" : 2},
+			{"name" : "PriorityTwo", "weight" : 1}		]
+	}`)
+	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
+	if err != nil {
+		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	for _, item := range table {
-		handler := util.FakeHandler{
-			StatusCode:   500,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-		// This test merely tests that the correct request is made.
-		item.factory().List()
-		handler.ValidateRequest(t, item.location, "GET", nil)
-	}
+	factory.CreateFromConfig(policy)
 }
 
-func TestCreateWatches(t *testing.T) {
-	factory := NewConfigFactory(nil)
-	table := []struct {
-		rv       string
-		location string
-		factory  func() *listWatch
-	}{
-		// Minion watch
-		{
-			rv:       "",
-			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=",
-			factory:  factory.createMinionLW,
-		}, {
-			rv:       "0",
-			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=0",
-			factory:  factory.createMinionLW,
-		}, {
-			rv:       "42",
-			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=42",
-			factory:  factory.createMinionLW,
-		},
-		// Assigned pod watches
-		{
-			rv:       "",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=",
-			factory:  factory.createAssignedPodLW,
-		}, {
-			rv:       "42",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
-			factory:  factory.createAssignedPodLW,
-		},
-		// Unassigned pod watches
-		{
-			rv:       "",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=",
-			factory:  factory.createUnassignedPodLW,
-		}, {
-			rv:       "42",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
-			factory:  factory.createUnassignedPodLW,
-		},
+func TestCreateFromEmptyConfig(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	factory := NewConfigFactory(client, nil)
+
+	configData = []byte(`{}`)
+	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
+	if err != nil {
+		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	for _, item := range table {
-		handler := util.FakeHandler{
-			StatusCode:   500,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-
-		// This test merely tests that the correct request is made.
-		item.factory().Watch(item.rv)
-		handler.ValidateRequest(t, item.location, "GET", nil)
-	}
+	factory.CreateFromConfig(policy)
 }
 
-func TestPollMinions(t *testing.T) {
-	table := []struct {
-		minions []api.Node
-	}{
-		{
-			minions: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-				{ObjectMeta: api.ObjectMeta{Name: "bar"}},
-			},
-		},
-	}
+func PredicateOne(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	return true, nil
+}
 
-	for _, item := range table {
-		ml := &api.NodeList{Items: item.minions}
-		handler := util.FakeHandler{
-			StatusCode:   200,
-			ResponseBody: runtime.EncodeOrDie(latest.Codec, ml),
-			T:            t,
-		}
-		mux := http.NewServeMux()
-		// FakeHandler musn't be sent requests other than the one you want to test.
-		mux.Handle("/api/"+testapi.Version()+"/minions", &handler)
-		server := httptest.NewServer(mux)
-		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-		cf := NewConfigFactory(client)
+func PredicateTwo(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	return true, nil
+}
 
-		ce, err := cf.pollMinions()
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/minions", "GET", nil)
+func PriorityOne(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	return []algorithm.HostPriority{}, nil
+}
 
-		if e, a := len(item.minions), ce.Len(); e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-	}
+func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	return []algorithm.HostPriority{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"}}
+	grace := int64(30)
+	testPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+		Spec: api.PodSpec{
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+		},
+	}
 	handler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
+		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()
+
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle("/api/"+testapi.Version()+"/pods/foo", &handler)
+	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
-	queue := cache.NewFIFO()
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()}), nil)
+	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
-		perPodBackoff: map[string]*backoffEntry{},
-		clock:         &fakeClock{},
+		perPodBackoff:   map[string]*backoffEntry{},
+		clock:           &fakeClock{},
+		defaultDuration: 1 * time.Millisecond,
+		maxDuration:     1 * time.Second,
 	}
 	errFunc := factory.makeDefaultErrorFunc(&podBackoff, queue)
 
@@ -209,11 +167,11 @@ func TestDefaultErrorFunc(t *testing.T) {
 		// whole error handling system in the future. The test will time
 		// out if something doesn't work.
 		time.Sleep(10 * time.Millisecond)
-		got, exists := queue.Get("foo")
+		got, exists, _ := queue.Get(testPod)
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/pods/foo?namespace=bar", "GET", nil)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -221,58 +179,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 }
 
-func TestStoreToMinionLister(t *testing.T) {
-	store := cache.NewStore()
-	ids := util.NewStringSet("foo", "bar", "baz")
-	for id := range ids {
-		store.Add(id, &api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
-	}
-	sml := storeToNodeLister{store}
-
-	gotNodes, err := sml.List()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	got := make([]string, len(gotNodes.Items))
-	for ix := range gotNodes.Items {
-		got[ix] = gotNodes.Items[ix].Name
-	}
-	if !ids.HasAll(got...) || len(got) != len(ids) {
-		t.Errorf("Expected %v, got %v", ids, got)
-	}
-}
-
-func TestStoreToPodLister(t *testing.T) {
-	store := cache.NewStore()
-	ids := []string{"foo", "bar", "baz"}
-	for _, id := range ids {
-		store.Add(id, &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   id,
-				Labels: map[string]string{"name": id},
-			},
-		})
-	}
-	spl := storeToPodLister{store}
-
-	for _, id := range ids {
-		got, err := spl.ListPods(labels.Set{"name": id}.AsSelector())
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		if e, a := 1, len(got); e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-			continue
-		}
-		if e, a := id, got[0].Name; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-			continue
-		}
-	}
-}
-
-func TestMinionEnumerator(t *testing.T) {
+func TestNodeEnumerator(t *testing.T) {
 	testList := &api.NodeList{
 		Items: []api.Node{
 			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
@@ -286,8 +193,8 @@ func TestMinionEnumerator(t *testing.T) {
 		t.Fatalf("expected %v, got %v", e, a)
 	}
 	for i := range testList.Items {
-		gotID, gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotID; e != a {
+		gotObj := me.Get(i)
+		if e, a := testList.Items[i].Name, gotObj.(*api.Node).Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
@@ -308,7 +215,15 @@ func TestBind(t *testing.T) {
 	table := []struct {
 		binding *api.Binding
 	}{
-		{binding: &api.Binding{PodID: "foo", Host: "foohost.kubernetes.mydomain.com"}},
+		{binding: &api.Binding{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+				Name:      "foo",
+			},
+			Target: api.ObjectReference{
+				Name: "foohost.kubernetes.mydomain.com",
+			},
+		}},
 	}
 
 	for _, item := range table {
@@ -319,23 +234,25 @@ func TestBind(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
+		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 
 func TestBackoff(t *testing.T) {
 	clock := fakeClock{}
 	backoff := podBackoff{
-		perPodBackoff: map[string]*backoffEntry{},
-		clock:         &clock,
+		perPodBackoff:   map[string]*backoffEntry{},
+		clock:           &clock,
+		defaultDuration: 1 * time.Second,
+		maxDuration:     60 * time.Second,
 	}
 
 	tests := []struct {

@@ -1,0 +1,5 @@
+fields:
+    id: int
+    name: string
+    parent: ref "datu:thing"
+    status: enum(draft, public, private)

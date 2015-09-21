@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,18 +17,21 @@ limitations under the License.
 package iptables
 
 import (
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/dbus"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func getIptablesCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv4 {
-		return "iptables"
+		return cmdIptables
 	}
 	if protocol == ProtocolIpv6 {
-		return "ip6tables"
+		return cmdIp6tables
 	}
 	panic("Unknown protocol")
 }
@@ -36,12 +39,14 @@ func getIptablesCommand(protocol Protocol) string {
 func testEnsureChain(t *testing.T, protocol Protocol) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Exists.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 			// Failure.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{2} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -49,9 +54,11 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, protocol)
+	runner := New(&fexec, dbus.NewFake(nil, nil), protocol)
+	defer runner.Destroy()
 	// Success.
 	exists, err := runner.EnsureChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -60,12 +67,12 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	cmd := getIptablesCommand(protocol)
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Exists.
 	exists, err = runner.EnsureChain(TableNAT, Chain("FOOBAR"))
@@ -93,32 +100,74 @@ func TestEnsureChainIpv6(t *testing.T) {
 func TestFlushChain(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
 		CommandScript: []exec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
 	// Success.
 	err := runner.FlushChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Failure.
 	err = runner.FlushChain(TableNAT, Chain("FOOBAR"))
+	if err == nil {
+		t.Errorf("expected failure")
+	}
+}
+
+func TestDeleteChain(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+			// Failure.
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	// Success.
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	// Failure.
+	err = runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err == nil {
 		t.Errorf("expected failure")
 	}
@@ -141,8 +190,9 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
-	exists, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -150,10 +200,10 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 		t.Errorf("expected exists = true")
 	}
 	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 }
 
@@ -163,7 +213,7 @@ func TestEnsureRuleNew(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 			// Success on the second call.
 			func() ([]byte, error) { return []byte{}, nil },
 		},
@@ -177,8 +227,9 @@ func TestEnsureRuleNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
-	exists, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -188,8 +239,8 @@ func TestEnsureRuleNew(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 3 {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
 
@@ -199,7 +250,7 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 2 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{2} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -210,13 +261,14 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
-	_, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
 	}
 	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -226,9 +278,9 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -240,8 +292,9 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
-	_, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
 	}
@@ -256,7 +309,7 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -267,16 +320,17 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
 	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 }
 
@@ -300,7 +354,8 @@ func TestDeleteRuleNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -308,8 +363,8 @@ func TestDeleteRuleNew(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 3 {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
 
@@ -319,7 +374,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
 			// Status 2 on the first call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{2} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -330,13 +385,14 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
 	}
 	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -348,7 +404,7 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 			// Success on the first call.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := exec.FakeExec{
@@ -360,7 +416,8 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -394,71 +451,15 @@ func TestGetIptablesHasCheckCommand(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		check, err := getIptablesHasCheckCommand(&fexec)
-		if (err != nil) != testCase.Err {
-			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
-		}
-		if err == nil && testCase.Expected != check {
-			t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
-		}
-	}
-}
-
-func TestExtractIptablesVersion(t *testing.T) {
-	testCases := []struct {
-		Version string
-		V1      int
-		V2      int
-		V3      int
-		Err     bool
-	}{
-		{"iptables v1.4.7", 1, 4, 7, false},
-		{"iptables v1.4.11", 1, 4, 11, false},
-		{"iptables v0.2.5", 0, 2, 5, false},
-		{"iptables v1.2.3.4.5.6", 1, 2, 3, false},
-		{"iptables v1.4", 0, 0, 0, true},
-		{"iptables v12345.12345.12345.12344", 12345, 12345, 12345, false},
-		{"total junk", 0, 0, 0, true},
-	}
-
-	for _, testCase := range testCases {
-		v1, v2, v3, err := extractIptablesVersion(testCase.Version)
+		version, err := GetIptablesVersionString(&fexec)
 		if (err != nil) != testCase.Err {
 			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
 		}
 		if err == nil {
-			if v1 != testCase.V1 {
-				t.Errorf("First version number incorrect for string \"%s\", got %d, expected %d", testCase.Version, v1, testCase.V1)
+			check := getIptablesHasCheckCommand(version)
+			if testCase.Expected != check {
+				t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
 			}
-			if v2 != testCase.V2 {
-				t.Errorf("Second version number incorrect for string \"%s\", got %d, expected %d", testCase.Version, v2, testCase.V2)
-			}
-			if v3 != testCase.V3 {
-				t.Errorf("Third version number incorrect for string \"%s\", got %d, expected %d", testCase.Version, v3, testCase.V3)
-			}
-		}
-	}
-}
-
-func TestIptablesHasCheckCommand(t *testing.T) {
-	testCases := []struct {
-		V1     int
-		V2     int
-		V3     int
-		Result bool
-	}{
-		{0, 55, 55, false},
-		{1, 0, 55, false},
-		{1, 4, 10, false},
-		{1, 4, 11, true},
-		{1, 4, 19, true},
-		{1, 5, 0, true},
-		{2, 0, 0, true},
-	}
-
-	for _, testCase := range testCases {
-		if result := iptablesHasCheckCommand(testCase.V1, testCase.V2, testCase.V3); result != testCase.Result {
-			t.Errorf("For %d.%d.%d expected %v got %v", testCase.V1, testCase.V2, testCase.V3, testCase.Result, result)
 		}
 	}
 }
@@ -469,7 +470,7 @@ func TestCheckRuleWithoutCheckPresent(t *testing.T) {
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER 
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
@@ -496,7 +497,7 @@ COMMIT
 	if fcmd.CombinedOutputCalls != 1 {
 		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables-save", "-t", "nat") {
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("iptables-save", "-t", "nat") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 }
@@ -507,7 +508,7 @@ func TestCheckRuleWithoutCheckAbsent(t *testing.T) {
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER 
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
@@ -534,7 +535,234 @@ COMMIT
 	if fcmd.CombinedOutputCalls != 1 {
 		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables-save", "-t", "nat") {
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("iptables-save", "-t", "nat") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	}
+}
+
+func TestIptablesWaitFlag(t *testing.T) {
+	testCases := []struct {
+		Version string
+		Result  string
+	}{
+		{"0.55.55", ""},
+		{"1.0.55", ""},
+		{"1.4.19", ""},
+		{"1.4.20", "-w"},
+		{"1.4.21", "-w"},
+		{"1.4.22", "-w2"},
+		{"1.5.0", "-w2"},
+		{"2.0.0", "-w2"},
+	}
+
+	for _, testCase := range testCases {
+		result := getIptablesWaitFlag(testCase.Version)
+		if strings.Join(result, "") != testCase.Result {
+			t.Errorf("For %s expected %v got %v", testCase.Version, testCase.Result, result)
+		}
+	}
+}
+
+func TestWaitFlagUnavailable(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.19"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if sets.NewString(fcmd.CombinedOutputLog[1]...).HasAny("-w", "-w2") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+}
+
+func TestWaitFlagOld(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.20"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-w") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	if sets.NewString(fcmd.CombinedOutputLog[1]...).HasAny("-w2") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+}
+
+func TestWaitFlagNew(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-w2") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	if sets.NewString(fcmd.CombinedOutputLog[1]...).HasAny("-w") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+}
+
+func TestReload(t *testing.T) {
+	dbusConn := dbus.NewFakeConnection()
+	dbusConn.SetBusObject(func(method string, args ...interface{}) ([]interface{}, error) { return nil, nil })
+	dbusConn.AddObject(firewalldName, firewalldPath, func(method string, args ...interface{}) ([]interface{}, error) { return nil, nil })
+	fdbus := dbus.NewFake(dbusConn, nil)
+
+	reloaded := make(chan bool, 2)
+
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+
+			// first reload
+			// EnsureChain
+			func() ([]byte, error) { return []byte{}, nil },
+			// EnsureRule abc check
+			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{1} },
+			// EnsureRule abc
+			func() ([]byte, error) { return []byte{}, nil },
+
+			// second reload
+			// EnsureChain
+			func() ([]byte, error) { return []byte{}, nil },
+			// EnsureRule abc check
+			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{1} },
+			// EnsureRule abc
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+
+	runner := New(&fexec, fdbus, ProtocolIpv4)
+	defer runner.Destroy()
+
+	runner.AddReloadFunc(func() {
+		exists, err := runner.EnsureChain(TableNAT, Chain("FOOBAR"))
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if exists {
+			t.Errorf("expected exists = false")
+		}
+		reloaded <- true
+	})
+
+	runner.AddReloadFunc(func() {
+		exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if exists {
+			t.Errorf("expected exists = false")
+		}
+		reloaded <- true
+	})
+
+	dbusConn.EmitSignal("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameOwnerChanged", firewalldName, "", ":1.1")
+	<-reloaded
+	<-reloaded
+
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("expected 4 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
+	}
+
+	go func() { time.Sleep(time.Second / 100); reloaded <- true }()
+	dbusConn.EmitSignal(firewalldName, firewalldPath, firewalldInterface, "DefaultZoneChanged", "public")
+	dbusConn.EmitSignal("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameOwnerChanged", "io.k8s.Something", "", ":1.1")
+	<-reloaded
+
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("Incorrect signal caused a reload")
+	}
+
+	dbusConn.EmitSignal(firewalldName, firewalldPath, firewalldInterface, "Reloaded")
+	<-reloaded
+	<-reloaded
+
+	if fcmd.CombinedOutputCalls != 7 {
+		t.Errorf("expected 7 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[4]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[4])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[5]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[5])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[6]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[6])
 	}
 }

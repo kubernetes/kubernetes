@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,56 +17,30 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-	"net"
-	"net/http"
-	"strconv"
+	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
-	"github.com/golang/glog"
-)
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 
-var (
-	port         = flag.Int("port", ports.SchedulerPort, "The port that the scheduler's http service runs on")
-	address      = util.IP(net.ParseIP("127.0.0.1"))
-	clientConfig = &client.Config{}
+	"github.com/spf13/pflag"
 )
 
 func init() {
-	flag.Var(&address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+	healthz.DefaultHealthz()
 }
 
 func main() {
-	flag.Parse()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	s := app.NewSchedulerServer()
+	s.AddFlags(pflag.CommandLine)
+
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 
-	kubeClient, err := client.New(clientConfig)
-	if err != nil {
-		glog.Fatalf("Invalid API configuration: %v", err)
-	}
-
-	record.StartRecording(kubeClient.Events(""), "scheduler")
-
-	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
-
-	configFactory := factory.NewConfigFactory(kubeClient)
-	config, err := configFactory.Create(nil, nil)
-	if err != nil {
-		glog.Fatalf("Failed to create scheduler configuration: %v", err)
-	}
-	s := scheduler.New(config)
-	s.Run()
-
-	select {}
+	s.Run(pflag.CommandLine.Args())
 }

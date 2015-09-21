@@ -165,9 +165,16 @@ If you expect to read large amounts of payload data, and you do not use this fea
 Trouble shooting
 
 This package has the means to produce detail logging of the complete Http request matching process and filter invocation.
-Enabling this feature requires you to set a log.Logger instance such as:
+Enabling this feature requires you to set an implementation of restful.StdLogger (e.g. log.Logger) instance such as:
 
 	restful.TraceLogger(log.New(os.Stdout, "[restful] ", log.LstdFlags|log.Lshortfile))
+
+Logging
+
+The restful.SetLogger() method allows you to override the logger used by the package. By default restful
+uses the standard library `log` package and logs to stdout. Different logging packages are supported as
+long as they conform to `StdLogger` interface defined in the `log` sub-package, writing an adapter for your
+preferred package is simple.
 
 Resources
 
@@ -179,6 +186,6 @@ Resources
 
 [showcases]: https://github.com/emicklei/mora, https://github.com/emicklei/landskape
 
-(c) 2012-2014, http://ernestmicklei.com. MIT License
+(c) 2012-2015, http://ernestmicklei.com. MIT License
 */
 package restful

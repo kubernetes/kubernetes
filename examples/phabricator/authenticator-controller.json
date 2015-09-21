@@ -1,0 +1,31 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "authenticator-controller",
+    "labels": {
+      "name": "authenticator"
+    }
+  },
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "name": "authenticator"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "authenticator"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "authenticator",
+            "image": "gcr.io/google_containers/cloudsql-authenticator:v1"
+          }
+        ]
+      }
+    }
+  }
+}

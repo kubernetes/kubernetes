@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,160 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
+
+func TestAccept(t *testing.T) {
+	tests := []struct {
+		acceptPaths  string
+		rejectPaths  string
+		acceptHosts  string
+		path         string
+		host         string
+		method       string
+		expectAccept bool
+	}{
+
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "127.0.0.1",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods/foo/exec",
+			host:         "127.0.0.1",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "evil.com",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "localhost.evil.com",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "127a0b0c1",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/ui",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "localhost",
+			method:       "POST",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods/somepod",
+			host:         "localhost",
+			method:       "PUT",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods/somepod",
+			host:         "localhost",
+			method:       "PATCH",
+			expectAccept: false,
+		},
+	}
+	for _, test := range tests {
+		filter := &FilterServer{
+			AcceptPaths:   MakeRegexpArrayOrDie(test.acceptPaths),
+			RejectPaths:   MakeRegexpArrayOrDie(test.rejectPaths),
+			AcceptHosts:   MakeRegexpArrayOrDie(test.acceptHosts),
+			RejectMethods: MakeRegexpArrayOrDie(DefaultMethodRejectRE),
+		}
+		accept := filter.accept(test.method, test.path, test.host)
+		if accept != test.expectAccept {
+			t.Errorf("expected: %v, got %v for %#v", test.expectAccept, accept, test)
+		}
+	}
+}
+
+func TestRegexpMatch(t *testing.T) {
+	tests := []struct {
+		str         string
+		regexps     string
+		expectMatch bool
+	}{
+		{
+			str:         "foo",
+			regexps:     "bar,.*",
+			expectMatch: true,
+		},
+		{
+			str:         "foo",
+			regexps:     "bar,fo.*",
+			expectMatch: true,
+		},
+		{
+			str:         "bar",
+			regexps:     "bar,fo.*",
+			expectMatch: true,
+		},
+		{
+			str:         "baz",
+			regexps:     "bar,fo.*",
+			expectMatch: false,
+		},
+	}
+	for _, test := range tests {
+		match := matchesRegexp(test.str, MakeRegexpArrayOrDie(test.regexps))
+		if test.expectMatch != match {
+			t.Errorf("expected: %v, found: %v, for %s and %v", test.expectMatch, match, test.str, test.regexps)
+		}
+	}
+}
 
 func TestFileServing(t *testing.T) {
 	const (
@@ -77,7 +230,7 @@ func TestAPIRequests(t *testing.T) {
 
 	// httptest.NewServer should always generate a valid URL.
 	target, _ := url.Parse(ts.URL)
-	proxy := newProxyServer(target)
+	proxy := newProxy(target)
 
 	tests := []struct{ method, body string }{
 		{"GET", ""},
@@ -101,6 +254,71 @@ func TestAPIRequests(t *testing.T) {
 		want := strings.Join([]string{tt.method, path, tt.body}, " ")
 		if w.Body.String() != want {
 			t.Errorf("%d: response body = %q; want %q", i, w.Body.String(), want)
+		}
+	}
+}
+
+func TestPathHandling(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, r.URL.Path)
+	}))
+	defer ts.Close()
+
+	table := []struct {
+		prefix     string
+		reqPath    string
+		expectPath string
+	}{
+		{"/api/", "/metrics", "404 page not found\n"},
+		{"/api/", "/api/metrics", "/api/metrics"},
+		{"/api/", "/api/v1/pods/", "/api/v1/pods/"},
+		{"/", "/metrics", "/metrics"},
+		{"/", "/api/v1/pods/", "/api/v1/pods/"},
+		{"/custom/", "/metrics", "404 page not found\n"},
+		{"/custom/", "/api/metrics", "404 page not found\n"},
+		{"/custom/", "/api/v1/pods/", "404 page not found\n"},
+		{"/custom/", "/custom/api/metrics", "/api/metrics"},
+		{"/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
+	}
+
+	cc := &client.Config{
+		Host: ts.URL,
+	}
+
+	for _, item := range table {
+		func() {
+			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", nil, cc)
+			if err != nil {
+				t.Fatalf("%#v: %v", item, err)
+			}
+			pts := httptest.NewServer(p.handler)
+			defer pts.Close()
+
+			r, err := http.Get(pts.URL + item.reqPath)
+			if err != nil {
+				t.Fatalf("%#v: %v", item, err)
+			}
+			body, err := ioutil.ReadAll(r.Body)
+			r.Body.Close()
+			if err != nil {
+				t.Fatalf("%#v: %v", item, err)
+			}
+			if e, a := item.expectPath, string(body); e != a {
+				t.Errorf("%#v: Wanted %q, got %q", item, e, a)
+			}
+		}()
+	}
+}
+
+func TestExtractHost(t *testing.T) {
+	fixtures := map[string]string{
+		"localhost:8085": "localhost",
+		"marmalade":      "marmalade",
+	}
+	for header, expected := range fixtures {
+		host := extractHost(header)
+		if host != expected {
+			t.Fatalf("%s != %s", host, expected)
 		}
 	}
 }

@@ -1,0 +1,5 @@
+*~
+*.a
+*.6
+*.out
+_testmain.go

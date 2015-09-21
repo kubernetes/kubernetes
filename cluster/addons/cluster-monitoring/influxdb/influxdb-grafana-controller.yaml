@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: monitoring-influx-grafana-v1
+  namespace: kube-system
+  labels: 
+    k8s-app: influxGrafana
+    version: v1
+    kubernetes.io/cluster-service: "true"
+spec: 
+  replicas: 1
+  selector: 
+    k8s-app: influxGrafana
+    version: v1
+  template: 
+    metadata: 
+      labels: 
+        k8s-app: influxGrafana
+        version: v1
+        kubernetes.io/cluster-service: "true"
+    spec: 
+      containers: 
+        - image: gcr.io/google_containers/heapster_influxdb:v0.3
+          name: influxdb
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+          ports: 
+            - containerPort: 8083
+              hostPort: 8083
+            - containerPort: 8086
+              hostPort: 8086
+          volumeMounts:
+          - name: influxdb-persistent-storage
+            mountPath: /data
+        - image: gcr.io/google_containers/heapster_grafana:v0.7
+          name: grafana
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+          env: 
+            - name: INFLUXDB_EXTERNAL_URL
+              value: /api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api/db/
+            - name: INFLUXDB_HOST
+              value: monitoring-influxdb
+            - name: INFLUXDB_PORT
+              value: "8086"
+      volumes:
+      - name: influxdb-persistent-storage
+        emptyDir: {}
+

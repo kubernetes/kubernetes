@@ -1,0 +1,20 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "zookeeper",
+    "labels": {
+      "name": "zookeeper"
+    }
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 2181
+      }
+    ],
+    "selector": {
+      "name": "zookeeper"
+    }
+  }
+}

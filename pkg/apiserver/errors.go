@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,40 +20,50 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/util"
 )
 
-// statusError is an object that can be converted into an api.Status
+// statusError is an object that can be converted into an unversioned.Status
 type statusError interface {
-	Status() api.Status
+	Status() unversioned.Status
 }
 
-// errToAPIStatus converts an error to an api.Status object.
-func errToAPIStatus(err error) *api.Status {
+// errToAPIStatus converts an error to an unversioned.Status object.
+func errToAPIStatus(err error) *unversioned.Status {
 	switch t := err.(type) {
 	case statusError:
 		status := t.Status()
-		status.Status = api.StatusFailure
+		if len(status.Status) == 0 {
+			status.Status = unversioned.StatusFailure
+		}
+		if status.Code == 0 {
+			switch status.Status {
+			case unversioned.StatusSuccess:
+				status.Code = http.StatusOK
+			case unversioned.StatusFailure:
+				status.Code = http.StatusInternalServerError
+			}
+		}
 		//TODO: check for invalid responses
 		return &status
 	default:
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case tools.IsEtcdTestFailed(err):
+		case etcdstorage.IsEtcdTestFailed(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		glog.V(1).Infof("An unchecked error was received: %v", err)
-		return &api.Status{
-			Status:  api.StatusFailure,
+		util.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
+		return &unversioned.Status{
+			Status:  unversioned.StatusFailure,
 			Code:    status,
-			Reason:  api.StatusReasonUnknown,
+			Reason:  unversioned.StatusReasonUnknown,
 			Message: err.Error(),
 		}
 	}

@@ -1,0 +1,36 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "explorer"
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "explorer",
+        "image": "gcr.io/google_containers/explorer:1.0",
+        "args": [
+          "-port=8080"
+        ],
+        "ports": [
+          {
+            "containerPort": 8080,
+            "protocol": "TCP"
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "test-volume",
+            "mountPath": "/mount/test-volume"
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "name": "test-volume",
+        "emptyDir": {}
+      }
+    ]
+  }
+}

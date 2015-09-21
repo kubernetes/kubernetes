@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
+source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/rackspace/authorization.sh"
 
 verify-prereqs() {
   # Make sure that prerequisites are installed.
@@ -47,32 +49,6 @@ verify-prereqs() {
     echo -e "\texport OS_PASSWORD=myapikey"
     return 1
   fi
-}
-
-# Ensure that we have a password created for validating to the master.  Will
-# read from $HOME/.kubernetres_auth if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-get-password() {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
-  fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Store password for reuse.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 rax-ssh-key() {
@@ -117,7 +93,8 @@ find-object-url() {
 
   KUBE_TAR=${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz
 
-  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${KUBE_TAR})
+ # Create temp URL good for 24 hours
+  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${KUBE_TAR} 86400 )
   echo "cluster/rackspace/util.sh: Object temp URL:"
   echo -e "\t${RELEASE_TMP_URL}"
 
@@ -128,7 +105,7 @@ ensure_dev_container() {
   SWIFTLY_CMD="swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD}"
 
   if ! ${SWIFTLY_CMD} get ${CLOUDFILES_CONTAINER} > /dev/null 2>&1 ; then
-    echo "cluster/rackspace/util.sh: Container doesn't exist. Creating container ${KUBE_RACKSPACE_RELEASE_BUCKET}"
+    echo "cluster/rackspace/util.sh: Container doesn't exist. Creating container ${CLOUDFILES_CONTAINER}"
     ${SWIFTLY_CMD} put ${CLOUDFILES_CONTAINER} > /dev/null 2>&1
   fi
 }
@@ -139,8 +116,27 @@ copy_dev_tarballs() {
   echo "cluster/rackspace/util.sh: Uploading to Cloud Files"
   ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz \
   ${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
-  
+
   echo "Release pushed."
+}
+
+prep_known_tokens() {
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    generate_kubelet_tokens ${MINION_NAMES[i]}
+    cat ${KUBE_TEMP}/${MINION_NAMES[i]}_tokens.csv >> ${KUBE_TEMP}/known_tokens.csv
+  done
+
+    # Generate tokens for other "service accounts".  Append to known_tokens.
+    #
+    # NB: If this list ever changes, this script actually has to
+    # change to detect the existence of this file, kill any deleted
+    # old tokens and add any new tokens (to handle the upgrade case).
+    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+    for account in "${service_accounts[@]}"; do
+      echo "$(create_token),${account},${account}" >> ${KUBE_TEMP}/known_tokens.csv
+    done
+
+  generate_admin_token
 }
 
 rax-boot-master() {
@@ -154,7 +150,12 @@ rax-boot-master() {
       -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
       -e "s|KUBE_USER|${KUBE_USER}|" \
       -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
-      -e "s|PORTAL_NET|${PORTAL_NET}|" \
+      -e "s|SERVICE_CLUSTER_IP_RANGE|${SERVICE_CLUSTER_IP_RANGE}|" \
+      -e "s|OS_AUTH_URL|${OS_AUTH_URL}|" \
+      -e "s|OS_USERNAME|${OS_USERNAME}|" \
+      -e "s|OS_PASSWORD|${OS_PASSWORD}|" \
+      -e "s|OS_TENANT_NAME|${OS_TENANT_NAME}|" \
+      -e "s|OS_REGION_NAME|${OS_REGION_NAME}|" \
       $(dirname $0)/rackspace/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
 
@@ -181,11 +182,19 @@ rax-boot-minions() {
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 
+    get_tokens_from_csv ${MINION_NAMES[i]}
+
     sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
-        -e "s|INDEX|$((i + 1))|g" \
         -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
-        -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
+        -e "s|DNS_SERVER_IP|${DNS_SERVER_IP:-}|" \
+        -e "s|DNS_DOMAIN|${DNS_DOMAIN:-}|" \
+        -e "s|ENABLE_CLUSTER_DNS|${ENABLE_CLUSTER_DNS:-false}|" \
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
+        -e "s|INDEX|$((i + 1))|g" \
+        -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \
+        -e "s|KUBE_NETWORK|${KUBE_NETWORK}|" \
+        -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \
+        -e "s|KUBE_PROXY_TOKEN|${KUBE_PROXY_TOKEN}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
     $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
 
@@ -238,7 +247,20 @@ detect-minions() {
 detect-master() {
   KUBE_MASTER=${MASTER_NAME}
 
+  echo "Waiting for ${MASTER_NAME} IP Address."
+  echo
+  echo "  This will continually check to see if the master node has an IP address."
+  echo
+
   KUBE_MASTER_IP=$(nova show $KUBE_MASTER --minimal | grep accessIPv4 | awk '{print $4}')
+
+  while [ "${KUBE_MASTER_IP-|}" == "|" ]; do
+    KUBE_MASTER_IP=$(nova show $KUBE_MASTER --minimal | grep accessIPv4 | awk '{print $4}')
+    printf "."
+    sleep 2
+  done
+
+  echo "${KUBE_MASTER} IP Address is ${KUBE_MASTER_IP}"
 }
 
 # $1 should be the network you would like to get an IP address for
@@ -265,8 +287,8 @@ kube-up() {
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
-  get-password
-  python $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
+  gen-kube-basicauth
+  python2.7 $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
   rax-nova-network
@@ -276,9 +298,20 @@ kube-up() {
   rax-ssh-key
 
   echo "cluster/rackspace/util.sh: Starting Cloud Servers"
-  rax-boot-master
+  prep_known_tokens
 
+  rax-boot-master
   rax-boot-minions
+
+  detect-master
+
+  # TODO look for a better way to get the known_tokens to the master. This is needed over file injection since the files were too large on a 4 node cluster.
+  $(scp -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} ${KUBE_TEMP}/known_tokens.csv core@${KUBE_MASTER_IP}:/home/core/known_tokens.csv)
+  $(sleep 2)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo /usr/bin/mkdir -p /var/lib/kube-apiserver)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo mv /home/core/known_tokens.csv /var/lib/kube-apiserver/known_tokens.csv)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo chown root.root /var/lib/kube-apiserver/known_tokens.csv)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo systemctl restart kube-apiserver)
 
   FAIL=0
   for job in `jobs -p`
@@ -290,8 +323,6 @@ kube-up() {
     exit 2
   fi
 
-  detect-master
-
   echo "Waiting for cluster initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
@@ -301,37 +332,38 @@ kube-up() {
 
   #This will fail until apiserver salt is updated
   until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
-          --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
+          --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/healthz); do
       printf "."
       sleep 2
   done
 
   echo "Kubernetes cluster created."
 
+  export KUBE_CERT=""
+  export KUBE_KEY=""
+  export CA_CERT=""
+  export CONTEXT="rackspace_${INSTANCE_PREFIX}"
+
+  create-kubeconfig
+
   # Don't bail on errors, we want to be able to print some info.
   set +e
 
   detect-minions
 
+  # ensures KUBECONFIG is set
+  get-kubeconfig-basicauth
   echo "All minions may not be online yet, this is okay."
   echo
   echo "Kubernetes cluster is running.  The master is running at:"
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
   echo
   echo "Security note: The server above uses a self signed certificate.  This is"
   echo "    subject to \"Man in the middle\" type attacks."
   echo
-}
-
-function setup-monitoring {
-    echo "TODO"
-}
-
-function teardown-monitoring {
-  echo "TODO"
 }
 
 # Perform preparations required to run e2e tests

@@ -1,6 +1,9 @@
 # OSX leaves these everywhere on SMB shares
 ._*
 
+# OSX trash
+.DS_Store
+
 # Eclipse files
 .classpath
 .project
@@ -14,6 +17,8 @@
 
 # Emacs save files
 *~
+\#*\#
+.\#*
 
 # Vim-related files
 [._]*.s[a-w][a-z]
@@ -24,6 +29,10 @@ Session.vim
 
 # Go test binaries
 *.test
+/hack/.test-cmd-auth
+
+# JUnit test output from ginkgo e2e tests
+/junit*.xml
 
 # Mercurial files
 **/.hg
@@ -33,8 +42,28 @@ Session.vim
 .vagrant
 network_closure.sh
 
-# compiled binaries in third_party
+# Local cluster env variables
+/cluster/env.sh
+
+# Compiled binaries in third_party
 /third_party/pkg
 
-# also ignore etcd installed by hack/install-etcd.sh
+# Also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+
+# User cluster configs
+.kubeconfig
+
+.tags*
+
+# Web UI
+www/master/node_modules/
+www/master/npm-debug.log
+www/master/shared/config/development.json
+
+# Karma output
+www/test_out
+
+# precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
+_tmp/
+doc_tmp/

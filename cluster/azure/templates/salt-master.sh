@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ log_level: debug
 log_level_logfile: debug
 EOF
 
-cat <<EOF >/etc/salt/master.d/log-level-debug.d
+cat <<EOF >/etc/salt/master.d/log-level-debug.conf
 log_level: debug
 log_level_logfile: debug
 EOF

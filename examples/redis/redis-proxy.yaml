@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-proxy
+    role: proxy
+  name: redis-proxy
+spec:
+  containers:
+  - name: proxy
+    image: kubernetes/redis-proxy:v1
+    ports:
+    - containerPort: 6379
+      name: api

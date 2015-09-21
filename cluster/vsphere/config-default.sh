@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,11 +31,27 @@ MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_MEMORY_MB=2048
 MINION_CPU=1
 
-PORTAL_NET="10.244.240.0/20"
-
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
+SERVICE_CLUSTER_IP_RANGE="10.244.240.0/20"  # formerly PORTAL_NET
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING=true
+ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
+
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=false
+ELASTICSEARCH_LOGGING_REPLICAS=1
+
+# Optional: Cluster monitoring to setup as part of the cluster bring up:
+#   none     - No cluster monitoring setup 
+#   influxdb - Heapster, InfluxDB, and Grafana 
+#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
+
+# Optional: Install cluster DNS.
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
+DNS_SERVER_IP="10.244.240.240"
+DNS_DOMAIN="cluster.local"
+DNS_REPLICAS=1
+
+# Optional: Install Kubernetes UI
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"

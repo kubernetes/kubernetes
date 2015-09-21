@@ -1,14 +1,17 @@
 # Building Kubernetes
 
-To build Kubernetes you need to have access to a Docker installation through either of the following methods:
+Building Kubernetes is easy if you take advantage of the containerized build environment. This document will help guide you through understanding this build process.
 
 ## Requirements
 
-1. Be running Docker.  2 options supported/tested:
-  1. **Mac OS X** The best way to go is to use `boot2docker`.  See instructions [here](https://docs.docker.com/installation/mac/).
+1. Docker, using one of the two following configurations:
+  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
+  **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
-2. Have python installed.  Pretty much it is installed everywhere at this point so you can probably ignore this.
-3. *Optional* For uploading your release to Google Cloud Storage, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.
+2. [Python](https://www.python.org)
+3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
+
+You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
 
 ## Overview
 
@@ -34,7 +37,7 @@ The `release.sh` script will build a release.  It will build binaries, run tests
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
-* Script (`cluster/kubecfg.sh`) for picking and running the right client binary based on platform.
+* Script (`kubectl`) for picking and running the right client binary based on platform.
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries
@@ -55,7 +58,6 @@ Env Variable | Default | Description
 `KUBE_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
 `KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
 `KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
-`KUBE_BUILD_RUN_IMAGES` | `n` | *Experimental* Build Docker images for running most server components.
 `KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
 
 ## Basic Flow
@@ -68,25 +70,28 @@ Everything in `build/build-image/` is meant to be run inside of the container.  
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
-## Runtime Docker Images
+## Proxy Settings
 
-This support is experimental and hasn't been used yet to deploy a cluster.
 
-The files necessarily for the release Docker images are in `build/run-images/*`.  All of this is staged into `_output/images` similar to build-image.  The `base` image is used as a base for each of the specialized containers and is generally never pushed to a shared repository.
+If you are behind a proxy, you need to edit `build/build-image/Dockerfile` and add proxy settings to execute command in that container correctly.
 
-If the release script is set to upload to GCS, it'll do the following:
-* Start up a local `google/docker-registry` registry that is backed by GCS.
-* Rename/push the runtime images to that registry.
+example:
+
+`ENV http_proxy http://username:password@proxyaddr:proxyport`
+
+`ENV https_proxy http://username:password@proxyaddr:proxyport`
+
+Besides, to avoid integration test touch the proxy while connecting to local etcd service, you need to set
+
+`ENV no_proxy 127.0.0.1`
 
 ## TODOs
 
 These are in no particular order
 
 * [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
-* [ ] Get a cluster up and running with the Docker images.  Perhaps start with a local cluster and move up to a GCE cluster.
-* [ ] Implement (#186)[https://github.com/GoogleCloudPlatform/kubernetes/issues/186].  This will make it easier to develop Kubernetes.
 * [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Create an install script that'll let us do a `curl https://[URL] | bash` to get that tarball down and ensure that other dependencies (cloud SDK?) are installed and configured correctly.
-* [ ] Support/test Windows as a client.
-* [ ] Finish support for the Dockerized runtime. Issue (#19)[https://github.com/GoogleCloudPlatform/kubernetes/issues/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
-* [ ] Support uploading to the Docker index instead of the GCS bucket.  This'll allow easier installs for those not running on GCE
+* [ ] Finish support for the Dockerized runtime. Issue (#19)[http://issue.k8s.io/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()

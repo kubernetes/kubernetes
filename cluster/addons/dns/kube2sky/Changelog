@@ -1,0 +1,20 @@
+## Version 1.10 (Jun 19 2015 Tim Hockin <thockin@google.com>)
+- Fall back on service account tokens if no other auth is specified.
+
+
+## Version 1.9 (May 28 2015 Abhishek Shah <abshah@google.com>)
+- Add SRV support.
+
+
+## Version 1.8 (May 28 2015 Vishnu Kannan <vishnuk@google.com>)
+- Avoid making connections to the master insecure by default
+- Let users override the master URL in kubeconfig via a flag
+
+
+## Version 1.7 (May 25 2015 Vishnu Kannan <vishnuk@google.com>)
+- Adding support for headless services. All pods backing a headless service is
+addressible via DNS RR.
+
+
+## Version 1.4 (Fri May 15 2015 Tim Hockin <thockin@google.com>)
+- First Changelog entry

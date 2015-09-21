@@ -25,18 +25,51 @@ import (
 	"text/template"
 )
 
+var templateFuncs template.FuncMap = template.FuncMap{
+	"trim": strings.TrimSpace,
+	"rpad": rpad,
+	"gt":   Gt,
+	"eq":   Eq,
+}
+
 var initializers []func()
 
 // automatic prefix matching can be a dangerous thing to automatically enable in CLI tools.
 // Set this to true to enable it
 var EnablePrefixMatching bool = false
 
+// enables an information splash screen on Windows if the CLI is started from explorer.exe.
+var EnableWindowsMouseTrap bool = true
+
+var MousetrapHelpText string = `This is a command line tool
+
+You need to open cmd.exe and run it from there.
+`
+
+//AddTemplateFunc adds a template function that's available to Usage and Help
+//template generation.
+func AddTemplateFunc(name string, tmplFunc interface{}) {
+	templateFuncs[name] = tmplFunc
+}
+
+//AddTemplateFuncs adds multiple template functions availalble to Usage and
+//Help template generation.
+func AddTemplateFuncs(tmplFuncs template.FuncMap) {
+	for k, v := range tmplFuncs {
+		templateFuncs[k] = v
+	}
+}
+
+//OnInitialize takes a series of func() arguments and appends them to a slice of func().
 func OnInitialize(y ...func()) {
 	for _, x := range y {
 		initializers = append(initializers, x)
 	}
 }
 
+//Gt takes two types and checks whether the first type is greater than the second. In case of types Arrays, Chans,
+//Maps and Slices, Gt will compare their lengths. Ints are compared directly while strings are first parsed as
+//ints and then compared.
 func Gt(a interface{}, b interface{}) bool {
 	var left, right int64
 	av := reflect.ValueOf(a)
@@ -64,6 +97,7 @@ func Gt(a interface{}, b interface{}) bool {
 	return left > right
 }
 
+//Eq takes two types and checks whether they are equal. Supported types are int and string. Unsupported types will panic.
 func Eq(a interface{}, b interface{}) bool {
 	av := reflect.ValueOf(a)
 	bv := reflect.ValueOf(b)
@@ -79,6 +113,7 @@ func Eq(a interface{}, b interface{}) bool {
 	return false
 }
 
+//rpad adds padding to the right of a string
 func rpad(s string, padding int) string {
 	template := fmt.Sprintf("%%-%ds", padding)
 	return fmt.Sprintf(template, s)
@@ -87,12 +122,7 @@ func rpad(s string, padding int) string {
 // tmpl executes the given template text on data, writing the result to w.
 func tmpl(w io.Writer, text string, data interface{}) error {
 	t := template.New("top")
-	t.Funcs(template.FuncMap{
-		"trim": strings.TrimSpace,
-		"rpad": rpad,
-		"gt":   Gt,
-		"eq":   Eq,
-	})
+	t.Funcs(templateFuncs)
 	template.Must(t.Parse(text))
 	return t.Execute(w, data)
 }

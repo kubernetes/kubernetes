@@ -1,0 +1,180 @@
+#cloud-config
+
+coreos:
+  units:
+    - name: kubernetes-install-rkt.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch Rocket
+        Documentation=http://github.com/coreos/rkt
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/rkt
+        ExecStartPre=/usr/bin/wget \
+        -O /opt/rkt/rkt-v${RKT_VERSION}.tar.gz \
+        https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+        ExecStart=/usr/bin/tar xzvf /opt/rkt/rkt-v${RKT_VERSION}.tar.gz -C /opt --overwrite
+
+    - name: hostname-override.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubelet Hostname Override
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStart=/run/setup-hostname-override.sh
+
+    - name: kubernetes-install-minion.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install Kubernetes Server
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/pkg
+        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
+
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run Kubelet service
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=hostname-override.service
+        After=hostname-override.service
+
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        EnvironmentFile=/etc/hostname-override
+        ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
+        ExecStartPre=/run/setup-auth.sh
+        ExecStart=/opt/kubernetes/server/bin/kubelet \
+        --api-servers=https://${MASTER_IP} \
+        --config=/etc/kubernetes/manifests \
+        --allow-privileged=False \
+        --v=2 \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=${DNS_DOMAIN} \
+        --logtostderr=true \
+        --hostname-override=${HOSTNAME_OVERRIDE} \
+        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}
+        Restart=always
+        RestartSec=10
+
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Start Kube-proxy service as Daemon
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/run/config-kube-proxy.sh
+        ExecStart=/opt/kubernetes/server/bin/kube-proxy \
+        --master=https://${MASTER_IP} \
+        --kubeconfig=/var/lib/kube-proxy/kubeconfig \
+        --v=2 \
+        --logtostderr=true
+        Restart=always
+        RestartSec=10
+
+    - name: rkt-metadata.socket
+      command: start
+      content: |
+        [Unit]
+        Description=rkt metadata service socket
+        PartOf=rkt-metadata.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Socket]
+        ListenStream=/run/rkt/metadata-svc.sock
+        SocketMode=0660
+        SocketUser=root
+        SocketGroup=root
+        RemoveOnStop=true
+
+    - name: rkt-metadata.service
+      command: start
+      content: |
+        [Unit]
+        Description=rkt metadata service
+        Documentation=http://github.com/coreos/rkt
+        Requires=rkt-metadata.socket
+        After=network.target rkt-metadata.socket
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStart=/opt/rkt-${RKT_VERSION}/rkt metadata-service
+write_files:
+  - path: /run/setup-hostname-override.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -x
+      source /etc/kube-env
+      if [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
+        HOSTNAME_OVERRIDE=`curl --silent http://169.254.169.254/2007-01-19/meta-data/local-hostname`
+      fi
+      if [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
+        HOSTNAME_OVERRIDE=`hostname -f`
+      fi
+      echo "HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE}" > /etc/hostname-override
+  - path: /run/setup-auth.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      /usr/bin/mkdir -p /var/lib/kubelet
+      printf '{"BearerToken": "%s", "Insecure": true }' ${KUBE_BEARER_TOKEN} > /var/lib/kubelet/kubernetes_auth
+  - path: /run/config-kube-proxy.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      /usr/bin/mkdir -p /var/lib/kube-proxy
+      cat > /var/lib/kube-proxy/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kube-proxy
+        user:
+          token: $KUBE_PROXY_TOKEN
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kube-proxy
+        name: service-account-context
+      current-context: service-account-context
+      EOF
+  - path: /etc/kube-env
+    permissions: 0644
+    owner: root
+    content: |

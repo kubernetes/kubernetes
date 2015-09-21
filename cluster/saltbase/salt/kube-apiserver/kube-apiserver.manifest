@@ -1,0 +1,224 @@
+{% set daemon_args = "$DAEMON_ARGS" -%}
+{% if grains['os_family'] == 'RedHat' -%}
+	{% set daemon_args = "" -%}
+{% endif -%}
+
+{% set cloud_provider = "" -%}
+{% set cloud_config = "" -%}
+{% set cloud_config_mount = "" -%}
+{% set cloud_config_volume = "" -%}
+
+{% if grains.cloud is defined -%}
+  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+
+  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
+    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
+    {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
+    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+  {% endif -%}
+{% endif -%}
+
+{% set advertise_address = "" -%}
+{% if grains.advertise_address is defined -%}
+  {% set advertise_address = "--advertise-address=" + grains.advertise_address -%}
+{% endif -%}
+
+{% set proxy_ssh_options = "" -%}
+{% if grains.proxy_ssh_user is defined -%}
+  {% set proxy_ssh_options = "--ssh-user=" + grains.proxy_ssh_user + " --ssh-keyfile=/srv/sshproxy/.sshkeyfile" -%}
+  {# Append 40 characters onto command to work around #9822. #}
+  {# If mount list changes, this may also need to change. #}
+  {% set proxy_ssh_options = proxy_ssh_options + "                                        " -%}
+{% endif -%}
+
+{% set address = "--address=127.0.0.1" -%}
+
+{% set cluster_name = "" -%}
+{% if pillar['instance_prefix'] is defined -%}
+  {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
+{% endif -%}
+
+{% set bind_address = "" -%}
+{% if grains.publicAddressOverride is defined -%}
+  {% set bind_address = "--bind-address=" + grains.publicAddressOverride -%}
+{% endif -%}
+
+{% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
+
+{% set service_cluster_ip_range = "" -%}
+{% if pillar['service_cluster_ip_range'] is defined -%}
+  {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
+{% endif -%}
+
+{% set cert_file = "--tls-cert-file=/srv/kubernetes/server.cert" -%}
+{% set key_file = "--tls-private-key-file=/srv/kubernetes/server.key" -%}
+{% set client_ca_file = "" -%}
+
+{% set secure_port = "6443" -%}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]    %}
+  {% set secure_port = "443" -%}
+  {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
+{% endif -%}
+
+{% set token_auth_file = "--token-auth-file=/dev/null" -%}
+{% set basic_auth_file = "" -%}
+
+{% set min_request_timeout = "" -%}
+{% if grains.minRequestTimeout is defined -%}
+  {% set min_request_timeout = "--min-request-timeout=" + grains.minRequestTimeout -%}
+{% endif -%}
+
+{% if grains.cloud is defined -%}
+{% if grains.cloud in [ 'aws', 'gce', 'vagrant' ] -%}
+    {% set token_auth_file = "--token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
+{% endif -%}
+{% endif -%}
+
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant']  %}
+  {% set basic_auth_file = "--basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
+{% endif -%}
+
+{% set admission_control = "" -%}
+{% if pillar['admission_control'] is defined -%}
+ {% set admission_control = "--admission-control=" + pillar['admission_control'] -%}
+{% endif -%}
+
+{% set runtime_config = "" -%}
+{% if grains.runtime_config is defined -%}
+ {% set runtime_config = "--runtime-config=" + grains.runtime_config -%}
+{% endif -%}
+
+{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
+{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
+
+# test_args has to be kept at the end, so they'll overwrite any prior configuration
+{% if pillar['apiserver_test_args'] is defined -%}
+{% set params = params + " " + pillar['apiserver_test_args'] -%}
+{% endif -%}
+
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-apiserver",
+  "namespace": "kube-system"
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-apiserver",
+    "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
+    "command": [
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
+               ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
+    "ports":[
+      { "name": "https",
+        "containerPort": {{secure_port}},
+        "hostPort": {{secure_port}}},{
+       "name": "local",
+        "containerPort": 8080,
+        "hostPort": 8080}
+        ],
+    "volumeMounts": [
+        {{cloud_config_mount}}
+        { "name": "srvkube",
+        "mountPath": "/srv/kubernetes",
+        "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-apiserver.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharessl",
+        "mountPath": "/usr/share/ssl",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "usrssl",
+        "mountPath": "/usr/ssl",
+        "readOnly": true},
+        { "name": "usrlibssl",
+        "mountPath": "/usr/lib/ssl",
+        "readOnly": true},
+        { "name": "usrlocalopenssl",
+        "mountPath": "/usr/local/openssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpkitls",
+        "mountPath": "/etc/pki/tls",
+        "readOnly": true},
+        { "name": "srvsshproxy",
+        "mountPath": "/srv/sshproxy",
+        "readOnly": false}
+      ]
+    }
+],
+"volumes":[
+  {{cloud_config_volume}}
+  { "name": "srvkube",
+    "hostPath": {
+        "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver.log"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/ssl"}
+  },
+  { "name": "usrsharessl",
+    "hostPath": {
+        "path": "/usr/share/ssl"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "usrssl",
+    "hostPath": {
+        "path": "/usr/ssl"}
+  },
+  { "name": "usrlibssl",
+    "hostPath": {
+        "path": "/usr/lib/ssl"}
+  },
+  { "name": "usrlocalopenssl",
+    "hostPath": {
+        "path": "/usr/local/openssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpkitls",
+    "hostPath": {
+        "path": "/etc/pki/tls"}
+  },
+  { "name": "srvsshproxy",
+    "hostPath": {
+        "path": "/srv/sshproxy"}
+  }
+]
+}}

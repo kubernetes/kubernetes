@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ReplicationController
+metadata: 
+  labels: 
+    name: hazelcast
+  name: hazelcast
+spec: 
+  replicas: 1
+  selector: 
+    name: hazelcast
+  template: 
+    metadata: 
+      labels: 
+        name: hazelcast
+    spec: 
+      containers: 
+        - resources:
+            limits:
+              cpu: 0.1
+          image: quay.io/pires/hazelcast-kubernetes:0.5
+          name: hazelcast
+          env:
+          - name: "DNS_DOMAIN"
+            value: "cluster.local"
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          ports: 
+            - containerPort: 5701
+              name: hazelcast

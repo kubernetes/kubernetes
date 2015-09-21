@@ -1,17 +1,27 @@
 package swagger
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/emicklei/go-restful"
 )
 
-// go test -v -test.run TestApi ...swagger
-func TestApi(t *testing.T) {
-	value := Api{Path: "/", Description: "Some Path", Operations: []Operation{}}
-	compareJson(t, true, value, `{"path":"/","description":"Some Path"}`)
+// go test -v -test.run TestThatMultiplePathsOnRootAreHandled ...swagger
+func TestThatMultiplePathsOnRootAreHandled(t *testing.T) {
+	ws1 := new(restful.WebService)
+	ws1.Route(ws1.GET("/_ping").To(dummy))
+	ws1.Route(ws1.GET("/version").To(dummy))
+
+	cfg := Config{
+		WebServicesUrl: "http://here.com",
+		ApiPath:        "/apipath",
+		WebServices:    []*restful.WebService{ws1},
+	}
+	sws := newSwaggerService(cfg)
+	decl := sws.composeDeclaration(ws1, "/")
+	if got, want := len(decl.Apis), 2; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
 }
 
 // go test -v -test.run TestServiceToApi ...swagger
@@ -20,20 +30,44 @@ func TestServiceToApi(t *testing.T) {
 	ws.Path("/tests")
 	ws.Consumes(restful.MIME_JSON)
 	ws.Produces(restful.MIME_XML)
-	ws.Route(ws.GET("/all").To(dummy).Writes(sample{}))
+	ws.Route(ws.GET("/a").To(dummy).Writes(sample{}))
+	ws.Route(ws.PUT("/b").To(dummy).Writes(sample{}))
+	ws.Route(ws.POST("/c").To(dummy).Writes(sample{}))
+	ws.Route(ws.DELETE("/d").To(dummy).Writes(sample{}))
+
+	ws.Route(ws.GET("/d").To(dummy).Writes(sample{}))
+	ws.Route(ws.PUT("/c").To(dummy).Writes(sample{}))
+	ws.Route(ws.POST("/b").To(dummy).Writes(sample{}))
+	ws.Route(ws.DELETE("/a").To(dummy).Writes(sample{}))
 	ws.ApiVersion("1.2.3")
 	cfg := Config{
-		WebServicesUrl: "http://here.com",
-		ApiPath:        "/apipath",
-		WebServices:    []*restful.WebService{ws}}
+		WebServicesUrl:   "http://here.com",
+		ApiPath:          "/apipath",
+		WebServices:      []*restful.WebService{ws},
+		PostBuildHandler: func(in *ApiDeclarationList) {},
+	}
 	sws := newSwaggerService(cfg)
 	decl := sws.composeDeclaration(ws, "/tests")
-	data, err := json.MarshalIndent(decl, " ", " ")
-	if err != nil {
-		t.Fatal(err.Error())
+	// checks
+	if decl.ApiVersion != "1.2.3" {
+		t.Errorf("got %v want %v", decl.ApiVersion, "1.2.3")
 	}
-	// for visual inspection only
-	fmt.Println(string(data))
+	if decl.BasePath != "http://here.com" {
+		t.Errorf("got %v want %v", decl.BasePath, "http://here.com")
+	}
+	if len(decl.Apis) != 4 {
+		t.Errorf("got %v want %v", len(decl.Apis), 4)
+	}
+	pathOrder := ""
+	for _, each := range decl.Apis {
+		pathOrder += each.Path
+		for _, other := range each.Operations {
+			pathOrder += other.Method
+		}
+	}
+	if pathOrder != "/tests/aGETDELETE/tests/bPUTPOST/tests/cPOSTPUT/tests/dDELETEGET" {
+		t.Errorf("got %v want %v", pathOrder, "see test source")
+	}
 }
 
 func dummy(i *restful.Request, o *restful.Response) {}
@@ -57,7 +91,7 @@ func TestComposeResponseMessages(t *testing.T) {
 	responseErrors[400] = restful.ResponseError{Code: 400, Message: "Bad Request", Model: TestItem{}}
 	route := restful.Route{ResponseErrors: responseErrors}
 	decl := new(ApiDeclaration)
-	decl.Models = map[string]Model{}
+	decl.Models = ModelList{}
 	msgs := composeResponseMessages(route, decl)
 	if msgs[0].ResponseModel != "swagger.TestItem" {
 		t.Errorf("got %s want swagger.TestItem", msgs[0].ResponseModel)
@@ -70,7 +104,7 @@ func TestComposeResponseMessageArray(t *testing.T) {
 	responseErrors[400] = restful.ResponseError{Code: 400, Message: "Bad Request", Model: []TestItem{}}
 	route := restful.Route{ResponseErrors: responseErrors}
 	decl := new(ApiDeclaration)
-	decl.Models = map[string]Model{}
+	decl.Models = ModelList{}
 	msgs := composeResponseMessages(route, decl)
 	if msgs[0].ResponseModel != "array[swagger.TestItem]" {
 		t.Errorf("got %s want swagger.TestItem", msgs[0].ResponseModel)
@@ -79,23 +113,23 @@ func TestComposeResponseMessageArray(t *testing.T) {
 
 func TestIssue78(t *testing.T) {
 	sws := newSwaggerService(Config{})
-	models := map[string]Model{}
+	models := new(ModelList)
 	sws.addModelFromSampleTo(&Operation{}, true, Response{Items: &[]TestItem{}}, models)
-	model, ok := models["swagger.Response"]
+	model, ok := models.At("swagger.Response")
 	if !ok {
 		t.Fatal("missing response model")
 	}
 	if "swagger.Response" != model.Id {
 		t.Fatal("wrong model id:" + model.Id)
 	}
-	code, ok := model.Properties["Code"]
+	code, ok := model.Properties.At("Code")
 	if !ok {
 		t.Fatal("missing code")
 	}
 	if "integer" != *code.Type {
 		t.Fatal("wrong code type:" + *code.Type)
 	}
-	items, ok := model.Properties["Items"]
+	items, ok := model.Properties.At("Items")
 	if !ok {
 		t.Fatal("missing items")
 	}
@@ -103,10 +137,10 @@ func TestIssue78(t *testing.T) {
 		t.Fatal("wrong items type:" + *items.Type)
 	}
 	items_items := items.Items
-	if len(items_items) == 0 {
+	if items_items == nil {
 		t.Fatal("missing items->items")
 	}
-	ref := items_items[0].Ref
+	ref := items_items.Ref
 	if ref == nil {
 		t.Fatal("missing $ref")
 	}

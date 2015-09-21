@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
 // TODO: make this into a real API object.  Note that when that happens, it
@@ -37,14 +37,14 @@ import (
 // body.Namespace, if we want to add that feature, without affecting the
 // meta.Namespace.
 type policy struct {
-	User string `json:"user,omitempty"`
-	// TODO: add support for groups as well as users.
+	User  string `json:"user,omitempty"`
+	Group string `json:"group,omitempty"`
 	// TODO: add support for robot accounts as well as human user accounts.
 	// TODO: decide how to namespace user names when multiple authentication
 	// providers are in use. Either add "Realm", or assume "user@example.com"
 	// format.
 
-	// TODO: Make the "cluster" Kinds be one API group (minions, bindings,
+	// TODO: Make the "cluster" Kinds be one API group (nodes, bindings,
 	// events, endpoints).  The "user" Kinds are another (pods, services,
 	// replicationControllers, operations) Make a "plugin", e.g. build
 	// controller, be another group.  That way when we add a new object to a
@@ -52,7 +52,7 @@ type policy struct {
 
 	// TODO: make this a proper REST object with its own registry.
 	Readonly  bool   `json:"readonly,omitempty"`
-	Kind      string `json:"kind,omitempty"`
+	Resource  string `json:"resource,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 
 	// TODO: "expires" string in RFC3339 format.
@@ -78,9 +78,9 @@ func NewFromFile(path string) (policyList, error) {
 
 	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
-	var p policy
 
 	for scanner.Scan() {
+		var p policy
 		b := scanner.Bytes()
 		// TODO: skip comment lines.
 		err = json.Unmarshal(b, &p)
@@ -98,9 +98,9 @@ func NewFromFile(path string) (policyList, error) {
 }
 
 func (p policy) matches(a authorizer.Attributes) bool {
-	if p.User == "" || p.User == a.GetUserName() {
+	if p.subjectMatches(a) {
 		if p.Readonly == false || (p.Readonly == a.IsReadOnly()) {
-			if p.Kind == "" || (p.Kind == a.GetKind()) {
+			if p.Resource == "" || (p.Resource == a.GetResource()) {
 				if p.Namespace == "" || (p.Namespace == a.GetNamespace()) {
 					return true
 				}
@@ -108,6 +108,27 @@ func (p policy) matches(a authorizer.Attributes) bool {
 		}
 	}
 	return false
+}
+
+func (p policy) subjectMatches(a authorizer.Attributes) bool {
+	if p.User != "" {
+		// Require user match
+		if p.User != a.GetUserName() {
+			return false
+		}
+	}
+
+	if p.Group != "" {
+		// Require group match
+		for _, group := range a.GetGroups() {
+			if p.Group == group {
+				return true
+			}
+		}
+		return false
+	}
+
+	return true
 }
 
 // Authorizer implements authorizer.Authorize

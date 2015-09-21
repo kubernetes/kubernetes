@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,9 @@ package tools
 
 import (
 	"errors"
-	"fmt"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -33,6 +34,7 @@ type EtcdResponseWithError struct {
 
 // TestLogger is a type passed to Test functions to support formatted test logs.
 type TestLogger interface {
+	Fatalf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
 }
@@ -45,11 +47,14 @@ type FakeEtcdClient struct {
 	expectNotFoundGetSet map[string]struct{}
 	sync.Mutex
 	Err         error
+	CasErr      error
 	t           TestLogger
 	Ix          int
 	TestIndex   bool
 	ChangeIndex uint64
 	LastSetTTL  uint64
+	// Will avoid setting the expires header on objects to make comparison easier
+	HideExpires bool
 	Machines    []string
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
@@ -84,12 +89,23 @@ func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	return ret
 }
 
+func (f *FakeEtcdClient) SetError(err error) {
+	f.Err = err
+}
+
 func (f *FakeEtcdClient) GetCluster() []string {
 	return f.Machines
 }
 
 func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {
 	f.expectNotFoundGetSet[key] = struct{}{}
+}
+
+func (f *FakeEtcdClient) NewError(code int) *etcd.EtcdError {
+	return &etcd.EtcdError{
+		ErrorCode: code,
+		Index:     f.ChangeIndex,
+	}
 }
 
 func (f *FakeEtcdClient) generateIndex() uint64 {
@@ -111,15 +127,11 @@ func (f *FakeEtcdClient) updateResponse(key string) {
 	f.Data[key] = *resp.N
 }
 
-func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
-	f.Mutex.Lock()
-	defer f.Mutex.Unlock()
-
-	f.Ix = f.Ix + 1
-	return f.setLocked(fmt.Sprintf("%s/%d", key, f.Ix), data, ttl)
-}
-
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
 	defer f.updateResponse(key)
@@ -127,12 +139,26 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		if _, ok := f.expectNotFoundGetSet[key]; !ok {
-			f.t.Errorf("Unexpected get for %s", key)
+			f.t.Logf("data for %s was not defined prior to invoking Get", key)
 		}
-		return &etcd.Response{}, EtcdErrorNotFound
+		return &etcd.Response{}, f.NewError(EtcdErrorCodeNotFound)
 	}
-	f.t.Logf("returning %v: %v %#v", key, result.R, result.E)
+	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
+
+	// Sort response, note this will alter result.R.
+	if result.R.Node != nil && result.R.Node.Nodes != nil && sort {
+		f.sortResponse(result.R.Node.Nodes)
+	}
 	return result.R, result.E
+}
+
+func (f *FakeEtcdClient) sortResponse(nodes etcd.Nodes) {
+	for i := range nodes {
+		if nodes[i].Dir {
+			f.sortResponse(nodes[i].Nodes)
+		}
+	}
+	sort.Sort(nodes)
 }
 
 func (f *FakeEtcdClient) nodeExists(key string) bool {
@@ -151,13 +177,20 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 	if f.nodeExists(key) {
 		prevResult := f.Data[key]
 		createdIndex := prevResult.R.Node.CreatedIndex
-		f.t.Logf("updating %v, index %v -> %v", key, createdIndex, i)
+		f.t.Logf("updating %v, index %v -> %v (ttl: %d)", key, createdIndex, i, ttl)
+		var expires *time.Time
+		if !f.HideExpires && ttl > 0 {
+			now := time.Now()
+			expires = &now
+		}
 		result := EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
 					Value:         value,
 					CreatedIndex:  createdIndex,
 					ModifiedIndex: i,
+					TTL:           int64(ttl),
+					Expiration:    expires,
 				},
 			},
 		}
@@ -165,7 +198,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 		return result.R, nil
 	}
 
-	f.t.Logf("creating %v, index %v", key, i)
+	f.t.Logf("creating %v, index %v (ttl: %d)", key, i, ttl)
 	result := EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -192,6 +225,10 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 	if f.Err != nil {
 		f.t.Logf("c&s: returning err %v", f.Err)
 		return nil, f.Err
+	}
+	if f.CasErr != nil {
+		f.t.Logf("c&s: returning err %v", f.CasErr)
+		return nil, f.CasErr
 	}
 
 	if !f.TestIndex {
@@ -246,15 +283,38 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	existing, ok := f.Data[key]
+	if !ok {
+		return &etcd.Response{}, &etcd.EtcdError{
+			ErrorCode: EtcdErrorCodeNotFound,
+			Index:     f.ChangeIndex,
+		}
+	}
+	etcdError, ok := existing.E.(*etcd.EtcdError)
+	if ok && etcdError != nil && etcdError.ErrorCode == EtcdErrorCodeNotFound {
+		f.DeletedKeys = append(f.DeletedKeys, key)
+		return existing.R, existing.E
+	}
+	index := f.generateIndex()
 	f.Data[key] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
+		R: &etcd.Response{},
+		E: &etcd.EtcdError{
+			ErrorCode: EtcdErrorCodeNotFound,
+			Index:     index,
 		},
-		E: EtcdErrorNotFound,
+	}
+	res := &etcd.Response{
+		Action:    "delete",
+		Node:      nil,
+		PrevNode:  nil,
+		EtcdIndex: index,
+	}
+	if existing.R != nil && existing.R.Node != nil {
+		res.PrevNode = existing.R.Node
 	}
 
 	f.DeletedKeys = append(f.DeletedKeys, key)
-	return &etcd.Response{}, nil
+	return res, nil
 }
 
 func (f *FakeEtcdClient) WaitForWatchCompletion() {
@@ -262,6 +322,7 @@ func (f *FakeEtcdClient) WaitForWatchCompletion() {
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
+	f.Mutex.Lock()
 	if f.WatchImmediateError != nil {
 		return nil, f.WatchImmediateError
 	}
@@ -273,6 +334,7 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	defer close(injectedError)
 	f.WatchInjectError = injectedError
 
+	f.Mutex.Unlock()
 	if receiver == nil {
 		return f.Get(prefix, false, recursive)
 	} else {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,13 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
 
-VERSION_REGEX="v([0-9]+).([0-9]+(.[0-9]+)?)"
+fetch_url=$(git remote -v | grep kubernetes/kubernetes.git | grep fetch | awk '{ print $2 }')
+if ! push_url=$(git remote -v | grep kubernetes/kubernetes.git | grep push | awk '{ print $2 }'); then
+  push_url="https://github.com/kubernetes/kubernetes.git"
+fi
+fetch_remote=$(git remote -v | grep kubernetes/kubernetes.git | grep fetch | awk '{ print $1 }')
+
+VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
 [[ ${NEW_VERSION} =~ $VERSION_REGEX ]] || {
   echo "!!! You must specify the version in the form of '$VERSION_REGEX'" >&2
   exit 1
@@ -32,9 +38,10 @@ VERSION_REGEX="v([0-9]+).([0-9]+(.[0-9]+)?)"
 
 VERSION_MAJOR="${BASH_REMATCH[1]}"
 VERSION_MINOR="${BASH_REMATCH[2]}"
+VERSION_PATCH="${BASH_REMATCH[3]}"
 
-if ! git diff-index --quiet --cached HEAD; then
-  echo "!!! You must not have any changes in your index when running this command"
+if ! git diff HEAD --quiet; then
+  echo "!!! You must not have any uncommitted changes when running this command"
   exit 1
 fi
 
@@ -43,20 +50,57 @@ if ! git diff-files --quiet pkg/version/base.go; then
   exit 1
 fi
 
+release_branch="release-${VERSION_MAJOR}.${VERSION_MINOR}"
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+head_commit=$(git rev-parse --short HEAD)
+
+if [[ "${VERSION_PATCH}" != "0" ]]; then
+  # sorry, no going back in time, pull latest from upstream
+  git remote update > /dev/null 2>&1
+
+  if git ls-remote --tags --exit-code ${fetch_url} refs/tags/${NEW_VERSION} > /dev/null; then
+    echo "!!! You are trying to tag ${NEW_VERSION} but it already exists.  Stop it!"
+    exit 1
+  fi
+
+  last_version="v${VERSION_MAJOR}.${VERSION_MINOR}.$((VERSION_PATCH-1))"
+  if ! git ls-remote --tags --exit-code ${fetch_url} refs/tags/${last_version} > /dev/null; then
+    echo "!!! You are trying to tag ${NEW_VERSION} but ${last_version} doesn't even exist!"
+    exit 1
+  fi
+
+  # this is rather magic.  This checks that HEAD is a descendant of the github branch release-x.y
+  branches=$(git branch --contains $(git ls-remote --heads ${fetch_url} refs/heads/${release_branch} | cut -f1) ${current_branch})
+  if [[ $? -ne 0 ]]; then
+    echo "!!! git failed, I dunno...."
+    exit 1
+  fi
+
+  if [[ ${branches} != "* ${current_branch}" ]]; then
+    echo "!!! You are trying to tag to an existing minor release but branch: ${release_branch} is not an ancestor of ${current_branch}"
+    exit 1
+  fi
+fi
+
 SED=sed
 if which gsed &>/dev/null; then
   SED=gsed
 fi
-if ! ("$SED" --version 2>&1 | grep -q GNU); then
+if ! ($SED --version 2>&1 | grep -q GNU); then
   echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
 fi
 
+echo "+++ Running ./versionize-docs"
+${KUBE_ROOT}/build/versionize-docs.sh ${NEW_VERSION}
+git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
 
+GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
 echo "+++ Updating to ${NEW_VERSION}"
-"$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"$VERSION_MAJOR\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"$VERSION_MINOR\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-${release_branch}+\$Format:%h\$\"/" "${VERSION_FILE}"
 gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
@@ -65,13 +109,30 @@ git commit -m "Kubernetes version $NEW_VERSION"
 
 echo "+++ Tagging version"
 git tag -a -m "Kubernetes version $NEW_VERSION" "${NEW_VERSION}"
+newtag=$(git rev-parse --short HEAD)
 
-echo "+++ Updating to ${NEW_VERSION}-dev"
-"$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"$VERSION_MAJOR\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"$VERSION_MINOR\+\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-dev\"/" "${VERSION_FILE}"
-gofmt -s -w "${VERSION_FILE}"
+if [[ "${VERSION_PATCH}" == "0" ]]; then
+  declare -r alpha_ver="v${VERSION_MAJOR}.$((${VERSION_MINOR}+1)).0-alpha.0"
+  git tag -a -m "Kubernetes pre-release branch ${alpha-ver}" "${alpha_ver}" "${head_commit}"
+fi
 
-echo "+++ Committing version change"
-git add "${VERSION_FILE}"
-git commit -m "Kubernetes version ${NEW_VERSION}-dev"
+echo ""
+echo "Success you must now:"
+echo ""
+echo "- Push the tag:"
+echo "   git push ${push_url} v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+
+if [[ "${VERSION_PATCH}" == "0" ]]; then
+  echo "- Push the alpha tag:"
+  echo "   git push ${push_url} ${alpha_ver}"
+  echo "- Push the new release branch:"
+  echo "   git push ${push_url} ${current_branch}:${release_branch}"
+  echo "- DO NOTHING TO MASTER. You were done with master when you pushed the alpha tag."
+else
+  echo "- Send branch: ${current_branch} as a PR to ${release_branch} <-- NOTE THIS"
+  echo "- In the contents of the PR, include the PRs in the release:"
+  echo "    hack/cherry_pick_list.sh ${current_branch}^1"
+  echo "  This helps cross-link PRs to patch releases they're part of in GitHub."
+  echo "- Have someone review the PR. This is a mechanical review to ensure it contains"
+  echo "  the ${NEW_VERSION} commit, which was tagged at ${newtag}."
+fi

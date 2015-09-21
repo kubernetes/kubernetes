@@ -1,0 +1,22 @@
+  {
+    "apiVersion": "v1",
+    "kind": "PodTemplate",
+    "metadata": {
+      "name": "nginx"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "nginx"
+        },
+        "generateName": "nginx-"
+      },
+      "spec": {
+         "containers": [{
+           "name": "nginx",
+           "image": "dockerfile/nginx",
+           "ports": [{"containerPort": 80}]
+         }]
+      }
+    }
+  }

@@ -1,0 +1,10 @@
+language: go
+go:
+  - 1.3
+  
+install:
+  - go get -v ./...
+  - go get github.com/onsi/ginkgo
+  - go install github.com/onsi/ginkgo/ginkgo
+
+script: $HOME/gopath/bin/ginkgo -r --randomizeAllSpecs --failOnPending --randomizeSuites --race

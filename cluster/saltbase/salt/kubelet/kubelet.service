@@ -5,6 +5,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 [Service]
 EnvironmentFile=/etc/sysconfig/kubelet
 ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

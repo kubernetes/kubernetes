@@ -1,0 +1,59 @@
+{% set params = "" -%}
+
+{% if pillar['log_level'] is defined -%}
+{% set params = params + " " + pillar['log_level'] -%}
+{% endif -%}
+
+# test_args has to be kept at the end, so they'll overwrite any prior configuration
+{% if pillar['scheduler_test_args'] is defined -%}
+{% set params = params + " " + pillar['scheduler_test_args'] -%}
+{% endif -%}
+
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-scheduler",
+  "namespace": "kube-system"
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-scheduler",
+    "image": "gcr.io/google_containers/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
+    "command": [
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
+               ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 10251,
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
+    "volumeMounts": [
+        {
+          "name": "logfile",
+          "mountPath": "/var/log/kube-scheduler.log",
+          "readOnly": false
+        }
+      ]
+    }
+],
+"volumes":[
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-scheduler.log"}
+  }
+]
+}}

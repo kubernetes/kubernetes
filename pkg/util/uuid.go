@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,12 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
+	"k8s.io/kubernetes/pkg/types"
 )
-
-type UUID interface {
-	String() string
-}
 
 var uuidLock sync.Mutex
 
@@ -35,12 +32,12 @@ var uuidLock sync.Mutex
  * Blocks in a go routine, so that the caller doesn't have to wait.
  * TODO: save old unused UUIDs so that no one has to block.
  */
-func NewUUID() UUID {
+func NewUUID() types.UID {
 	uuidLock.Lock()
 	result := uuid.NewUUID()
 	go func() {
 		time.Sleep(200 * time.Nanosecond)
 		uuidLock.Unlock()
 	}()
-	return result
+	return types.UID(result.String())
 }

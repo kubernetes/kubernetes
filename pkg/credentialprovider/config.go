@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,9 +25,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 )
+
+// DockerConfigJson represents ~/.docker/config.json file info
+// see https://github.com/docker/docker/pull/12009
+type DockerConfigJson struct {
+	Auths       DockerConfig      `json:"auths"`
+	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
+}
 
 // DockerConfig represents the config file used by the docker CLI.
 // This config that represents the credentials that should be used
@@ -40,29 +48,81 @@ type DockerConfigEntry struct {
 	Email    string
 }
 
-const (
-	dockerConfigFileLocation = ".dockercfg"
+var (
+	preferredPathLock sync.Mutex
+	preferredPath     = ""
+	workingDirPath    = ""
+	homeDirPath       = os.Getenv("HOME")
+	rootDirPath       = "/"
+	homeJsonDirPath   = filepath.Join(homeDirPath, ".docker")
+	rootJsonDirPath   = filepath.Join(rootDirPath, ".docker")
+
+	configFileName     = ".dockercfg"
+	configJsonFileName = "config.json"
 )
 
-func ReadDockerConfigFile() (cfg DockerConfig, err error) {
-	// TODO(mattmoor): This causes the Kubelet to read /.dockercfg,
-	// which is incorrect.  It should come from $HOME/.dockercfg.
-	absDockerConfigFileLocation, err := filepath.Abs(dockerConfigFileLocation)
-	if err != nil {
-		glog.Errorf("while trying to canonicalize %s: %v", dockerConfigFileLocation, err)
-	}
-	absDockerConfigFileLocation, err = filepath.Abs(dockerConfigFileLocation)
-	glog.V(2).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
-	contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
-	if os.IsNotExist(err) {
-		return make(DockerConfig), nil
-	}
-	if err != nil {
-		glog.Errorf("while trying to read %s: %v", absDockerConfigFileLocation, err)
-		return nil, err
-	}
+func SetPreferredDockercfgPath(path string) {
+	preferredPathLock.Lock()
+	defer preferredPathLock.Unlock()
+	preferredPath = path
+}
 
-	return readDockerConfigFileFromBytes(contents)
+func GetPreferredDockercfgPath() string {
+	preferredPathLock.Lock()
+	defer preferredPathLock.Unlock()
+	return preferredPath
+}
+
+func ReadDockerConfigFile() (cfg DockerConfig, err error) {
+	// Try happy path first - latest config file
+	dockerConfigJsonLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
+	for _, configPath := range dockerConfigJsonLocations {
+		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
+		if err != nil {
+			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			continue
+		}
+		glog.V(4).Infof("looking for .docker/config.json at %s", absDockerConfigFileLocation)
+		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			continue
+		}
+		cfg, err := readDockerConfigJsonFileFromBytes(contents)
+		if err == nil {
+			glog.V(4).Infof("found .docker/config.json at %s", absDockerConfigFileLocation)
+			return cfg, nil
+		}
+	}
+	glog.V(4).Infof("couldn't find valid .docker/config.json after checking in %v", dockerConfigJsonLocations)
+
+	// Can't find latest config file so check for the old one
+	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
+	for _, configPath := range dockerConfigFileLocations {
+		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
+		if err != nil {
+			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			continue
+		}
+		glog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
+		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			continue
+		}
+		cfg, err := readDockerConfigFileFromBytes(contents)
+		if err == nil {
+			glog.V(4).Infof("found .dockercfg at %s", absDockerConfigFileLocation)
+			return cfg, nil
+		}
+	}
+	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", dockerConfigFileLocations)
 }
 
 // HttpError wraps a non-StatusOK error code as an error.
@@ -123,13 +183,23 @@ func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error
 	return
 }
 
+func readDockerConfigJsonFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
+	var cfgJson DockerConfigJson
+	if err = json.Unmarshal(contents, &cfgJson); err != nil {
+		glog.Errorf("while trying to parse blob %q: %v", contents, err)
+		return nil, err
+	}
+	cfg = cfgJson.Auths
+	return
+}
+
 // dockerConfigEntryWithAuth is used solely for deserializing the Auth field
 // into a dockerConfigEntry during JSON deserialization.
 type dockerConfigEntryWithAuth struct {
-	Username string
-	Password string
-	Email    string
-	Auth     string
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Auth     string `json:"auth,omitempty"`
 }
 
 func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
@@ -151,6 +221,13 @@ func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+func (ident DockerConfigEntry) MarshalJSON() ([]byte, error) {
+	toEncode := dockerConfigEntryWithAuth{ident.Username, ident.Password, ident.Email, ""}
+	toEncode.Auth = encodeDockerConfigFieldAuth(ident.Username, ident.Password)
+
+	return json.Marshal(toEncode)
+}
+
 // decodeDockerConfigFieldAuth deserializes the "auth" field from dockercfg into a
 // username and a password. The format of the auth field is base64(<username>:<password>).
 func decodeDockerConfigFieldAuth(field string) (username, password string, err error) {
@@ -169,4 +246,10 @@ func decodeDockerConfigFieldAuth(field string) (username, password string, err e
 	password = parts[1]
 
 	return
+}
+
+func encodeDockerConfigFieldAuth(username, password string) string {
+	fieldValue := username + ":" + password
+
+	return base64.StdEncoding.EncodeToString([]byte(fieldValue))
 }

@@ -7,11 +7,13 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -28,6 +30,10 @@ const (
 	defaultBufferSize = 10
 )
 
+func init() {
+	rand.Seed(int64(time.Now().Nanosecond()))
+}
+
 type Config struct {
 	CertFile    string        `json:"certFile"`
 	KeyFile     string        `json:"keyFile"`
@@ -36,10 +42,17 @@ type Config struct {
 	Consistency string        `json:"consistency"`
 }
 
+type credentials struct {
+	username string
+	password string
+}
+
 type Client struct {
 	config      Config   `json:"config"`
 	cluster     *Cluster `json:"cluster"`
 	httpClient  *http.Client
+	credentials *credentials
+	transport   *http.Transport
 	persistence io.Writer
 	cURLch      chan string
 	// CheckRetry can be used to control the policy for failed requests
@@ -64,8 +77,7 @@ func NewClient(machines []string) *Client {
 	config := Config{
 		// default timeout is one second
 		DialTimeout: time.Second,
-		// default consistency level is STRONG
-		Consistency: STRONG_CONSISTENCY,
+		Consistency: WEAK_CONSISTENCY,
 	}
 
 	client := &Client{
@@ -89,8 +101,7 @@ func NewTLSClient(machines []string, cert, key, caCert string) (*Client, error) 
 	config := Config{
 		// default timeout is one second
 		DialTimeout: time.Second,
-		// default consistency level is STRONG
-		Consistency: STRONG_CONSISTENCY,
+		Consistency: WEAK_CONSISTENCY,
 		CertFile:    cert,
 		KeyFile:     key,
 		CaCertFile:  make([]string, 0),
@@ -166,17 +177,27 @@ func NewClientFromReader(reader io.Reader) (*Client, error) {
 // Override the Client's HTTP Transport object
 func (c *Client) SetTransport(tr *http.Transport) {
 	c.httpClient.Transport = tr
+	c.transport = tr
+}
+
+func (c *Client) SetCredentials(username, password string) {
+	c.credentials = &credentials{username, password}
+}
+
+func (c *Client) Close() {
+	c.transport.DisableKeepAlives = true
+	c.transport.CloseIdleConnections()
 }
 
 // initHTTPClient initializes a HTTP client for etcd client
 func (c *Client) initHTTPClient() {
-	tr := &http.Transport{
+	c.transport = &http.Transport{
 		Dial: c.dial,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
 	}
-	c.httpClient = &http.Client{Transport: tr}
+	c.httpClient = &http.Client{Transport: c.transport}
 }
 
 // initHTTPClient initializes a HTTPS client for etcd client
@@ -285,18 +306,38 @@ func (c *Client) GetCluster() []string {
 }
 
 // SyncCluster updates the cluster information using the internal machine list.
+// If no members are found, the intenral machine list is left untouched.
 func (c *Client) SyncCluster() bool {
 	return c.internalSyncCluster(c.cluster.Machines)
 }
 
 // internalSyncCluster syncs cluster information using the given machine list.
 func (c *Client) internalSyncCluster(machines []string) bool {
+	// comma-separated list of machines in the cluster.
+	members := ""
+
 	for _, machine := range machines {
-		httpPath := c.createHttpPath(machine, path.Join(version, "machines"))
+		httpPath := c.createHttpPath(machine, path.Join(version, "members"))
 		resp, err := c.httpClient.Get(httpPath)
 		if err != nil {
 			// try another machine in the cluster
 			continue
+		}
+
+		if resp.StatusCode != http.StatusOK { // fall-back to old endpoint
+			httpPath := c.createHttpPath(machine, path.Join(version, "machines"))
+			resp, err := c.httpClient.Get(httpPath)
+			if err != nil {
+				// try another machine in the cluster
+				continue
+			}
+			b, err := ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				// try another machine in the cluster
+				continue
+			}
+			members = string(b)
 		} else {
 			b, err := ioutil.ReadAll(resp.Body)
 			resp.Body.Close()
@@ -305,18 +346,32 @@ func (c *Client) internalSyncCluster(machines []string) bool {
 				continue
 			}
 
-			// update Machines List
-			c.cluster.updateFromStr(string(b))
+			var mCollection memberCollection
+			if err := json.Unmarshal(b, &mCollection); err != nil {
+				// try another machine
+				continue
+			}
 
-			// update leader
-			// the first one in the machine list is the leader
-			c.cluster.switchLeader(0)
+			urls := make([]string, 0)
+			for _, m := range mCollection {
+				urls = append(urls, m.ClientURLs...)
+			}
 
-			logger.Debug("sync.machines ", c.cluster.Machines)
-			c.saveConfig()
-			return true
+			members = strings.Join(urls, ",")
 		}
+
+		// We should never do an empty cluster update.
+		if members == "" {
+			continue
+		}
+
+		// update Machines List
+		c.cluster.updateFromStr(members)
+		logger.Debug("sync.machines ", c.cluster.Machines)
+		c.saveConfig()
+		return true
 	}
+
 	return false
 }
 

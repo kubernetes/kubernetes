@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,14 +19,12 @@ package json
 import (
 	"bytes"
 	"io/ioutil"
-	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
@@ -38,17 +36,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		{
 			watch.Added,
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			v1beta1.Codec,
+			testapi.Default.Codec(),
 		},
 		{
 			watch.Modified,
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			v1beta2.Codec,
+			testapi.Default.Codec(),
 		},
 		{
 			watch.Deleted,
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			api.Codec,
+			testapi.Default.Codec(),
 		},
 	}
 	for i, testCase := range testCases {
@@ -66,7 +64,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(testCase.Object, obj) {
+		if !api.Semantic.DeepDerivative(testCase.Object, obj) {
 			t.Errorf("%d: expected %#v, got %#v", i, testCase.Object, obj)
 		}
 		if event != testCase.Type {

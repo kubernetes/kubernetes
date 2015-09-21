@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type TypeMeta struct {
@@ -87,14 +87,15 @@ func TestScheme(t *testing.T) {
 		TestString: "foo",
 	}
 
-	// Test Encode, Decode, and DecodeInto
+	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
 	data, err := scheme.EncodeToVersion(obj, "externalVersion")
 	obj2, err2 := scheme.Decode(data)
 	obj3 := &InternalSimple{}
 	err3 := scheme.DecodeInto(data, obj3)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v' '%v'", err, err2, err3)
+	obj4, err4 := scheme.DecodeToVersion(data, "externalVersion")
+	if err != nil || err2 != nil || err3 != nil || err4 != nil {
+		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
 	if _, ok := obj2.(*InternalSimple); !ok {
 		t.Fatalf("Got wrong type")
@@ -104,6 +105,9 @@ func TestScheme(t *testing.T) {
 	}
 	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
+	}
+	if _, ok := obj4.(*ExternalSimple); !ok {
+		t.Fatalf("Got wrong type")
 	}
 
 	// Test Convert
@@ -176,17 +180,63 @@ type InternalExtensionType struct {
 	Extension runtime.EmbeddedObject `json:"extension"`
 }
 
-func (*ExtensionA) IsAnAPIObject()            {}
-func (*ExtensionB) IsAnAPIObject()            {}
-func (*ExternalExtensionType) IsAnAPIObject() {}
-func (*InternalExtensionType) IsAnAPIObject() {}
+type ExternalOptionalExtensionType struct {
+	TypeMeta  `json:",inline"`
+	Extension runtime.RawExtension `json:"extension,omitempty"`
+}
+
+type InternalOptionalExtensionType struct {
+	TypeMeta  `json:",inline"`
+	Extension runtime.EmbeddedObject `json:"extension,omitempty"`
+}
+
+func (*ExtensionA) IsAnAPIObject()                    {}
+func (*ExtensionB) IsAnAPIObject()                    {}
+func (*ExternalExtensionType) IsAnAPIObject()         {}
+func (*InternalExtensionType) IsAnAPIObject()         {}
+func (*ExternalOptionalExtensionType) IsAnAPIObject() {}
+func (*InternalOptionalExtensionType) IsAnAPIObject() {}
+
+func TestExternalToInternalMapping(t *testing.T) {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
+
+	table := []struct {
+		obj     runtime.Object
+		encoded string
+	}{
+		{
+			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
+			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
+		},
+	}
+
+	for _, item := range table {
+		gotDecoded, err := scheme.Decode([]byte(item.encoded))
+		if err != nil {
+			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
+		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
+			var eEx, aEx runtime.Object
+			if obj, ok := e.(*InternalOptionalExtensionType); ok {
+				eEx = obj.Extension.Object
+			}
+			if obj, ok := a.(*InternalOptionalExtensionType); ok {
+				aEx = obj.Extension.Object
+			}
+			t.Errorf("expected %#v, got %#v (%#v, %#v)", e, a, eEx, aEx)
+		}
+	}
+}
 
 func TestExtensionMapping(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionType{})
+	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
 	scheme.AddKnownTypeWithName("", "A", &ExtensionA{})
 	scheme.AddKnownTypeWithName("", "B", &ExtensionB{})
 	scheme.AddKnownTypeWithName("testExternal", "ExtensionType", &ExternalExtensionType{})
+	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
 	scheme.AddKnownTypeWithName("testExternal", "A", &ExtensionA{})
 	scheme.AddKnownTypeWithName("testExternal", "B", &ExtensionB{})
 
@@ -195,13 +245,13 @@ func TestExtensionMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionB{TestString: "bar"}}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{nil}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
 		},
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 // To pass this test, we need to create a cluster of 3 machines
-// The server should be listening on 127.0.0.1:4001, 4002, 4003
+// The server should be listening on localhost:4001, 4002, 4003
 func TestSync(t *testing.T) {
 	fmt.Println("Make sure there are three nodes at 0.0.0.0:4001-4003")
 
@@ -36,8 +36,8 @@ func TestSync(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if host != "127.0.0.1" {
-			t.Fatal("Host must be 127.0.0.1")
+		if host != "localhost" {
+			t.Fatal("Host must be localhost")
 		}
 	}
 
@@ -92,5 +92,17 @@ func TestPersistence(t *testing.T) {
 
 	if string(b1) != string(b2) {
 		t.Fatalf("The two configs should be equal!")
+	}
+}
+
+func TestClientRetry(t *testing.T) {
+	c := NewClient([]string{"http://strange", "http://127.0.0.1:4001"})
+	// use first endpoint as the picked url
+	c.cluster.picked = 0
+	if _, err := c.Set("foo", "bar", 5); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Delete("foo", true); err != nil {
+		t.Fatal(err)
 	}
 }

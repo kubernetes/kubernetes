@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,38 +22,40 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func Test_errToAPIStatus(t *testing.T) {
-	err := errors.NewNotFound("foo", "bar")
-	status := errToAPIStatus(err)
-	if status.Reason != api.StatusReasonNotFound || status.Status != api.StatusFailure {
-		t.Errorf("unexpected status object: %#v", status)
-	}
-}
-
 func TestErrorsToAPIStatus(t *testing.T) {
-	cases := map[error]api.Status{
+	cases := map[error]unversioned.Status{
+		errors.NewNotFound("foo", "bar"): {
+			Status:  unversioned.StatusFailure,
+			Code:    http.StatusNotFound,
+			Reason:  unversioned.StatusReasonNotFound,
+			Message: "foo \"bar\" not found",
+			Details: &unversioned.StatusDetails{
+				Kind: "foo",
+				Name: "bar",
+			},
+		},
 		errors.NewAlreadyExists("foo", "bar"): {
-			Status:  api.StatusFailure,
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "AlreadyExists",
 			Message: "foo \"bar\" already exists",
-			Details: &api.StatusDetails{
+			Details: &unversioned.StatusDetails{
 				Kind: "foo",
-				ID:   "bar",
+				Name: "bar",
 			},
 		},
 		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
-			Status:  api.StatusFailure,
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
 			Message: "foo \"bar\" cannot be updated: failure",
-			Details: &api.StatusDetails{
+			Details: &unversioned.StatusDetails{
 				Kind: "foo",
-				ID:   "bar",
+				Name: "bar",
 			},
 		},
 	}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,5 +15,11 @@
 # limitations under the License.
 
 ## Contains configuration values for interacting with the Vagrant cluster in test mode
+#Set NUM_MINIONS to minimum required for testing.
+NUM_MINIONS=2
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vagrant/config-default.sh"
+
+# Do not register the master kubelet during testing
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}

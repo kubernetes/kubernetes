@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestGenericTypeMeta(t *testing.T) {
@@ -29,8 +29,9 @@ func TestGenericTypeMeta(t *testing.T) {
 		Kind              string            `json:"kind,omitempty"`
 		Namespace         string            `json:"namespace,omitempty"`
 		Name              string            `json:"name,omitempty"`
+		GenerateName      string            `json:"generateName,omitempty"`
 		UID               string            `json:"uid,omitempty"`
-		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+		CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
 		SelfLink          string            `json:"selfLink,omitempty"`
 		ResourceVersion   string            `json:"resourceVersion,omitempty"`
 		APIVersion        string            `json:"apiVersion,omitempty"`
@@ -44,6 +45,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		TypeMeta{
 			Namespace:       "bar",
 			Name:            "foo",
+			GenerateName:    "prefix",
 			UID:             "uid",
 			APIVersion:      "a",
 			Kind:            "b",
@@ -63,7 +65,10 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", accessor.UID(); e != a {
+	if e, a := "prefix", accessor.GenerateName(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -79,8 +84,20 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	typeAccessor, err := TypeAccessor(&j)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if e, a := "a", accessor.APIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "b", accessor.Kind(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
 	accessor.SetNamespace("baz")
 	accessor.SetName("bar")
+	accessor.SetGenerateName("generate")
 	accessor.SetUID("other")
 	accessor.SetAPIVersion("c")
 	accessor.SetKind("d")
@@ -92,6 +109,9 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "bar", j.Name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "generate", j.GenerateName; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "other", j.UID; e != a {
@@ -109,14 +129,24 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "google.com", j.SelfLink; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+
+	typeAccessor.SetAPIVersion("d")
+	typeAccessor.SetKind("e")
+	if e, a := "d", j.APIVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "e", j.Kind; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }
 
 type InternalTypeMeta struct {
 	Kind              string            `json:"kind,omitempty"`
 	Namespace         string            `json:"namespace,omitempty"`
 	Name              string            `json:"name,omitempty"`
+	GenerateName      string            `json:"generateName,omitempty"`
 	UID               string            `json:"uid,omitempty"`
-	CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+	CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
 	SelfLink          string            `json:"selfLink,omitempty"`
 	ResourceVersion   string            `json:"resourceVersion,omitempty"`
 	APIVersion        string            `json:"apiVersion,omitempty"`
@@ -134,6 +164,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 		InternalTypeMeta{
 			Namespace:       "bar",
 			Name:            "foo",
+			GenerateName:    "prefix",
 			UID:             "uid",
 			APIVersion:      "a",
 			Kind:            "b",
@@ -158,11 +189,18 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if e, a := "foo", name; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	generateName, err := accessor.GenerateName(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "prefix", generateName; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	uid, err := accessor.UID(j)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if e, a := "uid", uid; e != a {
+	if e, a := "uid", string(uid); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	apiVersion, err := accessor.APIVersion(j)
@@ -214,6 +252,9 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if err := accessor.SetName(j, "bar"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	if err := accessor.SetGenerateName(j, "generate"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	if err := accessor.SetUID(j, "other"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -242,6 +283,9 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "bar", j.TypeMeta.Name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "generate", j.TypeMeta.GenerateName; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "other", j.TypeMeta.UID; e != a {
@@ -275,8 +319,9 @@ func TestGenericObjectMeta(t *testing.T) {
 	type ObjectMeta struct {
 		Namespace         string            `json:"namespace,omitempty"`
 		Name              string            `json:"name,omitempty"`
+		GenerateName      string            `json:"generateName,omitempty"`
 		UID               string            `json:"uid,omitempty"`
-		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+		CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
 		SelfLink          string            `json:"selfLink,omitempty"`
 		ResourceVersion   string            `json:"resourceVersion,omitempty"`
 		Labels            map[string]string `json:"labels,omitempty"`
@@ -294,6 +339,7 @@ func TestGenericObjectMeta(t *testing.T) {
 		ObjectMeta{
 			Namespace:       "bar",
 			Name:            "foo",
+			GenerateName:    "prefix",
 			UID:             "uid",
 			ResourceVersion: "1",
 			SelfLink:        "some/place/only/we/know",
@@ -311,7 +357,10 @@ func TestGenericObjectMeta(t *testing.T) {
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", accessor.UID(); e != a {
+	if e, a := "prefix", accessor.GenerateName(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -335,6 +384,7 @@ func TestGenericObjectMeta(t *testing.T) {
 
 	accessor.SetNamespace("baz")
 	accessor.SetName("bar")
+	accessor.SetGenerateName("generate")
 	accessor.SetUID("other")
 	accessor.SetAPIVersion("c")
 	accessor.SetKind("d")
@@ -348,6 +398,9 @@ func TestGenericObjectMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "bar", j.Name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "generate", j.GenerateName; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "other", j.UID; e != a {
@@ -403,7 +456,7 @@ func TestGenericListMeta(t *testing.T) {
 	if e, a := "", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "", accessor.UID(); e != a {
+	if e, a := "", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {

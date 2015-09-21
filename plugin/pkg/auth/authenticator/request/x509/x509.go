@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import (
 	"crypto/x509"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
@@ -55,18 +55,18 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	var errors util.ErrorList
+	var errlist []error
 	for _, cert := range req.TLS.PeerCertificates {
 		chains, err := cert.Verify(a.opts)
 		if err != nil {
-			errors = append(errors, err)
+			errlist = append(errlist, err)
 			continue
 		}
 
 		for _, chain := range chains {
 			user, ok, err := a.user.User(chain)
 			if err != nil {
-				errors = append(errors, err)
+				errlist = append(errlist, err)
 				continue
 			}
 
@@ -75,7 +75,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 			}
 		}
 	}
-	return nil, false, errors.ToError()
+	return nil, false, errors.NewAggregate(errlist)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

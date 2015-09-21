@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,105 +17,71 @@ limitations under the License.
 package apiserver
 
 import (
+	"math/rand"
 	"net/http"
-	"net/url"
-	"path"
+	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
+	watchjson "k8s.io/kubernetes/pkg/watch/json"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
 )
 
-type WatchHandler struct {
-	storage         map[string]RESTStorage
-	codec           runtime.Codec
-	canonicalPrefix string
-	selfLinker      runtime.SelfLinker
-}
+var (
+	connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
 
-// setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
-func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) error {
-	name, err := h.selfLinker.Name(obj)
-	if err != nil {
-		return err
-	}
-	newURL := *req.URL
-	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
-	newURL.RawQuery = ""
-	newURL.Fragment = ""
-	return h.selfLinker.SetSelfLink(obj, newURL.String())
-}
-
-func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string) {
-	if s, err := labels.ParseSelector(query.Get("labels")); err != nil {
-		label = labels.Everything()
-	} else {
-		label = s
-	}
-	if s, err := labels.ParseSelector(query.Get("fields")); err != nil {
-		field = labels.Everything()
-	} else {
-		field = s
-	}
-	resourceVersion = query.Get("resourceVersion")
-	return
-}
-
-var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
+	// nothing will ever be sent down this channel
+	neverExitWatch <-chan time.Time = make(chan time.Time)
+)
 
 func isWebsocketRequest(req *http.Request) bool {
 	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 }
 
-// ServeHTTP processes watch requests.
-func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := api.NewContext()
-	namespace := req.URL.Query().Get("namespace")
-	if len(namespace) > 0 {
-		ctx = api.WithNamespace(ctx, namespace)
-	}
-	parts := splitPath(req.URL.Path)
-	if len(parts) < 1 || req.Method != "GET" {
-		notFound(w, req)
-		return
-	}
-	storage := h.storage[parts[0]]
-	if storage == nil {
-		notFound(w, req)
-		return
-	}
-	if watcher, ok := storage.(ResourceWatcher); ok {
-		label, field, resourceVersion := getWatchParams(req.URL.Query())
-		watching, err := watcher.Watch(ctx, label, field, resourceVersion)
-		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
-		}
+// timeoutFactory abstracts watch timeout logic for testing
+type timeoutFactory interface {
+	TimeoutCh() (<-chan time.Time, func() bool)
+}
 
-		// TODO: This is one watch per connection. We want to multiplex, so that
-		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching, h.codec, func(obj runtime.Object) {
-			if err := h.setSelfLinkAddName(obj, req); err != nil {
-				glog.Errorf("Failed to set self link for object %#v", obj)
-			}
-		}}
-		if isWebsocketRequest(req) {
-			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
-		} else {
-			watchServer.ServeHTTP(w, req)
-		}
-		return
-	}
+// realTimeoutFactory implements timeoutFactory
+type realTimeoutFactory struct {
+	timeout time.Duration
+}
 
-	notFound(w, req)
+// TimeoutChan returns a channel which will receive something when the watch times out,
+// and a cleanup function to call when this happens.
+func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
+	if w.timeout == 0 {
+		return neverExitWatch, func() bool { return false }
+	}
+	t := time.NewTimer(w.timeout)
+	return t.C, t.Stop
+}
+
+// serveWatch handles serving requests to the server
+func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, minRequestTimeout time.Duration) {
+	var timeout time.Duration
+	if minRequestTimeout > 0 {
+		// Each watch gets a random timeout between minRequestTimeout and 2*minRequestTimeout to avoid thundering herds.
+		timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+	}
+	watchServer := &WatchServer{watcher, scope.Codec, func(obj runtime.Object) {
+		if err := setSelfLink(obj, req, scope.Namer); err != nil {
+			glog.V(5).Infof("Failed to set self link for object %v: %v", reflect.TypeOf(obj), err)
+		}
+	}, &realTimeoutFactory{timeout}}
+	if isWebsocketRequest(req.Request) {
+		websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req.Request)
+	} else {
+		watchServer.ServeHTTP(w, req.Request)
+	}
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
@@ -123,6 +89,7 @@ type WatchServer struct {
 	watching watch.Interface
 	codec    runtime.Codec
 	fixup    func(runtime.Object)
+	t        timeoutFactory
 }
 
 // HandleWS implements a websocket handler.
@@ -166,6 +133,9 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	loggedW := httplog.LogOf(req, w)
 	w = httplog.Unlogged(w)
+	timeoutCh, cleanup := self.t.TimeoutCh()
+	defer cleanup()
+	defer self.watching.Stop()
 
 	cn, ok := w.(http.CloseNotifier)
 	if !ok {
@@ -179,16 +149,15 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.NotFound(w, req)
 		return
 	}
-
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
-
 	encoder := watchjson.NewEncoder(w, self.codec)
 	for {
 		select {
 		case <-cn.CloseNotify():
-			self.watching.Stop()
+			return
+		case <-timeoutCh:
 			return
 		case event, ok := <-self.watching.ResultChan():
 			if !ok {
@@ -198,7 +167,6 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			self.fixup(event.Object)
 			if err := encoder.Encode(&event); err != nil {
 				// Client disconnect.
-				self.watching.Stop()
 				return
 			}
 			flusher.Flush()

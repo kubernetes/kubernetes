@@ -1,0 +1,44 @@
+Jan  5 15:19:01 CRON[14500]: (root) CMD (touch /var/run/crond.sittercheck)
+Jan  5 15:19:04 cookie_monster[1249]: uid 0, pid 14504, "/var/lib/certs/machine_cert.crt" accessed by exe "/usr/bin/nsscacheclient", cwd "/root", comm "/usr/bin/nsscacheclient"
+Jan  5 15:19:04 cookie_monster[1249]: uid 0, pid 14504, "/var/lib/certs/machine_cert.key" accessed by exe "/usr/bin/nsscacheclient", cwd "/root", comm "/usr/bin/nsscacheclient"
+Jan  5 15:19:05 nsscacheclient[14504]: SUCCESS: Completed run (v29/c20 rtime:0.334299 utime:0.136923 stime:0.011736 maxrss:5260k dials:1 sent:1793 rcvd:5143).
+Jan  5 15:19:27 kernel: [ 5864.708440] memorymonster invoked oom-killer: gfp_mask=0xd0, order=0, oom_score_adj=0
+Jan  5 15:19:27 kernel: [ 5864.708443] memorymonster cpuset=/ mems_allowed=0
+Jan  5 15:19:27 kernel: [ 5864.708446] CPU: 5 PID: 13536 Comm: memorymonster Tainted: P           OX 3.13.0-43-generic #72-Ubuntu
+Jan  5 15:19:27 kernel: [ 5864.708447] Hardware name: Hewlett-Packard HP Z420 Workstation/1589, BIOS J61 v03.65 12/19/2013
+Jan  5 15:19:27 kernel: [ 5864.708448]  ffff88072ae10800 ffff8807a4835c48 ffffffff81720bf6 ffff8807a8e86000
+Jan  5 15:19:27 kernel: [ 5864.708451]  ffff8807a4835cd0 ffffffff8171b4b1 0000000000000246 ffff88072ae10800
+Jan  5 15:19:27 kernel: [ 5864.708453]  ffff8807a4835c90 ffff8807a4835ca0 ffffffff811522a7 0000000000000001
+Jan  5 15:19:27 kernel: [ 5864.708455] Call Trace:
+Jan  5 15:19:27 kernel: [ 5864.708460]  [<ffffffff81720bf6>] dump_stack+0x45/0x56
+Jan  5 15:19:27 kernel: [ 5864.708463]  [<ffffffff8171b4b1>] dump_header+0x7f/0x1f1
+Jan  5 15:19:27 kernel: [ 5864.708465]  [<ffffffff811522a7>] ? find_lock_task_mm+0x27/0x70
+Jan  5 15:19:27 kernel: [ 5864.708467]  [<ffffffff811526de>] oom_kill_process+0x1ce/0x330
+Jan  5 15:19:27 kernel: [ 5864.708470]  [<ffffffff812d6ce5>] ? security_capable_noaudit+0x15/0x20
+Jan  5 15:19:27 kernel: [ 5864.708474]  [<ffffffff811b491c>] mem_cgroup_oom_synchronize+0x51c/0x560
+Jan  5 15:19:27 kernel: [ 5864.708476]  [<ffffffff811b3e50>] ? mem_cgroup_charge_common+0xa0/0xa0
+Jan  5 15:19:27 kernel: [ 5864.708478]  [<ffffffff81152e64>] pagefault_out_of_memory+0x14/0x80
+Jan  5 15:19:27 kernel: [ 5864.708480]  [<ffffffff81719aa1>] mm_fault_error+0x8e/0x180
+Jan  5 15:19:27 kernel: [ 5864.708482]  [<ffffffff8172cf31>] __do_page_fault+0x4a1/0x560
+Jan  5 15:19:27 kernel: [ 5864.708485]  [<ffffffff810a0255>] ? set_next_entity+0x95/0xb0
+Jan  5 15:19:27 kernel: [ 5864.708489]  [<ffffffff81012609>] ? __switch_to+0x169/0x4c0
+Jan  5 15:19:27 kernel: [ 5864.708490]  [<ffffffff8172d00a>] do_page_fault+0x1a/0x70
+Jan  5 15:19:27 kernel: [ 5864.708492]  [<ffffffff81729468>] page_fault+0x28/0x30
+Jan  5 15:19:27 kernel: [ 5864.708493] Task in /mem2 killed as a result of limit of /mem2
+Jan  5 15:19:27 kernel: [ 5864.708495] memory: usage 980kB, limit 980kB, failcnt 4152239
+Jan  5 15:19:27 kernel: [ 5864.708495] memory+swap: usage 0kB, limit 18014398509481983kB, failcnt 0
+Jan  5 15:19:27 kernel: [ 5864.708496] kmem: usage 0kB, limit 18014398509481983kB, failcnt 0
+Jan  5 15:19:27 kernel: [ 5864.708497] Memory cgroup stats for /mem2: cache:0KB rss:980KB rss_huge:0KB mapped_file:0KB writeback:20KB inactive_anon:560KB active_anon:420KB inactive_file:0KB active_file:0KB unevictable:0KB
+Jan  5 15:19:27 kernel: [ 5864.708505] [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+Jan  5 15:19:27 kernel: [ 5864.708600] [13536] 275858 13536  8389663      343   16267  8324326             0 memorymonster
+Jan  5 15:19:27 kernel: [ 5864.708607] Memory cgroup out of memory: Kill process 13536 (memorymonster) score 996 or sacrifice child
+Jan  5 15:19:27 kernel: [ 5864.708608] Killed process 13536 (memorymonster) total-vm:33558652kB, anon-rss:920kB, file-rss:452kB
+Jan  5 15:20:01 CRON[14608]: (root) CMD (touch /var/run/crond.sittercheck)
+Jan  5 15:20:01 CRON[14609]: (root) CMD (/usr/bin/alarm 6000 /usr/share/update-notifier/reevaluate.py)
+Jan  5 15:20:01 CRON[14610]: (root) CMD (/usr/bin/corp_cronwrap -j 80 -t 600 -A -K -L -l 'nsscache-client' /usr/bin/nsscacheclient all)
+Jan  5 15:20:01 /usr/bin/lock: called by /bin/bash for . uid 0, euid 0.
+Jan  5 15:21:01 CRON[14639]: (root) CMD (touch /var/run/crond.sittercheck)
+Jan  5 15:21:05 cookie_monster[1249]: uid 0, pid 14643, "/var/lib/certs/machine_cert.crt" accessed by exe "/usr/bin/nsscacheclient", cwd "/root", comm "/usr/bin/nsscacheclient"
+Jan  5 15:21:05 cookie_monster[1249]: uid 0, pid 14643, "/var/lib/certs/machine_cert.key" accessed by exe "/usr/bin/nsscacheclient", cwd "/root", comm "/usr/bin/nsscacheclient"
+Jan  5 15:21:05 nsscacheclient[14643]: auto.auto(no change) time:0.042264697000000004 retries:0
+Jan  5 15:21:05 nsscacheclient[14643]: auto.home(63c07d09->8686499b write:3631382) time:0.318774602 retries:0

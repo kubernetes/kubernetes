@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tools implements general tools which depend on the api package.
+// Package tools implements types which help work with etcd which depend on the api package.
+// TODO: move this package to an etcd specific utility package.
 package tools

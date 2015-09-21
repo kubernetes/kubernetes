@@ -1,5 +1,17 @@
 Change history of swagger
 =
+2015-05-25
+- (api break) changed the type of Properties in Model
+- (api break) changed the type of Models in ApiDeclaration
+- (api break) changed the parameter type of PostBuildDeclarationMapFunc
+
+2015-04-09
+- add ModelBuildable interface for customization of Model
+
+2015-03-17
+- preserve order of Routes per WebService in Swagger listing
+- fix use of $ref and type in Swagger models
+- add api version to listing
 
 2014-11-14
 - operation parameters are now sorted using ordering path,query,form,header,body

@@ -1,0 +1,24 @@
+seqdiag {
+  activation = none;
+
+
+  user[label = "Admin User"];
+  bootstrap[label = "Bootstrap API\nEndpoint"];
+  master;
+  kubelet[stacked];
+
+  user -> bootstrap [label="createCluster", return="cluster ID"];
+  user <-- bootstrap [label="returns\n- bootstrap-cluster-uri"];
+
+  user ->> master [label="start\n- bootstrap-cluster-uri"];
+  master => bootstrap [label="setMaster\n- master-location\n- master-ca"];
+
+  user ->> kubelet [label="start\n- bootstrap-cluster-uri"];
+  kubelet => bootstrap [label="get-master", return="returns\n- master-location\n- master-ca"];
+  kubelet ->> master [label="signCert\n- unsigned-kubelet-cert", return="retuns\n- kubelet-cert"];
+  user => master [label="getSignRequests"];
+  user => master [label="approveSignRequests"];
+  kubelet <<-- master [label="returns\n- kubelet-cert"];
+
+  kubelet => master [label="register\n- kubelet-location"]
+}

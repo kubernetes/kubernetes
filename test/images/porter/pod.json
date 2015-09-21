@@ -1,0 +1,35 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "porter"
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "porter",
+        "image": "gcr.io/google_containers/porter:59ad46ed2c56ba50fa7f1dc176c07c37",
+        "env": [
+          {
+            "name": "SERVE_PORT_80",
+            "value": "foo"
+          },
+          {
+            "name": "SERVE_PORT_81",
+            "value": "<html><head></head><body><a href=\"/rewriteme\">rewritten link</a></body></html>"
+          }
+        ],
+        "ports": [
+          {
+            "name": "p80",
+            "containerPort": 80
+          },
+          {
+            "name": "p81",
+            "containerPort": 81
+          }
+        ]
+      }
+    ]
+  }
+}

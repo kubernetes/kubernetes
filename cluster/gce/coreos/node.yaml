@@ -1,0 +1,207 @@
+#cloud-config
+
+write_files:
+  - path: /run/configure-hostname.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      hostnamectl set-hostname $(hostname | cut -f1 -d.)
+  - path: /run/setup-auth.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      /usr/bin/mkdir -p /var/lib/kubelet
+      cat > /var/lib/kubelet/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kubelet
+        user:
+          token: ${KUBELET_TOKEN}
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kubelet
+        name: service-account-context
+      current-context: service-account-context
+      EOF
+
+  - path: /run/config-kube-proxy.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      /usr/bin/mkdir -p /var/lib/kube-proxy
+      cat > /var/lib/kube-proxy/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kube-proxy
+        user:
+          token: ${KUBE_PROXY_TOKEN}
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kube-proxy
+        name: service-account-context
+      current-context: service-account-context
+      EOF
+
+coreos:
+  units:
+    - name: kube-env.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch kubernetes-node-environment
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /etc/kube-env \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+
+    - name: kubernetes-install-rkt.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch Rocket
+        Documentation=http://github.com/coreos/rkt
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/rm -rf /opt/rkt
+        ExecStartPre=/usr/bin/mkdir -p /opt/rkt
+        ExecStartPre=/usr/bin/mkdir -p /etc/rkt
+        ExecStartPre=/usr/bin/wget \
+        -O /opt/rkt/rkt-v${RKT_VERSION}.tar.gz \
+        https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+        ExecStartPre=/usr/bin/tar xzvf /opt/rkt/rkt-v${RKT_VERSION}.tar.gz -C /opt --overwrite
+        ExecStart=/usr/bin/mv /opt/rkt-v${RKT_VERSION} /opt/rkt/rkt
+
+    - name: kubernetes-install-minion.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install Kubernetes Server
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kube-env.service
+        After=kube-env.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/pkg
+        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
+
+    - name: kubernetes-preparation.service
+      command: start
+      content: |
+        [Unit]
+        Description=Configure Node For Kubernetes service
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        # TODO(dawnchen): Push this to separate write-files
+        ExecStart=/run/configure-hostname.sh
+
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run Kubelet service
+        Requires=kubernetes-preparation.service
+        After=kubernetes-preparation.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
+        ExecStartPre=/run/setup-auth.sh
+        ExecStart=/opt/kubernetes/server/bin/kubelet \
+        --api-servers=https://${KUBERNETES_MASTER_NAME}.c.${PROJECT_ID}.internal \
+        --config=/etc/kubernetes/manifests \
+        --allow-privileged=False \
+        --v=2 \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local \
+        --logtostderr=true \
+        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
+        --rkt-path=/opt/rkt/rkt/rkt
+        Restart=always
+        RestartSec=10
+
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Start Kube-proxy service as Daemon
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/run/config-kube-proxy.sh
+        ExecStart=/opt/kubernetes/server/bin/kube-proxy \
+        --master=https://${KUBERNETES_MASTER_NAME}.c.${PROJECT_ID}.internal \
+        --kubeconfig=/var/lib/kube-proxy/kubeconfig \
+        --v=2 \
+        --logtostderr=true
+        Restart=always
+        RestartSec=10
+
+    - name: rkt-metadata.socket
+      command: start
+      content: |
+        [Unit]
+        Description=rkt metadata service socket
+        PartOf=rkt-metadata.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Socket]
+        ListenStream=/run/rkt/metadata-svc.sock
+        SocketMode=0660
+        SocketUser=root
+        SocketGroup=root
+        RemoveOnStop=true
+
+    - name: rkt-metadata.service
+      command: start
+      content: |
+        [Unit]
+        Description=rkt metadata service
+        Documentation=http://github.com/coreos/rkt
+        Requires=rkt-metadata.socket
+        After=network.target rkt-metadata.socket
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStart=/opt/rkt/rkt/rkt metadata-service

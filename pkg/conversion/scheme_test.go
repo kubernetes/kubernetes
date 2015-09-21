@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,19 +18,19 @@ package conversion
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"
+	flag "github.com/spf13/pflag"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
 
 // Test a weird version/kind embedding format.
 type MyWeirdCustomEmbeddedVersionKindField struct {

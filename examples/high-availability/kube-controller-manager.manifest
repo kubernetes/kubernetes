@@ -1,0 +1,104 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-controller-manager",
+  "namespace": "kube-system"
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-controller-manager",
+    "image": "gcr.io/google_containers/kube-controller-manager:fda24638d51a48baa13c35337fcd4793",
+    "command": [
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-controller-manager --master=192.168.4.102:8080 --service-account-private-key-file=/srv/kubernetes/server.key --v=4  1>>/var/log/kube-controller-manager.log 2>&1"
+               ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 10252,
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 1
+    },
+    "volumeMounts": [
+        { "name": "srvkube",
+        "mountPath": "/srv/kubernetes",
+        "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-controller-manager.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharessl",
+        "mountPath": "/usr/share/ssl",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "usrssl",
+        "mountPath": "/usr/ssl",
+        "readOnly": true},
+        { "name": "usrlibssl",
+        "mountPath": "/usr/lib/ssl",
+        "readOnly": true},
+        { "name": "usrlocalopenssl",
+        "mountPath": "/usr/local/openssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpkitls",
+        "mountPath": "/etc/pki/tls",
+        "readOnly": true}
+      ]
+    }
+],
+"volumes":[
+  { "name": "srvkube",
+    "hostPath": {
+        "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-controller-manager.log"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/ssl"}
+  },
+  { "name": "usrsharessl",
+    "hostPath": {
+        "path": "/usr/share/ssl"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "usrssl",
+    "hostPath": {
+        "path": "/usr/ssl"}
+  },
+  { "name": "usrlibssl",
+    "hostPath": {
+        "path": "/usr/lib/ssl"}
+  },
+  { "name": "usrlocalopenssl",
+    "hostPath": {
+        "path": "/usr/local/openssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpkitls",
+    "hostPath": {
+        "path": "/etc/pki/tls"}
+  }
+]
+}}

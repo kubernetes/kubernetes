@@ -1,0 +1,11 @@
+<network>
+  <name>kubernetes_global</name>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='virbr_kub_gl' stp='off' delay='0'/>
+  <ip address='192.168.10.254' netmask='255.255.255.0'>
+  </ip>
+</network>

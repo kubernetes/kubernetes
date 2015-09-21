@@ -1,0 +1,22 @@
+{
+  "swaggerVersion": "1.2",
+  "apis": [
+   {
+    "path": "/api/v1",
+    "description": "API at /api/v1 version v1"
+   },
+   {
+    "path": "/api",
+    "description": "get available API versions"
+   },
+   {
+    "path": "/version",
+    "description": "git code version from which this is built"
+   }
+  ],
+  "apiVersion": "",
+  "info": {
+   "title": "",
+   "description": ""
+  }
+ }

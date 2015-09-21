@@ -1,0 +1,9 @@
+[Unit]
+Description=Kubernetes Addon Object Manager
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+ExecStart=/etc/kubernetes/kube-addons.sh
+
+[Install]
+WantedBy=multi-user.target

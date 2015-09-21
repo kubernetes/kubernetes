@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,5 +47,45 @@ func IsNotRegisteredError(err error) bool {
 		return false
 	}
 	_, ok := err.(*notRegisteredErr)
+	return ok
+}
+
+type missingKindErr struct {
+	data string
+}
+
+func NewMissingKindErr(data string) error {
+	return &missingKindErr{data}
+}
+
+func (k *missingKindErr) Error() string {
+	return fmt.Sprintf("Object 'Kind' is missing in '%s'", k.data)
+}
+
+func IsMissingKind(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*missingKindErr)
+	return ok
+}
+
+type missingVersionErr struct {
+	data string
+}
+
+func NewMissingVersionErr(data string) error {
+	return &missingVersionErr{data}
+}
+
+func (k *missingVersionErr) Error() string {
+	return fmt.Sprintf("Object 'apiVersion' is missing in '%s'", k.data)
+}
+
+func IsMissingVersion(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*missingVersionErr)
 	return ok
 }

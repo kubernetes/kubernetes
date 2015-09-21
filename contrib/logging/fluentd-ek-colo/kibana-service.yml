@@ -1,8 +1,0 @@
-apiVersion: v1beta1
-kind: Service
-id: kibana-colo
-containerPort: kibana-port
-port: 5601
-selector:
-  app: elasticsearch-kibana
-createExternalLoadBalancer: true

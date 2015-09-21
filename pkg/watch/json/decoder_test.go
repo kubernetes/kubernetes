@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,14 +19,13 @@ package json
 import (
 	"encoding/json"
 	"io"
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestDecoder(t *testing.T) {
@@ -34,16 +33,16 @@ func TestDecoder(t *testing.T) {
 
 	for _, eventType := range table {
 		out, in := io.Pipe()
-		decoder := NewDecoder(out, testapi.Codec())
+		decoder := NewDecoder(out, testapi.Default.Codec())
 
 		expect := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
-			data, err := testapi.Codec().Encode(expect)
+			data, err := testapi.Default.Codec().Encode(expect)
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			if err := encoder.Encode(&watchEvent{eventType, runtime.RawExtension{json.RawMessage(data)}}); err != nil {
+			if err := encoder.Encode(&WatchEvent{eventType, runtime.RawExtension{RawJSON: json.RawMessage(data)}}); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 			in.Close()
@@ -58,7 +57,7 @@ func TestDecoder(t *testing.T) {
 			if e, a := eventType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
-			if e, a := expect, got; !reflect.DeepEqual(e, a) {
+			if e, a := expect, got; !api.Semantic.DeepDerivative(e, a) {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
 			t.Logf("Exited read")
@@ -82,7 +81,7 @@ func TestDecoder(t *testing.T) {
 
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
-	decoder := NewDecoder(out, testapi.Codec())
+	decoder := NewDecoder(out, testapi.Default.Codec())
 
 	done := make(chan struct{})
 

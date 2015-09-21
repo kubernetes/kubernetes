@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,4 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-redis-server --slaveof ${REDIS_MASTER_SERVICE_HOST:-$SERVICE_HOST} $REDIS_MASTER_SERVICE_PORT
+if [[ ${GET_HOSTS_FROM:-dns} == "env" ]]; then
+  redis-server --slaveof ${REDIS_MASTER_SERVICE_HOST} 6379
+else
+  redis-server --slaveof redis-master 6379
+fi

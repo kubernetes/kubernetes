@@ -1,0 +1,3 @@
+import: ../../../../fossene/db/schema/thing.yml
+fields:
+    site: string

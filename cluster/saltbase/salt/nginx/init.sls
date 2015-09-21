@@ -28,6 +28,28 @@ nginx:
     - group: root
     - mode: 644
 
+{% if grains.cloud is defined and grains.cloud in ['gce'] %}
+/etc/kubernetes/manifests/nginx.json:
+  file:
+    - managed
+    - source: salt://nginx/nginx.json
+    - user: root
+    - group: root
+    - mode: 644
+    - require:
+      - file: /etc/nginx/nginx.conf
+      - file: /etc/nginx/sites-enabled/default
+      - file: /usr/share/nginx/htpasswd
+      - cmd: kubernetes-cert      
+
+
+#stop legacy nginx_service 
+stop_nginx-service:
+  service.dead:
+    - name: nginx
+    - enable: None
+
+{% else %}
 nginx-service:
   service:
     - running
@@ -38,3 +60,5 @@ nginx-service:
       - file: /etc/nginx/sites-enabled/default
       - file: /usr/share/nginx/htpasswd
       - cmd: kubernetes-cert
+{% endif %}
+

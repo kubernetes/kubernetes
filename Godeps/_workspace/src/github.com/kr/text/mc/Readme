@@ -1,9 +1,0 @@
-Command mc prints in multiple columns.
-
-  Usage: mc [-] [-N] [file...]
-
-Mc splits the input into as many columns as will fit in N
-print positions. If the output is a tty, the default N is
-the number of characters in a terminal line; otherwise the
-default N is 80. Under option - each input line ending in
-a colon ':' is printed separately.

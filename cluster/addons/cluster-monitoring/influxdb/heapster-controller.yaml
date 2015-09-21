@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: monitoring-heapster-v8
+  namespace: kube-system
+  labels:
+    k8s-app: heapster
+    version: v8
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: heapster
+    version: v8
+  template:
+    metadata:
+      labels:
+        k8s-app: heapster
+        version: v8
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+        - image: gcr.io/google_containers/heapster:v0.17.0
+          name: heapster
+          resources:
+            limits:
+              cpu: 100m
+              memory: 300Mi
+          command:
+            - /heapster
+            - --source=kubernetes:''
+            - --sink=influxdb:http://monitoring-influxdb:8086

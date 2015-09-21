@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	flag "github.com/ogier/pflag"
+	flag "github.com/spf13/pflag"
 )
 
 // Example 1: A single string flag called "species" with default value "gopher".
@@ -27,6 +27,10 @@ type interval []time.Duration
 // The String method's output will be used in diagnostics.
 func (i *interval) String() string {
 	return fmt.Sprint(*i)
+}
+
+func (i *interval) Type() string {
+	return "interval"
 }
 
 // Set is the method to set the flag value, part of the flag.Value interface.

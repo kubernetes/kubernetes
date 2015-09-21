@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,10 +20,105 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/gofuzz"
 )
+
+func TestConverter_byteSlice(t *testing.T) {
+	c := NewConverter()
+	src := []byte{1, 2, 3}
+	dest := []byte{}
+	err := c.Convert(&src, &dest, 0, nil)
+	if err != nil {
+		t.Fatalf("expected no error")
+	}
+	if e, a := src, dest; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %#v, got %#v", e, a)
+	}
+}
+
+func TestConverter_DefaultConvert(t *testing.T) {
+	type A struct {
+		Foo string
+		Baz int
+	}
+	type B struct {
+		Bar string
+		Baz int
+	}
+	c := NewConverter()
+	c.Debug = t
+	c.nameFunc = func(t reflect.Type) string { return "MyType" }
+
+	// Ensure conversion funcs can call DefaultConvert to get default behavior,
+	// then fixup remaining fields manually
+	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		if err := s.DefaultConvert(in, out, IgnoreMissingFields); err != nil {
+			return err
+		}
+		out.Bar = in.Foo
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	x := A{"hello, intrepid test reader!", 3}
+	y := B{}
+
+	err = c.Convert(&x, &y, 0, nil)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if e, a := x.Foo, y.Bar; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := x.Baz, y.Baz; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestConverter_DeepCopy(t *testing.T) {
+	type A struct {
+		Foo *string
+		Bar []string
+		Baz interface{}
+		Qux map[string]string
+	}
+	c := NewConverter()
+	c.Debug = t
+
+	foo, baz := "foo", "baz"
+	x := A{
+		Foo: &foo,
+		Bar: []string{"bar"},
+		Baz: &baz,
+		Qux: map[string]string{"qux": "qux"},
+	}
+	y := A{}
+
+	if err := c.Convert(&x, &y, 0, nil); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	*x.Foo = "foo2"
+	x.Bar[0] = "bar2"
+	*x.Baz.(*string) = "baz2"
+	x.Qux["qux"] = "qux2"
+	if e, a := *x.Foo, *y.Foo; e == a {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+	if e, a := x.Bar, y.Bar; reflect.DeepEqual(e, a) {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+	if e, a := *x.Baz.(*string), *y.Baz.(*string); e == a {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+	if e, a := x.Qux, y.Qux; reflect.DeepEqual(e, a) {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+}
 
 func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type A struct {
@@ -37,14 +132,14 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type C struct{}
 	c := NewConverter()
 	c.Debug = t
-	err := c.Register(func(in *A, out *B, s Scope) error {
+	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		return s.Convert(&in.Baz, &out.Baz, 0)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	err = c.Register(func(in *B, out *A, s Scope) error {
+	err = c.RegisterConversionFunc(func(in *B, out *A, s Scope) error {
 		out.Foo = in.Bar
 		return s.Convert(&in.Baz, &out.Baz, 0)
 	})
@@ -80,16 +175,136 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	err = c.Register(func(in *A, out *C, s Scope) error {
+	err = c.RegisterConversionFunc(func(in *A, out *C, s Scope) error {
 		return fmt.Errorf("C can't store an A, silly")
 	})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-
 	err = c.Convert(&A{}, &C{}, 0, nil)
 	if err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestConverter_GeneratedConversionOverriden(t *testing.T) {
+	type A struct{}
+	type B struct{}
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("generated function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestConverter_MapsStringArrays(t *testing.T) {
+	type A struct {
+		Foo   string
+		Baz   int
+		Other string
+	}
+	c := NewConverter()
+	c.Debug = t
+	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
+		if len(*input) == 0 {
+			*out = ""
+		}
+		*out = (*input)[0]
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	x := map[string][]string{
+		"Foo":   {"bar"},
+		"Baz":   {"1"},
+		"Other": {"", "test"},
+		"other": {"wrong"},
+	}
+	y := A{"test", 2, "something"}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames, nil); err == nil {
+		t.Error("unexpected non-error")
+	}
+
+	if err := c.RegisterConversionFunc(func(input *[]string, out *int, s Scope) error {
+		if len(*input) == 0 {
+			*out = 0
+		}
+		str := (*input)[0]
+		i, err := strconv.Atoi(str)
+		if err != nil {
+			return err
+		}
+		*out = i
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames, nil); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(y, A{"bar", 1, ""}) {
+		t.Errorf("unexpected result: %#v", y)
+	}
+}
+
+func TestConverter_MapsStringArraysWithMappingKey(t *testing.T) {
+	type A struct {
+		Foo   string `json:"test"`
+		Baz   int
+		Other string
+	}
+	c := NewConverter()
+	c.Debug = t
+	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
+		if len(*input) == 0 {
+			*out = ""
+		}
+		*out = (*input)[0]
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	x := map[string][]string{
+		"Foo":  {"bar"},
+		"test": {"baz"},
+	}
+	y := A{"", 0, ""}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames|IgnoreMissingFields, &Meta{}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(y, A{"bar", 0, ""}) {
+		t.Errorf("unexpected result: %#v", y)
+	}
+
+	mapping := func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string) {
+		if s := destTag.Get("json"); len(s) > 0 {
+			return strings.SplitN(s, ",", 2)[0], key
+		}
+		return key, key
+	}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames|IgnoreMissingFields, &Meta{KeyNameMapping: mapping}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(y, A{"baz", 0, ""}) {
+		t.Errorf("unexpected result: %#v", y)
 	}
 }
 
@@ -104,7 +319,7 @@ func TestConverter_fuzz(t *testing.T) {
 
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
-	c.NameFunc = func(t reflect.Type) string {
+	c.nameFunc = func(t reflect.Type) string {
 		// Hide the fact that we don't have separate packages for these things.
 		return map[reflect.Type]string{
 			reflect.TypeOf(TestType1{}):         "TestType1",
@@ -144,7 +359,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	}
 	c := NewConverter()
 	c.Debug = t
-	err := c.Register(
+	err := c.RegisterConversionFunc(
 		func(in *int, out *string, s Scope) error {
 			*out = fmt.Sprintf("%v", *in)
 			return nil
@@ -153,7 +368,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Register(
+	err = c.RegisterConversionFunc(
 		func(in *string, out *int, s Scope) error {
 			if str, err := strconv.Atoi(*in); err != nil {
 				return err
@@ -190,7 +405,7 @@ func TestConverter_tags(t *testing.T) {
 	}
 	c := NewConverter()
 	c.Debug = t
-	err := c.Register(
+	err := c.RegisterConversionFunc(
 		func(in *string, out *string, s Scope) error {
 			if e, a := "foo", s.SrcTag().Get("test"); e != a {
 				t.Errorf("expected %v, got %v", e, a)
@@ -216,7 +431,7 @@ func TestConverter_meta(t *testing.T) {
 	c := NewConverter()
 	c.Debug = t
 	checks := 0
-	err := c.Register(
+	err := c.RegisterConversionFunc(
 		func(in *Foo, out *Bar, s Scope) error {
 			if s.Meta() == nil || s.Meta().SrcVersion != "test" || s.Meta().DestVersion != "passes" {
 				t.Errorf("Meta did not get passed!")
@@ -229,7 +444,7 @@ func TestConverter_meta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Register(
+	err = c.RegisterConversionFunc(
 		func(in *string, out *string, s Scope) error {
 			if s.Meta() == nil || s.Meta().SrcVersion != "test" || s.Meta().DestVersion != "passes" {
 				t.Errorf("Meta did not get passed a second time!")

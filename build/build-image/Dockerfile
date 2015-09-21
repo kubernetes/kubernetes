@@ -22,24 +22,29 @@ ENV GOARM 5
 ENV GOOS    linux
 ENV GOARCH  amd64
 
+# work around 64MB tmpfs size in Docker 1.6
+ENV TMPDIR /tmp.k8s
+
 # Get the code coverage tool and godep
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
+RUN mkdir $TMPDIR && \
+    go get golang.org/x/tools/cmd/cover github.com/tools/godep
 
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`
-RUN apt-get update && apt-get install -y rsync
+RUN rm -rf /var/lib/apt/lists/
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
 
 # Download and symlink etcd.  We need this for our integration tests.
 RUN mkdir -p /usr/local/src/etcd &&\
     cd /usr/local/src/etcd &&\
-    curl -L -O -s https://github.com/coreos/etcd/releases/download/v0.4.6/etcd-v0.4.6-linux-amd64.tar.gz &&\
-    tar xzf etcd-v0.4.6-linux-amd64.tar.gz &&\
-    ln -s ../src/etcd/etcd-v0.4.6-linux-amd64/etcd /usr/local/bin/
+    curl -L -O -s https://github.com/coreos/etcd/releases/download/v2.0.0/etcd-v2.0.0-linux-amd64.tar.gz &&\
+    tar xzf etcd-v2.0.0-linux-amd64.tar.gz &&\
+    ln -s ../src/etcd/etcd-v2.0.0-linux-amd64/etcd /usr/local/bin/
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+WORKDIR /go/src/k8s.io/kubernetes
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs
@@ -49,4 +54,4 @@ ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
 # Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes
+ADD kube-source.tar.gz /go/src/k8s.io/kubernetes

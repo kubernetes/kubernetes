@@ -9,40 +9,35 @@ import (
 	"testing"
 )
 
-func testJsonFromStruct(t *testing.T, sample interface{}, expectedJson string) {
-	compareJson(t, false, modelsFromStruct(sample), expectedJson)
+func testJsonFromStruct(t *testing.T, sample interface{}, expectedJson string) bool {
+	m := modelsFromStruct(sample)
+	data, _ := json.MarshalIndent(m, " ", " ")
+	return compareJson(t, string(data), expectedJson)
 }
 
-func modelsFromStruct(sample interface{}) map[string]Model {
-	models := map[string]Model{}
+func modelsFromStruct(sample interface{}) *ModelList {
+	models := new(ModelList)
 	builder := modelBuilder{models}
-	builder.addModel(reflect.TypeOf(sample), "")
+	builder.addModelFrom(sample)
 	return models
 }
 
-func compareJson(t *testing.T, flatCompare bool, value interface{}, expectedJsonAsString string) {
-	var output []byte
-	var err error
-	if flatCompare {
-		output, err = json.Marshal(value)
-	} else {
-		output, err = json.MarshalIndent(value, " ", " ")
+func compareJson(t *testing.T, actualJsonAsString string, expectedJsonAsString string) bool {
+	var actualMap map[string]interface{}
+	json.Unmarshal([]byte(actualJsonAsString), &actualMap)
+	var expectedMap map[string]interface{}
+	json.Unmarshal([]byte(expectedJsonAsString), &expectedMap)
+	if !reflect.DeepEqual(actualMap, expectedMap) {
+		t.Log("---- expected -----")
+		t.Log(withLineNumbers(expectedJsonAsString))
+		t.Log("---- actual -----")
+		t.Log(withLineNumbers(actualJsonAsString))
+		t.Log("---- raw -----")
+		t.Log(actualJsonAsString)
+		t.Error("there are differences")
+		return false
 	}
-	if err != nil {
-		t.Error(err.Error())
-		return
-	}
-	actual := string(output)
-	if actual != expectedJsonAsString {
-		t.Errorf("First mismatch JSON doc at line:%d", indexOfNonMatchingLine(actual, expectedJsonAsString))
-		// Use simple fmt to create a pastable output :-)
-		fmt.Println("---- expected -----")
-		fmt.Println(withLineNumbers(expectedJsonAsString))
-		fmt.Println("---- actual -----")
-		fmt.Println(withLineNumbers(actual))
-		fmt.Println("---- raw -----")
-		fmt.Println(actual)
-	}
+	return true
 }
 
 func indexOfNonMatchingLine(actual, expected string) int {

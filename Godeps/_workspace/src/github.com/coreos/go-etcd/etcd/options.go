@@ -17,11 +17,11 @@ type validOptions map[string]reflect.Kind
 // values are meant to be used as constants.
 var (
 	VALID_GET_OPTIONS = validOptions{
-		"recursive":  reflect.Bool,
-		"consistent": reflect.Bool,
-		"sorted":     reflect.Bool,
-		"wait":       reflect.Bool,
-		"waitIndex":  reflect.Uint64,
+		"recursive": reflect.Bool,
+		"quorum":    reflect.Bool,
+		"sorted":    reflect.Bool,
+		"wait":      reflect.Bool,
+		"waitIndex": reflect.Uint64,
 	}
 
 	VALID_PUT_OPTIONS = validOptions{

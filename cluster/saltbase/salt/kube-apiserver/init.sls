@@ -1,77 +1,55 @@
-{% if grains['os_family'] == 'RedHat' %}
-{% set environment_file = '/etc/sysconfig/kube-apiserver' %}
-{% else %}
-{% set environment_file = '/etc/default/kube-apiserver' %}
-{% endif %}
-
-{{ environment_file }}:
-  file.managed:
-    - source: salt://kube-apiserver/default
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-
-/usr/local/bin/kube-apiserver:
-  file.managed:
-    - source: salt://kube-bins/kube-apiserver
-    - user: root
-    - group: root
-    - mode: 755
-
-{% if grains['os_family'] == 'RedHat' %}
-
-/usr/lib/systemd/system/kube-apiserver.service:
-  file.managed:
-    - source: salt://kube-apiserver/kube-apiserver.service
-    - user: root
-    - group: root
-
-{% else %}
-
-/etc/init.d/kube-apiserver:
-  file.managed:
-    - source: salt://kube-apiserver/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-{% endif %}
-
 {% if grains.cloud is defined %}
-{% if grains.cloud == 'gce' or grains.cloud == 'vagrant' %}
+{% if grains.cloud in ['aws', 'gce', 'vagrant'] %}
 # TODO: generate and distribute tokens on other cloud providers.
 /srv/kubernetes/known_tokens.csv:
   file.managed:
     - source: salt://kube-apiserver/known_tokens.csv
-    - user: kube-apiserver
-    - group: kube-apiserver
-    - mode: 400
-    - watch:
-      - user: kube-apiserver
-      - group: kube-apiserver
-    - watch_in:
-      - service: kube-apiserver
+#    - watch_in:
+#      - service: kube-apiserver
 {% endif %}
 {% endif %}
 
-kube-apiserver:
-  group.present:
-    - system: True
-  user.present:
-    - system: True
-    - gid_from_name: True
-    - groups:
-      - kube-cert
-    - shell: /sbin/nologin
-    - home: /var/kube-apiserver
-    - require:
-      - group: kube-apiserver
-  service.running:
-    - enable: True
-    - watch:
-      - file: {{ environment_file }}
-      - file: /usr/local/bin/kube-apiserver
-{% if grains['os_family'] != 'RedHat' %}
-      - file: /etc/init.d/kube-apiserver
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
+/srv/kubernetes/basic_auth.csv:
+  file.managed:
+    - source: salt://kube-apiserver/basic_auth.csv
 {% endif %}
+
+/var/log/kube-apiserver.log:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: 644
+
+# Copy kube-apiserver manifest to manifests folder for kubelet.
+# Current containervm image by default has both docker and kubelet
+# running. But during cluster creation stage, docker and kubelet
+# could be overwritten completely, or restarted due to flag changes.
+# The ordering of salt states for service docker, kubelet and
+# master-addon below is very important to avoid the race between
+# salt restart docker or kubelet and kubelet start master components.
+# Without the ordering of salt states, when gce instance boot up,
+# configure-vm.sh will run and download the release. At the end of
+# boot, run-salt will installs kube-apiserver.manifest files to
+# kubelet config directory before the installation of proper version
+# kubelet. Please see
+# http://issue.k8s.io/10122#issuecomment-114566063
+# for detail explanation on this very issue.
+/etc/kubernetes/manifests/kube-apiserver.manifest:
+  file.managed:
+    - source: salt://kube-apiserver/kube-apiserver.manifest
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - dir_mode: 755
+    - require:
+      - service: docker
+      - service: kubelet
+
+#stop legacy kube-apiserver service
+stop_kube-apiserver:
+  service.dead:
+    - name: kube-apiserver
+    - enable: None

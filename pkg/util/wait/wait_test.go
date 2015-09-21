@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,6 +68,13 @@ func TestPoll(t *testing.T) {
 	if invocations == 0 {
 		t.Errorf("Expected at least one invocation, got zero")
 	}
+	expectedError := errors.New("Expected error")
+	f = ConditionFunc(func() (bool, error) {
+		return false, expectedError
+	})
+	if err := Poll(time.Microsecond, time.Microsecond, f); err == nil || err != expectedError {
+		t.Fatalf("Expected error %v, got none %v", expectedError, err)
+	}
 }
 
 func TestPollForever(t *testing.T) {
@@ -84,9 +91,10 @@ func TestPollForever(t *testing.T) {
 			}
 			return false, nil
 		})
-		if err := Poll(time.Microsecond, 0, f); err != nil {
+		if err := PollInfinite(time.Microsecond, f); err != nil {
 			t.Fatalf("unexpected error %v", err)
 		}
+
 		close(ch)
 		complete <- struct{}{}
 	}()

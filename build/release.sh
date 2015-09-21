@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,6 +37,5 @@ if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
 fi
 
 kube::build::copy_output
-kube::build::run_image
 kube::release::package_tarballs
 kube::release::gcs::release
