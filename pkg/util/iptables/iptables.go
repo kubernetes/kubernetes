@@ -170,7 +170,7 @@ const (
 func (runner *runner) connectToFirewallD() {
 	bus, err := runner.dbus.SystemBus()
 	if err != nil {
-		glog.V(1).Info("Could not connect to D-Bus system bus: %s", err)
+		glog.V(1).Infof("Could not connect to D-Bus system bus: %s", err)
 		return
 	}
 
