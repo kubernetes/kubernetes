@@ -66,7 +66,12 @@ func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
 func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
 	groupMeta, found := g[group]
 	if !found {
-		panic(fmt.Sprintf("no version is registered for group %v", group))
+		const msg = "Please check the KUBE_API_VERSIONS environment variable."
+		if group == "" {
+			panic("The legacy v1 API is not registered. " + msg)
+		} else {
+			panic(fmt.Sprintf("No version is registered for group %s. ", group) + msg)
+		}
 	}
 	return groupMeta
 }
