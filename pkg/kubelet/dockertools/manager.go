@@ -311,7 +311,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 		return &result
 	}
 
-	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
+	glog.V(4).Infof("Container inspect result: %+v", *inspectResult)
 	result.status = api.ContainerStatus{
 		Name:        containerName,
 		Image:       inspectResult.Config.Image,
