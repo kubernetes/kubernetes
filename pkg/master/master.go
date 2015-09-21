@@ -74,6 +74,7 @@ import (
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -806,7 +807,11 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version := m.defaultAPIGroupVersion()
 	version.Storage = storage
 	version.Version = "v1"
-	version.Codec = v1.Codec
+	codec, err := runtime.NewRawDataCodec(v1.Codec)
+	if err != nil {
+		glog.Fatalf("Failed to create a raw data codec: %v", err)
+	}
+	version.Codec = codec
 	return version
 }
 

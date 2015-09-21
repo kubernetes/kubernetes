@@ -39,7 +39,7 @@ type TypeMeta struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
 	APIVersion string `json:"apiVersion,omitempty"`
 
-	Raw *RawData
+	Raw *RawData `json:"-"`
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and

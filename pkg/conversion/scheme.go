@@ -56,6 +56,9 @@ type Scheme struct {
 	// the version and kind information for all objects. The default uses the
 	// keys "apiVersion" and "kind" respectively.
 	MetaFactory MetaFactory
+
+	// SaveRawData will cause the scheme to also store the raw data into the object on Encode
+	SaveRawData bool
 }
 
 // NewScheme manufactures a new scheme.

@@ -17,16 +17,53 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path"
 	"reflect"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func getRawData(obj interface{}) *unversioned.RawData {
-	return reflect.ValueOf(obj).Elem().FieldByName("Raw").Interface().(*unversioned.RawData)
+	val := reflect.ValueOf(obj)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	raw := val.FieldByName("Raw")
+	if raw.IsValid() {
+		return raw.Interface().(*unversioned.RawData)
+	}
+	return nil	
+}
+
+func extractResourceVersion(obj interface{}) (string, error) {
+	val := reflect.ValueOf(obj).Elem()
+	objMeta := val.FieldByName("ObjectMeta")
+	if objMeta.IsValid() {
+		return objMeta.FieldByName("ResourceVersion").String(), nil
+	}
+	listMeta := val.FieldByName("ListMeta")
+	if listMeta.IsValid() {
+		return listMeta.FieldByName("ResourceVersion").String(), nil
+	}
+	return "", fmt.Errorf("Unknown object: %#v", obj)
+}
+
+func spliceResourceVersion(obj, resourceVersion string) ([]byte, error) {
+	buff := &bytes.Buffer{}
+	buff.Grow(len(obj) + len(resourceVersion) + 20)
+	
+	ix := strings.Index(obj, "metadata")
+	for i := ix; i < len(obj); i++ {
+		if obj[i] == '{' {
+			fmt.Fprintf(buff, "%s \"resourceVersion\": \"%s\", %s", obj[:i+1], resourceVersion, obj[i+1:])
+			return buff.Bytes(), nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find metadata")
 }
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
@@ -73,7 +110,15 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	}
 	raw := getRawData(obj)
 	if raw != nil && raw.DataAPIVersion == destVersion {
-		return raw.Data, nil
+		resourceVersion, err := extractResourceVersion(obj)
+		if err != nil {
+			return nil, err
+		}
+		data, err := spliceResourceVersion(string(raw.Data), resourceVersion)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
 	}
 
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
