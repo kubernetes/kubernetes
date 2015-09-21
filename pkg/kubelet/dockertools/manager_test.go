@@ -2071,7 +2071,7 @@ func TestGetPidMode(t *testing.T) {
 func TestGetIPCMode(t *testing.T) {
 	// test false
 	pod := &api.Pod{}
-	ipcMode := getIPCMode(pod, "")
+	ipcMode := getIPCMode(pod)
 
 	if ipcMode != "" {
 		t.Errorf("expected empty ipc mode for pod but got %v", ipcMode)
@@ -2079,7 +2079,7 @@ func TestGetIPCMode(t *testing.T) {
 
 	// test true
 	pod.Spec.HostIPC = true
-	ipcMode = getIPCMode(pod, "")
+	ipcMode = getIPCMode(pod)
 	if ipcMode != "host" {
 		t.Errorf("expected host ipc mode for pod but got %v", ipcMode)
 	}
