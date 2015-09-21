@@ -35,8 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -122,6 +122,7 @@ type TestContextType struct {
 	MinStartupPods        int
 	UpgradeTarget         string
 	PrometheusPushGateway string
+	VerifyServiceAccount  bool
 }
 
 var testContext TestContextType
@@ -481,8 +482,10 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		return nil, err
 	}
 
-	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-		return nil, err
+	if testContext.VerifyServiceAccount {
+		if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
+			return nil, err
+		}
 	}
 	return got, nil
 }
@@ -668,12 +671,22 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
-		if err != nil {
-			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
-			return !exist, nil
-		} else {
+		switch {
+		case err == nil:
+			if !exist {
+				return false, nil
+			}
 			Logf("Service %s in namespace %s found.", name, namespace)
-			return exist, nil
+			return true, nil
+		case apierrs.IsNotFound(err):
+			if exist {
+				return false, nil
+			}
+			Logf("Service %s in namespace %s disappeared.", name, namespace)
+			return true, nil
+		default:
+			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
+			return false, nil
 		}
 	})
 	if err != nil {

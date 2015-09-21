@@ -1413,7 +1413,7 @@ func isEqualIPPermission(l, r *ec2.IPPermission, compareGroupUserIDs bool) bool 
 }
 
 // Makes sure the security group includes the specified permissions
-// Returns true iff changes were made
+// Returns true if and only if changes were made
 // The security group must already exist
 func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
@@ -1467,7 +1467,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 }
 
 // Makes sure the security group no longer includes the specified permissions
-// Returns true iff changes were made
+// Returns true if and only if changes were made
 // If the security group no longer exists, will return (false, nil)
 func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)

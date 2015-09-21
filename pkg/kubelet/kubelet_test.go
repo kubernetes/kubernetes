@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -35,21 +34,20 @@ import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	cadvisorApiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 )
@@ -77,6 +75,7 @@ type TestKubelet struct {
 	fakeCadvisor     *cadvisor.Mock
 	fakeKubeClient   *testclient.Fake
 	fakeMirrorClient *fakeMirrorClient
+	fakeNodeManager  *fakeNodeManager
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
@@ -103,13 +102,15 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.sourcesReady = func() bool { return true }
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
-	kubelet.nodeLister = testNodeLister{}
+
 	kubelet.readinessManager = kubecontainer.NewReadinessManager()
 	kubelet.recorder = fakeRecorder
-	kubelet.statusManager = newStatusManager(fakeKubeClient)
+	kubelet.statusManager = status.NewManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
+	fakeNodeManager := &fakeNodeManager{}
+	kubelet.nodeManager = fakeNodeManager
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
 	podManager, fakeMirrorClient := newFakePodManager()
@@ -135,7 +136,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient}
+	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeNodeManager}
 }
 
 func newTestPods(count int) []*api.Pod {
@@ -961,20 +962,6 @@ func (ls testServiceLister) List() (api.ServiceList, error) {
 	}, nil
 }
 
-type testNodeLister struct {
-	nodes []api.Node
-}
-
-func (ls testNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (ls testNodeLister) List() (api.NodeList, error) {
-	return api.NodeList{
-		Items: ls.nodes,
-	}, nil
-}
-
 type envs []kubecontainer.EnvVar
 
 func (e envs) Len() int {
@@ -1745,30 +1732,47 @@ func getNotReadyStatus(cName string) api.ContainerStatus {
 		Ready: false,
 	}
 }
+func getReadyCondition(status api.ConditionStatus, transitionTime unversioned.Time, reason, message string) []api.PodCondition {
+	return []api.PodCondition{{
+		Type:               api.PodReady,
+		Status:             status,
+		LastTransitionTime: transitionTime,
+		Reason:             reason,
+		Message:            message,
+	}}
+}
 
 func TestGetPodReadyCondition(t *testing.T) {
-	ready := []api.PodCondition{{
-		Type:   api.PodReady,
-		Status: api.ConditionTrue,
-	}}
-	unready := []api.PodCondition{{
-		Type:   api.PodReady,
-		Status: api.ConditionFalse,
-	}}
+	transitionTime := unversioned.Now()
 	tests := []struct {
-		spec     *api.PodSpec
-		info     []api.ContainerStatus
-		expected []api.PodCondition
+		spec              *api.PodSpec
+		containerStatuses []api.ContainerStatus
+		existingStatus    *api.PodStatus
+		expected          []api.PodCondition
+		clearTimestamp    bool
 	}{
 		{
-			spec:     nil,
-			info:     nil,
-			expected: unready,
+			spec:              nil,
+			containerStatuses: nil,
+			existingStatus:    nil,
+			expected:          getReadyCondition(api.ConditionFalse, transitionTime, "UnknownContainerStatuses", ""),
+			clearTimestamp:    true,
 		},
 		{
-			spec:     &api.PodSpec{},
-			info:     []api.ContainerStatus{},
-			expected: ready,
+			spec:              nil,
+			containerStatuses: nil,
+			existingStatus: &api.PodStatus{
+				Conditions: getReadyCondition(api.ConditionFalse, transitionTime, "", ""),
+			},
+			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "UnknownContainerStatuses", ""),
+			clearTimestamp: false,
+		},
+		{
+			spec:              &api.PodSpec{},
+			containerStatuses: []api.ContainerStatus{},
+			existingStatus:    nil,
+			expected:          getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
+			clearTimestamp:    true,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1776,8 +1780,10 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
-			info:     []api.ContainerStatus{},
-			expected: unready,
+			containerStatuses: []api.ContainerStatus{},
+			existingStatus:    nil,
+			expected:          getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unknown status: [1234]"),
+			clearTimestamp:    true,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1785,10 +1791,12 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
-			info: []api.ContainerStatus{
+			containerStatuses: []api.ContainerStatus{
 				getReadyStatus("1234"),
 			},
-			expected: ready,
+			existingStatus: nil,
+			expected:       getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
+			clearTimestamp: true,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1797,11 +1805,13 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: []api.ContainerStatus{
+			containerStatuses: []api.ContainerStatus{
 				getReadyStatus("1234"),
 				getReadyStatus("5678"),
 			},
-			expected: ready,
+			existingStatus: nil,
+			expected:       getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
+			clearTimestamp: true,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1810,10 +1820,12 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: []api.ContainerStatus{
+			containerStatuses: []api.ContainerStatus{
 				getReadyStatus("1234"),
 			},
-			expected: unready,
+			existingStatus: nil,
+			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unknown status: [5678]"),
+			clearTimestamp: true,
 		},
 		{
 			spec: &api.PodSpec{
@@ -1822,16 +1834,22 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: []api.ContainerStatus{
+			containerStatuses: []api.ContainerStatus{
 				getReadyStatus("1234"),
 				getNotReadyStatus("5678"),
 			},
-			expected: unready,
+			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unready status: [5678]"),
+			clearTimestamp: true,
 		},
 	}
 
 	for i, test := range tests {
-		condition := getPodReadyCondition(test.spec, test.info)
+		condition := getPodReadyCondition(test.spec, test.containerStatuses, test.existingStatus)
+		if test.clearTimestamp {
+			condition[0].LastTransitionTime = transitionTime
+			test.expected[0].LastTransitionTime = transitionTime
+		}
+		condition[0].LastProbeTime = unversioned.Time{}
 		if !reflect.DeepEqual(condition, test.expected) {
 			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
 		}
@@ -2117,8 +2135,8 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}
 	// Make sure the Pods are in the reverse order of creation time.
-	pods[1].CreationTimestamp = util.NewTime(time.Now())
-	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
+	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
+	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
 	conflictedPod := pods[0]
 
@@ -2136,10 +2154,10 @@ func TestHandlePortConflicts(t *testing.T) {
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t)
+	testKubelet.fakeNodeManager.node = &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}}
+
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
-	}}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2207,8 +2225,8 @@ func TestHandleMemExceeded(t *testing.T) {
 		},
 	}
 	// Make sure the Pods are in the reverse order of creation time.
-	pods[1].CreationTimestamp = util.NewTime(time.Now())
-	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
+	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
+	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
 	notfittingPod := pods[0]
 
@@ -2347,305 +2365,6 @@ func TestValidateContainerStatus(t *testing.T) {
 		ContainerStatuses: testCases[1].statuses,
 	}, containerName, true); err == nil {
 		t.Errorf("expected error with for previous terminated container")
-	}
-}
-
-func TestUpdateNewNodeStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
-	}}).ReactionChain
-	machineInfo := &cadvisorApi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorApi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  util.Time{},
-					LastTransitionTime: util.Time{},
-				},
-			},
-			NodeInfo: api.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
-			},
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-			},
-			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
-			},
-		},
-	}
-
-	kubelet.updateRuntimeUp()
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	actions := kubeClient.Actions()
-	if len(actions) != 2 {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
-	if !ok {
-		t.Errorf("unexpected object type")
-	}
-	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
-		t.Errorf("unexpected zero last probe timestamp")
-	}
-	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
-		t.Errorf("unexpected zero last transition timestamp")
-	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
-	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
-	}
-}
-
-func TestUpdateExistingNodeStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{
-			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-			Spec:       api.NodeSpec{},
-			Status: api.NodeStatus{
-				Conditions: []api.NodeCondition{
-					{
-						Type:               api.NodeReady,
-						Status:             api.ConditionTrue,
-						Reason:             fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
-					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-				},
-			},
-		},
-	}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	machineInfo := &cadvisorApi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorApi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  util.Time{}, // placeholder
-					LastTransitionTime: util.Time{}, // placeholder
-				},
-			},
-			NodeInfo: api.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
-			},
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-			},
-			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
-			},
-		},
-	}
-
-	kubelet.updateRuntimeUp()
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	actions := kubeClient.Actions()
-	if len(actions) != 2 {
-		t.Errorf("unexpected actions: %v", actions)
-	}
-	updateAction, ok := actions[1].(testclient.UpdateAction)
-	if !ok {
-		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
-	}
-	updatedNode, ok := updateAction.GetObject().(*api.Node)
-	if !ok {
-		t.Errorf("unexpected object type")
-	}
-	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastHeartbeatTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
-		t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
-	}
-	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
-		t.Errorf("expected \n%#v\n, got \n%#v", updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy(),
-			util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
-	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
-	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
-	}
-}
-
-func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-	fakeRuntime := testKubelet.fakeRuntime
-	// This causes returning an error from GetContainerRuntimeVersion() which
-	// simulates that container runtime is down.
-	fakeRuntime.VersionInfo = ""
-
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
-	}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	machineInfo := &cadvisorApi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorApi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionFalse,
-					Reason:             fmt.Sprintf("container runtime is down"),
-					LastHeartbeatTime:  util.Time{},
-					LastTransitionTime: util.Time{},
-				},
-			},
-			NodeInfo: api.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
-			},
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-			},
-			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
-			},
-		},
-	}
-
-	kubelet.runtimeUpThreshold = time.Duration(0)
-	kubelet.updateRuntimeUp()
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	actions := kubeClient.Actions()
-	if len(actions) != 2 {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
-	if !ok {
-		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
-	}
-
-	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
-		t.Errorf("unexpected zero last probe timestamp")
-	}
-	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
-		t.Errorf("unexpected zero last transition timestamp")
-	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
-	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
-	}
-}
-
-func TestUpdateNodeStatusError(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	// No matching node for the kubelet
-	testKubelet.fakeKubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactionChain
-
-	if err := kubelet.updateNodeStatus(); err == nil {
-		t.Errorf("unexpected non error: %v", err)
-	}
-	if len(testKubelet.fakeKubeClient.Actions()) != nodeStatusUpdateRetry {
-		t.Errorf("unexpected actions: %v", testKubelet.fakeKubeClient.Actions())
 	}
 }
 
@@ -3024,55 +2743,6 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	}
 }
 
-func TestRegisterExistingNodeWithApiserver(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.AddReactor("create", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
-		// Return an error on create.
-		return true, &api.Node{}, &apierrors.StatusError{
-			ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
-		}
-	})
-	kubeClient.AddReactor("get", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
-		// Return an existing (matching) node on get.
-		return true, &api.Node{
-			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-			Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
-		}, nil
-	})
-	kubeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	})
-	machineInfo := &cadvisorApi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorApi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	done := make(chan struct{})
-	go func() {
-		kubelet.registerWithApiserver()
-		done <- struct{}{}
-	}()
-	select {
-	case <-time.After(5 * time.Second):
-		t.Errorf("timed out waiting for registration")
-	case <-done:
-		return
-	}
-}
-
 func TestMakePortMappings(t *testing.T) {
 	tests := []struct {
 		container            *api.Container
@@ -3154,8 +2824,8 @@ func TestIsPodPastActiveDeadline(t *testing.T) {
 
 	exceededActiveDeadlineSeconds := int64(30)
 	notYetActiveDeadlineSeconds := int64(120)
-	now := util.Now()
-	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	now := unversioned.Now()
+	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
 	pods[0].Status.StartTime = &startTime
 	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
 	pods[1].Status.StartTime = &startTime
@@ -3180,8 +2850,8 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
-	now := util.Now()
-	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	now := unversioned.Now()
+	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
 	exceededActiveDeadlineSeconds := int64(30)
 
 	pods := []*api.Pod{
@@ -3231,8 +2901,8 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
-	now := util.Now()
-	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	now := unversioned.Now()
+	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
 	exceededActiveDeadlineSeconds := int64(300)
 
 	pods := []*api.Pod{

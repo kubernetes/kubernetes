@@ -23,8 +23,8 @@ import (
 	"strings"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 var ErrNoContext = errors.New("no context chosen")
@@ -232,7 +232,7 @@ func validateContext(contextName string, context clientcmdapi.Context, config cl
 		validationErrors = append(validationErrors, fmt.Errorf("cluster %q was not found for context %q", context.Cluster, contextName))
 	}
 
-	if (len(context.Namespace) != 0) && !util.IsDNS952Label(context.Namespace) {
+	if (len(context.Namespace) != 0) && !validation.IsDNS952Label(context.Namespace) {
 		validationErrors = append(validationErrors, fmt.Errorf("namespace %q for context %q does not conform to the kubernetes DNS952 rules", context.Namespace, contextName))
 	}
 

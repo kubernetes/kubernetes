@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -319,11 +319,6 @@ func (e *EndpointController) syncService(key string) {
 				continue
 			}
 
-			if !api.IsPodReady(pod) {
-				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
-				continue
-			}
-
 			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
 			epa := api.EndpointAddress{IP: pod.Status.PodIP, TargetRef: &api.ObjectReference{
 				Kind:            "Pod",
@@ -332,7 +327,18 @@ func (e *EndpointController) syncService(key string) {
 				UID:             pod.ObjectMeta.UID,
 				ResourceVersion: pod.ObjectMeta.ResourceVersion,
 			}}
-			subsets = append(subsets, api.EndpointSubset{Addresses: []api.EndpointAddress{epa}, Ports: []api.EndpointPort{epp}})
+			if api.IsPodReady(pod) {
+				subsets = append(subsets, api.EndpointSubset{
+					Addresses: []api.EndpointAddress{epa},
+					Ports:     []api.EndpointPort{epp},
+				})
+			} else {
+				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+				subsets = append(subsets, api.EndpointSubset{
+					NotReadyAddresses: []api.EndpointAddress{epa},
+					Ports:             []api.EndpointPort{epp},
+				})
+			}
 		}
 	}
 	subsets = endpoints.RepackSubsets(subsets)

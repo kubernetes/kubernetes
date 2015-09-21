@@ -49,9 +49,9 @@ Event compression should be best effort (not guaranteed). Meaning, in the worst 
 ## Design
 
 Instead of a single Timestamp, each event object [contains](http://releases.k8s.io/HEAD/pkg/api/types.go#L1111) the following fields:
- * `FirstTimestamp util.Time`
+ * `FirstTimestamp unversioned.Time`
    * The date/time of the first occurrence of the event.
- * `LastTimestamp util.Time`
+ * `LastTimestamp unversioned.Time`
    * The date/time of the most recent occurrence of the event.
    * On first occurrence, this is equal to the FirstTimestamp.
  * `Count int`
@@ -60,7 +60,7 @@ Instead of a single Timestamp, each event object [contains](http://releases.k8s.
 
 Each binary that generates events:
  * Maintains a historical record of previously generated events:
-   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/unversioned/record/events_cache.go`](../../pkg/client/unversioned/record/events_cache.go).
+   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/record/events_cache.go`](../../pkg/client/record/events_cache.go).
    * The key in the cache is generated from the event object minus timestamps/count/transient fields, specifically the following events fields are used to construct a unique key for an event:
      * `event.Source.Component`
      * `event.Source.Host`
@@ -96,11 +96,11 @@ Thu, 12 Feb 2015 01:13:02 +0000   Thu, 12 Feb 2015 01:13:02 +0000   1           
 Thu, 12 Feb 2015 01:13:09 +0000   Thu, 12 Feb 2015 01:13:09 +0000   1                   kubernetes-minion-1.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-1.c.saad-dev-vms.internal}   Starting kubelet.
 Thu, 12 Feb 2015 01:13:09 +0000   Thu, 12 Feb 2015 01:13:09 +0000   1                   kubernetes-minion-3.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-3.c.saad-dev-vms.internal}   Starting kubelet.
 Thu, 12 Feb 2015 01:13:09 +0000   Thu, 12 Feb 2015 01:13:09 +0000   1                   kubernetes-minion-2.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-2.c.saad-dev-vms.internal}   Starting kubelet.
-Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   monitoring-influx-grafana-controller-0133o    Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no minions available to schedule pods
-Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   elasticsearch-logging-controller-fplln        Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no minions available to schedule pods
-Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   kibana-logging-controller-gziey               Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no minions available to schedule pods
-Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   skydns-ls6k1                                  Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no minions available to schedule pods
-Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   monitoring-heapster-controller-oh43e          Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no minions available to schedule pods
+Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   monitoring-influx-grafana-controller-0133o    Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no nodes available to schedule pods
+Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   elasticsearch-logging-controller-fplln        Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no nodes available to schedule pods
+Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   kibana-logging-controller-gziey               Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no nodes available to schedule pods
+Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   skydns-ls6k1                                  Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no nodes available to schedule pods
+Thu, 12 Feb 2015 01:13:05 +0000   Thu, 12 Feb 2015 01:13:12 +0000   4                   monitoring-heapster-controller-oh43e          Pod                                                          failedScheduling    {scheduler }                                            Error scheduling: no nodes available to schedule pods
 Thu, 12 Feb 2015 01:13:20 +0000   Thu, 12 Feb 2015 01:13:20 +0000   1                   kibana-logging-controller-gziey               BoundPod            implicitly required container POD        pulled              {kubelet kubernetes-minion-4.c.saad-dev-vms.internal}   Successfully pulled image "kubernetes/pause:latest"
 Thu, 12 Feb 2015 01:13:20 +0000   Thu, 12 Feb 2015 01:13:20 +0000   1                   kibana-logging-controller-gziey               Pod                                                          scheduled           {scheduler }                                            Successfully assigned kibana-logging-controller-gziey to kubernetes-minion-4.c.saad-dev-vms.internal
 ```

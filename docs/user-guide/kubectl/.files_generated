@@ -14,6 +14,7 @@ kubectl_config_view.md
 kubectl_create.md
 kubectl_delete.md
 kubectl_describe.md
+kubectl_edit.md
 kubectl_exec.md
 kubectl_expose.md
 kubectl_get.md

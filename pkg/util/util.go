@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -189,6 +190,25 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 		intstr.IntVal = 0
 		c.Fuzz(&intstr.StrVal)
 	}
+}
+
+func GetIntOrPercentValue(intStr *IntOrString) (int, bool, error) {
+	switch intStr.Kind {
+	case IntstrInt:
+		return intStr.IntVal, false, nil
+	case IntstrString:
+		s := strings.Replace(intStr.StrVal, "%", "", -1)
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, false, fmt.Errorf("invalid value %q: %v", intStr.StrVal, err)
+		}
+		return v, true, nil
+	}
+	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
+}
+
+func GetValueFromPercent(percent int, value int) int {
+	return int(math.Ceil(float64(percent) * (float64(value)) / 100))
 }
 
 // Takes a list of strings and compiles them into a list of regular expressions
@@ -518,4 +538,36 @@ func FileExists(filename string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// borrowed from ioutil.ReadDir
+// ReadDir reads the directory named by dirname and returns
+// a list of directory entries, minus those with lstat errors
+func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
+	if dirname == "" {
+		dirname = "."
+	}
+
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	names, err := f.Readdirnames(-1)
+	list := make([]os.FileInfo, 0, len(names))
+	errs := make([]error, 0, len(names))
+	for _, filename := range names {
+		fip, lerr := os.Lstat(dirname + "/" + filename)
+		if os.IsNotExist(lerr) {
+			// File disappeared between readdir + stat.
+			// Just treat it as if it didn't exist.
+			continue
+		}
+
+		list = append(list, fip)
+		errs = append(errs, lerr)
+	}
+
+	return list, errs, nil
 }

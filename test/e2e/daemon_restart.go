@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -256,7 +256,7 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	It("Kubelet should not restart containers across restart", func() {
-		nodeIPs, err := getMinionPublicIps(framework.Client)
+		nodeIPs, err := getNodePublicIps(framework.Client)
 		expectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(framework.Client, ns, labelSelector)
 		if preRestarts != 0 {

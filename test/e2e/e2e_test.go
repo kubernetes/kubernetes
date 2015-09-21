@@ -81,6 +81,7 @@ func init() {
 	flag.IntVar(&testContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
 	flag.StringVar(&testContext.UpgradeTarget, "upgrade-target", "latest_ci", "Version to upgrade to (e.g. 'latest_stable', 'latest_release', 'latest_ci', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
 	flag.StringVar(&testContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
+	flag.BoolVar(&testContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 }
 
 func TestE2E(t *testing.T) {

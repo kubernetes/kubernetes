@@ -17,8 +17,9 @@ limitations under the License.
 package iptables
 
 import (
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"testing"
+
+	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {

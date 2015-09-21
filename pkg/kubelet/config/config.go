@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -39,9 +39,12 @@ import (
 type PodConfigNotificationMode int
 
 const (
+	// PodConfigNotificationUnknown is the default value for
+	// PodConfigNotificationMode when uninitialized.
+	PodConfigNotificationUnknown = iota
 	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
 	// any change occurs.
-	PodConfigNotificationSnapshot = iota
+	PodConfigNotificationSnapshot
 	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE message whenever pods are
 	// changed, and a SET message if there are any additions or removals.
 	PodConfigNotificationSnapshotAndUpdates
@@ -178,6 +181,8 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- kubelet.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubelet.SET, Source: source}
 		}
 
+	case PodConfigNotificationUnknown:
+		fallthrough
 	default:
 		panic(fmt.Sprintf("unsupported PodConfigNotificationMode: %#v", s.mode))
 	}
@@ -185,19 +190,13 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-// recordFirstSeenTime records the first seen time of this pod.
-func recordFirstSeenTime(pod *api.Pod) {
-	glog.V(4).Infof("Receiving a new pod %q", kubeletUtil.FormatPodName(pod))
-	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
-}
-
 func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubelet.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
-	adds = &kubelet.PodUpdate{Op: kubelet.ADD}
-	updates = &kubelet.PodUpdate{Op: kubelet.UPDATE}
-	deletes = &kubelet.PodUpdate{Op: kubelet.REMOVE}
+	adds = &kubelet.PodUpdate{Op: kubelet.ADD, Source: source}
+	updates = &kubelet.PodUpdate{Op: kubelet.UPDATE, Source: source}
+	deletes = &kubelet.PodUpdate{Op: kubelet.REMOVE, Source: source}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -216,6 +215,11 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
+			// Annotate the pod with the source before any comparison.
+			if ref.Annotations == nil {
+				ref.Annotations = make(map[string]string)
+			}
+			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			if existing, found := pods[name]; found {
 				if checkAndUpdatePod(existing, ref) {
 					// this is an update
@@ -226,10 +230,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				continue
 			}
 			// this is an add
-			if ref.Annotations == nil {
-				ref.Annotations = make(map[string]string)
-			}
-			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			recordFirstSeenTime(ref)
 			pods[name] = ref
 			adds.Pods = append(adds.Pods, ref)
@@ -258,6 +258,11 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
+			// Annotate the pod with the source before any comparison.
+			if ref.Annotations == nil {
+				ref.Annotations = make(map[string]string)
+			}
+			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
 				if checkAndUpdatePod(existing, ref) {
@@ -268,10 +273,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				// this is a no-op
 				continue
 			}
-			if ref.Annotations == nil {
-				ref.Annotations = make(map[string]string)
-			}
-			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			recordFirstSeenTime(ref)
 			pods[name] = ref
 			adds.Pods = append(adds.Pods, ref)
@@ -353,9 +354,12 @@ func isLocalAnnotationKey(key string) bool {
 // for local annotations.
 func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 	if candidateMap == nil {
-		return true
+		candidateMap = make(map[string]string)
 	}
 	for k, v := range candidateMap {
+		if isLocalAnnotationKey(k) {
+			continue
+		}
 		if existingValue, ok := existingMap[k]; ok && existingValue == v {
 			continue
 		}
@@ -373,6 +377,12 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 	return true
 }
 
+// recordFirstSeenTime records the first seen time of this pod.
+func recordFirstSeenTime(pod *api.Pod) {
+	glog.V(4).Infof("Receiving a new pod %q", kubeletUtil.FormatPodName(pod))
+	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
+}
+
 // updateAnnotations returns an Annotation map containing the api annotation map plus
 // locally managed annotations
 func updateAnnotations(existing, ref *api.Pod) {
@@ -388,18 +398,30 @@ func updateAnnotations(existing, ref *api.Pod) {
 	existing.Annotations = annotations
 }
 
-// checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
-// returns false if there was no update.
-func checkAndUpdatePod(existing, ref *api.Pod) bool {
-	// TODO: it would be better to update the whole object and only preserve certain things
-	//       like the source annotation or the UID (to ensure safety)
+func podsDifferSemantically(existing, ref *api.Pod) bool {
 	if reflect.DeepEqual(existing.Spec, ref.Spec) &&
 		reflect.DeepEqual(existing.DeletionTimestamp, ref.DeletionTimestamp) &&
 		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) &&
 		isAnnotationMapEqual(existing.Annotations, ref.Annotations) {
 		return false
 	}
+	return true
+}
+
+// checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
+// returns false if there was no update.
+func checkAndUpdatePod(existing, ref *api.Pod) bool {
+	// TODO: it would be better to update the whole object and only preserve certain things
+	//       like the source annotation or the UID (to ensure safety)
+	if !podsDifferSemantically(existing, ref) {
+		return false
+	}
 	// this is an update
+
+	// Overwrite the first-seen time with the existing one. This is our own
+	// internal annotation, there is no need to update.
+	ref.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubelet.ConfigFirstSeenAnnotationKey]
+
 	existing.Spec = ref.Spec
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds

@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -229,6 +229,8 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		} else {
 			// another process is watching for released volumes.
 			// PersistentVolumeReclaimPolicy is set per PersistentVolume
+			//  Recycle - sets the PV to Pending and back under this controller's management
+			//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
 		}
 
 	// volumes are removed by processes external to this binder and must be removed from the cluster

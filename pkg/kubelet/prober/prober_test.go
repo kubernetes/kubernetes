@@ -17,9 +17,13 @@ limitations under the License.
 package prober
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -160,11 +164,276 @@ func TestGetTCPAddrParts(t *testing.T) {
 	}
 }
 
-type FakeExecProber struct {
+// TestProbeContainer tests the functionality of probeContainer.
+// Test cases are:
+//
+// No probe.
+// Only LivenessProbe.
+// Only ReadinessProbe.
+// Both probes.
+//
+// Also, for each probe, there will be several cases covering whether the initial
+// delay has passed, whether the probe handler will return Success, Failure,
+// Unknown or error.
+//
+// PLEASE READ THE PROBE DOCS BEFORE CHANGING THIS TEST IF YOU ARE UNSURE HOW PROBES ARE SUPPOSED TO WORK:
+// (See https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/user-guide/pod-states.md#pod-conditions)
+func TestProbeContainer(t *testing.T) {
+	readinessManager := kubecontainer.NewReadinessManager()
+	prober := &prober{
+		readinessManager: readinessManager,
+		refManager:       kubecontainer.NewRefManager(),
+		recorder:         &record.FakeRecorder{},
+	}
+	containerID := "foobar"
+	createdAt := time.Now().Unix()
+
+	tests := []struct {
+		testContainer     api.Container
+		expectError       bool
+		expectedResult    probe.Result
+		expectedReadiness bool
+	}{
+		// No probes.
+		{
+			testContainer:     api.Container{},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		// Only LivenessProbe. expectedReadiness should always be true here.
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{InitialDelaySeconds: 100},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{InitialDelaySeconds: -100},
+			},
+			expectedResult:    probe.Unknown,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Failure,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Unknown,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectError:       true,
+			expectedResult:    probe.Unknown,
+			expectedReadiness: true,
+		},
+		// // Only ReadinessProbe. expectedResult should always be probe.Success here.
+		{
+			testContainer: api.Container{
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				ReadinessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				ReadinessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				ReadinessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		{
+			testContainer: api.Container{
+				ReadinessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectError:       false,
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+		// Both LivenessProbe and ReadinessProbe.
+		{
+			testContainer: api.Container{
+				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe:  &api.Probe{InitialDelaySeconds: -100},
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
+			},
+			expectedResult:    probe.Unknown,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe:  &api.Probe{InitialDelaySeconds: -100},
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+			},
+			expectedResult:    probe.Unknown,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+			},
+			expectedResult:    probe.Unknown,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+			},
+			expectedResult:    probe.Failure,
+			expectedReadiness: false,
+		},
+		{
+			testContainer: api.Container{
+				LivenessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+				ReadinessProbe: &api.Probe{
+					InitialDelaySeconds: -100,
+					Handler: api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+			expectedResult:    probe.Success,
+			expectedReadiness: true,
+		},
+	}
+
+	for i, test := range tests {
+		if test.expectError {
+			prober.exec = fakeExecProber{test.expectedResult, errors.New("exec error")}
+		} else {
+			prober.exec = fakeExecProber{test.expectedResult, nil}
+		}
+		result, err := prober.Probe(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID, createdAt)
+		if test.expectError && err == nil {
+			t.Errorf("[%d] Expected error but no error was returned.", i)
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("[%d] Didn't expect error but got: %v", i, err)
+		}
+		if test.expectedResult != result {
+			t.Errorf("[%d] Expected result to be %v but was %v", i, test.expectedResult, result)
+		}
+		if test.expectedReadiness != readinessManager.GetReadiness(containerID) {
+			t.Errorf("[%d] Expected readiness to be %v but was %v", i, test.expectedReadiness, readinessManager.GetReadiness(containerID))
+		}
+	}
+}
+
+type fakeExecProber struct {
 	result probe.Result
 	err    error
 }
 
-func (p FakeExecProber) Probe(_ exec.Cmd) (probe.Result, error) {
-	return p.result, p.err
+func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
+	return p.result, "", p.err
 }

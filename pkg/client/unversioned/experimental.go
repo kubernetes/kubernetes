@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -36,6 +36,7 @@ type ExperimentalInterface interface {
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
+	JobsNamespacer
 }
 
 // ExperimentalClient is used to interact with experimental Kubernetes features.
@@ -90,6 +91,10 @@ func (c *ExperimentalClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
 }
 
+func (c *ExperimentalClient) Jobs(namespace string) JobInterface {
+	return newJobs(c, namespace)
+}
+
 // NewExperimental creates a new ExperimentalClient for the given config. This client
 // provides access to experimental Kubernetes features.
 // Experimental features are not supported and may be changed or removed in
@@ -119,17 +124,23 @@ func NewExperimentalOrDie(c *Config) *ExperimentalClient {
 }
 
 func setExperimentalDefaults(config *Config) error {
-	config.Prefix = "/experimental"
+	// if experimental group is not registered, return an error
+	g, err := latest.Group("experimental")
+	if err != nil {
+		return err
+	}
+	config.Prefix = "apis/" + g.Group
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
 	if config.Version == "" {
-		config.Version = explatest.Version
+		config.Version = g.Version
 	}
-	versionInterfaces, err := explatest.InterfacesFor(config.Version)
+
+	versionInterfaces, err := g.InterfacesFor(config.Version)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(explatest.Versions, ", "))
+			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec

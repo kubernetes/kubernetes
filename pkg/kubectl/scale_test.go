@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
@@ -41,6 +42,22 @@ func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace stri
 	return &ErrorReplicationControllers{testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
 }
 
+type InvalidReplicationControllers struct {
+	testclient.FakeReplicationControllers
+}
+
+func (c *InvalidReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	return nil, kerrors.NewInvalid(controller.Kind, controller.Name, nil)
+}
+
+type InvalidReplicationControllerClient struct {
+	testclient.Fake
+}
+
+func (c *InvalidReplicationControllerClient) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
+	return &InvalidReplicationControllers{testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
+}
+
 func TestReplicationControllerScaleRetry(t *testing.T) {
 	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}}
 	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
@@ -51,7 +68,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 
 	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
 	pass, err := scaleFunc()
-	if pass != false {
+	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
 	if err != nil {
@@ -62,6 +79,25 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	pass, err = scaleFunc()
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
+	}
+}
+
+func TestReplicationControllerScaleInvalid(t *testing.T) {
+	fake := &InvalidReplicationControllerClient{Fake: testclient.Fake{}}
+	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	preconditions := ScalePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	namespace := "default"
+
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err := scaleFunc()
+	if pass {
+		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
+	}
+	e, ok := err.(ControllerScaleError)
+	if err == nil || !ok || e.FailureType != ControllerScaleUpdateInvalidFailure {
+		t.Errorf("Expected error on invalid update failure, got %v", err)
 	}
 }
 

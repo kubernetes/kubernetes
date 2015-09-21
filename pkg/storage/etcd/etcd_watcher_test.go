@@ -23,7 +23,8 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
@@ -46,7 +47,7 @@ func (f *fakeEtcdCache) addToCache(index uint64, obj runtime.Object) {
 var _ etcdCache = &fakeEtcdCache{}
 
 func TestWatchInterpretations(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	// Declare some pods to make the test cases compact.
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
@@ -215,7 +216,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 }
 
 func TestWatchEtcdError(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.ExpectNotFoundGet("/some/key")
 	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
@@ -231,20 +232,20 @@ func TestWatchEtcdError(t *testing.T) {
 	if got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
-	status, ok := got.Object.(*api.Status)
+	status, ok := got.Object.(*unversioned.Status)
 	if !ok {
 		t.Fatalf("Unexpected non-error object type")
 	}
 	if status.Message != "immediate error" {
 		t.Errorf("Unexpected wrong error")
 	}
-	if status.Status != api.StatusFailure {
+	if status.Status != unversioned.StatusFailure {
 		t.Errorf("Unexpected wrong error status")
 	}
 }
 
 func TestWatch(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key := "/some/key"
 	prefixedKey := etcdtest.AddPrefix(key)
@@ -289,7 +290,7 @@ func TestWatch(t *testing.T) {
 		if e, a := watch.Error, errEvent.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
-		if e, a := "Injected error", errEvent.Object.(*api.Status).Message; e != a {
+		if e, a := "Injected error", errEvent.Object.(*unversioned.Status).Message; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
@@ -315,7 +316,7 @@ func makeSubsets(ip string, port int) []api.EndpointSubset {
 }
 
 func TestWatchEtcdState(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	baseKey := "/somekey/foo"
 	prefixedKey := etcdtest.AddPrefix(baseKey)
 	type T struct {
@@ -453,7 +454,7 @@ func TestWatchEtcdState(t *testing.T) {
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	testCases := map[string]struct {
@@ -531,7 +532,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	key := "/some/key"
 	prefixedKey := etcdtest.AddPrefix(key)
@@ -593,7 +594,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
-	codec := latest.Codec
+	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	key := "/some/key"
 	prefixedKey := etcdtest.AddPrefix(key)
@@ -690,7 +691,7 @@ func TestWatchFromOtherError(t *testing.T) {
 	if e, a := watch.Error, errEvent.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-	if e, a := "101:  () [2]", errEvent.Object.(*api.Status).Message; e != a {
+	if e, a := "101:  () [2]", errEvent.Object.(*unversioned.Status).Message; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -88,19 +89,19 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	if errs := ValidateObjectMetaUpdate(
 		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
-		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: unversioned.NewTime(time.Unix(10, 0))},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: unversioned.NewTime(time.Unix(10, 0))},
 		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
-		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(11, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: unversioned.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: unversioned.NewTime(time.Unix(11, 0))},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -445,6 +446,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 }
 
 func TestValidateVolumes(t *testing.T) {
+	lun := 1
 	successCase := []api.Volume{
 		{Name: "abc", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path1"}}},
 		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path2"}}},
@@ -485,12 +487,13 @@ func TestValidateVolumes(t *testing.T) {
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels"}},
 		}}}},
+		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{[]string{"some_wwn"}, &lun, "ext4", false}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk", "cinder", "cephfs") {
+	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk", "cinder", "cephfs", "fc") {
 		t.Errorf("wrong names result: %v", names)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
@@ -526,6 +529,8 @@ func TestValidateVolumes(t *testing.T) {
 			APIVersion: "v1",
 			FieldPath:  "metadata.labels"}}},
 	}}
+	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{[]string{}, &lun, "ext4", false}}
+	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{[]string{"wwn"}, nil, "ext4", false}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T errors.ValidationErrorType
@@ -548,6 +553,8 @@ func TestValidateVolumes(t *testing.T) {
 		"dot dot path":                {[]api.Volume{{Name: "dotdotpath", VolumeSource: dotDotInPath}}, errors.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not contain \"..\"."},
 		"dot dot file name":           {[]api.Volume{{Name: "dotdotfilename", VolumeSource: dotDotPathName}}, errors.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
 		"dot dot first level dirent ": {[]api.Volume{{Name: "dotdotdirfilename", VolumeSource: dotDotFirstLevelDirent}}, errors.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
+		"empty wwn":                   {[]api.Volume{{Name: "badimage", VolumeSource: zeroWWN}}, errors.ValidationErrorTypeRequired, "[0].source.fc.targetWWNs", ""},
+		"empty lun":                   {[]api.Volume{{Name: "badimage", VolumeSource: emptyLun}}, errors.ValidationErrorTypeRequired, "[0].source.fc.lun", ""},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
@@ -1401,7 +1408,7 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	now := util.Now()
+	now := unversioned.Now()
 	grace := int64(30)
 	grace2 := int64(31)
 	tests := []struct {
@@ -2911,6 +2918,12 @@ func TestValidateLimitRange(t *testing.T) {
 						Type:                 api.LimitTypePod,
 						Max:                  getResourceList("100m", "10000Mi"),
 						Min:                  getResourceList("5m", "100Mi"),
+						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+					{
+						Type:                 api.LimitTypeContainer,
+						Max:                  getResourceList("100m", "10000Mi"),
+						Min:                  getResourceList("5m", "100Mi"),
 						Default:              getResourceList("50m", "500Mi"),
 						DefaultRequest:       getResourceList("10m", "200Mi"),
 						MaxLimitRequestRatio: getResourceList("10", ""),
@@ -2923,7 +2936,7 @@ func TestValidateLimitRange(t *testing.T) {
 			spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
-						Type:                 api.LimitTypePod,
+						Type:                 api.LimitTypeContainer,
 						Max:                  getResourceList("100m", "10000T"),
 						Min:                  getResourceList("5m", "100Mi"),
 						Default:              getResourceList("50m", "500Mi"),
@@ -2978,6 +2991,32 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"",
 		},
+		"default-limit-type-pod": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:    api.LimitTypePod,
+						Max:     getResourceList("100m", "10000m"),
+						Min:     getResourceList("0m", "100m"),
+						Default: getResourceList("10m", "100m"),
+					},
+				},
+			}},
+			"Default is not supported when limit type is Pod",
+		},
+		"default-request-limit-type-pod": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:           api.LimitTypePod,
+						Max:            getResourceList("100m", "10000m"),
+						Min:            getResourceList("0m", "100m"),
+						DefaultRequest: getResourceList("10m", "100m"),
+					},
+				},
+			}},
+			"DefaultRequest is not supported when limit type is Pod",
+		},
 		"min value 100m is greater than max value 10m": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
@@ -2994,7 +3033,7 @@ func TestValidateLimitRange(t *testing.T) {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
-						Type:    api.LimitTypePod,
+						Type:    api.LimitTypeContainer,
 						Max:     getResourceList("1", ""),
 						Min:     getResourceList("100m", ""),
 						Default: getResourceList("2000m", ""),
@@ -3007,7 +3046,7 @@ func TestValidateLimitRange(t *testing.T) {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
-						Type:           api.LimitTypePod,
+						Type:           api.LimitTypeContainer,
 						Max:            getResourceList("1", ""),
 						Min:            getResourceList("100m", ""),
 						DefaultRequest: getResourceList("2000m", ""),
@@ -3029,6 +3068,30 @@ func TestValidateLimitRange(t *testing.T) {
 				},
 			}},
 			"default request value 800m is greater than default limit value 500m",
+		},
+		"invalid spec maxLimitRequestRatio less than 1": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypePod,
+						MaxLimitRequestRatio: getResourceList("800m", ""),
+					},
+				},
+			}},
+			"maxLimitRequestRatio 800m is less than 1",
+		},
+		"invalid spec maxLimitRequestRatio greater than max/min": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypeContainer,
+						Max:                  getResourceList("", "2Gi"),
+						Min:                  getResourceList("", "512Mi"),
+						MaxLimitRequestRatio: getResourceList("", "10"),
+					},
+				},
+			}},
+			"maxLimitRequestRatio 10 is greater than max/min = 4.000000",
 		},
 	}
 
@@ -3219,7 +3282,7 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 }
 
 func TestValidateNamespaceStatusUpdate(t *testing.T) {
-	now := util.Now()
+	now := unversioned.Now()
 
 	tests := []struct {
 		oldNamespace api.Namespace

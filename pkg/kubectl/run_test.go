@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 func TestGenerate(t *testing.T) {
@@ -279,6 +280,92 @@ func TestGenerate(t *testing.T) {
 								{
 									Name:  "foo",
 									Image: "someimage",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"hostport": "80",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"labels":   "foo=bar,baz=blah",
+				"requests": "cpu100m,memory=100Mi",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"labels":   "foo=bar,baz=blah",
+				"requests": "cpu=100m&memory=100Mi",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"labels":   "foo=bar,baz=blah",
+				"requests": "cpu=",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"labels":   "foo=bar,baz=blah",
+				"requests": "cpu=100m,memory=100Mi",
+				"limits":   "cpu=400m,memory=200Mi",
+			},
+			expected: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"foo": "bar", "baz": "blah"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"foo": "bar", "baz": "blah"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "foo",
+									Image: "someimage",
+									Resources: api.ResourceRequirements{
+										Requests: api.ResourceList{
+											api.ResourceCPU:    resource.MustParse("100m"),
+											api.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: api.ResourceList{
+											api.ResourceCPU:    resource.MustParse("400m"),
+											api.ResourceMemory: resource.MustParse("200Mi"),
+										},
+									},
 								},
 							},
 						},

@@ -67,7 +67,7 @@ echo "Copying files to workspace"
 mkdir -p "${workspace}/bin"
 #cp "${script_dir}/bin/"* "${workspace}/bin/"
 cp "${common_bin_path}/"* "${workspace}/bin/"
-cp "${kube_bin_path}/"* "${workspace}/bin/"
+cp "${kube_bin_path}/km" "${workspace}/bin/"
 
 # config
 mkdir -p "${workspace}/opt"

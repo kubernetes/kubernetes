@@ -79,7 +79,7 @@ Note that replication controllers may themselves have labels and would generally
 
 Pods may be removed from a replication controller's target set by changing their labels. This technique may be used to remove pods from service for debugging, data recovery, etc. Pods that are removed in this way will be replaced automatically (assuming that the number of replicas is not also changed).
 
-Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. (Note that the client tool, kubectl, provides a single operation, [stop](kubectl/kubectl_stop.md) to delete both the replication controller and the pods it controls. However, there is no such operation in the API at the moment)
+Similarly, deleting a replication controller using the API does not affect the pods it created. Its `replicas` field must first be set to `0` in order to delete the pods controlled. (Note that the client tool, `kubectl`, provides a single operation, [delete](kubectl/kubectl_delete.md) to delete both the replication controller and the pods it controls. If you want to leave the pods running when deleting a replication controller, specify `--cascade=false`. However, there is no such operation in the API at the moment)
 
 ## Responsibilities of the replication controller
 

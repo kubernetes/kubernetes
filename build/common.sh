@@ -835,6 +835,8 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
+  mkdir -p "${release_stage}/contrib/completions/bash"
+  cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
 
   kube::release::clean_cruft
 

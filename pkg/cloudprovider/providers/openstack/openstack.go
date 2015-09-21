@@ -525,8 +525,8 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (*api.LoadBalanc
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts, affinity)
+func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, affinity)
 
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
@@ -618,8 +618,8 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, externalIP ne
 		SubnetID:     lb.opts.SubnetId,
 		Persistence:  persistence,
 	}
-	if externalIP != nil {
-		createOpts.Address = externalIP.String()
+	if loadBalancerIP != nil {
+		createOpts.Address = loadBalancerIP.String()
 	}
 
 	vip, err := vips.Create(lb.network, createOpts).Extract()

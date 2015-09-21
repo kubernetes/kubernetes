@@ -42,8 +42,8 @@ func PodMemLimit(pod *api.Pod) MegaBytes {
 }
 
 // limitPodResource sets the given default resource limit for each container that
-// does not limit the given resource yet. limitPodResource returns true iff at least one
-// container had no limit for that resource.
+// does not limit the given resource yet. limitPodResource returns true if and only if
+// at least one container had no limit for that resource.
 func limitPodResource(pod *api.Pod, resourceName api.ResourceName, defaultLimit resource.Quantity) bool {
 	unlimited := false
 	for j := range pod.Spec.Containers {
@@ -79,16 +79,16 @@ func unlimitedCountainerNum(pod *api.Pod, resourceName api.ResourceName) int {
 }
 
 // limitPodCPU sets DefaultContainerCPUs for the CPU limit of each container that
-// does not limit its CPU resource yet. limitPodCPU returns true iff at least one
-// container had no CPU limit set.
+// does not limit its CPU resource yet. limitPodCPU returns true if and only if
+// at least one container had no CPU limit set.
 func LimitPodCPU(pod *api.Pod, defaultLimit CPUShares) bool {
 	defaultCPUQuantity := resource.NewMilliQuantity(int64(float64(defaultLimit)*1000.0), resource.DecimalSI)
 	return limitPodResource(pod, api.ResourceCPU, *defaultCPUQuantity)
 }
 
 // limitPodMem sets DefaultContainerMem for the memory limit of each container that
-// does not limit its memory resource yet. limitPodMem returns true iff at least one
-// container had no memory limit set.
+// does not limit its memory resource yet. limitPodMem returns true if and only if
+// at least one container had no memory limit set.
 func LimitPodMem(pod *api.Pod, defaultLimit MegaBytes) bool {
 	defaultMemQuantity := resource.NewQuantity(int64(float64(defaultLimit)*1024.0*1024.0), resource.BinarySI)
 	return limitPodResource(pod, api.ResourceMemory, *defaultMemQuantity)

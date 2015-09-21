@@ -37,13 +37,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/expapi"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/labels"
@@ -55,6 +54,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
+	jobetcd "k8s.io/kubernetes/pkg/registry/job/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
@@ -117,7 +117,7 @@ type Config struct {
 	EnableProfiling       bool
 	EnableWatchCache      bool
 	APIPrefix             string
-	ExpAPIPrefix          string
+	APIGroupPrefix        string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -195,7 +195,7 @@ type Master struct {
 	enableProfiling       bool
 	enableWatchCache      bool
 	apiPrefix             string
-	expAPIPrefix          string
+	apiGroupPrefix        string
 	corsAllowedOriginList []string
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
@@ -354,7 +354,7 @@ func New(c *Config) *Master {
 		enableProfiling:       c.EnableProfiling,
 		enableWatchCache:      c.EnableWatchCache,
 		apiPrefix:             c.APIPrefix,
-		expAPIPrefix:          c.ExpAPIPrefix,
+		apiGroupPrefix:        c.APIGroupPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
@@ -571,11 +571,11 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	if m.exp {
-		expVersion := m.expapi(c)
+		expVersion := m.experimental(c)
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
+		apiserver.AddApiWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", []string{expVersion.Version})
 		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
@@ -616,7 +616,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.GroupOrDie("").RESTMapper, "api")
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -746,12 +746,12 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
 		Root: m.apiPrefix,
 
-		Mapper: latest.RESTMapper,
+		Mapper: latest.GroupOrDie("").RESTMapper,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
-		Linker:    latest.SelfLinker,
+		Linker:    latest.GroupOrDie("").SelfLinker,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -774,7 +774,7 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	return version
 }
 
-func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
+func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) error {
 	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return err
@@ -783,8 +783,8 @@ func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
 	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
-	thirdPartyPrefix := "/thirdparty/" + group + "/"
-	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
+	thirdPartyAPIPrefix := makeThirdPartyPath(group) + "/"
+	apiserver.AddApiWebService(m.handlerContainer, thirdPartyAPIPrefix, []string{rsrc.Versions[0].Name})
 	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
 	return nil
@@ -793,7 +793,7 @@ func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := "/thirdparty/" + group + "/"
+	apiRoot := makeThirdPartyPath(group) + "/"
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
@@ -806,9 +806,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind, version),
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
+		Mapper:  thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version),
+		Codec:   latest.GroupOrDie("experimental").Codec,
+		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
 		Version: version,
 
@@ -820,13 +820,14 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 }
 
-// expapi returns the resources and codec for the experimental api
-func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
+// experimental returns the resources and codec for the experimental api
+func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	controllerStorage := expcontrolleretcd.NewStorage(c.ExpDatabaseStorage)
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
 	daemonSetStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
 	deploymentStorage := deploymentetcd.NewREST(c.ExpDatabaseStorage)
+	jobStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
 
 	storage := map[string]rest.Storage{
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
@@ -835,20 +836,21 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
 		strings.ToLower("daemonsets"):                   daemonSetStorage,
 		strings.ToLower("deployments"):                  deploymentStorage,
+		strings.ToLower("jobs"):                         jobStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root: m.expAPIPrefix,
+		Root: m.apiGroupPrefix + "/" + latest.GroupOrDie("experimental").Group,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  explatest.RESTMapper,
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
+		Mapper:  latest.GroupOrDie("experimental").RESTMapper,
+		Codec:   latest.GroupOrDie("experimental").Codec,
+		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
-		Version: explatest.Version,
+		Version: latest.GroupOrDie("experimental").Version,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -1024,6 +1026,7 @@ func (m *Master) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
 }
 
 func (m *Master) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
+	// TODO: user is not used. Consider removing it as an input to the function.
 	private, public, err := util.GenerateKey(2048)
 	if err != nil {
 		return err

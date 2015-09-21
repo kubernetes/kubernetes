@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -40,20 +42,21 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	defer s.Close()
 
 	deleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	binderClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	testClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 
-	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(client, 1*time.Second)
+	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
 	binder.Run()
 	defer binder.Stop()
 
 	for _, volume := range createTestVolumes() {
-		_, err := client.PersistentVolumes().Create(volume)
+		_, err := testClient.PersistentVolumes().Create(volume)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 	}
 
-	volumes, err := client.PersistentVolumes().List(labels.Everything(), fields.Everything())
+	volumes, err := testClient.PersistentVolumes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,13 +65,13 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	}
 
 	for _, claim := range createTestClaims() {
-		_, err := client.PersistentVolumeClaims(api.NamespaceDefault).Create(claim)
+		_, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(claim)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 	}
 
-	claims, err := client.PersistentVolumeClaims(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
+	claims, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +80,7 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	}
 
 	// the binder will eventually catch up and set status on Claims
-	watch, err := client.PersistentVolumeClaims(api.NamespaceDefault).Watch(labels.Everything(), fields.Everything(), "0")
+	watch, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Watch(labels.Everything(), fields.Everything(), "0")
 	if err != nil {
 		t.Fatalf("Couldn't subscribe to PersistentVolumeClaims: %v", err)
 	}
@@ -97,7 +100,7 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	}
 
 	for _, claim := range createTestClaims() {
-		claim, err := client.PersistentVolumeClaims(api.NamespaceDefault).Get(claim.Name)
+		claim, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Get(claim.Name)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -203,5 +206,129 @@ func createTestVolumes() []*api.PersistentVolume {
 				},
 			},
 		},
+	}
+}
+
+func TestPersistentVolumeRecycler(t *testing.T) {
+	_, s := runAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	binderClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	testClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+
+	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
+	binder.Run()
+	defer binder.Stop()
+
+	recycler, _ := volumeclaimbinder.NewPersistentVolumeRecycler(recyclerClient, 1*time.Second, []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", volume.NewFakeVolumeHost("/tmp/fake", nil, nil)}})
+	recycler.Run()
+	defer recycler.Stop()
+
+	// This PV will be claimed, released, and recycled.
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{Name: "fake-pv"},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource:        api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "foo"}},
+			Capacity:                      api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			AccessModes:                   []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
+		},
+	}
+
+	pvc := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: "fake-pvc"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("5G")}},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	watch, _ := testClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "0")
+	defer watch.Stop()
+
+	_, _ = testClient.PersistentVolumes().Create(pv)
+	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+
+	// wait until the binder pairs the volume and claim
+	waitForPersistentVolumePhase(watch, api.VolumeBound)
+
+	// deleting a claim releases the volume, after which it can be recycled
+	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name); err != nil {
+		t.Errorf("error deleting claim %s", pvc.Name)
+	}
+
+	waitForPersistentVolumePhase(watch, api.VolumeReleased)
+	waitForPersistentVolumePhase(watch, api.VolumeAvailable)
+}
+
+func waitForPersistentVolumePhase(w watch.Interface, phase api.PersistentVolumePhase) {
+	for {
+		event := <-w.ResultChan()
+		volume := event.Object.(*api.PersistentVolume)
+		if volume.Status.Phase == phase {
+			break
+		}
+	}
+}
+
+func TestPersistentVolumeDeleter(t *testing.T) {
+	_, s := runAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	binderClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	testClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+
+	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
+	binder.Run()
+	defer binder.Stop()
+
+	recycler, _ := volumeclaimbinder.NewPersistentVolumeRecycler(recyclerClient, 1*time.Second, []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", volume.NewFakeVolumeHost("/tmp/fake", nil, nil)}})
+	recycler.Run()
+	defer recycler.Stop()
+
+	// This PV will be claimed, released, and recycled.
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{Name: "fake-pv"},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource:        api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/tmp/foo"}},
+			Capacity:                      api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			AccessModes:                   []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+		},
+	}
+
+	pvc := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: "fake-pvc"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("5G")}},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	w, _ := testClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "0")
+	defer w.Stop()
+
+	_, _ = testClient.PersistentVolumes().Create(pv)
+	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+
+	// wait until the binder pairs the volume and claim
+	waitForPersistentVolumePhase(w, api.VolumeBound)
+
+	// deleting a claim releases the volume, after which it can be recycled
+	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name); err != nil {
+		t.Errorf("error deleting claim %s", pvc.Name)
+	}
+
+	waitForPersistentVolumePhase(w, api.VolumeReleased)
+
+	for {
+		event := <-w.ResultChan()
+		if event.Type == watch.Deleted {
+			break
+		}
 	}
 }

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -33,13 +33,13 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewDeployment() *expapi.Deployment {
-	return &expapi.Deployment{
+func validNewDeployment() *experimental.Deployment {
+	return &experimental.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: expapi.DeploymentSpec{
+		Spec: experimental.DeploymentSpec{
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -73,8 +73,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		deployment,
 		// invalid (invalid selector)
-		&expapi.Deployment{
-			Spec: expapi.DeploymentSpec{
+		&experimental.Deployment{
+			Spec: experimental.DeploymentSpec{
 				Selector: map[string]string{},
 				Template: validDeployment.Spec.Template,
 			},
@@ -90,28 +90,28 @@ func TestUpdate(t *testing.T) {
 		validNewDeployment(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Deployment)
+			object := obj.(*experimental.Deployment)
 			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Deployment)
+			object := obj.(*experimental.Deployment)
 			object.UID = "newUID"
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Deployment)
+			object := obj.(*experimental.Deployment)
 			object.Name = ""
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Deployment)
+			object := obj.(*experimental.Deployment)
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*expapi.Deployment)
+			object := obj.(*experimental.Deployment)
 			object.Spec.Selector = map[string]string{}
 			return object
 		},

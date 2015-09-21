@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/storage"
@@ -72,7 +71,7 @@ type APIServer struct {
 	TLSPrivateKeyFile          string
 	CertDirectory              string
 	APIPrefix                  string
-	ExpAPIPrefix               string
+	APIGroupPrefix             string
 	StorageVersion             string
 	ExpStorageVersion          string
 	CloudProvider              string
@@ -122,7 +121,7 @@ func NewAPIServer() *APIServer {
 		BindAddress:            net.ParseIP("0.0.0.0"),
 		SecurePort:             6443,
 		APIPrefix:              "/api",
-		ExpAPIPrefix:           "/experimental",
+		APIGroupPrefix:         "/apis",
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
@@ -181,7 +180,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
-	fs.StringVar(&s.ExpAPIPrefix, "experimental-prefix", s.ExpAPIPrefix, "The prefix for experimental API requests on the server. Default '/experimental'.")
+	fs.MarkDeprecated("api-prefix", "--api-prefix is deprecated and will be removed when the v1 API is retired")
 	fs.StringVar(&s.StorageVersion, "storage-version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
@@ -293,6 +292,7 @@ func (s *APIServer) Run(_ []string) error {
 		// TODO(vmarmol): Implement support for HostNetworkSources.
 		PrivilegedSources: capabilities.PrivilegedSources{
 			HostNetworkSources: []string{},
+			HostPIDSources:     []string{},
 		},
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
@@ -340,13 +340,21 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.InterfacesFor, latest.Version, s.StorageVersion, s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
-	expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, explatest.InterfacesFor, explatest.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
-	if err != nil {
-		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+
+	var expEtcdStorage storage.Interface
+	if enableExp {
+		g, err := latest.Group("experimental")
+		if err != nil {
+			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		}
+		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, g.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
+		if err != nil {
+			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+		}
 	}
 
 	n := s.ServiceClusterIPRange
@@ -430,7 +438,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableWatchCache:       s.EnableWatchCache,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
-		ExpAPIPrefix:           s.ExpAPIPrefix,
+		APIGroupPrefix:         s.APIGroupPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadWritePort:          s.SecurePort,
 		PublicAddress:          s.AdvertiseAddress,

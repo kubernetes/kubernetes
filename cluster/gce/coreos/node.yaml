@@ -93,6 +93,7 @@ coreos:
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/rm -rf /opt/rkt
         ExecStartPre=/usr/bin/mkdir -p /opt/rkt
+        ExecStartPre=/usr/bin/mkdir -p /etc/rkt
         ExecStartPre=/usr/bin/wget \
         -O /opt/rkt/rkt-v${RKT_VERSION}.tar.gz \
         https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz

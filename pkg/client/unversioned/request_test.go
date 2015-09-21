@@ -34,8 +34,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -193,7 +193,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test unencodable api object
-	r = (&Request{codec: latest.Codec}).Body(&NotAnAPIObject{})
+	r = (&Request{codec: testapi.Default.Codec()}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -356,7 +356,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		r := &Request{
-			codec:        latest.Codec,
+			codec:        testapi.Default.Codec(),
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
@@ -437,9 +437,9 @@ func TestRequestWatch(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Status{
-							Status: api.StatusFailure,
-							Reason: api.StatusReasonUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &unversioned.Status{
+							Status: unversioned.StatusFailure,
+							Reason: unversioned.StatusReasonUnauthorized,
 						})))),
 					}, nil
 				}),
@@ -537,13 +537,13 @@ func TestRequestStream(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Status{
-							Status: api.StatusFailure,
-							Reason: api.StatusReasonUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &unversioned.Status{
+							Status: unversioned.StatusFailure,
+							Reason: unversioned.StatusReasonUnauthorized,
 						})))),
 					}, nil
 				}),
-				codec:   latest.Codec,
+				codec:   testapi.Default.Codec(),
 				baseURL: &url.URL{},
 			},
 			Err: true,
@@ -1185,7 +1185,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := watchjson.NewEncoder(w, latest.Codec)
+		encoder := watchjson.NewEncoder(w, testapi.Default.Codec())
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)

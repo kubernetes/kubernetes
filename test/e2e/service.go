@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
@@ -412,7 +413,76 @@ var _ = Describe("Services", func() {
 		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
-		testReachable(pickMinionIP(c), port.NodePort)
+		testReachable(pickNodeIP(c), port.NodePort)
+
+		By("hitting the pod through the service's external load balancer")
+		testLoadBalancerReachable(ingress, inboundPort)
+	})
+
+	It("should be able to create a functioning external load balancer with user-provided load balancer ip", func() {
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke")
+
+		serviceName := "lb-test-with-user-ip"
+		ns := namespaces[0]
+
+		t := NewWebserverTest(c, ns, serviceName)
+		defer func() {
+			defer GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		inboundPort := 3000
+
+		service := t.BuildServiceSpec()
+		service.Spec.Type = api.ServiceTypeLoadBalancer
+		service.Spec.Ports[0].Port = inboundPort
+		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+
+		By("creating an external static ip")
+		rand.Seed(time.Now().UTC().UnixNano())
+		staticIPName := fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
+		glog.Errorf("static ip name is %s", staticIPName)
+		loadBalancerIP, err := createGCEStaticIP(staticIPName)
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			deleteGCEStaticIP(staticIPName)
+		}()
+
+		service.Spec.LoadBalancerIP = loadBalancerIP
+
+		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
+		result, err := t.CreateService(service)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Wait for the load balancer to be created asynchronously, which is
+		// currently indicated by ingress point(s) being added to the status.
+		result, err = waitForLoadBalancerIngress(c, serviceName, ns)
+		Expect(err).NotTo(HaveOccurred())
+		if len(result.Status.LoadBalancer.Ingress) != 1 {
+			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
+		}
+		ingress := result.Status.LoadBalancer.Ingress[0]
+		Expect(ingress.IP).To(Equal(loadBalancerIP))
+		if len(result.Spec.Ports) != 1 {
+			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
+		}
+		port := result.Spec.Ports[0]
+		if port.NodePort == 0 {
+			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
+		}
+		if !ServiceNodePortRange.Contains(port.NodePort) {
+			Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
+		}
+
+		By("creating pod to be part of service " + serviceName)
+		t.CreateWebserverRC(1)
+
+		By("hitting the pod through the service's NodePort")
+		testReachable(pickNodeIP(c), port.NodePort)
 
 		By("hitting the pod through the service's external load balancer")
 		testLoadBalancerReachable(ingress, inboundPort)
@@ -459,7 +529,7 @@ var _ = Describe("Services", func() {
 		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(c)
+		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
 		hosts, err := NodeSSHHosts(c)
@@ -535,7 +605,7 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
 		}
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(f.Client)
+		ip := pickNodeIP(f.Client)
 		nodePort1 := port.NodePort // Save for later!
 		testReachable(ip, nodePort1)
 
@@ -568,7 +638,7 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected Status.LoadBalancer.Ingresss[0] for LoadBalancer service: %v", service)
 		}
 		By("hitting the pod through the service's NodePort")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testReachable(ip, nodePort1)
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress1, 80)
@@ -640,10 +710,10 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for back-to-ClusterIP service: %v", service)
 		}
 		By("checking the NodePort (original) is closed")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort1)
 		By("checking the NodePort (updated) is closed")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort2)
 		By("checking the LoadBalancer is closed")
 		testLoadBalancerNotReachable(ingress2, 80)
@@ -699,7 +769,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(c)
+		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress, 80)
@@ -1049,18 +1119,15 @@ func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 
 				// use endpoint annotations to recover the container port in a Mesos setup
 				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
-				if providerIs("mesos/docker") {
-					key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
-					containerPortString := endpoints.Annotations[key]
-					if containerPortString == "" {
-						continue
-					}
+				key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
+				mesosContainerPortString := endpoints.Annotations[key]
+				if mesosContainerPortString != "" {
 					var err error
-					containerPort, err = strconv.Atoi(containerPortString)
+					containerPort, err = strconv.Atoi(mesosContainerPortString)
 					if err != nil {
 						continue
 					}
-					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, containerPortString)
+					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, mesosContainerPortString)
 				}
 
 				Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
@@ -1182,7 +1249,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 	return ips
 }
 
-func getMinionPublicIps(c *client.Client) ([]string, error) {
+func getNodePublicIps(c *client.Client) ([]string, error) {
 	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
@@ -1195,8 +1262,8 @@ func getMinionPublicIps(c *client.Client) ([]string, error) {
 	return ips, nil
 }
 
-func pickMinionIP(c *client.Client) string {
-	publicIps, err := getMinionPublicIps(c)
+func pickNodeIP(c *client.Client) string {
+	publicIps, err := getNodePublicIps(c)
 	Expect(err).NotTo(HaveOccurred())
 	if len(publicIps) == 0 {
 		Failf("got unexpected number (%d) of public IPs", len(publicIps))

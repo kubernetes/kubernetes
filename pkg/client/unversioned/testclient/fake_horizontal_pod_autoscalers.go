@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,22 +31,22 @@ type FakeHorizontalPodAutoscalers struct {
 	Namespace string
 }
 
-func (c *FakeHorizontalPodAutoscalers) Get(name string) (*expapi.HorizontalPodAutoscaler, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("horizontalpodautoscalers", c.Namespace, name), &expapi.HorizontalPodAutoscaler{})
+func (c *FakeHorizontalPodAutoscalers) Get(name string) (*experimental.HorizontalPodAutoscaler, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("horizontalpodautoscalers", c.Namespace, name), &experimental.HorizontalPodAutoscaler{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*expapi.HorizontalPodAutoscaler), err
+	return obj.(*experimental.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (*expapi.HorizontalPodAutoscalerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, label, field), &expapi.HorizontalPodAutoscalerList{})
+func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (*experimental.HorizontalPodAutoscalerList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, label, field), &experimental.HorizontalPodAutoscalerList{})
 	if obj == nil {
 		return nil, err
 	}
-	list := &expapi.HorizontalPodAutoscalerList{}
-	for _, a := range obj.(*expapi.HorizontalPodAutoscalerList).Items {
+	list := &experimental.HorizontalPodAutoscalerList{}
+	for _, a := range obj.(*experimental.HorizontalPodAutoscalerList).Items {
 		if label.Matches(labels.Set(a.Labels)) {
 			list.Items = append(list.Items, a)
 		}
@@ -54,26 +54,26 @@ func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.
 	return list, err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Create(a *expapi.HorizontalPodAutoscaler) (*expapi.HorizontalPodAutoscaler, error) {
+func (c *FakeHorizontalPodAutoscalers) Create(a *experimental.HorizontalPodAutoscaler) (*experimental.HorizontalPodAutoscaler, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("horizontalpodautoscalers", c.Namespace, a), a)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*expapi.HorizontalPodAutoscaler), err
+	return obj.(*experimental.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Update(a *expapi.HorizontalPodAutoscaler) (*expapi.HorizontalPodAutoscaler, error) {
+func (c *FakeHorizontalPodAutoscalers) Update(a *experimental.HorizontalPodAutoscaler) (*experimental.HorizontalPodAutoscaler, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction("horizontalpodautoscalers", c.Namespace, a), a)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*expapi.HorizontalPodAutoscaler), err
+	return obj.(*experimental.HorizontalPodAutoscaler), err
 }
 
 func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("horizontalpodautoscalers", c.Namespace, name), &expapi.HorizontalPodAutoscaler{})
+	_, err := c.Fake.Invokes(NewDeleteAction("horizontalpodautoscalers", c.Namespace, name), &experimental.HorizontalPodAutoscaler{})
 	return err
 }
 

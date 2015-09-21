@@ -222,7 +222,7 @@ you are doing [manual node administration](#manual-node-administration), then yo
 capacity when adding a node.
 
 The Kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
-checks that the sum of the limits of containers on the node is no greater than than the node capacity.  It
+checks that the sum of the limits of containers on the node is no greater than the node capacity.  It
 includes all containers started by kubelet, but not containers started directly by docker, nor
 processes not in containers.
 

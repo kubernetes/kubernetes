@@ -30,10 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/controller/replication"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -131,26 +130,28 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	var err error
 	if masterConfig == nil {
 		etcdClient := NewEtcdClient()
-		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
+		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, etcdtest.PathPrefix())
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
-		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
 
 		masterConfig = &master.Config{
-			DatabaseStorage:    etcdStorage,
-			ExpDatabaseStorage: expEtcdStorage,
-			KubeletClient:      client.FakeKubeletClient{},
-			EnableLogsSupport:  false,
-			EnableProfiling:    true,
-			EnableUISupport:    false,
-			APIPrefix:          "/api",
-			ExpAPIPrefix:       "/experimental",
-			Authorizer:         apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:   admit.NewAlwaysAdmit(),
+			DatabaseStorage:      etcdStorage,
+			ExpDatabaseStorage:   expEtcdStorage,
+			KubeletClient:        client.FakeKubeletClient{},
+			EnableExp:            true,
+			EnableLogsSupport:    false,
+			EnableProfiling:      true,
+			EnableSwaggerSupport: true,
+			EnableUISupport:      false,
+			APIPrefix:            "/api",
+			APIGroupPrefix:       "/apis",
+			Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:     admit.NewAlwaysAdmit(),
 		}
 	} else {
 		etcdStorage = masterConfig.DatabaseStorage
@@ -269,11 +270,11 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	etcdClient := NewEtcdClient()
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").Version, etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -286,7 +287,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableProfiling:    true,
 		EnableUISupport:    false,
 		APIPrefix:          "/api",
-		ExpAPIPrefix:       "/experimental",
+		APIGroupPrefix:     "/apis",
 		EnableExp:          true,
 		Authorizer:         apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:   admit.NewAlwaysAdmit(),

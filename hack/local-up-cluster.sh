@@ -27,7 +27,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
 
 if [ "$(id -u)" != "0" ]; then
-    echo "WARNING : This script MAY be run as root for docker socket / iptables functionality... if failures occur... Retry as root." 2>&1
+    echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
 fi
 
 # Stop right away if the build fails
@@ -63,7 +63,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh"
+    "${KUBE_ROOT}/hack/build-go.sh" cmd/kube-proxy cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet plugin/cmd/kube-scheduler
 else
     echo "skipped the build."
 fi
@@ -86,6 +86,8 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/loc
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
+RKT_PATH=${RKT_PATH:-""}
+RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 
 function test_apiserver_off {
@@ -199,7 +201,7 @@ function set_service_accounts {
 
 function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
-    ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+    ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -251,6 +253,8 @@ function start_kubelet {
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
+        --rkt-path="${RKT_PATH}" \
+        --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \

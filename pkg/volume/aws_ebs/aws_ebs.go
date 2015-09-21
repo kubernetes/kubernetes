@@ -26,7 +26,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -70,9 +69,9 @@ func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolum
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Builder, error) {
@@ -107,12 +106,12 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
-		diskMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{plugin.host.GetMounter(), exec.New()}}, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -133,7 +132,7 @@ type ebsManager interface {
 	DetachDisk(c *awsElasticBlockStoreCleaner) error
 }
 
-// awsElasticBlockStore volumes are disk resources provided by Google Compute Engine
+// awsElasticBlockStore volumes are disk resources provided by Amazon Web Services
 // that are attached to the kubelet's host machine and exposed to the pod.
 type awsElasticBlockStore struct {
 	volName string
@@ -156,11 +155,7 @@ func detachDiskLogError(ebs *awsElasticBlockStore) {
 
 // getVolumeProvider returns the AWS Volumes interface
 func (ebs *awsElasticBlockStore) getVolumeProvider() (aws_cloud.Volumes, error) {
-	name := "aws"
-	cloud, err := cloudprovider.GetCloudProvider(name, nil)
-	if err != nil {
-		return nil, err
-	}
+	cloud := ebs.plugin.host.GetCloudProvider()
 	volumes, ok := cloud.(aws_cloud.Volumes)
 	if !ok {
 		return nil, fmt.Errorf("Cloud provider does not support volumes")

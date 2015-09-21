@@ -22,6 +22,7 @@ import (
 	"hash/adler32"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -29,7 +30,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -255,7 +256,7 @@ func TestPullWithJSONError(t *testing.T) {
 		"Bad gateway": {
 			"ubuntu",
 			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
-			"because the registry is temporarily unavailbe",
+			"because the registry is temporarily unavailable",
 		},
 	}
 	for i, test := range tests {
@@ -279,6 +280,12 @@ func TestPullWithSecrets(t *testing.T) {
 	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
 	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	dockerConfigJson := map[string]map[string]map[string]string{"auths": dockerCfg}
+	dockerConfigJsonContent, err := json.Marshal(dockerConfigJson)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -310,6 +317,12 @@ func TestPullWithSecrets(t *testing.T) {
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
+		},
+		"builtin keyring secrets, but use passed with new docker config": {
+			"ubuntu",
+			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
@@ -698,42 +711,81 @@ func TestMakePortsAndBindings(t *testing.T) {
 			HostPort:      445,
 			Protocol:      "foobar",
 		},
+		{
+			ContainerPort: 443,
+			HostPort:      446,
+			Protocol:      "tcp",
+		},
+		{
+			ContainerPort: 443,
+			HostPort:      446,
+			Protocol:      "udp",
+		},
 	}
+
 	exposedPorts, bindings := makePortsAndBindings(ports)
-	if len(ports) != len(exposedPorts) ||
-		len(ports) != len(bindings) {
+
+	// Count the expected exposed ports and bindings
+	expectedExposedPorts := map[string]struct{}{}
+
+	for _, binding := range ports {
+		dockerKey := strconv.Itoa(binding.ContainerPort) + "/" + string(binding.Protocol)
+		expectedExposedPorts[dockerKey] = struct{}{}
+	}
+
+	// Should expose right ports in docker
+	if len(expectedExposedPorts) != len(exposedPorts) {
 		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", ports, exposedPorts, bindings)
 	}
-	for key, value := range bindings {
-		switch value[0].HostPort {
-		case "8080":
-			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
+
+	// Construct expected bindings
+	expectPortBindings := map[string][]docker.PortBinding{
+		"80/tcp": {
+			docker.PortBinding{
+				HostPort: "8080",
+				HostIP:   "127.0.0.1",
+			},
+		},
+		"443/tcp": {
+			docker.PortBinding{
+				HostPort: "443",
+				HostIP:   "",
+			},
+			docker.PortBinding{
+				HostPort: "446",
+				HostIP:   "",
+			},
+		},
+		"443/udp": {
+			docker.PortBinding{
+				HostPort: "446",
+				HostIP:   "",
+			},
+		},
+		"444/udp": {
+			docker.PortBinding{
+				HostPort: "444",
+				HostIP:   "",
+			},
+		},
+		"445/tcp": {
+			docker.PortBinding{
+				HostPort: "445",
+				HostIP:   "",
+			},
+		},
+	}
+
+	// interate the bindings by dockerPort, and check its portBindings
+	for dockerPort, portBindings := range bindings {
+		switch dockerPort {
+		case "80/tcp", "443/tcp", "443/udp", "444/udp", "445/tcp":
+			if !reflect.DeepEqual(expectPortBindings[string(dockerPort)], portBindings) {
+				t.Errorf("Unexpected portbindings for %#v, expected: %#v, but got: %#v",
+					dockerPort, expectPortBindings[string(dockerPort)], portBindings)
 			}
-			if value[0].HostIP != "127.0.0.1" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "443":
-			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "444":
-			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "445":
-			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
+		default:
+			t.Errorf("Unexpected docker port: %#v with portbindings: %#v", dockerPort, portBindings)
 		}
 	}
 }

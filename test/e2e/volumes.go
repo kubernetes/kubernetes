@@ -33,9 +33,11 @@ package e2e
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"time"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -99,7 +101,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 	privileged := new(bool)
 	*privileged = true
 	serverPod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -159,7 +161,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	podClient := client.Pods(config.namespace)
 
 	clientPod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -304,7 +306,7 @@ var _ = Describe("Volumes", func() {
 
 			// create Endpoints for the server
 			endpoints := api.Endpoints{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},
@@ -435,7 +437,7 @@ var _ = Describe("Volumes", func() {
 
 			// create secrets for the server
 			secret := api.Secret{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
 					APIVersion: "v1",
 				},
@@ -507,7 +509,7 @@ var _ = Describe("Volumes", func() {
 
 			// create ceph secret
 			secret := &api.Secret{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
 					APIVersion: "v1beta3",
 				},

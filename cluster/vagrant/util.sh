@@ -148,7 +148,7 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
+    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
     echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
     echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
     echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
@@ -162,7 +162,7 @@ function create-provision-scripts {
     echo "KUBE_UI_IP_PUBLIC='${KUBE_UI_IP_PUBLIC:-}'"
     echo "DNS_SERVER_IP_PUBLIC='${DNS_SERVER_IP_PUBLIC:-}'"
 
-    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
@@ -182,12 +182,12 @@ function create-provision-scripts {
       echo "CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
       echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
-      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
+      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
       echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
       echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
       echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
@@ -268,13 +268,21 @@ function verify-cluster {
     # ensures KUBECONFIG is set
     get-kubeconfig-basicauth
     echo
-    echo "Kubernetes cluster is running.  The master is running at:"
+    echo "Kubernetes cluster is running."
+    echo
+    echo "The master is running at:"
     echo
     echo "  https://${MASTER_IP}"
     echo
+    echo "Administer and visualize its resources using Cockpit:"
+    echo
+    echo "  https://${MASTER_IP}:9090"
+    echo
+    echo "For more information on Cockpit, visit http://cockpit-project.org"
+    echo 
     echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
-    )
+  )
 }
 
 # Instantiate a kubernetes cluster

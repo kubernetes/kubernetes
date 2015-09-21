@@ -57,5 +57,5 @@ var (
 )
 
 type SlaveIndex interface {
-	slaveFor(id string) (*Slave, bool)
+	slaveHostNameFor(id string) string
 }

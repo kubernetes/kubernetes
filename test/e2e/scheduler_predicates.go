@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -196,7 +197,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
 		startPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -215,7 +216,7 @@ var _ = Describe("SchedulerPredicates", func() {
 
 		podName := "additional-pod"
 		_, err = c.Pods(ns).Create(&api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -276,7 +277,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
 
 		startPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -300,7 +301,7 @@ var _ = Describe("SchedulerPredicates", func() {
 
 		podName := "additional-pod"
 		_, err = c.Pods(ns).Create(&api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -342,7 +343,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		_, currentlyDeadPods := getPodsNumbers(allPods)
 
 		_, err = c.Pods(ns).Create(&api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{

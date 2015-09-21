@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/evanphx/json-patch"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -122,7 +122,7 @@ func checkErr(err error, handleErr func(string)) {
 	handleErr(msg)
 }
 
-func statusCausesToAggrError(scs []api.StatusCause) utilerrors.Aggregate {
+func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
 	errs := make([]error, len(scs))
 	for i, sc := range scs {
 		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
@@ -268,8 +268,9 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
-func AddValidateFlag(cmd *cobra.Command) {
+func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
+	cmd.Flags().String("schema-cache-dir", "/tmp/kubectl.schema", "If non-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'")
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
@@ -344,7 +345,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("apiVersion must be a string")
 	}
-	i, err := latest.InterfacesFor(versionString)
+	i, err := latest.GroupOrDie("").InterfacesFor(versionString)
 	if err != nil {
 		return nil, err
 	}

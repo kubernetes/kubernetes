@@ -18,10 +18,12 @@ package e2e
 
 import (
 	"fmt"
+	"path"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
-	"path"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -205,9 +207,9 @@ func formatMedium(medium api.StorageMedium) string {
 func testPodWithVolume(image, path string, source *api.EmptyDirVolumeSource) *api.Pod {
 	podName := "pod-" + string(util.NewUUID())
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.Version,
+			APIVersion: latest.GroupOrDie("").Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,

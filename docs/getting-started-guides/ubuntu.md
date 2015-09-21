@@ -54,17 +54,16 @@ work, which has been merge into this document.
 ## Prerequisites
 
 1. The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge.
-2. All machines can communicate with each other, no need to connect Internet (should use
-private docker registry in this case).
+2. All machines can communicate with each other. Master node needs to connect the Internet to download the necessary files, while working nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
 Ubuntu 15 which use systemd instead of upstart. We are working around fixing this.
 4. Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.3, may work with higher versions.
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
 
-### Starting a Cluster
+## Starting a Cluster
 
-#### Download binaries
+### Download binaries
 
 First clone the kubernetes github repo
 
@@ -135,6 +134,10 @@ that conflicts with your own private network range.
 The `FLANNEL_NET` variable defines the IP range used for flannel overlay network,
 should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
 
+**Note:** When deploying, master needs to connect the Internet to download the necessary files. If your machines locate in a private network that need proxy setting to connect the Internet, you can set the config `PROXY_SETTING` in cluster/ubuntu/config-default.sh such as:
+
+     PROXY_SETTING="http_proxy=http://server:port https_proxy=https://server:port"
+
 After all the above variables being set correctly, we can use following command in cluster/ directory to bring up the whole cluster.
 
 `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh`
@@ -154,7 +157,7 @@ If all things goes right, you will see the below message from console indicating
 Cluster validation succeeded
 ```
 
-#### Test it out
+### Test it out
 
 You can use `kubectl` command to check if the newly created k8s is working correctly.
 The `kubectl` binary is under the `cluster/ubuntu/binaries` directory.
@@ -173,7 +176,7 @@ NAME            LABELS                                 STATUS
 Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
-#### Deploy addons
+### Deploy addons
 
 Assuming you have a starting cluster now, this section will tell you how to deploy addons like DNS
 and UI onto the existing cluster.
@@ -208,7 +211,7 @@ $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
 
 After some time, you can use `$ kubectl get pods --namespace=kube-system` to see the DNS and UI pods are running in the cluster.
 
-#### On going
+### On going
 
 We are working on these features which we'd like to let everybody know:
 
@@ -216,7 +219,7 @@ We are working on these features which we'd like to let everybody know:
 to eliminate OS-distro differences.
 2. Tearing Down scripts: clear and re-create the whole stack by one click.
 
-#### Trouble shooting
+### Trouble shooting
 
 Generally, what this approach does is quite simple:
 

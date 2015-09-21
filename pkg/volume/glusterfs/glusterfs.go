@@ -17,8 +17,8 @@ limitations under the License.
 package glusterfs
 
 import (
-	"math/rand"
 	"os"
+	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -66,7 +66,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	ns := pod.Namespace
@@ -76,7 +76,7 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 		return nil, err
 	}
 	glog.V(1).Infof("Glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, pod, mounter, exec.New())
+	return plugin.newBuilderInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
 }
 
 func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
@@ -104,8 +104,8 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 		exe:      exe}, nil
 }
 
-func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, mounter)
+func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter())
 }
 
 func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -221,12 +221,23 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 		options = append(options, "ro")
 	}
 
-	l := len(b.hosts.Subsets)
+	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
+	if err := os.MkdirAll(p, 0750); err != nil {
+		return err
+	}
+	log := path.Join(p, "glusterfs.log")
+	options = append(options, "log-file="+log)
+
+	addr := make(map[string]struct{})
+	for _, s := range b.hosts.Subsets {
+		for _, a := range s.Addresses {
+			addr[a.IP] = struct{}{}
+		}
+	}
+
 	// Avoid mount storm, pick a host randomly.
-	start := rand.Int() % l
 	// Iterate all hosts until mount succeeds.
-	for i := start; i < start+l; i++ {
-		hostIP := b.hosts.Subsets[i%l].Addresses[0].IP
+	for hostIP := range addr {
 		errs = b.mounter.Mount(hostIP+":"+b.path, dir, "glusterfs", options)
 		if errs == nil {
 			return nil

@@ -134,11 +134,11 @@ type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current
 	// resource consumption from its status, and will set the desired number of pods by modifying its spec.
 	ScaleRef *SubresourceReference
-	// MinCount is the lower limit for the number of pods that can be set by the autoscaler.
-	MinCount int
-	// MaxCount is the upper limit for the number of pods that can be set by the autoscaler.
-	// It cannot be smaller than MinCount.
-	MaxCount int
+	// MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.
+	MinReplicas int
+	// MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler.
+	// It cannot be smaller than MinReplicas.
+	MaxReplicas int
 	// Target is the target average consumption of the given resource that the autoscaler will try
 	// to maintain by adjusting the desired number of pods.
 	// Currently this can be either "cpu" or "memory".
@@ -162,7 +162,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
 	// This is used by the autoscaler to control how often the number of pods is changed.
-	LastScaleTimestamp *util.Time
+	LastScaleTimestamp *unversioned.Time
 }
 
 // ResourceConsumption is an object for specifying average resource consumption of a particular resource.
@@ -173,7 +173,7 @@ type ResourceConsumption struct {
 ```
 
 ```Scale``` will be a reference to the Scale subresource.
-```MinCount```, ```MaxCount``` and ```Target``` will define autoscaler configuration.
+```MinReplicas```, ```MaxReplicas``` and ```Target``` will define autoscaler configuration.
 We will also introduce HorizontalPodAutoscalerList object to enable listing all autoscalers in the cluster:
 
 ```go
@@ -194,8 +194,8 @@ and check their average CPU or memory usage from the last 1 minute
 (there will be API on master for this purpose, see
 [#11951](https://github.com/kubernetes/kubernetes/issues/11951).
 Then, it will compare the current CPU or memory consumption with the Target,
-and adjust the count of the Scale if needed to match the target
-(preserving condition: MinCount <= Count <= MaxCount).
+and adjust the replicas of the Scale if needed to match the target
+(preserving condition: MinReplicas <= Replicas <= MaxReplicas).
 
 The target number of pods will be calculated from the following formula:
 

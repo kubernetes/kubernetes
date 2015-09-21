@@ -35,9 +35,9 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
 	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -92,9 +92,8 @@ func (k *k8smScheduler) createPodTask(ctx api.Context, pod *api.Pod) (*podtask.T
 	return podtask.New(ctx, "", *pod, k.internal.executor)
 }
 
-func (k *k8smScheduler) slaveFor(id string) (slave *Slave, ok bool) {
-	slave, ok = k.internal.slaves.getSlave(id)
-	return
+func (k *k8smScheduler) slaveHostNameFor(id string) string {
+	return k.internal.slaveHostNames.HostName(id)
 }
 
 func (k *k8smScheduler) killTask(taskId string) error {
@@ -246,7 +245,7 @@ func recoverAssignedSlave(pod *api.Pod) string {
 
 // Schedule implements the Scheduler interface of Kubernetes.
 // It returns the selectedMachine's name and error (if there's any).
-func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.MinionLister) (string, error) {
+func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (string, error) {
 	log.Infof("Try to schedule pod %v\n", pod.Name)
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 
@@ -326,7 +325,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
 	slaveId := details.GetSlaveId().GetValue()
-	if slave, ok := k.api.slaveFor(slaveId); !ok {
+	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
 		k.api.offers().Invalidate(details.Id.GetValue())
@@ -343,7 +342,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			offer.Release()
 			return "", err
 		}
-		return slave.HostName, nil
+		return slaveHostName, nil
 	}
 }
 
@@ -684,7 +683,7 @@ func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *ht
 	})
 	return &PluginConfig{
 		Config: &plugin.Config{
-			MinionLister: nil,
+			NodeLister: nil,
 			Algorithm: &kubeScheduler{
 				api:        kapi,
 				podUpdates: podUpdates,
@@ -741,7 +740,7 @@ func (s *schedulingPlugin) Run(done <-chan struct{}) {
 func (s *schedulingPlugin) scheduleOne() {
 	pod := s.config.NextPod()
 	log.V(3).Infof("Attempting to schedule: %+v", pod)
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister) // call kubeScheduler.Schedule
+	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister) // call kubeScheduler.Schedule
 	if err != nil {
 		log.V(1).Infof("Failed to schedule: %+v", pod)
 		s.config.Recorder.Eventf(pod, "FailedScheduling", "Error scheduling: %v", err)

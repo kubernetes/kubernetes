@@ -34,9 +34,9 @@ type ExposeOptions struct {
 }
 
 const (
-	expose_long = `Take a replicated application and expose it as Kubernetes Service.
+	expose_long = `Take a replication controller, service or pod and expose it as a new Kubernetes Service.
 
-Looks up a replication controller or service by name and uses the selector for that resource as the
+Looks up a replication controller, service or pod by name and uses the selector for that resource as the
 selector for a new Service on the specified port. If no labels are specified, the new service will
 re-use the labels from the resource it exposes.`
 
@@ -45,6 +45,9 @@ $ kubectl expose rc nginx --port=80 --target-port=8000
 
 # Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
+
+# Create a service for a pod valid-pod, which serves on port 444 with the name "frontend"
+$ kubectl expose pod valid-pod --port=444 --name=frontend
 
 # Create a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
 $ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
@@ -57,8 +60,8 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ExposeOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]",
-		Short:   "Take a replicated application and expose it as Kubernetes Service",
+		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]",
+		Short:   "Take a replication controller, service or pod and expose it as a new Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -70,11 +73,11 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("generator", "service/v2", "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.")
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Copied from the resource being exposed, if unspecified")
-	cmd.MarkFlagRequired("port")
 	cmd.Flags().String("type", "", "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.")
 	// TODO: remove create-external-load-balancer in code on or after Aug 25, 2016.
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().MarkDeprecated("create-external-load-balancer", "use --type=\"LoadBalancer\" instead")
+	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud-provider specific).")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. If empty (the default) infer the selector from the replication controller.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
@@ -113,7 +116,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-
+	if err := f.CanBeExposed(mapping.Kind); err != nil {
+		return err
+	}
 	// Get the input object
 	inputObject, err := r.Object()
 	if err != nil {
@@ -129,14 +134,18 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	params["default-name"] = info.Name
-	if s, found := params["selector"]; !found || kubectl.IsZero(s) || cmdutil.GetFlagInt(cmd, "port") < 1 {
-		if kubectl.IsZero(s) {
-			s, err := f.PodSelectorForObject(inputObject)
-			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
-			}
-			params["selector"] = s
+
+	// For objects that need a pod selector, derive it from the exposed object in case a user
+	// didn't explicitly specify one via --selector
+	if s, found := params["selector"]; found && kubectl.IsZero(s) {
+		s, err := f.PodSelectorForObject(inputObject)
+		if err != nil {
+			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
 		}
+		params["selector"] = s
+	}
+
+	if cmdutil.GetFlagInt(cmd, "port") < 1 {
 		noPorts := true
 		for _, param := range names {
 			if param.Name == "port" {

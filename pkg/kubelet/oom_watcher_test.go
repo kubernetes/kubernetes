@@ -21,14 +21,14 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type fakeEvent struct {
 	object    runtime.Object
-	timestamp util.Time
+	timestamp unversioned.Time
 	reason    string
 	message   string
 }
@@ -38,14 +38,14 @@ type fakeRecorder struct {
 }
 
 func (f fakeRecorder) Event(object runtime.Object, reason, message string) {
-	f.events = append(f.events, fakeEvent{object, util.Now(), reason, message})
+	f.events = append(f.events, fakeEvent{object, unversioned.Now(), reason, message})
 }
 
 func (f fakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	f.events = append(f.events, fakeEvent{object, util.Now(), reason, fmt.Sprintf(messageFmt, args...)})
+	f.events = append(f.events, fakeEvent{object, unversioned.Now(), reason, fmt.Sprintf(messageFmt, args...)})
 }
 
-func (f fakeRecorder) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
+func (f fakeRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
 	f.events = append(f.events, fakeEvent{object, timestamp, reason, fmt.Sprintf(messageFmt, args...)})
 }
 

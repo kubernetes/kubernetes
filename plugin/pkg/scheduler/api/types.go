@@ -16,12 +16,10 @@ limitations under the License.
 
 package api
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-)
+import "k8s.io/kubernetes/pkg/api/unversioned"
 
 type Policy struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions
 	Predicates []PredicatePolicy `json:"predicates"`
 	// Holds the information to configure the priority functions
@@ -42,7 +40,7 @@ type PriorityPolicy struct {
 	// For a custom priority, the name can be user-defined
 	// For the Kubernetes provided priority functions, the name is the identifier of the pre-defined priority function
 	Name string `json:"name"`
-	// The numeric multiplier for the minion scores that the priority function generates
+	// The numeric multiplier for the node scores that the priority function generates
 	// The weight should be non-zero and can be a positive or a negative integer
 	Weight int `json:"weight"`
 	// Holds the parameters to configure the given priority function
@@ -53,9 +51,9 @@ type PriorityPolicy struct {
 // Only one of its members may be specified
 type PredicateArgument struct {
 	// The predicate that provides affinity for pods belonging to a service
-	// It uses a label to identify minions that belong to the same "group"
+	// It uses a label to identify nodes that belong to the same "group"
 	ServiceAffinity *ServiceAffinity `json:"serviceAffinity"`
-	// The predicate that checks whether a particular minion has a certain label
+	// The predicate that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelsPresence *LabelsPresence `json:"labelsPresence"`
 }
@@ -64,41 +62,41 @@ type PredicateArgument struct {
 // Only one of its members may be specified
 type PriorityArgument struct {
 	// The priority function that ensures a good spread (anti-affinity) for pods belonging to a service
-	// It uses a label to identify minions that belong to the same "group"
+	// It uses a label to identify nodes that belong to the same "group"
 	ServiceAntiAffinity *ServiceAntiAffinity `json:"serviceAntiAffinity"`
-	// The priority function that checks whether a particular minion has a certain label
+	// The priority function that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelPreference *LabelPreference `json:"labelPreference"`
 }
 
 // Holds the parameters that are used to configure the corresponding predicate
 type ServiceAffinity struct {
-	// The list of labels that identify minion "groups"
-	// All of the labels should match for the minion to be considered a fit for hosting the pod
+	// The list of labels that identify node "groups"
+	// All of the labels should match for the node to be considered a fit for hosting the pod
 	Labels []string `json:"labels"`
 }
 
 // Holds the parameters that are used to configure the corresponding predicate
 type LabelsPresence struct {
-	// The list of labels that identify minion "groups"
-	// All of the labels should be either present (or absent) for the minion to be considered a fit for hosting the pod
+	// The list of labels that identify node "groups"
+	// All of the labels should be either present (or absent) for the node to be considered a fit for hosting the pod
 	Labels []string `json:"labels"`
-	// The boolean flag that indicates whether the labels should be present or absent from the minion
+	// The boolean flag that indicates whether the labels should be present or absent from the node
 	Presence bool `json:"presence"`
 }
 
 // Holds the parameters that are used to configure the corresponding priority function
 type ServiceAntiAffinity struct {
-	// Used to identify minion "groups"
+	// Used to identify node "groups"
 	Label string `json:"label"`
 }
 
 // Holds the parameters that are used to configure the corresponding priority function
 type LabelPreference struct {
-	// Used to identify minion "groups"
+	// Used to identify node "groups"
 	Label string `json:"label"`
 	// This is a boolean flag
-	// If true, higher priority is given to minions that have the label
-	// If false, higher priority is given to minions that do not have the label
+	// If true, higher priority is given to nodes that have the label
+	// If false, higher priority is given to nodes that do not have the label
 	Presence bool `json:"presence"`
 }

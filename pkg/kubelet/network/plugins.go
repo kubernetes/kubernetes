@@ -23,10 +23,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 const DefaultPluginName = "kubernetes.io/no-op"
@@ -56,7 +57,7 @@ type NetworkPlugin interface {
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
 // This struct represents version "v1"
 type PodNetworkStatus struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// IP is the primary ipv4/ipv6 address of the pod. Among other things it is the address that -
 	//   - kube expects to be reachable across the cluster
@@ -87,7 +88,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	allErrs := []error{}
 	for _, plugin := range plugins {
 		name := plugin.Name()
-		if !util.IsQualifiedName(name) {
+		if !validation.IsQualifiedName(name) {
 			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %#v", plugin))
 			continue
 		}

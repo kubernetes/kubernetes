@@ -61,11 +61,8 @@ type documentable interface {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
-	errors = make([]error, 0)
-
-	// Create the WebService.
-	ws = a.newWebService()
+func (a *APIInstaller) Install(ws *restful.WebService) []error {
+	errors := make([]error, 0)
 
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
 
@@ -82,10 +79,11 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 			errors = append(errors, err)
 		}
 	}
-	return ws, errors
+	return errors
 }
 
-func (a *APIInstaller) newWebService() *restful.WebService {
+// NewWebService creates a new restful webservice with the api installer's prefix and version.
+func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
 	ws.Doc("API at " + a.prefix + " version " + a.group.Version)
@@ -260,7 +258,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
-	pathParam := ws.PathParameter("path:*", "path to the resource").DataType("string")
+	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 	params := []*restful.Parameter{}
 	actions := []action{}
 
@@ -809,7 +807,7 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				if docable, ok := obj.(documentable); ok {
 					desc = docable.SwaggerDoc()[jsonName]
 				}
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.Name())))
+				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
 	}
@@ -824,11 +822,15 @@ func typeToJSON(typeName string) string {
 		return "boolean"
 	case "uint8", "int", "int32", "int64", "uint32", "uint64":
 		return "integer"
-	case "byte":
-		return "string"
 	case "float64", "float32":
 		return "number"
-	case "util.Time":
+	case "unversioned.Time":
+		return "string"
+	case "byte":
+		return "string"
+	case "[]string":
+		// TODO: Fix this when go-restful supports a way to specify an array query param:
+		// https://github.com/emicklei/go-restful/issues/225
 		return "string"
 	default:
 		return typeName

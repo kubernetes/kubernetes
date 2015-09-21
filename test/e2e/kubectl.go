@@ -33,9 +33,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -188,6 +190,14 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 
+		It("should support inline execution and attach", func() {
+			By("executing a command with run and attach")
+			runOutput := runKubectl(fmt.Sprintf("--namespace=%v", ns), "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "echo", "running", "in", "container")
+			expectedRunOutput := "running in container"
+			Expect(runOutput).To(ContainSubstring(expectedRunOutput))
+			// everything in the ns will be deleted at the end of the test
+		})
+
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
 			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), simplePodName, fmt.Sprintf(":%d", simplePodPort))
@@ -314,9 +324,9 @@ var _ = Describe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			// Node
-			minions, err := c.Nodes().List(labels.Everything(), fields.Everything())
+			nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 			Expect(err).NotTo(HaveOccurred())
-			node := minions.Items[0]
+			node := nodes.Items[0]
 			output = runKubectl("describe", "node", node.Name)
 			requiredStrings = [][]string{
 				{"Name:", node.Name},
@@ -356,7 +366,6 @@ var _ = Describe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
-			serviceTimeout := 60 * time.Second
 
 			By("creating Redis RC")
 			runKubectl("create", "-f", controllerJson, nsFlag)
@@ -364,30 +373,33 @@ var _ = Describe("Kubectl client", func() {
 				lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
-				endpointFound := false
-				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+				err := wait.Poll(poll, timeout, func() (bool, error) {
 					endpoints, err := c.Endpoints(ns).Get(name)
-					Expect(err).NotTo(HaveOccurred())
+					if err != nil {
+						if apierrs.IsNotFound(err) {
+							err = nil
+						}
+						Logf("Get endpoints failed (interval %v): %v", poll, err)
+						return false, err
+					}
 
 					uidToPort := getContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
 						Logf("No endpoint found, retrying")
-						continue
+						return false, nil
 					}
 					if len(uidToPort) > 1 {
-						Fail("To many endpoints found")
+						Fail("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
 						if port[0] != redisPort {
 							Failf("Wrong endpoint port: %d", port[0])
 						}
 					}
-					endpointFound = true
-					break
-				}
-				if !endpointFound {
-					Failf("1 endpoint is expected")
-				}
+					return true, nil
+				})
+				Expect(err).NotTo(HaveOccurred())
+
 				service, err := c.Services(ns).Get(name)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -405,13 +417,13 @@ var _ = Describe("Kubectl client", func() {
 
 			By("exposing RC")
 			runKubectl("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			waitForService(c, ns, "rm2", true, poll, serviceTimeout)
-			validateService("rm2", 1234, serviceTimeout)
+			waitForService(c, ns, "rm2", true, poll, serviceStartTimeout)
+			validateService("rm2", 1234, serviceStartTimeout)
 
 			By("exposing service")
 			runKubectl("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			waitForService(c, ns, "rm3", true, poll, serviceTimeout)
-			validateService("rm3", 2345, serviceTimeout)
+			waitForService(c, ns, "rm3", true, poll, serviceStartTimeout)
+			validateService("rm3", 2345, serviceStartTimeout)
 		})
 	})
 
