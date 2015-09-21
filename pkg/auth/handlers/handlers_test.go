@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,16 +22,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 )
 
 func TestAuthenticateRequest(t *testing.T) {
 	success := make(chan struct{})
-	contextMapper := api.NewRequestContextMapper()
-	auth, err := NewRequestAuthenticator(
-		contextMapper,
+	context := NewUserRequestContext()
+	auth := NewRequestAuthenticator(
+		context,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return &user.DefaultInfo{Name: "user"}, true, nil
 		}),
@@ -39,13 +38,8 @@ func TestAuthenticateRequest(t *testing.T) {
 			t.Errorf("unexpected call to failed")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-			ctx, ok := contextMapper.Get(req)
-			if ctx == nil || !ok {
-				t.Errorf("no context stored on contextMapper: %#v", contextMapper)
-			}
-			user, ok := api.UserFrom(ctx)
-			if user == nil || !ok {
-				t.Errorf("no user stored in context: %#v", ctx)
+			if user, ok := context.Get(req); user == nil || !ok {
+				t.Errorf("no user stored on context: %#v", context)
 			}
 			close(success)
 		}),
@@ -54,20 +48,16 @@ func TestAuthenticateRequest(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-success
-	empty, err := api.IsEmpty(contextMapper)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !empty {
-		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
+	if len(context.requests) > 0 {
+		t.Errorf("context should have no stored requests: %v", context)
 	}
 }
 
 func TestAuthenticateRequestFailed(t *testing.T) {
 	failed := make(chan struct{})
-	contextMapper := api.NewRequestContextMapper()
-	auth, err := NewRequestAuthenticator(
-		contextMapper,
+	context := NewUserRequestContext()
+	auth := NewRequestAuthenticator(
+		context,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return nil, false, nil
 		}),
@@ -82,20 +72,16 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	empty, err := api.IsEmpty(contextMapper)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !empty {
-		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
+	if len(context.requests) > 0 {
+		t.Errorf("context should have no stored requests: %v", context)
 	}
 }
 
 func TestAuthenticateRequestError(t *testing.T) {
 	failed := make(chan struct{})
-	contextMapper := api.NewRequestContextMapper()
-	auth, err := NewRequestAuthenticator(
-		contextMapper,
+	context := NewUserRequestContext()
+	auth := NewRequestAuthenticator(
+		context,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return nil, false, errors.New("failure")
 		}),
@@ -110,11 +96,7 @@ func TestAuthenticateRequestError(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	empty, err := api.IsEmpty(contextMapper)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !empty {
-		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
+	if len(context.requests) > 0 {
+		t.Errorf("context should have no stored requests: %v", context)
 	}
 }

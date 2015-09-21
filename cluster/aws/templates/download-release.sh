@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@
 # master and run.
 
 echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-download-or-bust "$SERVER_BINARY_TAR_URL"
+wget "$SERVER_BINARY_TAR_URL" .
 
 echo "Downloading binary release tar ($SALT_TAR_URL)"
-download-or-bust "$SALT_TAR_URL"
+wget "$SALT_TAR_URL" .
 
 echo "Unpacking Salt tree"
 rm -rf kubernetes

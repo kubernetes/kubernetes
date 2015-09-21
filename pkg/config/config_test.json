@@ -1,0 +1,128 @@
+[
+  {
+    "id": "frontend",
+    "name": "frontend",
+    "kind": "Service",
+    "apiVersion": "v1beta2",
+    "port": 5432,
+    "selector": {
+      "name": "frontend"
+    }
+  },
+  {
+    "id": "redismaster",
+    "name": "redismaster",
+    "kind": "Service",
+    "apiVersion": "v1beta1",
+    "port": 10000,
+    "selector": {
+      "name": "redis-master"
+    }
+  },
+  {
+    "id": "redisslave",
+    "name": "redisslave",
+    "kind": "Service",
+    "apiVersion": "v1beta1",
+    "port": 10001,
+    "labels": {
+      "name": "redisslave"
+    },
+    "selector": {
+      "name": "redisslave"
+    }
+  },
+  {
+    "id": "redis-master-2",
+    "name": "redis-master-2",
+    "kind": "Pod",
+    "apiVersion": "v1beta1",
+    "desiredState": {
+      "manifest": {
+        "version": "v1beta1",
+        "containers": [{
+          "name": "master",
+          "image": "dockerfile/redis",
+          "env": [
+            {
+              "name": "REDIS_PASSWORD",
+              "value": "secret"
+            }
+          ],
+          "ports": [{
+            "containerPort": 6379
+          }]
+        }]
+      }
+    },
+    "labels": {
+      "name": "redis-master"
+    }
+  },
+  {
+    "id": "frontendController",
+    "name": "frontendController",
+    "kind": "ReplicationController",
+    "apiVersion": "v1beta1",
+    "desiredState": {
+      "replicas": 3,
+      "replicaSelector": {"name": "frontend"},
+      "podTemplate": {
+        "desiredState": {
+          "manifest": {
+            "version": "v1beta1",
+            "containers": [{
+              "name": "php-redis",
+              "image": "brendanburns/php-redis",
+              "env": [
+                {
+                  "name": "ADMIN_USERNAME",
+                  "value": "admin"
+                },
+                {
+                  "name": "ADMIN_PASSWORD",
+                  "value": "secret"
+                },
+                {
+                  "name": "REDIS_PASSWORD",
+                  "value": "secret"
+                }
+              ],
+              "ports": [{"containerPort": 80}]
+            }]
+          }
+        },
+        "labels": {"name": "frontend"}
+      }},
+      "labels": {"name": "frontend"}
+  },
+  {
+    "id": "redisSlaveController",
+    "name": "redisSlaveController",
+    "kind": "ReplicationController",
+    "apiVersion": "v1beta1",
+    "desiredState": {
+      "replicas": 2,
+      "replicaSelector": {"name": "redisslave"},
+      "podTemplate": {
+        "desiredState": {
+          "manifest": {
+            "version": "v1beta1",
+            "containers": [{
+              "name": "slave",
+              "image": "brendanburns/redis-slave",
+              "env": [
+                {
+                  "name": "REDIS_PASSWORD",
+                  "value": "secret"
+                }
+              ],
+              "ports": [{"containerPort": 6379}]
+            }]
+          }
+        },
+        "labels": {"name": "redisslave"}
+      }},
+      "labels": {"name": "redisslave"}
+  }
+]

@@ -1,8 +1,0 @@
-language: go
-go: 1.2
-
-install:
- - echo "Skip install"
-
-script:
- - ./test

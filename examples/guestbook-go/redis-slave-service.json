@@ -1,23 +1,9 @@
 {
-   "kind":"Service",
-   "apiVersion":"v1",
-   "metadata":{
-      "name":"redis-slave",
-      "labels":{
-         "app":"redis",
-         "role":"slave"
-      }
-   },
-   "spec":{
-      "ports": [
-        {
-          "port":6379,
-          "targetPort":"redis-server"
-        }
-      ],
-      "selector":{
-         "app":"redis",
-         "role":"slave"
-      }
-   }
+  "apiVersion": "v1beta1",
+  "kind": "Service",
+  "id": "redis-slave",
+  "port": 6379,
+  "containerPort": "redis-server",
+  "labels": { "name": "redis", "role": "slave" },
+  "selector": { "name": "redis", "role": "slave" }
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	. "k8s.io/kubernetes/pkg/proxy/config"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	. "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 )
 
 const TomcatPort int = 8080
@@ -57,7 +57,7 @@ func NewServiceHandlerMock() *ServiceHandlerMock {
 	return &ServiceHandlerMock{services: make([]api.Service, 0)}
 }
 
-func (h *ServiceHandlerMock) OnServiceUpdate(services []api.Service) {
+func (h *ServiceHandlerMock) OnUpdate(services []api.Service) {
 	sort.Sort(sortedServices(services))
 	h.services = services
 	h.updated.Done()
@@ -95,7 +95,7 @@ func NewEndpointsHandlerMock() *EndpointsHandlerMock {
 	return &EndpointsHandlerMock{endpoints: make([]api.Endpoints, 0)}
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []api.Endpoints) {
+func (h *EndpointsHandlerMock) OnUpdate(endpoints []api.Endpoints) {
 	sort.Sort(sortedEndpoints(endpoints))
 	h.endpoints = endpoints
 	h.updated.Done()
@@ -136,10 +136,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	handler := NewServiceHandlerMock()
 	handler.Wait(1)
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
+	serviceUpdate := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
@@ -150,35 +147,24 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
+	serviceUpdate := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
 	handler.Wait(1)
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
-	})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}, Spec: api.ServiceSpec{Port: 20}})
 	handler.Wait(1)
 	channel <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-	})
+	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	handler.Wait(1)
 	channel <- serviceUpdate3
 	services = []api.Service{serviceUpdate2.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 99}}},
-	})
+	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{ObjectMeta: api.ObjectMeta{Name: "foobar"}, Spec: api.ServiceSpec{Port: 99}})
 	handler.Wait(1)
 	channel <- serviceUpdate4
 	services = []api.Service{serviceUpdate4.Services[0]}
@@ -194,14 +180,8 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 	}
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
-	})
+	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}, Spec: api.ServiceSpec{Port: 20}})
 	handler.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
@@ -217,14 +197,8 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 	handler2 := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
-	})
+	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}, Spec: api.ServiceSpec{Port: 20}})
 	handler.Wait(2)
 	handler2.Wait(2)
 	channelOne <- serviceUpdate1
@@ -243,18 +217,12 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
-			Ports:     []api.EndpointPort{{Port: 80}},
-		}},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint1", "endpoint2"},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
-			Ports:     []api.EndpointPort{{Port: 80}},
-		}},
+		ObjectMeta: api.ObjectMeta{Name: "bar"},
+		Endpoints:  []string{"endpoint3", "endpoint4"},
 	})
 	handler.Wait(2)
 	handler2.Wait(2)
@@ -275,18 +243,12 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
-			Ports:     []api.EndpointPort{{Port: 80}},
-		}},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint1", "endpoint2"},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
-			Ports:     []api.EndpointPort{{Port: 80}},
-		}},
+		ObjectMeta: api.ObjectMeta{Name: "bar"},
+		Endpoints:  []string{"endpoint3", "endpoint4"},
 	})
 	handler.Wait(2)
 	handler2.Wait(2)
@@ -299,11 +261,8 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 
 	// Add one more
 	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
-			Ports:     []api.EndpointPort{{Port: 80}},
-		}},
+		ObjectMeta: api.ObjectMeta{Name: "foobar"},
+		Endpoints:  []string{"endpoint5", "endpoint6"},
 	})
 	handler.Wait(1)
 	handler2.Wait(1)
@@ -314,11 +273,8 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 
 	// Update the "foo" service with new endpoints
 	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "7.7.7.7"}},
-			Ports:     []api.EndpointPort{{Port: 80}},
-		}},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint77"},
 	})
 	handler.Wait(1)
 	handler2.Wait(1)
@@ -328,7 +284,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Remove "bar" service
-	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
+	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar"}})
 	handler.Wait(1)
 	handler2.Wait(1)
 	channelTwo <- endpointsUpdate2

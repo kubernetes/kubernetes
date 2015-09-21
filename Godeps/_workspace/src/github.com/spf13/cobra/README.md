@@ -2,7 +2,7 @@
 
 A Commander for modern go CLI interactions
 
-[![Build Status](https://travis-ci.org/spf13/cobra.svg)](https://travis-ci.org/spf13/cobra)
+[![Build Status](https://travis-ci.org/spf13/cobra.png)](https://travis-ci.org/spf13/cobra)
 
 ## Overview
 
@@ -62,7 +62,7 @@ and flags that are only available to that command.
 In the example above 'port' is the flag.
 
 Flag functionality is provided by the [pflag
-library](https://github.com/ogier/pflag), a fork of the flag standard library
+libary](https://github.com/ogier/pflag), a fork of the flag standard library
 which maintains the same interface while adding posix compliance.
 
 ## Usage
@@ -120,9 +120,7 @@ In this example we are attaching it to the root, but commands can be attached at
 
 ### Assign flags to a command
 
-Since the flags are defined and used in different locations, we need to
-define a variable outside with the correct scope to assign the flag to
-work with.
+Since the flags are defined and used in different locations, we need to define a variable outside with the correct scope to assign the flag to work with.
 
     var Verbose bool
     var Source string
@@ -142,15 +140,6 @@ global flags assign a flag as a persistent flag on the root.
 A flag can also be assigned locally which will only apply to that specific command.
 
 	HugoCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to read from")
-
-### Remove a command from its parent
-
-Removing a command is not a common action in simple programs but it allows 3rd parties to customize an existing command tree.
-
-In this example, we remove the existing `VersionCmd` command of an existing root command, and we replace it by our own version.
-
-	mainlib.RootCmd.RemoveCommand(mainlib.VersionCmd)
-	mainlib.RootCmd.AddCommand(versionCmd)
 
 ### Once all commands and flags are defined, Execute the commands
 
@@ -225,11 +214,11 @@ For a more complete example of a larger application, please checkout [Hugo](http
 
 ## The Help Command
 
-Cobra automatically adds a help command to your application when you have subcommands.
+Cobra automatically adds a help command to your application.
 This will be called when a user runs 'app help'. Additionally help will also
 support all other commands as input. Say for instance you have a command called
 'create' without any additional configuration cobra will work when 'app help
-create' is called.  Every command will automatically have the '--help' flag added.
+create' is called.
 
 ### Example
 
@@ -348,87 +337,6 @@ Like help the function and template are over ridable through public methods.
 
     command.SetUsageTemplate(s string)
 
-## PreRun or PostRun Hooks
-
-It is possible to run functions before or after the main `Run` function of your command. The `PersistentPreRun` and `PreRun` functions will be executed before `Run`. `PersistendPostRun` and `PostRun` will be executed after `Run`.  The `Persistent*Run` functions will be inherrited by children if they do not declare their own.  These function are run in the following order:
-
-- `PersistentPreRun`
-- `PreRun`
-- `Run`
-- `PostRun`
-- `PersistenPostRun`
-
-And example of two commands which use all of these features is below.  When the subcommand in executed it will run the root command's `PersistentPreRun` but not the root command's `PersistentPostRun`
-
-```go
-package main
-
-import (
-	"fmt"
-
-	"github.com/spf13/cobra"
-)
-
-func main() {
-
-	var rootCmd = &cobra.Command{
-		Use:   "root [sub]",
-		Short: "My root command",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside rootCmd PersistentPreRun with args: %v\n", args)
-		},
-		PreRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside rootCmd PreRun with args: %v\n", args)
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside rootCmd Run with args: %v\n", args)
-		},
-		PostRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside rootCmd PostRun with args: %v\n", args)
-		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside rootCmd PersistentPostRun with args: %v\n", args)
-		},
-	}
-
-	var subCmd = &cobra.Command{
-		Use:   "sub [no options!]",
-		Short: "My sub command",
-		PreRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside subCmd PreRun with args: %v\n", args)
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside subCmd Run with args: %v\n", args)
-		},
-		PostRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside subCmd PostRun with args: %v\n", args)
-		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Inside subCmd PersistentPostRun with args: %v\n", args)
-		},
-	}
-
-	rootCmd.AddCommand(subCmd)
-
-	rootCmd.SetArgs([]string{""})
-	_ = rootCmd.Execute()
-	fmt.Print("\n")
-	rootCmd.SetArgs([]string{"sub", "arg1", "arg2"})
-	_ = rootCmd.Execute()
-}
-```
-
-## Generating markdown formatted documentation for your command
-
-Cobra can generate a markdown formatted document based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Markdown Docs](md_docs.md)
-
-## Generating man pages for your command
-
-Cobra can generate a man page based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Man Docs](man_docs.md)
-
-## Generating bash completions for your command
-
-Cobra can generate a bash completions file. If you add more information to your command these completions can be amazingly powerful and flexible.  Read more about [Bash Completions](bash_completions.md)
 
 ## Debugging
 

@@ -1,4 +1,4 @@
-// Copyright 2015 go-dockerclient authors. All rights reserved.
+// Copyright 2014 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -11,9 +11,9 @@ import (
 
 // Version returns version information about the docker server.
 //
-// See https://goo.gl/ND9R8L for more details.
+// See http://goo.gl/BOZrF5 for more details.
 func (c *Client) Version() (*Env, error) {
-	body, _, err := c.do("GET", "/version", doOptions{})
+	body, _, err := c.do("GET", "/version", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -26,9 +26,9 @@ func (c *Client) Version() (*Env, error) {
 
 // Info returns system-wide information about the Docker server.
 //
-// See https://goo.gl/ElTHi2 for more details.
+// See http://goo.gl/wmqZsW for more details.
 func (c *Client) Info() (*Env, error) {
-	body, _, err := c.do("GET", "/info", doOptions{})
+	body, _, err := c.do("GET", "/info", nil)
 	if err != nil {
 		return nil, err
 	}

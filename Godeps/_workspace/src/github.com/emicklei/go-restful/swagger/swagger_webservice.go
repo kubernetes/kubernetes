@@ -2,33 +2,28 @@ package swagger
 
 import (
 	"fmt"
-
 	"github.com/emicklei/go-restful"
 	// "github.com/emicklei/hopwatch"
+	"log"
 	"net/http"
 	"reflect"
 	"sort"
 	"strings"
-
-	"github.com/emicklei/go-restful/log"
 )
 
 type SwaggerService struct {
 	config            Config
-	apiDeclarationMap *ApiDeclarationList
+	apiDeclarationMap map[string]ApiDeclaration
 }
 
 func newSwaggerService(config Config) *SwaggerService {
 	return &SwaggerService{
 		config:            config,
-		apiDeclarationMap: new(ApiDeclarationList)}
+		apiDeclarationMap: map[string]ApiDeclaration{}}
 }
 
 // LogInfo is the function that is called when this package needs to log. It defaults to log.Printf
-var LogInfo = func(format string, v ...interface{}) {
-	// use the restful package-wide logger
-	log.Printf(format, v...)
-}
+var LogInfo = log.Printf
 
 // InstallSwaggerService add the WebService that provides the API documentation of all services
 // conform the Swagger documentation specifcation. (https://github.com/wordnik/swagger-core/wiki).
@@ -66,20 +61,15 @@ func RegisterSwaggerService(config Config, wsContainer *restful.Container) {
 				// use routes
 				for _, route := range each.Routes() {
 					entry := staticPathFromRoute(route)
-					_, exists := sws.apiDeclarationMap.At(entry)
+					_, exists := sws.apiDeclarationMap[entry]
 					if !exists {
-						sws.apiDeclarationMap.Put(entry, sws.composeDeclaration(each, entry))
+						sws.apiDeclarationMap[entry] = sws.composeDeclaration(each, entry)
 					}
 				}
 			} else { // use root path
-				sws.apiDeclarationMap.Put(each.RootPath(), sws.composeDeclaration(each, each.RootPath()))
+				sws.apiDeclarationMap[each.RootPath()] = sws.composeDeclaration(each, each.RootPath())
 			}
 		}
-	}
-
-	// if specified then call the PostBuilderHandler
-	if config.PostBuildHandler != nil {
-		config.PostBuildHandler(sws.apiDeclarationMap)
 	}
 
 	// Check paths for UI serving
@@ -138,60 +128,34 @@ func enableCORS(req *restful.Request, resp *restful.Response, chain *restful.Fil
 }
 
 func (sws SwaggerService) getListing(req *restful.Request, resp *restful.Response) {
-	listing := ResourceListing{SwaggerVersion: swaggerVersion, ApiVersion: sws.config.ApiVersion}
-	sws.apiDeclarationMap.Do(func(k string, v ApiDeclaration) {
+	listing := ResourceListing{SwaggerVersion: swaggerVersion}
+	for k, v := range sws.apiDeclarationMap {
 		ref := Resource{Path: k}
 		if len(v.Apis) > 0 { // use description of first (could still be empty)
 			ref.Description = v.Apis[0].Description
 		}
 		listing.Apis = append(listing.Apis, ref)
-	})
+	}
 	resp.WriteAsJson(listing)
 }
 
 func (sws SwaggerService) getDeclarations(req *restful.Request, resp *restful.Response) {
-	decl, ok := sws.apiDeclarationMap.At(composeRootPath(req))
-	if !ok {
-		resp.WriteErrorString(http.StatusNotFound, "ApiDeclaration not found")
-		return
-	}
+	decl := sws.apiDeclarationMap[composeRootPath(req)]
 	// unless WebServicesUrl is given
 	if len(sws.config.WebServicesUrl) == 0 {
 		// update base path from the actual request
 		// TODO how to detect https? assume http for now
-		var host string
-		// X-Forwarded-Host or Host or Request.Host
-		hostvalues, ok := req.Request.Header["X-Forwarded-Host"] // apache specific?
-		if !ok || len(hostvalues) == 0 {
-			forwarded, ok := req.Request.Header["Host"] // without reverse-proxy
-			if !ok || len(forwarded) == 0 {
-				// fallback to Host field
-				host = req.Request.Host
-			} else {
-				host = forwarded[0]
-			}
-		} else {
-			host = hostvalues[0]
-		}
-		// inspect Referer for the scheme (http vs https)
-		scheme := "http"
-		if referer := req.Request.Header["Referer"]; len(referer) > 0 {
-			if strings.HasPrefix(referer[0], "https") {
-				scheme = "https"
-			}
-		}
-		(&decl).BasePath = fmt.Sprintf("%s://%s", scheme, host)
+		(&decl).BasePath = fmt.Sprintf("http://%s", req.Request.Host)
 	}
 	resp.WriteAsJson(decl)
 }
 
-// composeDeclaration uses all routes and parameters to create a ApiDeclaration
 func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix string) ApiDeclaration {
 	decl := ApiDeclaration{
 		SwaggerVersion: swaggerVersion,
 		BasePath:       sws.config.WebServicesUrl,
-		ResourcePath:   pathPrefix,
-		Models:         ModelList{},
+		ResourcePath:   ws.RootPath(),
+		Models:         map[string]Model{},
 		ApiVersion:     ws.Version()}
 
 	// collect any path parameters
@@ -200,19 +164,19 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 		rootParams = append(rootParams, asSwaggerParameter(param.Data()))
 	}
 	// aggregate by path
-	pathToRoutes := newOrderedRouteMap()
+	pathToRoutes := map[string][]restful.Route{}
 	for _, other := range ws.Routes() {
 		if strings.HasPrefix(other.Path, pathPrefix) {
-			pathToRoutes.Add(other.Path, other)
+			routes := pathToRoutes[other.Path]
+			pathToRoutes[other.Path] = append(routes, other)
 		}
 	}
-	pathToRoutes.Do(func(path string, routes []restful.Route) {
+	for path, routes := range pathToRoutes {
 		api := Api{Path: strings.TrimSuffix(path, "/"), Description: ws.Documentation()}
 		for _, route := range routes {
 			operation := Operation{
 				Method:           route.Method,
 				Summary:          route.Doc,
-				Notes:            route.Notes,
 				Type:             asDataType(route.WriteSample),
 				Parameters:       []Parameter{},
 				Nickname:         route.Operation,
@@ -229,12 +193,14 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 			for _, param := range route.ParameterDocs {
 				operation.Parameters = append(operation.Parameters, asSwaggerParameter(param.Data()))
 			}
+			// sort parameters
+			sort.Sort(ParameterSorter(operation.Parameters))
 
 			sws.addModelsFromRouteTo(&operation, route, &decl)
 			api.Operations = append(api.Operations, operation)
 		}
 		decl.Apis = append(decl.Apis, api)
-	})
+	}
 	return decl
 }
 
@@ -262,7 +228,7 @@ func composeResponseMessages(route restful.Route, decl *ApiDeclaration) (message
 			if isCollection {
 				modelName = "array[" + modelName + "]"
 			}
-			modelBuilder{&decl.Models}.addModel(st, "")
+			modelBuilder{decl.Models}.addModel(st, "")
 			// reference the model
 			message.ResponseModel = modelName
 		}
@@ -274,10 +240,10 @@ func composeResponseMessages(route restful.Route, decl *ApiDeclaration) (message
 // addModelsFromRoute takes any read or write sample from the Route and creates a Swagger model from it.
 func (sws SwaggerService) addModelsFromRouteTo(operation *Operation, route restful.Route, decl *ApiDeclaration) {
 	if route.ReadSample != nil {
-		sws.addModelFromSampleTo(operation, false, route.ReadSample, &decl.Models)
+		sws.addModelFromSampleTo(operation, false, route.ReadSample, decl.Models)
 	}
 	if route.WriteSample != nil {
-		sws.addModelFromSampleTo(operation, true, route.WriteSample, &decl.Models)
+		sws.addModelFromSampleTo(operation, true, route.WriteSample, decl.Models)
 	}
 }
 
@@ -298,7 +264,7 @@ func detectCollectionType(st reflect.Type) (bool, reflect.Type) {
 }
 
 // addModelFromSample creates and adds (or overwrites) a Model from a sample resource
-func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse bool, sample interface{}, models *ModelList) {
+func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse bool, sample interface{}, models map[string]Model) {
 	st := reflect.TypeOf(sample)
 	isCollection, st := detectCollectionType(st)
 	modelName := modelBuilder{}.keyFrom(st)
@@ -308,15 +274,14 @@ func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse 
 		}
 		operation.Type = modelName
 	}
-	modelBuilder{models}.addModelFrom(sample)
+	modelBuilder{models}.addModel(reflect.TypeOf(sample), "")
 }
 
 func asSwaggerParameter(param restful.ParameterData) Parameter {
 	return Parameter{
 		DataTypeFields: DataTypeFields{
-			Type:         &param.DataType,
-			Format:       asFormat(param.DataType),
-			DefaultValue: Special(param.DefaultValue),
+			Type:   &param.DataType,
+			Format: asFormat(param.DataType),
 		},
 		Name:        param.Name,
 		Description: param.Description,

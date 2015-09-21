@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,47 +59,47 @@ cd "${KUBE_ROOT}"
 echo All verbose output will be redirected to $logfile, use --logfile option to change.
 
 printf "Start the cluster with 2 minions .. "
-export NUM_MINIONS=2
+export KUBERNETES_NUM_MINIONS=2
 export KUBERNETES_PROVIDER=vagrant
 
-(cluster/kube-up.sh >>"$logfile" 2>&1) || true
+(cluster/kube-up.sh &>> $logfile) || true
 echoOK $?
 
 printf "Check if minion-1 can reach kubernetes master .. "
-vagrant ssh minion-1 -- ping -c 10 kubernetes-master >>"$logfile" 2>&1
+vagrant ssh minion-1 -- ping -c 10 kubernetes-master &>> $logfile
 echoOK $?
 printf "Check if minion-2 can reach kubernetes master .. "
-vagrant ssh minion-2 -- ping -c 10 kubernetes-master >>"$logfile" 2>&1
+vagrant ssh minion-2 -- ping -c 10 kubernetes-master &>> $logfile
 echoOK $?
 
 printf "Pull an image that runs a web server on minion-1 .. "
-vagrant ssh minion-1 -- 'sudo docker pull kubernetes/serve_hostname' >>"$logfile" 2>&1
+vagrant ssh minion-1 -- 'sudo docker pull dockerfile/nginx' &>> $logfile
 echoOK $?
 printf "Pull an image that runs a web server on minion-2 .. "
-vagrant ssh minion-2 -- 'sudo docker pull kubernetes/serve_hostname' >>"$logfile" 2>&1
+vagrant ssh minion-2 -- 'sudo docker pull dockerfile/nginx' &>> $logfile
 echoOK $?
 
 printf "Run the server on minion-1 .. "
-vagrant ssh minion-1 -- sudo docker run -d kubernetes/serve_hostname >>"$logfile" 2>&1
+vagrant ssh minion-1 -- sudo docker run -d dockerfile/nginx &>> $logfile
 echoOK $?
 printf "Run the server on minion-2 .. "
-vagrant ssh minion-2 -- sudo docker run -d kubernetes/serve_hostname >>"$logfile" 2>&1
+vagrant ssh minion-2 -- sudo docker run -d dockerfile/nginx &>> $logfile
 echoOK $?
 
 printf "Run ping from minion-1 to docker bridges and to the containers on both minions .. "
-vagrant ssh minion-1 -- 'ping -c 20 10.246.0.1 && ping -c 20 10.246.1.1 && ping -c 20 10.246.0.2 && ping -c 20 10.246.1.2' >>"$logfile" 2>&1
+vagrant ssh minion-1 -- 'ping -c 20 10.244.1.1 && ping -c 20 10.244.2.1 && ping -c 20 10.244.1.3 && ping -c 20 10.244.2.3' &>> $logfile
 echoOK $?
 printf "Same pinch from minion-2 .. "
-vagrant ssh minion-2 -- 'ping -c 20 10.246.0.1 && ping -c 20 10.246.1.1 && ping -c 20 10.246.0.2 && ping -c 20 10.246.1.2' >>"$logfile" 2>&1
+vagrant ssh minion-2 -- 'ping -c 20 10.244.1.1 && ping -c 20 10.244.2.1 && ping -c 20 10.244.1.3 && ping -c 20 10.244.2.3' &>> $logfile
 echoOK $?
 
 printf "tcp check, curl to both the running webservers from minion-1 .. "
-vagrant ssh minion-1 -- 'curl -sS 10.246.0.2:9376  && curl -sS 10.246.1.2:9376' >>"$logfile" 2>&1
+vagrant ssh minion-1 -- 'curl 10.244.1.3:80  && curl 10.244.2.3:80' &>> $logfile
 echoOK $?
 printf "tcp check, curl to both the running webservers from minion-2 .. "
-vagrant ssh minion-2 -- 'curl -sS 10.246.0.2:9376  && curl -sS 10.246.1.2:9376' >>"$logfile" 2>&1
+vagrant ssh minion-2 -- 'curl 10.244.1.3:80 && curl 10.244.2.3:80' &>> $logfile
 echoOK $?
 
 printf "All good, destroy the cluster .. "
-vagrant destroy -f >>"$logfile" 2>&1
+vagrant destroy -f &>> $logfile
 echoOK $?

@@ -1,0 +1,9 @@
+apiVersion: v1beta1
+id: www
+desiredState:
+  manifest:
+    version: v1beta1
+    id: www
+    containers:
+      - name: nginx
+        image: dockerfile/nginx

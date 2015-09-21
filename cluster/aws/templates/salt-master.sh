@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,39 +16,22 @@
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $SALT_MASTER" > /etc/salt/minion.d/master.conf
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-master
   cloud: aws
-  cbr-cidr: "${MASTER_IP_RANGE}"
 EOF
 
-if [[ -n "${DOCKER_OPTS}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+cat <<EOF > /etc/aws.conf
+{
+  "Global": {
+    "Region": "${AWS_ZONE}"
+  }
+}
 EOF
-fi
-
-if [[ -n "${DOCKER_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${KUBELET_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${MASTER_EXTRA_SANS}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
-EOF
-fi
 
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
@@ -63,7 +46,12 @@ reactor:
     - /srv/reactor/highstate-new.sls
 EOF
 
-install-salt master
-
-service salt-master start
-service salt-minion start
+# Install Salt
+#
+# We specify -X to avoid a race condition that can cause minion failure to
+# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
+#
+# -M installs the master
+set +x
+curl -L --connect-timeout 20 --retry 6 --retry-delay 10 http://bootstrap.saltstack.com | sh -s -- -M -X
+set -x

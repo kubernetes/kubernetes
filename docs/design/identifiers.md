@@ -1,39 +1,6 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/design/identifiers.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Identifiers and Names in Kubernetes
 
-A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](http://issue.k8s.io/199).
+A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/kubernetes/issues/199).
 
 
 ## Definitions
@@ -45,16 +12,14 @@ Name
 : A non-empty string guaranteed to be unique within a given scope at a particular time; used in resource URLs; provided by clients at creation time and encouraged to be human friendly; intended to facilitate creation idempotence and space-uniqueness of singleton objects, distinguish distinct entities, and reference particular entities across operations.
 
 [rfc1035](http://www.ietf.org/rfc/rfc1035.txt)/[rfc1123](http://www.ietf.org/rfc/rfc1123.txt) label (DNS_LABEL)
-: An alphanumeric (a-z, and 0-9) string, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character, suitable for use as a hostname or segment in a domain name
+: An alphanumeric (a-z, A-Z, and 0-9) string, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character, suitable for use as a hostname or segment in a domain name
 
 [rfc1035](http://www.ietf.org/rfc/rfc1035.txt)/[rfc1123](http://www.ietf.org/rfc/rfc1123.txt) subdomain (DNS_SUBDOMAIN)
-: One or more lowercase rfc1035/rfc1123 labels separated by '.' with a maximum length of 253 characters
+: One or more rfc1035/rfc1123 labels separated by '.' with a maximum length of 253 characters
 
 [rfc4122](http://www.ietf.org/rfc/rfc4122.txt) universally unique identifier (UUID)
 : A 128 bit generated value that is extremely unlikely to collide across time and space and requires no central coordination
 
-[rfc6335](https://tools.ietf.org/rfc/rfc6335.txt) port name (IANA_SVC_NAME)
-: An alphanumeric (a-z, and 0-9) string, with a maximum length of 15 characters, with the '-' character allowed anywhere except the first or the last character or adjacent to another '-' character, it must contain at least a (a-z) character
 
 ## Objectives for names and UIDs
 
@@ -74,7 +39,7 @@ Name
 1. When an object is created via an API, a Name string (a DNS_SUBDOMAIN) must be specified.  Name must be non-empty and unique within the apiserver.  This enables idempotent and space-unique creation operations.  Parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffix) to create a unique Name.  For situations where generating a name is impractical, some or all objects may support a param to auto-generate a name.  Generating random names will defeat idempotency.
    * Examples: "guestbook.user", "backend-x4eb1"
 
-2. When an object is created via an API, a Namespace string (a DNS_SUBDOMAIN? format TBD via #1114) may be specified.  Depending on the API receiver, namespaces might be validated (e.g. apiserver might ensure that the namespace actually exists).  If a namespace is not specified, one will be assigned by the API receiver.  This assignment policy might vary across API receivers (e.g. apiserver might have a default, kubelet might generate something semi-random).
+2. When an object is created via an api, a Namespace string (a DNS_SUBDOMAIN? format TBD via #1114) may be specified.  Depending on the API receiver, namespaces might be validated (e.g. apiserver might ensure that the namespace actually exists).  If a namespace is not specified, one will be assigned by the API receiver.  This assignment policy might vary across API receivers (e.g. apiserver might have a default, kubelet might generate something semi-random).
    * Example: "api.k8s.example.com"
 
 3. Upon acceptance of an object via an API, the object is assigned a UID (a UUID).  UID must be non-empty and unique across space and time.
@@ -123,8 +88,3 @@ objectives.
    1. Each container is started up with enough metadata to distinguish the pod from whence it came.
    2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
       1. This may correspond to Docker's container ID.
-
-
-<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/identifiers.md?pixel)]()
-<!-- END MUNGE: GENERATED_ANALYTICS -->

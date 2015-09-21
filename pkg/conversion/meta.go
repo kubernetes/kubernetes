@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ limitations under the License.
 package conversion
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"github.com/ghodss/yaml"
 )
 
 // MetaFactory is used to store and retrieve the version and kind
@@ -32,13 +33,13 @@ type MetaFactory interface {
 	Interpret(data []byte) (version, kind string, err error)
 }
 
-// DefaultMetaFactory is a default factory for versioning objects in JSON. The object
+// DefaultMetaFactory is a default factory for versioning objects in JSON/YAML. The object
 // in memory and in the default JSON serialization will use the "kind" and "apiVersion"
 // fields.
 var DefaultMetaFactory = SimpleMetaFactory{KindField: "Kind", VersionField: "APIVersion"}
 
 // SimpleMetaFactory provides default methods for retrieving the type and version of objects
-// that are identified with an "apiVersion" and "kind" fields in their JSON
+// that are identified with an "apiVersion" and "kind" fields in their JSON/YAML
 // serialization. It may be parameterized with the names of the fields in memory, or an
 // optional list of base structs to search for those fields in memory.
 type SimpleMetaFactory struct {
@@ -50,16 +51,18 @@ type SimpleMetaFactory struct {
 	BaseFields []string
 }
 
-// Interpret will return the APIVersion and Kind of the JSON wire-format
+// Interpret will return the APIVersion and Kind of the JSON/YAML wire-format
 // encoding of an object, or an error.
 func (SimpleMetaFactory) Interpret(data []byte) (version, kind string, err error) {
 	findKind := struct {
 		APIVersion string `json:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty"`
 	}{}
-	err = json.Unmarshal(data, &findKind)
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, &findKind)
 	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
+		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
 	}
 	return findKind.APIVersion, findKind.Kind, nil
 }

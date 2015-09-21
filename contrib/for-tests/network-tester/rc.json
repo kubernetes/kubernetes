@@ -1,0 +1,29 @@
+{
+  "id": "nettestController",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 8,
+    "replicaSelector": {"name": "nettest"},
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "nettest",
+          "containers": [{
+            "name": "webserver",
+            "image": "kubernetes/nettest:latest",
+            "command": ["-service=nettest"],
+            "ports": [{
+              "containerPort": 8080
+            }]
+          }]
+        }
+       },
+       "labels": {
+         "name": "nettest"
+       }
+      }
+    },
+  "labels": {"name": "nettest"}
+}

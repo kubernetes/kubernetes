@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,146 +19,49 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// CreateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type CreateOptions struct {
-	Filenames []string
-}
-
-const (
-	create_long = `Create a resource by filename or stdin.
-
-JSON and YAML formats are accepted.`
-	create_example = `# Create a pod using the data in pod.json.
-$ kubectl create -f ./pod.json
-
-# Create a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl create -f -`
-)
-
-func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &CreateOptions{}
-
+func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create -f FILENAME",
-		Short:   "Create a resource by filename or stdin",
-		Long:    create_long,
-		Example: create_example,
+		Use:   "create -f filename",
+		Short: "Create a resource by filename or stdin",
+		Long: `Create a resource by filename or stdin.
+
+JSON and YAML formats are accepted.
+
+Examples:
+  $ kubectl create -f pod.json
+  <create a pod using the data in pod.json>
+
+  $ cat pod.json | kubectl create -f -
+  <create a pod based on the json passed into stdin>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(ValidateArgs(cmd, args))
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			cmdutil.CheckErr(RunCreate(f, cmd, out, options))
+			filename := GetFlagString(cmd, "filename")
+			if len(filename) == 0 {
+				usageError(cmd, "Must specify filename to create")
+			}
+			schema, err := f.Validator(cmd)
+			checkErr(err)
+			mapping, namespace, name, data := ResourceFromFile(filename, f.Typer, f.Mapper, schema)
+			client, err := f.Client(cmd, mapping)
+			checkErr(err)
+
+			// use the default namespace if not specified, or check for conflict with the file's namespace
+			if len(namespace) == 0 {
+				namespace = GetKubeNamespace(cmd)
+			} else {
+				err = CompareNamespaceFromFile(cmd, namespace)
+				checkErr(err)
+			}
+
+			err = kubectl.NewRESTHelper(client, mapping).Create(namespace, true, data)
+			checkErr(err)
+			fmt.Fprintf(out, "%s\n", name)
 		},
 	}
-
-	usage := "Filename, directory, or URL to file to use to create the resource"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmd.MarkFlagRequired("filename")
-	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddOutputFlagsForMutation(cmd)
+	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the resource")
 	return cmd
-}
-
-func ValidateArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageError(cmd, "Unexpected args: %v", args)
-	}
-	return nil
-}
-
-func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
-	if err != nil {
-		return err
-	}
-
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
-		Schema(schema).
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
-		Flatten().
-		Do()
-	err = r.Err()
-	if err != nil {
-		return err
-	}
-
-	count := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		data, err := info.Mapping.Codec.Encode(info.Object)
-		if err != nil {
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
-		}
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data)
-		if err != nil {
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
-		}
-		count++
-		info.Refresh(obj, true)
-		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-		if !shortOutput {
-			printObjectSpecificMessage(info.Object, out)
-		}
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return fmt.Errorf("no objects passed to create")
-	}
-	return nil
-}
-
-func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
-	switch obj := obj.(type) {
-	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeNodePort {
-			msg := fmt.Sprintf(
-				`You have exposed your service on an external port on all nodes in your
-cluster.  If you want to expose this service to the external internet, you may
-need to set up firewall rules for the service port(s) (%s) to serve traffic.
-
-See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
-`,
-				makePortsString(obj.Spec.Ports, true))
-			out.Write([]byte(msg))
-		}
-	}
-}
-
-func makePortsString(ports []api.ServicePort, useNodePort bool) string {
-	pieces := make([]string, len(ports))
-	for ix := range ports {
-		var port int
-		if useNodePort {
-			port = ports[ix].NodePort
-		} else {
-			port = ports[ix].Port
-		}
-		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
-	}
-	return strings.Join(pieces, ",")
 }

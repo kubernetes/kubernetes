@@ -1,11 +1,10 @@
-// Copyright 2015 go-dockerclient authors. All rights reserved.
+// Copyright 2014 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package docker
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,11 +49,6 @@ var (
 	// ErrListenerAlreadyExists is the error returned when the listerner already
 	// exists.
 	ErrListenerAlreadyExists = errors.New("listener already exists for docker events")
-
-	// EOFEvent is sent when the event listener receives an EOF error.
-	EOFEvent = &APIEvents{
-		Status: "EOF",
-	}
 )
 
 // AddEventListener adds a new listener to container events in the Docker API.
@@ -82,7 +76,10 @@ func (c *Client) RemoveEventListener(listener chan *APIEvents) error {
 		return err
 	}
 	if len(c.eventMonitor.listeners) == 0 {
-		c.eventMonitor.disableEventMonitoring()
+		err = c.eventMonitor.disableEventMonitoring()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -114,14 +111,6 @@ func (eventState *eventMonitoringState) removeListener(listener chan<- *APIEvent
 	return nil
 }
 
-func (eventState *eventMonitoringState) closeListeners() {
-	for _, l := range eventState.listeners {
-		close(l)
-		eventState.Add(-1)
-	}
-	eventState.listeners = nil
-}
-
 func listenerExists(a chan<- *APIEvents, list *[]chan<- *APIEvents) bool {
 	for _, b := range *list {
 		if b == a {
@@ -146,13 +135,9 @@ func (eventState *eventMonitoringState) enableEventMonitoring(c *Client) error {
 }
 
 func (eventState *eventMonitoringState) disableEventMonitoring() error {
+	eventState.Wait()
 	eventState.Lock()
 	defer eventState.Unlock()
-
-	eventState.closeListeners()
-
-	eventState.Wait()
-
 	if eventState.enabled {
 		eventState.enabled = false
 		close(eventState.C)
@@ -167,9 +152,7 @@ func (eventState *eventMonitoringState) monitorEvents(c *Client) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if err = eventState.connectWithRetry(c); err != nil {
-		// terminate if connect failed
-		eventState.disableEventMonitoring()
-		return
+		eventState.terminate(err)
 	}
 	for eventState.isEnabled() {
 		timeout := time.After(100 * time.Millisecond)
@@ -178,15 +161,11 @@ func (eventState *eventMonitoringState) monitorEvents(c *Client) {
 			if !ok {
 				return
 			}
-			if ev == EOFEvent {
-				eventState.disableEventMonitoring()
-				return
-			}
-			eventState.updateLastSeen(ev)
 			go eventState.sendEvent(ev)
+			go eventState.updateLastSeen(ev)
 		case err = <-eventState.errC:
 			if err == ErrNoListeners {
-				eventState.disableEventMonitoring()
+				eventState.terminate(nil)
 				return
 			} else if err != nil {
 				defer func() { go eventState.monitorEvents(c) }()
@@ -226,8 +205,8 @@ func (eventState *eventMonitoringState) sendEvent(event *APIEvents) {
 	defer eventState.RUnlock()
 	eventState.Add(1)
 	defer eventState.Done()
-	if eventState.enabled {
-		if len(eventState.listeners) == 0 {
+	if eventState.isEnabled() {
+		if eventState.noListeners() {
 			eventState.errC <- ErrNoListeners
 			return
 		}
@@ -246,6 +225,10 @@ func (eventState *eventMonitoringState) updateLastSeen(e *APIEvents) {
 	}
 }
 
+func (eventState *eventMonitoringState) terminate(err error) {
+	eventState.disableEventMonitoring()
+}
+
 func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan chan error) error {
 	uri := "/events"
 	if startTime != 0 {
@@ -257,13 +240,7 @@ func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan
 		protocol = "tcp"
 		address = c.endpointURL.Host
 	}
-	var dial net.Conn
-	var err error
-	if c.TLSConfig == nil {
-		dial, err = net.Dial(protocol, address)
-	} else {
-		dial, err = tls.Dial(protocol, address, c.TLSConfig)
-	}
+	dial, err := net.Dial(protocol, address)
 	if err != nil {
 		return err
 	}
@@ -284,10 +261,6 @@ func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan
 			var event APIEvents
 			if err = decoder.Decode(&event); err != nil {
 				if err == io.EOF || err == io.ErrUnexpectedEOF {
-					if c.eventMonitor.isEnabled() {
-						// Signal that we're exiting.
-						eventChan <- EOFEvent
-					}
 					break
 				}
 				errChan <- err
@@ -298,7 +271,7 @@ func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan
 			if !c.eventMonitor.isEnabled() {
 				return
 			}
-			eventChan <- &event
+			c.eventMonitor.C <- &event
 		}
 	}(res, conn)
 	return nil

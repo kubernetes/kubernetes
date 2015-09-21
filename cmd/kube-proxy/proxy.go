@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,35 +17,117 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"os"
-	"runtime"
+	"flag"
+	"net"
+	"net/http"
+	"strconv"
+	"time"
 
-	"k8s.io/kubernetes/cmd/kube-proxy/app"
-	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/version/verflag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
+)
 
-	"github.com/spf13/pflag"
+var (
+	etcdServerList util.StringList
+	etcdConfigFile = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
+	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
+	clientConfig   = &client.Config{}
+	healthz_port   = flag.Int("healthz_port", 10249, "The port to bind the health check server. Use 0 to disable.")
 )
 
 func init() {
-	healthz.DefaultHealthz()
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional). Mutually exclusive with -etcd_config")
+	flag.Var(&bindAddress, "bind_address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewProxyServer()
-	s.AddFlags(pflag.CommandLine)
-
-	util.InitFlags()
+	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+	serviceConfig := config.NewServiceConfig()
+	endpointsConfig := config.NewEndpointsConfig()
+
+	protocol := iptables.ProtocolIpv4
+	if net.IP(bindAddress).To4() == nil {
+		protocol = iptables.ProtocolIpv6
 	}
+	loadBalancer := proxy.NewLoadBalancerRR()
+	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), iptables.New(exec.New(), protocol))
+	// Wire proxier to handle changes to services
+	serviceConfig.RegisterHandler(proxier)
+	// And wire loadBalancer to handle changes to endpoints to services
+	endpointsConfig.RegisterHandler(loadBalancer)
+
+	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
+	// only notify on changes, and the initial update (on process start) may be lost if no handlers
+	// are registered yet.
+
+	// define api config source
+	if clientConfig.Host != "" {
+		glog.Infof("Using api calls to get config %v", clientConfig.Host)
+		client, err := client.New(clientConfig)
+		if err != nil {
+			glog.Fatalf("Invalid API configuration: %v", err)
+		}
+		config.NewSourceAPI(
+			client.Services(api.NamespaceAll),
+			client.Endpoints(api.NamespaceAll),
+			30*time.Second,
+			serviceConfig.Channel("api"),
+			endpointsConfig.Channel("api"),
+		)
+	} else {
+
+		var etcdClient *etcd.Client
+
+		// Set up etcd client
+		if len(etcdServerList) > 0 {
+			// Set up logger for etcd client
+			etcd.SetLogger(util.NewLogger("etcd "))
+			etcdClient = etcd.NewClient(etcdServerList)
+		} else if *etcdConfigFile != "" {
+			// Set up logger for etcd client
+			etcd.SetLogger(util.NewLogger("etcd "))
+			var err error
+			etcdClient, err = etcd.NewClientFromFile(*etcdConfigFile)
+
+			if err != nil {
+				glog.Fatalf("Error with etcd config file: %v", err)
+			}
+		}
+
+		// Create a configuration source that handles configuration from etcd.
+		if etcdClient != nil {
+			glog.Infof("Using etcd servers %v", etcdClient.GetCluster())
+
+			config.NewConfigSourceEtcd(etcdClient,
+				serviceConfig.Channel("etcd"),
+				endpointsConfig.Channel("etcd"))
+		}
+	}
+
+	if *healthz_port > 0 {
+		go util.Forever(func() {
+			err := http.ListenAndServe(bindAddress.String()+":"+strconv.Itoa(*healthz_port), nil)
+			if err != nil {
+				glog.Errorf("Starting health server failed: %v", err)
+			}
+		}, 5*time.Second)
+	}
+
+	// Just loop forever for now...
+	proxier.SyncLoop()
 }

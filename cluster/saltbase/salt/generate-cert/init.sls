@@ -1,4 +1,3 @@
-{% set master_extra_sans=grains.get('master_extra_sans', '') %}
 {% if grains.cloud is defined %}
   {% if grains.cloud == 'gce' %}
     {% set cert_ip='_use_gce_external_ip_' %}
@@ -8,6 +7,9 @@
   {% endif %}
   {% if grains.cloud == 'azure' %}
     {% set cert_ip='_use_azure_dns_name_' %}
+  {% endif %}
+  {% if grains.cloud == 'vagrant' %}
+    {% set cert_ip=grains.ip_interfaces.eth1[0] %}
   {% endif %}
   {% if grains.cloud == 'vsphere' %}
     {% set cert_ip=grains.ip_interfaces.eth0[0] %}
@@ -33,7 +35,7 @@ kubernetes-cert:
     - unless: test -f /srv/kubernetes/server.cert
     - source: salt://generate-cert/{{certgen}}
 {% if cert_ip is defined %}
-    - args: {{cert_ip}} {{master_extra_sans}}
+    - args: {{cert_ip}}
     - require:
       - pkg: curl
 {% endif %}
@@ -41,3 +43,33 @@ kubernetes-cert:
     - user: root
     - group: root
     - shell: /bin/bash
+
+# These are introduced to ensure backwards compatability with older gcloud tools in GKE
+kubernetes-old-key:
+  file.copy:
+    - name: /usr/share/nginx/kubecfg.key
+    - source: /srv/kubernetes/kubecfg.key
+    - makedirs: True
+    - preserve: True
+    - require:
+      - cmd: kubernetes-cert
+
+
+kubernetes-old-cert:
+  file.copy:
+    - name: /usr/share/nginx/kubecfg.crt
+    - source: /srv/kubernetes/kubecfg.crt
+    - makedirs: True
+    - preserve: True
+    - require:
+      - cmd: kubernetes-cert
+
+
+kubernetes-old-ca:
+  file.copy:
+    - name: /usr/share/nginx/ca.crt
+    - source: /srv/kubernetes/ca.crt
+    - makedirs: True
+    - preserve: True
+    - require:
+      - cmd: kubernetes-cert

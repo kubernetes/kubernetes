@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,27 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Stop the bleeding, turn off the warning until we fix token gen.
-# echo "-=-=-=-=-=-=-=-=-=-="
-# echo "NOTE:"
-# echo "kubectl.sh is deprecated and will be removed soon."
-# echo "please replace all usage with calls to the kubectl"
-# echo "binary and ensure that it is in your PATH." 
-# echo ""
-# echo "Please see 'kubectl help config' for more details"
-# echo "about configuring kubectl for your cluster."
-# echo "-=-=-=-=-=-=-=-=-=-="
-
-
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/kube-util.sh"
-
-# Get the absolute path of the directory component of a file, i.e. the
-# absolute path of the dirname of $1.
-get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
-}
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -68,7 +50,7 @@ case "$(uname -m)" in
     host_arch=arm
     ;;
   i?86*)
-    host_arch=386
+    host_arch=x86
     ;;
   *)
     echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
@@ -76,53 +58,42 @@ case "$(uname -m)" in
     ;;
 esac
 
-# If KUBECTL_PATH isn't set, gather up the list of likely places and use ls
-# to find the latest one.
-if [[ -z "${KUBECTL_PATH:-}" ]]; then
-  locations=(
-    "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
-    "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
-    "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
-  )
-  kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+# Gather up the list of likely places and use ls to find the latest one.
+locations=(
+  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
+  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
+  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
+)
+kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-  if [[ ! -x "$kubectl" ]]; then
-    {
-      echo "It looks as if you don't have a compiled kubectl binary"
-      echo
-      echo "If you are running from a clone of the git repo, please run"
-      echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
-      echo "Docker installed."
-      echo
-      echo "If you are running from a binary release tarball, something is wrong. "
-      echo "Look at http://kubernetes.io/ for information on how to contact the "
-      echo "development team for help."
-    } >&2
-    exit 1
-  fi
-elif [[ ! -x "${KUBECTL_PATH}" ]]; then
+if [[ ! -x "$kubectl" ]]; then
   {
-    echo "KUBECTL_PATH environment variable set to '${KUBECTL_PATH}', but "
-    echo "this doesn't seem to be a valid executable."
+    echo "It looks as if you don't have a compiled kubectl binary."
+    echo
+    echo "If you are running from a clone of the git repo, please run"
+    echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
+    echo "Docker installed."
+    echo
+    echo "If you are running from a binary release tarball, something is wrong. "
+    echo "Look at http://kubernetes.io/ for information on how to contact the "
+    echo "development team for help."
   } >&2
   exit 1
 fi
-kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
-  detect-project &> /dev/null
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
-  detect-master > /dev/null
-  config=(
-    "--server=http://${KUBE_MASTER_IP}:8080"
+# When we are using vagrant it has hard coded auth.  We repeat that here so that
+# we don't clobber auth that might be used for a publicly facing cluster.
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  auth_config=(
+    "--auth-path=$HOME/.kubernetes_vagrant_auth"
   )
+else
+  auth_config=()
 fi
 
-
-if false; then
-  # disable these debugging messages by default
-  echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
-  echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+detect-master > /dev/null
+if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
+  export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-"${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
+"$kubectl" "${auth_config[@]:+${auth_config[@]}}" "$@"

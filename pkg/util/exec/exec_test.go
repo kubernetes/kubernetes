@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ limitations under the License.
 package exec
 
 import (
-	osexec "os/exec"
 	"testing"
 )
 
@@ -80,15 +79,5 @@ func TestExecutorWithArgs(t *testing.T) {
 	}
 	if string(out) != "stderr\n" {
 		t.Errorf("unexpected output: %q", string(out))
-	}
-}
-
-func TestLookPath(t *testing.T) {
-	ex := New()
-
-	shExpected, _ := osexec.LookPath("sh")
-	sh, _ := ex.LookPath("sh")
-	if sh != shExpected {
-		t.Errorf("unexpected result for LookPath: got %s, expected %s", sh, shExpected)
 	}
 }

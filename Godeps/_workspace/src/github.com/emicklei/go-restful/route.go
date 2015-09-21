@@ -29,7 +29,6 @@ type Route struct {
 
 	// documentation
 	Doc                     string
-	Notes                   string
 	Operation               string
 	ParameterDocs           []*Parameter
 	ResponseErrors          map[int]ResponseError
@@ -79,8 +78,8 @@ func (r Route) matchesAccept(mimeTypesWithQuality string) bool {
 		if withoutQuality == "*/*" {
 			return true
 		}
-		for _, producibleType := range r.Produces {
-			if producibleType == "*/*" || producibleType == withoutQuality {
+		for _, other := range r.Produces {
+			if other == withoutQuality {
 				return true
 			}
 		}
@@ -88,24 +87,8 @@ func (r Route) matchesAccept(mimeTypesWithQuality string) bool {
 	return false
 }
 
-// Return whether this Route can consume content with a type specified by mimeTypes (can be empty).
+// Return whether the mimeType matches to what this Route can consume.
 func (r Route) matchesContentType(mimeTypes string) bool {
-
-	if len(r.Consumes) == 0 {
-		// did not specify what it can consume ;  any media type (“*/*”) is assumed
-		return true
-	}
-
-	if len(mimeTypes) == 0 {
-		// idempotent methods with (most-likely or garanteed) empty content match missing Content-Type
-		m := r.Method
-		if m == "GET" || m == "HEAD" || m == "OPTIONS" || m == "DELETE" || m == "TRACE" {
-			return true
-		}
-		// proceed with default
-		mimeTypes = MIME_OCTET
-	}
-
 	parts := strings.Split(mimeTypes, ",")
 	for _, each := range parts {
 		var contentType string
@@ -116,8 +99,8 @@ func (r Route) matchesContentType(mimeTypes string) bool {
 		}
 		// trim before compare
 		contentType = strings.Trim(contentType, " ")
-		for _, consumeableType := range r.Consumes {
-			if consumeableType == "*/*" || consumeableType == contentType {
+		for _, other := range r.Consumes {
+			if other == "*/*" || other == contentType {
 				return true
 			}
 		}

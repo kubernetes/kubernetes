@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,15 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api/errors"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
 // InterpretGetError converts a generic etcd error on a retrieval
 // operation into the appropriate API error.
 func InterpretGetError(err error, kind, name string) error {
 	switch {
-	case etcdstorage.IsEtcdNotFound(err):
+	case tools.IsEtcdNotFound(err):
 		return errors.NewNotFound(kind, name)
 	default:
 		return err
@@ -36,29 +36,29 @@ func InterpretGetError(err error, kind, name string) error {
 // operation into the appropriate API error.
 func InterpretCreateError(err error, kind, name string) error {
 	switch {
-	case etcdstorage.IsEtcdNodeExist(err):
+	case tools.IsEtcdNodeExist(err):
 		return errors.NewAlreadyExists(kind, name)
 	default:
 		return err
 	}
 }
 
-// InterpretUpdateError converts a generic etcd error on a update
+// InterpretUpdateError converts a generic etcd error on a create
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, kind, name string) error {
 	switch {
-	case etcdstorage.IsEtcdTestFailed(err), etcdstorage.IsEtcdNodeExist(err):
+	case tools.IsEtcdTestFailed(err), tools.IsEtcdNodeExist(err):
 		return errors.NewConflict(kind, name, err)
 	default:
 		return err
 	}
 }
 
-// InterpretDeleteError converts a generic etcd error on a delete
+// InterpretDeleteError converts a generic etcd error on a create
 // operation into the appropriate API error.
 func InterpretDeleteError(err error, kind, name string) error {
 	switch {
-	case etcdstorage.IsEtcdNotFound(err):
+	case tools.IsEtcdNotFound(err):
 		return errors.NewNotFound(kind, name)
 	default:
 		return err

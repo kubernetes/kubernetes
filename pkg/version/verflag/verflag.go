@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,12 @@ limitations under the License.
 package verflag
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
 
-	flag "github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
 type versionValue int
@@ -64,11 +64,6 @@ func (v *versionValue) String() string {
 		return strRawVersion
 	}
 	return fmt.Sprintf("%v", bool(*v == VersionTrue))
-}
-
-// The type of the flag as required by the pflag.Value interface
-func (v *versionValue) Type() string {
-	return "version"
 }
 
 func VersionVar(p *versionValue, name string, value versionValue, usage string) {

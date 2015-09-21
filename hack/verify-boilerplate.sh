@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,14 +19,40 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-boiler="${KUBE_ROOT}/hack/boilerplate/boilerplate.py"
 
-files_need_boilerplate=($(${boiler} "$@"))
+cd ${KUBE_ROOT}
 
-if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
-  for file in "${files_need_boilerplate[@]}"; do
+result=0
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+for file in $(find_files); do
+  if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
     echo "Boilerplate header is wrong for: ${file}"
-  done
+    result=1
+  fi
+done
 
-  exit 1
-fi
+dirs=("cluster" "hack" "hooks" "build")
+
+for dir in ${dirs[@]}; do
+  for file in $(find "$dir" -name '*.sh'); do
+    if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
+      echo "Boilerplate header is wrong for: ${file}"
+      result=1
+    fi
+  done
+done
+
+
+exit ${result}

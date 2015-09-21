@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,66 +18,59 @@ package apiserver
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type fakeRoundTripper struct {
+type fakeHttpGet struct {
 	err  error
 	resp *http.Response
 	url  string
 }
 
-func (f *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	f.url = req.URL.String()
+func (f *fakeHttpGet) Get(url string) (*http.Response, error) {
+	f.url = url
 	return f.resp, f.err
 }
 
-func alwaysError([]byte) error { return errors.New("test error") }
-
-func matchError(data []byte) error {
-	if string(data) == "bar" {
-		return errors.New("match error")
+func makeFake(data string, statusCode int, err error) *fakeHttpGet {
+	return &fakeHttpGet{
+		err: err,
+		resp: &http.Response{
+			Body:       ioutil.NopCloser(bytes.NewBufferString(data)),
+			StatusCode: statusCode,
+		},
 	}
-	return nil
 }
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		err            error
 		data           string
-		expectedStatus probe.Result
+		expectedStatus health.Status
 		code           int
 		expectErr      bool
-		validator      ValidatorFn
 	}{
-		{fmt.Errorf("test error"), "", probe.Unknown, 500 /*ignored*/, true, nil},
-		{nil, "foo", probe.Success, 200, false, nil},
-		{nil, "foo", probe.Failure, 500, true, nil},
-		{nil, "foo", probe.Failure, 200, true, alwaysError},
-		{nil, "foo", probe.Success, 200, false, matchError},
+		{fmt.Errorf("test error"), "", health.Unknown, 500 /*ignored*/, true},
+		{nil, "foo", health.Healthy, 200, false},
+		{nil, "foo", health.Unhealthy, 500, true},
 	}
 
 	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}
 
 	for _, test := range tests {
-		fakeRT := &fakeRoundTripper{
-			err: test.err,
-			resp: &http.Response{
-				Body:       ioutil.NopCloser(bytes.NewBufferString(test.data)),
-				StatusCode: test.code,
-			},
-		}
-		s.Validate = test.validator
-		status, data, err := s.DoServerCheck(fakeRT)
+		fake := makeFake(test.data, test.code, test.err)
+		status, data, err := s.check(fake)
 		expect := fmt.Sprintf("http://%s:%d/healthz", s.Addr, s.Port)
-		if fakeRT.url != expect {
-			t.Errorf("expected %s, got %s", expect, fakeRT.url)
+		if fake.url != expect {
+			t.Errorf("expected %s, got %s", expect, fake.url)
 		}
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
@@ -89,7 +82,47 @@ func TestValidate(t *testing.T) {
 			t.Errorf("expected empty string, got %s", status)
 		}
 		if status != test.expectedStatus {
-			t.Errorf("expected %s, got %s", test.expectedStatus, status)
+			t.Errorf("expected %s, got %s", test.expectedStatus.String(), status.String())
 		}
+	}
+}
+
+func TestValidator(t *testing.T) {
+	fake := makeFake("foo", 200, nil)
+	validator, err := makeTestValidator(map[string]string{
+		"foo": "foo.com:80",
+		"bar": "bar.com:8080",
+	}, fake)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	testServer := httptest.NewServer(validator)
+	defer testServer.Close()
+
+	resp, err := http.Get(testServer.URL + "/validatez")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %v", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	status := []ServerStatus{}
+	err = json.Unmarshal(data, &status)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	components := util.StringSet{}
+	for _, s := range status {
+		components.Insert(s.Component)
+	}
+	if len(status) != 2 || !components.Has("foo") || !components.Has("bar") {
+		t.Errorf("unexpected status: %#v", status)
 	}
 }

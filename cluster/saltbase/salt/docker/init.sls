@@ -1,4 +1,4 @@
-{% if pillar.get('is_systemd') %}
+{% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/docker' %}
 {% else %}
 {% set environment_file = '/etc/default/docker' %}
@@ -8,31 +8,6 @@ bridge-utils:
   pkg.installed
 
 {% if grains.os_family == 'RedHat' %}
-
-{{ environment_file }}:
-  file.managed:
-    - source: salt://docker/default
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-    - makedirs: true
-
-{% if grains.os == 'Fedora' and grains.osrelease_info[0] >= 22 %}
-
-docker:
-  pkg:
-    - installed
-  service.running:
-    - enable: True
-    - require:
-      - pkg: docker
-    - watch:
-      - file: {{ environment_file }}
-      - pkg: docker
-
-{% else %}
-
 docker-io:
   pkg:
     - installed
@@ -42,11 +17,6 @@ docker:
     - enable: True
     - require:
       - pkg: docker-io
-    - watch:
-      - file: {{ environment_file }}
-      - pkg: docker-io
-
-{% endif %}
 
 {% else %}
 
@@ -60,14 +30,23 @@ docker:
     - repl: '# net.ipv4.ip_forward=0'
 {% endif %}
 
-# Work around Salt #18089: https://github.com/saltstack/salt/issues/18089
-/etc/sysctl.d/99-salt.conf:
-  file.touch
-
 # TODO: This should really be based on network strategy instead of os_family
 net.ipv4.ip_forward:
   sysctl.present:
     - value: 1
+
+cbr0:
+  container_bridge.ensure:
+    - cidr: {{ grains['cbr-cidr'] }}
+    - mtu: 1460
+
+purge-old-docker:
+  pkg.removed:
+    - pkgs:
+      - lxc-docker-1.2.0
+      - lxc-docker-1.3.0
+      - lxc-docker-1.3.1
+      - lxc-docker-1.3.2
 
 {{ environment_file }}:
   file.managed:
@@ -78,54 +57,30 @@ net.ipv4.ip_forward:
     - mode: 644
     - makedirs: true
 
-# Docker is on the ContainerVM image by default. The following
-# variables are provided for other cloud providers, and for testing and dire circumstances, to allow
-# overriding the Docker version that's in a ContainerVM image.
-#
-# To change:
-#
-# 1. Find new deb name at:
-#    http://apt.dockerproject.org/repo/pool/main/d/docker-engine
+# We are caching the Docker deb file in GCS for reliability and speed.  To
+# update this to a new version of docker, do the following:
+# 1. Find new deb name with:
+#    curl https://get.docker.com/ubuntu/dists/docker/main/binary-amd64/Packages
 # 2. Download based on that:
-#    curl -O http://apt.dockerproject.org/repo/pool/main/d/docker-engine/<deb>
+#    curl -O https://get.docker.com/ubuntu/pool/main/<...>
 # 3. Upload to GCS:
 #    gsutil cp <deb> gs://kubernetes-release/docker/<deb>
 # 4. Make it world readable:
 #    gsutil acl ch -R -g all:R gs://kubernetes-release/docker/<deb>
 # 5. Get a hash of the deb:
 #    shasum <deb>
-# 6. Update override_deb, override_deb_sha1, override_docker_ver with new
-#    deb name, new hash and new version
+# 6. Update this file with new deb name, new hash and new version
+# 7. Add the old version to purge-old-docker above.
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
+{% set deb='lxc-docker-1.3.3_1.3.3_amd64.deb' %}
+{% set deb_hash='sha1=7c0f4a8016dae234e66f13f922f24987db3d3ba4' %}
+{% set docker_ver='1.3.3' %}
 
-# Only upgrade Docker to 1.8.2 for the containerVM image.
-# TODO(dchen1107): For release 1.1, we want to update the ContainerVM image to
-# include Docker 1.8.2 and comment out the upgrade below.
-{% if grains.get('cloud', '') == 'gce'
-   and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'wheezy' -%}
-{% set docker_pkg_name='docker-engine' %}
-{% set override_deb='docker-engine_1.8.2-0~wheezy_amd64.deb' %}
-{% set override_deb_sha1='dcff80bffcbde458508da58d2a9fe7bef8eed404' %}
-{% set override_docker_ver='1.8.2-0~wheezy' %}
-{% else %}
-{% set docker_pkg_name='lxc-docker-1.7.1' %}
-{% set override_docker_ver='1.7.1' %}
-{% set override_deb='lxc-docker-1.7.1_1.7.1_amd64.deb' %}
-{% set override_deb_sha1='81abef31dd2c616883a61f85bfb294d743b1c889' %}
-{% endif %}
-
-{% if override_docker_ver != '' %}
-purge-old-docker-package:
-  pkg.removed:
-    - pkgs:
-      - lxc-docker-1.6.2
-
-/var/cache/docker-install/{{ override_deb }}:
+/var/cache/docker-install/{{ deb }}:
   file.managed:
-    - source: {{ storage_base }}{{ override_deb }}
-    - source_hash: sha1={{ override_deb_sha1 }}
+    - source: {{ storage_base }}{{ deb }}
+    - source_hash: {{ deb_hash }}
     - user: root
     - group: root
     - mode: 644
@@ -141,65 +96,19 @@ purge-old-docker-package:
     - mode: 644
     - makedirs: true
 
-docker-upgrade:
+lxc-docker-{{ docker_ver }}:
   pkg.installed:
     - sources:
-      - {{ docker_pkg_name }}: /var/cache/docker-install/{{ override_deb }}
-    - require:
-      - file: /var/cache/docker-install/{{ override_deb }}
-{% endif %} # end override_docker_ver != ''
-
-# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
-{% if pillar.get('is_systemd') %}
-
-{{ pillar.get('systemd_system_path') }}/docker.service:
-  file.managed:
-    - source: salt://docker/docker.service
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-    - defaults:
-        environment_file: {{ environment_file }}
-
-# The docker service.running block below doesn't work reliably
-# Instead we run our script which e.g. does a systemd daemon-reload
-# But we keep the service block below, so it can be used by dependencies
-# TODO: Fix this
-fix-service-docker:
-  cmd.wait:
-    - name: /opt/kubernetes/helpers/services bounce docker
-    - watch:
-      - file: {{ pillar.get('systemd_system_path') }}/docker.service
-      - file: {{ environment_file }}
-{% if override_docker_ver != '' %}
-    - require:
-      - pkg: {{ docker_pkg_name }}-{{ override_docker_ver }}
-{% endif %}
-
-{% endif %}
+      - lxc-docker-{{ docker_ver }}: /var/cache/docker-install/{{ deb }}
 
 docker:
   service.running:
-# Starting Docker is racy on aws for some reason.  To be honest, since Monit
-# is managing Docker restart we should probably just delete this whole thing
-# but the kubernetes components use salt 'require' to set up a dag, and that
-# complicated and scary to unwind.
-{% if grains.cloud is defined and grains.cloud == 'aws' %}
-    - enable: False
-{% else %}
     - enable: True
-{% endif %}
+    - require:
+      - pkg: lxc-docker-{{ docker_ver }}
     - watch:
       - file: {{ environment_file }}
-{% if override_docker_ver != '' %}
-      - pkg: docker-upgrade
+      - container_bridge: cbr0
+      - pkg: lxc-docker-{{ docker_ver }}
+
 {% endif %}
-{% if pillar.get('is_systemd') %}
-      - file: {{ pillar.get('systemd_system_path') }}/docker.service
-{% endif %}
-{% if override_docker_ver != '' %}
-    - require:
-      - pkg: docker-upgrade
-{% endif %}
-{% endif %} # end grains.os_family != 'RedHat'

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,12 +40,7 @@ type Scheme struct {
 	// default coverting behavior.
 	converter *Converter
 
-	// cloner stores all registered copy functions. It also has default
-	// deep copy behavior.
-	cloner *Cloner
-
-	// Indent will cause the JSON output from Encode to be indented,
-	// if and only if it is true.
+	// Indent will cause the JSON output from Encode to be indented, iff it is true.
 	Indent bool
 
 	// InternalVersion is the default internal version. It is recommended that
@@ -65,11 +60,10 @@ func NewScheme() *Scheme {
 		typeToVersion:   map[reflect.Type]string{},
 		typeToKind:      map[reflect.Type][]string{},
 		converter:       NewConverter(),
-		cloner:          NewCloner(),
 		InternalVersion: "",
 		MetaFactory:     DefaultMetaFactory,
 	}
-	s.converter.nameFunc = s.nameFunc
+	s.converter.NameFunc = s.nameFunc
 	return s
 }
 
@@ -78,20 +72,13 @@ func (s *Scheme) Log(l DebugLogger) {
 	s.converter.Debug = l
 }
 
-// nameFunc returns the name of the type that we wish to use to determine when two types attempt
-// a conversion. Defaults to the go name of the type if the type is not registered.
+// nameFunc returns the name of the type that we wish to use for encoding. Defaults to
+// the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
 	// find the preferred names for this type
 	names, ok := s.typeToKind[t]
 	if !ok {
 		return t.Name()
-	}
-	if internal, ok := s.versionMap[""]; ok {
-		for _, name := range names {
-			if t, ok := internal[name]; ok {
-				return s.typeToKind[t][0]
-			}
-		}
 	}
 	return names[0]
 }
@@ -200,41 +187,7 @@ func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
 // add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
-		if err := s.converter.RegisterConversionFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Similar to AddConversionFuncs, but registers conversion functions that were
-// automatically generated.
-func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
-	for _, f := range conversionFuncs {
-		if err := s.converter.RegisterGeneratedConversionFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// AddDeepCopyFuncs adds functions to the list of deep copy functions.
-// Note that to copy sub-objects, you can use the conversion.Cloner object that
-// will be passed to your deep-copy function.
-func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterDeepCopyFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Similar to AddDeepCopyFuncs, but registers deep copy functions that were
-// automatically generated.
-func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterGeneratedDeepCopyFunc(f); err != nil {
+		if err := s.converter.Register(f); err != nil {
 			return err
 		}
 	}
@@ -247,53 +200,6 @@ func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
 // Call as many times as needed, even on the same fields.
 func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
 	return s.converter.SetStructFieldCopy(srcFieldType, srcFieldName, destFieldType, destFieldName)
-}
-
-// AddDefaultingFuncs adds functions to the list of default-value functions.
-// Each of the given functions is responsible for applying default values
-// when converting an instance of a versioned API object into an internal
-// API object.  These functions do not need to handle sub-objects. We deduce
-// how to call these functions from the types of their two parameters.
-//
-// s.AddDefaultingFuncs(
-//	func(obj *v1beta1.Pod) {
-//		if obj.OptionalField == "" {
-//			obj.OptionalField = "DefaultValue"
-//		}
-//	},
-// )
-func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
-	for _, f := range defaultingFuncs {
-		err := s.converter.RegisterDefaultingFunc(f)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Recognizes returns true if the scheme is able to handle the provided version and kind
-// of an object.
-func (s *Scheme) Recognizes(version, kind string) bool {
-	m, ok := s.versionMap[version]
-	if !ok {
-		return false
-	}
-	_, ok = m[kind]
-	return ok
-}
-
-// RegisterInputDefaults sets the provided field mapping function and field matching
-// as the defaults for the provided input type.  The fn may be nil, in which case no
-// mapping will happen by default. Use this method to register a mechanism for handling
-// a specific input type in conversion, such as a map[string]string to structs.
-func (s *Scheme) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {
-	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
-}
-
-// Performs a deep copy of the given object.
-func (s *Scheme) DeepCopy(in interface{}) (interface{}, error) {
-	return s.cloner.DeepCopy(in)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers. For easy
@@ -311,11 +217,7 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	if v, _, err := s.ObjectVersionAndKind(out); err == nil {
 		outVersion = v
 	}
-	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
-	if flags == 0 {
-		flags = AllowDifferentFieldTypeNames
-	}
-	return s.converter.Convert(in, out, flags, meta)
+	return s.converter.Convert(in, out, AllowDifferentFieldTypeNames, s.generateConvertMeta(inVersion, outVersion))
 }
 
 // ConvertToVersion attempts to convert an input object to its matching Kind in another
@@ -347,8 +249,7 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
-	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
-	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+	if err := s.converter.Convert(in, out, 0, s.generateConvertMeta(inVersion, outVersion)); err != nil {
 		return nil, err
 	}
 
@@ -359,18 +260,11 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 	return out, nil
 }
 
-// Converter allows access to the converter for the scheme
-func (s *Scheme) Converter() *Converter {
-	return s.converter
-}
-
 // generateConvertMeta constructs the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interface{}) (FieldMatchingFlags, *Meta) {
-	t := reflect.TypeOf(in)
-	return s.converter.inputDefaultFlags[t], &Meta{
-		SrcVersion:     srcVersion,
-		DestVersion:    destVersion,
-		KeyNameMapping: s.converter.inputFieldMappingFuncs[t],
+func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) *Meta {
+	return &Meta{
+		SrcVersion:  srcVersion,
+		DestVersion: destVersion,
 	}
 }
 
