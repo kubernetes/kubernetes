@@ -834,6 +834,9 @@ func loadClient() (*client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
+	if c.Timeout == 0 {
+		c.Timeout = singleCallTimeout
+	}
 	return c, nil
 }
 
