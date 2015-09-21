@@ -1,11 +1,9 @@
 .PHONY: all netexec image push clean
 
-TAG = 1.0
+TAG = 1.1
 PREFIX = gcr.io/google_containers
 
 all: push
-
-TAG = 1.0
 
 netexec: netexec.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./netexec.go
