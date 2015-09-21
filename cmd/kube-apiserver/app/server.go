@@ -21,6 +21,7 @@ package app
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -245,7 +246,10 @@ func (s *APIServer) verifyClusterIPFlags() {
 	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, defaultVersion, storageVersion, pathPrefix string) (etcdStorage storage.Interface, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, storageVersion, pathPrefix string) (etcdStorage storage.Interface, err error) {
+	if storageVersion == "" {
+		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
+	}
 	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
@@ -264,11 +268,8 @@ func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta
 		etcdClient.SetTransport(transport)
 		client = etcdClient
 	}
-
-	if storageVersion == "" {
-		storageVersion = defaultVersion
-	}
-	return master.NewEtcdStorage(client, interfacesFunc, storageVersion, pathPrefix)
+	etcdStorage, err = master.NewEtcdStorage(client, interfacesFunc, storageVersion, pathPrefix)
+	return etcdStorage, err
 }
 
 // Run runs the specified APIServer.  This should never exit.
@@ -341,7 +342,16 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").Version, s.StorageVersion, s.EtcdPathPrefix)
+	g, err := latest.Group("")
+	if err != nil {
+		return err
+	}
+	storageVersions := make(map[string]string)
+	if s.StorageVersion == "" {
+		s.StorageVersion = g.Version
+	}
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, s.StorageVersion, s.EtcdPathPrefix)
+	storageVersions[""] = s.StorageVersion
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -352,10 +362,14 @@ func (s *APIServer) Run(_ []string) error {
 		if err != nil {
 			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
-		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, g.Version, s.ExpStorageVersion, s.EtcdPathPrefix)
+		if s.ExpStorageVersion == "" {
+			s.ExpStorageVersion = g.Version
+		}
+		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, s.ExpStorageVersion, s.EtcdPathPrefix)
 		if err != nil {
 			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 		}
+		storageVersions["experimental"] = s.StorageVersion
 	}
 
 	n := s.ServiceClusterIPRange
@@ -427,6 +441,7 @@ func (s *APIServer) Run(_ []string) error {
 	config := &master.Config{
 		DatabaseStorage:    etcdStorage,
 		ExpDatabaseStorage: expEtcdStorage,
+		StorageVersions:    storageVersions,
 
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,

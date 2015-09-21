@@ -75,6 +75,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
