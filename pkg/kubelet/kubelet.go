@@ -2346,7 +2346,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	// Check whether network is configured properly
 	networkConfigured := kl.doneNetworkConfigure()
 
-	currentTime := util.Now()
+	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
 	if containerRuntimeUp && networkConfigured {
