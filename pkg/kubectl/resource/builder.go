@@ -516,7 +516,7 @@ func (b *Builder) visitorResult() *Result {
 
 	// visit items specified by resource and name
 	if len(b.resourceTuples) != 0 {
-		isSingular := len(b.resourceTuples) == 1
+		isSingular := (len(b.resourceTuples) == 1)
 
 		if len(b.paths) != 0 {
 			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
@@ -579,7 +579,7 @@ func (b *Builder) visitorResult() *Result {
 
 	// visit items specified by name
 	if len(b.names) != 0 {
-		isSingular := len(b.names) == 1
+		isSingular := (len(b.names) == 1)
 
 		if len(b.paths) != 0 {
 			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
