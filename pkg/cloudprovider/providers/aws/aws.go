@@ -1269,19 +1269,6 @@ func (s *AWSCloud) describeLoadBalancer(region, name string) (*elb.LoadBalancerD
 	return ret, nil
 }
 
-// TCPLoadBalancerExists implements TCPLoadBalancer.TCPLoadBalancerExists.
-func (self *AWSCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
-	lb, err := self.describeLoadBalancer(name, region)
-	if err != nil {
-		return false, err
-	}
-
-	if lb != nil {
-		return true, nil
-	}
-	return false, nil
-}
-
 // Retrieves instance's vpc id from metadata
 func (self *AWSCloud) findVPCID() (string, error) {
 
