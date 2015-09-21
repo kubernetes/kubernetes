@@ -1595,6 +1595,10 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
 
+	if region != s.region {
+		return nil, fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
+	}
+
 	if affinity != api.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
@@ -1729,6 +1733,10 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 // GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
 func (s *AWSCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+	if region != s.region {
+		return nil, false, fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
+	}
+
 	lb, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return nil, false, err
@@ -1889,6 +1897,10 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 
 // EnsureTCPLoadBalancerDeleted implements TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
+	if region != s.region {
+		return fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
+	}
+
 	lb, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return err
@@ -1979,6 +1991,10 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 
 // UpdateTCPLoadBalancer implements TCPLoadBalancer.UpdateTCPLoadBalancer
 func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+	if region != s.region {
+		return fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
+	}
+
 	instances, err := s.getInstancesByNodeNames(hosts)
 	if err != nil {
 		return err
