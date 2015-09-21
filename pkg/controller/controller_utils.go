@@ -18,9 +18,9 @@ package controller
 
 import (
 	"fmt"
-	"time"
-
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -226,6 +226,8 @@ type RealPodControl struct {
 	Recorder   record.EventRecorder
 }
 
+var _ PodControlInterface = &RealPodControl{}
+
 func getPodsLabelSet(template *api.PodTemplateSpec) labels.Set {
 	desiredLabels := make(labels.Set)
 	for k, v := range template.Labels {
@@ -310,6 +312,52 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 
 func (r RealPodControl) DeletePod(namespace, podID string) error {
 	return r.KubeClient.Pods(namespace).Delete(podID, nil)
+}
+
+type FakePodControl struct {
+	sync.Mutex
+	Templates     []api.PodTemplateSpec
+	DeletePodName []string
+	Err           error
+}
+
+var _ PodControlInterface = &FakePodControl{}
+
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.Templates = append(f.Templates, *spec)
+	return nil
+}
+
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.Templates = append(f.Templates, *template)
+	return nil
+}
+
+func (f *FakePodControl) DeletePod(namespace string, podName string) error {
+	f.Lock()
+	defer f.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.DeletePodName = append(f.DeletePodName, podName)
+	return nil
+}
+
+func (f *FakePodControl) Clear() {
+	f.Lock()
+	defer f.Unlock()
+	f.DeletePodName = []string{}
+	f.Templates = []api.PodTemplateSpec{}
 }
 
 // ActivePods type allows custom sorting of pods so a controller can pick the best ones to delete.
