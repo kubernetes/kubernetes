@@ -354,6 +354,10 @@
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
 		},
 		{
+			"ImportPath": "github.com/google/google-api-go-client/cloudmonitoring/v2beta2",
+			"Rev": "8cbf97d5e925c857511aedf459affeed490e6861"
+		},
+		{
 			"ImportPath": "github.com/gorilla/context",
 			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
 		},
