@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,9 @@ package config
 import (
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // Operation is a type of operation of services or endpoints.
@@ -58,17 +56,17 @@ type EndpointsUpdate struct {
 
 // ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
 type ServiceConfigHandler interface {
-	// OnServiceUpdate gets called when a configuration has been changed by one of the sources.
+	// OnUpdate gets called when a configuration has been changed by one of the sources.
 	// This is the union of all the configuration sources.
-	OnServiceUpdate(services []api.Service)
+	OnUpdate(services []api.Service)
 }
 
 // EndpointsConfigHandler is an abstract interface of objects which receive update notifications for the set of endpoints.
 type EndpointsConfigHandler interface {
-	// OnEndpointsUpdate gets called when endpoints configuration is changed for a given
+	// OnUpdate gets called when endpoints configuration is changed for a given
 	// service on any of the configuration sources. An example is when a new
 	// service comes up, or when containers come up or down for an existing service.
-	OnEndpointsUpdate(endpoints []api.Endpoints)
+	OnUpdate(endpoints []api.Endpoints)
 }
 
 // EndpointsConfig tracks a set of endpoints configurations.
@@ -83,7 +81,7 @@ type EndpointsConfig struct {
 // It immediately runs the created EndpointsConfig.
 func NewEndpointsConfig() *EndpointsConfig {
 	updates := make(chan struct{})
-	store := &endpointsStore{updates: updates, endpoints: make(map[string]map[types.NamespacedName]api.Endpoints)}
+	store := &endpointsStore{updates: updates, endpoints: make(map[string]map[string]api.Endpoints)}
 	mux := config.NewMux(store)
 	bcaster := config.NewBroadcaster()
 	go watchForUpdates(bcaster, store, updates)
@@ -92,8 +90,7 @@ func NewEndpointsConfig() *EndpointsConfig {
 
 func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
 	c.bcaster.Add(config.ListenerFunc(func(instance interface{}) {
-		glog.V(3).Infof("Calling handler.OnEndpointsUpdate()")
-		handler.OnEndpointsUpdate(instance.([]api.Endpoints))
+		handler.OnUpdate(instance.([]api.Endpoints))
 	}))
 }
 
@@ -109,13 +106,13 @@ func (c *EndpointsConfig) Channel(source string) chan EndpointsUpdate {
 	return endpointsCh
 }
 
-func (c *EndpointsConfig) Config() []api.Endpoints {
-	return c.store.MergedState().([]api.Endpoints)
+func (c *EndpointsConfig) Config() map[string]map[string]api.Endpoints {
+	return c.store.MergedState().(map[string]map[string]api.Endpoints)
 }
 
 type endpointsStore struct {
 	endpointLock sync.RWMutex
-	endpoints    map[string]map[types.NamespacedName]api.Endpoints
+	endpoints    map[string]map[string]api.Endpoints
 	updates      chan<- struct{}
 }
 
@@ -123,32 +120,29 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	s.endpointLock.Lock()
 	endpoints := s.endpoints[source]
 	if endpoints == nil {
-		endpoints = make(map[types.NamespacedName]api.Endpoints)
+		endpoints = make(map[string]api.Endpoints)
 	}
 	update := change.(EndpointsUpdate)
 	switch update.Op {
 	case ADD:
-		glog.V(4).Infof("Adding new endpoint from source %s : %s", source, spew.Sdump(update.Endpoints))
+		glog.V(4).Infof("Adding new endpoint from source %s : %+v", source, update.Endpoints)
 		for _, value := range update.Endpoints {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			endpoints[name] = value
+			endpoints[value.Name] = value
 		}
 	case REMOVE:
-		glog.V(4).Infof("Removing an endpoint %s", spew.Sdump(update))
+		glog.V(4).Infof("Removing an endpoint %+v", update)
 		for _, value := range update.Endpoints {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			delete(endpoints, name)
+			delete(endpoints, value.Name)
 		}
 	case SET:
-		glog.V(4).Infof("Setting endpoints %s", spew.Sdump(update))
+		glog.V(4).Infof("Setting endpoints %+v", update)
 		// Clear the old map entries by just creating a new map
-		endpoints = make(map[types.NamespacedName]api.Endpoints)
+		endpoints = make(map[string]api.Endpoints)
 		for _, value := range update.Endpoints {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			endpoints[name] = value
+			endpoints[value.Name] = value
 		}
 	default:
-		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
+		glog.V(4).Infof("Received invalid update type: %v", update)
 	}
 	s.endpoints[source] = endpoints
 	s.endpointLock.Unlock()
@@ -182,7 +176,7 @@ type ServiceConfig struct {
 // It immediately runs the created ServiceConfig.
 func NewServiceConfig() *ServiceConfig {
 	updates := make(chan struct{})
-	store := &serviceStore{updates: updates, services: make(map[string]map[types.NamespacedName]api.Service)}
+	store := &serviceStore{updates: updates, services: make(map[string]map[string]api.Service)}
 	mux := config.NewMux(store)
 	bcaster := config.NewBroadcaster()
 	go watchForUpdates(bcaster, store, updates)
@@ -191,8 +185,7 @@ func NewServiceConfig() *ServiceConfig {
 
 func (c *ServiceConfig) RegisterHandler(handler ServiceConfigHandler) {
 	c.bcaster.Add(config.ListenerFunc(func(instance interface{}) {
-		glog.V(3).Infof("Calling handler.OnServiceUpdate()")
-		handler.OnServiceUpdate(instance.([]api.Service))
+		handler.OnUpdate(instance.([]api.Service))
 	}))
 }
 
@@ -208,13 +201,13 @@ func (c *ServiceConfig) Channel(source string) chan ServiceUpdate {
 	return serviceCh
 }
 
-func (c *ServiceConfig) Config() []api.Service {
-	return c.store.MergedState().([]api.Service)
+func (c *ServiceConfig) Config() map[string]map[string]api.Service {
+	return c.store.MergedState().(map[string]map[string]api.Service)
 }
 
 type serviceStore struct {
 	serviceLock sync.RWMutex
-	services    map[string]map[types.NamespacedName]api.Service
+	services    map[string]map[string]api.Service
 	updates     chan<- struct{}
 }
 
@@ -222,32 +215,29 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	s.serviceLock.Lock()
 	services := s.services[source]
 	if services == nil {
-		services = make(map[types.NamespacedName]api.Service)
+		services = make(map[string]api.Service)
 	}
 	update := change.(ServiceUpdate)
 	switch update.Op {
 	case ADD:
-		glog.V(4).Infof("Adding new service from source %s : %s", source, spew.Sdump(update.Services))
+		glog.V(4).Infof("Adding new service from source %s : %+v", source, update.Services)
 		for _, value := range update.Services {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			services[name] = value
+			services[value.Name] = value
 		}
 	case REMOVE:
-		glog.V(4).Infof("Removing a service %s", spew.Sdump(update))
+		glog.V(4).Infof("Removing a service %+v", update)
 		for _, value := range update.Services {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			delete(services, name)
+			delete(services, value.Name)
 		}
 	case SET:
-		glog.V(4).Infof("Setting services %s", spew.Sdump(update))
+		glog.V(4).Infof("Setting services %+v", update)
 		// Clear the old map entries by just creating a new map
-		services = make(map[types.NamespacedName]api.Service)
+		services = make(map[string]api.Service)
 		for _, value := range update.Services {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			services[name] = value
+			services[value.Name] = value
 		}
 	default:
-		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
+		glog.V(4).Infof("Received invalid update type: %v", update)
 	}
 	s.services[source] = services
 	s.serviceLock.Unlock()
@@ -272,8 +262,7 @@ func (s *serviceStore) MergedState() interface{} {
 // watchForUpdates invokes bcaster.Notify() with the latest version of an object
 // when changes occur.
 func watchForUpdates(bcaster *config.Broadcaster, accessor config.Accessor, updates <-chan struct{}) {
-	for true {
-		<-updates
+	for _ = range updates {
 		bcaster.Notify(accessor.MergedState())
 	}
 }

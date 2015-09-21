@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,10 +16,6 @@ limitations under the License.
 
 package api
 
-import (
-	"strings"
-)
-
 // This file contains API types that are unversioned.
 
 // APIVersions lists the api versions that are available, to allow
@@ -28,31 +24,3 @@ import (
 type APIVersions struct {
 	Versions []string `json:"versions"`
 }
-
-// RootPaths lists the paths available at root.
-// For example: "/healthz", "/api".
-type RootPaths struct {
-	Paths []string `json:"paths"`
-}
-
-// TODO: remove me when watch is refactored
-func LabelSelectorQueryParam(version string) string {
-	return "labelSelector"
-}
-
-// TODO: remove me when watch is refactored
-func FieldSelectorQueryParam(version string) string {
-	return "fieldSelector"
-}
-
-// String returns available api versions as a human-friendly version string.
-func (apiVersions APIVersions) String() string {
-	return strings.Join(apiVersions.Versions, ",")
-}
-
-func (apiVersions APIVersions) GoString() string {
-	return apiVersions.String()
-}
-
-// Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.
-type Patch struct{}

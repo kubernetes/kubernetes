@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Validates that the cluster is healthy.
+# Bring up a Kubernetes cluster.
+#
+# If the full release name (gs://<bucket>/<release>) is passed in then we take
+# that directly.  If not then we assume we are doing development stuff and take
+# the defaults in the release config.
 
 set -o errexit
 set -o nounset
@@ -22,73 +26,85 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-EXPECTED_NUM_NODES="${NUM_MINIONS}"
-if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
-  EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+1))
-fi
-# Make several attempts to deal with slow cluster birth.
+get-password
+detect-master > /dev/null
+detect-minions > /dev/null
+
+MINIONS_FILE=/tmp/minions
 attempt=0
 while true; do
-  # The "kubectl get nodes -o template" exports node information.
-  #
-  # Echo the output and gather 2 counts:
-  #  - Total number of nodes.
-  #  - Number of "ready" nodes.
-  #
-  # Suppress errors from kubectl output because during cluster bootstrapping
-  # for clusters where the master node is registered, the apiserver will become
-  # available and then get restarted as the kubelet configures the docker bridge.
-  nodes_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template --template='{{range .items}}{{with index .status.conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}' --api-version=v1) || true
-  found=$(echo "${nodes_status}" | tr "," "\n" | grep -c 'Ready:') || true
-  ready=$(echo "${nodes_status}" | tr "," "\n" | grep -c 'Ready:True') || true
-
-  if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
+  "${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.items}}{{.id}}\n{{end}}' list minions > "${MINIONS_FILE}"
+  found=$(grep -c . "${MINIONS_FILE}")
+  if [[ ${found} == "${NUM_MINIONS}" ]]; then
     break
   else
-    # Set the timeout to ~10minutes (40 x 15 second) to avoid timeouts for 100-node clusters.
-    if (( attempt > 40 )); then
-      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be working.${color_norm}"
-      "${KUBE_ROOT}/cluster/kubectl.sh" get nodes
+    if (( attempt > 5 )); then
+      echo -e "${color_red}Detected ${found} nodes out of ${NUM_MINIONS}. Your cluster may not be working. ${color_norm}"
       exit 2
-		else
-      echo -e "${color_yellow}Waiting for ${EXPECTED_NUM_NODES} ready nodes. ${ready} ready nodes, ${found} registered. Retrying.${color_norm}"
     fi
     attempt=$((attempt+1))
-    sleep 15
+    sleep 30
   fi
 done
-echo "Found ${found} node(s)."
-"${KUBE_ROOT}/cluster/kubectl.sh" get nodes
+echo "Found ${found} nodes."
 
-attempt=0
-while true; do
-  # The "kubectl componentstatuses -o template" exports components health information.
-  #
-  # Echo the output and gather 2 counts:
-  #  - Total number of componentstatuses.
-  #  - Number of "healthy" components.
-  cs_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get componentstatuses -o template --template='{{range .items}}{{with index .conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}' --api-version=v1) || true
-  componentstatuses=$(echo "${cs_status}" | tr "," "\n" | grep -c 'Healthy:') || true
-  healthy=$(echo "${cs_status}" | tr "," "\n" | grep -c 'Healthy:True') || true
+# On vSphere, use minion IPs as their names
+if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]]; then
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    MINION_NAMES[$i]=${KUBE_MINION_IP_ADDRESSES[$i]}
+  done
+fi
 
-  if ((componentstatuses > healthy)); then
-    if ((attempt < 5)); then
-      echo -e "${color_yellow}Cluster not working yet.${color_norm}"
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
+    # Make several attempts to deal with slow cluster birth.
+    attempt=0
+    while true; do
+      echo -n "Attempt $((attempt+1)) to find ${MINION_NAMES[$i]} ..."
+      count=$(grep -c "${MINION_NAMES[$i]}" "${MINIONS_FILE}") || :
+      if [[ "${count}" == "0" ]]; then
+          if (( attempt > 5 )); then
+            echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
+            exit 1
+          fi
+      else
+        echo -e " ${color_green}[working]${color_norm}"
+        break
+      fi
+      echo -e " ${color_yellow}[not working yet]${color_norm}"
+      attempt=$((attempt+1))
+      sleep 20
+    done
+
+    name="${MINION_NAMES[$i]}"
+    if [ "$KUBERNETES_PROVIDER" != "vsphere" ]; then
+      # Grab fully qualified name
+      name=$(grep "${MINION_NAMES[$i]}\." "${MINIONS_FILE}")
+    fi
+
+    # Make sure the kubelet is healthy.
+    # Make several attempts to deal with slow cluster birth.
+    attempt=0
+    while true; do
+      echo -n "Attempt $((attempt+1)) at checking Kubelet installation on node ${MINION_NAMES[$i]} ..."
+      curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
+          "https://${KUBE_MASTER_IP}/api/v1beta1/proxy/minions/${name}/healthz")
+      if [[ "${curl_output}" != "ok" ]]; then
+          if (( attempt > 5 )); then
+            echo
+            echo -e "${color_red}Kubelet failed to install on node ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
+            echo -e "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)${color_norm}"
+            exit 1
+          fi
+      else
+          echo -e " ${color_green}[working]${color_norm}"
+          break
+      fi
+      echo -e " ${color_yellow}[not working yet]${color_norm}"
       attempt=$((attempt+1))
       sleep 30
-    else
-      echo -e " ${color_yellow}Validate output:${color_norm}"
-      "${KUBE_ROOT}/cluster/kubectl.sh" get cs
-      echo -e "${color_red}Validation returned one or more failed components. Cluster is probably broken.${color_norm}"
-      exit 1
-    fi
-  else
-    break
-  fi
+    done
 done
-
-echo "Validate output:"
-"${KUBE_ROOT}/cluster/kubectl.sh" get cs
 echo -e "${color_green}Cluster validation succeeded${color_norm}"

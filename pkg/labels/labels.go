@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,13 +59,4 @@ func (ls Set) Get(label string) string {
 // AsSelector converts labels into a selectors.
 func (ls Set) AsSelector() Selector {
 	return SelectorFromSet(ls)
-}
-
-// FormatLables convert label map into plain string
-func FormatLabels(labelMap map[string]string) string {
-	l := Set(labelMap).String()
-	if l == "" {
-		l = "<none>"
-	}
-	return l
 }

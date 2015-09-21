@@ -1,0 +1,19 @@
+[Unit]
+Description=Kubernetes Controller Manager
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/apiserver
+EnvironmentFile=-/etc/kubernetes/controller-manager
+User=kube
+ExecStart=/usr/bin/kube-controller-manager \
+	    ${KUBE_LOGTOSTDERR} \
+	    ${KUBE_LOG_LEVEL} \
+	    ${KUBELET_ADDRESSES} \
+	    ${KUBE_MASTER} \
+	    ${KUBE_CONTROLLER_MANAGER_ARGS}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

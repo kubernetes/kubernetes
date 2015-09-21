@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,47 +24,25 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-# Lists of API Versions of each groups that should be tested, groups are
-# separated by comma, lists are separated by semicolon. e.g.,
-# "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
-# TODO: It's going to be:
-# KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1"}
-
-KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
-LOG_LEVEL=${LOG_LEVEL:-2}
 
 cleanup() {
   kube::etcd::cleanup
   kube::log::status "Integration test cleanup complete"
 }
 
-runTests() {
-  kube::etcd::start
-
-  kube::log::status "Running integration test cases"
-
-  KUBE_GOFLAGS="-tags 'integration no-docker' " \
-    KUBE_RACE="-race" \
-    KUBE_TEST_API_VERSIONS="$1" \
-    KUBE_API_VERSIONS="v1,experimental/v1" \
-    "${KUBE_ROOT}/hack/test-go.sh" test/integration
-
-  kube::log::status "Running integration test scenario"
-
-  KUBE_API_VERSIONS="v1,experimental/v1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
-    --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
-
-  cleanup
-}
-
-KUBE_API_VERSIONS="v1,experimental/v1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
+"${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
 
-# Convert the CSV to an array of API versions to test
-IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-for apiVersion in "${apiVersions[@]}"; do
-  runTests "${apiVersion}"
-done
+kube::etcd::start
+
+kube::log::status "Running integration test cases"
+KUBE_GOFLAGS="-tags 'integration no-docker' " \
+  "${KUBE_ROOT}/hack/test-go.sh" test/integration
+
+kube::log::status "Running integration test scenario"
+
+"${KUBE_OUTPUT_HOSTBIN}/integration" --v=10
+
+cleanup

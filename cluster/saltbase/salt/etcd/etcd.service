@@ -1,0 +1,11 @@
+[Unit]
+Description=etcd
+Documentation=https://github.com/coreos/etcd
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/etcd
+ExecStart=/usr/local/bin/etcd $DAEMON_ARGS
+
+[Install]
+WantedBy=multi-user.target

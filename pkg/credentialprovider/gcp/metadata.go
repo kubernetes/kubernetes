@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,25 +22,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 const (
-	metadataUrl              = "http://metadata.google.internal./computeMetadata/v1/"
-	metadataAttributes       = metadataUrl + "instance/attributes/"
-	dockerConfigKey          = metadataAttributes + "google-dockercfg"
-	dockerConfigUrlKey       = metadataAttributes + "google-dockercfg-url"
-	metadataScopes           = metadataUrl + "instance/service-accounts/default/scopes"
-	metadataToken            = metadataUrl + "instance/service-accounts/default/token"
-	metadataEmail            = metadataUrl + "instance/service-accounts/default/email"
-	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
-	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
+	metadataUrl        = "http://metadata.google.internal./computeMetadata/v1/"
+	metadataAttributes = metadataUrl + "instance/attributes/"
+	dockerConfigKey    = metadataAttributes + "google-dockercfg"
+	dockerConfigUrlKey = metadataAttributes + "google-dockercfg-url"
+	metadataScopes     = metadataUrl + "instance/service-accounts/default/scopes"
+	metadataToken      = metadataUrl + "instance/service-accounts/default/token"
+	metadataEmail      = metadataUrl + "instance/service-accounts/default/email"
+	storageScopePrefix = "https://www.googleapis.com/auth/devstorage"
 )
 
-// For these urls, the parts of the host name can be glob, for example '*.gcr.io" will match
-// "foo.gcr.io" and "bar.gcr.io".
-var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io", "*.gcr.io"}
+var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io"}
 
 var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
@@ -151,8 +148,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 
 	for _, v := range scopes {
-		// cloudPlatformScope implies storage scope.
-		if strings.HasPrefix(v, storageScopePrefix) || strings.HasPrefix(v, cloudPlatformScopePrefix) {
+		if strings.HasPrefix(v, storageScopePrefix) {
 			return true
 		}
 	}

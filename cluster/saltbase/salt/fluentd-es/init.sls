@@ -1,6 +1,6 @@
-/etc/kubernetes/manifests/fluentd-es.yaml:
+/etc/kubernetes/manifests/fluentd-es.manifest:
   file.managed:
-    - source: salt://fluentd-es/fluentd-es.yaml
+    - source: salt://fluentd-es/fluentd-es.manifest
     - user: root
     - group: root
     - mode: 644

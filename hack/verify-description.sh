@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +19,29 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/genswaggertypedocs
+cd "${KUBE_ROOT}"
 
-"${KUBE_ROOT}/hack/after-build/verify-description.sh" "$@"
+result=0
 
-# ex: ts=2 sw=2 et filetype=sh
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+find_files | egrep "pkg/api/v.[^/]*/types\.go" | grep -v v1beta3 | while read file ; do
+    if [[ "$("${KUBE_ROOT}/hooks/description.sh" "${file}")" -eq "0" ]]; then
+      echo "API file is missing the required field descriptions: ${file}"
+      result=1
+    fi
+done
+
+exit ${result}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,36 +19,25 @@ package cmd
 import (
 	"io"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
-
-	"k8s.io/kubernetes/pkg/kubectl"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the client and server version information.",
+		Short: "Print version of client and server",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunVersion(f, out, cmd)
-			cmdutil.CheckErr(err)
+			if GetFlagBool(cmd, "client") {
+				kubectl.GetClientVersion(out)
+			} else {
+				client, err := f.ClientBuilder.Client()
+				checkErr(err)
+
+				kubectl.GetVersion(out, client)
+			}
 		},
 	}
-	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
+	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required)")
 	return cmd
-}
-
-func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	kubectl.GetClientVersion(out)
-	if cmdutil.GetFlagBool(cmd, "client") {
-		return nil
-	}
-
-	client, err := f.Client()
-	if err != nil {
-		return err
-	}
-
-	kubectl.GetServerVersion(out, client)
-	return nil
 }

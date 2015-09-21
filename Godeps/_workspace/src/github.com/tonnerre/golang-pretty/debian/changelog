@@ -1,0 +1,5 @@
+golang-pretty (0.0~git20130613-1) unstable; urgency=low
+
+  * Initial release. Closes: #722983
+
+ -- Tonnerre Lombard <tonnerre@ancient-solutions.com>  Wed, 11 Sep 2013 02:36:12 +0200

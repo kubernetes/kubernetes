@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,19 +20,11 @@
 
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
-instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: $NODE_INSTANCE_PREFIX
-service_cluster_ip_range: $SERVICE_CLUSTER_IP_RANGE
-enable_cluster_monitoring: $ENABLE_CLUSTER_MONITORING
-enable_cluster_logging: $ENABLE_CLUSTER_LOGGING
-enable_cluster_ui: $ENABLE_CLUSTER_UI
+portal_net: $PORTAL_NET
+enable_node_monitoring: $ENABLE_NODE_MONITORING
 enable_node_logging: $ENABLE_NODE_LOGGING
 logging_destination: $LOGGING_DESTINATION
-elasticsearch_replicas: $ELASTICSEARCH_LOGGING_REPLICAS
-enable_cluster_dns: $ENABLE_CLUSTER_DNS
-dns_replicas: $DNS_REPLICAS
-dns_server: $DNS_SERVER_IP
-dns_domain: $DNS_DOMAIN
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 )
 
 func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
@@ -76,15 +76,10 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 
 	keyring.Add(provider.Provide())
 
-	creds, ok := keyring.Lookup(registryUrl)
+	val, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
-		return
 	}
-	if len(creds) > 1 {
-		t.Errorf("Got more hits than expected: %s", creds)
-	}
-	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -148,15 +143,10 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 
 	keyring.Add(provider.Provide())
 
-	creds, ok := keyring.Lookup(registryUrl)
+	val, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
-		return
 	}
-	if len(creds) > 1 {
-		t.Errorf("Got more hits than expected: %s", creds)
-	}
-	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -221,15 +211,10 @@ func TestContainerRegistryBasics(t *testing.T) {
 
 	keyring.Add(provider.Provide())
 
-	creds, ok := keyring.Lookup(registryUrl)
+	val, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
-		return
 	}
-	if len(creds) > 1 {
-		t.Errorf("Got more hits than expected: %s", creds)
-	}
-	val := creds[0]
 
 	if "_token" != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", "_token", val.Username)
@@ -272,39 +257,6 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 
 	if provider.Enabled() {
 		t.Errorf("Provider is unexpectedly enabled")
-	}
-}
-
-func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
-	const (
-		defaultEndpoint = "/computeMetadata/v1/instance/service-accounts/default/"
-		scopeEndpoint   = defaultEndpoint + "scopes"
-	)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only serve the URL key and the value endpoint
-		if scopeEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprint(w, `["https://www.googleapis.com/auth/compute.read_write","https://www.googleapis.com/auth/cloud-platform.read-only"]`)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
-		Proxy: func(req *http.Request) (*url.URL, error) {
-			return url.Parse(server.URL + req.URL.Path)
-		},
-	}
-
-	provider := &containerRegistryProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
-	}
-
-	if !provider.Enabled() {
-		t.Errorf("Provider is unexpectedly disabled")
 	}
 }
 

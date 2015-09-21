@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package union
 import (
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests
@@ -35,11 +35,11 @@ func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
 // AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.  The first
 // success returns that identity.  Errors are only returned if no matches are found.
 func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	var errlist []error
+	var errors util.ErrorList
 	for _, currAuthRequestHandler := range authHandler {
 		info, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
 		if err != nil {
-			errlist = append(errlist, err)
+			errors = append(errors, err)
 			continue
 		}
 
@@ -48,5 +48,5 @@ func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request
 		}
 	}
 
-	return nil, false, errors.NewAggregate(errlist)
+	return nil, false, errors.ToError()
 }

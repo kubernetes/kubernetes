@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package config
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type Merger interface {
@@ -74,7 +74,7 @@ func (m *Mux) Channel(source string) chan interface{} {
 	}
 	newChannel := make(chan interface{})
 	m.sources[source] = newChannel
-	go util.Until(func() { m.listen(source, newChannel) }, 0, util.NeverStop)
+	go util.Forever(func() { m.listen(source, newChannel) }, 0)
 	return newChannel
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,7 @@ limitations under the License.
 package httplog
 
 import (
-	"bufio"
 	"fmt"
-	"net"
 	"net/http"
 	"runtime"
 	"time"
@@ -48,10 +46,6 @@ type logger interface {
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
-//
-// TODO now that we're using go-restful, we shouldn't need to be wrapping
-// the http.ResponseWriter. We can recover panics from go-restful, and
-// the logging value is questionable.
 type respLogger struct {
 	status      int
 	statusStack string
@@ -74,7 +68,7 @@ func (passthroughLogger) Addf(format string, data ...interface{}) {
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
-	return (status < http.StatusOK || status >= http.StatusInternalServerError) && status != http.StatusSwitchingProtocols
+	return status < http.StatusOK || status >= http.StatusBadRequest
 }
 
 // NewLogged turns a normal response writer into a logged response writer.
@@ -83,7 +77,7 @@ func DefaultStacktracePred(status int) bool {
 //
 // defer NewLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
 //
-// (Only the call to Log() is deferred, so you can set everything up in one line!)
+// (Only the call to Log() is defered, so you can set everything up in one line!)
 //
 // Note that this *changes* your writer, to route response writing actions
 // through the logger.
@@ -155,7 +149,7 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
 	if glog.V(2) {
-		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo))
 	}
 }
 
@@ -174,8 +168,8 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 func (rl *respLogger) Flush() {
 	if flusher, ok := rl.w.(http.Flusher); ok {
 		flusher.Flush()
-	} else if glog.V(2) {
-		glog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
+	} else {
+		glog.V(2).Infof("Unable to convert %v into http.Flusher", rl.w)
 	}
 }
 
@@ -191,9 +185,4 @@ func (rl *respLogger) WriteHeader(status int) {
 		rl.statusStack = ""
 	}
 	rl.w.WriteHeader(status)
-}
-
-// Hijack implements http.Hijacker.
-func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return rl.w.(http.Hijacker).Hijack()
 }

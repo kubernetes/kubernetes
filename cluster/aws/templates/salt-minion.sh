@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $SALT_MASTER" > /etc/salt/minion.d/master.conf
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
@@ -26,41 +26,12 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: 10.123.45.0/30
+  cbr-cidr: $MINION_IP_RANGE
   cloud: aws
 EOF
 
-# We set the hostname_override to the full EC2 private dns name
-# we'd like to use EC2 instance-id, but currently the kubelet health-check assumes the name
-# is resolvable, although that check should be going away entirely (#7092)
-if [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
-  HOSTNAME_OVERRIDE=`curl --silent curl http://169.254.169.254/2007-01-19/meta-data/local-hostname`
-fi
-
-if [[ -n "${HOSTNAME_OVERRIDE}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  hostname_override: "${HOSTNAME_OVERRIDE}"
-EOF
-fi
-
-if [[ -n "${DOCKER_OPTS}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${DOCKER_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${KUBELET_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-install-salt
-
-service salt-minion start
+# Install Salt
+#
+# We specify -X to avoid a race condition that can cause minion failure to
+# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
+curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X

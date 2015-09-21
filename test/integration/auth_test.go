@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,32 +24,28 @@ package integration
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
-	"strconv"
-	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
-	"k8s.io/kubernetes/pkg/auth/user"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
-	"k8s.io/kubernetes/test/integration/framework"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 )
+
+func init() {
+	requireEtcd()
+}
 
 const (
 	AliceToken   string = "abc123" // username: alice.  Present in token file.
@@ -64,118 +60,75 @@ func getTestTokenAuth() authenticator.Request {
 	return bearertoken.New(tokenAuthenticator)
 }
 
-func path(resource, namespace, name string) string {
-	return testapi.Default.ResourcePath(resource, namespace, name)
-}
-
-func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
-}
-
-func timeoutPath(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.Default.ResourcePath(resource, namespace, name))
-}
-
 // Bodies for requests used in subsequent tests.
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a",
-    "creationTimestamp": null%s
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "a",
+      "containers": [{ "name": "foo", "image": "bar/foo", }]
+    }
   },
-  "spec": {
-    "containers": [
-      {
-        "name": "foo",
-        "image": "bar/foo"
-      }
-    ]
-  }
 }
 `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a",
-    "labels": {
-      "name": "a"
-    }%s
-  },
-  "spec": {
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "desiredState": {
     "replicas": 2,
-    "selector": {
-      "name": "a"
-    },
-    "template": {
-      "metadata": {
-        "labels": {
-          "name": "a"
-        }
-      },
-      "spec": {
-        "containers": [
-          {
-            "name": "foo",
-            "image": "bar/foo"
-          }
-        ]
-      }
-    }
-  }
+    "replicaSelector": {"name": "a"},
+    "podTemplate": {
+      "desiredState": {
+         "manifest": {
+           "version": "v1beta1",
+           "id": "a",
+           "containers": [{
+             "name": "foo",
+             "image": "bar/foo",
+           }]
+         }
+       },
+       "labels": {"name": "a"}
+      }},
+  "labels": {"name": "a"}
 }
 `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a",
-    "labels": {
-      "name": "a"
-    }%s
-  },
-  "spec": {
-    "ports": [
-      {
-        "protocol": "TCP",
-        "port": 8000
-      }
-    ],
-    "selector": {
-      "name": "a"
-    },
-    "clusterIP": "10.0.0.100"
-  }
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "port": 8000,
+  "labels": { "name": "a" },
+  "selector": { "name": "a" }
 }
 `
-var aNode string = `
+var aMinion string = `
 {
-  "kind": "Node",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a"%s
-  },
-  "spec": {
-    "externalID": "external"
-  }
+  "kind": "Minion",
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "hostIP": "10.10.10.10",
 }
 `
+
 var aEvent string = `
 {
   "kind": "Event",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a"%s
-  },
+  "apiVersion": "v1beta1",
+  "namespace": "default",
+  "id": "a",
   "involvedObject": {
-    "kind": "Node",
-    "namespace": "default",
+    "kind": "Minion",
     "name": "a",
-    "apiVersion": "v1"
+    "namespace": "default",
+    "apiVersion": "v1beta1",
   }
 }
 `
@@ -183,63 +136,29 @@ var aEvent string = `
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a"%s
-  },
-  "target": {
-    "name": "10.10.10.10"
-  }
-}
-`
-
-var emptyEndpoints string = `
-{
-  "kind": "Endpoints",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "a"%s
-  }
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "host": "10.10.10.10",
+  "podID": "a"
 }
 `
 
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "metadata": {
-    "name": "a"%s
-  },
-  "subsets": [
-    {
-      "addresses": [
-        {
-          "ip": "10.10.1.1"
-        }
-      ],
-      "ports": [
-        {
-          "port": 1909,
-          "protocol": "TCP"
-        }
-      ]
-    }
-  ]
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "endpoints": ["10.10.1.1:1909"],
 }
 `
 
-var deleteNow string = `
-{
-  "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Default.Version() + `",
-  "gracePeriodSeconds": 0%s
-}
-`
+// To ensure that a POST completes before a dependent GET, make operations
+// effectively synchronous with the following parameters.
+var syncFlags = "?sync=true&timeout=60s"
 
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
 var code200 = map[int]bool{200: true}
-var code201 = map[int]bool{201: true}
 var code400 = map[int]bool{400: true}
 var code403 = map[int]bool{403: true}
 var code404 = map[int]bool{404: true}
@@ -247,16 +166,6 @@ var code405 = map[int]bool{405: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
 var code500 = map[int]bool{500: true}
-var code503 = map[int]bool{503: true}
-
-// To ensure that a POST completes before a dependent GET, set a timeout.
-func addTimeoutFlag(URLString string) string {
-	u, _ := url.Parse(URLString)
-	values := u.Query()
-	values.Set("timeout", "60s")
-	u.RawQuery = values.Encode()
-	return u.String()
-}
 
 func getTestRequests() []struct {
 	verb        string
@@ -271,107 +180,98 @@ func getTestRequests() []struct {
 		statusCodes map[int]bool // Set of expected resp.StatusCode if all goes well.
 	}{
 		// Normal methods on pods
-		{"GET", path("pods", "", ""), "", code200},
-		{"GET", path("pods", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201},
-		{"PUT", timeoutPath("pods", api.NamespaceDefault, "a"), aPod, code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code200},
-		// GET and POST for /exec should return Bad Request (400) since the pod has not been assigned a node yet.
-		{"GET", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
-		{"POST", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
-		// PUT for /exec should return Method Not Allowed (405).
-		{"PUT", path("pods", api.NamespaceDefault, "a") + "/exec", "", code405},
-		// GET and POST for /portforward should return Bad Request (400) since the pod has not been assigned a node yet.
-		{"GET", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
-		{"POST", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
-		// PUT for /portforward should return Method Not Allowed (405).
-		{"PUT", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code405},
-		{"PATCH", path("pods", api.NamespaceDefault, "a"), "{%v}", code200},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), deleteNow, code200},
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200},
+		{"PUT", "/api/v1beta1/pods/a" + syncFlags, aPod, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"GET", "/api/v1beta1/pods/a", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + syncFlags, "", code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"OPTIONS", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"OPTIONS", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"HEAD", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"HEAD", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"TRACE", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"TRACE", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"NOSUCHVERB", path("pods", api.NamespaceDefault, ""), "", code405},
+		{"PATCH", "/api/v1beta1/pods/a", "", code405},
+		{"OPTIONS", "/api/v1beta1/pods", "", code405},
+		{"OPTIONS", "/api/v1beta1/pods/a", "", code405},
+		{"HEAD", "/api/v1beta1/pods", "", code405},
+		{"HEAD", "/api/v1beta1/pods/a", "", code405},
+		{"TRACE", "/api/v1beta1/pods", "", code405},
+		{"TRACE", "/api/v1beta1/pods/a", "", code405},
+		{"NOSUCHVERB", "/api/v1beta1/pods", "", code405},
 
 		// Normal methods on services
-		{"GET", path("services", "", ""), "", code200},
-		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
-		// Create an endpoint for the service (this is done automatically by endpoint controller
-		// whenever a service is created, but this test does not run that controller)
-		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), emptyEndpoints, code201},
-		// Should return service unavailable when endpoint.subset is empty.
-		{"GET", pathWithPrefix("proxy", "services", api.NamespaceDefault, "a") + "/", "", code503},
-		{"PUT", timeoutPath("services", api.NamespaceDefault, "a"), aService, code200},
-		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"POST", "/api/v1beta1/services" + syncFlags, aService, code200},
+		{"PUT", "/api/v1beta1/services/a" + syncFlags, aService, code409}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"GET", "/api/v1beta1/services/a", "", code200},
+		{"DELETE", "/api/v1beta1/services/a" + syncFlags, "", code200},
 
 		// Normal methods on replicationControllers
-		{"GET", path("replicationControllers", "", ""), "", code200},
-		{"GET", path("replicationControllers", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("replicationControllers", api.NamespaceDefault, ""), aRC, code201},
-		{"PUT", timeoutPath("replicationControllers", api.NamespaceDefault, "a"), aRC, code200},
-		{"GET", path("replicationControllers", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("replicationControllers", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/replicationControllers", "", code200},
+		{"POST", "/api/v1beta1/replicationControllers" + syncFlags, aRC, code200},
+		{"PUT", "/api/v1beta1/replicationControllers/a" + syncFlags, aRC, code409}, // See #2115 about why 409
+		{"GET", "/api/v1beta1/replicationControllers", "", code200},
+		{"GET", "/api/v1beta1/replicationControllers/a", "", code200},
+		{"DELETE", "/api/v1beta1/replicationControllers/a" + syncFlags, "", code200},
 
 		// Normal methods on endpoints
-		{"GET", path("endpoints", "", ""), "", code200},
-		{"GET", path("endpoints", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), aEndpoints, code201},
-		{"PUT", timeoutPath("endpoints", api.NamespaceDefault, "a"), aEndpoints, code200},
-		{"GET", path("endpoints", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/endpoints", "", code200},
+		{"POST", "/api/v1beta1/endpoints" + syncFlags, aEndpoints, code200},
+		{"PUT", "/api/v1beta1/endpoints/a" + syncFlags, aEndpoints, code200},
+		{"GET", "/api/v1beta1/endpoints", "", code200},
+		{"GET", "/api/v1beta1/endpoints/a", "", code200},
+		{"DELETE", "/api/v1beta1/endpoints/a" + syncFlags, "", code400},
 
-		// Normal methods on nodes
-		{"GET", path("nodes", "", ""), "", code200},
-		{"POST", timeoutPath("nodes", "", ""), aNode, code201},
-		{"PUT", timeoutPath("nodes", "", "a"), aNode, code200},
-		{"GET", path("nodes", "", "a"), "", code200},
-		{"DELETE", timeoutPath("nodes", "", "a"), "", code200},
+		// Normal methods on minions
+		{"GET", "/api/v1beta1/minions", "", code200},
+		{"POST", "/api/v1beta1/minions" + syncFlags, aMinion, code200},
+		{"PUT", "/api/v1beta1/minions/a" + syncFlags, aMinion, code422}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"GET", "/api/v1beta1/minions", "", code200},
+		{"GET", "/api/v1beta1/minions/a", "", code200},
+		{"DELETE", "/api/v1beta1/minions/a" + syncFlags, "", code200},
 
 		// Normal methods on events
-		{"GET", path("events", "", ""), "", code200},
-		{"GET", path("events", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("events", api.NamespaceDefault, ""), aEvent, code201},
-		{"PUT", timeoutPath("events", api.NamespaceDefault, "a"), aEvent, code200},
-		{"GET", path("events", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("events", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"POST", "/api/v1beta1/events" + syncFlags, aEvent, code200},
+		{"PUT", "/api/v1beta1/events/a" + syncFlags, aEvent, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"GET", "/api/v1beta1/events/a", "", code200},
+		{"DELETE", "/api/v1beta1/events/a" + syncFlags, "", code200},
 
 		// Normal methods on bindings
-		{"GET", path("bindings", api.NamespaceDefault, ""), "", code405},
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201}, // Need a pod to bind or you get a 404
-		{"POST", timeoutPath("bindings", api.NamespaceDefault, ""), aBinding, code201},
-		{"PUT", timeoutPath("bindings", api.NamespaceDefault, "a"), aBinding, code404},
-		{"GET", path("bindings", api.NamespaceDefault, "a"), "", code404}, // No bindings instances
-		{"DELETE", timeoutPath("bindings", api.NamespaceDefault, "a"), "", code404},
+		{"GET", "/api/v1beta1/bindings", "", code405},            // Bindings are write-only
+		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200}, // Need a pod to bind or you get a 404
+		{"POST", "/api/v1beta1/bindings" + syncFlags, aBinding, code200},
+		{"PUT", "/api/v1beta1/bindings/a" + syncFlags, aBinding, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/bindings", "", code405},
+		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
+		{"DELETE", "/api/v1beta1/bindings/a" + syncFlags, "", code404},
 
 		// Non-existent object type.
-		{"GET", path("foo", "", ""), "", code404},
-		{"POST", path("foo", api.NamespaceDefault, ""), `{"foo": "foo"}`, code404},
-		{"PUT", path("foo", api.NamespaceDefault, "a"), `{"foo": "foo"}`, code404},
-		{"GET", path("foo", api.NamespaceDefault, "a"), "", code404},
-		{"DELETE", timeoutPath("foo", api.NamespaceDefault, ""), "", code404},
+		{"GET", "/api/v1beta1/foo", "", code404},
+		{"POST", "/api/v1beta1/foo", `{"foo": "foo"}`, code404},
+		{"PUT", "/api/v1beta1/foo/a", `{"foo": "foo"}`, code404},
+		{"GET", "/api/v1beta1/foo", "", code404},
+		{"GET", "/api/v1beta1/foo/a", "", code404},
+		{"DELETE", "/api/v1beta1/foo" + syncFlags, "", code404},
+
+		// Operations
+		{"GET", "/api/v1beta1/operations", "", code200},
+		{"GET", "/api/v1beta1/operations/1234567890", "", code404},
 
 		// Special verbs on nodes
-		{"GET", pathWithPrefix("proxy", "nodes", api.NamespaceDefault, "a"), "", code404},
-		{"GET", pathWithPrefix("redirect", "nodes", api.NamespaceDefault, "a"), "", code404},
+		// TODO: Will become 405 once these are converted to go-restful
+		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},
+		{"GET", "/api/v1beta1/redirect/minions/a", "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
-		// TODO: figure out how to create a node so that it can successfully proxy/redirect.
+		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
 		{"GET", "/", "", code200},
-		{"GET", "/api", "", code200},
 		{"GET", "/healthz", "", code200},
 		{"GET", "/version", "", code200},
-		{"GET", "/invalidURL", "", code404},
 	}
 	return requests
 }
@@ -383,13 +283,15 @@ func getTestRequests() []struct {
 //
 // TODO(etune): write a fuzz test of the REST API.
 func TestAuthModeAlwaysAllow(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
+	deleteAllEtcdKeys()
 
 	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -397,111 +299,45 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
 
 	transport := http.DefaultTransport
-	previousResourceVersion := make(map[string]float64)
 
 	for _, r := range getTestRequests() {
-		var bodyStr string
-		if r.body != "" {
-			sub := ""
-			if r.verb == "PUT" {
-				// For update operations, insert previous resource version
-				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
-				}
-				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
-			}
-			bodyStr = fmt.Sprintf(r.body, sub)
-		}
-		r.body = bodyStr
-		bodyBytes := bytes.NewReader([]byte(bodyStr))
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
-			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
-		}
-		if r.verb == "PATCH" {
-			req.Header.Set("Content-Type", "application/merge-patch+json")
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
-				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
-			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
-				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
-			} else {
-				if r.verb == "POST" {
-					// For successful create operations, extract resourceVersion
-					id, currentResourceVersion, err := parseResourceVersion(b)
-					if err == nil {
-						key := getPreviousResourceVersionKey(r.URL, id)
-						previousResourceVersion[key] = currentResourceVersion
-					} else {
-						t.Logf("error in trying to extract resource version: %s", err)
-					}
-				}
 			}
 		}()
 	}
 }
 
-func parseResourceVersion(response []byte) (string, float64, error) {
-	var resultBodyMap map[string]interface{}
-	err := json.Unmarshal(response, &resultBodyMap)
-	if err != nil {
-		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %v", err)
-	}
-	metadata, ok := resultBodyMap["metadata"].(map[string]interface{})
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, metadata not found in JSON response: %v", string(response))
-	}
-	id, ok := metadata["name"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, id not found in JSON response: %v", string(response))
-	}
-	resourceVersionString, ok := metadata["resourceVersion"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, resourceVersion not found in JSON response: %v", string(response))
-	}
-	resourceVersion, err := strconv.ParseFloat(resourceVersionString, 64)
-	if err != nil {
-		return "", 0, fmt.Errorf("unexpected error, could not parse resourceVersion as float64, err: %s. JSON response: %v", err, string(response))
-	}
-	return id, resourceVersion, nil
-}
-
-func getPreviousResourceVersionKey(url, id string) string {
-	baseUrl := strings.Split(url, "?")[0]
-	key := baseUrl
-	if id != "" {
-		key = fmt.Sprintf("%s/%v", baseUrl, id)
-	}
-	return key
-}
-
 func TestAuthModeAlwaysDeny(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
+	deleteAllEtcdKeys()
 
 	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -513,35 +349,31 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
 	})
 
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
+		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
-			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
-				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if resp.StatusCode != http.StatusForbidden {
-				t.Logf("case %v", r)
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
 			}
 		}()
@@ -563,12 +395,13 @@ func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
 // the authentication system and authorized to do any actions.
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
-	framework.DeleteAllEtcdKeys()
+	deleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
 
 	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -580,109 +413,21 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authenticator:         getTestTokenAuth(),
-		Authorizer:            allowAliceAuthorizer{},
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authenticator:     getTestTokenAuth(),
+		Authorizer:        allowAliceAuthorizer{},
 	})
 
-	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
 		token := AliceToken
-		var bodyStr string
-		if r.body != "" {
-			sub := ""
-			if r.verb == "PUT" {
-				// For update operations, insert previous resource version
-				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
-				}
-				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
-			}
-			bodyStr = fmt.Sprintf(r.body, sub)
-		}
-		r.body = bodyStr
-		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		if r.verb == "PATCH" {
-			req.Header.Set("Content-Type", "application/merge-patch+json")
-		}
-
-		func() {
-			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
-			if err != nil {
-				t.Logf("case %v", r)
-				t.Fatalf("unexpected error: %v", err)
-			}
-			b, _ := ioutil.ReadAll(resp.Body)
-			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
-				t.Logf("case %v", r)
-				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				t.Errorf("Body: %v", string(b))
-			} else {
-				if r.verb == "POST" {
-					// For successful create operations, extract resourceVersion
-					id, currentResourceVersion, err := parseResourceVersion(b)
-					if err == nil {
-						key := getPreviousResourceVersionKey(r.URL, id)
-						previousResourceVersion[key] = currentResourceVersion
-					}
-				}
-			}
-
-		}()
-	}
-}
-
-// TestBobIsForbidden tests that a user who is known to
-// the authentication system but not authorized to do any actions
-// should receive "Forbidden".
-func TestBobIsForbidden(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
-
-	// This file has alice and bob in it.
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
-	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authenticator:         getTestTokenAuth(),
-		Authorizer:            allowAliceAuthorizer{},
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-	})
-
-	transport := http.DefaultTransport
-
-	for _, r := range getTestRequests() {
-		token := BobToken
+		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -694,12 +439,69 @@ func TestBobIsForbidden(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
-				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
+			}
+		}()
+	}
+}
+
+// TestBobIsForbidden tests that a user who is known to
+// the authentication system but not authorized to do any actions
+// should receive "Forbidden".
+func TestBobIsForbidden(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	// This file has alice and bob in it.
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authenticator:     getTestTokenAuth(),
+		Authorizer:        allowAliceAuthorizer{},
+	})
+
+	transport := http.DefaultTransport
+
+	for _, r := range getTestRequests() {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
-				t.Logf("case %v", r)
 				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
 			}
 		}()
@@ -711,12 +513,13 @@ func TestBobIsForbidden(t *testing.T) {
 // An authorization module is installed in this scenario for integration
 // test purposes, but requests aren't expected to reach it.
 func TestUnknownUserIsUnauthorized(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
+	deleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
 
 	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -728,22 +531,21 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authenticator:         getTestTokenAuth(),
-		Authorizer:            allowAliceAuthorizer{},
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authenticator:     getTestTokenAuth(),
+		Authorizer:        allowAliceAuthorizer{},
 	})
 
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
 		token := UnknownToken
+		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -754,12 +556,10 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
-				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// Expect all of unauthenticated user's request to be "Unauthorized"
 			if resp.StatusCode != http.StatusUnauthorized {
-				t.Logf("case %v", r)
 				t.Errorf("Expected status %v, but got %v", http.StatusUnauthorized, resp.StatusCode)
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
@@ -790,10 +590,11 @@ func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authori
 // TestNamespaceAuthorization tests that authorization can be controlled
 // by namespace.
 func TestNamespaceAuthorization(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
+	deleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-	etcdStorage, err := framework.NewEtcdStorage()
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -808,233 +609,14 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authenticator:         getTestTokenAuth(),
-		Authorizer:            a,
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-	})
-
-	previousResourceVersion := make(map[string]float64)
-	transport := http.DefaultTransport
-
-	requests := []struct {
-		verb        string
-		URL         string
-		namespace   string
-		body        string
-		statusCodes map[int]bool // allowed status codes.
-	}{
-
-		{"POST", timeoutPath("pods", "foo", ""), "foo", aPod, code201},
-		{"GET", path("pods", "foo", ""), "foo", "", code200},
-		{"GET", path("pods", "foo", "a"), "foo", "", code200},
-		{"DELETE", timeoutPath("pods", "foo", "a"), "foo", "", code200},
-
-		{"POST", timeoutPath("pods", "bar", ""), "bar", aPod, code403},
-		{"GET", path("pods", "bar", ""), "bar", "", code403},
-		{"GET", path("pods", "bar", "a"), "bar", "", code403},
-		{"DELETE", timeoutPath("pods", "bar", "a"), "bar", "", code403},
-
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, code403},
-		{"GET", path("pods", "", ""), "", "", code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", "", code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", "", code403},
-	}
-
-	for _, r := range requests {
-		token := BobToken
-		var bodyStr string
-		if r.body != "" {
-			sub := ""
-			if r.verb == "PUT" && r.body != "" {
-				// For update operations, insert previous resource version
-				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
-				}
-				namespace := r.namespace
-				if len(namespace) == 0 {
-					namespace = "default"
-				}
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
-			}
-			bodyStr = fmt.Sprintf(r.body, sub)
-		}
-		r.body = bodyStr
-		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
-		if err != nil {
-			t.Logf("case %v", r)
-			t.Fatalf("unexpected error: %v", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		func() {
-			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
-			if err != nil {
-				t.Logf("case %v", r)
-				t.Fatalf("unexpected error: %v", err)
-			}
-			b, _ := ioutil.ReadAll(resp.Body)
-			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
-				t.Logf("case %v", r)
-				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				t.Errorf("Body: %v", string(b))
-			} else {
-				if r.verb == "POST" {
-					// For successful create operations, extract resourceVersion
-					id, currentResourceVersion, err := parseResourceVersion(b)
-					if err == nil {
-						key := getPreviousResourceVersionKey(r.URL, id)
-						previousResourceVersion[key] = currentResourceVersion
-					}
-				}
-			}
-
-		}()
-	}
-}
-
-// TestKindAuthorization tests that authorization can be controlled
-// by namespace.
-func TestKindAuthorization(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
-
-	// This file has alice and bob in it.
-
-	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	a := newAuthorizerWithContents(t, `{"resource": "services"}
-`)
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
-	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authenticator:         getTestTokenAuth(),
-		Authorizer:            a,
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-	})
-
-	previousResourceVersion := make(map[string]float64)
-	transport := http.DefaultTransport
-
-	requests := []struct {
-		verb        string
-		URL         string
-		body        string
-		statusCodes map[int]bool // allowed status codes.
-	}{
-		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
-		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
-		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
-
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code403},
-		{"GET", path("pods", "", ""), "", code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", code403},
-	}
-
-	for _, r := range requests {
-		token := BobToken
-		var bodyStr string
-		if r.body != "" {
-			bodyStr = fmt.Sprintf(r.body, "")
-			if r.verb == "PUT" && r.body != "" {
-				// For update operations, insert previous resource version
-				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
-					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
-				}
-			}
-		}
-		r.body = bodyStr
-		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
-		if err != nil {
-			t.Logf("case %v", r)
-			t.Fatalf("unexpected error: %v", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		{
-			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
-			if err != nil {
-				t.Logf("case %v", r)
-				t.Fatalf("unexpected error: %v", err)
-			}
-			b, _ := ioutil.ReadAll(resp.Body)
-			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
-				t.Logf("case %v", r)
-				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				t.Errorf("Body: %v", string(b))
-			} else {
-				if r.verb == "POST" {
-					// For successful create operations, extract resourceVersion
-					id, currentResourceVersion, err := parseResourceVersion(b)
-					if err == nil {
-						key := getPreviousResourceVersionKey(r.URL, id)
-						previousResourceVersion[key] = currentResourceVersion
-					}
-				}
-			}
-
-		}
-	}
-}
-
-// TestReadOnlyAuthorization tests that authorization can be controlled
-// by namespace.
-func TestReadOnlyAuthorization(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
-
-	// This file has alice and bob in it.
-
-	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	a := newAuthorizerWithContents(t, `{"readonly": true}`)
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
-	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authenticator:         getTestTokenAuth(),
-		Authorizer:            a,
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authenticator:     getTestTokenAuth(),
+		Authorizer:        a,
 	})
 
 	transport := http.DefaultTransport
@@ -1045,13 +627,26 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", path("pods", "", ""), aPod, code403},
-		{"GET", path("pods", "", ""), "", code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code404},
+
+		{"POST", "/api/v1beta1/pods" + syncFlags + "&namespace=foo", aPod, code200},
+		{"GET", "/api/v1beta1/pods?namespace=foo", "", code200},
+		{"GET", "/api/v1beta1/pods/a?namespace=foo", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + syncFlags + "&namespace=foo", "", code200},
+
+		{"POST", "/api/v1beta1/pods" + syncFlags + "&namespace=bar", aPod, code403},
+		{"GET", "/api/v1beta1/pods?namespace=bar", "", code403},
+		{"GET", "/api/v1beta1/pods/a?namespace=bar", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + syncFlags + "&namespace=bar", "", code403},
+
+		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + syncFlags, "", code403},
 	}
 
 	for _, r := range requests {
 		token := BobToken
+		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -1062,11 +657,157 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
-				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
-				t.Logf("case %v", r)
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
+			}
+		}()
+	}
+}
+
+// TestKindAuthorization tests that authorization can be controlled
+// by namespace.
+func TestKindAuthorization(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	// This file has alice and bob in it.
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	a := newAuthorizerWithContents(t, `{"kind": "services"}
+`)
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authenticator:     getTestTokenAuth(),
+		Authorizer:        a,
+	})
+
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb        string
+		URL         string
+		body        string
+		statusCodes map[int]bool // allowed status codes.
+	}{
+		{"POST", "/api/v1beta1/services" + syncFlags, aService, code200},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"GET", "/api/v1beta1/services/a", "", code200},
+		{"DELETE", "/api/v1beta1/services/a" + syncFlags, "", code200},
+
+		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + syncFlags, "", code403},
+	}
+
+	for _, r := range requests {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
+			}
+		}
+	}
+}
+
+// TestReadOnlyAuthorization tests that authorization can be controlled
+// by namespace.
+func TestReadOnlyAuthorization(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	// This file has alice and bob in it.
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	a := newAuthorizerWithContents(t, `{"readonly": true}
+`)
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authenticator:     getTestTokenAuth(),
+		Authorizer:        a,
+	})
+
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb        string
+		URL         string
+		body        string
+		statusCodes map[int]bool // allowed status codes.
+	}{
+		{"POST", "/api/v1beta1/pods", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"GET", "/api/v1beta1/pods/a", "", code404},
+	}
+
+	for _, r := range requests {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))

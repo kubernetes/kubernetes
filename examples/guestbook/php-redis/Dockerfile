@@ -1,10 +1,7 @@
-FROM php:5-apache
+FROM brendanburns/php
 
-RUN apt-get update
-RUN apt-get install -y php-pear
-RUN pear channel-discover pear.nrk.io
-RUN pear install nrk/Predis
+ADD index.php /var/www/index.php
+ADD controllers.js /var/www/controllers.js
+ADD index.html /var/www/index.html
 
-ADD guestbook.php /var/www/html/guestbook.php
-ADD controllers.js /var/www/html/controllers.js
-ADD index.html /var/www/html/index.html
+CMD /run.sh

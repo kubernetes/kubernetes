@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,9 +24,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/errors"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
-	"k8s.io/kubernetes/pkg/util/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 type InvalidTypeError struct {
@@ -67,91 +65,53 @@ func NewSwaggerSchemaFromBytes(data []byte) (Schema, error) {
 
 func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	var obj interface{}
-	out, err := yaml.ToJSON(data)
+	err := yaml.Unmarshal(data, &obj)
 	if err != nil {
 		return err
 	}
-	data = out
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return err
-	}
-	fields, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("error in unmarshaling data %s", string(data))
-	}
-	apiVersion := fields["apiVersion"]
-	if apiVersion == nil {
-		return fmt.Errorf("apiVersion not set")
-	}
-	kind := fields["kind"]
-	if kind == nil {
-		return fmt.Errorf("kind not set")
-	}
-	allErrs := s.ValidateObject(obj, apiVersion.(string), "", apiVersion.(string)+"."+kind.(string))
-	if len(allErrs) == 1 {
-		return allErrs[0]
-	}
-	return errors.NewAggregate(allErrs)
+	fields := obj.(map[interface{}]interface{})
+	apiVersion := fields["apiVersion"].(string)
+	kind := fields["kind"].(string)
+	return s.ValidateObject(obj, apiVersion, "", apiVersion+"."+kind)
 }
 
-func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, typeName string) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
+func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, typeName string) error {
 	models := s.api.Models
 	// TODO: handle required fields here too.
-	model, ok := models.At(typeName)
+	model, ok := models[typeName]
 	if !ok {
-		return append(allErrs, fmt.Errorf("couldn't find type: %s", typeName))
-	}
-	properties := model.Properties
-	if len(properties.List) == 0 {
-		// The object does not have any sub-fields.
+		glog.V(2).Infof("couldn't find type: %s, skipping validation", typeName)
 		return nil
 	}
-	fields, ok := obj.(map[string]interface{})
-	if !ok {
-		return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
-	}
+	properties := model.Properties
+	fields := obj.(map[interface{}]interface{})
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
 	}
-	// handle required fields
-	for _, requiredKey := range model.Required {
-		if _, ok := fields[requiredKey]; !ok {
-			allErrs = append(allErrs, fmt.Errorf("field %s: is required", requiredKey))
-		}
-	}
 	for key, value := range fields {
-		details, ok := properties.At(key)
+		details, ok := properties[key.(string)]
 		if !ok {
-			allErrs = append(allErrs, fmt.Errorf("found invalid field %s for %s", key, typeName))
+			glog.V(2).Infof("couldn't find properties for %s, skipping", key)
 			continue
 		}
-		if details.Type == nil && details.Ref == nil {
-			allErrs = append(allErrs, fmt.Errorf("could not find the type of %s from object: %v", key, details))
-		}
-		var fieldType string
-		if details.Type != nil {
-			fieldType = *details.Type
-		} else {
-			fieldType = *details.Ref
-		}
+		fieldType := *details.Type
 		if value == nil {
 			glog.V(2).Infof("Skipping nil field: %s", key)
 			continue
 		}
-		errs := s.validateField(value, apiVersion, fieldName+key, fieldType, &details)
-		if len(errs) > 0 {
-			allErrs = append(allErrs, errs...)
+		err := s.validateField(value, apiVersion, fieldName+key.(string), fieldType, &details)
+		if err != nil {
+			glog.Errorf("Validation failed for: %s, %v", key, value)
+			return err
 		}
 	}
-	return allErrs
+	return nil
 }
 
-func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) errs.ValidationErrorList {
+func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) error {
 	if strings.HasPrefix(fieldType, apiVersion) {
 		return s.ValidateObject(value, apiVersion, fieldName, fieldType)
 	}
-	allErrs := errs.ValidationErrorList{}
 	switch fieldType {
 	case "string":
 		// Be loose about what we accept for 'string' since we use IntOrString in a couple of places
@@ -159,47 +119,37 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 		_, isNumber := value.(float64)
 		_, isInteger := value.(int)
 		if !isString && !isNumber && !isInteger {
-			return append(allErrs, NewInvalidTypeError(reflect.String, reflect.TypeOf(value).Kind(), fieldName))
+			return NewInvalidTypeError(reflect.String, reflect.TypeOf(value).Kind(), fieldName)
 		}
 	case "array":
 		arr, ok := value.([]interface{})
 		if !ok {
-			return append(allErrs, NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName))
+			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}
-		var arrType string
-		if fieldDetails.Items.Ref == nil && fieldDetails.Items.Type == nil {
-			return append(allErrs, NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName))
-		}
-		if fieldDetails.Items.Ref != nil {
-			arrType = *fieldDetails.Items.Ref
-		} else {
-			arrType = *fieldDetails.Items.Type
-		}
+		arrType := *fieldDetails.Items[0].Ref
 		for ix := range arr {
-			errs := s.validateField(arr[ix], apiVersion, fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil)
-			if len(errs) > 0 {
-				allErrs = append(allErrs, errs...)
+			err := s.validateField(arr[ix], apiVersion, fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil)
+			if err != nil {
+				return err
 			}
 		}
 	case "uint64":
-	case "int64":
 	case "integer":
 		_, isNumber := value.(float64)
 		_, isInteger := value.(int)
 		if !isNumber && !isInteger {
-			return append(allErrs, NewInvalidTypeError(reflect.Int, reflect.TypeOf(value).Kind(), fieldName))
+			return NewInvalidTypeError(reflect.Int, reflect.TypeOf(value).Kind(), fieldName)
 		}
 	case "float64":
 		if _, ok := value.(float64); !ok {
-			return append(allErrs, NewInvalidTypeError(reflect.Float64, reflect.TypeOf(value).Kind(), fieldName))
+			return NewInvalidTypeError(reflect.Float64, reflect.TypeOf(value).Kind(), fieldName)
 		}
 	case "boolean":
 		if _, ok := value.(bool); !ok {
-			return append(allErrs, NewInvalidTypeError(reflect.Bool, reflect.TypeOf(value).Kind(), fieldName))
+			return NewInvalidTypeError(reflect.Bool, reflect.TypeOf(value).Kind(), fieldName)
 		}
-	case "any":
 	default:
-		return append(allErrs, fmt.Errorf("unexpected type: %v", fieldType))
+		return fmt.Errorf("unexpected type: %v", fieldType)
 	}
-	return allErrs
+	return nil
 }

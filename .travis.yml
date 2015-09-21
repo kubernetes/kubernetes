@@ -1,20 +1,24 @@
-sudo: false
-
 language: go
 
-matrix:
-  include:
-    - go: 1.4
+go:
+  - 1.4
+  - 1.3
+  - 1.2
 
 install:
-  - go get github.com/tools/godep
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
   - ./hack/travis/install-etcd.sh
+  - ./hack/verify-gofmt.sh
+  - ./hack/verify-boilerplate.sh
+  - ./hack/verify-description.sh
+  - ./hack/travis/install-std-race.sh
   - ./hack/build-go.sh
-  - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
+  - go get ./contrib/podex
 
 script:
-  - make verify BRANCH=$TRAVIS_BRANCH
+  - KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
 
 notifications:
-  irc: "chat.freenode.net#kubernetes-dev"
-  slack: kubernetes:PHPPkljtEsHXED6xl9IfOvKe
+  irc: "chat.freenode.net#google-containers"
