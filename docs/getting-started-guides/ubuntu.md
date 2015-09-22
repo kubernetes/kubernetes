@@ -80,7 +80,7 @@ $ ./build.sh
 ```
 
 You can customize your etcd version, flannel version, k8s version by changing corresponding variables
-`ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, by default etcd version is 2.0.12,
+`ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` in build.sh, by default etcd version is 2.0.12,
 flannel version is 0.4.0 and k8s version is 1.0.3.
 
 Make sure that the involved binaries are located properly in the binaries/master
