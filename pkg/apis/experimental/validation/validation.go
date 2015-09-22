@@ -312,10 +312,32 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 	return allErrs
 }
 
+func ValidateJobStatus(status *experimental.JobStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if status.Active < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("active", status.Active, isNegativeErrorMsg))
+	}
+	if status.Successful < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("successful", status.Successful, isNegativeErrorMsg))
+	}
+	if status.Unsuccessful < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("unsuccessful", status.Unsuccessful, isNegativeErrorMsg))
+	}
+	return allErrs
+}
+
 func ValidateJobUpdate(oldJob, job *experimental.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateJobSpecUpdate(oldJob.Spec, job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidateJobUpdateStatus(oldJob, job *experimental.Job) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateJobStatusUpdate(oldJob.Status, job.Status).Prefix("status")...)
 	return allErrs
 }
 
@@ -331,5 +353,11 @@ func ValidateJobSpecUpdate(oldSpec, spec experimental.JobSpec) errs.ValidationEr
 	if !api.Semantic.DeepEqual(oldSpec.Template, spec.Template) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("template", "[omitted]", "field is immutable"))
 	}
+	return allErrs
+}
+
+func ValidateJobStatusUpdate(oldStatus, status experimental.JobStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateJobStatus(&status)...)
 	return allErrs
 }
