@@ -25,9 +25,6 @@ export LIBVIRT_DEFAULT_URI=qemu:///system
 
 readonly POOL=kubernetes
 readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
-readonly UUID=$(uuidgen)
-readonly LOCAL_ETCD_IP="192.168.10.200"
-DISCOVERY=${DISCOVERY:-""}
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
@@ -159,32 +156,6 @@ function initialize-network {
   virsh net-create "$ROOT/network_kubernetes_pods.xml"
 }
 
-function destroy-discovery {
-  if [ -d $ROOT/discovery.etcd ]; then
-    set +e
-    kill `ps ax | grep -v grep | grep http://$LOCAL_ETCD_IP:4001 | awk '{print $1}'`
-    rm -fr $ROOT/discovery.etcd
-    brctl delif virbr_kub_gl veth_etcd_br
-    ip link del veth_etcd
-    set -e
-  fi
-}
-
-function initialize-discovery {
-  if [[ "$DISCOVERY" == "local-etcd" ]]; then
-    unset http_proxy
-    unset https_proxy
-    ip link add veth_etcd type veth peer name veth_etcd_br
-    brctl addif virbr_kub_gl veth_etcd_br
-    ifconfig veth_etcd_br up
-    ifconfig veth_etcd $LOCAL_ETCD_IP/24 up
-    $POOL_PATH/etcd/bin/etcd --initial-cluster discovery=http://$LOCAL_ETCD_IP:7001 --initial-advertise-peer-urls http://$LOCAL_ETCD_IP:7001 --listen-peer-urls http://$LOCAL_ETCD_IP:7001 --listen-client-urls http://$LOCAL_ETCD_IP:4001 --advertise-client-urls http://$LOCAL_ETCD_IP:4001 --name discovery --data-dir $ROOT/discovery.etcd &
-    sleep 4
-    curl -X PUT http://$LOCAL_ETCD_IP:4001/v2/keys/_etcd/registry/$UUID/_config/size -d value=$(($NUM_MINIONS+1))
-    $POOL_PATH/etcd/bin/etcdctl -C http://$LOCAL_ETCD_IP:4001 ls /_etcd/registry/
-  fi
-}
-
 function render-template {
   eval "echo \"$(cat $1)\""
 }
@@ -215,15 +186,10 @@ function kube-up {
   gen-kube-bearertoken
   initialize-pool keep_base_image
   initialize-network
-  initialize-discovery
 
   readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
-  if [[ "$DISCOVERY" == "local-etcd" ]]; then
-    readonly discovery="http://$LOCAL_ETCD_IP:4001/v2/keys/_etcd/registry/$UUID"
-  else
-    readonly discovery=$(curl -s https://discovery.etcd.io/new?size=$(($NUM_MINIONS+1)))
-  fi
+  readonly discovery=$(curl -s https://discovery.etcd.io/new?size=$(($NUM_MINIONS+1)))
 
   readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
 
@@ -273,7 +239,6 @@ function kube-down {
       while read dom; do
         virsh destroy $dom
       done
-  destroy-discovery
   destroy-pool keep_base_image
   destroy-network
 }
