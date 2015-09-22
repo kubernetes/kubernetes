@@ -471,9 +471,7 @@ func (gce *GCECloud) computeHostTags(hosts []string) ([]string, error) {
 		return nil, err
 	}
 
-    // Set symantics
-    // * This will be faster for large numbers of hosts (over iterating for "contains")
-    set := make(map[string]bool)
+	tags := sets.NewString()
     for _, instance := range res.Items {
         longest_tag := ""
         for  _, tag := range instance.Tags.Items {
@@ -482,23 +480,17 @@ func (gce *GCECloud) computeHostTags(hosts []string) ([]string, error) {
             }
         }
         if len(longest_tag) > 0 {
-           set[longest_tag] = true
-        } else if len(set) > 0 {
+           tags.Insert(longest_tag)
+        } else if len(tags) > 0 {
 		    return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
         }
-    }
-
-    // Get the values
-    tags := make([]string, 0, len(set))
-    for tag := range set {
-        tags = append(tags, tag)
     }
 
     if len(tags) == 0 {
         glog.V(2).Info("No instances had tags, creating rule without target tags")
     }
 
-	return tags, nil
+	return tags.List(), nil
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
