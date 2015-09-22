@@ -134,6 +134,7 @@ GCE_FLAKY_TESTS=(
 GCE_SLOW_TESTS=(
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
+    "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
     )
 
 # Tests which are not able to be run in parallel.
@@ -147,6 +148,7 @@ GCE_PARALLEL_SKIP_TESTS=(
     "SchedulerPredicates"
     "Services.*restarting"
     "Shell.*services"
+    "resource\susage\stracking"
     )
 
 # Tests which are known to be flaky when run in parallel.
