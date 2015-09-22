@@ -159,6 +159,7 @@ maximum-dead-containers-per-container
 max-log-age
 max-log-backups
 max-log-size
+max-open-files
 max-outgoing-burst
 max-outgoing-qps
 max-pods
