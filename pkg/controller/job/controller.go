@@ -341,7 +341,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Unsuccessful = unsuccessful
 
 		if err := jm.updateHandler(&job); err != nil {
-			glog.Errorf("Failed to update job %v, requeuing", job.Name)
+			glog.Errorf("Failed to update job %v, requeuing.  Error: %v", job.Name, err)
 			jm.enqueueController(&job)
 		}
 	}
