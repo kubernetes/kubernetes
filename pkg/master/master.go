@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	expapi "k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -244,6 +244,10 @@ type Master struct {
 
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
+	// map from api path to storage for those objects
+	thirdPartyResources map[string]*thirdpartyresourcedataetcd.REST
+	// protects the map
+	thirdPartyResourcesLock sync.RWMutex
 }
 
 // NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
@@ -575,7 +579,11 @@ func (m *Master) init(c *Config) {
 	// allGroups records all supported groups at /apis
 	allGroups := []api.APIGroup{}
 	if m.exp {
+		m.thirdPartyStorage = c.ExpDatabaseStorage
+		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
+
 		expVersion := m.experimental(c)
+
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
@@ -802,7 +810,95 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	return version
 }
 
-func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) error {
+// HasThirdPartyResource returns true if a particular third party resource currently installed.
+func (m *Master) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, error) {
+	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	if err != nil {
+		return false, err
+	}
+	path := makeThirdPartyPath(group)
+	services := m.handlerContainer.RegisteredWebServices()
+	for ix := range services {
+		if services[ix].RootPath() == path {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (m *Master) removeThirdPartyStorage(path string) error {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	storage, found := m.thirdPartyResources[path]
+	if found {
+		if err := m.removeAllThirdPartyResources(storage); err != nil {
+			return err
+		}
+		delete(m.thirdPartyResources, path)
+	}
+	return nil
+}
+
+// RemoveThirdPartyResource removes all resources matching `path`.  Also deletes any stored data
+func (m *Master) RemoveThirdPartyResource(path string) error {
+	if err := m.removeThirdPartyStorage(path); err != nil {
+		return err
+	}
+
+	services := m.handlerContainer.RegisteredWebServices()
+	for ix := range services {
+		root := services[ix].RootPath()
+		if root == path || strings.HasPrefix(root, path+"/") {
+			m.handlerContainer.Remove(services[ix])
+		}
+	}
+	return nil
+}
+
+func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
+	ctx := api.NewDefaultContext()
+	existingData, err := registry.List(ctx, labels.Everything(), fields.Everything())
+	if err != nil {
+		return err
+	}
+	list, ok := existingData.(*expapi.ThirdPartyResourceDataList)
+	if !ok {
+		return fmt.Errorf("expected a *ThirdPartyResourceDataList, got %#v", list)
+	}
+	for ix := range list.Items {
+		item := &list.Items[ix]
+		if _, err := registry.Delete(ctx, item.Name, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ListThirdPartyResources lists all currently installed third party resources
+func (m *Master) ListThirdPartyResources() []string {
+	m.thirdPartyResourcesLock.RLock()
+	defer m.thirdPartyResourcesLock.RUnlock()
+	result := []string{}
+	for key := range m.thirdPartyResources {
+		result = append(result, key)
+	}
+	return result
+}
+
+func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyresourcedataetcd.REST) {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	m.thirdPartyResources[path] = storage
+}
+
+// InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
+// installed a corresponding RESTful resource is added as a valid path in the web service provided by
+// the master.
+//
+// For example, if you install a resource ThirdPartyResource{ Name: "foo.company.com", Versions: {"v1"} }
+// then the following RESTful resource is created on the server:
+//   http://<host>/apis/company.com/v1/foos/...
+func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
 	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return err
@@ -811,7 +907,7 @@ func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) err
 	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
-	thirdPartyAPIPrefix := makeThirdPartyPath(group) + "/"
+	path := makeThirdPartyPath(group)
 	groupVersion := api.GroupVersion{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
@@ -820,7 +916,8 @@ func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) err
 		Name:     group,
 		Versions: []api.GroupVersion{groupVersion},
 	}
-	apiserver.AddGroupWebService(m.handlerContainer, thirdPartyAPIPrefix, apiGroup)
+	apiserver.AddGroupWebService(m.handlerContainer, path, apiGroup)
+	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
 	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
 	return nil
@@ -829,7 +926,7 @@ func (m *Master) InstallThirdPartyAPI(rsrc *experimental.ThirdPartyResource) err
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := makeThirdPartyPath(group) + "/"
+	apiRoot := makeThirdPartyPath(group)
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
@@ -842,13 +939,12 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version),
-		Codec:   latest.GroupOrDie("experimental").Codec,
+		Mapper:  thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version, group),
+		Codec:   thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
 		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
 		Version: version,
 
-		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
 
 		ProxyDialerFn:     m.dialer,
@@ -865,6 +961,17 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	deploymentStorage := deploymentetcd.NewREST(c.ExpDatabaseStorage)
 	jobStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
 
+	thirdPartyControl := ThirdPartyController{
+		master: m,
+		thirdPartyResourceRegistry: thirdPartyResourceStorage,
+	}
+	go func() {
+		util.Forever(func() {
+			if err := thirdPartyControl.SyncResources(); err != nil {
+				glog.Warningf("third party resource sync failed: %v", err)
+			}
+		}, 10*time.Second)
+	}()
 	storage := map[string]rest.Storage{
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
 		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
