@@ -271,9 +271,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 		}
 	}
 
-	if err != nil {
-		return err
-	}
 	if nc.allocateNodeCIDRs {
 		// TODO (cjcullen): Use pkg/controller/framework to watch nodes and
 		// reduce lists/decouple this from monitoring status.
