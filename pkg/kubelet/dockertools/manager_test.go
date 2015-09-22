@@ -1762,6 +1762,12 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	}
 }
 
+type fakeReadWriteCloser struct{}
+
+func (*fakeReadWriteCloser) Read([]byte) (int, error)  { return 0, nil }
+func (*fakeReadWriteCloser) Write([]byte) (int, error) { return 0, nil }
+func (*fakeReadWriteCloser) Close() error              { return nil }
+
 func TestPortForwardNoSuchContainer(t *testing.T) {
 	dm, _ := newTestDockerManager()
 
@@ -1774,7 +1780,8 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 			Containers: nil,
 		},
 		5000,
-		nil,
+		// need a valid io.ReadWriteCloser here
+		&fakeReadWriteCloser{},
 	)
 	if err == nil {
 		t.Fatal("unexpected non-error")
