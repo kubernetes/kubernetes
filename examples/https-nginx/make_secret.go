@@ -27,7 +27,7 @@ import (
 	"log"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -63,5 +63,5 @@ func main() {
 			"nginx.key": nginxKey,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(latest.GroupOrDie("").Codec, secret))
+	fmt.Printf(runtime.EncodeOrDie(testapi.Default.Codec(), secret))
 }
