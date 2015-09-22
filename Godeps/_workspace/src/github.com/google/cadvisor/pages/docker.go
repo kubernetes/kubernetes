@@ -53,11 +53,11 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 	start := time.Now()
 
 	// The container name is the path after the handler
-	containerName := u.Path[len(DockerPage):]
-	rootDir := getRootDir(u.Path)
+	containerName := u.Path[len(DockerPage)-1:]
+	rootDir := getRootDir(containerName)
 
 	var data *pageData
-	if containerName == "" {
+	if containerName == "/" {
 		// Get the containers.
 		reqParams := info.ContainerInfoRequest{
 			NumStats: 0,
@@ -70,7 +70,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 		for _, cont := range conts {
 			subcontainers = append(subcontainers, link{
 				Text: getContainerDisplayName(cont.ContainerReference),
-				Link: path.Join("/docker", docker.ContainerNameToDockerId(cont.ContainerReference.Name)),
+				Link: path.Join(rootDir, DockerPage, docker.ContainerNameToDockerId(cont.ContainerReference.Name)),
 			})
 		}
 
@@ -106,7 +106,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 		reqParams := info.ContainerInfoRequest{
 			NumStats: 60,
 		}
-		cont, err := m.DockerContainer(containerName, &reqParams)
+		cont, err := m.DockerContainer(containerName[1:], &reqParams)
 		if err != nil {
 			return fmt.Errorf("failed to get container %q with error: %v", containerName, err)
 		}
