@@ -183,7 +183,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			t.Errorf("unexpected object: %v", got)
 			t.FailNow()
 		}
-		if !reflect.DeepEqual(got.Spec, expected.Spec) {
+		if !api.Semantic.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("got different than expected: %v, %v", got, expected)
 		}
 	}

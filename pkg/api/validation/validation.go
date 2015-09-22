@@ -76,6 +76,22 @@ func ValidateLabels(labels map[string]string, field string) errs.ValidationError
 	return allErrs
 }
 
+func ValidateLabelsSelector(selector labels.Selector, field string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for _, r := range selector {
+		if !validation.IsQualifiedName(r.Key) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, r.Key, qualifiedNameErrorMsg))
+		}
+		for v := range r.StrValues {
+			if !validation.IsValidLabelValue(v) {
+				allErrs = append(allErrs, errs.NewFieldInvalid(field, v, labelValueErrorMsg))
+			}
+		}
+	}
+	return allErrs
+
+}
+
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -1078,7 +1094,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
-	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
+	allErrs = append(allErrs, ValidateLabelsSelector(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 	if len(spec.ServiceAccountName) > 0 {
@@ -1185,7 +1201,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 
 	if service.Spec.Selector != nil {
-		allErrs = append(allErrs, ValidateLabels(service.Spec.Selector, "spec.selector")...)
+		allErrs = append(allErrs, ValidateLabelsSelector(service.Spec.Selector, "spec.selector")...)
 	}
 
 	if service.Spec.SessionAffinity == "" {
@@ -1314,9 +1330,8 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 }
 
 // Validates that the given selector is non-empty.
-func ValidateNonEmptySelector(selectorMap map[string]string, fieldName string) errs.ValidationErrorList {
+func ValidateNonEmptySelector(selector labels.Selector, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	selector := labels.Set(selectorMap).AsSelector()
 	if selector.Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired(fieldName))
 	}
@@ -1324,12 +1339,11 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fieldName string) e
 }
 
 // Validates the given template and ensures that it is in accordance with the desrired selector and replicas.
-func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map[string]string, replicas int, fieldName string) errs.ValidationErrorList {
+func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selector labels.Selector, replicas int, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired(fieldName))
 	} else {
-		selector := labels.Set(selectorMap).AsSelector()
 		if !selector.Empty() {
 			// Verify that the RC selector matches the labels in template.
 			labels := labels.Set(template.Labels)
@@ -1353,9 +1367,9 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, "selector")...)
+	allErrs = append(allErrs, ValidateNonEmptySelector(labels.Set(spec.Selector).AsSelector(), "selector")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(spec.Replicas), "replicas")...)
-	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, "template")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, labels.Set(spec.Selector).AsSelector(), spec.Replicas, "template")...)
 	return allErrs
 }
 

@@ -23,8 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestValidateHorizontalPodAutoscaler(t *testing.T) {
@@ -131,9 +133,12 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 }
 
 func TestValidateDaemonSetUpdate(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validSelector2 := map[string]string{"c": "d"}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	validLabels := map[string]string{"a": "b"}
+	validSelector := labels.SelectorFromSet(validLabels)
+	validLabels2 := map[string]string{"c": "d"}
+	validSelector2 := labels.SelectorFromSet(validLabels2)
+	invalidSelector := labels.Selector{labels.Requirement{"NoUppercaseOrSpecialCharsLike=Equals", labels.EqualsOperator, sets.NewString("b")}}
+	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 
 	validPodSpecAbc := api.PodSpec{
 		RestartPolicy: api.RestartPolicyAlways,
@@ -162,7 +167,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validPodTemplateAbc := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
+				Labels: validLabels,
 			},
 			Spec: validPodSpecAbc,
 		},
@@ -170,7 +175,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validPodTemplateNodeSelector := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
+				Labels: validLabels,
 			},
 			Spec: validPodSpecNodeSelector,
 		},
@@ -178,7 +183,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validPodTemplateAbc2 := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector2,
+				Labels: validLabels2,
 			},
 			Spec: validPodSpecAbc,
 		},
@@ -186,7 +191,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validPodTemplateDef := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector2,
+				Labels: validLabels2,
 			},
 			Spec: validPodSpecDef,
 		},
@@ -198,14 +203,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: api.ObjectMeta{
-				Labels: invalidSelector,
+				Labels: invalidLabels,
 			},
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
+				Labels: validLabels,
 			},
 			Spec: validPodSpecVolume,
 		},
@@ -362,11 +367,12 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 }
 
 func TestValidateDaemonSet(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
+	validLabels := map[string]string{"a": "b"}
+	validSelector := labels.SelectorFromSet(validLabels)
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validSelector,
+				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
@@ -433,7 +439,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: experimental.DaemonSetSpec{
-				Selector: map[string]string{"foo": "bar"},
+				Selector: labels.NewSelectorOrDie("foo=bar"),
 				Template: &validPodTemplate.Template,
 			},
 		},
@@ -495,7 +501,7 @@ func TestValidateDaemonSet(t *testing.T) {
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
 					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
+						Labels: validLabels,
 					},
 				},
 			},
@@ -514,7 +520,7 @@ func TestValidateDaemonSet(t *testing.T) {
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
 					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
+						Labels: validLabels,
 					},
 				},
 			},
@@ -549,9 +555,7 @@ func validDeployment() *experimental.Deployment {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: experimental.DeploymentSpec{
-			Selector: map[string]string{
-				"name": "abc",
-			},
+			Selector: labels.NewSelectorOrDie("name=abc"),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "abc",
@@ -595,9 +599,7 @@ func TestValidateDeployment(t *testing.T) {
 	}
 	// selector should match the labels in pod template.
 	invalidSelectorDeployment := validDeployment()
-	invalidSelectorDeployment.Spec.Selector = map[string]string{
-		"name": "def",
-	}
+	invalidSelectorDeployment.Spec.Selector = labels.NewSelectorOrDie("name=def")
 	errorCases["selector does not match labels"] = invalidSelectorDeployment
 
 	// RestartPolicy should be always.

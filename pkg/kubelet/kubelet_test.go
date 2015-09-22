@@ -45,6 +45,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -2168,7 +2169,7 @@ func TestHandleNodeSelector(t *testing.T) {
 				Name:      "podA",
 				Namespace: "foo",
 			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "A"}},
+			Spec: api.PodSpec{NodeSelector: labels.NewSelectorOrDie("key=A")},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -2176,7 +2177,7 @@ func TestHandleNodeSelector(t *testing.T) {
 				Name:      "podB",
 				Namespace: "foo",
 			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "B"}},
+			Spec: api.PodSpec{NodeSelector: labels.NewSelectorOrDie("key=B")},
 		},
 	}
 	// The first pod should be rejected.

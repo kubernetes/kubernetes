@@ -60,13 +60,13 @@ func proxyContext(version string) {
 	It("should proxy to cadvisor", func() { nodeProxyTest(f, version, ":4194/containers/") })
 
 	It("should proxy through a service and a pod", func() {
-		labels := map[string]string{"proxy-service-target": "true"}
+		l := map[string]string{"proxy-service-target": "true"}
 		service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{
 				GenerateName: "proxy-service-",
 			},
 			Spec: api.ServiceSpec{
-				Selector: labels,
+				Selector: labels.SelectorFromSet(l),
 				Ports: []api.ServicePort{
 					{
 						Name:       "portname1",
@@ -107,7 +107,7 @@ func proxyContext(version string) {
 				"dest1": 160,
 				"dest2": 162,
 			},
-			Labels:      labels,
+			Labels:      l,
 			CreatedPods: &pods,
 		}
 		Expect(RunRC(cfg)).NotTo(HaveOccurred())

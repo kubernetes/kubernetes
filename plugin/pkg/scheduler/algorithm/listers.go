@@ -80,7 +80,7 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 		if service.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(service.Spec.Selector).AsSelector()
+		selector = service.Spec.Selector
 		if selector.Matches(labels.Set(pod.Labels)) {
 			services = append(services, service)
 		}

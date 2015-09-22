@@ -47,7 +47,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
 		for _, service := range services {
-			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
+			selectors = append(selectors, service.Spec.Selector)
 		}
 	}
 	controllers, err := s.controllerLister.GetPodControllers(pod)
@@ -135,7 +135,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLis
 	if err == nil {
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
-		selector := labels.SelectorFromSet(services[0].Spec.Selector)
+		selector := services[0].Spec.Selector
 		pods, err := podLister.List(selector)
 		if err != nil {
 			return nil, err

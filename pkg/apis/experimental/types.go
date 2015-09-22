@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -47,7 +48,7 @@ type ScaleStatus struct {
 	Replicas int `json:"replicas"`
 
 	// Selector is a label query over pods that should match the replicas count. If it is empty, it is defaulted to labels on Pod template; More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector labels.Selector
 }
 
 // Scale subresource, applicable to ReplicationControllers and (in future) Deployment.
@@ -205,7 +206,7 @@ type DeploymentSpec struct {
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be scaled down.
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector labels.Selector
 
 	// Template describes the pods that will be created.
 	Template *api.PodTemplateSpec `json:"template,omitempty"`
@@ -301,7 +302,7 @@ type DaemonSetSpec struct {
 	// Must match in order to be controlled.
 	// If empty, defaulted to labels on Pod template.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector labels.Selector
 
 	// Template is the object that describes the pod that will be created.
 	// The DaemonSet will create exactly one copy of this pod on every node

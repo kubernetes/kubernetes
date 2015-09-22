@@ -129,9 +129,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 					},
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					NodeSelector: map[string]string{
-						"baz": "blah",
-					},
+					NodeSelector:  labels.NewSelectorOrDie("baz=blah"),
 				},
 			},
 		},

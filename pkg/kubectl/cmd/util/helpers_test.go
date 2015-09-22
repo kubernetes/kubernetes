@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
@@ -166,9 +167,7 @@ func TestMerge(t *testing.T) {
 			kind: "Service",
 			obj: &api.Service{
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"version": "v1",
-					},
+					Selector: labels.NewSelectorOrDie("version=v1"),
 				},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, testapi.Default.Version()),
@@ -176,9 +175,7 @@ func TestMerge(t *testing.T) {
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
 					Type:            api.ServiceTypeClusterIP,
-					Selector: map[string]string{
-						"version": "v2",
-					},
+					Selector:        labels.NewSelectorOrDie("version=v2"),
 				},
 			},
 		},

@@ -170,13 +170,8 @@ func convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *a
 	}
 	out.Replicas = new(int)
 	*out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	//if in.TemplateRef != nil {
 	//	out.TemplateRef = new(ObjectReference)
@@ -202,13 +197,8 @@ func convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *R
 		defaulting.(func(*ReplicationControllerSpec))(in)
 	}
 	out.Replicas = *in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	//if in.TemplateRef != nil {
 	//	out.TemplateRef = new(api.ObjectReference)
@@ -269,13 +259,9 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
+
+	if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+		return err
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
@@ -335,14 +321,11 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
+
+	if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+		return err
 	}
+
 	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
 	// If both are specified, ServiceAccountName (the new field) wins.
 	out.ServiceAccountName = in.ServiceAccountName

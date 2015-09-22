@@ -193,7 +193,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: experimental.DaemonSetSpec{
-						Selector: map[string]string{"foo": "baz"},
+						Selector: labels.NewSelectorOrDie("foo=baz"),
 					},
 				},
 			},
@@ -232,13 +232,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: experimental.DaemonSetSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: labels.NewSelectorOrDie("foo=bar"),
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: experimental.DaemonSetSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: labels.NewSelectorOrDie("foo=bar"),
 					},
 				},
 			},
@@ -329,7 +329,7 @@ func TestStoreToServiceLister(t *testing.T) {
 	store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{},
+			Selector: labels.Selector{},
 		},
 	})
 	store.Add(&api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}})

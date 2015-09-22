@@ -163,15 +163,15 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	}
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
-	var labels map[string]string
+	var labelsMap map[string]string
 	var err error
 	if found && len(labelString) > 0 {
-		labels, err = ParseLabels(labelString)
+		labelsMap, err = ParseLabels(labelString)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		labels = map[string]string{
+		labelsMap = map[string]string{
 			"run": name,
 		}
 	}
@@ -203,14 +203,14 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	controller := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
-			Labels: labels,
+			Labels: labelsMap,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: count,
-			Selector: labels,
+			Selector: labelsMap,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: labels,
+					Labels: labelsMap,
 				},
 				Spec: *podSpec,
 			},

@@ -27,24 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-// Selector represents a label selector.
-type Selector interface {
-	// Matches returns true if this selector matches the given set of labels.
-	Matches(Labels) bool
-
-	// Empty returns true if this selector does not restrict the selection space.
-	Empty() bool
-
-	// String returns a human readable string that represents this selector.
-	String() string
-
-	// Add add a specific requirement for the selector
-	Add(key string, operator Operator, values []string) Selector
-}
-
 // Everything returns a selector that matches all labels.
 func Everything() Selector {
-	return LabelSelector{}
+	return Selector{}
 }
 
 // Operator represents a key's relationship
@@ -60,8 +45,8 @@ const (
 	ExistsOperator       Operator = "exists"
 )
 
-//LabelSelector is a list of Requirements.
-type LabelSelector []Requirement
+//Selector is a list of Requirements.
+type Selector []Requirement
 
 // Sort by  obtain determisitic parser
 type ByKey []Requirement
@@ -70,7 +55,7 @@ func (a ByKey) Len() int { return len(a) }
 
 func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
-func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 // Requirement is a selector that contains values, a key
 // and an operator that relates the key and values. The zero
@@ -78,9 +63,9 @@ func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 // Requirement implements both set based match and exact match
 // Requirement is initialized via NewRequirement constructor for creating a valid Requirement.
 type Requirement struct {
-	key       string
-	operator  Operator
-	strValues sets.String
+	Key       string
+	Operator  Operator
+	StrValues sets.String
 }
 
 // NewRequirement is the constructor for a Requirement.
@@ -115,7 +100,7 @@ func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, er
 			return nil, err
 		}
 	}
-	return &Requirement{key: key, operator: op, strValues: vals}, nil
+	return &Requirement{Key: key, Operator: op, StrValues: vals}, nil
 }
 
 // Matches returns true if the Requirement matches the input Labels.
@@ -128,26 +113,26 @@ func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, er
 // (4) The operator is NotIn and Labels does not have the
 //     Requirement's key.
 func (r *Requirement) Matches(ls Labels) bool {
-	switch r.operator {
+	switch r.Operator {
 	case InOperator, EqualsOperator, DoubleEqualsOperator:
-		if !ls.Has(r.key) {
+		if !ls.Has(r.Key) {
 			return false
 		}
-		return r.strValues.Has(ls.Get(r.key))
+		return r.StrValues.Has(ls.Get(r.Key))
 	case NotInOperator, NotEqualsOperator:
-		if !ls.Has(r.key) {
+		if !ls.Has(r.Key) {
 			return true
 		}
-		return !r.strValues.Has(ls.Get(r.key))
+		return !r.StrValues.Has(ls.Get(r.Key))
 	case ExistsOperator:
-		return ls.Has(r.key)
+		return ls.Has(r.Key)
 	default:
 		return false
 	}
 }
 
-// Return true if the LabelSelector doesn't restrict selection space
-func (lsel LabelSelector) Empty() bool {
+// Return true if the Selector doesn't restrict selection space
+func (lsel Selector) Empty() bool {
 	if lsel == nil {
 		return true
 	}
@@ -159,9 +144,9 @@ func (lsel LabelSelector) Empty() bool {
 // returned. See NewRequirement for creating a valid Requirement.
 func (r *Requirement) String() string {
 	var buffer bytes.Buffer
-	buffer.WriteString(r.key)
+	buffer.WriteString(r.Key)
 
-	switch r.operator {
+	switch r.Operator {
 	case EqualsOperator:
 		buffer.WriteString("=")
 	case DoubleEqualsOperator:
@@ -176,39 +161,41 @@ func (r *Requirement) String() string {
 		return buffer.String()
 	}
 
-	switch r.operator {
+	switch r.Operator {
 	case InOperator, NotInOperator:
 		buffer.WriteString("(")
 	}
-	if len(r.strValues) == 1 {
-		buffer.WriteString(r.strValues.List()[0])
+	if len(r.StrValues) == 1 {
+		buffer.WriteString(r.StrValues.List()[0])
 	} else { // only > 1 since == 0 prohibited by NewRequirement
-		buffer.WriteString(strings.Join(r.strValues.List(), ","))
+		buffer.WriteString(strings.Join(r.StrValues.List(), ","))
 	}
 
-	switch r.operator {
+	switch r.Operator {
 	case InOperator, NotInOperator:
 		buffer.WriteString(")")
 	}
 	return buffer.String()
 }
 
-// Add adds a requirement to the selector. It copies the current selector returning a new one
-func (lsel LabelSelector) Add(key string, operator Operator, values []string) Selector {
+// Add adds a requirement to the selector. It copies the current selector returning a new one.
+// Requirements are sorted by Requirement.Key.
+func (lsel Selector) Add(key string, Operator Operator, values []string) Selector {
 	var reqs []Requirement
 	for _, item := range lsel {
 		reqs = append(reqs, item)
 	}
-	if r, err := NewRequirement(key, operator, sets.NewString(values...)); err == nil {
+	if r, err := NewRequirement(key, Operator, sets.NewString(values...)); err == nil {
 		reqs = append(reqs, *r)
 	}
-	return LabelSelector(reqs)
+	sort.Sort(ByKey(reqs))
+	return Selector(reqs)
 }
 
-// Matches for a LabelSelector returns true if all
+// Matches for a Selector returns true if all
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
-func (lsel LabelSelector) Matches(l Labels) bool {
+func (lsel Selector) Matches(l Labels) bool {
 	for _, req := range lsel {
 		if matches := req.Matches(l); !matches {
 			return false
@@ -218,8 +205,8 @@ func (lsel LabelSelector) Matches(l Labels) bool {
 }
 
 // String returns a comma-separated string of all
-// the LabelSelector Requirements' human-readable strings.
-func (lsel LabelSelector) String() string {
+// the Selector Requirements' human-readable strings.
+func (lsel Selector) String() string {
 	var reqs []string
 	for _, req := range lsel {
 		reqs = append(reqs, req.String())
@@ -642,7 +629,7 @@ func Parse(selector string) (Selector, error) {
 	items, error := p.parse()
 	if error == nil {
 		sort.Sort(ByKey(items)) // sort to grant determistic parsing
-		return LabelSelector(items), error
+		return Selector(items), error
 	}
 	return nil, error
 }
@@ -665,18 +652,49 @@ func validateLabelValue(v string) error {
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil and empty Sets are considered equivalent to Everything().
+// Requirements are sorted by Requirement.Key
 func SelectorFromSet(ls Set) Selector {
 	if ls == nil {
-		return LabelSelector{}
+		return Selector{}
 	}
 	var requirements []Requirement
 	for label, value := range ls {
 		if r, err := NewRequirement(label, EqualsOperator, sets.NewString(value)); err != nil {
 			//TODO: double check errors when input comes from serialization?
-			return LabelSelector{}
+			return Selector{}
 		} else {
 			requirements = append(requirements, *r)
 		}
 	}
-	return LabelSelector(requirements)
+	sort.Sort(ByKey(requirements))
+	return Selector(requirements)
+}
+
+// NewSelectorOrDie utility func to create a labels selector.
+// In case the selector string cannot be parsed it dies. Only for testing.
+func NewSelectorOrDie(selector string) Selector {
+	s, e := Parse(selector)
+	if e != nil {
+		panic(e)
+	}
+	return s
+}
+
+// MakeMapFroSelectorOrDie returns a map[string]string data structure from the labels.Selector
+// In case the selector cannot be translated to a map[string]string (basically every time
+// set based selector is used) it dies. Only for testing.
+func MakeMapFromSelectorOrDie(selector Selector) map[string]string {
+	m := make(map[string]string)
+	for _, r := range selector {
+		if len(r.StrValues.List()) > 1 {
+			panic(fmt.Sprintf("unable to convert %s to map[string]string", selector.String()))
+		}
+		switch r.Operator {
+		case EqualsOperator, DoubleEqualsOperator, InOperator:
+			m[r.Key] = r.StrValues.List()[0]
+		default:
+			panic(fmt.Sprintf("unable to convert %s to map[string]string", selector.String()))
+		}
+	}
+	return m
 }

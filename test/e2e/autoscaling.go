@@ -127,9 +127,7 @@ func CreateService(f *Framework, name string) {
 			Name: name,
 		},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: labels.NewSelectorOrDie("name=" + name),
 			Ports: []api.ServicePort{{
 				Port:       8080,
 				TargetPort: util.NewIntOrStringFromInt(8080),

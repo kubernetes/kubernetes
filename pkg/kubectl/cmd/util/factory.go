@@ -178,7 +178,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if t.Spec.Selector == nil {
 					return "", fmt.Errorf("the service has no pod selector set")
 				}
-				return kubectl.MakeLabels(t.Spec.Selector), nil
+				return t.Spec.Selector.String(), nil
 			default:
 				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {

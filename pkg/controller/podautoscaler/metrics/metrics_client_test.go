@@ -28,6 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -140,13 +141,13 @@ func TestHeapsterResourceConsumptionGet(t *testing.T) {
 
 	metricsClient := NewHeapsterMetricsClient(kubeClient)
 
-	val, err := metricsClient.ResourceConsumption(namespace).Get(api.ResourceCPU, map[string]string{"app": "test"})
+	val, err := metricsClient.ResourceConsumption(namespace).Get(api.ResourceCPU, labels.NewSelectorOrDie("app=test"))
 	if err != nil {
 		t.Fatalf("Error while getting consumption: %v", err)
 	}
 	assert.Equal(t, int64(cpu), val.Quantity.MilliValue())
 
-	val, err = metricsClient.ResourceConsumption(namespace).Get(api.ResourceMemory, map[string]string{"app": "test"})
+	val, err = metricsClient.ResourceConsumption(namespace).Get(api.ResourceMemory, labels.NewSelectorOrDie("app=test"))
 	if err != nil {
 		t.Fatalf("Error while getting consumption: %v", err)
 	}

@@ -133,7 +133,7 @@ func ValidateDaemonSetTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplat
 func ValidateDaemonSetSpec(spec *experimental.DaemonSetSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	selector := labels.Set(spec.Selector).AsSelector()
+	selector := spec.Selector
 	if selector.Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
 	}

@@ -47,7 +47,7 @@ type MetricsClient interface {
 
 type ResourceConsumptionClient interface {
 	// Gets average resource consumption for pods under the given selector.
-	Get(resourceName api.ResourceName, selector map[string]string) (*experimental.ResourceConsumption, error)
+	Get(resourceName api.ResourceName, selector labels.Selector) (*experimental.ResourceConsumption, error)
 }
 
 // Aggregates results into ResourceConsumption. Also returns number of
@@ -104,9 +104,9 @@ func (h *HeapsterMetricsClient) ResourceConsumption(namespace string) ResourceCo
 	}
 }
 
-func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, selector map[string]string) (*experimental.ResourceConsumption, error) {
+func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, selector labels.Selector) (*experimental.ResourceConsumption, error) {
 	podList, err := h.client.Pods(h.namespace).
-		List(labels.SelectorFromSet(labels.Set(selector)), fields.Everything())
+		List(selector, fields.Everything())
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pod list: %v", err)

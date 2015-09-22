@@ -313,7 +313,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *experimental.DaemonSet) (map[string][]*api.Pod, error) {
 	nodeToDaemonPods := make(map[string][]*api.Pod)
-	daemonPods, err := dsc.podStore.Pods(ds.Namespace).List(labels.Set(ds.Spec.Selector).AsSelector())
+	daemonPods, err := dsc.podStore.Pods(ds.Namespace).List(ds.Spec.Selector)
 	if err != nil {
 		return nodeToDaemonPods, err
 	}
@@ -340,7 +340,7 @@ func (dsc *DaemonSetsController) manage(ds *experimental.DaemonSet) {
 	var nodesNeedingDaemonPods, podsToDelete []string
 	for i := range nodeList.Items {
 		// Check if the node satisfies the daemon set's node selector.
-		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
+		nodeSelector := ds.Spec.Template.Spec.NodeSelector
 		shouldRun := nodeSelector.Matches(labels.Set(nodeList.Items[i].Labels))
 		// If the daemon set specifies a node name, check that it matches with nodeName.
 		nodeName := nodeList.Items[i].Name
@@ -429,7 +429,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *experimental.DaemonSe
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int
 	for _, node := range nodeList.Items {
-		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
+		nodeSelector := ds.Spec.Template.Spec.NodeSelector
 		shouldRun := nodeSelector.Matches(labels.Set(node.Labels))
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 

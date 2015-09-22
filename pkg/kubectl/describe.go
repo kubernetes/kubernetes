@@ -825,7 +825,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, controller.Spec.Selector)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, labels.Set(controller.Spec.Selector).AsSelector())
 	if err != nil {
 		return "", err
 	}
@@ -930,8 +930,8 @@ func describeDaemonSet(daemon *experimental.DaemonSet, events *api.EventList, ru
 		} else {
 			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
 		}
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Selector))
-		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
+		fmt.Fprintf(out, "Selector:\t%s\n", daemon.Spec.Selector.String())
+		fmt.Fprintf(out, "Node-Selector:\t%s\n", daemon.Spec.Template.Spec.NodeSelector.String())
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(daemon.Labels))
 		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
 		fmt.Fprintf(out, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
@@ -1026,7 +1026,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", service.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(service.Labels))
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
+		fmt.Fprintf(out, "Selector:\t%s\n", service.Spec.Selector.String())
 		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
 		if len(service.Status.LoadBalancer.Ingress) > 0 {
@@ -1411,7 +1411,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 	// Find the ones that match labelsToMatch.
 	var matchingDaemonSets []experimental.DaemonSet
 	for _, ds := range dss.Items {
-		selector := labels.SelectorFromSet(ds.Spec.Selector)
+		selector := ds.Spec.Selector
 		if selector.Matches(labelsToMatch) {
 			matchingDaemonSets = append(matchingDaemonSets, ds)
 		}
@@ -1456,8 +1456,8 @@ func printReplicationControllersByLabels(matchingRCs []api.ReplicationController
 	return list
 }
 
-func getPodStatusForController(c client.PodInterface, selector map[string]string) (running, waiting, succeeded, failed int, err error) {
-	rcPods, err := c.List(labels.SelectorFromSet(selector), fields.Everything())
+func getPodStatusForController(c client.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
+	rcPods, err := c.List(selector, fields.Everything())
 	if err != nil {
 		return
 	}

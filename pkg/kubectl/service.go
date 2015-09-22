@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -85,9 +86,9 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 
 	labelsString, found := params["labels"]
-	var labels map[string]string
+	var labelsMap map[string]string
 	if found && len(labelsString) > 0 {
-		labels, err = ParseLabels(labelsString)
+		labelsMap, err = ParseLabels(labelsString)
 		if err != nil {
 			return nil, err
 		}
@@ -116,10 +117,10 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	service := api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
-			Labels: labels,
+			Labels: labelsMap,
 		},
 		Spec: api.ServiceSpec{
-			Selector: selector,
+			Selector: labels.SelectorFromSet(selector),
 			Ports: []api.ServicePort{
 				{
 					Name:     servicePortName,

@@ -85,13 +85,8 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = v1.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
+	if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+		return err
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
@@ -151,14 +146,10 @@ func convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
+	if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+		return err
 	}
+
 	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
 	// If both are specified, ServiceAccountName (the new field) wins.
 	out.ServiceAccountName = in.ServiceAccountName
@@ -188,13 +179,9 @@ func convert_experimental_DeploymentSpec_To_v1_DeploymentSpec(in *experimental.D
 	}
 	out.Replicas = new(int)
 	*out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+
 	}
 	if in.Template != nil {
 		out.Template = new(v1.PodTemplateSpec)
@@ -219,14 +206,11 @@ func convert_v1_DeploymentSpec_To_experimental_DeploymentSpec(in *DeploymentSpec
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
+
 	if in.Template != nil {
 		out.Template = new(api.PodTemplateSpec)
 		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {

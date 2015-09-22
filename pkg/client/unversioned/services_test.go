@@ -44,9 +44,7 @@ func TestListServices(t *testing.T) {
 							},
 						},
 						Spec: api.ServiceSpec{
-							Selector: map[string]string{
-								"one": "two",
-							},
+							Selector: labels.NewSelectorOrDie("one=two"),
 						},
 					},
 				},
@@ -78,9 +76,7 @@ func TestListServicesLabels(t *testing.T) {
 							},
 						},
 						Spec: api.ServiceSpec{
-							Selector: map[string]string{
-								"one": "two",
-							},
+							Selector: labels.NewSelectorOrDie("one=two"),
 						},
 					},
 				},

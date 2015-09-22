@@ -793,7 +793,7 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 		internalIP,
 		externalIP,
 		makePortString(svc.Spec.Ports),
-		labels.FormatLabels(svc.Spec.Selector),
+		svc.Spec.Selector.String(),
 		translateTimestamp(svc.CreationTimestamp),
 	); err != nil {
 		return err
@@ -832,8 +832,8 @@ func printDaemonSet(ds *experimental.DaemonSet, w io.Writer, withNamespace bool,
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		labels.FormatLabels(ds.Spec.Selector),
-		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
+		ds.Spec.Selector.String(),
+		ds.Spec.Template.Spec.NodeSelector.String(),
 	); err != nil {
 		return err
 	}

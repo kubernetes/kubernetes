@@ -83,7 +83,7 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.PodTemplate)
-			object.Template.Spec.NodeSelector = map[string]string{"a": "b"}
+			object.Template.Spec.NodeSelector = labels.NewSelectorOrDie("a=b")
 			return object
 		},
 	)

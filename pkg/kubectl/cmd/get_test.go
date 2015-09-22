@@ -413,7 +413,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 
 	expected := []runtime.Object{pods, svc}
 	actual := tf.Printer.(*testPrinter).Objects
-	if !reflect.DeepEqual(expected, actual) {
+	if !api.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v", actual)
 	}
 	if len(buf.String()) == 0 {
@@ -476,7 +476,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 			&svc.Items[0],
 		},
 	}
-	if !reflect.DeepEqual(expected, out) {
+	if !api.Semantic.DeepEqual(expected, out) {
 		t.Errorf("unexpected output: %#v", out)
 	}
 }
@@ -514,7 +514,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 
 	expected := []runtime.Object{pods, svc}
 	actual := tf.Printer.(*testPrinter).Objects
-	if !reflect.DeepEqual(expected, actual) {
+	if !api.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v", actual)
 	}
 	if len(buf.String()) == 0 {

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
@@ -172,6 +173,58 @@ func TestValidateLabels(t *testing.T) {
 			if detail != labelValueErrorMsg {
 				t.Errorf("error detail %s should be equal %s", detail, labelValueErrorMsg)
 			}
+		}
+	}
+}
+
+func TestValidateLabelsSelector(t *testing.T) {
+	successCases := []labels.Selector{
+		{labels.Requirement{Key: "simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")}},
+		{
+			labels.Requirement{Key: "now-with-dashes", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1-starts-with-num", Operator: labels.InOperator, StrValues: sets.NewString("bar")}},
+
+		{
+			labels.Requirement{Key: "simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+		},
+		{
+			labels.Requirement{Key: "1234", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "simple/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now-with-dashes/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now-with-dashes/now-with-dashes", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now.with.dots/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now-with.dashes-and.dots/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1-num.2-num/3-num", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1234/5678", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1.2.3.4/5678", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "UpperCase123", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+		},
+	}
+	for i, l := range successCases {
+		errs := ValidateLabelsSelector(l, "")
+		if len(errs) != 0 {
+			t.Errorf("case[%d] expected success, got %#v", i, errs)
+		}
+	}
+
+	errorCases := []labels.Selector{
+		{
+			labels.Requirement{Key: "nospecialchars^=@", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+		},
+		{
+			labels.Requirement{Key: "cantendwithadash-", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+		},
+		{
+			labels.Requirement{Key: "only/one/slash", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+		},
+		{
+			labels.Requirement{Key: strings.Repeat("a", 254), Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+		},
+	}
+	for i, l := range errorCases {
+		errs := ValidateLabelsSelector(l, "")
+		if len(errs) != 1 {
+			t.Errorf("case[%d] expected failure", i)
 		}
 	}
 }
@@ -1238,11 +1291,9 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
+			Containers:            []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy:         api.RestartPolicyAlways,
+			NodeSelector:          labels.NewSelectorOrDie("key=value"),
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
@@ -1314,11 +1365,9 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
+			Containers:            []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy:         api.RestartPolicyAlways,
+			NodeSelector:          labels.NewSelectorOrDie("key=value"),
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
@@ -1351,10 +1400,8 @@ func TestValidatePod(t *testing.T) {
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				NodeSelector: map[string]string{
-					"key": "value",
-				},
-				NodeName: "foobar",
+				NodeSelector:  labels.NewSelectorOrDie("key=value"),
+				NodeName:      "foobar",
 			},
 		},
 	}
@@ -1655,7 +1702,7 @@ func makeValidService() api.Service {
 			ResourceVersion: "1",
 		},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"key": "val"},
+			Selector:        labels.NewSelectorOrDie("key=val"),
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: util.NewIntOrStringFromInt(8675)}},
@@ -1742,7 +1789,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid selector",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Selector["NoSpecialCharsLike=Equals"] = "bar"
+				s.Spec.Selector = append(s.Spec.Selector, labels.Requirement{Key: "NoSpecialCharsLike=Equals", Operator: labels.EqualsOperator, StrValues: sets.NewString("bar")})
 			},
 			numErrs: 1,
 		},

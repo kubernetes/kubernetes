@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestFromServices(t *testing.T) {
@@ -30,7 +31,7 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo-bar"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
+					Selector:  labels.NewSelectorOrDie("bar=baz"),
 					ClusterIP: "1.2.3.4",
 					Ports: []api.ServicePort{
 						{Port: 8080, Protocol: "TCP"},
@@ -40,7 +41,7 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
+					Selector:  labels.NewSelectorOrDie("bar=baz"),
 					ClusterIP: "5.6.7.8",
 					Ports: []api.ServicePort{
 						{Name: "u-d-p", Port: 8081, Protocol: "UDP"},
@@ -51,7 +52,7 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "q-u-u-x"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
+					Selector:  labels.NewSelectorOrDie("bar=baz"),
 					ClusterIP: "9.8.7.6",
 					Ports: []api.ServicePort{
 						{Port: 8082, Protocol: "TCP"},
@@ -62,7 +63,7 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-none"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
+					Selector:  labels.NewSelectorOrDie("bar=baz"),
 					ClusterIP: "None",
 					Ports: []api.ServicePort{
 						{Port: 8082, Protocol: "TCP"},
@@ -72,7 +73,7 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-empty"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
+					Selector:  labels.NewSelectorOrDie("bar=baz"),
 					ClusterIP: "",
 					Ports: []api.ServicePort{
 						{Port: 8082, Protocol: "TCP"},

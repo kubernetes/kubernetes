@@ -40,7 +40,7 @@ func validNewDeployment() *experimental.Deployment {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: experimental.DeploymentSpec{
-			Selector: map[string]string{"a": "b"},
+			Selector: labels.NewSelectorOrDie("a=b"),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -75,7 +75,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&experimental.Deployment{
 			Spec: experimental.DeploymentSpec{
-				Selector: map[string]string{},
+				Selector: labels.Selector{},
 				Template: validDeployment.Spec.Template,
 			},
 		},
@@ -91,7 +91,7 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*experimental.Deployment)
-			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
+			object.Spec.Template.Spec.NodeSelector = labels.NewSelectorOrDie("c=d")
 			return object
 		},
 		// invalid updateFunc
@@ -112,7 +112,7 @@ func TestUpdate(t *testing.T) {
 		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*experimental.Deployment)
-			object.Spec.Selector = map[string]string{}
+			object.Spec.Selector = labels.Selector{}
 			return object
 		},
 	)

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
@@ -78,9 +79,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 					},
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					NodeSelector: map[string]string{
-						"baz": "blah",
-					},
+					NodeSelector:  labels.NewSelectorOrDie("baz=blah"),
 				},
 			},
 		},

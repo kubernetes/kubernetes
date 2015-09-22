@@ -1695,13 +1695,8 @@ func convert_experimental_DaemonSetSpec_To_v1_DaemonSetSpec(in *experimental.Dae
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DaemonSetSpec))(in)
 	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	if in.Template != nil {
 		out.Template = new(v1.PodTemplateSpec)
@@ -2159,13 +2154,8 @@ func convert_experimental_ScaleStatus_To_v1_ScaleStatus(in *experimental.ScaleSt
 		defaulting.(func(*experimental.ScaleStatus))(in)
 	}
 	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	return nil
 }
@@ -2323,13 +2313,8 @@ func convert_v1_DaemonSetSpec_To_experimental_DaemonSetSpec(in *DaemonSetSpec, o
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetSpec))(in)
 	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	if in.Template != nil {
 		out.Template = new(api.PodTemplateSpec)
@@ -2787,13 +2772,8 @@ func convert_v1_ScaleStatus_To_experimental_ScaleStatus(in *ScaleStatus, out *ex
 		defaulting.(func(*ScaleStatus))(in)
 	}
 	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	return nil
 }

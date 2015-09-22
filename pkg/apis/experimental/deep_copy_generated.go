@@ -25,7 +25,9 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	labels "k8s.io/kubernetes/pkg/labels"
 	util "k8s.io/kubernetes/pkg/util"
+	sets "k8s.io/kubernetes/pkg/util/sets"
 	inf "speter.net/go/exp/math/dec/inf"
 )
 
@@ -490,9 +492,11 @@ func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner
 	}
 	out.DNSPolicy = in.DNSPolicy
 	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
+		out.NodeSelector = make([]labels.Requirement, len(in.NodeSelector))
+		for i := range in.NodeSelector {
+			if err := deepCopy_labels_Requirement(in.NodeSelector[i], &out.NodeSelector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.NodeSelector = nil
@@ -861,9 +865,11 @@ func deepCopy_experimental_DaemonSetList(in DaemonSetList, out *DaemonSetList, c
 
 func deepCopy_experimental_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = make([]labels.Requirement, len(in.Selector))
+		for i := range in.Selector {
+			if err := deepCopy_labels_Requirement(in.Selector[i], &out.Selector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.Selector = nil
@@ -925,9 +931,11 @@ func deepCopy_experimental_DeploymentList(in DeploymentList, out *DeploymentList
 func deepCopy_experimental_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = make([]labels.Requirement, len(in.Selector))
+		for i := range in.Selector {
+			if err := deepCopy_labels_Requirement(in.Selector[i], &out.Selector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.Selector = nil
@@ -1302,9 +1310,11 @@ func deepCopy_experimental_ScaleSpec(in ScaleSpec, out *ScaleSpec, c *conversion
 func deepCopy_experimental_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = make([]labels.Requirement, len(in.Selector))
+		for i := range in.Selector {
+			if err := deepCopy_labels_Requirement(in.Selector[i], &out.Selector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.Selector = nil
@@ -1400,10 +1410,32 @@ func deepCopy_experimental_ThirdPartyResourceList(in ThirdPartyResourceList, out
 	return nil
 }
 
+func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.StrValues != nil {
+		out.StrValues = make(sets.String)
+		for key, val := range in.StrValues {
+			newVal := new(sets.Empty)
+			if err := deepCopy_sets_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
 func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.IntVal = in.IntVal
 	out.StrVal = in.StrVal
+	return nil
+}
+
+func deepCopy_sets_Empty(in sets.Empty, out *sets.Empty, c *conversion.Cloner) error {
 	return nil
 }
 
@@ -1490,7 +1522,9 @@ func init() {
 		deepCopy_experimental_ThirdPartyResourceData,
 		deepCopy_experimental_ThirdPartyResourceDataList,
 		deepCopy_experimental_ThirdPartyResourceList,
+		deepCopy_labels_Requirement,
 		deepCopy_util_IntOrString,
+		deepCopy_sets_Empty,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

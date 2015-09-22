@@ -357,9 +357,7 @@ var _ = Describe("SchedulerPredicates", func() {
 						Image: "gcr.io/google_containers/pause:go",
 					},
 				},
-				NodeSelector: map[string]string{
-					"label": "nonempty",
-				},
+				NodeSelector: labels.NewSelectorOrDie("label=nonempty"),
 			},
 		})
 		expectNoError(err)

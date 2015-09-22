@@ -265,7 +265,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(daemonSet.Spec.Selector).AsSelector()
+		selector = daemonSet.Spec.Selector
 
 		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
@@ -308,7 +308,7 @@ func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Serv
 			// services with nil selectors match nothing, not everything.
 			continue
 		}
-		selector = labels.Set(service.Spec.Selector).AsSelector()
+		selector = service.Spec.Selector
 		if selector.Matches(labels.Set(pod.Labels)) {
 			services = append(services, service)
 		}
