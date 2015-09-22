@@ -67,12 +67,6 @@ func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.Typ
 	return nil
 }
 
-func deepCopy_v1_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
-	out.Name = in.Name
-	out.APIGroup = in.APIGroup
-	return nil
-}
-
 func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
@@ -2123,65 +2117,6 @@ func deepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *co
 	return nil
 }
 
-func deepCopy_v1_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	out.Description = in.Description
-	if in.Versions != nil {
-		out.Versions = make([]APIVersion, len(in.Versions))
-		for i := range in.Versions {
-			if err := deepCopy_v1_APIVersion(in.Versions[i], &out.Versions[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Versions = nil
-	}
-	return nil
-}
-
-func deepCopy_v1_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if in.Data != nil {
-		out.Data = make([]uint8, len(in.Data))
-		for i := range in.Data {
-			out.Data[i] = in.Data[i]
-		}
-	} else {
-		out.Data = nil
-	}
-	return nil
-}
-
-func deepCopy_v1_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ThirdPartyResource, len(in.Items))
-		for i := range in.Items {
-			if err := deepCopy_v1_ThirdPartyResource(in.Items[i], &out.Items[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
 func deepCopy_v1_Volume(in Volume, out *Volume, c *conversion.Cloner) error {
 	out.Name = in.Name
 	if err := deepCopy_v1_VolumeSource(in.VolumeSource, &out.VolumeSource, c); err != nil {
@@ -2346,7 +2281,6 @@ func init() {
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
-		deepCopy_v1_APIVersion,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		deepCopy_v1_Binding,
 		deepCopy_v1_Capabilities,
@@ -2461,9 +2395,6 @@ func init() {
 		deepCopy_v1_ServiceSpec,
 		deepCopy_v1_ServiceStatus,
 		deepCopy_v1_TCPSocketAction,
-		deepCopy_v1_ThirdPartyResource,
-		deepCopy_v1_ThirdPartyResourceData,
-		deepCopy_v1_ThirdPartyResourceList,
 		deepCopy_v1_Volume,
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,

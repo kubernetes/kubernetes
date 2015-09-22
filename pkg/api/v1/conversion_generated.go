@@ -23,7 +23,6 @@ import (
 
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
-	experimental "k8s.io/kubernetes/pkg/apis/experimental"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -2462,15 +2461,6 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	return nil
 }
 
-func convert_v1_APIVersion_To_experimental_APIVersion(in *APIVersion, out *experimental.APIVersion, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*APIVersion))(in)
-	}
-	out.Name = in.Name
-	out.APIGroup = in.APIGroup
-	return nil
-}
-
 func convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*AWSElasticBlockStoreVolumeSource))(in)
@@ -4758,69 +4748,6 @@ func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out 
 	return nil
 }
 
-func convert_v1_ThirdPartyResource_To_experimental_ThirdPartyResource(in *ThirdPartyResource, out *experimental.ThirdPartyResource, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ThirdPartyResource))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	out.Description = in.Description
-	if in.Versions != nil {
-		out.Versions = make([]experimental.APIVersion, len(in.Versions))
-		for i := range in.Versions {
-			if err := convert_v1_APIVersion_To_experimental_APIVersion(&in.Versions[i], &out.Versions[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Versions = nil
-	}
-	return nil
-}
-
-func convert_v1_ThirdPartyResourceData_To_experimental_ThirdPartyResourceData(in *ThirdPartyResourceData, out *experimental.ThirdPartyResourceData, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ThirdPartyResourceData))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1_ThirdPartyResourceList_To_experimental_ThirdPartyResourceList(in *ThirdPartyResourceList, out *experimental.ThirdPartyResourceList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ThirdPartyResourceList))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]experimental.ThirdPartyResource, len(in.Items))
-		for i := range in.Items {
-			if err := convert_v1_ThirdPartyResource_To_experimental_ThirdPartyResource(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
 func convert_v1_Volume_To_api_Volume(in *Volume, out *api.Volume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Volume))(in)
@@ -4969,78 +4896,6 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 	return nil
 }
 
-func convert_experimental_APIVersion_To_v1_APIVersion(in *experimental.APIVersion, out *APIVersion, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.APIVersion))(in)
-	}
-	out.Name = in.Name
-	out.APIGroup = in.APIGroup
-	return nil
-}
-
-func convert_experimental_ThirdPartyResource_To_v1_ThirdPartyResource(in *experimental.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResource))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	out.Description = in.Description
-	if in.Versions != nil {
-		out.Versions = make([]APIVersion, len(in.Versions))
-		for i := range in.Versions {
-			if err := convert_experimental_APIVersion_To_v1_APIVersion(&in.Versions[i], &out.Versions[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Versions = nil
-	}
-	return nil
-}
-
-func convert_experimental_ThirdPartyResourceData_To_v1_ThirdPartyResourceData(in *experimental.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResourceData))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_experimental_ThirdPartyResourceList_To_v1_ThirdPartyResourceList(in *experimental.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResourceList))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ThirdPartyResource, len(in.Items))
-		for i := range in.Items {
-			if err := convert_experimental_ThirdPartyResource_To_v1_ThirdPartyResource(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
@@ -5158,11 +5013,6 @@ func init() {
 		convert_api_VolumeMount_To_v1_VolumeMount,
 		convert_api_VolumeSource_To_v1_VolumeSource,
 		convert_api_Volume_To_v1_Volume,
-		convert_experimental_APIVersion_To_v1_APIVersion,
-		convert_experimental_ThirdPartyResourceData_To_v1_ThirdPartyResourceData,
-		convert_experimental_ThirdPartyResourceList_To_v1_ThirdPartyResourceList,
-		convert_experimental_ThirdPartyResource_To_v1_ThirdPartyResource,
-		convert_v1_APIVersion_To_experimental_APIVersion,
 		convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		convert_v1_Binding_To_api_Binding,
 		convert_v1_Capabilities_To_api_Capabilities,
@@ -5275,9 +5125,6 @@ func init() {
 		convert_v1_ServiceStatus_To_api_ServiceStatus,
 		convert_v1_Service_To_api_Service,
 		convert_v1_TCPSocketAction_To_api_TCPSocketAction,
-		convert_v1_ThirdPartyResourceData_To_experimental_ThirdPartyResourceData,
-		convert_v1_ThirdPartyResourceList_To_experimental_ThirdPartyResourceList,
-		convert_v1_ThirdPartyResource_To_experimental_ThirdPartyResource,
 		convert_v1_VolumeMount_To_api_VolumeMount,
 		convert_v1_VolumeSource_To_api_VolumeSource,
 		convert_v1_Volume_To_api_Volume,

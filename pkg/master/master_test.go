@@ -577,7 +577,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return testapi.Default.Codec().Encode(&thirdPartyData)
+	return testapi.Experimental.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {

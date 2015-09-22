@@ -2061,35 +2061,3 @@ type RangeAllocation struct {
 	// a single allocated address (the fifth bit on CIDR 10.0.0.0/8 is 10.0.0.4).
 	Data []byte `json:"data"`
 }
-
-// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
-// types to the API.  It consists of one or more Versions of the api.
-type ThirdPartyResource struct {
-	unversioned.TypeMeta `json:",inline"`
-	ObjectMeta           `json:"metadata,omitempty"`
-
-	Description string `json:"description,omitempty"`
-
-	Versions []APIVersion `json:"versions,omitempty"`
-}
-
-type ThirdPartyResourceList struct {
-	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,omitempty"`
-
-	Items []ThirdPartyResource `json:"items"`
-}
-
-// An APIVersion represents a single concrete version of an object model.
-type APIVersion struct {
-	Name     string `json:"name,omitempty"`
-	APIGroup string `json:"apiGroup,omitempty"`
-}
-
-// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
-type ThirdPartyResourceData struct {
-	unversioned.TypeMeta `json:",inline"`
-	ObjectMeta           `json:"metadata,omitempty"`
-
-	Data []byte `json:"name,omitempty"`
-}
