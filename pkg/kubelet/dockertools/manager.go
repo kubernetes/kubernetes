@@ -1185,16 +1185,39 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	}
 
 	containerPid := container.State.Pid
-	// TODO what if the host doesn't have it???
-	_, lookupErr := exec.LookPath("socat")
+	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
-		return fmt.Errorf("Unable to do port forwarding: socat not found.")
+		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
-	// TODO use exec.LookPath
-	command := exec.Command("nsenter", args...)
-	command.Stdin = stream
+
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+
+	nsenterPath, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
+	}
+
+	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream
+
+	// If we use Stdin, command.Run() won't return until the goroutine that's copying
+	// from stream finishes. Unfortunately, if you have a client like telnet connected
+	// via port forwarding, as long as the user's telnet client is connected to the user's
+	// local listener that port forwarding sets up, the telnet session never exits. This
+	// means that even if socat has finished running, command.Run() won't ever return
+	// (because the client still has the connection and stream open).
+	//
+	// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
+	// when the command (socat) exits.
+	inPipe, err := command.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
+	}
+	go func() {
+		io.Copy(inPipe, stream)
+		inPipe.Close()
+	}()
+
 	return command.Run()
 }
 
