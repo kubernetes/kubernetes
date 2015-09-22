@@ -171,14 +171,14 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resource string) (singular stri
 func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	meta, ok := m.mapping[strings.ToLower(resource)]
 	if !ok {
-		return "", "", fmt.Errorf("no resource %q has been defined", resource)
+		return "", "", fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
 	}
 	return meta.APIVersion, meta.Kind, nil
 }
 
 func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
 	if _, ok := m.mapping[strings.ToLower(resource)]; !ok {
-		return "", fmt.Errorf("no resource %q has been defined", resource)
+		return "", fmt.Errorf("in group for resource, no resource %q has been defined", resource)
 	}
 	return m.group, nil
 }

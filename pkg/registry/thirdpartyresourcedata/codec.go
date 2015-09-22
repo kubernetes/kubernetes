@@ -33,9 +33,17 @@ type thirdPartyResourceDataMapper struct {
 	mapper  meta.RESTMapper
 	kind    string
 	version string
+	group   string
+}
+
+func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
+	return resource == strings.ToLower(t.kind)+"s"
 }
 
 func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string, error) {
+	if t.isThirdPartyResource(resource) {
+		return t.group, nil
+	}
 	return t.mapper.GroupForResource(resource)
 }
 
@@ -66,14 +74,18 @@ func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (si
 }
 
 func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+	if t.isThirdPartyResource(resource) {
+		return t.version, t.kind, nil
+	}
 	return t.mapper.VersionAndKindForResource(resource)
 }
 
-func NewMapper(mapper meta.RESTMapper, kind, version string) meta.RESTMapper {
+func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMapper {
 	return &thirdPartyResourceDataMapper{
 		mapper:  mapper,
 		kind:    kind,
 		version: version,
+		group:   group,
 	}
 }
 
