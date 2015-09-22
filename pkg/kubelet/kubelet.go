@@ -2518,7 +2518,9 @@ func readyPodCondition(isPodReady bool, reason, message string, existingStatus *
 	} else {
 		condition.Status = api.ConditionFalse
 	}
-	condition.LastProbeTime = currentTime
+	// Disable setting LastProbeTime to avoid constantly sending pod status
+	// update to the apiserver. See http://issues.k8s.io/14273
+	// condition.LastProbeTime = currentTime
 	condition.Reason = reason
 	condition.Message = message
 	if existingStatus != nil {
