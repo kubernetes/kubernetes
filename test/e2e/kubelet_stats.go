@@ -438,10 +438,11 @@ func (r resourceUsageByCPU) Len() int           { return len(r) }
 func (r resourceUsageByCPU) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 func (r resourceUsageByCPU) Less(i, j int) bool { return r[i].CPUUsageInCores < r[j].CPUUsageInCores }
 
-var percentiles = [...]float64{0.05, 0.50, 0.90, 0.95}
+// The percentiles to report.
+var percentiles = [...]float64{0.05, 0.20, 0.50, 0.70, 0.90, 0.95, 0.99}
 
-// GetBasicCPUStats returns the 5-th, 50-th, and 95-th, percentiles the cpu
-// usage in cores for containerName. This method examines all data currently in the buffer.
+// GetBasicCPUStats returns the percentiles the cpu usage in cores for
+// containerName. This method examines all data currently in the buffer.
 func (r *resourceCollector) GetBasicCPUStats(containerName string) map[float64]float64 {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -451,7 +452,9 @@ func (r *resourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	for _, q := range percentiles {
 		index := int(float64(len(usages))*q) - 1
 		if index < 0 {
-			index = 0
+			// We don't have enough data.
+			result[q] = 0
+			continue
 		}
 		result[q] = usages[index].CPUUsageInCores
 	}
@@ -506,7 +509,7 @@ func (r *resourceMonitor) LogLatest() {
 }
 
 func (r *resourceMonitor) LogCPUSummary() {
-	// Example output for a node:
+	// Example output for a node (the percentiles may differ):
 	// CPU usage of containers on node "e2e-test-yjhong-minion-0vj7":
 	// container        5th%  50th% 90th% 95th%
 	// "/"              0.051 0.159 0.387 0.455
