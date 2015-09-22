@@ -17,7 +17,9 @@ limitations under the License.
 package clientcmd
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/pflag"
 
@@ -60,10 +62,11 @@ type ContextOverrideFlags struct {
 
 // ClusterOverride holds the flag names to be used for binding command line flags for Cluster objects
 type ClusterOverrideFlags struct {
-	APIServer             FlagInfo
-	APIVersion            FlagInfo
-	CertificateAuthority  FlagInfo
-	InsecureSkipTLSVerify FlagInfo
+	APIServer              FlagInfo
+	APIVersion             FlagInfo
+	PreferredGroupVersions FlagInfo
+	CertificateAuthority   FlagInfo
+	InsecureSkipTLSVerify  FlagInfo
 }
 
 // FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
@@ -88,6 +91,18 @@ func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
 	}
 }
 
+// BindStringSliceFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
+func (f FlagInfo) BindStringSliceFlag(flags *pflag.FlagSet, target *[]string) {
+	// you can't register a flag without a long name
+	if len(f.LongName) > 0 {
+		flags.StringSliceVarP(target, f.LongName, f.ShortName, parseStringSlice(f.Default), f.Description)
+	}
+}
+
+func parseStringSlice(str string) []string {
+	return strings.Split(str, ",")
+}
+
 // BindBoolFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
 func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
 	// you can't register a flag without a long name
@@ -103,20 +118,21 @@ func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
 }
 
 const (
-	FlagClusterName  = "cluster"
-	FlagAuthInfoName = "user"
-	FlagContext      = "context"
-	FlagNamespace    = "namespace"
-	FlagAPIServer    = "server"
-	FlagAPIVersion   = "api-version"
-	FlagInsecure     = "insecure-skip-tls-verify"
-	FlagCertFile     = "client-certificate"
-	FlagKeyFile      = "client-key"
-	FlagCAFile       = "certificate-authority"
-	FlagEmbedCerts   = "embed-certs"
-	FlagBearerToken  = "token"
-	FlagUsername     = "username"
-	FlagPassword     = "password"
+	FlagClusterName            = "cluster"
+	FlagAuthInfoName           = "user"
+	FlagContext                = "context"
+	FlagNamespace              = "namespace"
+	FlagAPIServer              = "server"
+	FlagAPIVersion             = "api-version"
+	FlagPreferredGroupVersions = "preferred-versions"
+	FlagInsecure               = "insecure-skip-tls-verify"
+	FlagCertFile               = "client-certificate"
+	FlagKeyFile                = "client-key"
+	FlagCAFile                 = "certificate-authority"
+	FlagEmbedCerts             = "embed-certs"
+	FlagBearerToken            = "token"
+	FlagUsername               = "username"
+	FlagPassword               = "password"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -133,10 +149,11 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 // RecommendedClusterOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 	return ClusterOverrideFlags{
-		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
-		APIVersion:            FlagInfo{prefix + FlagAPIVersion, "", "", "The API version to use when talking to the server"},
-		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority."},
-		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure."},
+		APIServer:              FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server."},
+		APIVersion:             FlagInfo{prefix + FlagAPIVersion, "", "", "The API version to use when talking to the server."},
+		PreferredGroupVersions: FlagInfo{prefix + FlagPreferredGroupVersions, "", "", "Preferred API versions to use when talking to the server."},
+		CertificateAuthority:   FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority."},
+		InsecureSkipTLSVerify:  FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure."},
 	}
 }
 
@@ -171,7 +188,12 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
 	flagNames.APIServer.BindStringFlag(flags, &clusterInfo.Server)
+	// TODO: remove --api-version flag on or after Oct. 5, 2016
 	flagNames.APIVersion.BindStringFlag(flags, &clusterInfo.APIVersion)
+	flagNames.PreferredGroupVersions.BindStringSliceFlag(flags, &clusterInfo.PreferredGroupVersions)
+	if len(flagNames.APIVersion.LongName) > 0 {
+		flags.MarkDeprecated(FlagAPIVersion, fmt.Sprintf("use --%s instead", FlagPreferredGroupVersions))
+	}
 	flagNames.CertificateAuthority.BindStringFlag(flags, &clusterInfo.CertificateAuthority)
 	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
 }

@@ -71,7 +71,6 @@ $ kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
@@ -86,7 +85,8 @@ $ kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
       --match-server-version[=false]: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --password="": Password for basic authentication to the API server.
-  -s, --server="": The address and port of the Kubernetes API server
+      --preferred-versions=[]: Preferred API versions to use when talking to the server.
+  -s, --server="": The address and port of the Kubernetes API server.
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use

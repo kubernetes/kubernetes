@@ -90,7 +90,7 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
       --limits="": The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
-      --output-version="": Output the formatted object with the given version (default api-version).
+      --output-version="": Output the formatted object with the given version (default preferred-versions).
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that this container exposes.
   -r, --replicas=1: Number of replicas to create for this container. Default is 1.
@@ -107,7 +107,6 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
@@ -122,7 +121,8 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
       --match-server-version[=false]: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --password="": Password for basic authentication to the API server.
-  -s, --server="": The address and port of the Kubernetes API server
+      --preferred-versions=[]: Preferred API versions to use when talking to the server.
+  -s, --server="": The address and port of the Kubernetes API server.
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use

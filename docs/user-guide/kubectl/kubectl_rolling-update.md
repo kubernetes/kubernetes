@@ -75,7 +75,7 @@ $ kubectl rolling-update frontend --image=image:v2
       --image="": Image to use for upgrading the replication controller.  Can not be used with --filename/-f
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
-      --output-version="": Output the formatted object with the given version (default api-version).
+      --output-version="": Output the formatted object with the given version (default preferred-versions).
       --poll-interval=3s: Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --rollback[=false]: If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout
       --schema-cache-dir="~/.kube/schema": If non-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
@@ -91,7 +91,6 @@ $ kubectl rolling-update frontend --image=image:v2
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
@@ -106,7 +105,8 @@ $ kubectl rolling-update frontend --image=image:v2
       --match-server-version[=false]: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --password="": Password for basic authentication to the API server.
-  -s, --server="": The address and port of the Kubernetes API server
+      --preferred-versions=[]: Preferred API versions to use when talking to the server.
+  -s, --server="": The address and port of the Kubernetes API server.
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use

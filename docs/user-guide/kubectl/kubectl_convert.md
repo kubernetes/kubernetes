@@ -75,7 +75,7 @@ $ kubectl convert -f . | kubectl create -f -
       --local[=true]: If true, convert will NOT try to contact api-server but run locally.
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
-      --output-version="": Output the formatted object with the given version (default api-version).
+      --output-version="": Output the formatted object with the given version (default preferred-versions).
       --schema-cache-dir="~/.kube/schema": If non-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
@@ -87,7 +87,6 @@ $ kubectl convert -f . | kubectl create -f -
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
@@ -102,7 +101,8 @@ $ kubectl convert -f . | kubectl create -f -
       --match-server-version[=false]: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --password="": Password for basic authentication to the API server.
-  -s, --server="": The address and port of the Kubernetes API server
+      --preferred-versions=[]: Preferred API versions to use when talking to the server.
+  -s, --server="": The address and port of the Kubernetes API server.
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use

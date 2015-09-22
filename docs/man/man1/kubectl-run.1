@@ -66,7 +66,7 @@ Creates a replication controller to manage the created container(s).
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given version (default preferred\-versions).
 
 .PP
 \fB\-\-overrides\fP=""
@@ -117,7 +117,7 @@ Creates a replication controller to manage the created container(s).
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    The API version to use when talking to the server.
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -176,8 +176,12 @@ Creates a replication controller to manage the created container(s).
     Password for basic authentication to the API server.
 
 .PP
+\fB\-\-preferred\-versions\fP=[]
+    Preferred API versions to use when talking to the server.
+
+.PP
 \fB\-s\fP, \fB\-\-server\fP=""
-    The address and port of the Kubernetes API server
+    The address and port of the Kubernetes API server.
 
 .PP
 \fB\-\-stderrthreshold\fP=2

@@ -33,8 +33,8 @@ func createValidTestConfig() *clientcmdapi.Config {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:     server,
-		APIVersion: testapi.Default.Version(),
+		Server:                 server,
+		PreferredGroupVersions: []string{testapi.Default.GroupAndVersion()},
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Token: token,
@@ -89,7 +89,7 @@ func TestCertificateData(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:                   "https://localhost:8443",
-		APIVersion:               testapi.Default.Version(),
+		PreferredGroupVersions:   []string{testapi.Default.GroupAndVersion()},
 		CertificateAuthorityData: caData,
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -121,8 +121,8 @@ func TestBasicAuthData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:     "https://localhost:8443",
-		APIVersion: testapi.Default.Version(),
+		Server:                 "https://localhost:8443",
+		PreferredGroupVersions: []string{testapi.Default.GroupAndVersion()},
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Username: username,
@@ -157,7 +157,7 @@ func TestCreateClean(t *testing.T) {
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
 	matchStringArg("", clientConfig.Prefix, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
+	matchStringArg(config.Clusters["clean"].PreferredGroupVersions[0], clientConfig.Version, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -212,7 +212,7 @@ func TestCreateCleanDefault(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
+	matchStringArg(config.Clusters["clean"].PreferredGroupVersions[0], clientConfig.Version, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
