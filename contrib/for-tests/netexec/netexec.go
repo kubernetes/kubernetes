@@ -191,9 +191,20 @@ func dialUDP(request string, remoteAddress *net.UDPAddr) (string, error) {
 
 func shellHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.FormValue("shellCommand"))
-	output, err := exec.Command(shellPath, "-c", r.FormValue("shellCommand")).CombinedOutput()
-	assertNoError(err)
-	fmt.Fprintf(w, string(output))
+	cmdOut, err := exec.Command(shellPath, "-c", r.FormValue("shellCommand")).CombinedOutput()
+	output := map[string]string{}
+	if len(cmdOut) > 0 {
+		output["output"] = string(cmdOut)
+	}
+	if err != nil {
+		output["error"] = fmt.Sprintf("%v", err)
+	}
+	bytes, err := json.Marshal(output)
+	if err == nil {
+		fmt.Fprintf(w, string(bytes))
+	} else {
+		http.Error(w, fmt.Sprintf("response could not be serialized. %v", err), http.StatusExpectationFailed)
+	}
 }
 
 func hostNameHandler(w http.ResponseWriter, r *http.Request) {

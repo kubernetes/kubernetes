@@ -1430,6 +1430,33 @@ func deepCopy_api_PodLogOptions(in PodLogOptions, out *PodLogOptions, c *convers
 	out.Container = in.Container
 	out.Follow = in.Follow
 	out.Previous = in.Previous
+	if in.SinceSeconds != nil {
+		out.SinceSeconds = new(int64)
+		*out.SinceSeconds = *in.SinceSeconds
+	} else {
+		out.SinceSeconds = nil
+	}
+	if in.SinceTime != nil {
+		out.SinceTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.SinceTime, out.SinceTime, c); err != nil {
+			return err
+		}
+	} else {
+		out.SinceTime = nil
+	}
+	out.Timestamps = in.Timestamps
+	if in.TailLines != nil {
+		out.TailLines = new(int64)
+		*out.TailLines = *in.TailLines
+	} else {
+		out.TailLines = nil
+	}
+	if in.LimitBytes != nil {
+		out.LimitBytes = new(int64)
+		*out.LimitBytes = *in.LimitBytes
+	} else {
+		out.LimitBytes = nil
+	}
 	return nil
 }
 
@@ -1488,6 +1515,7 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
 	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {

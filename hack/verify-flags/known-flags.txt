@@ -1,3 +1,4 @@
+
 accept-hosts
 accept-paths
 account-for-pod-resources
@@ -107,6 +108,7 @@ deployment-controller-sync-period
 hostname-override
 host-network-sources
 host-pid-sources
+host-ipc-sources
 http-check-frequency
 http-port
 ignore-not-found
@@ -141,7 +143,7 @@ kubelet-timeout
 kube-master
 label-columns
 last-release-pr
-legacy-userspace-proxy
+limit-bytes
 load-balancer-ip
 log-flush-frequency
 long-running-request-regexp
@@ -207,6 +209,7 @@ private-mountns
 prom-push-gateway
 proxy-bindall
 proxy-logv
+proxy-mode
 proxy-port-range
 public-address-override
 pvclaimbinder-sync-period
@@ -251,6 +254,8 @@ service-node-port-range
 service-node-ports
 service-sync-period
 session-affinity
+since-seconds
+since-time
 show-all
 shutdown-fd
 shutdown-fifo
@@ -286,3 +291,4 @@ www-prefix
 retry_time
 file_content_in_loop
 cpu-cfs-quota
+

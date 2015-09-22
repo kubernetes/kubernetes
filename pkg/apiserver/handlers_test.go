@@ -243,6 +243,10 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
 		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
+
+		// verb identification
+		{"PATCH", "/namespaces/other/pods/foo", "patch", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"DELETE", "/namespaces/other/pods/foo", "delete", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 	}
 
 	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), testapi.Default.RESTMapper()}

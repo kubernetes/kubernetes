@@ -61,8 +61,8 @@ type documentable interface {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install(ws *restful.WebService) []error {
-	errors := make([]error, 0)
+func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []api.APIResource, errors []error) {
+	errors = make([]error, 0)
 
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
 
@@ -75,11 +75,15 @@ func (a *APIInstaller) Install(ws *restful.WebService) []error {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler); err != nil {
+		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
+		if err != nil {
 			errors = append(errors, err)
 		}
+		if apiResource != nil {
+			apiResources = append(apiResources, *apiResource)
+		}
 	}
-	return errors
+	return apiResources, errors
 }
 
 // NewWebService creates a new restful webservice with the api installer's prefix and version.
@@ -95,7 +99,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) error {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*api.APIResource, error) {
 	admit := a.group.Admit
 	context := a.group.Context
 
@@ -112,40 +116,40 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resource = parts[0]
 	default:
 		// TODO: support deeper paths
-		return fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
+		return nil, fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
 	}
 	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
 	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	versionedPtr, err := a.group.Creater.New(a.group.Version, kind)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
 	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// subresources must have parent resources, and follow the namespacing rules of their parent
 	if hasSubresource {
 		parentStorage, ok := a.group.Storage[resource]
 		if !ok {
-			return fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
+			return nil, fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
 		}
 		parentObject := parentStorage.New()
 		_, parentKind, err := a.group.Typer.ObjectVersionAndKind(parentObject)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		mapping.Scope = parentMapping.Scope
 	}
@@ -178,14 +182,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
 		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
 	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var versionedDeleterObject interface{}
@@ -193,7 +197,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	case isGracefulDeleter:
 		objectPtr, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
 		isDeleter = true
@@ -203,7 +207,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
@@ -217,11 +221,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
 		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		versionedGetOptions, err = a.group.Creater.New(serverVersion, getOptionsKind)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		isGetter = true
 	}
@@ -238,7 +242,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if connectOptions != nil {
 			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			versionedConnectOptions, err = a.group.Creater.New(serverVersion, connectOptionsKind)
 		}
@@ -262,6 +266,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	params := []*restful.Parameter{}
 	actions := []action{}
 
+	var apiResource api.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
 	case meta.RESTScopeNameRoot:
@@ -276,6 +281,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
+		apiResource.Name = path
+		apiResource.Namespaced = false
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -314,6 +321,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
+		apiResource.Name = path
+		apiResource.Namespaced = true
 		namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
@@ -344,7 +353,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		break
 	default:
-		return fmt.Errorf("unsupported restscope: %s", scope.Name())
+		return nil, fmt.Errorf("unsupported restscope: %s", scope.Name())
 	}
 
 	// Create Routes for the actions.
@@ -404,7 +413,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Writes(versionedObject)
 			if isGetterWithOptions {
 				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
-					return err
+					return nil, err
 				}
 			}
 			addParams(route, action.Params)
@@ -423,7 +432,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
-				return err
+				return nil, err
 			}
 			switch {
 			case isLister && isWatcher:
@@ -529,7 +538,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
-				return err
+				return nil, err
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -548,7 +557,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
-				return err
+				return nil, err
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -576,18 +585,18 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					Writes("string")
 				if versionedConnectOptions != nil {
 					if err := addObjectParams(ws, route, versionedConnectOptions); err != nil {
-						return err
+						return nil, err
 					}
 				}
 				addParams(route, action.Params)
 				ws.Route(route)
 			}
 		default:
-			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
+			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
 		// Note: update GetAttribs() when adding a custom handler.
 	}
-	return nil
+	return &apiResource, nil
 }
 
 // rootScopeNaming reads only names from a request and ignores namespaces. It implements ScopeNamer

@@ -14,33 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
-
-import (
-	"net"
-
-	"k8s.io/kubernetes/pkg/api"
-)
-
-type fakeNodeManager struct {
-	podCIDR string
-	node    *api.Node
-	IP      net.IP
-}
-
-var _ nodeManager = &fakeNodeManager{}
-
-func (f *fakeNodeManager) Start() {
-}
-
-func (f *fakeNodeManager) GetNode() (*api.Node, error) {
-	return f.node, nil
-}
-
-func (f *fakeNodeManager) GetHostIP() (net.IP, error) {
-	return f.IP, nil
-}
-
-func (f *fakeNodeManager) GetPodCIDR() string {
-	return f.podCIDR
-}
+// Package limitwriter provides a writer that only allows a certain number of bytes to be
+// written.
+package limitwriter

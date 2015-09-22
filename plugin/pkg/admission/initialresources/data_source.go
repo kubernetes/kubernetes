@@ -180,13 +180,3 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 	}
 	return int64(usage), int64(count), nil
 }
-
-type gcmSource struct{}
-
-func newGcmSource() (dataSource, error) {
-	return &gcmSource{}, fmt.Errorf("gcm source not implemented")
-}
-
-func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image string, exactMatch bool, start, end time.Time) (int64, int64, error) {
-	return 0, 0, fmt.Errorf("gcm source not implemented")
-}

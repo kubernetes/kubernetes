@@ -594,6 +594,7 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	}
 
 	// TODO handle pod.Spec.HostPID
+	// TODO handle pod.Spec.HostIPC
 
 	units := []*unit.UnitOption{
 		newUnitOption(unitKubernetesSection, unitRktID, uuid),
@@ -1054,23 +1055,20 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 // See https://github.com/coreos/rkt/blob/master/Documentation/commands.md#logging for more details.
 //
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *runtime) GetContainerLogs(pod *api.Pod, containerID string, tail string, follow bool, stdout, stderr io.Writer) error {
+func (r *runtime) GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
 	id, err := parseContainerID(containerID)
 	if err != nil {
 		return err
 	}
 
 	cmd := exec.Command("journalctl", "-M", fmt.Sprintf("rkt-%s", id.uuid), "-u", id.appName)
-	if follow {
+	if logOptions.Follow {
 		cmd.Args = append(cmd.Args, "-f")
 	}
-	if tail == "all" {
+	if logOptions.TailLines == nil {
 		cmd.Args = append(cmd.Args, "-a")
 	} else {
-		_, err := strconv.Atoi(tail)
-		if err == nil {
-			cmd.Args = append(cmd.Args, "-n", tail)
-		}
+		cmd.Args = append(cmd.Args, "-n", strconv.FormatInt(*logOptions.TailLines, 10))
 	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	return cmd.Run()

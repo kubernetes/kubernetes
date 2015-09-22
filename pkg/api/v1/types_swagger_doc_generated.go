@@ -949,10 +949,15 @@ func (PodList) SwaggerDoc() map[string]string {
 }
 
 var map_PodLogOptions = map[string]string{
-	"":          "PodLogOptions is the query options for a Pod's logs REST call.",
-	"container": "The container for which to stream logs. Defaults to only container if there is one container in the pod.",
-	"follow":    "Follow the log stream of the pod. Defaults to false.",
-	"previous":  "Return previous terminated container logs. Defaults to false.",
+	"":             "PodLogOptions is the query options for a Pod's logs REST call.",
+	"container":    "The container for which to stream logs. Defaults to only container if there is one container in the pod.",
+	"follow":       "Follow the log stream of the pod. Defaults to false.",
+	"previous":     "Return previous terminated container logs. Defaults to false.",
+	"sinceSeconds": "A relative time in seconds before the current time from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value preceeds the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+	"timestamps":   "If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
+	"tailLines":    "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
+	"limitBytes":   "If set, the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
 }
 
 func (PodLogOptions) SwaggerDoc() map[string]string {
@@ -982,6 +987,7 @@ var map_PodSpec = map[string]string{
 	"nodeName":                      "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
 	"hostNetwork":                   "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
 	"hostPID":                       "Use the host's pid namespace. Optional: Default to false.",
+	"hostIPC":                       "Use the host's ipc namespace. Optional: Default to false.",
 	"imagePullSecrets":              "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod",
 }
 

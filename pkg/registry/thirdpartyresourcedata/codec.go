@@ -33,9 +33,17 @@ type thirdPartyResourceDataMapper struct {
 	mapper  meta.RESTMapper
 	kind    string
 	version string
+	group   string
+}
+
+func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
+	return resource == strings.ToLower(t.kind)+"s"
 }
 
 func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string, error) {
+	if t.isThirdPartyResource(resource) {
+		return t.group, nil
+	}
 	return t.mapper.GroupForResource(resource)
 }
 
@@ -66,14 +74,18 @@ func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (si
 }
 
 func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+	if t.isThirdPartyResource(resource) {
+		return t.version, t.kind, nil
+	}
 	return t.mapper.VersionAndKindForResource(resource)
 }
 
-func NewMapper(mapper meta.RESTMapper, kind, version string) meta.RESTMapper {
+func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMapper {
 	return &thirdPartyResourceDataMapper{
 		mapper:  mapper,
 		kind:    kind,
 		version: version,
+		group:   group,
 	}
 }
 
@@ -254,15 +266,18 @@ type thirdPartyResourceDataCreator struct {
 }
 
 func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.Object, err error) {
-	if t.version != version {
-		return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
-	}
 	switch kind {
 	case "ThirdPartyResourceData":
+		if t.version != version {
+			return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+		}
 		return &experimental.ThirdPartyResourceData{}, nil
 	case "ThirdPartyResourceDataList":
+		if t.version != version {
+			return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+		}
 		return &experimental.ThirdPartyResourceDataList{}, nil
 	default:
-		return t.delegate.New(latest.GroupOrDie("experimental").Version, kind)
+		return t.delegate.New(version, kind)
 	}
 }

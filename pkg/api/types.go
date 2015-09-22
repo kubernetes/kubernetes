@@ -982,6 +982,9 @@ type PodSpec struct {
 	// Use the host's pid namespace.
 	// Optional: Default to false.
 	HostPID bool `json:"hostPID,omitempty"`
+	// Use the host's ipc namespace.
+	// Optional: Default to false.
+	HostIPC bool `json:"hostIPC,omitempty"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
@@ -1595,12 +1598,30 @@ type PodLogOptions struct {
 
 	// Container for which to return logs
 	Container string
-
 	// If true, follow the logs for the pod
 	Follow bool
-
 	// If true, return previous terminated container logs
 	Previous bool
+	// A relative time in seconds before the current time from which to show logs. If this value
+	// precedes the time a pod was started, only logs since the pod start will be returned.
+	// If this value is in the future, no logs will be returned.
+	// Only one of sinceSeconds or sinceTime may be specified.
+	SinceSeconds *int64
+	// An RFC3339 timestamp from which to show logs. If this value
+	// preceeds the time a pod was started, only logs since the pod start will be returned.
+	// If this value is in the future, no logs will be returned.
+	// Only one of sinceSeconds or sinceTime may be specified.
+	SinceTime *unversioned.Time
+	// If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
+	// of log output.
+	Timestamps bool
+	// If set, the number of lines from the end of the logs to show. If not specified,
+	// logs are shown from the creation of the container or sinceSeconds or sinceTime
+	TailLines *int64
+	// If set, the number of bytes to read from the server before terminating the
+	// log output. This may not display a complete final line of logging, and may return
+	// slightly more or slightly less than the specified limit.
+	LimitBytes *int64
 }
 
 // PodAttachOptions is the query options to a Pod's remote attach call

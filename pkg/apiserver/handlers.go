@@ -495,6 +495,8 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 			requestInfo.Verb = "get"
 		case "PUT":
 			requestInfo.Verb = "update"
+		case "PATCH":
+			requestInfo.Verb = "patch"
 		case "DELETE":
 			requestInfo.Verb = "delete"
 		}

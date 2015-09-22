@@ -1255,6 +1255,7 @@ func TestValidatePodSpec(t *testing.T) {
 				},
 			},
 			HostNetwork:   true,
+			HostIPC:       true,
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -1305,6 +1306,7 @@ func TestValidatePodSpec(t *testing.T) {
 				},
 			},
 			HostNetwork:   true,
+			HostIPC:       true,
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -3862,5 +3864,36 @@ func TestValidateSecurityContext(t *testing.T) {
 func fakeValidSecurityContext(priv bool) *api.SecurityContext {
 	return &api.SecurityContext{
 		Privileged: &priv,
+	}
+}
+
+func TestValidPodLogOptions(t *testing.T) {
+	now := unversioned.Now()
+	negative := int64(-1)
+	zero := int64(0)
+	positive := int64(1)
+	tests := []struct {
+		opt  api.PodLogOptions
+		errs int
+	}{
+		{api.PodLogOptions{}, 0},
+		{api.PodLogOptions{Previous: true}, 0},
+		{api.PodLogOptions{Follow: true}, 0},
+		{api.PodLogOptions{TailLines: &zero}, 0},
+		{api.PodLogOptions{TailLines: &negative}, 1},
+		{api.PodLogOptions{TailLines: &positive}, 0},
+		{api.PodLogOptions{LimitBytes: &zero}, 1},
+		{api.PodLogOptions{LimitBytes: &negative}, 1},
+		{api.PodLogOptions{LimitBytes: &positive}, 0},
+		{api.PodLogOptions{SinceSeconds: &negative}, 1},
+		{api.PodLogOptions{SinceSeconds: &positive}, 0},
+		{api.PodLogOptions{SinceSeconds: &zero}, 1},
+		{api.PodLogOptions{SinceTime: &now}, 0},
+	}
+	for i, test := range tests {
+		errs := ValidatePodLogOptions(&test.opt)
+		if test.errs != len(errs) {
+			t.Errorf("%d: Unexpected errors: %v", i, errs)
+		}
 	}
 }
