@@ -49,6 +49,7 @@ const (
 	testPodName             = "test-container-pod"
 	nodePortServiceName     = "node-port-service"
 	loadBalancerServiceName = "load-balancer-service"
+	enableLoadBalancerTest  = false
 )
 
 type KubeProxyTestConfig struct {
@@ -70,32 +71,8 @@ var _ = Describe("KubeProxy", func() {
 		By("cleaning up any pre-existing namespaces used by this test")
 		config.cleanup()
 
-		By("creating a selector")
-		selectorName := "selector-" + string(util.NewUUID())
-		serviceSelector := map[string]string{
-			selectorName: "true",
-		}
-
-		By("Getting ssh-able hosts")
-		hosts, err := NodeSSHHosts(f.Client)
-		Expect(err).NotTo(HaveOccurred())
-		if len(hosts) == 0 {
-			Failf("No ssh-able nodes")
-		}
-		config.nodes = hosts
-
-		By("Creating the service pods in kubernetes")
-		podName := "netserver"
-		config.endpointPods = config.createNetProxyPods(podName, serviceSelector, testContext.CloudConfig.NumNodes)
-
-		By("Creating the service on top of the pods in kubernetes")
-		config.createNodePortService(serviceSelector)
-
-		By("Creating the LoadBalancer Service on top of the pods in kubernetes")
-		config.createLoadBalancerService(serviceSelector)
-
-		By("Creating test pods")
-		config.createTestPod()
+		By("Setting up for the tests")
+		config.setup()
 
 		//TODO Need to add hit externalIPs test
 		By("TODO: Need to add hit externalIPs test")
@@ -111,9 +88,11 @@ var _ = Describe("KubeProxy", func() {
 		config.deleteNodePortService()
 		config.hitNodePort(0) // expect 0 endpoints to be hit
 
-		By("Deleting loadBalancerService and ensuring that service cannot be hit")
-		config.deleteLoadBalancerService()
-		config.hitLoadBalancer(0)
+		if enableLoadBalancerTest {
+			By("Deleting loadBalancerService and ensuring that service cannot be hit")
+			config.deleteLoadBalancerService()
+			config.hitLoadBalancer(0) // expect 0 endpoints to be hit
+		}
 	})
 })
 
@@ -127,17 +106,20 @@ func (config *KubeProxyTestConfig) hitAll() {
 	By("Hitting nodePort from host and container")
 	config.hitNodePort(len(config.endpointPods))
 
-	By("Waiting for LoadBalancer Ingress Setup")
-	config.waitForLoadBalancerIngressSetup()
+	if enableLoadBalancerTest {
+		By("Waiting for LoadBalancer Ingress Setup")
+		config.waitForLoadBalancerIngressSetup()
 
-	By("Hitting LoadBalancer")
-	config.hitLoadBalancer(len(config.endpointPods))
+		By("Hitting LoadBalancer")
+		config.hitLoadBalancer(len(config.endpointPods))
+	}
 }
 
 func (config *KubeProxyTestConfig) hitLoadBalancer(epCount int) {
 	lbIP := config.loadBalancerService.Status.LoadBalancer.Ingress[0].IP
 	hostNames := make(map[string]bool)
-	for i := 0; i < 50; i++ {
+	tries := epCount*epCount + 5
+	for i := 0; i < tries; i++ {
 		transport := &http.Transport{}
 		httpClient := createHTTPClient(transport)
 		resp, err := httpClient.Get(fmt.Sprintf("http://%s:%d/hostName", lbIP, loadBalancerHttpPort))
@@ -163,7 +145,7 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 
 func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 	clusterIP := config.nodePortService.Spec.ClusterIP
-	tries := epCount*5 + 10
+	tries := epCount*epCount + 5 // if epCount == 0
 	By("dialing(udp) node1 --> clusterIP:clusterUdpPort")
 	config.dialFromNode("udp", clusterIP, clusterUdpPort, tries, epCount)
 	By("dialing(http) node1 --> clusterIP:clusterHttpPort")
@@ -182,7 +164,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	node1_IP := strings.TrimSuffix(config.nodes[0], ":22")
-	tries := epCount*5 + 10 // + 10 incase epCount is 0
+	tries := epCount*epCount + 5 // + 10 if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1  --> node1:nodeHttpPort")
@@ -255,9 +237,9 @@ func (config *KubeProxyTestConfig) dialFromContainer(protocol, containerIP, targ
 func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targetPort, tries, expectedCount int) {
 	var cmd string
 	if protocol == "udp" {
-		cmd = fmt.Sprintf("echo 'hostName' | nc -w 2 -u %s %d", targetIP, targetPort)
+		cmd = fmt.Sprintf("echo 'hostName' | nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
-		cmd = fmt.Sprintf("curl -s --connect-timeout 2 http://%s:%d/hostName", targetIP, targetPort)
+		cmd = fmt.Sprintf("curl -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
 	}
 	forLoop := fmt.Sprintf("for i in $(seq 1 %d); do %s; echo; done | grep -v '^\\s*$' |sort | uniq -c | wc -l", tries, cmd)
 	By(fmt.Sprintf("Dialing from node. command:%s", forLoop))
@@ -369,7 +351,7 @@ func (config *KubeProxyTestConfig) createNodePortService(selector map[string]str
 func (config *KubeProxyTestConfig) deleteNodePortService() {
 	err := config.getServiceClient().Delete(config.nodePortService.Name)
 	Expect(err).NotTo(HaveOccurred(), "error while deleting NodePortService. err:%v)", err)
-	time.Sleep(5 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
+	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
 
 func (config *KubeProxyTestConfig) createLoadBalancerService(selector map[string]string) {
@@ -389,13 +371,12 @@ func (config *KubeProxyTestConfig) createLoadBalancerService(selector map[string
 }
 
 func (config *KubeProxyTestConfig) deleteLoadBalancerService() {
-	err := config.getServiceClient().Delete(config.loadBalancerService.Name)
-	Expect(err).NotTo(HaveOccurred(), "error while deleting LoadBalancerService. err:%v)", err)
-	time.Sleep(10 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
+	go func() { config.getServiceClient().Delete(config.loadBalancerService.Name) }()
+	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
 
 func (config *KubeProxyTestConfig) waitForLoadBalancerIngressSetup() {
-	err := wait.Poll(5*time.Second, 45*time.Second, func() (bool, error) {
+	err := wait.Poll(2*time.Second, 120*time.Second, func() (bool, error) {
 		service, err := config.getServiceClient().Get(loadBalancerServiceName)
 		if err != nil {
 			return false, err
@@ -429,8 +410,39 @@ func (config *KubeProxyTestConfig) createService(serviceSpec *api.Service) *api.
 	return createdService
 }
 
+func (config *KubeProxyTestConfig) setup() {
+	By("creating a selector")
+	selectorName := "selector-" + string(util.NewUUID())
+	serviceSelector := map[string]string{
+		selectorName: "true",
+	}
+
+	By("Getting ssh-able hosts")
+	hosts, err := NodeSSHHosts(config.f.Client)
+	Expect(err).NotTo(HaveOccurred())
+	if len(hosts) == 0 {
+		Failf("No ssh-able nodes")
+	}
+	config.nodes = hosts
+
+	if enableLoadBalancerTest {
+		By("Creating the LoadBalancer Service on top of the pods in kubernetes")
+		config.createLoadBalancerService(serviceSelector)
+	}
+
+	By("Creating the service pods in kubernetes")
+	podName := "netserver"
+	config.endpointPods = config.createNetProxyPods(podName, serviceSelector, testContext.CloudConfig.NumNodes)
+
+	By("Creating the service on top of the pods in kubernetes")
+	config.createNodePortService(serviceSelector)
+
+	By("Creating test pods")
+	config.createTestPod()
+}
+
 func (config *KubeProxyTestConfig) cleanup() {
-	nsClient := config.getNamespaceClient()
+	nsClient := config.getNamespacesClient()
 	nsList, err := nsClient.List(nil, nil)
 	if err == nil {
 		for _, ns := range nsList.Items {
@@ -483,7 +495,7 @@ func (config *KubeProxyTestConfig) getServiceClient() client.ServiceInterface {
 	return config.f.Client.Services(config.f.Namespace.Name)
 }
 
-func (config *KubeProxyTestConfig) getNamespaceClient() client.NamespaceInterface {
+func (config *KubeProxyTestConfig) getNamespacesClient() client.NamespaceInterface {
 	return config.f.Client.Namespaces()
 }
 
