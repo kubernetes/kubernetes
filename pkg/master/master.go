@@ -960,7 +960,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
 	daemonSetStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
 	deploymentStorage := deploymentetcd.NewStorage(c.ExpDatabaseStorage)
-	jobStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
+	jobStorage, jobStatusStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
 
 	thirdPartyControl := ThirdPartyController{
 		master: m,
@@ -982,6 +982,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("deployments"):                  deploymentStorage.Deployment,
 		strings.ToLower("deployments/scale"):            deploymentStorage.Scale,
 		strings.ToLower("jobs"):                         jobStorage,
+		strings.ToLower("jobs/status"):                  jobStatusStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
