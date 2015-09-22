@@ -50,7 +50,7 @@ type ScaleREST struct {
 	registry *controller.Registry
 }
 
-// LogREST implements GetterWithOptions
+// ScaleREST implements Patcher
 var _ = rest.Patcher(&ScaleREST{})
 
 // New creates a new Scale object
