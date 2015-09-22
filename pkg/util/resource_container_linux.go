@@ -20,6 +20,7 @@ package util
 
 import (
 	"os"
+	"syscall"
 
 	"github.com/docker/libcontainer/cgroups/fs"
 	"github.com/docker/libcontainer/configs"
@@ -38,4 +39,8 @@ func RunInResourceContainer(containerName string) error {
 	}
 
 	return manager.Apply(os.Getpid())
+}
+
+func ApplyRLimitForSelf(maxOpenFiles uint64) {
+	syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{Max: maxOpenFiles, Cur: maxOpenFiles})
 }
