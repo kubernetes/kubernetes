@@ -46,7 +46,7 @@ for a number of reasons:
   - User accounts are for humans.  Service accounts are for processes, which
     run in pods.
   - User accounts are intended to be global. Names must be unique across all
-    namespaces of a cluster, future user resource will not be namespaced).
+    namespaces of a cluster, future user resource will not be namespaced.
     Service accounts are namespaced.
   - Typically, a cluster's User accounts might be synced from a corporate
     database, where new user account creation requires special privileges and
