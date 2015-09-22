@@ -433,6 +433,77 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 	}
 }
 
+func TestSetDefaultRequestsPod(t *testing.T) {
+	// verify we default if limits are specified
+	s := versioned.PodSpec{}
+	s.Containers = []versioned.Container{
+		{
+			Resources: versioned.ResourceRequirements{
+				Limits: versioned.ResourceList{
+					versioned.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultRequest := pod2.Spec.Containers[0].Resources.Requests
+	requestValue := defaultRequest[versioned.ResourceCPU]
+	if requestValue.String() != "100m" {
+		t.Errorf("Expected request cpu: %s, got: %s", "100m", requestValue.String())
+	}
+
+	// verify we do nothing if no limits are specified
+	s = versioned.PodSpec{}
+	s.Containers = []versioned.Container{{}}
+	pod = &versioned.Pod{
+		Spec: s,
+	}
+	output = roundTrip(t, runtime.Object(pod))
+	pod2 = output.(*versioned.Pod)
+	defaultRequest = pod2.Spec.Containers[0].Resources.Requests
+	requestValue = defaultRequest[versioned.ResourceCPU]
+	if requestValue.String() != "0" {
+		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
+	}
+}
+
+func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Containers = []versioned.Container{
+		{
+			Resources: versioned.ResourceRequirements{
+				Limits: versioned.ResourceList{
+					versioned.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+		},
+	}
+	rc := &versioned.ReplicationController{
+		Spec: versioned.ReplicationControllerSpec{
+			Replicas: newInt(3),
+			Template: &versioned.PodTemplateSpec{
+				ObjectMeta: versioned.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: s,
+			},
+		},
+	}
+	output := roundTrip(t, runtime.Object(rc))
+	rc2 := output.(*versioned.ReplicationController)
+	defaultRequest := rc2.Spec.Template.Spec.Containers[0].Resources.Requests
+	requestValue := defaultRequest[versioned.ResourceCPU]
+	if requestValue.String() != "0" {
+		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
+	}
+}
+
 func TestSetDefaultLimitRangeItem(t *testing.T) {
 	limitRange := &versioned.LimitRange{
 		ObjectMeta: versioned.ObjectMeta{
