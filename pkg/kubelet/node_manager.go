@@ -60,6 +60,7 @@ type nodeManager interface {
 	GetNode() (*api.Node, error)
 	GetPodCIDR() string
 	GetHostIP() (net.IP, error)
+	NodeIsSchedulable() bool
 }
 
 type realNodeManager struct {
@@ -157,6 +158,15 @@ func (nm *realNodeManager) GetNode() (*api.Node, error) {
 		return nil, errors.New("unable to get node entry because apiserver client is nil")
 	}
 	return nm.nodeLister.GetNodeInfo(nm.nodeName)
+}
+
+func (nm *realNodeManager) NodeIsSchedulable() bool {
+	node, err := nm.GetNode()
+	if err != nil {
+		// If we cannot get the Node spec, assume the node is not schedulable.
+		return false
+	}
+	return !node.Spec.Unschedulable
 }
 
 // Returns host IP or nil in case of error.
