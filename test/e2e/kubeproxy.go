@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -471,7 +472,18 @@ func (config *KubeProxyTestConfig) deleteNetProxyPod() {
 	pod := config.endpointPods[0]
 	config.getPodClient().Delete(pod.Name, nil)
 	config.endpointPods = config.endpointPods[1:]
-	time.Sleep(5 * time.Second) // wait for kube-proxy to catch up with the pod being deleted.
+	// wait for pod being deleted.
+	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, util.ForeverTestTimeout)
+	if err != nil {
+		Failf("Failed to delete %s pod: %v", pod.Name, err)
+	}
+	// wait for endpoint being removed.
+	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, util.ForeverTestTimeout)
+	if err != nil {
+		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
+	}
+	// wait for kube-proxy to catch up with the pod being deleted.
+	time.Sleep(5 * time.Second)
 }
 
 func (config *KubeProxyTestConfig) createPod(pod *api.Pod) *api.Pod {
