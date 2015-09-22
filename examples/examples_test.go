@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	expvalidation "k8s.io/kubernetes/pkg/apis/experimental/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -99,6 +101,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
+	case *experimental.Job:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expvalidation.ValidateJob(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -204,6 +211,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"multi-pod":   nil,
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
+			"job":         &experimental.Job{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
