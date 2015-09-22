@@ -21,6 +21,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -252,6 +254,21 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 	}
 	if opts.Previous {
 		params.Add("previous", "true")
+	}
+	if opts.Timestamps {
+		params.Add("timestamps", "true")
+	}
+	if opts.SinceSeconds != nil {
+		params.Add("sinceSeconds", strconv.FormatInt(*opts.SinceSeconds, 10))
+	}
+	if opts.SinceTime != nil {
+		params.Add("sinceTime", opts.SinceTime.Format(time.RFC3339))
+	}
+	if opts.TailLines != nil {
+		params.Add("tailLines", strconv.FormatInt(*opts.TailLines, 10))
+	}
+	if opts.LimitBytes != nil {
+		params.Add("limitBytes", strconv.FormatInt(*opts.LimitBytes, 10))
 	}
 	loc := &url.URL{
 		Scheme:   nodeScheme,
