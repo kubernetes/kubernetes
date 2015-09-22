@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	clientauth "k8s.io/kubernetes/pkg/client/v1/auth"
 )
 
 func TestLoadFromFile(t *testing.T) {

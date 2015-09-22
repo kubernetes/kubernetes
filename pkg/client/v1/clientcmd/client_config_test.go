@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	client "k8s.io/kubernetes/pkg/client/v1"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/v1/clientcmd/api"
 )
 
 func createValidTestConfig() *clientcmdapi.Config {

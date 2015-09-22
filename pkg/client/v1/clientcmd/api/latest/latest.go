@@ -17,7 +17,7 @@ limitations under the License.
 package latest
 
 import (
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
+	"k8s.io/kubernetes/pkg/client/v1/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 

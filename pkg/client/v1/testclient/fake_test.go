@@ -19,7 +19,7 @@ package testclient
 import (
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	client "k8s.io/kubernetes/pkg/client/v1"
 )
 
 // This test file just ensures that Fake and structs it is embedded in

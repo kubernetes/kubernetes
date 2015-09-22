@@ -17,8 +17,8 @@ limitations under the License.
 package testclient
 
 import (
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	kClientLib "k8s.io/kubernetes/pkg/client/unversioned"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
+	kClientLib "k8s.io/kubernetes/pkg/client/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"

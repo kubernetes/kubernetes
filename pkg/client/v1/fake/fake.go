@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -36,36 +36,36 @@ func (f HTTPClientFunc) Do(req *http.Request) (*http.Response, error) {
 
 // RESTClient provides a fake RESTClient interface.
 type RESTClient struct {
-	Client unversioned.HTTPClient
+	Client v1.HTTPClient
 	Codec  runtime.Codec
 	Req    *http.Request
 	Resp   *http.Response
 	Err    error
 }
 
-func (c *RESTClient) Get() *unversioned.Request {
-	return unversioned.NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Get() *v1.Request {
+	return v1.NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
-func (c *RESTClient) Put() *unversioned.Request {
-	return unversioned.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Put() *v1.Request {
+	return v1.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
-func (c *RESTClient) Patch(_ api.PatchType) *unversioned.Request {
-	return unversioned.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Patch(_ api.PatchType) *v1.Request {
+	return v1.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
-func (c *RESTClient) Post() *unversioned.Request {
-	return unversioned.NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Post() *v1.Request {
+	return v1.NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
-func (c *RESTClient) Delete() *unversioned.Request {
-	return unversioned.NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Delete() *v1.Request {
+	return v1.NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
 	c.Req = req
-	if c.Client != unversioned.HTTPClient(nil) {
+	if c.Client != v1.HTTPClient(nil) {
 		return c.Client.Do(req)
 	}
 	return c.Resp, c.Err

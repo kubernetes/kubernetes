@@ -25,9 +25,9 @@ import (
 	"github.com/imdario/mergo"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	client "k8s.io/kubernetes/pkg/client/v1"
+	clientauth "k8s.io/kubernetes/pkg/client/v1/auth"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/v1/clientcmd/api"
 )
 
 var (

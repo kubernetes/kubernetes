@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	experimental "k8s.io/kubernetes/pkg/apis/experimental/v1"
 )
 
 // FakeScales implements ScaleInterface. Meant to be embedded into a struct to get a default

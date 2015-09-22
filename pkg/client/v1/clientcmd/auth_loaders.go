@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	clientauth "k8s.io/kubernetes/pkg/client/v1/auth"
 )
 
 // AuthLoaders are used to build clientauth.Info objects.

@@ -26,8 +26,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/v1"
+	"k8s.io/kubernetes/pkg/client/v1/fake"
 )
 
 func objBody(object interface{}) io.ReadCloser {
@@ -43,13 +43,13 @@ func TestNegotiateVersion(t *testing.T) {
 		name, version, expectedVersion string
 		serverVersions                 []string
 		clientVersions                 []string
-		config                         *unversioned.Config
+		config                         *v1.Config
 		expectErr                      bool
 	}{
 		{
 			name:            "server supports client default",
 			version:         "version1",
-			config:          &unversioned.Config{},
+			config:          &v1.Config{},
 			serverVersions:  []string{"version1", testapi.Default.Version()},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "version1",
@@ -58,7 +58,7 @@ func TestNegotiateVersion(t *testing.T) {
 		{
 			name:            "server falls back to client supported",
 			version:         testapi.Default.Version(),
-			config:          &unversioned.Config{},
+			config:          &v1.Config{},
 			serverVersions:  []string{"version1"},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "version1",
@@ -67,7 +67,7 @@ func TestNegotiateVersion(t *testing.T) {
 		{
 			name:            "explicit version supported",
 			version:         "",
-			config:          &unversioned.Config{Version: testapi.Default.Version()},
+			config:          &v1.Config{Version: testapi.Default.Version()},
 			serverVersions:  []string{"version1", testapi.Default.Version()},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: testapi.Default.Version(),
@@ -76,7 +76,7 @@ func TestNegotiateVersion(t *testing.T) {
 		{
 			name:            "explicit version not supported",
 			version:         "",
-			config:          &unversioned.Config{Version: testapi.Default.Version()},
+			config:          &v1.Config{Version: testapi.Default.Version()},
 			serverVersions:  []string{"version1"},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "",
@@ -96,9 +96,9 @@ func TestNegotiateVersion(t *testing.T) {
 				return &http.Response{StatusCode: 200, Body: objBody(&api.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
-		c := unversioned.NewOrDie(test.config)
+		c := v1.NewOrDie(test.config)
 		c.Client = fakeClient.Client
-		response, err := unversioned.NegotiateVersion(c, test.config, test.version, test.clientVersions)
+		response, err := v1.NegotiateVersion(c, test.config, test.version, test.clientVersions)
 		if err == nil && test.expectErr {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

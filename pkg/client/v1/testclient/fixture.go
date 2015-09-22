@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	client "k8s.io/kubernetes/pkg/client/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
@@ -145,7 +145,7 @@ func NewObjects(scheme runtime.ObjectScheme, decoder runtime.ObjectDecoder) Obje
 }
 
 func (o objects) Kind(kind, name string) (runtime.Object, error) {
-	empty, _ := o.scheme.New("", kind)
+	empty, _ := o.scheme.New("v1", kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
 	arr, ok := o.types[kind]
@@ -156,14 +156,14 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 			if !ok {
 				return empty, nil
 			}
-			out, err := o.scheme.New("", kind)
+			out, err := o.scheme.New("v1", kind)
 			if err != nil {
 				return nilValue, err
 			}
 			if err := runtime.SetList(out, arr); err != nil {
 				return nilValue, err
 			}
-			if out, err = o.scheme.Copy(out); err != nil {
+			if out, err = o.scheme.ConvertToVersion(out, "v1"); err != nil {
 				return nilValue, err
 			}
 			return out, nil
@@ -178,7 +178,7 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 	if index < 0 {
 		return nilValue, errors.NewNotFound(kind, name)
 	}
-	out, err := o.scheme.Copy(arr[index])
+	out, err := o.scheme.ConvertToVersion(arr[index], "v1")
 	if err != nil {
 		return nilValue, err
 	}
@@ -223,6 +223,10 @@ func (o objects) Add(obj runtime.Object) error {
 	default:
 		if status, ok := obj.(*unversioned.Status); ok && status.Details != nil {
 			kind = status.Details.Kind
+		}
+		obj, err = o.scheme.ConvertToVersion(obj, "v1")
+		if err != nil {
+			return err
 		}
 		o.types[kind] = append(o.types[kind], obj)
 	}

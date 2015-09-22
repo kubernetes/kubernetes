@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/v1/clientcmd/api"
 	"k8s.io/kubernetes/pkg/util/errors"
 )
 
