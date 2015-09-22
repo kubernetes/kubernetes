@@ -20,3 +20,5 @@ spec:
       hostPort: 8001
   volumes:
   - name: app-volume
+    emptyDir: {}
+
