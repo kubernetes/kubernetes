@@ -78,6 +78,10 @@ type Mux interface {
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
+	// Root is the APIPrefix under which this is being served.  It can also be the APIPrefix/APIGroup that is being served
+	// Since the APIGroup may not contain a '/', you can get the APIGroup by parsing from the last '/'
+	// TODO Currently, an APIPrefix with a '/' is not supported in conjunction with an empty APIGroup.  This struct should
+	// be refactored to keep separate information separate to avoid this sort of problem in the future.
 	Root    string
 	Version string
 
@@ -111,6 +115,38 @@ const (
 	// Maximum duration before timing out read/write requests
 	MaxTimeoutSecs = 600
 )
+
+func (g *APIGroupVersion) GetAPIPrefix() string {
+	slashlessRoot := strings.Trim(g.Root, "/")
+	if lastSlashIndex := strings.LastIndex(slashlessRoot, "/"); lastSlashIndex != -1 {
+		return slashlessRoot[:lastSlashIndex]
+	}
+
+	return slashlessRoot
+}
+
+func (g *APIGroupVersion) GetAPIGroup() string {
+	slashlessRoot := strings.Trim(g.Root, "/")
+	if lastSlashIndex := strings.LastIndex(slashlessRoot, "/"); lastSlashIndex != -1 {
+		return slashlessRoot[lastSlashIndex:]
+	}
+
+	return ""
+}
+
+func (g *APIGroupVersion) GetAPIVersion() string {
+	return g.Version
+}
+
+func (g *APIGroupVersion) GetAPIRequestInfoResolver() *APIRequestInfoResolver {
+	apiPrefix := g.GetAPIPrefix()
+	info := &APIRequestInfoResolver{sets.NewString(apiPrefix), sets.String{}, g.Mapper}
+	if len(g.GetAPIGroup()) == 0 {
+		info.GrouplessAPIPrefixes.Insert(apiPrefix)
+	}
+
+	return info
+}
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
@@ -151,12 +187,10 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
-	info := &APIRequestInfoResolver{sets.NewString(strings.TrimPrefix(g.Root, "/")), g.Mapper}
-
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
 		group:             g,
-		info:              info,
+		info:              g.GetAPIRequestInfoResolver(),
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 		proxyDialerFn:     g.ProxyDialerFn,

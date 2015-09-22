@@ -348,8 +348,8 @@ type requestAttributeGetter struct {
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{sets.NewString(apiRoots...), restMapper}}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots []string, grouplessAPIRoots []string) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{sets.NewString(apiRoots...), sets.NewString(grouplessAPIRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
@@ -395,6 +395,8 @@ func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGet
 type APIRequestInfo struct {
 	// Verb is the kube verb associated with the request, not the http verb.  This includes things like list and watch.
 	Verb       string
+	APIPrefix  string
+	APIGroup   string
 	APIVersion string
 	Namespace  string
 	// Resource is the name of the resource being requested.  This is not the kind.  For example: pods
@@ -415,66 +417,68 @@ type APIRequestInfo struct {
 }
 
 type APIRequestInfoResolver struct {
-	APIPrefixes sets.String
-	RestMapper  meta.RESTMapper
+	APIPrefixes          sets.String
+	GrouplessAPIPrefixes sets.String
+	RestMapper           meta.RESTMapper
 }
 
 // TODO write an integration test against the swagger doc to test the APIRequestInfo and match up behavior to responses
 // GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
 // Valid Inputs:
 // Storage paths
-// /namespaces
-// /namespaces/{namespace}
-// /namespaces/{namespace}/{resource}
-// /namespaces/{namespace}/{resource}/{resourceName}
-// /{resource}
-// /{resource}/{resourceName}
+// /apis/{api-group}/{version}/namespaces
+// /api/{version}/namespaces
+// /api/{version}/namespaces/{namespace}
+// /api/{version}/namespaces/{namespace}/{resource}
+// /api/{version}/namespaces/{namespace}/{resource}/{resourceName}
+// /api/{version}/{resource}
+// /api/{version}/{resource}/{resourceName}
 //
 // Special verbs:
-// /proxy/{resource}/{resourceName}
-// /proxy/namespaces/{namespace}/{resource}/{resourceName}
-// /redirect/namespaces/{namespace}/{resource}/{resourceName}
-// /redirect/{resource}/{resourceName}
-// /watch/{resource}
-// /watch/namespaces/{namespace}/{resource}
-//
-// Fully qualified paths for above:
-// /api/{version}/*
-// /api/{version}/*
+// /api/{version}/proxy/{resource}/{resourceName}
+// /api/{version}/proxy/namespaces/{namespace}/{resource}/{resourceName}
+// /api/{version}/redirect/namespaces/{namespace}/{resource}/{resourceName}
+// /api/{version}/redirect/{resource}/{resourceName}
+// /api/{version}/watch/{resource}
+// /api/{version}/watch/namespaces/{namespace}/{resource}
 func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIRequestInfo, error) {
 	requestInfo := APIRequestInfo{
 		Raw: splitPath(req.URL.Path),
 	}
 
 	currentParts := requestInfo.Raw
-	if len(currentParts) < 1 {
-		return requestInfo, fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
+	if len(currentParts) < 3 {
+		return requestInfo, fmt.Errorf("a resource request must have a url with at least three parts, not %v", req.URL)
 	}
 
-	for _, currPrefix := range r.APIPrefixes.List() {
-		// handle input of form /api/{version}/* by adjusting special paths
-		if currentParts[0] == currPrefix {
-			if len(currentParts) > 1 {
-				requestInfo.APIVersion = currentParts[1]
-			}
+	if !r.APIPrefixes.Has(currentParts[0]) {
+		return requestInfo, &errAPIPrefixNotFound{currentParts[0]}
+	}
+	requestInfo.APIPrefix = currentParts[0]
+	currentParts = currentParts[1:]
 
-			if len(currentParts) > 2 {
-				currentParts = currentParts[2:]
-			} else {
-				return requestInfo, fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
-			}
+	if !r.GrouplessAPIPrefixes.Has(requestInfo.APIPrefix) {
+		// one part (APIPrefix) has already been consumed, so this is actually "do we have four parts?"
+		if len(currentParts) < 3 {
+			return requestInfo, fmt.Errorf("a resource request with an API group must have a url with at least four parts, not %v", req.URL)
 		}
+
+		requestInfo.APIGroup = currentParts[0]
+		currentParts = currentParts[1:]
 	}
+
+	requestInfo.APIVersion = currentParts[0]
+	currentParts = currentParts[1:]
 
 	// handle input of form /{specialVerb}/*
 	if _, ok := specialVerbs[currentParts[0]]; ok {
-		requestInfo.Verb = currentParts[0]
-
-		if len(currentParts) > 1 {
-			currentParts = currentParts[1:]
-		} else {
-			return requestInfo, fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+		if len(currentParts) < 2 {
+			return requestInfo, fmt.Errorf("unable to determine kind and namespace from url, %v", req.URL)
 		}
+
+		requestInfo.Verb = currentParts[0]
+		currentParts = currentParts[1:]
+
 	} else {
 		switch req.Method {
 		case "POST":
