@@ -86,16 +86,18 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	}
 	defer watch.Stop()
 
-	boundCount := 0
-	expectedBoundCount := 2
-	for {
+	// Wait for claim01 and claim02 to become bound
+	claim01Pending := true
+	claim02Pending := true
+	for claim01Pending || claim02Pending {
 		event := <-watch.ResultChan()
 		claim := event.Object.(*api.PersistentVolumeClaim)
-		if claim.Spec.VolumeName != "" {
-			boundCount++
-		}
-		if boundCount == expectedBoundCount {
-			break
+		if claim.Spec.VolumeName != "" && claim.Status.Phase != "Bound" {
+			if claim.Name == "claim01" {
+				claim01Pending = false
+			} else if claim.Name == "claim02" {
+				claim02Pending = false
+			}
 		}
 	}
 
