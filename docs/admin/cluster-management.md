@@ -141,7 +141,7 @@ gcloud preview autoscaler --zone compute-zone <command>
 
 Note that autoscaling will work properly only if node metrics are accessible in Google Cloud Monitoring.
 To make the metrics accessible, you need to create your cluster with ```KUBE_ENABLE_CLUSTER_MONITORING```
-equal to ```google``` or ```googleinfluxdb``` (```googleinfluxdb``` is the default value).
+equal to ```google``` or ```googleinfluxdb``` (```google``` is the default value).
 
 ## Maintenance on a Node
 

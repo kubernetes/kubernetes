@@ -66,8 +66,8 @@ ELASTICSEARCH_LOGGING_REPLICAS=1
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
 #   influxdb - Heapster, InfluxDB, and Grafana
-#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
+#   standalone - Heapster only
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
 
 # Extra options to set on the Docker command line.  This is useful for setting
 # --insecure-registry for local registries, or globally configuring selinux options
