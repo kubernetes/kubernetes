@@ -89,21 +89,10 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 	waitForPersistentVolumePhase(watch, api.VolumeReleased)
 	waitForPersistentVolumePhase(watch, api.VolumeAvailable)
-}
 
-func waitForPersistentVolumePhase(w watch.Interface, phase api.PersistentVolumePhase) {
-	for {
-		event := <-w.ResultChan()
-		volume := event.Object.(*api.PersistentVolume)
-		if volume.Status.Phase == phase {
-			break
-		}
-	}
-}
-
-func TestPersistentVolumeDeleter(t *testing.T) {
-	_, s := runAMaster(t)
-	defer s.Close()
+	// end of Recycler test.
+	// Deleter test begins now.
+	// tests are serial because running masters concurrently that delete keys may cause similar tests to time out
 
 	deleteAllEtcdKeys()
 	binderClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
@@ -156,6 +145,16 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	for {
 		event := <-w.ResultChan()
 		if event.Type == watch.Deleted {
+			break
+		}
+	}
+}
+
+func waitForPersistentVolumePhase(w watch.Interface, phase api.PersistentVolumePhase) {
+	for {
+		event := <-w.ResultChan()
+		volume := event.Object.(*api.PersistentVolume)
+		if volume.Status.Phase == phase {
 			break
 		}
 	}
