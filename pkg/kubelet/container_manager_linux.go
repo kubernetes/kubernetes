@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -70,75 +72,62 @@ func newSystemContainer(containerName string) *systemContainer {
 	}
 }
 
+type nodeConfig struct {
+	dockerDaemonContainerName string
+	systemContainerName       string
+	kubeletContainerName      string
+}
+
 type containerManagerImpl struct {
+	cadvisorInterface cadvisor.Interface
+	mountUtil         mount.Interface
+	nodeConfig
 	// External containers being managed.
 	systemContainers []*systemContainer
 }
 
 var _ containerManager = &containerManagerImpl{}
 
+// checks if the required cgroups subsystems are mounted.
+// As of now, only 'cpu' and 'memory' are required.
+func validateSystemRequirements(mountUtil mount.Interface) error {
+	const (
+		cgroupMountType = "cgroup"
+		localErr        = "system validation failed"
+	)
+	mountPoints, err := mountUtil.List()
+	if err != nil {
+		return fmt.Errorf("%s - %v", localErr, err)
+	}
+	expectedCgroups := sets.NewString("cpu", "cpuacct", "cpuset", "memory")
+	for _, mountPoint := range mountPoints {
+		if mountPoint.Type == cgroupMountType {
+			for _, opt := range mountPoint.Opts {
+				if expectedCgroups.Has(opt) {
+					expectedCgroups.Delete(opt)
+				}
+			}
+		}
+	}
+
+	if expectedCgroups.Len() > 0 {
+		return fmt.Errorf("%s - Following Cgroup subsystem not mounted: %v", localErr, expectedCgroups.List())
+	}
+	return nil
+}
+
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonContainerName, systemContainerName, kubeletContainerName string) (containerManager, error) {
-	systemContainers := []*systemContainer{}
-
-	if dockerDaemonContainerName != "" {
-		cont := newSystemContainer(dockerDaemonContainerName)
-
-		info, err := cadvisorInterface.MachineInfo()
-		var capacity = api.ResourceList{}
-		if err != nil {
-		} else {
-			capacity = CapacityFromMachineInfo(info)
-		}
-		memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
-		if memoryLimit < MinDockerMemoryLimit {
-			glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, dockerDaemonContainerName, MinDockerMemoryLimit)
-			memoryLimit = MinDockerMemoryLimit
-		}
-
-		glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", dockerDaemonContainerName, memoryLimit)
-
-		dockerContainer := &fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Name:            dockerDaemonContainerName,
-				Memory:          memoryLimit,
-				MemorySwap:      -1,
-				AllowAllDevices: true,
-			},
-		}
-		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureDockerInContainer(cadvisorInterface, -900, dockerContainer)
-		}
-		systemContainers = append(systemContainers, cont)
-	}
-
-	if systemContainerName != "" {
-		if systemContainerName == "/" {
-			return nil, fmt.Errorf("system container cannot be root (\"/\")")
-		}
-
-		rootContainer := &fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Name: "/",
-			},
-		}
-		manager := createManager(systemContainerName)
-
-		err := ensureSystemContainer(rootContainer, manager)
-		if err != nil {
-			return nil, err
-		}
-		systemContainers = append(systemContainers, newSystemContainer(systemContainerName))
-	}
-
-	if kubeletContainerName != "" {
-		systemContainers = append(systemContainers, newSystemContainer(kubeletContainerName))
-	}
-
+func newContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, dockerDaemonContainerName, systemContainerName, kubeletContainerName string) (containerManager, error) {
 	return &containerManagerImpl{
-		systemContainers: systemContainers,
+		cadvisorInterface: cadvisorInterface,
+		mountUtil:         mountUtil,
+		nodeConfig: nodeConfig{
+			dockerDaemonContainerName: dockerDaemonContainerName,
+			systemContainerName:       systemContainerName,
+			kubeletContainerName:      kubeletContainerName,
+		},
 	}, nil
 }
 
@@ -152,7 +141,73 @@ func createManager(containerName string) *fs.Manager {
 	}
 }
 
+func (cm *containerManagerImpl) setupNode() error {
+	if err := validateSystemRequirements(cm.mountUtil); err != nil {
+		return err
+	}
+	systemContainers := []*systemContainer{}
+	if cm.dockerDaemonContainerName != "" {
+		cont := newSystemContainer(cm.dockerDaemonContainerName)
+
+		info, err := cm.cadvisorInterface.MachineInfo()
+		var capacity = api.ResourceList{}
+		if err != nil {
+		} else {
+			capacity = CapacityFromMachineInfo(info)
+		}
+		memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
+		if memoryLimit < MinDockerMemoryLimit {
+			glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.dockerDaemonContainerName, MinDockerMemoryLimit)
+			memoryLimit = MinDockerMemoryLimit
+		}
+
+		glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.dockerDaemonContainerName, memoryLimit)
+
+		dockerContainer := &fs.Manager{
+			Cgroups: &configs.Cgroup{
+				Name:            cm.dockerDaemonContainerName,
+				Memory:          memoryLimit,
+				MemorySwap:      -1,
+				AllowAllDevices: true,
+			},
+		}
+		cont.ensureStateFunc = func(manager *fs.Manager) error {
+			return ensureDockerInContainer(cm.cadvisorInterface, -900, dockerContainer)
+		}
+		systemContainers = append(systemContainers, cont)
+	}
+
+	if cm.systemContainerName != "" {
+		if cm.systemContainerName == "/" {
+			return fmt.Errorf("system container cannot be root (\"/\")")
+		}
+
+		rootContainer := &fs.Manager{
+			Cgroups: &configs.Cgroup{
+				Name: "/",
+			},
+		}
+		manager := createManager(cm.systemContainerName)
+
+		err := ensureSystemContainer(rootContainer, manager)
+		if err != nil {
+			return err
+		}
+		systemContainers = append(systemContainers, newSystemContainer(cm.systemContainerName))
+	}
+
+	if cm.kubeletContainerName != "" {
+		systemContainers = append(systemContainers, newSystemContainer(cm.kubeletContainerName))
+	}
+	cm.systemContainers = systemContainers
+	return nil
+}
+
 func (cm *containerManagerImpl) Start() error {
+	// Setup the node
+	if err := cm.setupNode(); err != nil {
+		return err
+	}
 	// Don't run a background thread if there are no ensureStateFuncs.
 	numEnsureStateFuncs := 0
 	for _, cont := range cm.systemContainers {
