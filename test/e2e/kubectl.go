@@ -65,10 +65,7 @@ const (
 	simplePodPort            = 80
 )
 
-var (
-	portForwardRegexp = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
-	proxyRegexp       = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-)
+var proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 
 var _ = Describe("Kubectl client", func() {
 	defer GinkgoRecover()
@@ -205,32 +202,11 @@ var _ = Describe("Kubectl client", func() {
 
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
-			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), simplePodName, fmt.Sprintf(":%d", simplePodPort))
+			cmd, listenPort := runPortForward(ns, simplePodName, simplePodPort)
 			defer tryKill(cmd)
-			// This is somewhat ugly but is the only way to retrieve the port that was picked
-			// by the port-forward command. We don't want to hard code the port as we have no
-			// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
-			Logf("starting port-forward command and streaming output")
-			stdout, stderr, err := startCmdAndStreamOutput(cmd)
-			if err != nil {
-				Failf("Failed to start port-forward command: %v", err)
-			}
-			defer stdout.Close()
-			defer stderr.Close()
 
-			buf := make([]byte, 128)
-			var n int
-			Logf("reading from `kubectl port-forward` command's stderr")
-			if n, err = stderr.Read(buf); err != nil {
-				Failf("Failed to read from kubectl port-forward stderr: %v", err)
-			}
-			portForwardOutput := string(buf[:n])
-			match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
-			if len(match) != 2 {
-				Failf("Failed to parse kubectl port-forward output: %s", portForwardOutput)
-			}
 			By("curling local port output")
-			localAddr := fmt.Sprintf("http://localhost:%s", match[1])
+			localAddr := fmt.Sprintf("http://localhost:%d", listenPort)
 			body, err := curl(localAddr)
 			Logf("got: %s", body)
 			if err != nil {
