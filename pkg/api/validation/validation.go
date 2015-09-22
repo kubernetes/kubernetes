@@ -1825,8 +1825,8 @@ func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorL
 
 		ssErrs := errs.ValidationErrorList{}
 
-		if len(ss.Addresses) == 0 {
-			ssErrs = append(ssErrs, errs.NewFieldRequired("addresses"))
+		if len(ss.Addresses) == 0 && len(ss.NotReadyAddresses) == 0 {
+			ssErrs = append(ssErrs, errs.NewFieldRequired("addresses or notReadyAddresses"))
 		}
 		if len(ss.Ports) == 0 {
 			ssErrs = append(ssErrs, errs.NewFieldRequired("ports"))
