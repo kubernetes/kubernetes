@@ -2296,6 +2296,42 @@ func autoconvert_experimental_DeploymentStrategy_To_v1alpha1_DeploymentStrategy(
 	return nil
 }
 
+func autoconvert_experimental_HTTPIngressPath_To_v1alpha1_HTTPIngressPath(in *experimental.HTTPIngressPath, out *HTTPIngressPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.HTTPIngressPath))(in)
+	}
+	out.Path = in.Path
+	if err := convert_experimental_IngressBackend_To_v1alpha1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_experimental_HTTPIngressPath_To_v1alpha1_HTTPIngressPath(in *experimental.HTTPIngressPath, out *HTTPIngressPath, s conversion.Scope) error {
+	return autoconvert_experimental_HTTPIngressPath_To_v1alpha1_HTTPIngressPath(in, out, s)
+}
+
+func autoconvert_experimental_HTTPIngressRuleValue_To_v1alpha1_HTTPIngressRuleValue(in *experimental.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.HTTPIngressRuleValue))(in)
+	}
+	if in.Paths != nil {
+		out.Paths = make([]HTTPIngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := convert_experimental_HTTPIngressPath_To_v1alpha1_HTTPIngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func convert_experimental_HTTPIngressRuleValue_To_v1alpha1_HTTPIngressRuleValue(in *experimental.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
+	return autoconvert_experimental_HTTPIngressRuleValue_To_v1alpha1_HTTPIngressRuleValue(in, out, s)
+}
+
 func autoconvert_experimental_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodAutoscaler(in *experimental.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.HorizontalPodAutoscaler))(in)
@@ -2425,13 +2461,10 @@ func autoconvert_experimental_IngressBackend_To_v1alpha1_IngressBackend(in *expe
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.IngressBackend))(in)
 	}
-	if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ServiceRef, &out.ServiceRef, s); err != nil {
-		return err
-	}
+	out.ServiceName = in.ServiceName
 	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
 		return err
 	}
-	out.Protocol = v1.Protocol(in.Protocol)
 	return nil
 }
 
@@ -2466,35 +2499,13 @@ func convert_experimental_IngressList_To_v1alpha1_IngressList(in *experimental.I
 	return autoconvert_experimental_IngressList_To_v1alpha1_IngressList(in, out, s)
 }
 
-func autoconvert_experimental_IngressPath_To_v1alpha1_IngressPath(in *experimental.IngressPath, out *IngressPath, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressPath))(in)
-	}
-	out.Path = in.Path
-	if err := convert_experimental_IngressBackend_To_v1alpha1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_experimental_IngressPath_To_v1alpha1_IngressPath(in *experimental.IngressPath, out *IngressPath, s conversion.Scope) error {
-	return autoconvert_experimental_IngressPath_To_v1alpha1_IngressPath(in, out, s)
-}
-
 func autoconvert_experimental_IngressRule_To_v1alpha1_IngressRule(in *experimental.IngressRule, out *IngressRule, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.IngressRule))(in)
 	}
 	out.Host = in.Host
-	if in.Paths != nil {
-		out.Paths = make([]IngressPath, len(in.Paths))
-		for i := range in.Paths {
-			if err := convert_experimental_IngressPath_To_v1alpha1_IngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Paths = nil
+	if err := convert_experimental_IngressRuleValue_To_v1alpha1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -2503,9 +2514,36 @@ func convert_experimental_IngressRule_To_v1alpha1_IngressRule(in *experimental.I
 	return autoconvert_experimental_IngressRule_To_v1alpha1_IngressRule(in, out, s)
 }
 
+func autoconvert_experimental_IngressRuleValue_To_v1alpha1_IngressRuleValue(in *experimental.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressRuleValue))(in)
+	}
+	if in.HTTP != nil {
+		out.HTTP = new(HTTPIngressRuleValue)
+		if err := convert_experimental_HTTPIngressRuleValue_To_v1alpha1_HTTPIngressRuleValue(in.HTTP, out.HTTP, s); err != nil {
+			return err
+		}
+	} else {
+		out.HTTP = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressRuleValue_To_v1alpha1_IngressRuleValue(in *experimental.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
+	return autoconvert_experimental_IngressRuleValue_To_v1alpha1_IngressRuleValue(in, out, s)
+}
+
 func autoconvert_experimental_IngressSpec_To_v1alpha1_IngressSpec(in *experimental.IngressSpec, out *IngressSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.IngressSpec))(in)
+	}
+	if in.Backend != nil {
+		out.Backend = new(IngressBackend)
+		if err := convert_experimental_IngressBackend_To_v1alpha1_IngressBackend(in.Backend, out.Backend, s); err != nil {
+			return err
+		}
+	} else {
+		out.Backend = nil
 	}
 	if in.Rules != nil {
 		out.Rules = make([]IngressRule, len(in.Rules))
@@ -3097,6 +3135,42 @@ func convert_v1alpha1_DeploymentStatus_To_experimental_DeploymentStatus(in *Depl
 	return autoconvert_v1alpha1_DeploymentStatus_To_experimental_DeploymentStatus(in, out, s)
 }
 
+func autoconvert_v1alpha1_HTTPIngressPath_To_experimental_HTTPIngressPath(in *HTTPIngressPath, out *experimental.HTTPIngressPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HTTPIngressPath))(in)
+	}
+	out.Path = in.Path
+	if err := convert_v1alpha1_IngressBackend_To_experimental_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1alpha1_HTTPIngressPath_To_experimental_HTTPIngressPath(in *HTTPIngressPath, out *experimental.HTTPIngressPath, s conversion.Scope) error {
+	return autoconvert_v1alpha1_HTTPIngressPath_To_experimental_HTTPIngressPath(in, out, s)
+}
+
+func autoconvert_v1alpha1_HTTPIngressRuleValue_To_experimental_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *experimental.HTTPIngressRuleValue, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HTTPIngressRuleValue))(in)
+	}
+	if in.Paths != nil {
+		out.Paths = make([]experimental.HTTPIngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := convert_v1alpha1_HTTPIngressPath_To_experimental_HTTPIngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func convert_v1alpha1_HTTPIngressRuleValue_To_experimental_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *experimental.HTTPIngressRuleValue, s conversion.Scope) error {
+	return autoconvert_v1alpha1_HTTPIngressRuleValue_To_experimental_HTTPIngressRuleValue(in, out, s)
+}
+
 func autoconvert_v1alpha1_HorizontalPodAutoscaler_To_experimental_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *experimental.HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscaler))(in)
@@ -3226,13 +3300,10 @@ func autoconvert_v1alpha1_IngressBackend_To_experimental_IngressBackend(in *Ingr
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressBackend))(in)
 	}
-	if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ServiceRef, &out.ServiceRef, s); err != nil {
-		return err
-	}
+	out.ServiceName = in.ServiceName
 	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
 		return err
 	}
-	out.Protocol = api.Protocol(in.Protocol)
 	return nil
 }
 
@@ -3267,35 +3338,13 @@ func convert_v1alpha1_IngressList_To_experimental_IngressList(in *IngressList, o
 	return autoconvert_v1alpha1_IngressList_To_experimental_IngressList(in, out, s)
 }
 
-func autoconvert_v1alpha1_IngressPath_To_experimental_IngressPath(in *IngressPath, out *experimental.IngressPath, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*IngressPath))(in)
-	}
-	out.Path = in.Path
-	if err := convert_v1alpha1_IngressBackend_To_experimental_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1alpha1_IngressPath_To_experimental_IngressPath(in *IngressPath, out *experimental.IngressPath, s conversion.Scope) error {
-	return autoconvert_v1alpha1_IngressPath_To_experimental_IngressPath(in, out, s)
-}
-
 func autoconvert_v1alpha1_IngressRule_To_experimental_IngressRule(in *IngressRule, out *experimental.IngressRule, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressRule))(in)
 	}
 	out.Host = in.Host
-	if in.Paths != nil {
-		out.Paths = make([]experimental.IngressPath, len(in.Paths))
-		for i := range in.Paths {
-			if err := convert_v1alpha1_IngressPath_To_experimental_IngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Paths = nil
+	if err := convert_v1alpha1_IngressRuleValue_To_experimental_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -3304,9 +3353,36 @@ func convert_v1alpha1_IngressRule_To_experimental_IngressRule(in *IngressRule, o
 	return autoconvert_v1alpha1_IngressRule_To_experimental_IngressRule(in, out, s)
 }
 
+func autoconvert_v1alpha1_IngressRuleValue_To_experimental_IngressRuleValue(in *IngressRuleValue, out *experimental.IngressRuleValue, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressRuleValue))(in)
+	}
+	if in.HTTP != nil {
+		out.HTTP = new(experimental.HTTPIngressRuleValue)
+		if err := convert_v1alpha1_HTTPIngressRuleValue_To_experimental_HTTPIngressRuleValue(in.HTTP, out.HTTP, s); err != nil {
+			return err
+		}
+	} else {
+		out.HTTP = nil
+	}
+	return nil
+}
+
+func convert_v1alpha1_IngressRuleValue_To_experimental_IngressRuleValue(in *IngressRuleValue, out *experimental.IngressRuleValue, s conversion.Scope) error {
+	return autoconvert_v1alpha1_IngressRuleValue_To_experimental_IngressRuleValue(in, out, s)
+}
+
 func autoconvert_v1alpha1_IngressSpec_To_experimental_IngressSpec(in *IngressSpec, out *experimental.IngressSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressSpec))(in)
+	}
+	if in.Backend != nil {
+		out.Backend = new(experimental.IngressBackend)
+		if err := convert_v1alpha1_IngressBackend_To_experimental_IngressBackend(in.Backend, out.Backend, s); err != nil {
+			return err
+		}
+	} else {
+		out.Backend = nil
 	}
 	if in.Rules != nil {
 		out.Rules = make([]experimental.IngressRule, len(in.Rules))
@@ -3751,13 +3827,15 @@ func init() {
 		autoconvert_experimental_DeploymentStatus_To_v1alpha1_DeploymentStatus,
 		autoconvert_experimental_DeploymentStrategy_To_v1alpha1_DeploymentStrategy,
 		autoconvert_experimental_Deployment_To_v1alpha1_Deployment,
+		autoconvert_experimental_HTTPIngressPath_To_v1alpha1_HTTPIngressPath,
+		autoconvert_experimental_HTTPIngressRuleValue_To_v1alpha1_HTTPIngressRuleValue,
 		autoconvert_experimental_HorizontalPodAutoscalerList_To_v1alpha1_HorizontalPodAutoscalerList,
 		autoconvert_experimental_HorizontalPodAutoscalerSpec_To_v1alpha1_HorizontalPodAutoscalerSpec,
 		autoconvert_experimental_HorizontalPodAutoscalerStatus_To_v1alpha1_HorizontalPodAutoscalerStatus,
 		autoconvert_experimental_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodAutoscaler,
 		autoconvert_experimental_IngressBackend_To_v1alpha1_IngressBackend,
 		autoconvert_experimental_IngressList_To_v1alpha1_IngressList,
-		autoconvert_experimental_IngressPath_To_v1alpha1_IngressPath,
+		autoconvert_experimental_IngressRuleValue_To_v1alpha1_IngressRuleValue,
 		autoconvert_experimental_IngressRule_To_v1alpha1_IngressRule,
 		autoconvert_experimental_IngressSpec_To_v1alpha1_IngressSpec,
 		autoconvert_experimental_IngressStatus_To_v1alpha1_IngressStatus,
@@ -3827,13 +3905,15 @@ func init() {
 		autoconvert_v1alpha1_DeploymentSpec_To_experimental_DeploymentSpec,
 		autoconvert_v1alpha1_DeploymentStatus_To_experimental_DeploymentStatus,
 		autoconvert_v1alpha1_Deployment_To_experimental_Deployment,
+		autoconvert_v1alpha1_HTTPIngressPath_To_experimental_HTTPIngressPath,
+		autoconvert_v1alpha1_HTTPIngressRuleValue_To_experimental_HTTPIngressRuleValue,
 		autoconvert_v1alpha1_HorizontalPodAutoscalerList_To_experimental_HorizontalPodAutoscalerList,
 		autoconvert_v1alpha1_HorizontalPodAutoscalerSpec_To_experimental_HorizontalPodAutoscalerSpec,
 		autoconvert_v1alpha1_HorizontalPodAutoscalerStatus_To_experimental_HorizontalPodAutoscalerStatus,
 		autoconvert_v1alpha1_HorizontalPodAutoscaler_To_experimental_HorizontalPodAutoscaler,
 		autoconvert_v1alpha1_IngressBackend_To_experimental_IngressBackend,
 		autoconvert_v1alpha1_IngressList_To_experimental_IngressList,
-		autoconvert_v1alpha1_IngressPath_To_experimental_IngressPath,
+		autoconvert_v1alpha1_IngressRuleValue_To_experimental_IngressRuleValue,
 		autoconvert_v1alpha1_IngressRule_To_experimental_IngressRule,
 		autoconvert_v1alpha1_IngressSpec_To_experimental_IngressSpec,
 		autoconvert_v1alpha1_IngressStatus_To_experimental_IngressStatus,
