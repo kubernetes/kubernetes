@@ -322,8 +322,9 @@ For more details (e.g., how to specify command-based probes), see the [example i
 ## Lifecycle hooks and termination notice
 
 Of course, nodes and applications may fail at any time, but many applications benefit from clean shutdown, such as to complete in-flight requests, when the termination of the application is deliberate. To support such cases, Kubernetes supports two kinds of notifications:
-Kubernetes will send SIGTERM to applications, which can be handled in order to effect graceful termination. SIGKILL is sent 10 seconds later if the application does not terminate sooner.
-Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM.
+
+* Kubernetes will send SIGTERM to applications, which can be handled in order to effect graceful termination. SIGKILL is sent a configurable number of seconds later if the application does not terminate sooner (defaults to 30 seconds, controlled by `spec.terminationGracePeriodSeconds`).
+* Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM.
 
 The specification of a pre-stop hook is similar to that of probes, but without the timing-related parameters. For example:
 
