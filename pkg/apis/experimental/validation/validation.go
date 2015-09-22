@@ -371,3 +371,31 @@ func ValidateJobStatusUpdate(oldStatus, status experimental.JobStatus) errs.Vali
 	allErrs = append(allErrs, ValidateJobStatus(&status)...)
 	return allErrs
 }
+
+// ValidateIngressName validates that the given name can be used as an Ingress name.
+func ValidateIngressName(name string, prefix bool) (bool, string) {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateIngressSpec tests if required fields in the IngressSpec are set.
+func ValidateIngressSpec(spec *experimental.IngressSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	// TODO: Validate IngressHosts/Rules etc.
+	return allErrs
+}
+
+// ValidateIngress tests if required fields in the Ingress are set.
+func ValidateIngress(ingress *experimental.Ingress) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+// ValidateIngressUpdate tests if required fields in the Ingress are set.
+func ValidateIngressUpdate(oldController, ingress *experimental.Ingress) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec).Prefix("spec")...)
+	return allErrs
+}
