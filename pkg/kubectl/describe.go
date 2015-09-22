@@ -69,7 +69,6 @@ func describerMap(c *client.Client) map[string]Describer {
 	m := map[string]Describer{
 		"Pod": &PodDescriber{c},
 		"ReplicationController": &ReplicationControllerDescriber{c},
-		"DaemonSet":             &DaemonSetDescriber{c},
 		"Secret":                &SecretDescriber{c},
 		"Service":               &ServiceDescriber{c},
 		"ServiceAccount":        &ServiceAccountDescriber{c},
@@ -87,7 +86,8 @@ func describerMap(c *client.Client) map[string]Describer {
 func expDescriberMap(c *client.Client) map[string]Describer {
 	return map[string]Describer{
 		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{c},
-		"Job": &JobDescriber{c},
+		"DaemonSet":               &DaemonSetDescriber{c},
+		"Job":                     &JobDescriber{c},
 	}
 }
 
