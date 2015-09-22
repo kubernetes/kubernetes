@@ -94,8 +94,9 @@ type CMServer struct {
 	EnableHorizontalPodAutoscaler bool
 	EnableDeploymentController    bool
 
-	Master     string
-	Kubeconfig string
+	Master        string
+	APIServerList []string
+	Kubeconfig    string
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -186,7 +187,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IPNetVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.MarkDeprecated("master", "please use --api-servers instead")
+	fs.StringSliceVar(&s.APIServerList, "api-servers", s.APIServerList, "Comma separated list of api servers. (ex: http://host1:8080,https://host2:443). NOTE: Only the first server will be used")
+	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and apiserver location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.BoolVar(&s.EnableHorizontalPodAutoscaler, "enable-horizontal-pod-autoscaler", s.EnableHorizontalPodAutoscaler, "Enables horizontal pod autoscaler (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
 	fs.BoolVar(&s.EnableDeploymentController, "enable-deployment-controller", s.EnableDeploymentController, "Enables deployment controller (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
@@ -194,15 +197,23 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 
 // Run runs the CMServer.  This should never exit.
 func (s *CMServer) Run(_ []string) error {
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
+	if s.Master != "" {
+		if len(s.APIServerList) != 0 {
+			glog.Warningf("Both --mater and --api-servers set. Using --api-servers")
+		} else {
+			s.APIServerList = []string{s.Master}
+		}
+	}
+
+	if s.Kubeconfig == "" && len(s.APIServerList) == 0 {
+		glog.Warningf("Neither --kubeconfig nor --api-servers was specified.  Using default API client.  This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
+	// file, and then overriding the api-server flag, if non-empty.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
 	if err != nil {
 		return err
 	}

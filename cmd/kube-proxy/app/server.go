@@ -56,6 +56,7 @@ type ProxyServer struct {
 	OOMScoreAdj         int
 	ResourceContainer   string
 	Master              string
+	APIServerList       []string
 	Kubeconfig          string
 	PortRange           util.PortRange
 	Recorder            record.EventRecorder
@@ -83,11 +84,13 @@ func NewProxyServer() *ProxyServer {
 func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.MarkDeprecated("master", "please use --api-servers=")
+	fs.StringSliceVar(&s.APIServerList, "api-servers", s.APIServerList, "Comma separated list of api servers. (ex: http://host1:8080,https://host2:443). NOTE: Only the first server will be used")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
+	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the apiserver location is set by the api-servers flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.BoolVar(&s.ForceUserspaceProxy, "legacy-userspace-proxy", true, "Use the legacy userspace proxy (instead of the pure iptables proxy).")
@@ -129,16 +132,24 @@ func (s *ProxyServer) Run(_ []string) error {
 		glog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 	}
 
+	if s.Master != "" {
+		if len(s.APIServerList) != 0 {
+			glog.Warningf("Both --mater and --api-servers set. Using --api-servers")
+		} else {
+			s.APIServerList = []string{s.Master}
+		}
+	}
+
 	// define api config source
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
+	if s.Kubeconfig == "" && len(s.APIServerList) == 0 {
+		glog.Warningf("Neither --kubeconfig nor --api-servers was specified.  Using default API client.  This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
+	// file, and then overriding the apiserver flag, if non-empty.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
 	if err != nil {
 		return err
 	}

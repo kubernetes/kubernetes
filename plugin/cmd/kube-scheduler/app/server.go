@@ -53,6 +53,7 @@ type SchedulerServer struct {
 	PolicyConfigFile  string
 	EnableProfiling   bool
 	Master            string
+	APIServerList     []string
 	Kubeconfig        string
 	BindPodsQPS       float32
 	BindPodsBurst     int
@@ -76,22 +77,32 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.PolicyConfigFile, "policy-config-file", s.PolicyConfigFile, "File with scheduler policy configuration")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.MarkDeprecated("master", "please use --api-servers instead")
+	fs.StringSliceVar(&s.APIServerList, "api-servers", s.APIServerList, "Comma separated list of api servers. (ex: http://host1:8080,https://host2:443). NOTE: Only the first server will be used")
+	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and apiserver location information.")
 	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", 15.0, "Number of bindings per second scheduler is allowed to continuously make")
 	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", 20, "Number of bindings per second scheduler is allowed to make during bursts")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func (s *SchedulerServer) Run(_ []string) error {
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
+	if s.Master != "" {
+		if len(s.APIServerList) != 0 {
+			glog.Warningf("Both --mater and --api-servers set. Using --api-servers")
+		} else {
+			s.APIServerList = []string{s.Master}
+		}
+	}
+
+	if s.Kubeconfig == "" && len(s.APIServerList) == 0 {
+		glog.Warningf("Neither --kubeconfig nor --api-servers was specified.  Using default API client.  This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
+	// file, and then overriding the api-servers flag, if non-empty.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
 	if err != nil {
 		return err
 	}
