@@ -51,7 +51,7 @@ func TestRunOnce(t *testing.T) {
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 	}
-	kb.containerManager, _ = newContainerManager(cadvisor, "", "", "")
+	kb.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), cadvisor, "", "", "")
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {
