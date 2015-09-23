@@ -20,7 +20,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster_influxdb:v0.4
+        - image: gcr.io/google_containers/heapster_influxdb:v0.5
           name: influxdb
           resources:
             limits:
@@ -34,12 +34,18 @@ spec:
           volumeMounts:
           - name: influxdb-persistent-storage
             mountPath: /data
-        - image: grafana/grafana:2.1.0
+        - image: thuctnguyen/grafana:2.1.0
           name: grafana
           resources:
             limits:
               cpu: 100m
               memory: 100Mi
+          ports:
+            - containerPort: 3000
+              hostPort: 3000
+          env:
+            - name: "INFLUXDB_SERVICE_ENDPOINT"
+              value: "http://monitoring-influxdb:8086"
       volumes:
       - name: influxdb-persistent-storage
         emptyDir: {}
