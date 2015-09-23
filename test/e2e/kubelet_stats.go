@@ -178,12 +178,20 @@ const (
 )
 
 // A list of containers for which we want to collect resource usage.
-var targetContainers = []string{
-	"/",
-	"/docker-daemon",
-	"/kubelet",
-	"/kube-proxy",
-	"/system",
+func targetContainers() []string {
+	if providerIs("gce", "gke") {
+		return []string{
+			"/",
+			"/docker-daemon",
+			"/kubelet",
+			"/kube-proxy",
+			"/system",
+		}
+	} else {
+		return []string{
+			"/",
+		}
+	}
 }
 
 type containerResourceUsage struct {
@@ -229,8 +237,9 @@ func getOneTimeResourceUsageOnNode(c *client.Client, nodeName string, cpuInterva
 		return nil, err
 	}
 	// Process container infos that are relevant to us.
-	usageMap := make(map[string]*containerResourceUsage, len(targetContainers))
-	for _, name := range targetContainers {
+	containers := targetContainers()
+	usageMap := make(map[string]*containerResourceUsage, len(containers))
+	for _, name := range containers {
 		info, ok := containerInfos[name]
 		if !ok {
 			return nil, fmt.Errorf("missing info for container %q on node %q", name, nodeName)
@@ -491,7 +500,7 @@ func (r *resourceMonitor) LogCPUSummary() {
 		buf := &bytes.Buffer{}
 		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 		fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
-		for _, containerName := range targetContainers {
+		for _, containerName := range targetContainers() {
 			data := collector.GetBasicCPUStats(containerName)
 			var s []string
 			s = append(s, fmt.Sprintf("%q", containerName))
