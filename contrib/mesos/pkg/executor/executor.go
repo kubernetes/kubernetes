@@ -107,7 +107,7 @@ type KubernetesExecutor struct {
 	state                stateType
 	tasks                map[string]*kuberTask
 	pods                 map[string]*api.Pod
-	lock                 sync.RWMutex
+	lock                 sync.Mutex
 	sourcename           string
 	client               *client.Client
 	done                 chan struct{}                     // signals shutdown
@@ -269,6 +269,11 @@ func (k *KubernetesExecutor) onInitialRegistration() {
 	defer close(k.initialRegComplete)
 
 	// emit an empty update to allow the mesos "source" to be marked as seen
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	if k.isDone() {
+		return
+	}
 	k.updateChan <- kubetypes.PodUpdate{
 		Pods:   []*api.Pod{},
 		Op:     kubetypes.SET,
@@ -397,6 +402,9 @@ func (k *KubernetesExecutor) handleChangedApiserverPod(pod *api.Pod) {
 			oldPod.DeletionTimestamp = pod.DeletionTimestamp
 			oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
 
+			if k.isDone() {
+				return
+			}
 			update := kubetypes.PodUpdate{
 				Op:   kubetypes.UPDATE,
 				Pods: []*api.Pod{oldPod},
@@ -570,6 +578,9 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 	k.pods[podFullName] = pod
 
 	// send the new pod to the kubelet which will spin it up
+	if k.isDone() {
+		return
+	}
 	update := kubetypes.PodUpdate{
 		Op:   kubetypes.ADD,
 		Pods: []*api.Pod{pod},
@@ -775,6 +786,9 @@ func (k *KubernetesExecutor) removePodTask(driver bindings.ExecutorDriver, tid, 
 		delete(k.pods, pid)
 
 		// tell the kubelet to remove the pod
+		if k.isDone() {
+			return
+		}
 		update := kubetypes.PodUpdate{
 			Op:   kubetypes.REMOVE,
 			Pods: []*api.Pod{pod},
