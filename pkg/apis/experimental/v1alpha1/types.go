@@ -579,5 +579,5 @@ type IngressBackend struct {
 	ServiceName string `json:"serviceName"`
 
 	// Specifies the port of the referenced service.
-	ServicePort util.IntOrString `json:"servicePort,omitempty"`
+	ServicePort util.IntOrString `json:"servicePort"`
 }
