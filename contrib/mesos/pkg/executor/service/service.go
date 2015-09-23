@@ -134,23 +134,67 @@ func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate
 	return nil
 }
 
-func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate, kubeletFinished chan<- struct{},
+func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate, kubeletDone chan<- struct{},
 	staticPodsConfigPath string, apiclient *client.Client) error {
 	kcfg, err := s.KubeletConfig()
 	if err == nil {
+		// apply Messo specific settings
+		executorDone := make(chan struct{})
 		kcfg.Builder = func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
-			return s.createAndInitKubelet(kc, staticPodsConfigPath, execUpdates, kubeletFinished)
+			k, pc, err := app.CreateAndInitKubelet(kc)
+			if err != nil {
+				return k, pc, err
+			}
+
+			klet := k.(*kubelet.Kubelet)
+
+			s.kletLock.Lock()
+			s.klet = klet
+			s.kletLock.Unlock()
+
+			// decorate kubelet such that it shuts down when the executor is
+			decorated := &executorKubelet{
+				Kubelet:      klet,
+				kubeletDone:  kubeletDone,
+				executorDone: executorDone,
+			}
+
+			return decorated, pc, nil
 		}
 		kcfg.DockerDaemonContainer = "" // don't move the docker daemon into a cgroup
 		kcfg.Hostname = kcfg.HostnameOverride
 		kcfg.KubeClient = apiclient
 		kcfg.NodeName = kcfg.HostnameOverride
+		kcfg.PodConfig = kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kcfg.Recorder) // override the default pod source
 		kcfg.StandaloneMode = false
 		kcfg.SystemContainer = "" // don't take control over other system processes.
+
+		// create main pod source
+		updates := kcfg.PodConfig.Channel(MESOS_CFG_SOURCE)
+		go func() {
+			// execUpdates will be closed by the executor on shutdown
+			defer close(executorDone)
+
+			for u := range execUpdates {
+				u.Source = MESOS_CFG_SOURCE
+				updates <- u
+			}
+		}()
+
+		// create static-pods directory file source
+		log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
+		fileSourceUpdates := kcfg.PodConfig.Channel(kubelet.FileSource)
+		kconfig.NewSourceFile(staticPodsConfigPath, kcfg.HostnameOverride, kcfg.FileCheckFrequency, fileSourceUpdates)
+
+		// run the kubelet, until execUpdates is closed
+		// NOTE: because kcfg != nil holds, the upstream Run function will not
+		//       initialize the cloud provider. We explicitly wouldn't want
+		//       that because then every kubelet instance would query the master
+		//       state.json which does not scale.
 		err = s.KubeletServer.Run(kcfg)
 	}
 	if err != nil {
-		close(kubeletFinished)
+		close(kubeletDone)
 	}
 	return err
 }
@@ -196,118 +240,4 @@ func defaultBindingAddress() string {
 	} else {
 		return libProcessIP
 	}
-}
-
-func (ks *KubeletExecutorServer) createAndInitKubelet(
-	kc *app.KubeletConfig,
-	staticPodsConfigPath string,
-	execUpdates <-chan kubelet.PodUpdate,
-	kubeletDone chan<- struct{},
-) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
-
-	// TODO(k8s): block until all sources have delivered at least one update to the channel, or break the sync loop
-	// up into "per source" synchronizations
-	// TODO(k8s): KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
-	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
-	// a nil pointer to it when what we really want is a nil interface.
-	var kubeClient client.Interface
-	if kc.KubeClient == nil {
-		kubeClient = nil
-	} else {
-		kubeClient = kc.KubeClient
-	}
-
-	gcPolicy := kubelet.ContainerGCPolicy{
-		MinAge:             kc.MinimumGCAge,
-		MaxPerPodContainer: kc.MaxPerPodContainerCount,
-		MaxContainers:      kc.MaxContainerCount,
-	}
-
-	// create main pod source
-	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kc.Recorder)
-	updates := pc.Channel(MESOS_CFG_SOURCE)
-	executorDone := make(chan struct{})
-	go func() {
-		// execUpdates will be closed by the executor on shutdown
-		defer close(executorDone)
-
-		for u := range execUpdates {
-			u.Source = MESOS_CFG_SOURCE
-			updates <- u
-		}
-	}()
-
-	// create static-pods directory file source
-	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
-	fileSourceUpdates := pc.Channel(kubelet.FileSource)
-	kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
-
-	klet, err := kubelet.NewMainKubelet(
-		kc.Hostname,
-		kc.NodeName,
-		kc.DockerClient,
-		kubeClient,
-		kc.RootDirectory,
-		kc.PodInfraContainerImage,
-		kc.SyncFrequency,
-		float32(kc.RegistryPullQPS),
-		kc.RegistryBurst,
-		kc.EventRecordQPS,
-		kc.EventBurst,
-		gcPolicy,
-		pc.SeenAllSources,
-		kc.RegisterNode,
-		kc.StandaloneMode,
-		kc.ClusterDomain,
-		net.IP(kc.ClusterDNS),
-		kc.MasterServiceNamespace,
-		kc.VolumePlugins,
-		kc.NetworkPlugins,
-		kc.NetworkPluginName,
-		kc.StreamingConnectionIdleTimeout,
-		kc.Recorder,
-		kc.CAdvisorInterface,
-		kc.ImageGCPolicy,
-		kc.DiskSpacePolicy,
-		kc.Cloud,
-		kc.NodeStatusUpdateFrequency,
-		kc.ResourceContainer,
-		kc.OSInterface,
-		kc.CgroupRoot,
-		kc.ContainerRuntime,
-		kc.RktPath,
-		kc.RktStage1Image,
-		kc.Mounter,
-		kc.Writer,
-		kc.DockerDaemonContainer,
-		kc.SystemContainer,
-		kc.ConfigureCBR0,
-		kc.PodCIDR,
-		kc.MaxPods,
-		kc.DockerExecHandler,
-		kc.ResolverConfig,
-		kc.CPUCFSQuota,
-		&api.NodeDaemonEndpoints{
-			KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
-		},
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ks.kletLock.Lock()
-	ks.klet = klet
-	ks.kletLock.Unlock()
-
-	// decorate kubelet such that it shuts down when the executor is
-	k := &executorKubelet{
-		Kubelet:      ks.klet,
-		kubeletDone:  kubeletDone,
-		executorDone: executorDone,
-	}
-
-	k.BirthCry()
-	k.StartGarbageCollection()
-
-	return k, pc, nil
 }
