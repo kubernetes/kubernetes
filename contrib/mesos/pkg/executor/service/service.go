@@ -309,10 +309,9 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	ks.klet = klet
 	ks.kletLock.Unlock()
 
-	k := &kubeletExecutor{
+	// decorate kubelet such that it shuts down when the executor is
+	k := &executorKubelet{
 		Kubelet:      ks.klet,
-		address:      ks.Address,
-		dockerClient: kc.DockerClient,
 		kubeletDone:  kubeletDone,
 		executorDone: executorDone,
 	}
@@ -385,4 +384,3 @@ func (kl *kubeletExecutor) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 	// Force kubelet to delete all pods.
 	kl.HandlePodDeletions(kl.GetPods())
 }
-
