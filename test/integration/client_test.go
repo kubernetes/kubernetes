@@ -32,6 +32,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -160,8 +161,8 @@ func TestSingleWatch(t *testing.T) {
 	defer w.Stop()
 
 	select {
-	case <-time.After(5 * time.Second):
-		t.Fatal("watch took longer than 15 seconds")
+	case <-time.After(util.ForeverTestTimeout):
+		t.Fatalf("watch took longer than %s", util.ForeverTestTimeout.String())
 	case got, ok := <-w.ResultChan():
 		if !ok {
 			t.Fatal("Watch channel closed unexpectedly.")
