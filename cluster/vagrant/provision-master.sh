@@ -307,6 +307,28 @@ if ! which salt-minion >/dev/null 2>&1; then
   # Install Salt minion
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
 
+  # Edit the Salt minion unit file to do restart always
+  # needed because vagrant uses this as basis for registration of nodes in cloud provider
+  # set a oom_score_adj to -999 to prevent our node from being killed with salt-master and then making kubelet NotReady
+  # because its not found in salt cloud provider call
+  cat <<EOF >/usr/lib/systemd/system/salt-minion.service 
+[Unit]
+Description=The Salt Minion
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/salt-minion
+Restart=Always
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl restart salt-minion.service
+
 else
   # Only run highstate when updating the config.  In the first-run case, Salt is
   # set up to run highstate as new minions join for the first time.
