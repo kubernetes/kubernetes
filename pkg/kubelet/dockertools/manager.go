@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -1633,7 +1634,21 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 				// RestartPolicy::Always, but it's not a big deal.
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				containersToStart[index] = empty{}
+
 			}
+
+			// Trying to get the reference for container,
+			// if failing to get the ref giv the Pod as reference
+			var containerOrPodRef runtime.Object
+			containerOrPodRef = pod // default
+			ref, err := kubecontainer.GenerateContainerRef(pod, &container)
+			if ref != nil && err == nil {
+				containerOrPodRef = ref
+			}
+
+			// sending the event "died" weither or not the container should be restarted
+			dm.recorder.Eventf(containerOrPodRef, "Died", "Container \"%v\" in pod \"%v\" died.", container.Name, podFullName)
+
 			continue
 		}
 
