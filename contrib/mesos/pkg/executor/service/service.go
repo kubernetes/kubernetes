@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -300,12 +299,10 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	ks.klet = klet
 	ks.kletLock.Unlock()
 
-	k := &kubeletExecutor{
+	// decorate kubelet such that it shuts down when the executor is
+	k := &executorKubelet{
 		Kubelet:      ks.klet,
-		address:      ks.Address,
-		dockerClient: kc.DockerClient,
 		kubeletDone:  kubeletDone,
-		clientConfig: clientConfig,
 		executorDone: executorDone,
 	}
 
@@ -313,68 +310,4 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	k.StartGarbageCollection()
 
 	return k, pc, nil
-}
-
-// kubelet decorator
-type kubeletExecutor struct {
-	*kubelet.Kubelet
-	address      net.IP
-	dockerClient dockertools.DockerInterface
-	kubeletDone  chan<- struct{} // closed once kubelet.Run() returns
-	executorDone <-chan struct{} // closed when executor terminates
-	clientConfig *client.Config
-}
-
-func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions *kubelet.TLSOptions, enableDebuggingHandlers bool) {
-	log.Infof("Starting kubelet server...")
-	kubelet.ListenAndServeKubeletServer(kl, address, port, tlsOptions, enableDebuggingHandlers)
-}
-
-// runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
-// never returns.
-func (kl *kubeletExecutor) Run(mergedUpdates <-chan kubelet.PodUpdate) {
-	defer func() {
-		close(kl.kubeletDone)
-		util.HandleCrash()
-		log.Infoln("kubelet run terminated") //TODO(jdef) turn down verbosity
-		// important: never return! this is in our contract
-		select {}
-	}()
-
-	// push merged updates into another, closable update channel which is closed
-	// when the executor shuts down.
-	closableUpdates := make(chan kubelet.PodUpdate)
-	go func() {
-		// closing closableUpdates will cause our patched kubelet's syncLoop() to exit
-		defer close(closableUpdates)
-	pipeLoop:
-		for {
-			select {
-			case <-kl.executorDone:
-				break pipeLoop
-			default:
-				select {
-				case u := <-mergedUpdates:
-					select {
-					case closableUpdates <- u: // noop
-					case <-kl.executorDone:
-						break pipeLoop
-					}
-				case <-kl.executorDone:
-					break pipeLoop
-				}
-			}
-		}
-	}()
-
-	// we expect that Run() will complete after closableUpdates is closed and the
-	// kubelet's syncLoop() has finished processing its backlog, which hopefully
-	// will not take very long. Peeking into the future (current k8s master) it
-	// seems that the backlog has grown from 1 to 50 -- this may negatively impact
-	// us going forward, time will tell.
-	util.Until(func() { kl.Kubelet.Run(closableUpdates) }, 0, kl.executorDone)
-
-	//TODO(jdef) revisit this if/when executor failover lands
-	// Force kubelet to delete all pods.
-	kl.HandlePodDeletions(kl.GetPods())
 }
