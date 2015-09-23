@@ -35,8 +35,10 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -61,8 +63,9 @@ type KubeletExecutorServer struct {
 	*app.KubeletServer
 	SuicideTimeout    time.Duration
 	LaunchGracePeriod time.Duration
-	kletLock       sync.Mutex
-	klet           *kubelet.Kubelet
+
+	kletLock sync.Mutex // TODO(sttts): remove necessity to access the kubelet from the executor
+	klet     *kubelet.Kubelet
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -87,27 +90,7 @@ func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
 }
 
-// Run runs the specified KubeletExecutorServer.
-func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	oomAdjuster := oom.NewOOMAdjuster()
-	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
-		log.Info(err)
-	}
-
-	// empty string for the docker and system containers (= cgroup paths). This
-	// stops the kubelet taking any control over other system processes.
-	s.SystemContainer = ""
-	s.DockerDaemonContainer = ""
-
-	// create static pods directory
-	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
-	err := os.Mkdir(staticPodsConfigPath, 0755)
-	if err != nil {
-		return err
-	}
-
+func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubetypes.PodUpdate, kubeletFinished <-chan struct{}, staticPodsConfigPath string) error {
 	// create apiserver client
 	var apiclient *client.Client
 	clientConfig, err := s.CreateAPIServerClientConfig()
@@ -117,6 +100,89 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	if err != nil {
 		// required for k8sm since we need to send api.Binding information
 		// back to the apiserver
+		log.Fatalf("No API client: %v", err)
+	}
+	exec := executor.New(executor.Config{
+		Updates:         execUpdates,
+		APIClient:       apiclient,
+		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		SuicideTimeout:  s.SuicideTimeout,
+		KubeletFinished: kubeletFinished,
+		ExitFunc:        os.Exit,
+		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
+			s.kletLock.Lock()
+			defer s.kletLock.Unlock()
+
+			if s.klet == nil {
+				return nil, fmt.Errorf("PodStatucFunc called before kubelet is initialized")
+			}
+
+			status, err := s.klet.GetRuntime().GetPodStatus(pod)
+			if err != nil {
+				return nil, err
+			}
+
+			status.Phase = kubelet.GetPhase(&pod.Spec, status.ContainerStatuses)
+			hostIP, err := s.klet.GetHostIP()
+			if err != nil {
+				log.Errorf("Cannot get host IP: %v", err)
+			} else {
+				status.HostIP = hostIP.String()
+			}
+			return status, nil
+		},
+		StaticPodsConfigPath: staticPodsConfigPath,
+		PodLW: cache.NewListWatchFromClient(apiclient, "pods", api.NamespaceAll,
+			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
+		),
+	})
+
+	// initialize driver and initialize the executor with it
+	dconfig := bindings.DriverConfig{
+		Executor:         exec,
+		HostnameOverride: s.HostnameOverride,
+		BindingAddress:   s.Address,
+	}
+	driver, err := bindings.NewMesosExecutorDriver(dconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create executor driver: %v", err)
+	}
+	log.V(2).Infof("Initialize executor driver...")
+	exec.Init(driver)
+
+	// start the driver
+	go func() {
+		if _, err := driver.Run(); err != nil {
+			log.Fatalf("executor driver failed: %v", err)
+		}
+		log.Info("executor Run completed")
+	}()
+
+	return nil
+}
+
+// Run runs the specified KubeletExecutorServer.
+func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubetypes.PodUpdate, kubeletFinished chan<- struct{}, staticPodsConfigPath string) error {
+	// empty string for the docker and system containers (= cgroup paths). This
+	// stops the kubelet taking any control over other system processes.
+	s.SystemContainer = ""
+	s.DockerDaemonContainer = ""
+
+	oomAdjuster := oom.NewOOMAdjuster()
+	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
+		log.Info(err)
+	}
+
+	dockerClient := dockertools.ConnectToDockerOrDie(s.DockerEndpoint)
+
+	// create apiserver client
+	var apiclient *client.Client
+	clientConfig, err := s.CreateAPIServerClientConfig()
+	if err == nil {
+		apiclient, err = client.New(clientConfig)
+	}
+	if err != nil {
+		// required for k8sm since we need to send api.Binding information back to the apiserver
 		log.Fatalf("No API client: %v", err)
 	}
 
@@ -136,6 +202,15 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	diskSpacePolicy := kubelet.DiskSpacePolicy{
 		DockerFreeDiskMB: s.LowDiskSpaceThresholdMB,
 		RootFreeDiskMB:   s.LowDiskSpaceThresholdMB,
+	}
+
+	manifestURLHeader := make(http.Header)
+	if s.ManifestURLHeader != "" {
+		pieces := strings.Split(s.ManifestURLHeader, ":")
+		if len(pieces) != 2 {
+			return fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", s.ManifestURLHeader)
+		}
+		manifestURLHeader.Set(pieces[0], pieces[1])
 	}
 
 	//TODO(jdef) intentionally NOT initializing a cloud provider here since:
@@ -181,75 +256,6 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		log.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
-	dockerClient := dockertools.ConnectToDockerOrDie(s.DockerEndpoint)
-
-	//TODO(jdef) either configure Watch here with something useful, or else
-	// get rid of it from executor.Config
-	kubeletFinished := make(chan struct{})
-	execUpdates := make(chan kubetypes.PodUpdate, 1)
-	exec := executor.New(executor.Config{
-		Updates:         execUpdates,
-		APIClient:       apiclient,
-		Docker:          dockerClient,
-		SuicideTimeout:  s.SuicideTimeout,
-		KubeletFinished: kubeletFinished,
-		ExitFunc:        os.Exit,
-		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
-			s.kletLock.Lock()
-			defer s.kletLock.Unlock()
-
-			if s.klet == nil {
-				return nil, fmt.Errorf("PodStatucFunc called before kubelet is initialized")
-			}
-
-			status, err := s.klet.GetRuntime().GetPodStatus(pod)
-			if err != nil {
-				return nil, err
-			}
-
-			status.Phase = kubelet.GetPhase(&pod.Spec, status.ContainerStatuses)
-			hostIP, err := s.klet.GetHostIP()
-			if err != nil {
-				log.Errorf("Cannot get host IP: %v", err)
-			} else {
-				status.HostIP = hostIP.String()
-			}
-			return status, nil
-		},
-		StaticPodsConfigPath: staticPodsConfigPath,
-	})
-
-	manifestURLHeader := make(http.Header)
-	if s.ManifestURLHeader != "" {
-		pieces := strings.Split(s.ManifestURLHeader, ":")
-		if len(pieces) != 2 {
-			return fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", s.ManifestURLHeader)
-		}
-		manifestURLHeader.Set(pieces[0], pieces[1])
-	}
-
-	// initialize driver and initialize the executor with it
-	dconfig := bindings.DriverConfig{
-		Executor:         exec,
-		HostnameOverride: s.HostnameOverride,
-		BindingAddress:   s.Address,
-	}
-	driver, err := bindings.NewMesosExecutorDriver(dconfig)
-	if err != nil {
-		log.Fatalf("failed to create executor driver: %v", err)
-	}
-	log.V(2).Infof("Initialize executor driver...")
-	exec.Init(driver)
-
-	// start the driver
-	go func() {
-		if _, err := driver.Run(); err != nil {
-			log.Fatalf("executor driver failed: %v", err)
-		}
-		log.Info("executor Run completed")
-	}()
-
-	<-exec.InitiallyRegistered()
 
 	// prepare kubelet
 	kcfg := app.KubeletConfig{
@@ -333,6 +339,37 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 				log.Errorf("Starting health server failed: %v", err)
 			}
 		}, 5*time.Second, util.NeverStop)
+	}
+
+	return nil
+}
+
+// Run runs the specified KubeletExecutorServer.
+func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	// create shared channels
+	kubeletFinished := make(chan struct{})
+	execUpdates := make(chan kubetypes.PodUpdate, 1)
+
+	// create static pods directory
+	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
+	err := os.Mkdir(staticPodsConfigPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	// start executor
+	err = s.runExecutor(execUpdates, kubeletFinished, staticPodsConfigPath)
+	if err != nil {
+		return err
+	}
+
+	// start kubelet
+	err = s.runKubelet(execUpdates, kubeletFinished, staticPodsConfigPath)
+	if err != nil {
+		close(kubeletFinished) // tell executor
+		return err
 	}
 
 	// block until executor is shut down or commits shutdown
@@ -531,3 +568,4 @@ func (kl *kubeletExecutor) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 	// Force kubelet to delete all pods.
 	kl.HandlePodDeletions(kl.GetPods())
 }
+
