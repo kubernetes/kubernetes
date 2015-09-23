@@ -40,7 +40,7 @@ func (f *FakeAPIInterface) RemoveThirdPartyResource(path string) error {
 func (f *FakeAPIInterface) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
 	f.installed = append(f.installed, rsrc)
 	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	f.apis = append(f.apis, makeThirdPartyPath(group))
+	f.apis = append(f.apis, makeThirdPartyPath(group, rsrc.Versions[0].APIGroup))
 	return nil
 }
 
@@ -49,7 +49,7 @@ func (f *FakeAPIInterface) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource
 		return false, nil
 	}
 	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	path := makeThirdPartyPath(group)
+	path := makeThirdPartyPath(group, rsrc.Versions[0].APIGroup)
 	for _, api := range f.apis {
 		if api == path {
 			return true, nil
@@ -77,6 +77,9 @@ func TestSyncAPIs(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo.example.com",
 						},
+						Versions: []expapi.APIVersion{
+							{APIGroup: "group"},
+						},
 					},
 				},
 			},
@@ -90,12 +93,15 @@ func TestSyncAPIs(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo.example.com",
 						},
+						Versions: []expapi.APIVersion{
+							{APIGroup: "group"},
+						},
 					},
 				},
 			},
 			apis: []string{
-				"/apis/example.com",
-				"/apis/example.com/v1",
+				"/apis/example.com/group",
+				"/apis/example.com/group/v1",
 			},
 			name: "does nothing",
 		},
@@ -106,19 +112,22 @@ func TestSyncAPIs(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo.example.com",
 						},
+						Versions: []expapi.APIVersion{
+							{APIGroup: "group"},
+						},
 					},
 				},
 			},
 			apis: []string{
-				"/apis/example.com",
-				"/apis/example.com/v1",
-				"/apis/example.co",
-				"/apis/example.co/v1",
+				"/apis/example.com/group",
+				"/apis/example.com/group/v1",
+				"/apis/example.co/group",
+				"/apis/example.co/group/v1",
 			},
 			name: "deletes substring API",
 			expectedRemoved: []string{
-				"/apis/example.co",
-				"/apis/example.co/v1",
+				"/apis/example.co/group",
+				"/apis/example.co/group/v1",
 			},
 		},
 		{
@@ -128,17 +137,23 @@ func TestSyncAPIs(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo.example.com",
 						},
+						Versions: []expapi.APIVersion{
+							{APIGroup: "group"},
+						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo.company.com",
 						},
+						Versions: []expapi.APIVersion{
+							{APIGroup: "group"},
+						},
 					},
 				},
 			},
 			apis: []string{
-				"/apis/company.com",
-				"/apis/company.com/v1",
+				"/apis/company.com/group",
+				"/apis/company.com/group/v1",
 			},
 			expectedInstalled: []string{"foo.example.com"},
 			name:              "adds with existing",
@@ -150,15 +165,18 @@ func TestSyncAPIs(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo.example.com",
 						},
+						Versions: []expapi.APIVersion{
+							{APIGroup: "group"},
+						},
 					},
 				},
 			},
 			apis: []string{
-				"/apis/company.com",
-				"/apis/company.com/v1",
+				"/apis/company.com/group",
+				"/apis/company.com/group/v1",
 			},
 			expectedInstalled: []string{"foo.example.com"},
-			expectedRemoved:   []string{"/apis/company.com", "/apis/company.com/v1"},
+			expectedRemoved:   []string{"/apis/company.com/group", "/apis/company.com/group/v1"},
 			name:              "removes with existing",
 		},
 	}

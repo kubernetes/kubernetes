@@ -816,7 +816,7 @@ func (m *Master) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, e
 	if err != nil {
 		return false, err
 	}
-	path := makeThirdPartyPath(group)
+	path := makeThirdPartyPath(group, rsrc.Versions[0].APIGroup)
 	services := m.handlerContainer.RegisteredWebServices()
 	for ix := range services {
 		if services[ix].RootPath() == path {
@@ -903,11 +903,11 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 	if err != nil {
 		return err
 	}
-	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, rsrc.Versions[0].APIGroup)
 	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
-	path := makeThirdPartyPath(group)
+	path := makeThirdPartyPath(group, rsrc.Versions[0].APIGroup)
 	groupVersion := api.GroupVersion{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
@@ -923,10 +923,10 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 	return nil
 }
 
-func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
+func (m *Master) thirdpartyapi(group, kind, version, apiGroup string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := makeThirdPartyPath(group)
+	apiRoot := makeThirdPartyPath(group, apiGroup)
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,

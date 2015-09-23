@@ -32,8 +32,8 @@ import (
 
 const thirdpartyprefix = "/apis/"
 
-func makeThirdPartyPath(group string) string {
-	return thirdpartyprefix + group
+func makeThirdPartyPath(group, apiGroup string) string {
+	return thirdpartyprefix + group + "/" + apiGroup
 }
 
 // resourceInterface is the interface for the parts of the master that know how to add/remove
@@ -93,7 +93,7 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 				return err
 			}
 			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-			existing.Insert(makeThirdPartyPath(group))
+			existing.Insert(makeThirdPartyPath(group, item.Versions[0].APIGroup))
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
 				return err

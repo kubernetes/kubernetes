@@ -526,7 +526,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			setupEtcdList(fakeClient, "/ThirdPartyResourceData/company.com/foos/default", test.items)
 		}
 
-		resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos")
+		resp, err := http.Get(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos")
 		if !assert.NoError(err) {
 			return
 		}
@@ -646,7 +646,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		return
 	}
 
-	resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
@@ -691,7 +691,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		return
 	}
 
-	resp, err := http.Post(server.URL+"/apis/company.com/"+version+"/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
+	resp, err := http.Post(server.URL+"/apis/company.com/group/"+version+"/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -759,7 +759,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		return
 	}
 
-	resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
@@ -776,14 +776,14 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	resp, err = httpDelete(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err = httpDelete(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
 
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err = http.Get(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
@@ -839,7 +839,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 
 	setupEtcdList(fakeClient, "/ThirdPartyResourceData/company.com/foos/default", []Foo{expectedObj, secondObj})
 
-	resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err := http.Get(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		t.FailNow()
 		return
@@ -861,10 +861,10 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	path := makeThirdPartyPath("company.com")
+	path := makeThirdPartyPath("company.com", "group")
 	master.RemoveThirdPartyResource(path)
 
-	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
+	resp, err = http.Get(server.URL + "/apis/company.com/group/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
 		return
 	}
