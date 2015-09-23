@@ -1757,11 +1757,8 @@ func getNotReadyStatus(cName string) api.ContainerStatus {
 }
 func getReadyCondition(status api.ConditionStatus, transitionTime unversioned.Time, reason, message string) []api.PodCondition {
 	return []api.PodCondition{{
-		Type:               api.PodReady,
-		Status:             status,
-		LastTransitionTime: transitionTime,
-		Reason:             reason,
-		Message:            message,
+		Type:   api.PodReady,
+		Status: status,
 	}}
 }
 
