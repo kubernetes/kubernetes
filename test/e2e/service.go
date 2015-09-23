@@ -413,7 +413,7 @@ var _ = Describe("Services", func() {
 		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
-		testReachable(pickMinionIP(c), port.NodePort)
+		testReachable(pickNodeIP(c), port.NodePort)
 
 		By("hitting the pod through the service's external load balancer")
 		testLoadBalancerReachable(ingress, inboundPort)
@@ -482,7 +482,7 @@ var _ = Describe("Services", func() {
 		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
-		testReachable(pickMinionIP(c), port.NodePort)
+		testReachable(pickNodeIP(c), port.NodePort)
 
 		By("hitting the pod through the service's external load balancer")
 		testLoadBalancerReachable(ingress, inboundPort)
@@ -529,7 +529,7 @@ var _ = Describe("Services", func() {
 		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(c)
+		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
 		hosts, err := NodeSSHHosts(c)
@@ -605,7 +605,7 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
 		}
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(f.Client)
+		ip := pickNodeIP(f.Client)
 		nodePort1 := port.NodePort // Save for later!
 		testReachable(ip, nodePort1)
 
@@ -638,7 +638,7 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected Status.LoadBalancer.Ingresss[0] for LoadBalancer service: %v", service)
 		}
 		By("hitting the pod through the service's NodePort")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testReachable(ip, nodePort1)
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress1, 80)
@@ -710,10 +710,10 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for back-to-ClusterIP service: %v", service)
 		}
 		By("checking the NodePort (original) is closed")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort1)
 		By("checking the NodePort (updated) is closed")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort2)
 		By("checking the LoadBalancer is closed")
 		testLoadBalancerNotReachable(ingress2, 80)
@@ -769,7 +769,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(c)
+		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress, 80)
@@ -1249,7 +1249,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 	return ips
 }
 
-func getMinionPublicIps(c *client.Client) ([]string, error) {
+func getNodePublicIps(c *client.Client) ([]string, error) {
 	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
@@ -1262,8 +1262,8 @@ func getMinionPublicIps(c *client.Client) ([]string, error) {
 	return ips, nil
 }
 
-func pickMinionIP(c *client.Client) string {
-	publicIps, err := getMinionPublicIps(c)
+func pickNodeIP(c *client.Client) string {
+	publicIps, err := getNodePublicIps(c)
 	Expect(err).NotTo(HaveOccurred())
 	if len(publicIps) == 0 {
 		Failf("got unexpected number (%d) of public IPs", len(publicIps))

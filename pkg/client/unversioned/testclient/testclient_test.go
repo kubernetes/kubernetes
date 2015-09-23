@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -32,7 +32,7 @@ func TestNewClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := &Fake{}
-	client.AddReactor("*", "*", ObjectReaction(o, latest.RESTMapper))
+	client.AddReactor("*", "*", ObjectReaction(o, testapi.Default.RESTMapper()))
 	list, err := client.Services("test").List(labels.Everything())
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestErrors(t *testing.T) {
 		},
 	})
 	client := &Fake{}
-	client.AddReactor("*", "*", ObjectReaction(o, latest.RESTMapper))
+	client.AddReactor("*", "*", ObjectReaction(o, testapi.Default.RESTMapper()))
 	_, err := client.Services("test").List(labels.Everything())
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error: %v", err)

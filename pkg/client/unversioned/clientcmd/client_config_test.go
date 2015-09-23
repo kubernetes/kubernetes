@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -34,7 +34,7 @@ func createValidTestConfig() *clientcmdapi.Config {
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:     server,
-		APIVersion: latest.Version,
+		APIVersion: testapi.Default.Version(),
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Token: token,
@@ -89,7 +89,7 @@ func TestCertificateData(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:                   "https://localhost:8443",
-		APIVersion:               latest.Version,
+		APIVersion:               testapi.Default.Version(),
 		CertificateAuthorityData: caData,
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -122,7 +122,7 @@ func TestBasicAuthData(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:     "https://localhost:8443",
-		APIVersion: latest.Version,
+		APIVersion: testapi.Default.Version(),
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Username: username,

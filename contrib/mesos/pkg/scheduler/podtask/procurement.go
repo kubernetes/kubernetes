@@ -74,6 +74,21 @@ func ValidateProcurement(t *T, offer *mesos.Offer) error {
 	return nil
 }
 
+func setCommandArgument(ei *mesos.ExecutorInfo, flag, value string, create bool) {
+	argv := ei.Command.Arguments
+	overwrite := false
+	for i, arg := range argv {
+		if strings.HasPrefix(arg, flag+"=") {
+			overwrite = true
+			argv[i] = flag + "=" + value
+			break
+		}
+	}
+	if !overwrite && create {
+		ei.Command.Arguments = append(argv, flag+"="+value)
+	}
+}
+
 // NodeProcurement updates t.Spec in preparation for the task to be launched on the
 // slave associated with the offer.
 func NodeProcurement(t *T, offer *mesos.Offer) error {
@@ -82,22 +97,8 @@ func NodeProcurement(t *T, offer *mesos.Offer) error {
 
 	// hostname needs of the executor needs to match that of the offer, otherwise
 	// the kubelet node status checker/updater is very unhappy
-	const HOSTNAME_OVERRIDE_FLAG = "--hostname-override="
-	hostname := offer.GetHostname() // required field, non-empty
-	hostnameOverride := HOSTNAME_OVERRIDE_FLAG + hostname
+	setCommandArgument(t.executor, "--hostname-override", offer.GetHostname(), true)
 
-	argv := t.executor.Command.Arguments
-	overwrite := false
-	for i, arg := range argv {
-		if strings.HasPrefix(arg, HOSTNAME_OVERRIDE_FLAG) {
-			overwrite = true
-			argv[i] = hostnameOverride
-			break
-		}
-	}
-	if !overwrite {
-		t.executor.Command.Arguments = append(argv, hostnameOverride)
-	}
 	return nil
 }
 
@@ -113,10 +114,10 @@ func (r *RequireSomePodResources) Procure(t *T, offer *mesos.Offer) error {
 	// TODO(jdef): changing the state of t.Pod here feels dirty, especially since we don't use a kosher
 	// method to clone the api.Pod state in T.Clone(). This needs some love.
 	if unlimitedCPU := mresource.LimitPodCPU(&t.Pod, r.defaultContainerCPULimit); unlimitedCPU {
-		log.Warningf("Pod %s/%s without cpu limits is admitted %.2f cpu shares", t.Pod.Namespace, t.Pod.Name, mresource.PodCPULimit(&t.Pod))
+		log.V(2).Infof("Pod %s/%s without cpu limits is admitted %.2f cpu shares", t.Pod.Namespace, t.Pod.Name, mresource.PodCPULimit(&t.Pod))
 	}
 	if unlimitedMem := mresource.LimitPodMem(&t.Pod, r.defaultContainerMemLimit); unlimitedMem {
-		log.Warningf("Pod %s/%s without memory limits is admitted %.2f MB", t.Pod.Namespace, t.Pod.Name, mresource.PodMemLimit(&t.Pod))
+		log.V(2).Infof("Pod %s/%s without memory limits is admitted %.2f MB", t.Pod.Namespace, t.Pod.Name, mresource.PodMemLimit(&t.Pod))
 	}
 	return nil
 }

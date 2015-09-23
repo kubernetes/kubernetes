@@ -19,7 +19,6 @@ package replicationcontroller
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
@@ -27,22 +26,20 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 type FakePodControl struct {
-	controllerSpec []api.ReplicationController
+	controllerSpec []api.PodTemplateSpec
 	deletePodName  []string
 	lock           sync.Mutex
 	err            error
@@ -60,7 +57,7 @@ func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
-func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationController) error {
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.err != nil {
@@ -70,7 +67,7 @@ func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationCo
 	return nil
 }
 
-func (f *FakePodControl) CreateReplicaOnNode(namespace string, daemon *experimental.DaemonSet, nodeName string) error {
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
 	return nil
 }
 
@@ -87,7 +84,7 @@ func (f *FakePodControl) clear() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.deletePodName = []string{}
-	f.controllerSpec = []api.ReplicationController{}
+	f.controllerSpec = []api.PodTemplateSpec{}
 }
 
 func getKey(rc *api.ReplicationController, t *testing.T) string {
@@ -101,7 +98,7 @@ func getKey(rc *api.ReplicationController, t *testing.T) string {
 
 func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             util.NewUUID(),
 			Name:            "foobar",
@@ -177,51 +174,6 @@ func replicationControllerResourceName() string {
 type serverResponse struct {
 	statusCode int
 	obj        interface{}
-}
-
-func makeTestServer(t *testing.T, namespace, name string, podResponse, controllerResponse, updateResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakePodHandler := util.FakeHandler{
-		StatusCode:   podResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), podResponse.obj.(runtime.Object)),
-	}
-	fakeControllerHandler := util.FakeHandler{
-		StatusCode:   controllerResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), controllerResponse.obj.(runtime.Object)),
-	}
-	fakeUpdateHandler := util.FakeHandler{
-		StatusCode:   updateResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), updateResponse.obj.(runtime.Object)),
-	}
-	mux := http.NewServeMux()
-	mux.Handle(testapi.Default.ResourcePath("pods", namespace, ""), &fakePodHandler)
-	mux.Handle(testapi.Default.ResourcePath(replicationControllerResourceName(), "", ""), &fakeControllerHandler)
-	if namespace != "" {
-		mux.Handle(testapi.Default.ResourcePath(replicationControllerResourceName(), namespace, ""), &fakeControllerHandler)
-	}
-	if name != "" {
-		mux.Handle(testapi.Default.ResourcePath(replicationControllerResourceName(), namespace, name), &fakeUpdateHandler)
-	}
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		t.Errorf("unexpected request: %v", req.RequestURI)
-		res.WriteHeader(http.StatusNotFound)
-	})
-	return httptest.NewServer(mux), &fakeUpdateHandler
-}
-
-func startManagerAndWait(manager *ReplicationManager, pods int, t *testing.T) chan struct{} {
-	stopCh := make(chan struct{})
-	go manager.Run(1, stopCh)
-	err := wait.Poll(10*time.Millisecond, 100*time.Millisecond, func() (bool, error) {
-		podList, err := manager.podStore.List(labels.Everything())
-		if err != nil {
-			return false, err
-		}
-		return len(podList) == pods, nil
-	})
-	if err != nil {
-		t.Errorf("Failed to observe %d pods in 100ms", pods)
-	}
-	return stopCh
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
@@ -969,7 +921,7 @@ func TestOverlappingRCs(t *testing.T) {
 		var controllers []*api.ReplicationController
 		for j := 1; j < 10; j++ {
 			controllerSpec := newReplicationController(1)
-			controllerSpec.CreationTimestamp = util.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
+			controllerSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
 			controllerSpec.Name = string(util.NewUUID())
 			controllers = append(controllers, controllerSpec)
 		}

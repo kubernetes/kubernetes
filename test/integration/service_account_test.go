@@ -341,7 +341,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	deleteAllEtcdKeys()
 
 	// Etcd
-	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -420,6 +420,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		Authenticator:     authenticator,
 		Authorizer:        authorizer,
 		AdmissionControl:  serviceAccountAdmission,
+		StorageVersions:   map[string]string{"": testapi.Default.Version()},
 	})
 
 	// Start the service account and service account token controllers

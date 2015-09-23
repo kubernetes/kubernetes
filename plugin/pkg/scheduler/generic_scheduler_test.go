@@ -44,31 +44,31 @@ func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (boo
 	return len(existingPods) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
+func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
 	result := []algorithm.HostPriority{}
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %v", err)
 	}
-	for _, minion := range nodes.Items {
-		score, err := strconv.Atoi(minion.Name)
+	for _, node := range nodes.Items {
+		score, err := strconv.Atoi(node.Name)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, algorithm.HostPriority{
-			Host:  minion.Name,
+			Host:  node.Name,
 			Score: score,
 		})
 	}
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []algorithm.HostPriority{}
-	result, err := numericPriority(pod, podLister, minionLister)
+	result, err := numericPriority(pod, podLister, nodeLister)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func TestGenericScheduler(t *testing.T) {
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
 		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, algorithm.FakePodLister(test.pods), random)
-		machine, err := scheduler.Schedule(test.pod, algorithm.FakeMinionLister(makeNodeList(test.nodes)))
+		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Error("Unexpected non-error")

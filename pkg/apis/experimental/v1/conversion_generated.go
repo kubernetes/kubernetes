@@ -288,6 +288,29 @@ func convert_api_ExecAction_To_v1_ExecAction(in *api.ExecAction, out *v1.ExecAct
 	return nil
 }
 
+func convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out *v1.FCVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.FCVolumeSource))(in)
+	}
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	if in.Lun != nil {
+		out.Lun = new(int)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource(in *api.GCEPersistentDiskVolumeSource, out *v1.GCEPersistentDiskVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.GCEPersistentDiskVolumeSource))(in)
@@ -405,12 +428,29 @@ func convert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *v1.Lifecycle,
 	return nil
 }
 
-func convert_api_ListMeta_To_v1_ListMeta(in *api.ListMeta, out *v1.ListMeta, s conversion.Scope) error {
+func convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalancerIngress, out *v1.LoadBalancerIngress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ListMeta))(in)
+		defaulting.(func(*api.LoadBalancerIngress))(in)
 	}
-	out.SelfLink = in.SelfLink
-	out.ResourceVersion = in.ResourceVersion
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *api.LoadBalancerStatus, out *v1.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]v1.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
 	return nil
 }
 
@@ -646,15 +686,6 @@ func convert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, 
 	return nil
 }
 
-func convert_api_TypeMeta_To_v1_TypeMeta(in *api.TypeMeta, out *v1.TypeMeta, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.TypeMeta))(in)
-	}
-	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
-	return nil
-}
-
 func convert_api_Volume_To_v1_Volume(in *api.Volume, out *v1.Volume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Volume))(in)
@@ -791,6 +822,14 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *v1.V
 		}
 	} else {
 		out.DownwardAPI = nil
+	}
+	if in.FC != nil {
+		out.FC = new(v1.FCVolumeSource)
+		if err := convert_api_FCVolumeSource_To_v1_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
 	}
 	return nil
 }
@@ -1055,6 +1094,29 @@ func convert_v1_ExecAction_To_api_ExecAction(in *v1.ExecAction, out *api.ExecAct
 	return nil
 }
 
+func convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, out *api.FCVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.FCVolumeSource))(in)
+	}
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	if in.Lun != nil {
+		out.Lun = new(int)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource(in *v1.GCEPersistentDiskVolumeSource, out *api.GCEPersistentDiskVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.GCEPersistentDiskVolumeSource))(in)
@@ -1172,12 +1234,29 @@ func convert_v1_Lifecycle_To_api_Lifecycle(in *v1.Lifecycle, out *api.Lifecycle,
 	return nil
 }
 
-func convert_v1_ListMeta_To_api_ListMeta(in *v1.ListMeta, out *api.ListMeta, s conversion.Scope) error {
+func convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(in *v1.LoadBalancerIngress, out *api.LoadBalancerIngress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*v1.ListMeta))(in)
+		defaulting.(func(*v1.LoadBalancerIngress))(in)
 	}
-	out.SelfLink = in.SelfLink
-	out.ResourceVersion = in.ResourceVersion
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(in *v1.LoadBalancerStatus, out *api.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]api.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
 	return nil
 }
 
@@ -1413,15 +1492,6 @@ func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *v1.TCPSocketAction, o
 	return nil
 }
 
-func convert_v1_TypeMeta_To_api_TypeMeta(in *v1.TypeMeta, out *api.TypeMeta, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*v1.TypeMeta))(in)
-	}
-	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
-	return nil
-}
-
 func convert_v1_Volume_To_api_Volume(in *v1.Volume, out *api.Volume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.Volume))(in)
@@ -1559,6 +1629,14 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *api.V
 	} else {
 		out.DownwardAPI = nil
 	}
+	if in.FC != nil {
+		out.FC = new(api.FCVolumeSource)
+		if err := convert_v1_FCVolumeSource_To_api_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+	}
 	return nil
 }
 
@@ -1575,7 +1653,7 @@ func convert_experimental_DaemonSet_To_v1_DaemonSet(in *experimental.DaemonSet, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DaemonSet))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1594,10 +1672,10 @@ func convert_experimental_DaemonSetList_To_v1_DaemonSetList(in *experimental.Dae
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DaemonSetList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1650,7 +1728,7 @@ func convert_experimental_Deployment_To_v1_Deployment(in *experimental.Deploymen
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.Deployment))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1669,10 +1747,10 @@ func convert_experimental_DeploymentList_To_v1_DeploymentList(in *experimental.D
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DeploymentList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1701,7 +1779,7 @@ func convert_experimental_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.HorizontalPodAutoscaler))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1725,10 +1803,10 @@ func convert_experimental_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutosca
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.HorizontalPodAutoscalerList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1756,8 +1834,8 @@ func convert_experimental_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutosca
 	} else {
 		out.ScaleRef = nil
 	}
-	out.MinCount = in.MinCount
-	out.MaxCount = in.MaxCount
+	out.MinReplicas = in.MinReplicas
+	out.MaxReplicas = in.MaxReplicas
 	if err := convert_experimental_ResourceConsumption_To_v1_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -1788,11 +1866,123 @@ func convert_experimental_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutos
 	return nil
 }
 
+func convert_experimental_Ingress_To_v1_Ingress(in *experimental.Ingress, out *Ingress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.Ingress))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_experimental_IngressSpec_To_v1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_experimental_IngressStatus_To_v1_IngressStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_experimental_IngressBackend_To_v1_IngressBackend(in *experimental.IngressBackend, out *IngressBackend, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressBackend))(in)
+	}
+	if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ServiceRef, &out.ServiceRef, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
+		return err
+	}
+	out.Protocol = v1.Protocol(in.Protocol)
+	return nil
+}
+
+func convert_experimental_IngressList_To_v1_IngressList(in *experimental.IngressList, out *IngressList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Ingress, len(in.Items))
+		for i := range in.Items {
+			if err := convert_experimental_Ingress_To_v1_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressPath_To_v1_IngressPath(in *experimental.IngressPath, out *IngressPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressPath))(in)
+	}
+	out.Path = in.Path
+	if err := convert_experimental_IngressBackend_To_v1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_experimental_IngressRule_To_v1_IngressRule(in *experimental.IngressRule, out *IngressRule, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressRule))(in)
+	}
+	out.Host = in.Host
+	if in.Paths != nil {
+		out.Paths = make([]IngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := convert_experimental_IngressPath_To_v1_IngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressSpec_To_v1_IngressSpec(in *experimental.IngressSpec, out *IngressSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressSpec))(in)
+	}
+	if in.Rules != nil {
+		out.Rules = make([]IngressRule, len(in.Rules))
+		for i := range in.Rules {
+			if err := convert_experimental_IngressRule_To_v1_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
+	return nil
+}
+
+func convert_experimental_IngressStatus_To_v1_IngressStatus(in *experimental.IngressStatus, out *IngressStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.IngressStatus))(in)
+	}
+	if err := convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_experimental_Job_To_v1_Job(in *experimental.Job, out *Job, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.Job))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1828,10 +2018,10 @@ func convert_experimental_JobList_To_v1_JobList(in *experimental.JobList, out *J
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.JobList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1920,7 +2110,7 @@ func convert_experimental_ReplicationControllerDummy_To_v1_ReplicationController
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.ReplicationControllerDummy))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	return nil
@@ -1941,7 +2131,7 @@ func convert_experimental_Scale_To_v1_Scale(in *experimental.Scale, out *Scale, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.Scale))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1996,7 +2186,7 @@ func convert_experimental_ThirdPartyResource_To_v1_ThirdPartyResource(in *experi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.ThirdPartyResource))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2020,7 +2210,7 @@ func convert_experimental_ThirdPartyResourceData_To_v1_ThirdPartyResourceData(in
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.ThirdPartyResourceData))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2036,10 +2226,10 @@ func convert_experimental_ThirdPartyResourceDataList_To_v1_ThirdPartyResourceDat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.ThirdPartyResourceDataList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2059,10 +2249,10 @@ func convert_experimental_ThirdPartyResourceList_To_v1_ThirdPartyResourceList(in
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.ThirdPartyResourceList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2091,7 +2281,7 @@ func convert_v1_DaemonSet_To_experimental_DaemonSet(in *DaemonSet, out *experime
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSet))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2110,10 +2300,10 @@ func convert_v1_DaemonSetList_To_experimental_DaemonSetList(in *DaemonSetList, o
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2166,7 +2356,7 @@ func convert_v1_Deployment_To_experimental_Deployment(in *Deployment, out *exper
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Deployment))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2185,10 +2375,10 @@ func convert_v1_DeploymentList_To_experimental_DeploymentList(in *DeploymentList
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2217,7 +2407,7 @@ func convert_v1_HorizontalPodAutoscaler_To_experimental_HorizontalPodAutoscaler(
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscaler))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2241,10 +2431,10 @@ func convert_v1_HorizontalPodAutoscalerList_To_experimental_HorizontalPodAutosca
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2272,8 +2462,8 @@ func convert_v1_HorizontalPodAutoscalerSpec_To_experimental_HorizontalPodAutosca
 	} else {
 		out.ScaleRef = nil
 	}
-	out.MinCount = in.MinCount
-	out.MaxCount = in.MaxCount
+	out.MinReplicas = in.MinReplicas
+	out.MaxReplicas = in.MaxReplicas
 	if err := convert_v1_ResourceConsumption_To_experimental_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -2304,11 +2494,123 @@ func convert_v1_HorizontalPodAutoscalerStatus_To_experimental_HorizontalPodAutos
 	return nil
 }
 
+func convert_v1_Ingress_To_experimental_Ingress(in *Ingress, out *experimental.Ingress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Ingress))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_IngressSpec_To_experimental_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_IngressStatus_To_experimental_IngressStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_IngressBackend_To_experimental_IngressBackend(in *IngressBackend, out *experimental.IngressBackend, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressBackend))(in)
+	}
+	if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ServiceRef, &out.ServiceRef, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
+		return err
+	}
+	out.Protocol = api.Protocol(in.Protocol)
+	return nil
+}
+
+func convert_v1_IngressList_To_experimental_IngressList(in *IngressList, out *experimental.IngressList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]experimental.Ingress, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Ingress_To_experimental_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_IngressPath_To_experimental_IngressPath(in *IngressPath, out *experimental.IngressPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressPath))(in)
+	}
+	out.Path = in.Path
+	if err := convert_v1_IngressBackend_To_experimental_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_IngressRule_To_experimental_IngressRule(in *IngressRule, out *experimental.IngressRule, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressRule))(in)
+	}
+	out.Host = in.Host
+	if in.Paths != nil {
+		out.Paths = make([]experimental.IngressPath, len(in.Paths))
+		for i := range in.Paths {
+			if err := convert_v1_IngressPath_To_experimental_IngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
+	return nil
+}
+
+func convert_v1_IngressSpec_To_experimental_IngressSpec(in *IngressSpec, out *experimental.IngressSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressSpec))(in)
+	}
+	if in.Rules != nil {
+		out.Rules = make([]experimental.IngressRule, len(in.Rules))
+		for i := range in.Rules {
+			if err := convert_v1_IngressRule_To_experimental_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
+	return nil
+}
+
+func convert_v1_IngressStatus_To_experimental_IngressStatus(in *IngressStatus, out *experimental.IngressStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressStatus))(in)
+	}
+	if err := convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1_Job_To_experimental_Job(in *Job, out *experimental.Job, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Job))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2344,10 +2646,10 @@ func convert_v1_JobList_To_experimental_JobList(in *JobList, out *experimental.J
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2436,7 +2738,7 @@ func convert_v1_ReplicationControllerDummy_To_experimental_ReplicationController
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerDummy))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	return nil
@@ -2457,7 +2759,7 @@ func convert_v1_Scale_To_experimental_Scale(in *Scale, out *experimental.Scale, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Scale))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2512,7 +2814,7 @@ func convert_v1_ThirdPartyResource_To_experimental_ThirdPartyResource(in *ThirdP
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResource))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2536,7 +2838,7 @@ func convert_v1_ThirdPartyResourceData_To_experimental_ThirdPartyResourceData(in
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceData))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -2552,10 +2854,10 @@ func convert_v1_ThirdPartyResourceDataList_To_experimental_ThirdPartyResourceDat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceDataList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2575,10 +2877,10 @@ func convert_v1_ThirdPartyResourceList_To_experimental_ThirdPartyResourceList(in
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -2608,6 +2910,7 @@ func init() {
 		convert_api_EnvVarSource_To_v1_EnvVarSource,
 		convert_api_EnvVar_To_v1_EnvVar,
 		convert_api_ExecAction_To_v1_ExecAction,
+		convert_api_FCVolumeSource_To_v1_FCVolumeSource,
 		convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource,
 		convert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource,
 		convert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource,
@@ -2616,7 +2919,8 @@ func init() {
 		convert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
 		convert_api_Lifecycle_To_v1_Lifecycle,
-		convert_api_ListMeta_To_v1_ListMeta,
+		convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
+		convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		convert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector,
@@ -2630,7 +2934,6 @@ func init() {
 		convert_api_SecretVolumeSource_To_v1_SecretVolumeSource,
 		convert_api_SecurityContext_To_v1_SecurityContext,
 		convert_api_TCPSocketAction_To_v1_TCPSocketAction,
-		convert_api_TypeMeta_To_v1_TypeMeta,
 		convert_api_VolumeMount_To_v1_VolumeMount,
 		convert_api_VolumeSource_To_v1_VolumeSource,
 		convert_api_Volume_To_v1_Volume,
@@ -2646,6 +2949,13 @@ func init() {
 		convert_experimental_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
 		convert_experimental_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
 		convert_experimental_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
+		convert_experimental_IngressBackend_To_v1_IngressBackend,
+		convert_experimental_IngressList_To_v1_IngressList,
+		convert_experimental_IngressPath_To_v1_IngressPath,
+		convert_experimental_IngressRule_To_v1_IngressRule,
+		convert_experimental_IngressSpec_To_v1_IngressSpec,
+		convert_experimental_IngressStatus_To_v1_IngressStatus,
+		convert_experimental_Ingress_To_v1_Ingress,
 		convert_experimental_JobCondition_To_v1_JobCondition,
 		convert_experimental_JobList_To_v1_JobList,
 		convert_experimental_JobSpec_To_v1_JobSpec,
@@ -2681,6 +2991,7 @@ func init() {
 		convert_v1_EnvVarSource_To_api_EnvVarSource,
 		convert_v1_EnvVar_To_api_EnvVar,
 		convert_v1_ExecAction_To_api_ExecAction,
+		convert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		convert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource,
 		convert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource,
 		convert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource,
@@ -2692,13 +3003,21 @@ func init() {
 		convert_v1_HorizontalPodAutoscaler_To_experimental_HorizontalPodAutoscaler,
 		convert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,
+		convert_v1_IngressBackend_To_experimental_IngressBackend,
+		convert_v1_IngressList_To_experimental_IngressList,
+		convert_v1_IngressPath_To_experimental_IngressPath,
+		convert_v1_IngressRule_To_experimental_IngressRule,
+		convert_v1_IngressSpec_To_experimental_IngressSpec,
+		convert_v1_IngressStatus_To_experimental_IngressStatus,
+		convert_v1_Ingress_To_experimental_Ingress,
 		convert_v1_JobCondition_To_experimental_JobCondition,
 		convert_v1_JobList_To_experimental_JobList,
 		convert_v1_JobSpec_To_experimental_JobSpec,
 		convert_v1_JobStatus_To_experimental_JobStatus,
 		convert_v1_Job_To_experimental_Job,
 		convert_v1_Lifecycle_To_api_Lifecycle,
-		convert_v1_ListMeta_To_api_ListMeta,
+		convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
+		convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector,
@@ -2722,7 +3041,6 @@ func init() {
 		convert_v1_ThirdPartyResourceData_To_experimental_ThirdPartyResourceData,
 		convert_v1_ThirdPartyResourceList_To_experimental_ThirdPartyResourceList,
 		convert_v1_ThirdPartyResource_To_experimental_ThirdPartyResource,
-		convert_v1_TypeMeta_To_api_TypeMeta,
 		convert_v1_VolumeMount_To_api_VolumeMount,
 		convert_v1_VolumeSource_To_api_VolumeSource,
 		convert_v1_Volume_To_api_Volume,

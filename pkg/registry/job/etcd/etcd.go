@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for jobs against etcd
+// REST implements a RESTStorage for jobs against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }

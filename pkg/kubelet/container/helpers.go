@@ -62,7 +62,7 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 		}
 	}
 
-	// Set dead containers to unready state.
+	// Set dead containers to notReady state.
 	for _, c := range resultStatus {
 		readinessManager.RemoveReadiness(TrimRuntimePrefix(c.ContainerID))
 	}

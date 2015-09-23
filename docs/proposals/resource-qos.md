@@ -101,7 +101,8 @@ API changes for request
 - Add validation code that checks request <= limit, and validation test cases (api/validation/validation.go)
 
 Scheduler Changes
-- Use requests instead of limits in CheckPodsExceedingCapacity and PodFitsResources (scheduler/algorithm/predicates.go)
+- Predicates: Use requests instead of limits in CheckPodsExceedingCapacity and PodFitsResources (scheduler/algorithm/predicates/predicates.go)
+- Priorities: Use requests instead of limits in LeastRequestedPriority and BalancedResourceAllocation(scheduler/algorithm/priorities/priorities.go)(PR #12718)
 
 Container Manager Changes
 - Use requests to assign CPU shares for Docker (kubelet/dockertools/container_manager.go)

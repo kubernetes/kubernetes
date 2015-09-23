@@ -18,7 +18,6 @@ package generic
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/fields"
@@ -115,44 +114,6 @@ func TestSelectionPredicate(t *testing.T) {
 				t.Errorf("%v: expected %v, got %v", name, e, a)
 			}
 		}
-	}
-}
-
-func TestFilterList(t *testing.T) {
-	try := &IgnoredList{
-		Items: []Ignored{
-			{"foo"},
-			{"bar"},
-			{"baz"},
-			{"qux"},
-			{"zot"},
-		},
-	}
-	expect := &IgnoredList{
-		Items: []Ignored{
-			{"bar"},
-			{"baz"},
-		},
-	}
-
-	m := MatcherFunc(func(obj runtime.Object) (bool, error) {
-		i, ok := obj.(*Ignored)
-		if !ok {
-			return false, errors.New("wrong type")
-		}
-		return i.ID[0] == 'b', nil
-	})
-	if _, matchesSingleObject := m.MatchesSingle(); matchesSingleObject {
-		t.Errorf("matcher unexpectedly matches only a single object.")
-	}
-
-	got, err := FilterList(try, m, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-
-	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }
 

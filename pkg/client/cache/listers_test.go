@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func TestStoreToMinionLister(t *testing.T) {
+func TestStoreToNodeLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	ids := sets.NewString("foo", "bar", "baz")
 	for id := range ids {

@@ -141,7 +141,7 @@ type RESTMapping struct {
 
 // RESTMapper allows clients to map resources to kind, and map kind and version
 // to interfaces for manipulating those objects. It is primarily intended for
-// consumers of Kubernetes compatible REST APIs as defined in docs/api-conventions.md.
+// consumers of Kubernetes compatible REST APIs as defined in docs/devel/api-conventions.md.
 //
 // The Kubernetes API provides versioned resources and object kinds which are scoped
 // to API groups. In other words, kinds and resources should not be assumed to be

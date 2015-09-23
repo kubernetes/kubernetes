@@ -18,11 +18,11 @@ package api
 
 import (
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
@@ -46,7 +46,7 @@ func init() {
 		},
 	)
 	Scheme.AddConversionFuncs(
-		func(in *util.Time, out *util.Time, s conversion.Scope) error {
+		func(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
 			// Cannot deep copy these, because time.Time has unexported fields.
 			*out = *in
 			return nil

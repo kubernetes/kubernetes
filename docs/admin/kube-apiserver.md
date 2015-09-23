@@ -48,7 +48,7 @@ cluster's shared state through which all other components interact.
 
 ```
       --address=<nil>: DEPRECATED: see --insecure-bind-address instead
-      --admission-control="": Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: AlwaysAdmit, AlwaysDeny, DenyExecOnPrivileged, LimitRanger, NamespaceAutoProvision, NamespaceExists, NamespaceLifecycle, ResourceQuota, SecurityContextDeny, ServiceAccount
+      --admission-control="": Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: AlwaysAdmit, AlwaysDeny, DenyExecOnPrivileged, DenyEscalatingExec, LimitRanger, NamespaceAutoProvision, NamespaceExists, NamespaceLifecycle, ResourceQuota, SecurityContextDeny, ServiceAccount
       --admission-control-config-file="": File with admission control configuration.
       --advertise-address=<nil>: The IP address on which to advertise the apiserver to members of the cluster. This address must be reachable by the rest of the cluster. If blank, the --bind-address will be used. If --bind-address is unspecified, the host's default interface will be used.
       --allow-privileged=false: If true, allow privileged containers.

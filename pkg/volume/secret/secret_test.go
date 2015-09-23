@@ -85,7 +85,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -140,14 +140,14 @@ func TestPluginIdempotent(t *testing.T) {
 	podVolumeDir := fmt.Sprintf("%v/pods/test_pod_uid2/volumes/kubernetes.io~secret/test_volume_name", rootDir)
 	podMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid2/plugins/kubernetes.io~secret/test_volume_name", rootDir)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
-	mounter := &mount.FakeMounter{}
+	mounter := host.GetMounter().(*mount.FakeMounter)
 	mounter.MountPoints = []mount.MountPoint{
 		{
 			Path: podVolumeDir,
 		},
 	}
 	util.SetReady(podMetadataDir)
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, mounter)
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestPluginReboot(t *testing.T) {
 	}
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -275,7 +275,7 @@ func doTestSecretDataInVolume(volumePath string, secret api.Secret, t *testing.T
 }
 
 func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
-	cleaner, err := plugin.NewCleaner(testVolumeName, podUID, mount.New())
+	cleaner, err := plugin.NewCleaner(testVolumeName, podUID)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

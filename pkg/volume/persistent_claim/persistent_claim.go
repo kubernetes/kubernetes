@@ -18,10 +18,10 @@ package persistent_claim
 
 import (
 	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -52,7 +52,7 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.PersistentVolumeClaim != nil
 }
 
-func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.Volume.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.Volume.PersistentVolumeClaim.ClaimName)
@@ -79,7 +79,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts, mounter)
+	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts)
 	if err != nil {
 		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
 		return nil, err
@@ -92,6 +92,6 @@ func (plugin *persistentClaimPlugin) IsReadOnly() bool {
 	return plugin.readOnly
 }
 
-func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID, _ mount.Interface) (volume.Cleaner, error) {
+func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a cleaner.  Kubelet uses that cleaner, not this one, when removing orphaned volumes.")
 }

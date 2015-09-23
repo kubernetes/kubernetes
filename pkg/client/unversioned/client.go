@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -117,7 +118,7 @@ type VersionInterface interface {
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
-	Status() api.Status
+	Status() unversioned.Status
 }
 
 // Client is the implementation of a Kubernetes client.

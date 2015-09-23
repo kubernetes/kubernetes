@@ -108,7 +108,7 @@ The reclaim policy for a `PersistentVolume` tells the cluster what to do with th
 * iSCSI
 * RBD (Ceph Block Device)
 * Glusterfs
-* HostPath (single node testing only)
+* HostPath (single node testing only -- local storage is not supported in any way and WILL NOT WORK in a multi-node cluster)
 
 
 ## Persistent Volumes

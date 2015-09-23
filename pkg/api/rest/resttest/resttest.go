@@ -26,12 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type Tester struct {
@@ -369,7 +369,7 @@ func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
 
 func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
-	now := util.Now()
+	now := unversioned.Now()
 	objectMeta.UID = "bad-uid"
 	objectMeta.CreationTimestamp = now
 
@@ -527,9 +527,9 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, setFn SetFunc, getFn G
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !t.returnDeletedObject {
-		if status, ok := obj.(*api.Status); !ok {
+		if status, ok := obj.(*unversioned.Status); !ok {
 			t.Errorf("expected status of delete, got %v", status)
-		} else if status.Status != api.StatusSuccess {
+		} else if status.Status != unversioned.StatusSuccess {
 			t.Errorf("expected success, got: %v", status.Status)
 		}
 	}

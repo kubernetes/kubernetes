@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -146,10 +147,19 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
 
+	err = setRLimit(64 * 1000)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set open file handler limit", err)
+	}
+
 	proxyPorts := newPortAllocator(pr)
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
 	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod)
+}
+
+func setRLimit(limit uint64) error {
+	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{Max: limit, Cur: limit})
 }
 
 func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod time.Duration) (*Proxier, error) {
@@ -214,12 +224,21 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 			encounteredError = true
 		} else {
 			if err = ipt.DeleteChain(iptables.TableNAT, c); err != nil {
-				glog.Errorf("Error flushing userspace chain: %v", err)
+				glog.Errorf("Error deleting userspace chain: %v", err)
 				encounteredError = true
 			}
 		}
 	}
 	return encounteredError
+}
+
+// Sync is called to immediately synchronize the proxier state to iptables
+func (proxier *Proxier) Sync() {
+	if err := iptablesInit(proxier.iptables); err != nil {
+		glog.Errorf("Failed to ensure iptables: %v", err)
+	}
+	proxier.ensurePortals()
+	proxier.cleanupStaleStickySessions()
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
@@ -229,11 +248,7 @@ func (proxier *Proxier) SyncLoop() {
 	for {
 		<-t.C
 		glog.V(6).Infof("Periodic sync")
-		if err := iptablesInit(proxier.iptables); err != nil {
-			glog.Errorf("Failed to ensure iptables: %v", err)
-		}
-		proxier.ensurePortals()
-		proxier.cleanupStaleStickySessions()
+		proxier.Sync()
 	}
 }
 

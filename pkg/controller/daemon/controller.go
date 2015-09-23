@@ -214,11 +214,13 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *experimental.Dae
 		glog.V(4).Infof("No daemon sets found for pod %v, daemon set controller will avoid syncing", pod.Name)
 		return nil
 	}
-	// More than two items in this list indicates user error. If two daemon
-	// sets overlap, sort by creation timestamp, subsort by name, then pick
-	// the first.
-	glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
-	sort.Sort(byCreationTimestamp(sets))
+	if len(sets) > 1 {
+		// More than two items in this list indicates user error. If two daemon
+		// sets overlap, sort by creation timestamp, subsort by name, then pick
+		// the first.
+		glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
+		sort.Sort(byCreationTimestamp(sets))
+	}
 	return &sets[0]
 }
 
@@ -371,7 +373,7 @@ func (dsc *DaemonSetsController) manage(ds *experimental.DaemonSet) {
 
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v", ds.Name, nodesNeedingDaemonPods)
 	for i := range nodesNeedingDaemonPods {
-		if err := dsc.podControl.CreateReplicaOnNode(ds.Namespace, ds, nodesNeedingDaemonPods[i]); err != nil {
+		if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[i], ds.Namespace, ds.Spec.Template, ds); err != nil {
 			glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 			dsc.expectations.CreationObserved(dsKey)
 			util.HandleError(err)
@@ -414,7 +416,7 @@ func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *experimental.D
 }
 
 func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *experimental.DaemonSet) {
-	glog.Infof("Updating daemon set status")
+	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		glog.Errorf("Error getting node to daemon pod mapping for daemon set %+v: %v", ds, err)

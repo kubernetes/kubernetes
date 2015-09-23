@@ -38,9 +38,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinCount: 1,
-				MaxCount: 5,
-				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas: 1,
+				MaxReplicas: 5,
+				Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -60,12 +60,12 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinCount: -1,
-				MaxCount: 5,
-				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas: -1,
+				MaxReplicas: 5,
+				Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
-		"must be bigger or equal to minCount": {
+		"must be bigger or equal to minReplicas": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
@@ -74,9 +74,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinCount: 7,
-				MaxCount: 5,
-				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas: 7,
+				MaxReplicas: 5,
+				Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"invalid value": {
@@ -88,9 +88,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinCount: 1,
-				MaxCount: 5,
-				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
+				MinReplicas: 1,
+				MaxReplicas: 5,
+				Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
 			},
 		},
 		"resource not supported": {
@@ -102,9 +102,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: &experimental.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinCount: 1,
-				MaxCount: 5,
-				Target:   experimental.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
+				MinReplicas: 1,
+				MaxReplicas: 5,
+				Target:      experimental.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"required value": {
@@ -113,9 +113,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: experimental.HorizontalPodAutoscalerSpec{
-				MinCount: 1,
-				MaxCount: 5,
-				Target:   experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas: 1,
+				MaxReplicas: 5,
+				Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -613,7 +613,7 @@ func TestValidateDeployment(t *testing.T) {
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()
 	invalidRecreateDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type:          experimental.DeploymentRecreate,
+		Type:          experimental.RecreateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{},
 	}
 	errorCases["rollingUpdate should be nil when strategy type is Recreate"] = invalidRecreateDeployment
@@ -621,7 +621,7 @@ func TestValidateDeployment(t *testing.T) {
 	// MaxSurge should be in the form of 20%.
 	invalidMaxSurgeDeployment := validDeployment()
 	invalidMaxSurgeDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type: experimental.DeploymentRollingUpdate,
+		Type: experimental.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxSurge: util.NewIntOrStringFromString("20Percent"),
 		},
@@ -631,7 +631,7 @@ func TestValidateDeployment(t *testing.T) {
 	// MaxSurge and MaxUnavailable cannot both be zero.
 	invalidRollingUpdateDeployment := validDeployment()
 	invalidRollingUpdateDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type: experimental.DeploymentRollingUpdate,
+		Type: experimental.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxSurge:       util.NewIntOrStringFromString("0%"),
 			MaxUnavailable: util.NewIntOrStringFromInt(0),
@@ -642,7 +642,7 @@ func TestValidateDeployment(t *testing.T) {
 	// MaxUnavailable should not be more than 100%.
 	invalidMaxUnavailableDeployment := validDeployment()
 	invalidMaxUnavailableDeployment.Spec.Strategy = experimental.DeploymentStrategy{
-		Type: experimental.DeploymentRollingUpdate,
+		Type: experimental.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &experimental.RollingUpdateDeployment{
 			MaxUnavailable: util.NewIntOrStringFromString("110%"),
 		},

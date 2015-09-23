@@ -48,7 +48,7 @@ type ConfigFactory struct {
 	ScheduledPodLister *cache.StoreToPodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
 	PodLister algorithm.PodLister
-	// a means to list all minions
+	// a means to list all nodes
 	NodeLister *cache.StoreToNodeLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
@@ -180,9 +180,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 	// Begin populating scheduled pods.
 	go f.scheduledPodPopulator.Run(f.StopEverything)
 
-	// Watch minions.
-	// Minions may be listed frequently, so provide a local up-to-date cache.
-	cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
+	// Watch nodes.
+	// Nodes may be listed frequently, so provide a local up-to-date cache.
+	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers, so that it can spread them correctly.
@@ -209,9 +209,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 	return &scheduler.Config{
 		Modeler: f.modeler,
 		// The scheduler only needs to consider schedulable nodes.
-		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
-		Algorithm:    algo,
-		Binder:       &binder{f.Client},
+		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		Algorithm:  algo,
+		Binder:     &binder{f.Client},
 		NextPod: func() *api.Pod {
 			pod := f.PodQueue.Pop().(*api.Pod)
 			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
@@ -245,8 +245,8 @@ func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 		parseSelectorOrDie(client.PodHost+"!="))
 }
 
-// createMinionLW returns a cache.ListWatch that gets all changes to minions.
-func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
+// createNodeLW returns a cache.ListWatch that gets all changes to nodes.
+func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// TODO: Filter out nodes that doesn't have NodeReady condition.
 	fields := fields.Set{client.NodeUnschedulable: "false"}.AsSelector()
 	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)

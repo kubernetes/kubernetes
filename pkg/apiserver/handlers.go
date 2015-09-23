@@ -230,6 +230,15 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	return tw.w.Write(p)
 }
 
+func (tw *baseTimeoutWriter) Flush() {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+
+	if flusher, ok := tw.w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
@@ -486,6 +495,8 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 			requestInfo.Verb = "get"
 		case "PUT":
 			requestInfo.Verb = "update"
+		case "PATCH":
+			requestInfo.Verb = "patch"
 		case "DELETE":
 			requestInfo.Verb = "delete"
 		}

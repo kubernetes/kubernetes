@@ -637,7 +637,7 @@ func TestServiceAffinity(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region"},
-			test:     "service pod on same minion",
+			test:     "service pod on same node",
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
@@ -646,7 +646,7 @@ func TestServiceAffinity(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region"},
-			test:     "service pod on different minion, region match",
+			test:     "service pod on different node, region match",
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
@@ -655,7 +655,7 @@ func TestServiceAffinity(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
 			labels:   []string{"region"},
-			test:     "service pod on different minion, region mismatch",
+			test:     "service pod on different node, region mismatch",
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
@@ -691,7 +691,7 @@ func TestServiceAffinity(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
 			labels:   []string{"region", "zone"},
-			test:     "service pod on different minion, multiple labels, not all match",
+			test:     "service pod on different node, multiple labels, not all match",
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
@@ -700,7 +700,7 @@ func TestServiceAffinity(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region", "zone"},
-			test:     "service pod on different minion, multiple labels, all match",
+			test:     "service pod on different node, multiple labels, all match",
 		},
 	}
 

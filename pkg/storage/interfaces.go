@@ -55,7 +55,7 @@ type ResponseMeta struct {
 }
 
 // FilterFunc is a predicate which takes an API object and returns true
-// iff the object should remain in the set.
+// if and only if the object should remain in the set.
 type FilterFunc func(obj runtime.Object) bool
 
 // Everything is a FilterFunc which accepts all objects.
@@ -111,11 +111,11 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(key string, listObj runtime.Object) error
+	GetToList(key string, filter FilterFunc, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	List(key string, listObj runtime.Object) error
+	List(key string, filter FilterFunc, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
