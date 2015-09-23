@@ -134,6 +134,12 @@ GCE_FLAKY_TESTS=(
 GCE_SLOW_TESTS=(
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
+    "should\sbe\sable\sto\screate\sa\sfunctioning\sexternal\sload\sbalancer" # Issue with Google internal e2e testing, ref # 24195566
+    "should\sbe\sable\sto\screate\sa\sfunctioning\sexternal\sload\sbalancer\swith\suser-provided\sload\sbalancer\sip" # Issue with Google internal e2e testing, ref # 24195566
+    "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # Issue with Google internal e2e testing, ref # 24195566
+    "should\srelease\sthe\sload\sbalancer\swhen\sType\sgoes\sfrom\sLoadBalancer\s->\sNodePort" # Issue with Google internal e2e testing, ref # 24195566
+    "should\scorrectly\sserve\sidentically\snamed\sservices\sin\sdifferent\snamespaces\son\sdifferent\sexternal\sIP\saddresses" # Issue with Google internal e2e testing, ref # 24195566
+    "
     )
 
 # Tests which are not able to be run in parallel.
