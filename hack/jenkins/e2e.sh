@@ -100,7 +100,9 @@ REBOOT_SKIP_TESTS=(
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
-    "Reboot")
+    "Reboot"
+    "should\srelease\sthe\sload\sbalancer\swhen\sType\sgoes\sfrom\sLoadBalancer" # timeouts in 20 minutes in last builds. #14424
+    )
 
 # Tests which cannot be run on GKE, e.g. because they require
 # master ssh access.
