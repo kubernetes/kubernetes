@@ -578,3 +578,65 @@ type IngressBackend struct {
 	// Specifies the port of the referenced service.
 	ServicePort util.IntOrString `json:"servicePort"`
 }
+
+// DerivedNodeMetrics contains derived metrics for a single node. It holds
+// derived metrics in windows about the node itself and all all the cgroups
+// created and managed by kubernetes on the node, which we call system
+// containers.
+type DerivedNodeMetrics struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// nodeMetrics contains derived metrics about the node.
+	NodeMetrics MetricsWindows `json:"nodeMetrics"`
+	// systemContainers contains derived metrics about all the system
+	// containers.
+	SystemContainers []DerivedContainerMetrics `json:"systemContainers"`
+}
+
+// DerivedContainerMetrics contains derived metrics for a single container.
+type DerivedContainerMetrics struct {
+	// containerName is the name of the cgroups relative to the mountpoint.
+	ContainerName string `json:"containerName"`
+	// containerMetrics contains derived metrics about the container.
+	ContainerMetrics MetricsWindows `json:"containerMetrics"`
+}
+
+// DerivedNodeMetricsList contains derived node metrics for all nodes.
+type DerivedNodeMetricsList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// items holds a list of a DerivedNodeMetrics object for every node.
+	Items []DerivedNodeMetrics `json:"items"`
+}
+
+// MetricsWindows holds multiple derived metrics windows.
+type MetricsWindows struct {
+	// endTime is the end time of all the time windows.
+	EndTime unversioned.Time `json:"endTime"`
+
+	// windows is a list of all the time windows with metrics. All of the
+	// windows are rolling.
+	Windows []MetricsWindow `json:"windows"`
+}
+
+// MetricsWindow holds derived metrics for multiple resources.
+type MetricsWindow struct {
+	// duration is the length in time of the window. The start of the
+	// window will be the subtraction of this duration to EndTime.
+	Duration unversioned.Duration `json:"duration"`
+
+	// mean holds the averages over the window.
+	Mean ResourceUsage `json:"mean"`
+	// max holds the maximum values over the window.
+	Max ResourceUsage `json:"max"`
+	// ninetyFifthPercentile holds the 95th percentile values over the window.
+	NinetyFifthPercentile ResourceUsage `json:"ninetyFifthPercentile"`
+}
+
+// ResourceUsage maps resource names to their metric values.
+// Resource names are "cpu" and "memory".
+type ResourceUsage map[string]resource.Quantity

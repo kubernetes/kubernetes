@@ -18,11 +18,14 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
@@ -947,6 +950,137 @@ func TestValidateIngress(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
 			}
+		}
+	}
+}
+
+func anyErrMatch(errs errors.ValidationErrorList, re *regexp.Regexp) bool {
+	for _, err := range errs {
+		if re.MatchString(err.Error()) {
+			return true
+		}
+	}
+	return false
+}
+
+func errStrings(errs errors.ValidationErrorList) []string {
+	var result []string
+	for _, err := range errs {
+		result = append(result, err.Error())
+	}
+	return result
+}
+
+func TestValidateDerivedNodeMetrics(t *testing.T) {
+	mockMetricsWindow := func(d time.Duration) experimental.MetricsWindow {
+		return experimental.MetricsWindow{
+			Duration: unversioned.Duration{d},
+			Mean: experimental.ResourceUsage{
+				"memory": {},
+				"cpu":    {},
+			},
+			Max: experimental.ResourceUsage{
+				"memory": {},
+				"cpu":    {},
+			},
+			NinetyFifthPercentile: experimental.ResourceUsage{
+				"memory": {},
+				"cpu":    {},
+			},
+		}
+	}
+	successCases := [...]experimental.DerivedNodeMetrics{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name: "mynodename",
+			},
+			NodeMetrics: experimental.MetricsWindows{
+				EndTime: unversioned.Time{time.Unix(1000, 0)},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name: "mynodename",
+			},
+			NodeMetrics: experimental.MetricsWindows{
+				EndTime: unversioned.Time{time.Unix(1000, 0)},
+				Windows: []experimental.MetricsWindow{
+					mockMetricsWindow(time.Minute),
+					mockMetricsWindow(time.Hour),
+					mockMetricsWindow(24 * time.Hour),
+				},
+			},
+			SystemContainers: []experimental.DerivedContainerMetrics{
+				{
+					ContainerName: "foo",
+					ContainerMetrics: experimental.MetricsWindows{
+						EndTime: unversioned.Time{time.Unix(1000, 0)},
+						Windows: []experimental.MetricsWindow{
+							mockMetricsWindow(time.Minute),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateDerivedNodeMetrics(&successCase); len(errs) != 0 {
+			t.Errorf("expected success, but found errors:\n\t%s",
+				strings.Join(errStrings(errs), "\n\t"))
+		}
+	}
+
+	errorCases := map[string]experimental.DerivedNodeMetrics{
+		`nodeMetrics.endTime: .* is not set`: {
+			ObjectMeta: api.ObjectMeta{
+				Name: "mynodename",
+			},
+			NodeMetrics: experimental.MetricsWindows{},
+		},
+		`systemContainers.windows.endTime: .* is not set`: {
+			ObjectMeta: api.ObjectMeta{
+				Name: "mynodename",
+			},
+			NodeMetrics: experimental.MetricsWindows{
+				EndTime: unversioned.Time{time.Unix(1000, 0)},
+			},
+			SystemContainers: []experimental.DerivedContainerMetrics{
+				{
+					ContainerName: "foo",
+					ContainerMetrics: experimental.MetricsWindows{
+						Windows: []experimental.MetricsWindow{
+							mockMetricsWindow(time.Hour),
+						},
+					},
+				},
+			},
+		},
+		`nodeMetrics.mean: .* is missing 'cpu' resource`: {
+			ObjectMeta: api.ObjectMeta{
+				Name: "mynodename",
+			},
+			NodeMetrics: experimental.MetricsWindows{
+				Windows: []experimental.MetricsWindow{
+					{
+						Duration: unversioned.Duration{time.Minute},
+						Mean: experimental.ResourceUsage{
+							"memory": {},
+						},
+					},
+				},
+			},
+		},
+	}
+	for exp, v := range errorCases {
+		errs := ValidateDerivedNodeMetrics(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", exp)
+			continue
+		}
+		re := regexp.MustCompile(exp)
+		if !anyErrMatch(errs, re) {
+			t.Errorf("expected error not found: `%s`\nerrors:\n\t%s", exp,
+				strings.Join(errStrings(errs), "\n\t"))
 		}
 	}
 }

@@ -85,6 +85,7 @@ import (
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
+	nodemetrics "k8s.io/kubernetes/pkg/registry/nodemetrics/etcd"
 
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
@@ -1042,6 +1043,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
 	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"))
 	ingressStorage := ingressetcd.NewREST(dbClient("ingress"))
+	nodeMetricsStorage := nodemetrics.NewREST(dbClient("nodemetrics"))
 
 	thirdPartyControl := ThirdPartyController{
 		master: m,
@@ -1066,6 +1068,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("jobs"):                         jobStorage,
 		strings.ToLower("jobs/status"):                  jobStatusStorage,
 		strings.ToLower("ingress"):                      ingressStorage,
+		strings.ToLower("nodemetrics"):                  nodeMetricsStorage,
 	}
 
 	expMeta := latest.GroupOrDie("experimental")

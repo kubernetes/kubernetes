@@ -30,6 +30,8 @@ func addKnownTypes() {
 	api.Scheme.AddKnownTypes("",
 		&Deployment{},
 		&DeploymentList{},
+		&DerivedNodeMetrics{},
+		&DerivedNodeMetricsList{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&Job{},
@@ -49,6 +51,8 @@ func addKnownTypes() {
 
 func (*Deployment) IsAnAPIObject()                  {}
 func (*DeploymentList) IsAnAPIObject()              {}
+func (*DerivedNodeMetrics) IsAnAPIObject()          {}
+func (*DerivedNodeMetricsList) IsAnAPIObject()      {}
 func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
 func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
 func (*Job) IsAnAPIObject()                         {}

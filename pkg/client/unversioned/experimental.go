@@ -33,6 +33,7 @@ import (
 type ExperimentalInterface interface {
 	VersionInterface
 	HorizontalPodAutoscalersNamespacer
+	NodeMetrics
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
@@ -78,6 +79,10 @@ func (c *ExperimentalClient) ServerAPIVersions() (*api.APIVersions, error) {
 
 func (c *ExperimentalClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
 	return newHorizontalPodAutoscalers(c, namespace)
+}
+
+func (c *ExperimentalClient) NodeMetrics() NodeMetricsInterface {
+	return newNodeMetrics(c)
 }
 
 func (c *ExperimentalClient) Scales(namespace string) ScaleInterface {

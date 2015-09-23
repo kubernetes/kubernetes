@@ -809,6 +809,11 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
+func deepCopy_unversioned_Duration(in unversioned.Duration, out *unversioned.Duration, c *conversion.Cloner) error {
+	out.Duration = in.Duration
+	return nil
+}
+
 func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
@@ -975,6 +980,57 @@ func deepCopy_experimental_DeploymentStrategy(in DeploymentStrategy, out *Deploy
 		}
 	} else {
 		out.RollingUpdate = nil
+	}
+	return nil
+}
+
+func deepCopy_experimental_DerivedContainerMetrics(in DerivedContainerMetrics, out *DerivedContainerMetrics, c *conversion.Cloner) error {
+	out.ContainerName = in.ContainerName
+	if err := deepCopy_experimental_MetricsWindows(in.ContainerMetrics, &out.ContainerMetrics, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_experimental_DerivedNodeMetrics(in DerivedNodeMetrics, out *DerivedNodeMetrics, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_experimental_MetricsWindows(in.NodeMetrics, &out.NodeMetrics, c); err != nil {
+		return err
+	}
+	if in.SystemContainers != nil {
+		out.SystemContainers = make([]DerivedContainerMetrics, len(in.SystemContainers))
+		for i := range in.SystemContainers {
+			if err := deepCopy_experimental_DerivedContainerMetrics(in.SystemContainers[i], &out.SystemContainers[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SystemContainers = nil
+	}
+	return nil
+}
+
+func deepCopy_experimental_DerivedNodeMetricsList(in DerivedNodeMetricsList, out *DerivedNodeMetricsList, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]DerivedNodeMetrics, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_experimental_DerivedNodeMetrics(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -1284,6 +1340,66 @@ func deepCopy_experimental_JobStatus(in JobStatus, out *JobStatus, c *conversion
 	return nil
 }
 
+func deepCopy_experimental_MetricsWindow(in MetricsWindow, out *MetricsWindow, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_Duration(in.Duration, &out.Duration, c); err != nil {
+		return err
+	}
+	if in.Mean != nil {
+		out.Mean = make(ResourceUsage)
+		for key, val := range in.Mean {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.Mean[key] = *newVal
+		}
+	} else {
+		out.Mean = nil
+	}
+	if in.Max != nil {
+		out.Max = make(ResourceUsage)
+		for key, val := range in.Max {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.Max[key] = *newVal
+		}
+	} else {
+		out.Max = nil
+	}
+	if in.NinetyFifthPercentile != nil {
+		out.NinetyFifthPercentile = make(ResourceUsage)
+		for key, val := range in.NinetyFifthPercentile {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.NinetyFifthPercentile[key] = *newVal
+		}
+	} else {
+		out.NinetyFifthPercentile = nil
+	}
+	return nil
+}
+
+func deepCopy_experimental_MetricsWindows(in MetricsWindows, out *MetricsWindows, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_Time(in.EndTime, &out.EndTime, c); err != nil {
+		return err
+	}
+	if in.Windows != nil {
+		out.Windows = make([]MetricsWindow, len(in.Windows))
+		for i := range in.Windows {
+			if err := deepCopy_experimental_MetricsWindow(in.Windows[i], &out.Windows[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Windows = nil
+	}
+	return nil
+}
+
 func deepCopy_experimental_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1483,6 +1599,7 @@ func init() {
 		deepCopy_api_VolumeMount,
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
+		deepCopy_unversioned_Duration,
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
@@ -1496,6 +1613,9 @@ func init() {
 		deepCopy_experimental_DeploymentSpec,
 		deepCopy_experimental_DeploymentStatus,
 		deepCopy_experimental_DeploymentStrategy,
+		deepCopy_experimental_DerivedContainerMetrics,
+		deepCopy_experimental_DerivedNodeMetrics,
+		deepCopy_experimental_DerivedNodeMetricsList,
 		deepCopy_experimental_HTTPIngressPath,
 		deepCopy_experimental_HTTPIngressRuleValue,
 		deepCopy_experimental_HorizontalPodAutoscaler,
@@ -1514,6 +1634,8 @@ func init() {
 		deepCopy_experimental_JobList,
 		deepCopy_experimental_JobSpec,
 		deepCopy_experimental_JobStatus,
+		deepCopy_experimental_MetricsWindow,
+		deepCopy_experimental_MetricsWindows,
 		deepCopy_experimental_ReplicationControllerDummy,
 		deepCopy_experimental_ResourceConsumption,
 		deepCopy_experimental_RollingUpdateDeployment,
