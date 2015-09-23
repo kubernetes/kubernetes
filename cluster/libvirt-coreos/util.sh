@@ -189,11 +189,18 @@ function kube-up {
 
   readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
-  readonly discovery=$(curl -s https://discovery.etcd.io/new?size=$(($NUM_MINIONS+1)))
-
-  readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
 
   local i
+  for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
+    if [[ $i -eq $NUM_MINIONS ]]; then
+        etcd2_initial_cluster[$i]="${MASTER_NAME}=http://${MASTER_IP}:2380"
+    else
+        etcd2_initial_cluster[$i]="${MINION_NAMES[$i]}=http://${MINION_IPS[$i]}:2380"
+    fi
+  done
+  etcd2_initial_cluster=$(join , "${etcd2_initial_cluster[@]}")
+  readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
+
   for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
     if [[ $i -eq $NUM_MINIONS ]]; then
         type=master
