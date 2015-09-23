@@ -103,7 +103,7 @@ var _ = Describe("kubelet", func() {
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		resourceMonitor = newResourceMonitor(framework.Client, targetContainers, containerStatsPollingInterval)
+		resourceMonitor = newResourceMonitor(framework.Client, targetContainers(), containerStatsPollingInterval)
 		resourceMonitor.Start()
 	})
 
