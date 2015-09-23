@@ -19,11 +19,8 @@ package service
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,19 +32,13 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
-	utilio "k8s.io/kubernetes/pkg/util/io"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 const (
@@ -83,19 +74,8 @@ func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.SuicideTimeout, "suicide-timeout", s.SuicideTimeout, "Self-terminate after this period of inactivity. Zero disables suicide watch.")
 }
 
-func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate, kubeletFinished <-chan struct{}, staticPodsConfigPath string) error {
-	// create apiserver client
-	var apiclient *client.Client
-	clientConfig, err := s.CreateAPIServerClientConfig()
-	if err == nil {
-		apiclient, err = client.New(clientConfig)
-	}
-	if err != nil {
-		// required for k8sm since we need to send api.Binding information
-		// back to the apiserver
-		log.Fatalf("No API client: %v", err)
-	}
-
+func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate, kubeletFinished <-chan struct{},
+	staticPodsConfigPath string, apiclient *client.Client) error {
 	exec := executor.New(executor.Config{
 		Updates:         execUpdates,
 		APIClient:       apiclient,
@@ -155,12 +135,39 @@ func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate
 	return nil
 }
 
+func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate, kubeletFinished chan<- struct{},
+	staticPodsConfigPath string, apiclient *client.Client) error {
+	kcfg, err := s.KubeletConfig()
+	if err == nil {
+		kcfg.Builder = func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
+			return s.createAndInitKubelet(kc, staticPodsConfigPath, execUpdates, kubeletFinished)
+		}
+		kcfg.DockerDaemonContainer = "" // don't move the docker daemon into a cgroup
+		kcfg.Hostname = kcfg.HostnameOverride
+		kcfg.KubeClient = apiclient
+		kcfg.NodeName = kcfg.HostnameOverride
+		kcfg.StandaloneMode = false
+		kcfg.SystemContainer = "" // don't take control over other system processes.
+		err = s.KubeletServer.Run(kcfg)
+	}
+	if err != nil {
+		close(kubeletFinished)
+	}
+	return err
+}
+
 // Run runs the specified KubeletExecutorServer.
-func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate, kubeletFinished chan<- struct{}, staticPodsConfigPath string) error {
-	// empty string for the docker and system containers (= cgroup paths). This
-	// stops the kubelet taking any control over other system processes.
-	s.SystemContainer = ""
-	s.DockerDaemonContainer = ""
+func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
+	// create shared channels
+	kubeletFinished := make(chan struct{})
+	execUpdates := make(chan kubelet.PodUpdate, 1)
+
+	// create static pods directory
+	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
+	err := os.Mkdir(staticPodsConfigPath, 0755)
+	if err != nil {
+		return err
+	}
 
 	// create apiserver client
 	var apiclient *client.Client
@@ -173,162 +180,14 @@ func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate,
 		log.Fatalf("No API client: %v", err)
 	}
 
-	log.Infof("Using root directory: %v", s.RootDirectory)
-	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
-
-	cAdvisorInterface, err := cadvisor.New(s.CAdvisorPort)
-	if err != nil {
-		return err
-	}
-
-	//TODO(jdef) intentionally NOT initializing a cloud provider here since:
-	//(a) the kubelet doesn't actually use it
-	//(b) we don't need to create N-kubelet connections to zookeeper for no good reason
-	//cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-	//log.Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-
-	hostNetworkSources, err := kubelet.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
-	if err != nil {
-		return err
-	}
-
-	tlsOptions, err := s.InitializeTLS()
-	if err != nil {
-		return err
-	}
-	mounter := mount.New()
-	if s.Containerized {
-		log.V(2).Info("Running kubelet in containerized mode (experimental)")
-		mounter = &mount.NsenterMounter{}
-	}
-
-	var writer utilio.Writer = &utilio.StdWriter{}
-	var dockerExecHandler dockertools.ExecHandler
-	switch s.DockerExecHandlerName {
-	case "native":
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	case "nsenter":
-		writer = &utilio.NsenterWriter{}
-		dockerExecHandler = &dockertools.NsenterExecHandler{}
-	default:
-		log.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	}
-
-	// prepare kubelet
-	kcfg := app.KubeletConfig{
-		Address:            s.Address,
-		AllowPrivileged:    s.AllowPrivileged,
-		HostNetworkSources: hostNetworkSources,
-		HostnameOverride:   s.HostnameOverride,
-		RootDirectory:      s.RootDirectory,
-		// ConfigFile: ""
-		// ManifestURL: ""
-		FileCheckFrequency: s.FileCheckFrequency,
-		// HTTPCheckFrequency
-		PodInfraContainerImage:  s.PodInfraContainerImage,
-		SyncFrequency:           s.SyncFrequency,
-		RegistryPullQPS:         s.RegistryPullQPS,
-		RegistryBurst:           s.RegistryBurst,
-		MinimumGCAge:            s.MinimumGCAge,
-		MaxPerPodContainerCount: s.MaxPerPodContainerCount,
-		MaxContainerCount:       s.MaxContainerCount,
-		RegisterNode:            s.RegisterNode,
-		// StandaloneMode: false
-		ClusterDomain:                  s.ClusterDomain,
-		ClusterDNS:                     s.ClusterDNS,
-		Runonce:                        s.RunOnce,
-		Port:                           s.Port,
-		ReadOnlyPort:                   s.ReadOnlyPort,
-		CAdvisorInterface:              cAdvisorInterface,
-		EnableServer:                   s.EnableServer,
-		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
-		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		KubeClient:                     apiclient,
-		MasterServiceNamespace:         s.MasterServiceNamespace,
-		VolumePlugins:                  app.ProbeVolumePlugins(),
-		NetworkPlugins:                 app.ProbeNetworkPlugins(s.NetworkPluginDir),
-		NetworkPluginName:              s.NetworkPluginName,
-		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
-		TLSOptions:                     tlsOptions,
-		ImageGCPolicy:                  imageGCPolicy,
-		DiskSpacePolicy:                diskSpacePolicy,
-		Cloud:                          nil, // TODO(jdef) Cloud, specifying null here because we don't want all kubelets polling mesos-master; need to account for this in the cloudprovider impl
-		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
-		ResourceContainer:         s.ResourceContainer,
-		CgroupRoot:                s.CgroupRoot,
-		ContainerRuntime:          s.ContainerRuntime,
-		Mounter:                   mounter,
-		DockerDaemonContainer:     s.DockerDaemonContainer,
-		SystemContainer:           s.SystemContainer,
-		ConfigureCBR0:             s.ConfigureCBR0,
-		MaxPods:                   s.MaxPods,
-		DockerExecHandler:         dockerExecHandler,
-		ResolverConfig:            s.ResolverConfig,
-		CPUCFSQuota:               s.CPUCFSQuota,
-		Writer:                    writer,
-		MaxOpenFiles:              s.MaxOpenFiles,
-	}
-
-	kcfg.NodeName = kcfg.Hostname
-
-	kcfg.Builder = app.KubeletBuilder(func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
-		return s.createAndInitKubelet(kc, clientConfig, staticPodsConfigPath, execUpdates, kubeletFinished)
-	})
-	err = app.RunKubelet(&kcfg)
-	if err != nil {
-		return err
-	}
-
-	// start health check server
-	if s.HealthzPort > 0 {
-		healthz.DefaultHealthz()
-		go util.Until(func() {
-			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
-			if err != nil {
-				log.Errorf("Starting health server failed: %v", err)
-			}
-		}, 5*time.Second, util.NeverStop)
-	}
-
-	return nil
-}
-
-// Run runs the specified KubeletExecutorServer.
-func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	oomAdjuster := oom.NewOomAdjuster()
-	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
-		log.Info(err)
-	}
-
-	// create shared channels
-	kubeletFinished := make(chan struct{})
-	execUpdates := make(chan kubelet.PodUpdate, 1)
-
-	// create static pods directory
-	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
-	err := os.Mkdir(staticPodsConfigPath, 0755)
-	if err != nil {
-		return err
-	}
-
 	// start executor
-	err = s.runExecutor(execUpdates, kubeletFinished, staticPodsConfigPath)
+	err = s.runExecutor(execUpdates, kubeletFinished, staticPodsConfigPath, apiclient)
 	if err != nil {
 		return err
 	}
 
-	// start kubelet
-	err = s.runKubelet(execUpdates, kubeletFinished, staticPodsConfigPath)
-	if err != nil {
-		close(kubeletFinished) // tell executor
-		return err
-	}
-
-	// block until executor is shut down or commits shutdown
-	select {}
+	// start kubelet, blocking
+	return s.runKubelet(execUpdates, kubeletFinished, staticPodsConfigPath, apiclient)
 }
 
 func defaultBindingAddress() string {
@@ -342,7 +201,6 @@ func defaultBindingAddress() string {
 
 func (ks *KubeletExecutorServer) createAndInitKubelet(
 	kc *app.KubeletConfig,
-	clientConfig *client.Config,
 	staticPodsConfigPath string,
 	execUpdates <-chan kubelet.PodUpdate,
 	kubeletDone chan<- struct{},
