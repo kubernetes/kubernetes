@@ -161,9 +161,9 @@ func calculateSumFromLatestSample(metrics heapster.MetricResultList) (uint64, in
 	for _, metrics := range metrics.Items {
 		var newest *heapster.MetricPoint
 		newest = nil
-		for _, metricPoint := range metrics.Metrics {
+		for i, metricPoint := range metrics.Metrics {
 			if newest == nil || newest.Timestamp.Before(metricPoint.Timestamp) {
-				newest = &metricPoint
+				newest = &metrics.Metrics[i]
 			}
 		}
 		if newest != nil {
