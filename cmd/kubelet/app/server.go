@@ -823,6 +823,7 @@ type KubeletConfig struct {
 	NodeStatusUpdateFrequency      time.Duration
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
+	PodConfig                      *config.PodConfig
 	PodInfraContainerImage         string
 	Port                           uint
 	ReadOnlyPort                   uint
@@ -866,7 +867,10 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
 	}
 
-	pc = makePodSourceConfig(kc)
+	pc = kc.PodConfig
+	if pc == nil {
+		pc = makePodSourceConfig(kc)
+	}
 	k, err = kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.NodeName,
