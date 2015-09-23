@@ -19,8 +19,10 @@ limitations under the License.
 package factory
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -29,6 +31,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -199,7 +202,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
 
 	podBackoff := podBackoff{
-		perPodBackoff: map[string]*backoffEntry{},
+		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
 		clock:         realClock{},
 
 		defaultDuration: 1 * time.Second,
@@ -274,12 +277,19 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
 			defer util.HandleCrash()
-			podID := pod.Name
-			podNamespace := pod.Namespace
-			backoff.wait(podID)
+			podID := types.NamespacedName{
+				Namespace: pod.Namespace,
+				Name:      pod.Name,
+			}
+
+			entry := backoff.getEntry(podID)
+			if !entry.TryWait(backoff.maxDuration) {
+				glog.Warningf("Request for pod %v already in flight, abandoning", podID)
+				return
+			}
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
-			err := factory.Client.Get().Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
+			err := factory.Client.Get().Namespace(podID.Namespace).Resource("pods").Name(podID.Name).Do().Into(pod)
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
@@ -287,7 +297,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				return
 			}
 			if pod.Spec.NodeName == "" {
-				podQueue.Add(pod)
+				podQueue.AddIfNotPresent(pod)
 			}
 		}()
 	}
@@ -334,20 +344,62 @@ func (realClock) Now() time.Time {
 	return time.Now()
 }
 
+// backoffEntry is single threaded.  in particular, it only allows a single action to be waiting on backoff at a time.
+// It is expected that all users will only use the public TryWait(...) method
+// It is also not safe to copy this object.
 type backoffEntry struct {
-	backoff    time.Duration
-	lastUpdate time.Time
+	backoff     time.Duration
+	lastUpdate  time.Time
+	reqInFlight int32
+}
+
+// tryLock attempts to acquire a lock via atomic compare and swap.
+// returns true if the lock was acquired, false otherwise
+func (b *backoffEntry) tryLock() bool {
+	return atomic.CompareAndSwapInt32(&b.reqInFlight, 0, 1)
+}
+
+// unlock returns the lock.  panics if the lock isn't held
+func (b *backoffEntry) unlock() {
+	if !atomic.CompareAndSwapInt32(&b.reqInFlight, 1, 0) {
+		panic(fmt.Sprintf("unexpected state on unlocking: %v", b))
+	}
+}
+
+// TryWait tries to acquire the backoff lock, maxDuration is the maximum allowed period to wait for.
+func (b *backoffEntry) TryWait(maxDuration time.Duration) bool {
+	if !b.tryLock() {
+		return false
+	}
+	defer b.unlock()
+	b.wait(maxDuration)
+	return true
+}
+
+func (entry *backoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
+	duration := entry.backoff
+	newDuration := time.Duration(duration) * 2
+	if newDuration > maxDuration {
+		newDuration = maxDuration
+	}
+	entry.backoff = newDuration
+	glog.V(4).Infof("Backing off %s for pod %v", duration.String(), entry)
+	return duration
+}
+
+func (entry *backoffEntry) wait(maxDuration time.Duration) {
+	time.Sleep(entry.getBackoff(maxDuration))
 }
 
 type podBackoff struct {
-	perPodBackoff   map[string]*backoffEntry
+	perPodBackoff   map[types.NamespacedName]*backoffEntry
 	lock            sync.Mutex
 	clock           clock
 	defaultDuration time.Duration
 	maxDuration     time.Duration
 }
 
-func (p *podBackoff) getEntry(podID string) *backoffEntry {
+func (p *podBackoff) getEntry(podID types.NamespacedName) *backoffEntry {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	entry, ok := p.perPodBackoff[podID]
@@ -357,21 +409,6 @@ func (p *podBackoff) getEntry(podID string) *backoffEntry {
 	}
 	entry.lastUpdate = p.clock.Now()
 	return entry
-}
-
-func (p *podBackoff) getBackoff(podID string) time.Duration {
-	entry := p.getEntry(podID)
-	duration := entry.backoff
-	entry.backoff *= 2
-	if entry.backoff > p.maxDuration {
-		entry.backoff = p.maxDuration
-	}
-	glog.V(4).Infof("Backing off %s for pod %s", duration.String(), podID)
-	return duration
-}
-
-func (p *podBackoff) wait(podID string) {
-	time.Sleep(p.getBackoff(podID))
 }
 
 func (p *podBackoff) gc() {
