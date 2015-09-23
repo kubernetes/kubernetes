@@ -484,3 +484,78 @@ func createTestVolumes() []*api.PersistentVolume {
 		},
 	}
 }
+
+func TestFindingPreboundVolumes(t *testing.T) {
+	pv1 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "pv1",
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	pv5 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "pv5",
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi")},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	pv8 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "pv8",
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi")},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")}},
+		},
+	}
+
+	index := NewPersistentVolumeOrderedIndex()
+	index.Add(pv1)
+	index.Add(pv5)
+	index.Add(pv8)
+
+	// expected exact match on size
+	volume, _ := index.FindBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
+
+	// pretend the exact match is pre-bound.  should get the next size up.
+	pv1.Annotations[createdForKey] = "some/other/claim"
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != pv5.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
+	}
+
+	// pretend the exact match is available but the largest volume is pre-bound to the claim.
+	delete(pv1.Annotations, createdForKey)
+	pv8.Annotations[createdForKey] = "myns/claim01"
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != pv8.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
+	}
+}
