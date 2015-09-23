@@ -25,3 +25,7 @@ import (
 func RunInResourceContainer(containerName string) error {
 	return errors.New("resource-only containers unsupported in this platform")
 }
+
+func ApplyRLimitForSelf(maxOpenFiles uint64) error {
+	return errors.New("SetRLimit unsupported in this platform")
+}
