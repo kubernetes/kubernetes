@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -93,17 +92,6 @@ func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler 
 		default:
 			tooManyRequests(w)
 		}
-	})
-}
-
-// RateLimit uses rl to rate limit accepting requests to 'handler'.
-func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if rl.CanAccept() {
-			handler.ServeHTTP(w, req)
-			return
-		}
-		tooManyRequests(w)
 	})
 }
 
