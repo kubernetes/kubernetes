@@ -46,6 +46,8 @@ func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "switched to context %q.\n", options.contextName)
 			}
 		},
 	}
@@ -86,7 +88,7 @@ func (o *useContextOptions) complete(cmd *cobra.Command) bool {
 
 func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("You must specify a current-context")
+		return errors.New("you must specify a current-context")
 	}
 
 	for name := range config.Contexts {
@@ -95,5 +97,5 @@ func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 		}
 	}
 
-	return fmt.Errorf("No context exists with the name: %q.", o.contextName)
+	return fmt.Errorf("no context exists with the name: %q.", o.contextName)
 }
