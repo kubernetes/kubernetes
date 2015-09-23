@@ -45,6 +45,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+const (
+	tabwriterMinWidth = 10
+	tabwriterWidth    = 4
+	tabwriterPadding  = 3
+	tabwriterPadChar  = ' '
+	tabwriterFlags    = 0
+)
+
 // GetPrinter takes a format type, an optional format argument. It will return true
 // if the format is generic (untyped), otherwise it will return false. The printer
 // is agnostic to schema versions, so you must send arguments to PrintObj in the
@@ -382,6 +390,7 @@ var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLA
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
 var jobColumns = []string{"JOB", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "SUCCESSFUL"}
 var serviceColumns = []string{"NAME", "CLUSTER_IP", "EXTERNAL_IP", "PORT(S)", "SELECTOR", "AGE"}
+var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
 var daemonSetColumns = []string{"NAME", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "NODE-SELECTOR"}
@@ -413,6 +422,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(jobColumns, printJobList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
+	h.Handler(ingressColumns, printIngress)
+	h.Handler(ingressColumns, printIngressList)
 	h.Handler(endpointColumns, printEndpoints)
 	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
@@ -739,6 +750,18 @@ func printJobList(list *experimental.JobList, w io.Writer, withNamespace bool, w
 	return nil
 }
 
+// loadBalancerStatusStringer behaves just like a string interface and converts the given status to a string.
+func loadBalancerStatusStringer(s api.LoadBalancerStatus) string {
+	ingress := s.Ingress
+	result := []string{}
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			result = append(result, ingress[i].IP)
+		}
+	}
+	return strings.Join(result, ",")
+}
+
 func getServiceExternalIP(svc *api.Service) string {
 	switch svc.Spec.Type {
 	case api.ServiceTypeClusterIP:
@@ -752,17 +775,12 @@ func getServiceExternalIP(svc *api.Service) string {
 		}
 		return "nodes"
 	case api.ServiceTypeLoadBalancer:
-		ingress := svc.Status.LoadBalancer.Ingress
-		result := []string{}
-		for i := range ingress {
-			if ingress[i].IP != "" {
-				result = append(result, ingress[i].IP)
-			}
-		}
+		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer)
 		if len(svc.Spec.ExternalIPs) > 0 {
-			result = append(result, svc.Spec.ExternalIPs...)
+			result := append(strings.Split(lbIps, ","), svc.Spec.ExternalIPs...)
+			return strings.Join(result, ",")
 		}
-		return strings.Join(result, ",")
+		return lbIps
 	}
 	return "unknown"
 }
@@ -807,6 +825,71 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, svc := range list.Items {
 		if err := printService(&svc, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// backendStringer behaves just like a string interface and converts the given backend to a string.
+func backendStringer(backend *experimental.IngressBackend) string {
+	if backend == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
+}
+
+func printIngress(ingress *experimental.Ingress, w io.Writer, withNamespace, wide bool, showAll bool, columnLabels []string) error {
+	name := ingress.Name
+	namespace := ingress.Namespace
+
+	hostRules := ingress.Spec.Rules
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v\n",
+		name,
+		"-",
+		backendStringer(ingress.Spec.Backend),
+		loadBalancerStatusStringer(ingress.Status.LoadBalancer)); err != nil {
+		return err
+	}
+
+	// Lay out all the rules on separate lines.
+	extraLinePrefix := ""
+	if withNamespace {
+		extraLinePrefix = "\t"
+	}
+	for _, rules := range hostRules {
+		if rules.HTTP == nil {
+			continue
+		}
+		_, err := fmt.Fprintf(w, "%s\t%v\t", extraLinePrefix, rules.Host)
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
+			return err
+		}
+		for _, rule := range rules.HTTP.Paths {
+			_, err := fmt.Fprintf(w, "%s\t%v\t%v", extraLinePrefix, rule.Path, backendStringer(&rule.Backend))
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func printIngressList(ingressList *experimental.IngressList, w io.Writer, withNamespace, wide bool, showAll bool, columnLabels []string) error {
+	for _, ingress := range ingressList.Items {
+		if err := printIngress(&ingress, w, withNamespace, wide, true, columnLabels); err != nil {
 			return err
 		}
 	}
@@ -1369,7 +1452,7 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
-	w := tabwriter.NewWriter(output, 10, 4, 3, ' ', 0)
+	w := tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
 	defer w.Flush()
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
