@@ -83,9 +83,9 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 	return
 }
 
-// This tests does nothing except checking current resource usage of containers defained in kubelet_stats systemContainers variable.
+// This tests does nothing except checking current resource usage of containers defined in kubelet_stats systemContainers variable.
 // Test fails if an average container resource consumption over datapointAmount tries exceeds amount defined in allowedUsage.
-var _ = Describe("ResourceUsage", func() {
+var _ = Describe("Resource usage of system containers", func() {
 	var c *client.Client
 	BeforeEach(func() {
 		var err error
