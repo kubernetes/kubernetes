@@ -94,8 +94,7 @@ func addDefaultingFuncs() {
 				obj.Spec.Completions = &completions
 			}
 			if obj.Spec.Parallelism == nil {
-				parallelism := 2
-				obj.Spec.Parallelism = &parallelism
+				obj.Spec.Parallelism = obj.Spec.Completions
 			}
 		},
 	)
