@@ -41,6 +41,9 @@ type Attributes interface {
 
 	// The kind of object, if a request is for a REST object.
 	GetResource() string
+
+	// The group of the resource, if a request is for a REST object.
+	GetAPIGroup() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -61,6 +64,7 @@ type AttributesRecord struct {
 	User      user.Info
 	ReadOnly  bool
 	Namespace string
+	APIGroup  string
 	Resource  string
 }
 
@@ -82,4 +86,8 @@ func (a AttributesRecord) GetNamespace() string {
 
 func (a AttributesRecord) GetResource() string {
 	return a.Resource
+}
+
+func (a AttributesRecord) GetAPIGroup() string {
+	return a.APIGroup
 }

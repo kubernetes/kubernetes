@@ -367,6 +367,8 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 
 	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 
+	attribs.APIGroup = apiRequestInfo.APIGroup
+
 	// If a path follows the conventions of the REST object store, then
 	// we can extract the resource.  Otherwise, not.
 	attribs.Resource = apiRequestInfo.Resource
