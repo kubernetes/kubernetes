@@ -91,7 +91,7 @@ These are in no particular order
 
 * [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
 * [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Finish support for the Dockerized runtime. Issue (#19)[http://issue.k8s.io/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
+* [ ] Finish support for the Dockerized runtime. Issue [#19](http://issue.k8s.io/19).  A key issue here is to make this fast/light enough that we can use it for development workflows.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()
