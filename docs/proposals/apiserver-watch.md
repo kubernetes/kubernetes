@@ -116,7 +116,7 @@ we will store two things:
   This should be as simple as having an array an treating it as a cyclic buffer.
   Obviously resourceVersion of objects watched from etcd will be increasing, but
   they are necessary for registering a new watcher that is interested in all the
-  changes since a given etcdIndec.
+  changes since a given etcdIndex.
 
   Additionally, we should support LIST operation, otherwise clients can never
   start watching at now. We may consider passing lists through etcd, however
