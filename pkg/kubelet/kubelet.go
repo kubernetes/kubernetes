@@ -2508,65 +2508,32 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-func readyPodCondition(isPodReady bool, reason, message string, existingStatus *api.PodStatus) []api.PodCondition {
-	currentTime := unversioned.Now()
-	condition := api.PodCondition{
-		Type: api.PodReady,
-	}
-	if isPodReady {
-		condition.Status = api.ConditionTrue
-	} else {
-		condition.Status = api.ConditionFalse
-	}
-	condition.LastProbeTime = currentTime
-	condition.Reason = reason
-	condition.Message = message
-	if existingStatus != nil {
-		if api.IsPodReadyConditionTrue(*existingStatus) != isPodReady {
-			// condition has transitioned, update transition time.
-			condition.LastTransitionTime = currentTime
-		} else {
-			// retain the existing transition time.
-			existingCondition := api.GetPodReadyCondition(*existingStatus)
-			if existingCondition != nil {
-				condition.LastTransitionTime = existingCondition.LastTransitionTime
-			}
-		}
-	}
-	return []api.PodCondition{condition}
-}
+// Disabled LastProbeTime/LastTranitionTime for Pods to avoid constantly sending pod status
+// update to the apiserver. See http://issues.k8s.io/14273. Functional revert of a PR #12894
 
 // getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
 func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, existingStatus *api.PodStatus) []api.PodCondition {
-	// Find if all containers are ready or not.
+	ready := []api.PodCondition{{
+		Type:   api.PodReady,
+		Status: api.ConditionTrue,
+	}}
+	notReady := []api.PodCondition{{
+		Type:   api.PodReady,
+		Status: api.ConditionFalse,
+	}}
 	if containerStatuses == nil {
-		return readyPodCondition(false, "UnknownContainerStatuses", "", existingStatus)
+		return notReady
 	}
-	unknownContainers := []string{}
-	unreadyContainers := []string{}
 	for _, container := range spec.Containers {
 		if containerStatus, ok := api.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
-				unreadyContainers = append(unreadyContainers, container.Name)
+				return notReady
 			}
 		} else {
-			unknownContainers = append(unknownContainers, container.Name)
+			return notReady
 		}
 	}
-	unreadyMessages := []string{}
-	if len(unknownContainers) > 0 {
-		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unknown status: %s", unknownContainers))
-	}
-	if len(unreadyContainers) > 0 {
-		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unready status: %s", unreadyContainers))
-	}
-	unreadyMessage := strings.Join(unreadyMessages, ", ")
-	if unreadyMessage != "" {
-		// return unready status.
-		return readyPodCondition(false, fmt.Sprint("ContainersNotReady"), unreadyMessage, existingStatus)
-	}
-	// return ready status.
-	return readyPodCondition(true, "", "", existingStatus)
+	return ready
 }
 
 // By passing the pod directly, this method avoids pod lookup, which requires
@@ -2580,8 +2547,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
-	existingStatus, hasExistingStatus := kl.statusManager.GetPodStatus(pod.UID)
-	if hasExistingStatus {
+	if existingStatus, hasExistingStatus := kl.statusManager.GetPodStatus(pod.UID); hasExistingStatus {
 		// This is a hacky fix to ensure container restart counts increment
 		// monotonically. Normally, we should not modify given pod. In this
 		// case, we check if there are cached status for this pod, and update
@@ -2633,11 +2599,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 			}
 		}
 	}
-	if hasExistingStatus {
-		podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, &existingStatus)...)
-	} else {
-		podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, nil)...)
-	}
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, nil /* unused */)...)
 
 	if !kl.standaloneMode {
 		hostIP, err := kl.GetHostIP()
