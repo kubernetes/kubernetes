@@ -74,8 +74,7 @@ function check-curl-proxy-code()
   echo "For address ${full_address}, got ${status} but wanted ${desired}"
   return 1
 }
-
-trap cleanup EXIT SIGINT
+kube::util::trap_add cleanup EXIT SIGINT
 
 kube::util::ensure-temp-dir
 kube::etcd::start
@@ -128,7 +127,7 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,experimental/v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -398,11 +397,21 @@ runTests() {
 
   ## --force replace pod can change other field, e.g., spec.container.name
   # Command
-  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > tmp-valid-pod.json
-  kubectl replace "${kube_flags[@]}" --force -f tmp-valid-pod.json
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
+  kubectl replace "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
-  rm tmp-valid-pod.json
+  #cleaning
+  rm /tmp/tmp-valid-pod.json
+
+  ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
+  echo -e '#!/bin/bash\nsed -i "s/kubernetes\/pause/gcr.io\/google_containers\/serve_hostname/g" $1' > /tmp/tmp-editor.sh
+  chmod +x /tmp/tmp-editor.sh
+  EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
+  # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
+  # cleaning
+  rm /tmp/tmp-editor.sh
 
   ### Overwriting an existing label is not permitted
   # Pre-condition: name is valid-pod
@@ -680,6 +689,13 @@ __EOF__
   kubectl delete pod valid-pod "${kube_flags[@]}"
   kubectl delete service frontend{,-2,-3,-4,-5} "${kube_flags[@]}"
 
+  ### Expose negative invalid resource test
+  # Pre-condition: don't need
+  # Command
+  output_message=$(! kubectl expose nodes 127.0.0.1 2>&1 "${kube_flags[@]}")
+  # Post-condition: the error message has "invalid resource" string
+  kube::test::if_has_string "${output_message}" 'invalid resource'
+
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
@@ -813,7 +829,7 @@ kube_api_versions=(
   v1
 )
 for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1" runTests "${version}"
+  KUBE_API_VERSIONS="v1,experimental/v1" runTests "${version}"
 done
 
 kube::log::status "TEST PASSED"

@@ -22,6 +22,7 @@ import (
 	"hash/adler32"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -283,6 +284,12 @@ func TestPullWithSecrets(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	dockerConfigJson := map[string]map[string]map[string]string{"auths": dockerCfg}
+	dockerConfigJsonContent, err := json.Marshal(dockerConfigJson)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	tests := map[string]struct {
 		imageName           string
 		passedSecrets       []api.Secret
@@ -310,6 +317,12 @@ func TestPullWithSecrets(t *testing.T) {
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
+		},
+		"builtin keyring secrets, but use passed with new docker config": {
+			"ubuntu",
+			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
@@ -698,42 +711,81 @@ func TestMakePortsAndBindings(t *testing.T) {
 			HostPort:      445,
 			Protocol:      "foobar",
 		},
+		{
+			ContainerPort: 443,
+			HostPort:      446,
+			Protocol:      "tcp",
+		},
+		{
+			ContainerPort: 443,
+			HostPort:      446,
+			Protocol:      "udp",
+		},
 	}
+
 	exposedPorts, bindings := makePortsAndBindings(ports)
-	if len(ports) != len(exposedPorts) ||
-		len(ports) != len(bindings) {
+
+	// Count the expected exposed ports and bindings
+	expectedExposedPorts := map[string]struct{}{}
+
+	for _, binding := range ports {
+		dockerKey := strconv.Itoa(binding.ContainerPort) + "/" + string(binding.Protocol)
+		expectedExposedPorts[dockerKey] = struct{}{}
+	}
+
+	// Should expose right ports in docker
+	if len(expectedExposedPorts) != len(exposedPorts) {
 		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", ports, exposedPorts, bindings)
 	}
-	for key, value := range bindings {
-		switch value[0].HostPort {
-		case "8080":
-			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
+
+	// Construct expected bindings
+	expectPortBindings := map[string][]docker.PortBinding{
+		"80/tcp": {
+			docker.PortBinding{
+				HostPort: "8080",
+				HostIP:   "127.0.0.1",
+			},
+		},
+		"443/tcp": {
+			docker.PortBinding{
+				HostPort: "443",
+				HostIP:   "",
+			},
+			docker.PortBinding{
+				HostPort: "446",
+				HostIP:   "",
+			},
+		},
+		"443/udp": {
+			docker.PortBinding{
+				HostPort: "446",
+				HostIP:   "",
+			},
+		},
+		"444/udp": {
+			docker.PortBinding{
+				HostPort: "444",
+				HostIP:   "",
+			},
+		},
+		"445/tcp": {
+			docker.PortBinding{
+				HostPort: "445",
+				HostIP:   "",
+			},
+		},
+	}
+
+	// interate the bindings by dockerPort, and check its portBindings
+	for dockerPort, portBindings := range bindings {
+		switch dockerPort {
+		case "80/tcp", "443/tcp", "443/udp", "444/udp", "445/tcp":
+			if !reflect.DeepEqual(expectPortBindings[string(dockerPort)], portBindings) {
+				t.Errorf("Unexpected portbindings for %#v, expected: %#v, but got: %#v",
+					dockerPort, expectPortBindings[string(dockerPort)], portBindings)
 			}
-			if value[0].HostIP != "127.0.0.1" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "443":
-			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "444":
-			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "445":
-			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
+		default:
+			t.Errorf("Unexpected docker port: %#v with portbindings: %#v", dockerPort, portBindings)
 		}
 	}
 }

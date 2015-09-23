@@ -75,9 +75,9 @@ func (plugin *iscsiPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *iscsiPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *iscsiPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &ISCSIUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
@@ -110,9 +110,9 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	}, nil
 }
 
-func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {

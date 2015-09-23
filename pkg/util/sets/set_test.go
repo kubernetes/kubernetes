@@ -183,3 +183,88 @@ func TestStringSetEquals(t *testing.T) {
 		t.Errorf("Expected to be not-equal: %v vs %v", a, b)
 	}
 }
+
+func TestStringUnion(t *testing.T) {
+	tests := []struct {
+		s1       String
+		s2       String
+		expected String
+	}{
+		{
+			NewString("1", "2", "3", "4"),
+			NewString("3", "4", "5", "6"),
+			NewString("1", "2", "3", "4", "5", "6"),
+		},
+		{
+			NewString("1", "2", "3", "4"),
+			NewString(),
+			NewString("1", "2", "3", "4"),
+		},
+		{
+			NewString(),
+			NewString("1", "2", "3", "4"),
+			NewString("1", "2", "3", "4"),
+		},
+		{
+			NewString(),
+			NewString(),
+			NewString(),
+		},
+	}
+
+	for _, test := range tests {
+		union := test.s1.Union(test.s2)
+		if union.Len() != test.expected.Len() {
+			t.Errorf("Expected union.Len()=%d but got %d", test.expected.Len(), union.Len())
+		}
+
+		if !union.Equal(test.expected) {
+			t.Errorf("Expected union.Equal(expected) but not true.  union:%v expected:%v", union.List(), test.expected.List())
+		}
+	}
+}
+
+func TestStringIntersection(t *testing.T) {
+	tests := []struct {
+		s1       String
+		s2       String
+		expected String
+	}{
+		{
+			NewString("1", "2", "3", "4"),
+			NewString("3", "4", "5", "6"),
+			NewString("3", "4"),
+		},
+		{
+			NewString("1", "2", "3", "4"),
+			NewString("1", "2", "3", "4"),
+			NewString("1", "2", "3", "4"),
+		},
+		{
+			NewString("1", "2", "3", "4"),
+			NewString(),
+			NewString(),
+		},
+		{
+			NewString(),
+			NewString("1", "2", "3", "4"),
+			NewString(),
+		},
+		{
+			NewString(),
+			NewString(),
+			NewString(),
+		},
+	}
+
+	for _, test := range tests {
+		intersection := test.s1.Intersection(test.s2)
+		if intersection.Len() != test.expected.Len() {
+			t.Errorf("Expected intersection.Len()=%d but got %d", test.expected.Len(), intersection.Len())
+		}
+
+		if !intersection.Equal(test.expected) {
+			t.Errorf("Expected intersection.Equal(expected) but not true.  intersection:%v expected:%v", intersection.List(), test.expected.List())
+		}
+	}
+}

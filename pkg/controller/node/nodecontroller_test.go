@@ -19,7 +19,6 @@ package nodecontroller
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/fields"
@@ -141,7 +141,7 @@ func (m *FakeNodeHandler) Watch(label labels.Selector, field fields.Selector, re
 }
 
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
-	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 
 	table := []struct {
@@ -176,15 +176,15 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFalse,
-									LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -199,8 +199,8 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Type:   api.NodeReady,
 						Status: api.ConditionFalse,
 						// Node status has just been updated, and is NotReady for 10min.
-						LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
 			},
@@ -214,15 +214,15 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFalse,
-									LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -237,8 +237,8 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Type:   api.NodeReady,
 						Status: api.ConditionFalse,
 						// Node status has just been updated, and is NotReady for 1hr.
-						LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
 			},
@@ -252,15 +252,15 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionUnknown,
-									LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -275,8 +275,8 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Type:   api.NodeReady,
 						Status: api.ConditionUnknown,
 						// Node status was updated by nodecontroller 10min ago
-						LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
 			},
@@ -290,15 +290,15 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionUnknown,
-									LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -313,8 +313,8 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Type:   api.NodeReady,
 						Status: api.ConditionUnknown,
 						// Node status was updated by nodecontroller 1hr ago
-						LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
 			},
@@ -327,12 +327,12 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler,
 			evictionTimeout, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
-		nodeController.now = func() util.Time { return fakeNow }
+		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if item.timeToPass > 0 {
-			nodeController.now = func() util.Time { return util.Time{Time: fakeNow.Add(item.timeToPass)} }
+			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -365,7 +365,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 }
 
 func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
-	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
 		timeToPass           time.Duration
@@ -382,7 +382,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 					},
 				},
@@ -393,15 +393,16 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet never posted node status."),
-								LastHeartbeatTime:  util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            fmt.Sprintf("Kubelet never posted node status."),
+								LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},
 						},
@@ -434,7 +435,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -442,8 +443,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									Type:   api.NodeReady,
 									Status: api.ConditionTrue,
 									// Node status hasn't been updated for 1hr.
-									LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 							Capacity: api.ResourceList{
@@ -466,8 +467,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						Type:   api.NodeReady,
 						Status: api.ConditionTrue,
 						// Node status hasn't been updated for 1hr.
-						LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
 				Capacity: api.ResourceList{
@@ -479,16 +480,17 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet stopped posting node status."),
-								LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: util.Time{Time: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+								Reason:             "NodeStatusStopUpdated",
+								Message:            fmt.Sprintf("Kubelet stopped posting node status."),
+								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: unversioned.Time{Time: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
 							},
 						},
 						Capacity: api.ResourceList{
@@ -510,7 +512,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
-							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -542,12 +544,12 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	for _, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
-		nodeController.now = func() util.Time { return fakeNow }
+		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if item.timeToPass > 0 {
-			nodeController.now = func() util.Time { return util.Time{Time: fakeNow.Add(item.timeToPass)} }
+			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
 			if err := nodeController.monitorNodeStatus(); err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -564,13 +566,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 }
 
 func TestNodeDeletion(t *testing.T) {
-	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	fakeNodeHandler := &FakeNodeHandler{
 		Existing: []*api.Node{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "node0",
-					CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				Status: api.NodeStatus{
 					Conditions: []api.NodeCondition{
@@ -594,7 +596,7 @@ func TestNodeDeletion(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "node1",
-					CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				Status: api.NodeStatus{
 					Conditions: []api.NodeCondition{
@@ -621,7 +623,7 @@ func TestNodeDeletion(t *testing.T) {
 
 	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
-	nodeController.now = func() util.Time { return fakeNow }
+	nodeController.now = func() unversioned.Time { return fakeNow }
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -661,35 +663,6 @@ func newNode(name string) *api.Node {
 
 func newPod(name, host string) *api.Pod {
 	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{NodeName: host}}
-}
-
-func sortedNodeNames(nodes []*api.Node) []string {
-	nodeNames := []string{}
-	for _, node := range nodes {
-		nodeNames = append(nodeNames, node.Name)
-	}
-	sort.Strings(nodeNames)
-	return nodeNames
-}
-
-func sortedNodeAddresses(nodes []*api.Node) []string {
-	nodeAddresses := []string{}
-	for _, node := range nodes {
-		for _, addr := range node.Status.Addresses {
-			nodeAddresses = append(nodeAddresses, addr.Address)
-		}
-	}
-	sort.Strings(nodeAddresses)
-	return nodeAddresses
-}
-
-func sortedNodeExternalIDs(nodes []*api.Node) []string {
-	nodeExternalIDs := []string{}
-	for _, node := range nodes {
-		nodeExternalIDs = append(nodeExternalIDs, node.Spec.ExternalID)
-	}
-	sort.Strings(nodeExternalIDs)
-	return nodeExternalIDs
 }
 
 func contains(node *api.Node, nodes []*api.Node) bool {

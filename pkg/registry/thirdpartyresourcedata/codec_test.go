@@ -23,21 +23,23 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type Foo struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
 }
 
 type FooList struct {
-	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
 	items []Foo `json:"items"`
 }
@@ -54,20 +56,20 @@ func TestCodec(t *testing.T) {
 			name:      "missing kind",
 		},
 		{
-			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}, TypeMeta: api.TypeMeta{Kind: "Foo"}},
+			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}, TypeMeta: unversioned.TypeMeta{Kind: "Foo"}},
 			name: "basic",
 		},
 		{
-			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"}, TypeMeta: api.TypeMeta{Kind: "Foo"}},
+			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"}, TypeMeta: unversioned.TypeMeta{Kind: "Foo"}},
 			name: "resource version",
 		},
 		{
 			obj: &Foo{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "bar",
-					CreationTimestamp: util.Time{time.Unix(100, 0)},
+					CreationTimestamp: unversioned.Time{time.Unix(100, 0)},
 				},
-				TypeMeta: api.TypeMeta{Kind: "Foo"},
+				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
 			},
 			name: "creation time",
 		},
@@ -78,7 +80,7 @@ func TestCodec(t *testing.T) {
 					ResourceVersion: "baz",
 					Labels:          map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				TypeMeta: api.TypeMeta{Kind: "Foo"},
+				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
 			},
 			name: "labels",
 		},
@@ -131,5 +133,51 @@ func TestCodec(t *testing.T) {
 		if !reflect.DeepEqual(&output2, test.obj) {
 			t.Errorf("[%s]\nexpected\n%v\nsaw\n%v\n", test.name, test.obj, &output2)
 		}
+	}
+}
+
+func TestCreater(t *testing.T) {
+	creater := NewObjectCreator("creater version", api.Scheme)
+	tests := []struct {
+		name        string
+		version     string
+		kind        string
+		expectedObj runtime.Object
+		expectErr   bool
+	}{
+		{
+			name:        "valid ThirdPartyResourceData creation",
+			version:     "creater version",
+			kind:        "ThirdPartyResourceData",
+			expectedObj: &experimental.ThirdPartyResourceData{},
+			expectErr:   false,
+		},
+		{
+			name:        "invalid ThirdPartyResourceData creation",
+			version:     "invalid version",
+			kind:        "ThirdPartyResourceData",
+			expectedObj: nil,
+			expectErr:   true,
+		},
+		{
+			name:        "valid ListOptions creation",
+			version:     "v1",
+			kind:        "ListOptions",
+			expectedObj: &v1.ListOptions{},
+			expectErr:   false,
+		},
+	}
+	for _, test := range tests {
+		out, err := creater.New(test.version, test.kind)
+		if err != nil && !test.expectErr {
+			t.Errorf("[%s] unexpected error: %v", test.name, err)
+		}
+		if err == nil && test.expectErr {
+			t.Errorf("[%s] unexpected non-error", test.name)
+		}
+		if !reflect.DeepEqual(test.expectedObj, out) {
+			t.Errorf("[%s] unexpected error: expect: %v, got: %v", test.expectedObj, out)
+		}
+
 	}
 }

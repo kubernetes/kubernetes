@@ -353,7 +353,7 @@ func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, r
 
 // pollForReadyPods polls oldRc and newRc each interval and returns the old
 // and new ready counts for their pods. If a pod is observed as being ready,
-// it's considered ready even if it later becomes unready.
+// it's considered ready even if it later becomes notReady.
 func (r *RollingUpdater) pollForReadyPods(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
 	controllers := []*api.ReplicationController{oldRc, newRc}
 	oldReady := 0

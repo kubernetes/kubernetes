@@ -251,7 +251,7 @@ func (f *FakeRuntime) RunInContainer(containerID string, cmd []string) ([]byte, 
 	return []byte{}, f.Err
 }
 
-func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	f.Lock()
 	defer f.Unlock()
 

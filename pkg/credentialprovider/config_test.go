@@ -22,6 +22,35 @@ import (
 	"testing"
 )
 
+func TestDockerConfigJsonJSONDecode(t *testing.T) {
+	input := []byte(`{"auths": {"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}}`)
+
+	expect := DockerConfigJson{
+		Auths: DockerConfig(map[string]DockerConfigEntry{
+			"http://foo.example.com": {
+				Username: "foo",
+				Password: "bar",
+				Email:    "foo@example.com",
+			},
+			"http://bar.example.com": {
+				Username: "bar",
+				Password: "baz",
+				Email:    "bar@example.com",
+			},
+		}),
+	}
+
+	var output DockerConfigJson
+	err := json.Unmarshal(input, &output)
+	if err != nil {
+		t.Errorf("Received unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(expect, output) {
+		t.Errorf("Received unexpected output. Expected %#v, got %#v", expect, output)
+	}
+}
+
 func TestDockerConfigJSONDecode(t *testing.T) {
 	input := []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`)
 

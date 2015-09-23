@@ -277,7 +277,14 @@ func (k *unionDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, b
 func MakeDockerKeyring(passedSecrets []api.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
 	passedCredentials := []DockerConfig{}
 	for _, passedSecret := range passedSecrets {
-		if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
+		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[api.DockerConfigJsonKey]; (passedSecret.Type == api.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
+			dockerConfigJson := DockerConfigJson{}
+			if err := json.Unmarshal(dockerConfigJsonBytes, &dockerConfigJson); err != nil {
+				return nil, err
+			}
+
+			passedCredentials = append(passedCredentials, dockerConfigJson.Auths)
+		} else if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
 			dockercfg := DockerConfig{}
 			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
 				return nil, err

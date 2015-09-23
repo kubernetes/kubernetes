@@ -131,13 +131,13 @@ type JobStatus struct {
     Conditions []JobCondition
 
     // CreationTime represents time when the job was created
-    CreationTime util.Time
+    CreationTime unversioned.Time
 
     // StartTime represents time when the job was started
-    StartTime util.Time
+    StartTime unversioned.Time
 
     // CompletionTime represents time when the job was completed
-    CompletionTime util.Time
+    CompletionTime unversioned.Time
 
     // Active is the number of actively running pods.
     Active int
@@ -162,8 +162,8 @@ const (
 type JobCondition struct {
     Type               JobConditionType
     Status             ConditionStatus
-    LastHeartbeatTime  util.Time
-    LastTransitionTime util.Time
+    LastHeartbeatTime  unversioned.Time
+    LastTransitionTime unversioned.Time
     Reason             string
     Message            string
 }

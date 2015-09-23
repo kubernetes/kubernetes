@@ -87,7 +87,7 @@ DNS_REPLICAS=1
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!

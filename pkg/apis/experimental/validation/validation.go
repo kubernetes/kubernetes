@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 const isNegativeErrorMsg string = `must be non-negative`
@@ -39,11 +40,11 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 
 func validateHorizontalPodAutoscalerSpec(autoscaler experimental.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if autoscaler.MinCount < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("minCount", autoscaler.MinCount, `must be non-negative`))
+	if autoscaler.MinReplicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, `must be non-negative`))
 	}
-	if autoscaler.MaxCount < autoscaler.MinCount {
-		allErrs = append(allErrs, errs.NewFieldInvalid("maxCount", autoscaler.MaxCount, `must be bigger or equal to minCount`))
+	if autoscaler.MaxReplicas < autoscaler.MinReplicas {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
 	if autoscaler.ScaleRef == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired("scaleRef"))
@@ -170,7 +171,7 @@ func ValidateDeploymentName(name string, prefix bool) (bool, string) {
 func ValidatePositiveIntOrPercent(intOrPercent util.IntOrString, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if intOrPercent.Kind == util.IntstrString {
-		if !util.IsValidPercent(intOrPercent.StrVal) {
+		if !validation.IsValidPercent(intOrPercent.StrVal) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
 		}
 
@@ -181,7 +182,7 @@ func ValidatePositiveIntOrPercent(intOrPercent util.IntOrString, fieldName strin
 }
 
 func getPercentValue(intOrStringValue util.IntOrString) (int, bool) {
-	if intOrStringValue.Kind != util.IntstrString || !util.IsValidPercent(intOrStringValue.StrVal) {
+	if intOrStringValue.Kind != util.IntstrString || !validation.IsValidPercent(intOrStringValue.StrVal) {
 		return 0, false
 	}
 	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
@@ -226,9 +227,9 @@ func ValidateDeploymentStrategy(strategy *experimental.DeploymentStrategy, field
 		return allErrs
 	}
 	switch strategy.Type {
-	case experimental.DeploymentRecreate:
-		allErrs = append(allErrs, errs.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+experimental.DeploymentRecreate))
-	case experimental.DeploymentRollingUpdate:
+	case experimental.RecreateDeploymentStrategyType:
+		allErrs = append(allErrs, errs.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+experimental.RecreateDeploymentStrategyType))
+	case experimental.RollingUpdateDeploymentStrategyType:
 		allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, "rollingUpdate")...)
 	}
 	return allErrs
@@ -314,6 +315,21 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 func ValidateJobUpdate(oldJob, job *experimental.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, ValidateJobSpecUpdate(oldJob.Spec, job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidateJobSpecUpdate(oldSpec, spec experimental.JobSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateJobSpec(&spec)...)
+	if !api.Semantic.DeepEqual(oldSpec.Completions, spec.Completions) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, "field is immutable"))
+	}
+	if !api.Semantic.DeepEqual(oldSpec.Selector, spec.Selector) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("selector", spec.Selector, "field is immutable"))
+	}
+	if !api.Semantic.DeepEqual(oldSpec.Template, spec.Template) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("template", "[omitted]", "field is immutable"))
+	}
 	return allErrs
 }

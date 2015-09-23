@@ -29,10 +29,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -127,7 +128,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "successful re-use of labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "svc=test",
 			err:      nil,
@@ -136,7 +137,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "empty labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -145,7 +146,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "nil labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -162,6 +163,33 @@ func TestLabelsForObject(t *testing.T) {
 			t.Fatalf("%s: Labels mismatch! Expected %s, got %s", test.name, test.expected, got)
 		}
 
+	}
+}
+
+func TestCanBeExposed(t *testing.T) {
+	factory := NewFactory(nil)
+	tests := []struct {
+		kind      string
+		expectErr bool
+	}{
+		{
+			kind:      "ReplicationController",
+			expectErr: false,
+		},
+		{
+			kind:      "Node",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		err := factory.CanBeExposed(test.kind)
+		if test.expectErr && err == nil {
+			t.Error("unexpected non-error")
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	}
 }
 
@@ -199,9 +227,9 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 	requests := map[string]int{}
 
-	c := &client.FakeRESTClient{
+	c := &fake.RESTClient{
 		Codec: testapi.Default.Codec(),
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1

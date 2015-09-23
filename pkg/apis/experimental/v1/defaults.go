@@ -50,11 +50,11 @@ func addDefaultingFuncs() {
 				*obj.Spec.Replicas = 1
 			}
 			strategy := &obj.Spec.Strategy
-			// Set default DeploymentType as RollingUpdate.
+			// Set default DeploymentStrategyType as RollingUpdate.
 			if strategy.Type == "" {
-				strategy.Type = DeploymentRollingUpdate
+				strategy.Type = RollingUpdateDeploymentStrategyType
 			}
-			if strategy.Type == DeploymentRollingUpdate {
+			if strategy.Type == RollingUpdateDeploymentStrategyType {
 				if strategy.RollingUpdate == nil {
 					rollingUpdate := RollingUpdateDeployment{}
 					strategy.RollingUpdate = &rollingUpdate
@@ -73,6 +73,29 @@ func addDefaultingFuncs() {
 			if obj.Spec.UniqueLabelKey == nil {
 				obj.Spec.UniqueLabelKey = new(string)
 				*obj.Spec.UniqueLabelKey = "deployment.kubernetes.io/podTemplateHash"
+			}
+		},
+		func(obj *Job) {
+			var labels map[string]string
+			if obj.Spec.Template != nil {
+				labels = obj.Spec.Template.Labels
+			}
+			// TODO: support templates defined elsewhere when we support them in the API
+			if labels != nil {
+				if len(obj.Spec.Selector) == 0 {
+					obj.Spec.Selector = labels
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
+			if obj.Spec.Completions == nil {
+				completions := 1
+				obj.Spec.Completions = &completions
+			}
+			if obj.Spec.Parallelism == nil {
+				parallelism := 2
+				obj.Spec.Parallelism = &parallelism
 			}
 		},
 	)

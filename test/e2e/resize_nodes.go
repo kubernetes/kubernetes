@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -183,9 +184,9 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
 	return &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: latest.Version,
+			APIVersion: latest.GroupOrDie("").Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -404,7 +405,7 @@ var _ = Describe("Nodes", func() {
 		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
 		}
-		if err := deleteTestingNS(c); err != nil {
+		if err := checkTestingNSDeletedExcept(c, ""); err != nil {
 			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
 		}
 	})

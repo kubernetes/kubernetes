@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -102,7 +103,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 	items, err := q.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
+		return admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
 	}
 	if len(items) == 0 {
 		return nil
@@ -149,7 +150,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 				// we have concurrent requests to update quota, so look to retry if needed
 				if retry == numRetries {
-					return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
+					return admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
 				}
 				time.Sleep(interval)
 				// manually get the latest quota
@@ -167,7 +168,8 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 // Return true if the usage must be recorded prior to admitting the new resource
 // Return an error if the operation should not pass admission control
 func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
-	dirty := false
+	var errs []error
+	dirty := true
 	set := map[api.ResourceName]bool{}
 	for k := range status.Hard {
 		set[k] = true
@@ -180,13 +182,13 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 		if hardFound {
 			used, usedFound := status.Used[resourceName]
 			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
+				return false, fmt.Errorf("quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
 			}
 			if used.Value() >= hard.Value() {
-				return false, fmt.Errorf("Limited to %s %s", hard.String(), resourceName)
+				errs = append(errs, fmt.Errorf("limited to %s %s", hard.String(), resourceName))
+				dirty = false
 			} else {
 				status.Used[resourceName] = *resource.NewQuantity(used.Value()+int64(1), resource.DecimalSI)
-				dirty = true
 			}
 		}
 	}
@@ -194,7 +196,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	if a.GetResource() == "pods" {
 		for _, resourceName := range []api.ResourceName{api.ResourceMemory, api.ResourceCPU} {
 
-			// ignore tracking the resource if its not in the quota document
+			// ignore tracking the resource if it's not in the quota document
 			if !set[resourceName] {
 				continue
 			}
@@ -207,7 +209,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			// if we do not yet know how much of the current resource is used, we cannot accept any request
 			used, usedFound := status.Used[resourceName]
 			if !usedFound {
-				return false, fmt.Errorf("Unable to admit pod until quota usage stats are calculated.")
+				return false, fmt.Errorf("unable to admit pod until quota usage stats are calculated.")
 			}
 
 			// the amount of resource being requested, or an error if it does not make a request that is tracked
@@ -215,7 +217,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			delta, err := resourcequotacontroller.PodRequests(pod, resourceName)
 
 			if err != nil {
-				return false, fmt.Errorf("Must make a non-zero request for %s since it is tracked by quota.", resourceName)
+				return false, fmt.Errorf("must make a non-zero request for %s since it is tracked by quota.", resourceName)
 			}
 
 			// if this operation is an update, we need to find the delta usage from the previous state
@@ -250,12 +252,14 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			}
 
 			if newUsageValue > hardUsageValue {
-				return false, fmt.Errorf("Unable to admit pod without exceeding quota for resource %s.  Limited to %s but require %s to succeed.", resourceName, hard.String(), newUsage.String())
+				errs = append(errs, fmt.Errorf("unable to admit pod without exceeding quota for resource %s:  limited to %s but require %s to succeed.", resourceName, hard.String(), newUsage.String()))
+				dirty = false
 			} else {
 				status.Used[resourceName] = *newUsage
-				dirty = true
 			}
+
 		}
 	}
-	return dirty, nil
+
+	return dirty, errors.NewAggregate(errs)
 }

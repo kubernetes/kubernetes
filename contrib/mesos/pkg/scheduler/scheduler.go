@@ -39,64 +39,18 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-type Slave struct {
-	HostName string
-}
-
-func newSlave(hostName string) *Slave {
-	return &Slave{
-		HostName: hostName,
-	}
-}
-
-type slaveStorage struct {
-	sync.Mutex
-	slaves map[string]*Slave // SlaveID => slave.
-}
-
-func newSlaveStorage() *slaveStorage {
-	return &slaveStorage{
-		slaves: make(map[string]*Slave),
-	}
-}
-
-// Create a mapping between a slaveID and slave if not existing.
-func (self *slaveStorage) checkAndAdd(slaveId, slaveHostname string) {
-	self.Lock()
-	defer self.Unlock()
-	_, exists := self.slaves[slaveId]
-	if !exists {
-		self.slaves[slaveId] = newSlave(slaveHostname)
-	}
-}
-
-func (self *slaveStorage) getSlaveIds() []string {
-	self.Lock()
-	defer self.Unlock()
-	slaveIds := make([]string, 0, len(self.slaves))
-	for slaveID := range self.slaves {
-		slaveIds = append(slaveIds, slaveID)
-	}
-	return slaveIds
-}
-
-func (self *slaveStorage) getSlave(slaveId string) (*Slave, bool) {
-	self.Lock()
-	defer self.Unlock()
-	slave, exists := self.slaves[slaveId]
-	return slave, exists
-}
 
 type PluginInterface interface {
 	// the apiserver may have a different state for the pod than we do
@@ -138,7 +92,7 @@ type KubernetesScheduler struct {
 	registration   chan struct{} // signal chan that closes upon first successful registration
 	onRegistration sync.Once
 	offers         offers.Registry
-	slaves         *slaveStorage
+	slaveHostNames *slave.Registry
 
 	// unsafe state, needs to be guarded
 
@@ -205,7 +159,7 @@ func New(config Config) *KubernetesScheduler {
 			TTL:           config.Schedcfg.OfferTTL.Duration,
 			ListenerDelay: config.Schedcfg.ListenerDelay.Duration,
 		}),
-		slaves:            newSlaveStorage(),
+		slaveHostNames:    slave.NewRegistry(),
 		taskRegistry:      podtask.NewInMemoryRegistry(),
 		reconcileCooldown: config.ReconcileCooldown,
 		registration:      make(chan struct{}),
@@ -270,7 +224,7 @@ func (k *KubernetesScheduler) InstallDebugHandlers(mux *http.ServeMux) {
 	requestReconciliation("/debug/actions/requestImplicit", k.reconciler.RequestImplicit)
 
 	wrappedHandler("/debug/actions/kamikaze", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slaves := k.slaves.getSlaveIds()
+		slaves := k.slaveHostNames.SlaveIDs()
 		for _, slaveId := range slaves {
 			_, err := k.driver.SendFrameworkMessage(
 				k.executor.ExecutorId,
@@ -368,7 +322,7 @@ func (k *KubernetesScheduler) ResourceOffers(driver bindings.SchedulerDriver, of
 	k.offers.Add(offers)
 	for _, offer := range offers {
 		slaveId := offer.GetSlaveId().GetValue()
-		k.slaves.checkAndAdd(slaveId, offer.GetHostname())
+		k.slaveHostNames.Register(slaveId, offer.GetHostname())
 	}
 }
 
@@ -423,7 +377,7 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 			} // else, we don't really care about FINISHED tasks that aren't registered
 			return
 		}
-		if _, exists := k.slaves.getSlave(taskStatus.GetSlaveId().GetValue()); !exists {
+		if hostName := k.slaveHostNames.HostName(taskStatus.GetSlaveId().GetValue()); hostName != "" {
 			// a registered task has an update reported by a slave that we don't recognize.
 			// this should never happen! So we don't reconcile it.
 			log.Errorf("Ignore status %+v because the slave does not exist", taskStatus)
@@ -487,7 +441,7 @@ func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDri
 		//to do anything. The underlying driver transport may be able to send a
 		//FrameworkMessage directly to the slave to terminate the task.
 		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
-		data := fmt.Sprintf("task-lost:%s", task.ID) //TODO(jdef) use a real message type
+		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) //TODO(jdef) use a real message type
 		if _, err := driver.SendFrameworkMessage(taskStatus.ExecutorId, taskStatus.SlaveId, data); err != nil {
 			log.Error(err.Error())
 		}
@@ -920,9 +874,15 @@ func (ks *KubernetesScheduler) recoverTasks() error {
 	recoverSlave := func(t *podtask.T) {
 
 		slaveId := t.Spec.SlaveID
-		ks.slaves.checkAndAdd(slaveId, t.Offer.Host())
+		ks.slaveHostNames.Register(slaveId, t.Offer.Host())
 	}
 	for _, pod := range podList.Items {
+		if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
+			// mirrored pods are never reconciled because the scheduler isn't responsible for
+			// scheduling them; they're started by the executor/kubelet upon instantiation and
+			// reflected in the apiserver afterward. the scheduler has no knowledge of them.
+			continue
+		}
 		if t, ok, err := podtask.RecoverFrom(pod); err != nil {
 			log.Errorf("failed to recover task from pod, will attempt to delete '%v/%v': %v", pod.Namespace, pod.Name, err)
 			err := ks.client.Pods(pod.Namespace).Delete(pod.Name, nil)

@@ -17,9 +17,10 @@ limitations under the License.
 package cache
 
 import (
+	"time"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
-	"time"
 )
 
 // ExpirationCache implements the store interface
@@ -73,7 +74,7 @@ func (c *ExpirationCache) getTimestampedEntry(key string) (*timestampedEntry, bo
 	return nil, false
 }
 
-// getOrExpire retrieves the object from the timestampedEntry iff it hasn't
+// getOrExpire retrieves the object from the timestampedEntry if and only if it hasn't
 // already expired. It kicks-off a go routine to delete expired objects from
 // the store and sets exists=false.
 func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {

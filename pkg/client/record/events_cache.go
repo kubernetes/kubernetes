@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/groupcache/lru"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type history struct {
@@ -29,7 +29,7 @@ type history struct {
 	Count int
 
 	// The time at which the event was first recorded.
-	FirstTimestamp util.Time
+	FirstTimestamp unversioned.Time
 
 	// The unique name of the first occurrence of this event
 	Name string
@@ -47,15 +47,17 @@ type historyCache struct {
 	cache *lru.Cache
 }
 
-var previousEvents = historyCache{cache: lru.New(maxLruCacheEntries)}
+func NewEventCache() *historyCache {
+	return &historyCache{cache: lru.New(maxLruCacheEntries)}
+}
 
 // addOrUpdateEvent creates a new entry for the given event in the previous events hash table if the event
 // doesn't already exist, otherwise it updates the existing entry.
-func addOrUpdateEvent(newEvent *api.Event) history {
+func (eventCache *historyCache) addOrUpdateEvent(newEvent *api.Event) history {
 	key := getEventKey(newEvent)
-	previousEvents.Lock()
-	defer previousEvents.Unlock()
-	previousEvents.cache.Add(
+	eventCache.Lock()
+	defer eventCache.Unlock()
+	eventCache.cache.Add(
 		key,
 		history{
 			Count:           newEvent.Count,
@@ -63,20 +65,20 @@ func addOrUpdateEvent(newEvent *api.Event) history {
 			Name:            newEvent.Name,
 			ResourceVersion: newEvent.ResourceVersion,
 		})
-	return getEventFromCache(key)
+	return eventCache.getEventFromCache(key)
 }
 
 // getEvent returns the entry corresponding to the given event, if one exists, otherwise a history object
 // with a count of 0 is returned.
-func getEvent(event *api.Event) history {
+func (eventCache *historyCache) getEvent(event *api.Event) history {
 	key := getEventKey(event)
-	previousEvents.RLock()
-	defer previousEvents.RUnlock()
-	return getEventFromCache(key)
+	eventCache.RLock()
+	defer eventCache.RUnlock()
+	return eventCache.getEventFromCache(key)
 }
 
-func getEventFromCache(key string) history {
-	value, ok := previousEvents.cache.Get(key)
+func (eventCache *historyCache) getEventFromCache(key string) history {
+	value, ok := eventCache.cache.Get(key)
 	if ok {
 		historyValue, ok := value.(history)
 		if ok {

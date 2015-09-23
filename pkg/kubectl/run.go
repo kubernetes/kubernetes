@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type BasicReplicationController struct{}
@@ -394,7 +394,7 @@ func parseEnvs(envArray []string) ([]api.EnvVar, error) {
 	envs := []api.EnvVar{}
 	for _, env := range envArray {
 		parts := strings.Split(env, "=")
-		if len(parts) != 2 || !util.IsCIdentifier(parts[0]) || len(parts[1]) == 0 {
+		if len(parts) != 2 || !validation.IsCIdentifier(parts[0]) || len(parts[1]) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := api.EnvVar{Name: parts[0], Value: parts[1]}

@@ -69,8 +69,8 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, mounter, &realMountDetector{mounter}, opts, newChconRunner())
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts, newChconRunner())
 }
 
 func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions, chconRunner chconRunner) (volume.Builder, error) {
@@ -90,9 +90,9 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 	}, nil
 }
 
-func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, mounter, &realMountDetector{mounter})
+	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {

@@ -33,9 +33,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -322,9 +324,9 @@ var _ = Describe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			// Node
-			minions, err := c.Nodes().List(labels.Everything(), fields.Everything())
+			nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 			Expect(err).NotTo(HaveOccurred())
-			node := minions.Items[0]
+			node := nodes.Items[0]
 			output = runKubectl("describe", "node", node.Name)
 			requiredStrings = [][]string{
 				{"Name:", node.Name},
@@ -364,7 +366,6 @@ var _ = Describe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
-			serviceTimeout := 60 * time.Second
 
 			By("creating Redis RC")
 			runKubectl("create", "-f", controllerJson, nsFlag)
@@ -372,30 +373,33 @@ var _ = Describe("Kubectl client", func() {
 				lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
-				endpointFound := false
-				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+				err := wait.Poll(poll, timeout, func() (bool, error) {
 					endpoints, err := c.Endpoints(ns).Get(name)
-					Expect(err).NotTo(HaveOccurred())
+					if err != nil {
+						if apierrs.IsNotFound(err) {
+							err = nil
+						}
+						Logf("Get endpoints failed (interval %v): %v", poll, err)
+						return false, err
+					}
 
 					uidToPort := getContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
 						Logf("No endpoint found, retrying")
-						continue
+						return false, nil
 					}
 					if len(uidToPort) > 1 {
-						Fail("To many endpoints found")
+						Fail("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
 						if port[0] != redisPort {
 							Failf("Wrong endpoint port: %d", port[0])
 						}
 					}
-					endpointFound = true
-					break
-				}
-				if !endpointFound {
-					Failf("1 endpoint is expected")
-				}
+					return true, nil
+				})
+				Expect(err).NotTo(HaveOccurred())
+
 				service, err := c.Services(ns).Get(name)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -413,13 +417,13 @@ var _ = Describe("Kubectl client", func() {
 
 			By("exposing RC")
 			runKubectl("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			waitForService(c, ns, "rm2", true, poll, serviceTimeout)
-			validateService("rm2", 1234, serviceTimeout)
+			waitForService(c, ns, "rm2", true, poll, serviceStartTimeout)
+			validateService("rm2", 1234, serviceStartTimeout)
 
 			By("exposing service")
 			runKubectl("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			waitForService(c, ns, "rm3", true, poll, serviceTimeout)
-			validateService("rm3", 2345, serviceTimeout)
+			waitForService(c, ns, "rm3", true, poll, serviceStartTimeout)
+			validateService("rm3", 2345, serviceStartTimeout)
 		})
 	})
 
@@ -460,18 +464,57 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl logs", func() {
-		It("should find a string in pod logs", func() {
+		var rcPath string
+		var nsFlag string
+		containerName := "redis-master"
+		BeforeEach(func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			controllerJson := mkpath("redis-master-controller.json")
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			By("creating Redis RC")
-			runKubectl("create", "-f", controllerJson, nsFlag)
-			By("checking logs")
+			rcPath = mkpath("redis-master-controller.json")
+			By("creating an rc")
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			runKubectl("create", "-f", rcPath, nsFlag)
+		})
+		AfterEach(func() {
+			cleanup(rcPath, ns, simplePodSelector)
+		})
+
+		It("should be able to retrieve and filter logs", func() {
 			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
-				_, err := lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
+				By("checking for a matching strings")
+				_, err := lookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", podStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
+
+				By("limiting log lines")
+				out := runKubectl("log", pod.Name, containerName, nsFlag, "--tail=1")
+				Expect(len(out)).NotTo(BeZero())
+				Expect(len(strings.Split(out, "\n"))).To(Equal(1))
+
+				By("limiting log bytes")
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--limit-bytes=1")
+				Expect(len(strings.Split(out, "\n"))).To(Equal(1))
+				Expect(len(out)).To(Equal(1))
+
+				By("exposing timestamps")
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--tail=1", "--timestamps")
+				lines := strings.Split(out, "\n")
+				Expect(len(lines)).To(Equal(1))
+				words := strings.Split(lines[0], " ")
+				Expect(len(words)).To(BeNumerically(">", 1))
+				if _, err := time.Parse(time.RFC3339Nano, words[0]); err != nil {
+					if _, err := time.Parse(time.RFC3339, words[0]); err != nil {
+						Failf("expected %q to be RFC3339 or RFC3339Nano", words[0])
+					}
+				}
+
+				By("restricting to a time range")
+				time.Sleep(1500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--since=1s")
+				recent := len(strings.Split(out, "\n"))
+				out = runKubectl("log", pod.Name, containerName, nsFlag, "--since=24h")
+				older := len(strings.Split(out, "\n"))
+				Expect(recent).To(BeNumerically("<", older))
 			})
 		})
 	})

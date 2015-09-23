@@ -18,6 +18,7 @@ package util
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -86,6 +88,8 @@ type Factory struct {
 	DefaultNamespace func() (string, bool, error)
 	// Returns the generator for the provided generator name
 	Generator func(name string) (kubectl.Generator, bool)
+	// Check whether the kind of resources could be exposed
+	CanBeExposed func(kind string) error
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -233,8 +237,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return &clientSwaggerSchema{
 					c:        client,
-					ec:       client.ExperimentalClient,
 					cacheDir: dir,
+					mapper:   api.RESTMapper,
 				}, nil
 			}
 			return validation.NullSchema{}, nil
@@ -245,6 +249,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Generator: func(name string) (kubectl.Generator, bool) {
 			generator, ok := generators[name]
 			return generator, ok
+		},
+		CanBeExposed: func(kind string) error {
+			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
 		},
 	}
 }
@@ -289,8 +299,8 @@ func getServicePorts(spec api.ServiceSpec) []string {
 
 type clientSwaggerSchema struct {
 	c        *client.Client
-	ec       *client.ExperimentalClient
 	cacheDir string
+	mapper   meta.RESTMapper
 }
 
 const schemaFileName = "schema.json"
@@ -340,25 +350,29 @@ func getSchemaAndValidate(c schemaClient, data []byte, group, version, cacheDir 
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
 	if err != nil {
 		return err
 	}
 	if ok := registered.IsRegisteredAPIVersion(version); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
 	}
-	// First try stable api, if we can't validate using that, try experimental.
-	// If experimental fails, return error from stable api.
-	// TODO: Figure out which group to try once multiple group support is merged
-	//       instead of trying everything.
-	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
-	if err != nil && c.ec != nil {
-		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version, c.cacheDir)
-		if errExp == nil {
-			return nil
-		}
+	resource, _ := meta.KindToResource(kind, false)
+	group, err := c.mapper.GroupForResource(resource)
+	if err != nil {
+		return fmt.Errorf("could not find api group for %s: %v", kind, err)
 	}
-	return err
+	if group == "experimental" {
+		g, err := latest.Group(group)
+		if err != nil {
+			return err
+		}
+		if c.c.ExperimentalClient == nil {
+			return errors.New("unable to validate: no experimental client")
+		}
+		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/"+g.Group, version, c.cacheDir)
+	}
+	return getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:

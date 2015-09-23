@@ -100,6 +100,17 @@ func NewUpdateAction(resource, namespace string, object runtime.Object) UpdateAc
 	return action
 }
 
+func NewUpdateSubresourceAction(resource, subresource, namespace string, object runtime.Object) UpdateActionImpl {
+	action := UpdateActionImpl{}
+	action.Verb = "update"
+	action.Resource = resource
+	action.Subresource = subresource
+	action.Namespace = namespace
+	action.Object = object
+
+	return action
+}
+
 func NewRootDeleteAction(resource, name string) DeleteActionImpl {
 	action := DeleteActionImpl{}
 	action.Verb = "delete"

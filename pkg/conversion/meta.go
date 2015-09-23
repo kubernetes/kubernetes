@@ -19,6 +19,7 @@ package conversion
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"reflect"
 )
 
@@ -77,6 +78,7 @@ func UpdateVersionAndKind(baseFields []string, versionField, version, kindField,
 	if err != nil {
 		return err
 	}
+	pkg := path.Base(v.Type().PkgPath())
 	t := v.Type()
 	name := t.Name()
 	if v.Kind() != reflect.Struct {
@@ -93,6 +95,15 @@ func UpdateVersionAndKind(baseFields []string, versionField, version, kindField,
 
 	field := v.FieldByName(kindField)
 	if !field.IsValid() {
+		// Types defined in the unversioned package are allowed to not have a
+		// kindField. Clients will have to know what they are based on the
+		// context.
+		// TODO: add some type trait here, or some way of indicating whether
+		// this feature is allowed on a per-type basis. Using package name is
+		// overly broad and a bit hacky.
+		if pkg == "unversioned" {
+			return nil
+		}
 		return fmt.Errorf("couldn't find %v field in %#v", kindField, v.Interface())
 	}
 	field.SetString(kind)

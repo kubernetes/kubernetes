@@ -27,19 +27,18 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 )
 
 const basePath = "/tmp/fake"
 
-func formatMap(m map[string]string) string {
-	var l string
+func formatMap(m map[string]string) (fmtstr string) {
 	for key, value := range m {
-		l += key + "=" + fmt.Sprintf("%q", value) + "\n"
+		fmtstr += fmt.Sprintf("%v=%q\n", key, value)
 	}
-	return l
+
+	return
 }
 
 func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
@@ -64,7 +63,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func CleanEverything(plugin volume.VolumePlugin, testVolumeName, volumePath string, testPodUID types.UID, t *testing.T) {
-	cleaner, err := plugin.NewCleaner(testVolumeName, testPodUID, mount.New())
+	cleaner, err := plugin.NewCleaner(testVolumeName, testPodUID)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -117,7 +116,7 @@ func TestLabels(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -182,7 +181,7 @@ func TestAnnotations(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Annotations: annotations}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -242,7 +241,7 @@ func TestName(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Name: testName}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -303,7 +302,7 @@ func TestNamespace(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Namespace: testNamespace}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -366,7 +365,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -450,7 +449,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -556,7 +555,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels, Annotations: annotations}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -601,7 +600,8 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 
 	labels := map[string]string{
 		"key1": "value1",
-		"key2": "value2"}
+		"key2": "value2",
+	}
 
 	fake := testclient.NewSimpleFake(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -614,42 +614,48 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "this//labels", FieldRef: api.ObjectFieldSelector{
-						FieldPath: "metadata.labels"}},
-				}}},
+					{
+						Path: "this//labels",
+						FieldRef: api.ObjectFieldSelector{
+							FieldPath: "metadata.labels",
+						},
+					},
+				},
+			},
+		},
 	}
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
 
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
-	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+		t.Fatalf("Failed to make a new Builder: %v", err)
+	} else if builder == nil {
+		t.Fatalf("Got a nil Builder")
 	}
 
 	volumePath := builder.GetPath()
+	defer CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
+
 	err = builder.SetUp()
 	if err != nil {
-		t.Errorf("Failed to setup volume: %v", err)
+		t.Fatalf("Failed to setup volume: %v", err)
 	}
 
-	var data []byte
-	data, err = ioutil.ReadFile(path.Join(volumePath, "this/labels"))
+	data, err := ioutil.ReadFile(path.Join(volumePath, "this/labels"))
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
 
 	if sortLines(string(data)) != sortLines(formatMap(labels)) {
 		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
 	}
-	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 }

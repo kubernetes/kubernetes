@@ -21,8 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-// ControllerHasDesiredReplicas returns a condition that will be true iff the desired replica count
-// for a controller's ReplicaSelector equals the Replicas count.
+// ControllerHasDesiredReplicas returns a condition that will be true if and only if
+// the desired replica count for a controller's ReplicaSelector equals the Replicas count.
 func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationController) wait.ConditionFunc {
 
 	// If we're given a controller where the status lags the spec, it either means that the controller is stale,

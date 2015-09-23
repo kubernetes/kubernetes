@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -49,7 +50,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             util.NewUUID(),
 			Name:            "foobar",
@@ -180,7 +181,7 @@ func TestControllerExpectations(t *testing.T) {
 	}
 }
 
-func TestCreateReplica(t *testing.T) {
+func TestCreatePods(t *testing.T) {
 	ns := api.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := util.FakeHandler{
@@ -199,7 +200,7 @@ func TestCreateReplica(t *testing.T) {
 	controllerSpec := newReplicationController(1)
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	podControl.CreateReplica(ns, controllerSpec)
+	podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{

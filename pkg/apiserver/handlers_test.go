@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -244,9 +243,13 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
 		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
+
+		// verb identification
+		{"PATCH", "/namespaces/other/pods/foo", "patch", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"DELETE", "/namespaces/other/pods/foo", "delete", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 	}
 
-	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), latest.RESTMapper}
+	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), testapi.Default.RESTMapper()}
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)

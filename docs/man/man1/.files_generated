@@ -13,6 +13,7 @@ kubectl-config.1
 kubectl-create.1
 kubectl-delete.1
 kubectl-describe.1
+kubectl-edit.1
 kubectl-exec.1
 kubectl-expose.1
 kubectl-get.1

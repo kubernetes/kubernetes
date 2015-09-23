@@ -61,10 +61,10 @@ func TestListWatchesCanList(t *testing.T) {
 		namespace     string
 		fieldSelector fields.Selector
 	}{
-		// Minion
+		// Node
 		{
-			location:      testapi.Default.ResourcePath("minions", api.NamespaceAll, ""),
-			resource:      "minions",
+			location:      testapi.Default.ResourcePath("nodes", api.NamespaceAll, ""),
+			resource:      "nodes",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
@@ -112,22 +112,22 @@ func TestListWatchesCanWatch(t *testing.T) {
 		namespace     string
 		fieldSelector fields.Selector
 	}{
-		// Minion
+		// Node
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "minions", api.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
 				buildQueryValues(url.Values{"resourceVersion": []string{""}})),
 			rv:            "",
-			resource:      "minions",
+			resource:      "nodes",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "minions", api.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
 				buildQueryValues(url.Values{"resourceVersion": []string{"42"}})),
 			rv:            "42",
-			resource:      "minions",
+			resource:      "nodes",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},

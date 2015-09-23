@@ -51,6 +51,7 @@ Documentation for other releases can be found at
   - [Publishing services - service types](#publishing-services---service-types)
     - [Type NodePort](#type-nodeport)
     - [Type LoadBalancer](#type-loadbalancer)
+    - [External IPs](#external-ips)
   - [Shortcomings](#shortcomings)
   - [Future work](#future-work)
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
@@ -454,6 +455,42 @@ the `loadBalancerIP` to be specified. In those cases, the load-balancer will be 
 with the user-specified `loadBalancerIP`. If the `loadBalancerIP` field is not specified,
 an ephemeral IP will be assigned to the loadBalancer. If the `loadBalancerIP` is specified, but the
 cloud provider does not support the feature, the field will be ignored.
+
+### External IPs
+
+If there are external IPs that route to one or more cluster nodes, Kubernetes services can be exposed on those
+`externalIPs`. Traffic that ingresses into the cluster with the external IP (as destination IP), on the service port,
+will be routed to one of the service endpoints. `externalIPs` are not managed by Kubernetes and are the responsibility
+of the cluster administrator.
+
+In the ServiceSpec, `externalIPs` can be specified along with any of the `ServiceTypes`.
+In the example below, my-service can be accessed by clients on 80.11.12.10:80 (externalIP:port)
+
+```json
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "selector": {
+            "app": "MyApp"
+        },
+        "ports": [
+            {
+                "name": "http",
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376
+            }
+        ],
+        "externalIPs" : [
+            "80.11.12.10"
+        ]
+    }
+}
+```
 
 ## Shortcomings
 

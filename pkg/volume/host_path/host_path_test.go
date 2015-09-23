@@ -17,12 +17,16 @@ limitations under the License.
 package host_path
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -63,8 +67,8 @@ func TestGetAccessModes(t *testing.T) {
 
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	volumeHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler}}, volumeHost)
+	pluginHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, nil, nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -83,6 +87,101 @@ func TestRecycler(t *testing.T) {
 	}
 }
 
+func TestDeleter(t *testing.T) {
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	defer os.RemoveAll(tempPath)
+	err := os.MkdirAll(tempPath, 0750)
+	if err != nil {
+		t.Fatal("Failed to create tmp directory for deleter: %v", err)
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
+	plug, err := plugMgr.FindDeletablePluginBySpec(spec)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	deleter, err := plug.NewDeleter(spec)
+	if err != nil {
+		t.Errorf("Failed to make a new Deleter: %v", err)
+	}
+	if deleter.GetPath() != tempPath {
+		t.Errorf("Expected %s but got %s", tempPath, deleter.GetPath())
+	}
+	if err := deleter.Delete(); err != nil {
+		t.Errorf("Mock Recycler expected to return nil but got %s", err)
+	}
+	if exists, _ := util.FileExists("foo"); exists {
+		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
+	}
+}
+
+func TestDeleterTempDir(t *testing.T) {
+	tests := map[string]struct {
+		expectedFailure bool
+		path            string
+	}{
+		"just-tmp": {true, "/tmp"},
+		"not-tmp":  {true, "/nottmp"},
+		"good-tmp": {false, "/tmp/scratch"},
+	}
+
+	for name, test := range tests {
+		plugMgr := volume.VolumePluginMgr{}
+		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+		spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: test.path}}}}}
+		plug, _ := plugMgr.FindDeletablePluginBySpec(spec)
+		deleter, _ := plug.NewDeleter(spec)
+		err := deleter.Delete()
+		if err == nil && test.expectedFailure {
+			t.Errorf("Expected failure for test '%s' but got nil err", name)
+		}
+		if err != nil && !test.expectedFailure {
+			t.Errorf("Unexpected failure for test '%s': %v", name, err)
+		}
+	}
+}
+
+func TestCreater(t *testing.T) {
+	tempPath := "/tmp/hostpath/"
+	defer os.RemoveAll(tempPath)
+	err := os.MkdirAll(tempPath, 0750)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
+	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	creater, err := plug.NewCreater(volume.VolumeOptions{CapacityMB: 100, PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete})
+	if err != nil {
+		t.Errorf("Failed to make a new Creater: %v", err)
+	}
+	pv, err := creater.Create()
+	if err != nil {
+		t.Errorf("Unexpected error creating volume: %v", err)
+	}
+	if pv.Spec.HostPath.Path == "" {
+		t.Errorf("Expected pv.Spec.HostPath.Path to not be empty: %#v", pv)
+	}
+	expectedCapacity := resource.NewQuantity(100*1024*1024, resource.BinarySI)
+	actualCapacity := pv.Spec.Capacity[api.ResourceStorage]
+	expectedAmt := expectedCapacity.Value()
+	actualAmt := actualCapacity.Value()
+	if expectedAmt != actualAmt {
+		t.Errorf("Expected capacity %+v but got %+v", expectedAmt, actualAmt)
+	}
+
+	if pv.Spec.PersistentVolumeReclaimPolicy != api.PersistentVolumeReclaimDelete {
+		t.Errorf("Expected reclaim policy %+v but got %+v", api.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+	}
+
+	os.RemoveAll(pv.Spec.HostPath.Path)
+}
+
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("fake", nil, nil))
@@ -96,7 +195,7 @@ func TestPlugin(t *testing.T) {
 		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/vol1"}},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{}, nil)
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -113,7 +212,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), nil)
+	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -158,7 +257,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	o.Add(pv)
 	o.Add(claim)
 	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, latest.RESTMapper))
+	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
@@ -167,7 +266,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 
 	if !builder.IsReadOnly() {
 		t.Errorf("Expected true for builder.IsReadOnly")

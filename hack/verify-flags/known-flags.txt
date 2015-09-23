@@ -1,3 +1,4 @@
+
 accept-hosts
 accept-paths
 account-for-pod-resources
@@ -65,9 +66,11 @@ dockercfg-path
 driver-port
 dry-run
 duration-sec
+e2e-verify-service-account
 e2e-output-dir
 enable-debugging-handlers
 enable-horizontal-pod-autoscaler
+enable-deployment-controller
 enable-server
 etcd-config
 etcd-prefix
@@ -101,8 +104,11 @@ ha-domain
 healthz-bind-address
 healthz-port
 horizontal-pod-autoscaler-sync-period
+deployment-controller-sync-period
 hostname-override
 host-network-sources
+host-pid-sources
+host-ipc-sources
 http-check-frequency
 http-port
 ignore-not-found
@@ -137,7 +143,7 @@ kubelet-timeout
 kube-master
 label-columns
 last-release-pr
-legacy-userspace-proxy
+limit-bytes
 load-balancer-ip
 log-flush-frequency
 long-running-request-regexp
@@ -203,9 +209,16 @@ private-mountns
 prom-push-gateway
 proxy-bindall
 proxy-logv
+proxy-mode
 proxy-port-range
 public-address-override
 pvclaimbinder-sync-period
+pv-recycler-pod-template-filepath-nfs
+pv-recycler-minimum-timeout-nfs
+pv-recycler-increment-timeout-nfs
+pv-recycler-pod-template-filepath-hostpath
+pv-recycler-minimum-timeout-hostpath
+pv-recycler-timeout-increment-hostpath
 read-only-port
 really-crash-for-testing
 reconcile-cooldown
@@ -241,6 +254,8 @@ service-node-port-range
 service-node-ports
 service-sync-period
 session-affinity
+since-seconds
+since-time
 show-all
 shutdown-fd
 shutdown-fifo
@@ -263,6 +278,7 @@ tls-private-key-file
 token-auth-file
 ttl-secs
 type-src
+udp-port
 unix-socket
 update-period
 upgrade-target
@@ -275,3 +291,4 @@ www-prefix
 retry_time
 file_content_in_loop
 cpu-cfs-quota
+

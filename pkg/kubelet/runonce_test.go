@@ -30,6 +30,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
 type listContainersResult struct {
@@ -83,7 +84,7 @@ func TestRunOnce(t *testing.T) {
 		recorder:            &record.FakeRecorder{},
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
-		statusManager:       newStatusManager(nil),
+		statusManager:       status.NewManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
 		readinessManager:    kubecontainer.NewReadinessManager(),
 		podManager:          podManager,

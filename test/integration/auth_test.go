@@ -330,7 +330,7 @@ func getTestRequests() []struct {
 		{"GET", path("endpoints", api.NamespaceDefault, "a"), "", code200},
 		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
 
-		// Normal methods on minions
+		// Normal methods on nodes
 		{"GET", path("nodes", "", ""), "", code200},
 		{"POST", timeoutPath("nodes", "", ""), aNode, code201},
 		{"PUT", timeoutPath("nodes", "", "a"), aNode, code200},
@@ -364,7 +364,7 @@ func getTestRequests() []struct {
 		{"GET", pathWithPrefix("proxy", "nodes", api.NamespaceDefault, "a"), "", code404},
 		{"GET", pathWithPrefix("redirect", "nodes", api.NamespaceDefault, "a"), "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
-		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
+		// TODO: figure out how to create a node so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
 		{"GET", "/", "", code200},
@@ -406,6 +406,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -522,6 +523,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -590,6 +592,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -677,6 +680,7 @@ func TestBobIsForbidden(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -738,6 +742,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -818,6 +823,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -933,6 +939,7 @@ func TestKindAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1035,6 +1042,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport

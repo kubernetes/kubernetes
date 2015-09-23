@@ -18,10 +18,11 @@ package e2e
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 func createGCEStaticIP(name string) (string, error) {

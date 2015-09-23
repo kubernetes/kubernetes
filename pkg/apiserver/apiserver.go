@@ -114,8 +114,43 @@ const (
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
-// in a slash. A restful WebService is created for the group and version.
+// in a slash.
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+	installer := g.newInstaller()
+	ws := installer.NewWebService()
+	apiResources, registrationErrors := installer.Install(ws)
+	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
+	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	container.Add(ws)
+	return errors.NewAggregate(registrationErrors)
+}
+
+// UpdateREST registers the REST handlers for this APIGroupVersion to an existing web service
+// in the restful Container.  It will use the prefix (root/version) to find the existing
+// web service.  If a web service does not exist within the container to support the prefix
+// this method will return an error.
+func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
+	installer := g.newInstaller()
+	var ws *restful.WebService = nil
+
+	for i, s := range container.RegisteredWebServices() {
+		if s.RootPath() == installer.prefix {
+			ws = container.RegisteredWebServices()[i]
+			break
+		}
+	}
+
+	if ws == nil {
+		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
+	}
+	apiResources, registrationErrors := installer.Install(ws)
+	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
+	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	return errors.NewAggregate(registrationErrors)
+}
+
+// newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
+func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	info := &APIRequestInfoResolver{sets.NewString(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
 	prefix := path.Join(g.Root, g.Version)
@@ -126,9 +161,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		minRequestTimeout: g.MinRequestTimeout,
 		proxyDialerFn:     g.ProxyDialerFn,
 	}
-	ws, registrationErrors := installer.Install()
-	container.Add(ws)
-	return errors.NewAggregate(registrationErrors)
+	return installer
 }
 
 // TODO: document all handlers
@@ -177,7 +210,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 
 	// TODO: make status unversioned or plumb enough of the request to deduce the requested API version
-	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.Codec, httpWriter)
+	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.GroupOrDie("").Codec, httpWriter)
 }
 
 func InstallServiceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string) {
@@ -188,7 +221,7 @@ func InstallServiceErrorHandler(container *restful.Container, requestResolver *A
 
 func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	requestInfo, err := requestResolver.GetAPIRequestInfo(request.Request)
-	codec := latest.Codec
+	codec := latest.GroupOrDie("").Codec
 	if err == nil && requestInfo.APIVersion != "" {
 		// check if the api version is valid.
 		for _, version := range apiVersions {
@@ -203,7 +236,7 @@ func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []
 	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), codec, response.ResponseWriter)
 }
 
-// Adds a service to return the supported api versions.
+// Adds a service to return the supported api versions at the legacy /api.
 func AddApiWebService(container *restful.Container, apiPrefix string, versions []string) {
 	// TODO: InstallREST should register each version automatically
 
@@ -219,6 +252,46 @@ func AddApiWebService(container *restful.Container, apiPrefix string, versions [
 	container.Add(ws)
 }
 
+// Adds a service to return the supported api versions at /apis.
+func AddApisWebService(container *restful.Container, apiPrefix string, groups []api.APIGroup) {
+	rootAPIHandler := RootAPIHandler(groups)
+	ws := new(restful.WebService)
+	ws.Path(apiPrefix)
+	ws.Doc("get available API versions")
+	ws.Route(ws.GET("/").To(rootAPIHandler).
+		Doc("get available API versions").
+		Operation("getAPIVersions").
+		Produces(restful.MIME_JSON).
+		Consumes(restful.MIME_JSON))
+	container.Add(ws)
+}
+
+// Adds a service to return the supported versions, preferred version, and name
+// of a group. E.g., a such web service will be registered at /apis/experimental.
+func AddGroupWebService(container *restful.Container, path string, group api.APIGroup) {
+	groupHandler := GroupHandler(group)
+	ws := new(restful.WebService)
+	ws.Path(path)
+	ws.Doc("get information of a group")
+	ws.Route(ws.GET("/").To(groupHandler).
+		Doc("get information of a group").
+		Operation("getAPIGroup").
+		Produces(restful.MIME_JSON).
+		Consumes(restful.MIME_JSON))
+	container.Add(ws)
+}
+
+// Adds a service to return the supported resources, E.g., a such web service
+// will be registered at /apis/experimental/v1.
+func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion string, apiResources []api.APIResource) {
+	resourceHandler := SupportedResourcesHandler(groupVersion, apiResources)
+	ws.Route(ws.GET("/").To(resourceHandler).
+		Doc("get available resources").
+		Operation("getAPIResources").
+		Produces(restful.MIME_JSON).
+		Consumes(restful.MIME_JSON))
+}
+
 // handleVersion writes the server's version information.
 func handleVersion(req *restful.Request, resp *restful.Response) {
 	// TODO: use restful's Response methods
@@ -230,6 +303,31 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
 		writeRawJSON(http.StatusOK, api.APIVersions{Versions: versions}, resp.ResponseWriter)
+	}
+}
+
+// RootAPIHandler returns a handler which will list the provided groups and versions as available.
+func RootAPIHandler(groups []api.APIGroup) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		// TODO: use restful's Response methods
+		writeRawJSON(http.StatusOK, api.APIGroupList{Groups: groups}, resp.ResponseWriter)
+	}
+}
+
+// GroupHandler returns a handler which will return the api.GroupAndVersion of
+// the group.
+func GroupHandler(group api.APIGroup) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		// TODO: use restful's Response methods
+		writeRawJSON(http.StatusOK, group, resp.ResponseWriter)
+	}
+}
+
+// SupportedResourcesHandler returns a handler which will list the provided resources as available.
+func SupportedResourcesHandler(groupVersion string, apiResources []api.APIResource) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		// TODO: use restful's Response methods
+		writeRawJSON(http.StatusOK, api.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter)
 	}
 }
 

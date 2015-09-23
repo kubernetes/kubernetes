@@ -122,6 +122,7 @@ type TestContextType struct {
 	MinStartupPods        int
 	UpgradeTarget         string
 	PrometheusPushGateway string
+	VerifyServiceAccount  bool
 }
 
 var testContext TestContextType
@@ -481,15 +482,17 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		return nil, err
 	}
 
-	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-		return nil, err
+	if testContext.VerifyServiceAccount {
+		if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
+			return nil, err
+		}
 	}
 	return got, nil
 }
 
-// deleteTestingNS checks whether all e2e based existing namespaces are in the Terminating state
-// and waits until they are finally deleted.
-func deleteTestingNS(c *client.Client) error {
+// checkTestingNSDeletedExcept checks whether all e2e based existing namespaces are in the Terminating state
+// and waits until they are finally deleted. It ignores namespace skip.
+func checkTestingNSDeletedExcept(c *client.Client, skip string) error {
 	// TODO: Since we don't have support for bulk resource deletion in the API,
 	// while deleting a namespace we are deleting all objects from that namespace
 	// one by one (one deletion == one API call). This basically exposes us to
@@ -512,7 +515,7 @@ func deleteTestingNS(c *client.Client) error {
 		}
 		terminating := 0
 		for _, ns := range namespaces.Items {
-			if strings.HasPrefix(ns.ObjectMeta.Name, "e2e-tests-") {
+			if strings.HasPrefix(ns.ObjectMeta.Name, "e2e-tests-") && ns.ObjectMeta.Name != skip {
 				if ns.Status.Phase == api.NamespaceActive {
 					return fmt.Errorf("Namespace %s is active", ns.ObjectMeta.Name)
 				}
@@ -668,12 +671,22 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
-		if err != nil {
-			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
-			return !exist, nil
-		} else {
+		switch {
+		case err == nil:
+			if !exist {
+				return false, nil
+			}
 			Logf("Service %s in namespace %s found.", name, namespace)
-			return exist, nil
+			return true, nil
+		case apierrs.IsNotFound(err):
+			if exist {
+				return false, nil
+			}
+			Logf("Service %s in namespace %s disappeared.", name, namespace)
+			return true, nil
+		default:
+			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
+			return false, nil
 		}
 	})
 	if err != nil {
@@ -820,6 +833,9 @@ func loadClient() (*client.Client, error) {
 	c, err := client.New(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
+	}
+	if c.Timeout == 0 {
+		c.Timeout = singleCallTimeout
 	}
 	return c, nil
 }

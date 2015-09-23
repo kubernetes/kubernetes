@@ -79,7 +79,7 @@ type Runtime interface {
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
+	GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability

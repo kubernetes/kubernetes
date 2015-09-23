@@ -46,7 +46,7 @@ func (at *AtomicValue) Load() interface{} {
 // for some quantity.
 type HighWaterMark int64
 
-// Check returns true iff 'current' is the highest value ever seen.
+// Check returns true if and only if 'current' is the highest value ever seen.
 func (hwm *HighWaterMark) Check(current int64) bool {
 	for {
 		old := atomic.LoadInt64((*int64)(hwm))

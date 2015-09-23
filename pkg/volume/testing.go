@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -35,10 +36,14 @@ type fakeVolumeHost struct {
 	kubeClient client.Interface
 	pluginMgr  VolumePluginMgr
 	cloud      cloudprovider.Interface
+	mounter    mount.Interface
+	writer     io.Writer
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient client.Interface, plugins []VolumePlugin) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil}
+	host.mounter = &mount.FakeMounter{}
+	host.writer = &io.StdWriter{}
 	host.pluginMgr.InitPlugins(plugins, host)
 	return host
 }
@@ -63,20 +68,28 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 	return f.cloud
 }
 
-func (f *fakeVolumeHost) NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
-	plug, err := f.pluginMgr.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	return plug.NewBuilder(spec, pod, opts, mounter)
+func (f *fakeVolumeHost) GetMounter() mount.Interface {
+	return f.mounter
 }
 
-func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID, mounter mount.Interface) (Cleaner, error) {
+func (f *fakeVolumeHost) GetWriter() io.Writer {
+	return f.writer
+}
+
+func (f *fakeVolumeHost) NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewCleaner(spec.Name(), podUID, mounter)
+	return plug.NewBuilder(spec, pod, opts)
+}
+
+func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error) {
+	plug, err := f.pluginMgr.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	return plug.NewCleaner(spec.Name(), podUID)
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
@@ -117,16 +130,20 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
+func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
 	return &FakeVolume{pod.UID, spec.Name(), plugin}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (Cleaner, error) {
+func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
 	return &FakeVolume{podUID, volName, plugin}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
 	return &fakeRecycler{"/attributesTransferredFromSpec"}, nil
+}
+
+func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
+	return &FakeDeleter{"/attributesTransferredFromSpec"}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -176,11 +193,24 @@ func (fr *fakeRecycler) GetPath() string {
 	return fr.path
 }
 
-func NewFakeRecycler(spec *Spec, host VolumeHost) (Recycler, error) {
+func NewFakeRecycler(spec *Spec, host VolumeHost, config VolumeConfig) (Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("fakeRecycler only supports spec.PersistentVolume.Spec.HostPath")
 	}
 	return &fakeRecycler{
 		path: spec.PersistentVolume.Spec.HostPath.Path,
 	}, nil
+}
+
+type FakeDeleter struct {
+	path string
+}
+
+func (fd *FakeDeleter) Delete() error {
+	// nil is success, else error
+	return nil
+}
+
+func (fd *FakeDeleter) GetPath() string {
+	return fd.path
 }

@@ -154,7 +154,7 @@
 		},
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
-			"Comment": "v1.0.3-2-g71acacd",
+			"Comment": "v1.0.4",
 			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
 		},
 		{
@@ -236,7 +236,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
+			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
 			"ImportPath": "github.com/godbus/dbus",
@@ -352,6 +352,10 @@
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
+		},
+		{
+			"ImportPath": "github.com/google/google-api-go-client/cloudmonitoring/v2beta2",
+			"Rev": "8cbf97d5e925c857511aedf459affeed490e6861"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
@@ -516,6 +520,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
+			"Comment": "v0.0.1-99-g8e7dc10",
 			"Rev": "8e7dc108ab3a1ab6ce6d922bbaff5657b88e8e49"
 		},
 		{

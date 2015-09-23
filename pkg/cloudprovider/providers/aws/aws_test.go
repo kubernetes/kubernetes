@@ -17,6 +17,7 @@ limitations under the License.
 package aws_cloud
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -662,5 +663,37 @@ func TestFindVPCID(t *testing.T) {
 	}
 	if vpcID != "vpc-mac0" {
 		t.Errorf("Unexpected vpcID: %s", vpcID)
+	}
+}
+
+func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	badELBRegion := "bad-elb-region"
+	errorMessage := fmt.Sprintf("requested load balancer region '%s' does not match cluster region '%s'", badELBRegion, c.region)
+
+	_, _, err = c.GetTCPLoadBalancer("elb-name", badELBRegion)
+	if err == nil || err.Error() != errorMessage {
+		t.Errorf("Expected GetTCPLoadBalancer region mismatch error.")
+	}
+
+	_, err = c.EnsureTCPLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
+	if err == nil || err.Error() != errorMessage {
+		t.Errorf("Expected EnsureTCPLoadBalancer region mismatch error.")
+	}
+
+	err = c.EnsureTCPLoadBalancerDeleted("elb-name", badELBRegion)
+	if err == nil || err.Error() != errorMessage {
+		t.Errorf("Expected EnsureTCPLoadBalancerDeleted region mismatch error.")
+	}
+
+	err = c.UpdateTCPLoadBalancer("elb-name", badELBRegion, nil)
+	if err == nil || err.Error() != errorMessage {
+		t.Errorf("Expected UpdateTCPLoadBalancer region mismatch error.")
 	}
 }

@@ -18,6 +18,7 @@ package aws_cloud
 
 import (
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"

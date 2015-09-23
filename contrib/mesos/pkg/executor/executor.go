@@ -88,15 +88,6 @@ type kuberTask struct {
 	podName       string
 }
 
-// func that attempts suicide
-type jumper func(bindings.ExecutorDriver, <-chan struct{})
-
-type suicideWatcher interface {
-	Next(time.Duration, bindings.ExecutorDriver, jumper) suicideWatcher
-	Reset(time.Duration) bool
-	Stop() bool
-}
-
 type podStatusFunc func() (*api.PodStatus, error)
 
 // KubeletInterface consists of the kubelet.Kubelet API's that we actually use
@@ -336,38 +327,6 @@ func (k *KubernetesExecutor) LaunchTask(driver bindings.ExecutorDriver, taskInfo
 	k.resetSuicideWatch(driver)
 
 	go k.launchTask(driver, taskId, pod)
-}
-
-// TODO(jdef) add metrics for this?
-type suicideTimer struct {
-	timer *time.Timer
-}
-
-func (w *suicideTimer) Next(d time.Duration, driver bindings.ExecutorDriver, f jumper) suicideWatcher {
-	return &suicideTimer{
-		timer: time.AfterFunc(d, func() {
-			log.Warningf("Suicide timeout (%v) expired", d)
-			f(driver, nil)
-		}),
-	}
-}
-
-func (w *suicideTimer) Stop() (result bool) {
-	if w != nil && w.timer != nil {
-		log.Infoln("stopping suicide watch") //TODO(jdef) debug
-		result = w.timer.Stop()
-	}
-	return
-}
-
-// return true if the timer was successfully reset
-func (w *suicideTimer) Reset(d time.Duration) bool {
-	if w != nil && w.timer != nil {
-		log.Infoln("resetting suicide watch") //TODO(jdef) debug
-		w.timer.Reset(d)
-		return true
-	}
-	return false
 }
 
 // determine whether we need to start a suicide countdown. if so, then start
@@ -758,8 +717,8 @@ func (k *KubernetesExecutor) FrameworkMessage(driver bindings.ExecutorDriver, me
 
 	log.Infof("Receives message from framework %v\n", message)
 	//TODO(jdef) master reported a lost task, reconcile this! @see scheduler.go:handleTaskLost
-	if strings.HasPrefix(message, "task-lost:") && len(message) > 10 {
-		taskId := message[10:]
+	if strings.HasPrefix(message, messages.TaskLost+":") {
+		taskId := message[len(messages.TaskLost)+1:]
 		if taskId != "" {
 			// clean up pod state
 			k.lock.Lock()

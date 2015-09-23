@@ -112,6 +112,7 @@ __custom_func() {
 	valid_resources = `Valid resource types include:
    * pods (aka 'po')
    * replicationcontrollers (aka 'rc')
+   * daemonsets (aka 'ds')
    * services (aka 'svc')
    * events (aka 'ev')
    * nodes (aka 'no')
@@ -148,6 +149,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdReplace(f, out))
 	cmds.AddCommand(NewCmdPatch(f, out))
 	cmds.AddCommand(NewCmdDelete(f, out))
+	cmds.AddCommand(NewCmdEdit(f, out))
 
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(f, out))

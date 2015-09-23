@@ -39,7 +39,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	explatest "k8s.io/kubernetes/pkg/apis/experimental/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -132,11 +132,14 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// We will fix this by supporting multiple group versions in Config
 	cl.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Experimental.Version()})
 
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	storageVersions := make(map[string]string)
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	storageVersions[""] = testapi.Default.Version()
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, testapi.Experimental.Version(), etcdtest.PathPrefix())
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, testapi.Experimental.Version(), etcdtest.PathPrefix())
+	storageVersions["experimental"] = testapi.Experimental.Version()
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
@@ -165,12 +168,13 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
-		ExpAPIPrefix:          "/experimental",
+		APIGroupPrefix:        "/apis",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
 		PublicAddress:         publicAddress,
 		CacheTimeout:          2 * time.Second,
+		StorageVersions:       storageVersions,
 	})
 	handler.delegate = m.Handler
 
@@ -546,7 +550,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 
 func runAtomicPutTest(c *client.Client) {
 	svcBody := api.Service{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -628,7 +632,7 @@ func runPatchTest(c *client.Client) {
 	name := "patchservice"
 	resource := "services"
 	svcBody := api.Service{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{

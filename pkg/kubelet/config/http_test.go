@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -58,16 +59,16 @@ func TestExtractInvalidPods(t *testing.T) {
 	}{
 		{
 			desc: "No version",
-			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: ""}},
+			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: ""}},
 		},
 		{
 			desc: "Invalid version",
-			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: "v1betta2"}},
+			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: "v1betta2"}},
 		},
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -76,7 +77,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -85,7 +86,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -94,7 +95,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -132,7 +133,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Single pod",
 			pods: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
@@ -174,7 +175,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Multiple pods",
 			pods: &api.PodList{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "PodList",
 					APIVersion: "",
 				},
@@ -287,7 +288,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 func TestURLWithHeader(t *testing.T) {
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: testapi.Default.Version(),
 			Kind:       "Pod",
 		},
