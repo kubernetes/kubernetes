@@ -172,7 +172,6 @@ type InstanceGroupInfo interface {
 
 // AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
 type AWSCloud struct {
-	awsServices      AWSServices
 	ec2              EC2
 	elb              ELB
 	asg              ASG
@@ -544,7 +543,6 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	}
 
 	awsCloud := &AWSCloud{
-		awsServices:      awsServices,
 		ec2:              ec2,
 		elb:              elb,
 		asg:              asg,
