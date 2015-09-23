@@ -121,10 +121,8 @@ func connectAndProxy(service proxy.ServicePortName, inConn net.Conn, srcAddr net
 		err = fmt.Errorf("failed to connect to an endpoint.")
 	}
 	if err != nil {
-		if protocol == "tcp" {
-			glog.Errorf("Failed to connect to balancer: %v", err)
-			inConn.Close()
-		}
+		glog.Errorf("Failed to connect to balancer: %v", err)
+		inConn.Close()
 		return
 	}
 	proxy(inConn, outConn)
@@ -209,6 +207,17 @@ func newClientCache() *clientCache {
 	return &clientCache{clients: map[string]net.Conn{}}
 }
 
+// fakeUDPConn pretends to be a "connection" to a UDP client so that other code can safely call Close().
+// Of course, UDP doesn't really have a connection, so just fake it.
+type fakeUDPConn struct {
+	net.Conn
+}
+
+func (u *fakeUDPConn) Close() error {
+	// Do nothing
+	return nil
+}
+
 func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
 	var buffer [bufferSize]byte
 	for {
@@ -230,46 +239,32 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			glog.Errorf("ReadFrom failed, exiting ProxyLoop: %v", err)
 			break
 		}
-		udp.connectBackend(myInfo.activeClients, &buffer, n, cliAddr, proxier, service, myInfo.timeout)
-	}
-}
 
-func (udp *udpProxySocket) connectBackend(activeClients *clientCache, buffer *[bufferSize]byte, n int, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortName, timeout time.Duration) {
-	activeClients.mu.Lock()
-	defer activeClients.mu.Unlock()
+		func(udp *udpProxySocket, activeClients *clientCache, buffer *[bufferSize]byte, n int, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortName, timeout time.Duration) {
+			activeClients.mu.Lock()
+			defer activeClients.mu.Unlock()
 
-	// If this is a client we know already, reuse the connection and goroutine.
-	svrConn, found := activeClients.clients[cliAddr.String()]
-	if !found {
-<<<<<<< HEAD
-		// TODO: This could spin up a new goroutine to make the outbound connection,
-		// and keep accepting inbound traffic.
-		glog.V(3).Infof("New UDP connection from %s", cliAddr)
-		var err error
-		svrConn, err = tryConnect(service, cliAddr, "udp", proxier)
-		if err != nil {
-			return nil, err
-		}
-		if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
-			glog.Errorf("SetDeadline failed: %v", err)
-			return nil, err
-=======
-		glog.V(2).Infof("New UDP connection from %s", cliAddr)
-		go connectAndProxy(service, udp, cliAddr, "udp", proxier, func(in, svrConn net.Conn) {
-			if err := svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
-				glog.Errorf("SetDeadline failed: %v", err)
+			// If this is a client we know already, reuse the connection and goroutine.
+			svrConn, found := activeClients.clients[cliAddr.String()]
+			if !found {
+				// TODO: This could spin up a new goroutine to make the outbound connection,
+				// and keep accepting inbound traffic.
+				glog.V(3).Infof("New UDP connection from %s", cliAddr)
+				go connectAndProxy(service, &fakeUDPConn{udp}, cliAddr, "udp", proxier, func(in, svrConn net.Conn) {
+					if err := svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
+						glog.Errorf("SetDeadline failed: %v", err)
+						return
+					}
+					activeClients.clients[cliAddr.String()] = svrConn
+					writeData(svrConn, buffer, n, timeout)
+					defer util.HandleCrash()
+					udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
+				})
 				return
 			}
-			activeClients.clients[cliAddr.String()] = svrConn
-			go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
-				defer util.HandleCrash()
-				udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
-			}(cliAddr, svrConn, activeClients, timeout)
 			writeData(svrConn, buffer, n, timeout)
-		})
-		return
+		}(udp, myInfo.activeClients, &buffer, n, cliAddr, proxier, service, myInfo.timeout)
 	}
-	writeData(svrConn, buffer, n, timeout)
 }
 
 func writeData(svrConn net.Conn, buffer *[bufferSize]byte, n int, timeout time.Duration) {
@@ -280,7 +275,6 @@ func writeData(svrConn net.Conn, buffer *[bufferSize]byte, n int, timeout time.D
 		if !logTimeout(err) {
 			glog.Errorf("Write failed: %v", err)
 			// TODO: Maybe tear down the goroutine for this client/server pair?
->>>>>>> 2e68a95... rename tryConnect to connectAndProxy, run as goroutine for both TCP and UDP request
 		}
 		return
 	}
@@ -295,7 +289,7 @@ func writeData(svrConn net.Conn, buffer *[bufferSize]byte, n int, timeout time.D
 // TODO: Track and log bytes copied, like TCP
 func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
 	defer svrConn.Close()
-	var buffer [4096]byte
+	var buffer [bufferSize]byte
 	for {
 		n, err := svrConn.Read(buffer[0:])
 		if err != nil {
