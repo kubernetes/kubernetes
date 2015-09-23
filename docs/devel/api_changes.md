@@ -508,8 +508,8 @@ doing!
 
 ## Write end-to-end tests
 
-This is, sadly, still sort of painful.  Talk to us and we'll try to help you
-figure out the best way to make sure your cool feature keeps working forever.
+Check out the [E2E docs](e2e-tests.md) for detailed information about how to write end-to-end
+tests for your feature.
 
 ## Examples and docs
 
