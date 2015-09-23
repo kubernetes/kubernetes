@@ -36,7 +36,7 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 }
 
 var (
-	namespace           = "foo-namespace"
+	namespace           = api.NamespaceNone
 	name                = "foo-ingress"
 	defaultHostname     = "foo.bar.com"
 	defaultBackendName  = "default-backend"
@@ -102,17 +102,15 @@ func newIngress(pathMap map[string]string) *experimental.Ingress {
 	}
 }
 
-func validNewIngress() *experimental.Ingress {
+func validIngress() *experimental.Ingress {
 	return newIngress(defaultPathMap)
 }
-
-var validIngress = *validNewIngress()
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	ingress := validNewIngress()
-	noDefaultBackendAndRules := validNewIngress()
+	ingress := validIngress()
+	noDefaultBackendAndRules := validIngress()
 	noDefaultBackendAndRules.Spec.Backend = &experimental.IngressBackend{}
 	noDefaultBackendAndRules.Spec.Rules = []experimental.IngressRule{}
 	badPath := validIngress()
@@ -121,9 +119,8 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		ingress,
-		// TODO: Add invalid Ingress tests once we have validation.
 		noDefaultBackendAndRules,
-		noIngressHosts,
+		badPath,
 	)
 }
 
@@ -132,7 +129,7 @@ func TestUpdate(t *testing.T) {
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
-		validNewIngress(),
+		validIngress(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*experimental.Ingress)
@@ -166,26 +163,26 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	test.TestDelete(validNewIngress())
+	test.TestDelete(validIngress())
 }
 
 func TestGet(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	test.TestGet(validNewIngress())
+	test.TestGet(validIngress())
 }
 
 func TestList(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
-	test.TestList(validNewIngress())
+	test.TestList(validIngress())
 }
 
 func TestWatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
-		validNewIngress(),
+		validIngress(),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
