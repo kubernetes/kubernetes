@@ -44,12 +44,19 @@ func (ingressStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// PrepareForCreate clears the status of an Ingress before creation.
 func (ingressStrategy) PrepareForCreate(obj runtime.Object) {
+	ingress := obj.(*experimental.Ingress)
+	ingress.Status = experimental.IngressStatus{}
+
+	ingress.Generation = 1
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newIngress := obj.(*experimental.Ingress)
 	oldIngress := old.(*experimental.Ingress)
+	//TODO: Clear Ingress status once we have a sub-resource.
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
@@ -60,12 +67,14 @@ func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 }
 
+// Validate validates a new Ingress.
 func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	ingress := obj.(*experimental.Ingress)
 	err := validation.ValidateIngress(ingress)
 	return err
 }
 
+// AllowCreateOnUpdate is false for Ingress; this means POST is needed to create one.
 func (ingressStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
@@ -77,6 +86,7 @@ func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) 
 	return append(validationErrorList, updateErrorList...)
 }
 
+// AllowUnconditionalUpdate is the default update policy for Ingress objects.
 func (ingressStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
