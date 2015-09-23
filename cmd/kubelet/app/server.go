@@ -455,7 +455,7 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(kcfg, nil); err != nil {
+	if err := RunKubelet(kcfg); err != nil {
 		return err
 	}
 
@@ -663,7 +663,7 @@ func SimpleKubelet(client *client.Client,
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
+func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
@@ -712,6 +712,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
+	builder := kcfg.Builder
 	if builder == nil {
 		builder = createAndInitKubelet
 	}
@@ -782,6 +783,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
+	Builder                        KubeletBuilder
 	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface

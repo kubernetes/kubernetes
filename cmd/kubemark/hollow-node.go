@@ -130,7 +130,7 @@ func main() {
 		10*time.Second,         /* SyncFrequency */
 		40,                     /* MaxPods */
 	)
-	kubeletapp.RunKubelet(kcfg, nil)
+	kubeletapp.RunKubelet(kcfg)
 
 	select {}
 }
