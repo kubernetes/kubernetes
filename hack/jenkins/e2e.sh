@@ -117,7 +117,7 @@ GKE_REQUIRED_SKIP_TESTS=(
 GCE_FLAKY_TESTS=(
     "DaemonRestart"
     "Daemon\sset\sshould\slaunch\sa\sdaemon\spod\son\severy\snode\sof\sthe\scluster"
-    "ResourceUsage"
+    "Resource\susage\sof\ssystem\scontainers"
     "monotonically\sincreasing\srestart\scount"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
@@ -141,7 +141,7 @@ GCE_PARALLEL_SKIP_TESTS=(
     "Nodes\sNetwork"
     "Nodes\sResize"
     "MaxPods"
-    "ResourceUsage"
+    "Resource\susage\sof\ssystem\scontainers"
     "SchedulerPredicates"
     "Services.*restarting"
     "Shell.*services"
