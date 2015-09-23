@@ -41,7 +41,7 @@ https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/prereqs.md
 
 ### Start MySQL Pod
 
-In Kubernetes a [_Pod_](../../docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. Its a collocated group of containers that share an IP and storage volume.
+In Kubernetes a [_Pod_](../../docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. It's a collocated group of containers that share an IP and storage volume.
 
 Here is the config for MySQL pod: [mysql-pod.yaml](mysql-pod.yaml)
 
