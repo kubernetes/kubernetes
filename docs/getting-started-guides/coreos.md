@@ -47,7 +47,7 @@ Guide to setting up a multi-node cluster on Vagrant. The deployer can independen
 
 [**Vagrant Single-Node**](https://coreos.com/kubernetes/docs/latest/kubernetes-on-vagrant-single.html)
 
-Quickest way to set up a Kubernetes development environment locally. As easy as `git clone`, `vagrant up` and configuring `kubectl`.
+The quickest way to set up a Kubernetes development environment locally. As easy as `git clone`, `vagrant up` and configuring `kubectl`.
 
 <hr/>
 
@@ -57,7 +57,7 @@ A generic guide to setting up an HA cluster on any cloud or bare metal, with ful
 
 ### Community Guides
 
-These guides are maintained by community members and cover specific platforms, use-cases and experiment with different ways of configuring Kubernetes on CoreOS.
+These guides are maintained by community members, cover specific platforms and use cases, and experiment with different ways of configuring Kubernetes on CoreOS.
 
 [**Multi-node Cluster**](coreos/coreos_multinode_cluster.md)
 
@@ -79,7 +79,7 @@ Configure a Vagrant-based cluster of 3 machines with networking provided by Weav
 
 [**Multi-node cluster using cloud-config and Vagrant**](https://github.com/pires/kubernetes-vagrant-coreos-cluster/blob/master/README.md)
 
-Configure a single-master, multi-worker cluster locally, running on your choice of hypervisor: VirtualBox, Parallels, or VMware
+Configure a single master, multi-worker cluster locally, running on your choice of hypervisor: VirtualBox, Parallels, or VMware
 
 <hr/>
 
@@ -97,7 +97,7 @@ Guide to running an HA etcd cluster with a single master on Azure. Uses the Azur
 
 [**Multi-node cluster using cloud-config, coreos and VMware ESXi**](https://github.com/xavierbaude/VMware-coreos-multi-nodes-Kubernetes)
 
-Configure a singe master, single worker cluster on VMware EXSi.
+Configure a single master, single worker cluster on VMware ESXi.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos.md?pixel)]()
