@@ -453,18 +453,18 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP n
 	return status, nil
 }
 
-// We grab all tags from all instances being added to the pool.  
+// We grab all tags from all instances being added to the pool.
 // * The longest tag that is a prefix of the instance name is used
 // * If any instance has a prefix tag, all instances must
 // * If no instances have a prefix tag, no tags are used
 func (gce *GCECloud) computeHostTags(hosts []string) ([]string, error) {
 	listCall := gce.service.Instances.List(gce.projectID, gce.zone)
 
-    // Add the filter for hosts
-    listCall = listCall.Filter("name eq (" + strings.Join(hosts, "|") + ")")
+	// Add the filter for hosts
+	listCall = listCall.Filter("name eq (" + strings.Join(hosts, "|") + ")")
 
-    // Add the fields we want
-    listCall = listCall.Fields("items(name,tags)")
+	// Add the fields we want
+	listCall = listCall.Fields("items(name,tags)")
 
 	res, err := listCall.Do()
 	if err != nil {
@@ -472,23 +472,23 @@ func (gce *GCECloud) computeHostTags(hosts []string) ([]string, error) {
 	}
 
 	tags := sets.NewString()
-    for _, instance := range res.Items {
-        longest_tag := ""
-        for  _, tag := range instance.Tags.Items {
-            if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
-                longest_tag = tag
-            }
-        }
-        if len(longest_tag) > 0 {
-           tags.Insert(longest_tag)
-        } else if len(tags) > 0 {
-		    return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
-        }
-    }
+	for _, instance := range res.Items {
+		longest_tag := ""
+		for _, tag := range instance.Tags.Items {
+			if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
+				longest_tag = tag
+			}
+		}
+		if len(longest_tag) > 0 {
+			tags.Insert(longest_tag)
+		} else if len(tags) > 0 {
+			return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
+		}
+	}
 
-    if len(tags) == 0 {
-        glog.V(2).Info("No instances had tags, creating rule without target tags")
-    }
+	if len(tags) == 0 {
+		glog.V(2).Info("No instances had tags, creating rule without target tags")
+	}
 
 	return tags.List(), nil
 }
