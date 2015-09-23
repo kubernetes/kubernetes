@@ -102,14 +102,12 @@ type KubernetesExecutor struct {
 	lock                 sync.Mutex
 	client               *client.Client
 	terminate            chan struct{}                     // signals that the executor should shutdown
-	registered           chan struct{}                     // closed when registerd
 	outgoing             chan func() (mesos.Status, error) // outgoing queue to the mesos driver
 	dockerClient         dockertools.DockerInterface
 	suicideWatch         suicideWatcher
 	suicideTimeout       time.Duration
 	shutdownAlert        func()          // invoked just prior to executor shutdown
 	kubeletFinished      <-chan struct{} // signals that kubelet Run() died
-	initialRegistration  sync.Once
 	exitFunc             func(int)
 	podStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	staticPodsConfigPath string
@@ -150,7 +148,6 @@ func New(config Config) *KubernetesExecutor {
 		shutdownAlert:        config.ShutdownAlert,
 		exitFunc:             config.ExitFunc,
 		podStatusFunc:        config.PodStatusFunc,
-		registered:           make(chan struct{}),
 		staticPodsConfigPath: config.StaticPodsConfigPath,
 	}
 
@@ -176,12 +173,6 @@ func New(config Config) *KubernetesExecutor {
 	})
 
 	return k
-}
-
-// InitiallyRegistered returns a channel which is closed when the executor is
-// registered with the Mesos master.
-func (k *KubernetesExecutor) InitiallyRegistered() <-chan struct{} {
-	return k.registered
 }
 
 func (k *KubernetesExecutor) Init(driver bindings.ExecutorDriver) {
@@ -229,8 +220,6 @@ func (k *KubernetesExecutor) Registered(driver bindings.ExecutorDriver,
 		Pods: []*api.Pod{},
 		Op:   kubelet.SET,
 	}
-
-	close(k.registered)
 }
 
 // Reregistered is called when the executor is successfully re-registered with the slave.
