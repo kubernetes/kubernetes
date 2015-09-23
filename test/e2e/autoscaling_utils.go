@@ -35,6 +35,8 @@ const (
 	port                            = 80
 	targetPort                      = 8080
 	timeoutRC                       = 120 * time.Second
+	startServiceTimeout             = time.Minute
+	startServiceInterval            = 5 * time.Second
 	image                           = "gcr.io/google_containers/resource_consumer:beta"
 	rcIsNil                         = "ERROR: replicationController = nil"
 )
@@ -246,6 +248,7 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		},
 	})
 	expectNoError(err)
+	expectNoError(waitForService(c, ns, name, true, startServiceInterval, startServiceTimeout))
 	config := RCConfig{
 		Client:    c,
 		Image:     image,
