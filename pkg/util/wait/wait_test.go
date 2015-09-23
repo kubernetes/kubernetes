@@ -40,8 +40,8 @@ DRAIN:
 			t.Errorf("unexpected timeout after poll")
 		}
 	}
-	if count < 2 {
-		t.Errorf("expected at least two values, got %d", count)
+	if count > 3 {
+		t.Errorf("expected up to three values, got %d", count)
 	}
 }
 
