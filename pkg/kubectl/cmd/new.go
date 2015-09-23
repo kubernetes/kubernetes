@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/cobra"
 	"io"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -91,7 +90,8 @@ func initExample(cmdNamespace string, resource string, f *cmdutil.Factory, cmd *
 		return nil, err
 	}
 
-	obj, err := api.Scheme.New(version, kind)
+	exBuilder := f.ExampleBuilder()
+	obj, _, err := exBuilder.NewExample(version, kind)
 	if err != nil {
 		return nil, err
 	}

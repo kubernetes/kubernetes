@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/examples"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -90,6 +91,8 @@ type Factory struct {
 	Generator func(name string) (kubectl.Generator, bool)
 	// Check whether the kind of resources could be exposed
 	CanBeExposed func(kind string) error
+	// Returns an interface for obtaining examples for different object types
+	ExampleBuilder func() examples.ExampleBuilder
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -255,6 +258,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
 			}
 			return nil
+		},
+		ExampleBuilder: func() examples.ExampleBuilder {
+			return examples.NewStaticExampleBuilder(api.Scheme, api.Scheme)
 		},
 	}
 }
