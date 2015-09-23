@@ -474,7 +474,6 @@ func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGrou
 func mockInstancesResp(instances []*ec2.Instance) *AWSCloud {
 	awsServices := NewFakeAWSServices().withInstances(instances)
 	return &AWSCloud{
-		awsServices:      awsServices,
 		ec2:              awsServices.ec2,
 		availabilityZone: awsServices.availabilityZone,
 	}
@@ -483,7 +482,6 @@ func mockInstancesResp(instances []*ec2.Instance) *AWSCloud {
 func mockAvailabilityZone(region string, availabilityZone string) *AWSCloud {
 	awsServices := NewFakeAWSServices().withAz(availabilityZone)
 	return &AWSCloud{
-		awsServices:      awsServices,
 		ec2:              awsServices.ec2,
 		availabilityZone: awsServices.availabilityZone,
 		region:           region,
