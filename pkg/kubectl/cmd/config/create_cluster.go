@@ -69,6 +69,8 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "cluster %q set.\n", options.name)
 			}
 		},
 	}
@@ -160,18 +162,18 @@ func (o *createClusterOptions) complete(cmd *cobra.Command) bool {
 
 func (o createClusterOptions) validate() error {
 	if len(o.name) == 0 {
-		return errors.New("You must specify a non-empty cluster name")
+		return errors.New("you must specify a non-empty cluster name")
 	}
 	if o.insecureSkipTLSVerify.Value() && o.certificateAuthority.Value() != "" {
-		return errors.New("You cannot specify a certificate authority and insecure mode at the same time")
+		return errors.New("you cannot specify a certificate authority and insecure mode at the same time")
 	}
 	if o.embedCAData.Value() {
 		caPath := o.certificateAuthority.Value()
 		if caPath == "" {
-			return fmt.Errorf("You must specify a --%s to embed", clientcmd.FlagCAFile)
+			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
 		if _, err := ioutil.ReadFile(caPath); err != nil {
-			return fmt.Errorf("Could not read %s data from %s: %v", clientcmd.FlagCAFile, caPath, err)
+			return fmt.Errorf("could not read %s data from %s: %v", clientcmd.FlagCAFile, caPath, err)
 		}
 	}
 
