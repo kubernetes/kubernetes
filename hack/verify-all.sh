@@ -53,6 +53,7 @@ fi
 
 EXCLUDE="verify-godeps.sh"
 
+ret=0
 for t in `ls $KUBE_ROOT/hack/verify-*.sh`
 do
   if is-excluded $t ; then
@@ -61,9 +62,14 @@ do
   fi
   if $SILENT ; then
     echo -e "Verifying $t"
-    bash "$t" &> /dev/null && echo -e "${color_green}SUCCESS${color_norm}" || echo -e "${color_red}FAILED${color_norm}" 
+    if bash "$t" &> /dev/null; then
+      echo -e "${color_green}SUCCESS${color_norm}"
+    else
+      echo -e "${color_red}FAILED${color_norm}"
+      ret=1
+    fi
   else
-    bash "$t" || true
+    bash "$t" || ret=1
   fi
 done
 
@@ -75,10 +81,16 @@ do
   fi
   if $SILENT ; then
     echo -e "Verifying $t"
-    python "$t" &> /dev/null && echo -e "${color_green}SUCCESS${color_norm}" || echo -e "${color_red}FAILED${color_norm}" 
+    if python "$t" &> /dev/null; then
+      echo -e "${color_green}SUCCESS${color_norm}"
+    else
+      echo -e "${color_red}FAILED${color_norm}"
+      ret=1
+    fi
   else 
-    python "$t" || true
+    python "$t" || ret=1
   fi
 done
+exit $ret
 
 # ex: ts=2 sw=2 et filetype=sh
