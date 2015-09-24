@@ -329,9 +329,9 @@ func (s *APIServer) Run(_ []string) error {
 	disableV1 := disableAllAPIs
 	disableV1 = !s.getRuntimeConfigValue("api/v1", !disableV1)
 
-	// "experimental/v1={true|false} allows users to enable/disable the experimental API.
+	// "experimental/v1alpha1={true|false} allows users to enable/disable the experimental API.
 	// This takes preference over api/all, if specified.
-	enableExp := s.getRuntimeConfigValue("experimental/v1", false)
+	enableExp := s.getRuntimeConfigValue("experimental/v1alpha1", false)
 
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -363,7 +363,7 @@ func (s *APIServer) Run(_ []string) error {
 			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
 		if s.ExpStorageVersion == "" {
-			s.ExpStorageVersion = g.Version
+			s.ExpStorageVersion = g.GroupVersion
 		}
 		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, s.ExpStorageVersion, s.EtcdPathPrefix)
 		if err != nil {

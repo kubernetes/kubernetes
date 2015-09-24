@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/experimental"
-	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -47,7 +47,7 @@ var (
 
 // types inside the api package don't need to say "api.Scheme"; all others do.
 func destScheme(group, version string) string {
-	if group == "api" && version == "" {
+	if group == "" && version == "" {
 		return "Scheme"
 	}
 	return "api.Scheme"
@@ -92,7 +92,13 @@ func main() {
 	group, version := path.Split(*groupVersion)
 	group = strings.TrimRight(group, "/")
 	registerTo := destScheme(group, version)
-	pkgname := group
+	var pkgname string
+	if group == "" {
+		// the internal version of v1 is registered in package api
+		pkgname = "api"
+	} else {
+		pkgname = group
+	}
 	if len(version) != 0 {
 		pkgname = version
 	}
@@ -115,7 +121,14 @@ func main() {
 			generator.OverwritePackage(vals[0], vals[1])
 		}
 	}
-	for _, knownType := range api.Scheme.KnownTypes(version) {
+	var schemeVersion string
+	if version == "" {
+		// This occurs when we generate deep-copy for internal version.
+		schemeVersion = ""
+	} else {
+		schemeVersion = *groupVersion
+	}
+	for _, knownType := range api.Scheme.KnownTypes(schemeVersion) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}

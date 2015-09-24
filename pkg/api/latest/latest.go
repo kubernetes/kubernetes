@@ -96,6 +96,10 @@ type GroupMeta struct {
 	// items when presented with a set of versions to choose.
 	Versions []string
 
+	// GroupVersions is Group + Versions. This is to avoid string concatenation
+	// in many places.
+	GroupVersions []string
+
 	// Codec is the default codec for serializing output that should use
 	// the latest supported version.  Use this Codec when writing to
 	// disk, a data store that is not dynamically versioned, or in tests.
