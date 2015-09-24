@@ -1496,10 +1496,21 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
 
-	// ExternalIPs are used by external load balancers, or can be set by
-	// users to handle external traffic that arrives at a node.
-	// Externally visible IPs (e.g. load balancers) that should be proxied to this service.
+	// externalIPs is a list of IP addresses for which nodes in the cluster
+	// will also accept traffic for this service.  These IPs are not managed by
+	// Kubernetes.  The user is responsible for ensuring that traffic arrives
+	// at a node with this IP.  A common example is external load-balancers
+	// that are not part of the Kubernetes system.  A previous form of this
+	// functionality exists as the deprecatedPublicIPs field.  When using this
+	// field, callers should also clear the deprecatedPublicIPs field.
 	ExternalIPs []string `json:"externalIPs,omitempty"`
+
+	// deprecatedPublicIPs is deprecated and replaced by the externalIPs field
+	// with almost the exact same semantics.  This field is retained in the v1
+	// API for compatibility until at least 8/20/2016.  It will be removed from
+	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
+	// set, deprecatedPublicIPs is used.
+	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
 	// Enable client IP based session affinity.
