@@ -83,8 +83,8 @@ func (m *MockedMessenger) Stop() error {
 }
 
 // UPID is a mocked implementation.
-func (m *MockedMessenger) UPID() *upid.UPID {
-	return m.Called().Get(0).(*upid.UPID)
+func (m *MockedMessenger) UPID() upid.UPID {
+	return m.Called().Get(0).(upid.UPID)
 }
 
 func (m *MockedMessenger) recvLoop() {

@@ -44,8 +44,8 @@ import (
 	"testing"
 	"time"
 
-	. "./testdata"
 	. "github.com/gogo/protobuf/proto"
+	. "github.com/gogo/protobuf/proto/testdata"
 )
 
 var globalO *Buffer
@@ -401,17 +401,18 @@ type fakeMarshaler struct {
 	err error
 }
 
-func (f fakeMarshaler) Marshal() ([]byte, error) {
-	return f.b, f.err
+func (f *fakeMarshaler) Marshal() ([]byte, error) { return f.b, f.err }
+func (f *fakeMarshaler) String() string           { return fmt.Sprintf("Bytes: %v Error: %v", f.b, f.err) }
+func (f *fakeMarshaler) ProtoMessage()            {}
+func (f *fakeMarshaler) Reset()                   {}
+
+type msgWithFakeMarshaler struct {
+	M *fakeMarshaler `protobuf:"bytes,1,opt,name=fake"`
 }
 
-func (f fakeMarshaler) String() string {
-	return fmt.Sprintf("Bytes: %v Error: %v", f.b, f.err)
-}
-
-func (f fakeMarshaler) ProtoMessage() {}
-
-func (f fakeMarshaler) Reset() {}
+func (m *msgWithFakeMarshaler) String() string { return CompactTextString(m) }
+func (m *msgWithFakeMarshaler) ProtoMessage()  {}
+func (m *msgWithFakeMarshaler) Reset()         {}
 
 // Simple tests for proto messages that implement the Marshaler interface.
 func TestMarshalerEncoding(t *testing.T) {
@@ -423,7 +424,7 @@ func TestMarshalerEncoding(t *testing.T) {
 	}{
 		{
 			name: "Marshaler that fails",
-			m: fakeMarshaler{
+			m: &fakeMarshaler{
 				err: errors.New("some marshal err"),
 				b:   []byte{5, 6, 7},
 			},
@@ -432,8 +433,24 @@ func TestMarshalerEncoding(t *testing.T) {
 			wantErr: errors.New("some marshal err"),
 		},
 		{
+			name: "Marshaler that fails with RequiredNotSetError",
+			m: &msgWithFakeMarshaler{
+				M: &fakeMarshaler{
+					err: &RequiredNotSetError{},
+					b:   []byte{5, 6, 7},
+				},
+			},
+			// Since there's an error that can be continued after,
+			// the buffer should be written.
+			want: []byte{
+				10, 3, // for &msgWithFakeMarshaler
+				5, 6, 7, // for &fakeMarshaler
+			},
+			wantErr: &RequiredNotSetError{},
+		},
+		{
 			name: "Marshaler that succeeds",
-			m: fakeMarshaler{
+			m: &fakeMarshaler{
 				b: []byte{0, 1, 2, 3, 4, 127, 255},
 			},
 			want:    []byte{0, 1, 2, 3, 4, 127, 255},
@@ -443,6 +460,10 @@ func TestMarshalerEncoding(t *testing.T) {
 	for _, test := range tests {
 		b := NewBuffer(nil)
 		err := b.Marshal(test.m)
+		if _, ok := err.(*RequiredNotSetError); ok {
+			// We're not in package proto, so we can only assert the type in this case.
+			err = &RequiredNotSetError{}
+		}
 		if !reflect.DeepEqual(test.wantErr, err) {
 			t.Errorf("%s: got err %v wanted %v", test.name, err, test.wantErr)
 		}
@@ -1252,7 +1273,8 @@ func TestProto1RepeatedGroup(t *testing.T) {
 	}
 
 	o := old()
-	if err := o.Marshal(pb); err != ErrRepeatedHasNil {
+	err := o.Marshal(pb)
+	if err == nil || !strings.Contains(err.Error(), "repeated field Message has nil") {
 		t.Fatalf("unexpected or no error when marshaling: %v", err)
 	}
 }
@@ -1280,7 +1302,7 @@ func TestEnum(t *testing.T) {
 // We don't care what the value actually is, just as long as it doesn't crash.
 func TestPrintingNilEnumFields(t *testing.T) {
 	pb := new(GoEnum)
-	fmt.Sprintf("%+v", pb)
+	_ = fmt.Sprintf("%+v", pb)
 }
 
 // Verify that absent required fields cause Marshal/Unmarshal to return errors.
@@ -1435,6 +1457,17 @@ func TestSetDefaultsWithRepeatedSubMessage(t *testing.T) {
 			Port: Int32(4000),
 		}},
 	}
+	SetDefaults(m)
+	if !Equal(m, expected) {
+		t.Errorf("\n got %v\nwant %v", m, expected)
+	}
+}
+
+func TestSetDefaultWithRepeatedNonMessage(t *testing.T) {
+	m := &MyMessage{
+		Pet: []string{"turtle", "wombat"},
+	}
+	expected := Clone(m)
 	SetDefaults(m)
 	if !Equal(m, expected) {
 		t.Errorf("\n got %v\nwant %v", m, expected)
@@ -1831,6 +1864,150 @@ func fuzzUnmarshal(t *testing.T, data []byte) {
 
 	pb := new(MyMessage)
 	Unmarshal(data, pb)
+}
+
+func TestMapFieldMarshal(t *testing.T) {
+	m := &MessageWithMap{
+		NameMapping: map[int32]string{
+			1: "Rob",
+			4: "Ian",
+			8: "Dave",
+		},
+	}
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	// b should be the concatenation of these three byte sequences in some order.
+	parts := []string{
+		"\n\a\b\x01\x12\x03Rob",
+		"\n\a\b\x04\x12\x03Ian",
+		"\n\b\b\x08\x12\x04Dave",
+	}
+	ok := false
+	for i := range parts {
+		for j := range parts {
+			if j == i {
+				continue
+			}
+			for k := range parts {
+				if k == i || k == j {
+					continue
+				}
+				try := parts[i] + parts[j] + parts[k]
+				if bytes.Equal(b, []byte(try)) {
+					ok = true
+					break
+				}
+			}
+		}
+	}
+	if !ok {
+		t.Fatalf("Incorrect Marshal output.\n got %q\nwant %q (or a permutation of that)", b, parts[0]+parts[1]+parts[2])
+	}
+	t.Logf("FYI b: %q", b)
+
+	(new(Buffer)).DebugPrint("Dump of b", b)
+}
+
+func TestMapFieldRoundTrips(t *testing.T) {
+	m := &MessageWithMap{
+		NameMapping: map[int32]string{
+			1: "Rob",
+			4: "Ian",
+			8: "Dave",
+		},
+		MsgMapping: map[int64]*FloatingPoint{
+			0x7001: {F: Float64(2.0)},
+		},
+		ByteMapping: map[bool][]byte{
+			false: []byte("that's not right!"),
+			true:  []byte("aye, 'tis true!"),
+		},
+	}
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	t.Logf("FYI b: %q", b)
+	m2 := new(MessageWithMap)
+	if err := Unmarshal(b, m2); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	for _, pair := range [][2]interface{}{
+		{m.NameMapping, m2.NameMapping},
+		{m.MsgMapping, m2.MsgMapping},
+		{m.ByteMapping, m2.ByteMapping},
+	} {
+		if !reflect.DeepEqual(pair[0], pair[1]) {
+			t.Errorf("Map did not survive a round trip.\ninitial: %v\n  final: %v", pair[0], pair[1])
+		}
+	}
+}
+
+func TestMapFieldWithNil(t *testing.T) {
+	m := &MessageWithMap{
+		MsgMapping: map[int64]*FloatingPoint{
+			1: nil,
+		},
+	}
+	b, err := Marshal(m)
+	if err == nil {
+		t.Fatalf("Marshal of bad map should have failed, got these bytes: %v", b)
+	}
+}
+
+func TestOneof(t *testing.T) {
+	m := &Communique{}
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal of empty message with oneof: %v", err)
+	}
+	if len(b) != 0 {
+		t.Errorf("Marshal of empty message yielded too many bytes: %v", b)
+	}
+
+	m = &Communique{
+		Union: &Communique_Name{"Barry"},
+	}
+
+	// Round-trip.
+	b, err = Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal of message with oneof: %v", err)
+	}
+	if len(b) != 7 { // name tag/wire (1) + name len (1) + name (5)
+		t.Errorf("Incorrect marshal of message with oneof: %v", b)
+	}
+	m.Reset()
+	if err := Unmarshal(b, m); err != nil {
+		t.Fatalf("Unmarshal of message with oneof: %v", err)
+	}
+	if x, ok := m.Union.(*Communique_Name); !ok || x.Name != "Barry" {
+		t.Errorf("After round trip, Union = %+v", m.Union)
+	}
+	if name := m.GetName(); name != "Barry" {
+		t.Errorf("After round trip, GetName = %q, want %q", name, "Barry")
+	}
+
+	// Let's try with a message in the oneof.
+	m.Union = &Communique_Msg{&Strings{StringField: String("deep deep string")}}
+	b, err = Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal of message with oneof set to message: %v", err)
+	}
+	if len(b) != 20 { // msg tag/wire (1) + msg len (1) + msg (1 + 1 + 16)
+		t.Errorf("Incorrect marshal of message with oneof set to message: %v", b)
+	}
+	m.Reset()
+	if err := Unmarshal(b, m); err != nil {
+		t.Fatalf("Unmarshal of message with oneof set to message: %v", err)
+	}
+	ss, ok := m.Union.(*Communique_Msg)
+	if !ok || ss.Msg.GetStringField() != "deep deep string" {
+		t.Errorf("After round trip with oneof set to message, Union = %+v", m.Union)
+	}
 }
 
 // Benchmarks
