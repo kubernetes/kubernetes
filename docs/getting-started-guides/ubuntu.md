@@ -56,10 +56,10 @@ work, which has been merge into this document.
 ## Prerequisites
 
 1. The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge.
-2. All machines can communicate with each other. Master node needs to connect the Internet to download 
-the necessary files, while working nodes do not.
+2. All machines can communicate with each other. Master node needs to be connected to the
+Internet to download the necessary files, while worker nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
-Ubuntu 15 which use systemd instead of upstart. We are working around fixing this.
+Ubuntu 15 which uses systemd instead of upstart.
 4. Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.6, may work with higher versions.
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
@@ -76,15 +76,16 @@ $ git clone https://github.com/kubernetes/kubernetes.git
 
 #### Configure and start the Kubernetes cluster
 
+The startup process will first download all the required binaries automatically.
+By default etcd version is 2.0.12, flannel version is 0.4.0 and k8s version is 1.0.6.
 You can customize your etcd version, flannel version, k8s version by changing corresponding variables
 `ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` like following.
 
 ```console
-$ export KUBE_VERSION=1.0.3
+$ export KUBE_VERSION=1.0.5
 $ export FLANNEL_VERSION=0.5.3
 $ export ETCD_VERSION=2.2.0
 ```
-By default etcd version is 2.0.12, flannel version is 0.4.0 and k8s version is 1.0.6.
 
 Note that we use flannel here to set up overlay network, yet it's optional. Actually you can build up k8s
 cluster natively, or use flannel, Open vSwitch or any other SDN tool you like.
@@ -133,18 +134,19 @@ that conflicts with your own private network range.
 The `FLANNEL_NET` variable defines the IP range used for flannel overlay network,
 should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
 
-**Note:** When deploying, master needs to connect the Internet to download the necessary files. 
-If your machines locate in a private network that need proxy setting to connect the Internet, 
+**Note:** When deploying, master needs to be connected to the Internet to download the necessary files.
+If your machines are located in a private network that need proxy setting to connect the Internet,
 you can set the config `PROXY_SETTING` in cluster/ubuntu/config-default.sh such as:
 
      PROXY_SETTING="http_proxy=http://server:port https_proxy=https://server:port"
 
-After all the above variables being set correctly, we can use following command in cluster/ directory to bring up the whole cluster.
+After all the above variables being set correctly, we can use following command in `cluster/` directory to
+bring up the whole cluster.
 
 `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh`
 
-The scripts automatically scp binaries and config files to all the machines and start k8s service on them.
-The only thing you need to do is to type the sudo password when promoted.
+The scripts automatically `scp` binaries and config files to all the machines and start kubernetes
+service on them. The only thing you need to do is to type the sudo password when promoted.
 
 ```console
 Deploying minion on machine 10.10.103.223
@@ -160,7 +162,7 @@ Cluster validation succeeded
 
 ### Test it out
 
-You can use `kubectl` command to check if the newly created k8s is working correctly.
+You can use `kubectl` command to check if the newly created cluster is working correctly.
 The `kubectl` binary is under the `cluster/ubuntu/binaries` directory.
 You can make it available via PATH, then you can use the below command smoothly.
 
@@ -174,7 +176,7 @@ NAME            LABELS                                 STATUS
 10.10.103.250   kubernetes.io/hostname=10.10.103.250   Ready
 ```
 
-Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
+Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster．
 
 
 ### Deploy addons
@@ -253,7 +255,7 @@ the latter one could start it again.
 ## Upgrading a Cluster
 
 If you already have a kubernetes cluster, and want to upgrade to a new version,
-you can use following command in cluster/ directory to update the whole cluster 
+you can use following command in `cluster/` directory to update the whole cluster
 or a specified node to a new version.
 
 ```console
@@ -261,8 +263,8 @@ $ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh [-m|-n <node id>] <version>
 ```
 
 It can be done for all components (by default), master(`-m`) or specified node(`-n`).
-Upgrading single node is experimental now.
-If the version is not specified, the script will try to use local binaries. You should ensure all 
+Upgrading single node is currently experimental.
+If the version is not specified, the script will try to use local binaries. You should ensure all
 the binaries are well prepared in the expected directory path cluster/ubuntu/binaries.
 
 ```console
@@ -298,7 +300,7 @@ The script will not delete any resources of your cluster, it just replaces the b
 
 ### Test it out
 
-You can use `kubectl` command to check if the newly upgraded k8s is working correctly. See 
+You can use `kubectl` command to check if the newly upgraded kubernetes cluster is working correctly. See
 also [test-it-out](ubuntu.md#test-it-out)
 
 To make sure the version of upgraded cluster is expected, you will find these commands helpful.
