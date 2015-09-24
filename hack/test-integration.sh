@@ -44,8 +44,10 @@ runTests() {
 
   kube::log::status "Running integration test cases"
 
+  # TODO: Re-enable race detection when we switch to a thread-safe etcd client
+  # KUBE_RACE="-race"
   KUBE_GOFLAGS="-tags 'integration no-docker' " \
-    KUBE_RACE="-race" \
+    KUBE_RACE="" \
     KUBE_TEST_API_VERSIONS="$1" \
     KUBE_API_VERSIONS="v1,experimental/v1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
