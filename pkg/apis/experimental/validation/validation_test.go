@@ -593,12 +593,6 @@ func TestValidateDeployment(t *testing.T) {
 			Namespace: api.NamespaceDefault,
 		},
 	}
-	// selector should match the labels in pod template.
-	invalidSelectorDeployment := validDeployment()
-	invalidSelectorDeployment.Spec.Selector = map[string]string{
-		"name": "def",
-	}
-	errorCases["selector does not match labels"] = invalidSelectorDeployment
 
 	// RestartPolicy should be always.
 	invalidRestartPolicyDeployment := validDeployment()
