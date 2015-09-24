@@ -5,12 +5,14 @@
 package mesosproto
 
 import proto "github.com/gogo/protobuf/proto"
+import fmt "fmt"
 import math "math"
 
-// discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto/gogo.pb"
+// discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
 
 // Possible event types, followed by message definitions if
@@ -18,35 +20,32 @@ var _ = math.Inf
 type Event_Type int32
 
 const (
-	Event_REGISTERED   Event_Type = 1
-	Event_REREGISTERED Event_Type = 2
-	Event_OFFERS       Event_Type = 3
-	Event_RESCIND      Event_Type = 4
-	Event_UPDATE       Event_Type = 5
-	Event_MESSAGE      Event_Type = 6
-	Event_FAILURE      Event_Type = 7
-	Event_ERROR        Event_Type = 8
+	Event_SUBSCRIBED Event_Type = 1
+	Event_OFFERS     Event_Type = 2
+	Event_RESCIND    Event_Type = 3
+	Event_UPDATE     Event_Type = 4
+	Event_MESSAGE    Event_Type = 5
+	Event_FAILURE    Event_Type = 6
+	Event_ERROR      Event_Type = 7
 )
 
 var Event_Type_name = map[int32]string{
-	1: "REGISTERED",
-	2: "REREGISTERED",
-	3: "OFFERS",
-	4: "RESCIND",
-	5: "UPDATE",
-	6: "MESSAGE",
-	7: "FAILURE",
-	8: "ERROR",
+	1: "SUBSCRIBED",
+	2: "OFFERS",
+	3: "RESCIND",
+	4: "UPDATE",
+	5: "MESSAGE",
+	6: "FAILURE",
+	7: "ERROR",
 }
 var Event_Type_value = map[string]int32{
-	"REGISTERED":   1,
-	"REREGISTERED": 2,
-	"OFFERS":       3,
-	"RESCIND":      4,
-	"UPDATE":       5,
-	"MESSAGE":      6,
-	"FAILURE":      7,
-	"ERROR":        8,
+	"SUBSCRIBED": 1,
+	"OFFERS":     2,
+	"RESCIND":    3,
+	"UPDATE":     4,
+	"MESSAGE":    5,
+	"FAILURE":    6,
+	"ERROR":      7,
 }
 
 func (x Event_Type) Enum() *Event_Type {
@@ -71,44 +70,41 @@ func (x *Event_Type) UnmarshalJSON(data []byte) error {
 type Call_Type int32
 
 const (
-	Call_REGISTER    Call_Type = 1
-	Call_REREGISTER  Call_Type = 2
-	Call_UNREGISTER  Call_Type = 3
-	Call_REQUEST     Call_Type = 4
-	Call_DECLINE     Call_Type = 5
-	Call_REVIVE      Call_Type = 6
-	Call_LAUNCH      Call_Type = 7
-	Call_KILL        Call_Type = 8
-	Call_ACKNOWLEDGE Call_Type = 9
-	Call_RECONCILE   Call_Type = 10
-	Call_MESSAGE     Call_Type = 11
+	Call_SUBSCRIBE   Call_Type = 1
+	Call_TEARDOWN    Call_Type = 2
+	Call_ACCEPT      Call_Type = 3
+	Call_DECLINE     Call_Type = 4
+	Call_REVIVE      Call_Type = 5
+	Call_KILL        Call_Type = 6
+	Call_SHUTDOWN    Call_Type = 7
+	Call_ACKNOWLEDGE Call_Type = 8
+	Call_RECONCILE   Call_Type = 9
+	Call_MESSAGE     Call_Type = 10
 )
 
 var Call_Type_name = map[int32]string{
-	1:  "REGISTER",
-	2:  "REREGISTER",
-	3:  "UNREGISTER",
-	4:  "REQUEST",
-	5:  "DECLINE",
-	6:  "REVIVE",
-	7:  "LAUNCH",
-	8:  "KILL",
-	9:  "ACKNOWLEDGE",
-	10: "RECONCILE",
-	11: "MESSAGE",
+	1:  "SUBSCRIBE",
+	2:  "TEARDOWN",
+	3:  "ACCEPT",
+	4:  "DECLINE",
+	5:  "REVIVE",
+	6:  "KILL",
+	7:  "SHUTDOWN",
+	8:  "ACKNOWLEDGE",
+	9:  "RECONCILE",
+	10: "MESSAGE",
 }
 var Call_Type_value = map[string]int32{
-	"REGISTER":    1,
-	"REREGISTER":  2,
-	"UNREGISTER":  3,
-	"REQUEST":     4,
-	"DECLINE":     5,
-	"REVIVE":      6,
-	"LAUNCH":      7,
-	"KILL":        8,
-	"ACKNOWLEDGE": 9,
-	"RECONCILE":   10,
-	"MESSAGE":     11,
+	"SUBSCRIBE":   1,
+	"TEARDOWN":    2,
+	"ACCEPT":      3,
+	"DECLINE":     4,
+	"REVIVE":      5,
+	"KILL":        6,
+	"SHUTDOWN":    7,
+	"ACKNOWLEDGE": 8,
+	"RECONCILE":   9,
+	"MESSAGE":     10,
 }
 
 func (x Call_Type) Enum() *Call_Type {
@@ -129,23 +125,23 @@ func (x *Call_Type) UnmarshalJSON(data []byte) error {
 }
 
 // *
-// Low-level scheduler event API.
+// Scheduler event API.
 //
 // An event is described using the standard protocol buffer "union"
-// trick, see https://developers.google.com/protocol-buffers/docs/techniques#union.
+// trick, see:
+// https://developers.google.com/protocol-buffers/docs/techniques#union.
 type Event struct {
 	// Type of the event, indicates which optional field below should be
 	// present if that type has a nested message definition.
-	Type             *Event_Type         `protobuf:"varint,1,req,name=type,enum=mesosproto.Event_Type" json:"type,omitempty"`
-	Registered       *Event_Registered   `protobuf:"bytes,2,opt,name=registered" json:"registered,omitempty"`
-	Reregistered     *Event_Reregistered `protobuf:"bytes,3,opt,name=reregistered" json:"reregistered,omitempty"`
-	Offers           *Event_Offers       `protobuf:"bytes,4,opt,name=offers" json:"offers,omitempty"`
-	Rescind          *Event_Rescind      `protobuf:"bytes,5,opt,name=rescind" json:"rescind,omitempty"`
-	Update           *Event_Update       `protobuf:"bytes,6,opt,name=update" json:"update,omitempty"`
-	Message          *Event_Message      `protobuf:"bytes,7,opt,name=message" json:"message,omitempty"`
-	Failure          *Event_Failure      `protobuf:"bytes,8,opt,name=failure" json:"failure,omitempty"`
-	Error            *Event_Error        `protobuf:"bytes,9,opt,name=error" json:"error,omitempty"`
-	XXX_unrecognized []byte              `json:"-"`
+	Type             *Event_Type       `protobuf:"varint,1,req,name=type,enum=mesosproto.Event_Type" json:"type,omitempty"`
+	Subscribed       *Event_Subscribed `protobuf:"bytes,2,opt,name=subscribed" json:"subscribed,omitempty"`
+	Offers           *Event_Offers     `protobuf:"bytes,3,opt,name=offers" json:"offers,omitempty"`
+	Rescind          *Event_Rescind    `protobuf:"bytes,4,opt,name=rescind" json:"rescind,omitempty"`
+	Update           *Event_Update     `protobuf:"bytes,5,opt,name=update" json:"update,omitempty"`
+	Message          *Event_Message    `protobuf:"bytes,6,opt,name=message" json:"message,omitempty"`
+	Failure          *Event_Failure    `protobuf:"bytes,7,opt,name=failure" json:"failure,omitempty"`
+	Error            *Event_Error      `protobuf:"bytes,8,opt,name=error" json:"error,omitempty"`
+	XXX_unrecognized []byte            `json:"-"`
 }
 
 func (m *Event) Reset()         { *m = Event{} }
@@ -156,19 +152,12 @@ func (m *Event) GetType() Event_Type {
 	if m != nil && m.Type != nil {
 		return *m.Type
 	}
-	return Event_REGISTERED
+	return Event_SUBSCRIBED
 }
 
-func (m *Event) GetRegistered() *Event_Registered {
+func (m *Event) GetSubscribed() *Event_Subscribed {
 	if m != nil {
-		return m.Registered
-	}
-	return nil
-}
-
-func (m *Event) GetReregistered() *Event_Reregistered {
-	if m != nil {
-		return m.Reregistered
+		return m.Subscribed
 	}
 	return nil
 }
@@ -215,54 +204,27 @@ func (m *Event) GetError() *Event_Error {
 	return nil
 }
 
-type Event_Registered struct {
+// First event received when the scheduler subscribes.
+type Event_Subscribed struct {
 	FrameworkId      *FrameworkID `protobuf:"bytes,1,req,name=framework_id" json:"framework_id,omitempty"`
-	MasterInfo       *MasterInfo  `protobuf:"bytes,2,req,name=master_info" json:"master_info,omitempty"`
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *Event_Registered) Reset()         { *m = Event_Registered{} }
-func (m *Event_Registered) String() string { return proto.CompactTextString(m) }
-func (*Event_Registered) ProtoMessage()    {}
+func (m *Event_Subscribed) Reset()         { *m = Event_Subscribed{} }
+func (m *Event_Subscribed) String() string { return proto.CompactTextString(m) }
+func (*Event_Subscribed) ProtoMessage()    {}
 
-func (m *Event_Registered) GetFrameworkId() *FrameworkID {
+func (m *Event_Subscribed) GetFrameworkId() *FrameworkID {
 	if m != nil {
 		return m.FrameworkId
 	}
 	return nil
 }
 
-func (m *Event_Registered) GetMasterInfo() *MasterInfo {
-	if m != nil {
-		return m.MasterInfo
-	}
-	return nil
-}
-
-type Event_Reregistered struct {
-	FrameworkId      *FrameworkID `protobuf:"bytes,1,req,name=framework_id" json:"framework_id,omitempty"`
-	MasterInfo       *MasterInfo  `protobuf:"bytes,2,req,name=master_info" json:"master_info,omitempty"`
-	XXX_unrecognized []byte       `json:"-"`
-}
-
-func (m *Event_Reregistered) Reset()         { *m = Event_Reregistered{} }
-func (m *Event_Reregistered) String() string { return proto.CompactTextString(m) }
-func (*Event_Reregistered) ProtoMessage()    {}
-
-func (m *Event_Reregistered) GetFrameworkId() *FrameworkID {
-	if m != nil {
-		return m.FrameworkId
-	}
-	return nil
-}
-
-func (m *Event_Reregistered) GetMasterInfo() *MasterInfo {
-	if m != nil {
-		return m.MasterInfo
-	}
-	return nil
-}
-
+// Received whenever there are new resources that are offered to the
+// scheduler. Each offer corresponds to a set of resources on a
+// slave. Until the scheduler accepts or declines an offer the
+// resources are considered allocated to the scheduler.
 type Event_Offers struct {
 	Offers           []*Offer `protobuf:"bytes,1,rep,name=offers" json:"offers,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
@@ -279,6 +241,10 @@ func (m *Event_Offers) GetOffers() []*Offer {
 	return nil
 }
 
+// Received when a particular offer is no longer valid (e.g., the
+// slave corresponding to the offer has been removed) and hence
+// needs to be rescinded. Any future calls ('Accept' / 'Decline') made
+// by the scheduler regarding this offer will be invalid.
 type Event_Rescind struct {
 	OfferId          *OfferID `protobuf:"bytes,1,req,name=offer_id" json:"offer_id,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
@@ -295,22 +261,23 @@ func (m *Event_Rescind) GetOfferId() *OfferID {
 	return nil
 }
 
+// Received whenever there is a status update that is generated by
+// the executor or slave or master. Status updates should be used by
+// executors to reliably communicate the status of the tasks that
+// they manage. It is crucial that a terminal update (see TaskState
+// in mesos.proto) is sent by the executor as soon as the task
+// terminates, in order for Mesos to release the resources allocated
+// to the task. It is also the responsibility of the scheduler to
+// explicitly acknowledge the receipt of a status update. See
+// 'Acknowledge' in the 'Call' section below for the semantics.
 type Event_Update struct {
-	Uuid             []byte      `protobuf:"bytes,1,req,name=uuid" json:"uuid,omitempty"`
-	Status           *TaskStatus `protobuf:"bytes,2,req,name=status" json:"status,omitempty"`
+	Status           *TaskStatus `protobuf:"bytes,1,req,name=status" json:"status,omitempty"`
 	XXX_unrecognized []byte      `json:"-"`
 }
 
 func (m *Event_Update) Reset()         { *m = Event_Update{} }
 func (m *Event_Update) String() string { return proto.CompactTextString(m) }
 func (*Event_Update) ProtoMessage()    {}
-
-func (m *Event_Update) GetUuid() []byte {
-	if m != nil {
-		return m.Uuid
-	}
-	return nil
-}
 
 func (m *Event_Update) GetStatus() *TaskStatus {
 	if m != nil {
@@ -319,6 +286,11 @@ func (m *Event_Update) GetStatus() *TaskStatus {
 	return nil
 }
 
+// Received when a custom message generated by the executor is
+// forwarded by the master. Note that this message is not
+// interpreted by Mesos and is only forwarded (without reliability
+// guarantees) to the scheduler. It is up to the executor to retry
+// if the message is dropped for any reason.
 type Event_Message struct {
 	SlaveId          *SlaveID    `protobuf:"bytes,1,req,name=slave_id" json:"slave_id,omitempty"`
 	ExecutorId       *ExecutorID `protobuf:"bytes,2,req,name=executor_id" json:"executor_id,omitempty"`
@@ -351,6 +323,16 @@ func (m *Event_Message) GetData() []byte {
 	return nil
 }
 
+// Received when a slave is removed from the cluster (e.g., failed
+// health checks) or when an executor is terminated. Note that, this
+// event coincides with receipt of terminal UPDATE events for any
+// active tasks belonging to the slave or executor and receipt of
+// 'Rescind' events for any outstanding offers belonging to the
+// slave. Note that there is no guaranteed order between the
+// 'Failure', 'Update' and 'Rescind' events when a slave or executor
+// is removed.
+// TODO(vinod): Consider splitting the lost slave and terminated
+// executor into separate events and ensure it's reliably generated.
 type Event_Failure struct {
 	SlaveId *SlaveID `protobuf:"bytes,1,opt,name=slave_id" json:"slave_id,omitempty"`
 	// If this was just a failure of an executor on a slave then
@@ -386,6 +368,13 @@ func (m *Event_Failure) GetStatus() int32 {
 	return 0
 }
 
+// Received when an invalid framework (e.g., unauthenticated,
+// unauthorized) attempts to subscribe with the master. Error can
+// also be received if scheduler sends invalid Calls (e.g., not
+// properly initialized).
+// TODO(vinod): Remove this once the old scheduler driver is no
+// longer supported. With HTTP API all errors will be signaled via
+// HTTP response codes.
 type Event_Error struct {
 	Message          *string `protobuf:"bytes,1,req,name=message" json:"message,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
@@ -403,25 +392,29 @@ func (m *Event_Error) GetMessage() string {
 }
 
 // *
-// Low-level scheduler call API.
+// Scheduler call API.
 //
 // Like Event, a Call is described using the standard protocol buffer
 // "union" trick (see above).
 type Call struct {
-	// Identifies who generated this call. Always necessary, but the
-	// only thing that needs to be set for certain calls, e.g.,
-	// REGISTER, REREGISTER, and UNREGISTER.
-	FrameworkInfo *FrameworkInfo `protobuf:"bytes,1,req,name=framework_info" json:"framework_info,omitempty"`
+	// Identifies who generated this call. Master assigns a framework id
+	// when a new scheduler subscribes for the first time. Once assigned,
+	// the scheduler must set the 'framework_id' here and within its
+	// FrameworkInfo (in any further 'Subscribe' calls). This allows the
+	// master to identify a scheduler correctly across disconnections,
+	// failovers, etc.
+	FrameworkId *FrameworkID `protobuf:"bytes,1,opt,name=framework_id" json:"framework_id,omitempty"`
 	// Type of the call, indicates which optional field below should be
 	// present if that type has a nested message definition.
 	Type             *Call_Type        `protobuf:"varint,2,req,name=type,enum=mesosproto.Call_Type" json:"type,omitempty"`
-	Request          *Call_Request     `protobuf:"bytes,3,opt,name=request" json:"request,omitempty"`
-	Decline          *Call_Decline     `protobuf:"bytes,4,opt,name=decline" json:"decline,omitempty"`
-	Launch           *Call_Launch      `protobuf:"bytes,5,opt,name=launch" json:"launch,omitempty"`
+	Subscribe        *Call_Subscribe   `protobuf:"bytes,3,opt,name=subscribe" json:"subscribe,omitempty"`
+	Accept           *Call_Accept      `protobuf:"bytes,4,opt,name=accept" json:"accept,omitempty"`
+	Decline          *Call_Decline     `protobuf:"bytes,5,opt,name=decline" json:"decline,omitempty"`
 	Kill             *Call_Kill        `protobuf:"bytes,6,opt,name=kill" json:"kill,omitempty"`
-	Acknowledge      *Call_Acknowledge `protobuf:"bytes,7,opt,name=acknowledge" json:"acknowledge,omitempty"`
-	Reconcile        *Call_Reconcile   `protobuf:"bytes,8,opt,name=reconcile" json:"reconcile,omitempty"`
-	Message          *Call_Message     `protobuf:"bytes,9,opt,name=message" json:"message,omitempty"`
+	Shutdown         *Call_Shutdown    `protobuf:"bytes,7,opt,name=shutdown" json:"shutdown,omitempty"`
+	Acknowledge      *Call_Acknowledge `protobuf:"bytes,8,opt,name=acknowledge" json:"acknowledge,omitempty"`
+	Reconcile        *Call_Reconcile   `protobuf:"bytes,9,opt,name=reconcile" json:"reconcile,omitempty"`
+	Message          *Call_Message     `protobuf:"bytes,10,opt,name=message" json:"message,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
 
@@ -429,9 +422,9 @@ func (m *Call) Reset()         { *m = Call{} }
 func (m *Call) String() string { return proto.CompactTextString(m) }
 func (*Call) ProtoMessage()    {}
 
-func (m *Call) GetFrameworkInfo() *FrameworkInfo {
+func (m *Call) GetFrameworkId() *FrameworkID {
 	if m != nil {
-		return m.FrameworkInfo
+		return m.FrameworkId
 	}
 	return nil
 }
@@ -440,12 +433,19 @@ func (m *Call) GetType() Call_Type {
 	if m != nil && m.Type != nil {
 		return *m.Type
 	}
-	return Call_REGISTER
+	return Call_SUBSCRIBE
 }
 
-func (m *Call) GetRequest() *Call_Request {
+func (m *Call) GetSubscribe() *Call_Subscribe {
 	if m != nil {
-		return m.Request
+		return m.Subscribe
+	}
+	return nil
+}
+
+func (m *Call) GetAccept() *Call_Accept {
+	if m != nil {
+		return m.Accept
 	}
 	return nil
 }
@@ -457,16 +457,16 @@ func (m *Call) GetDecline() *Call_Decline {
 	return nil
 }
 
-func (m *Call) GetLaunch() *Call_Launch {
+func (m *Call) GetKill() *Call_Kill {
 	if m != nil {
-		return m.Launch
+		return m.Kill
 	}
 	return nil
 }
 
-func (m *Call) GetKill() *Call_Kill {
+func (m *Call) GetShutdown() *Call_Shutdown {
 	if m != nil {
-		return m.Kill
+		return m.Shutdown
 	}
 	return nil
 }
@@ -492,22 +492,105 @@ func (m *Call) GetMessage() *Call_Message {
 	return nil
 }
 
-type Call_Request struct {
-	Requests         []*Request `protobuf:"bytes,1,rep,name=requests" json:"requests,omitempty"`
-	XXX_unrecognized []byte     `json:"-"`
+// Subscribes the scheduler with the master to receive events. A
+// scheduler must send other calls only after it has received the
+// SUBCRIBED event.
+type Call_Subscribe struct {
+	// See the comments below on 'framework_id' on the semantics for
+	// 'framework_info.id'.
+	FrameworkInfo *FrameworkInfo `protobuf:"bytes,1,req,name=framework_info" json:"framework_info,omitempty"`
+	// 'force' field is only relevant when 'framework_info.id' is set.
+	// It tells the master what to do in case an instance of the
+	// scheduler attempts to subscribe when another instance of it is
+	// already connected (e.g., split brain due to network partition).
+	// If 'force' is true, this scheduler instance is allowed and the
+	// old connected scheduler instance is disconnected. If false,
+	// this scheduler instance is disallowed subscription in favor of
+	// the already connected scheduler instance.
+	//
+	// It is recommended to set this to true only when a newly elected
+	// scheduler instance is attempting to subscribe but not when a
+	// scheduler is retrying subscription (e.g., disconnection or
+	// master failover; see sched/sched.cpp for an example).
+	Force            *bool  `protobuf:"varint,2,opt,name=force" json:"force,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *Call_Request) Reset()         { *m = Call_Request{} }
-func (m *Call_Request) String() string { return proto.CompactTextString(m) }
-func (*Call_Request) ProtoMessage()    {}
+func (m *Call_Subscribe) Reset()         { *m = Call_Subscribe{} }
+func (m *Call_Subscribe) String() string { return proto.CompactTextString(m) }
+func (*Call_Subscribe) ProtoMessage()    {}
 
-func (m *Call_Request) GetRequests() []*Request {
+func (m *Call_Subscribe) GetFrameworkInfo() *FrameworkInfo {
 	if m != nil {
-		return m.Requests
+		return m.FrameworkInfo
 	}
 	return nil
 }
 
+func (m *Call_Subscribe) GetForce() bool {
+	if m != nil && m.Force != nil {
+		return *m.Force
+	}
+	return false
+}
+
+// Accepts an offer, performing the specified operations
+// in a sequential manner.
+//
+// E.g. Launch a task with a newly reserved persistent volume:
+//
+//   Accept {
+//     offer_ids: [ ... ]
+//     operations: [
+//       { type: RESERVE,
+//         reserve: { resources: [ disk(role):2 ] } }
+//       { type: CREATE,
+//         create: { volumes: [ disk(role):1+persistence ] } }
+//       { type: LAUNCH,
+//         launch: { task_infos ... disk(role):1;disk(role):1+persistence } }
+//     ]
+//   }
+//
+// Note that any of the offer’s resources not used in the 'Accept'
+// call (e.g., to launch a task) are considered unused and might be
+// reoffered to other frameworks. In other words, the same OfferID
+// cannot be used in more than one 'Accept' call.
+type Call_Accept struct {
+	OfferIds         []*OfferID         `protobuf:"bytes,1,rep,name=offer_ids" json:"offer_ids,omitempty"`
+	Operations       []*Offer_Operation `protobuf:"bytes,2,rep,name=operations" json:"operations,omitempty"`
+	Filters          *Filters           `protobuf:"bytes,3,opt,name=filters" json:"filters,omitempty"`
+	XXX_unrecognized []byte             `json:"-"`
+}
+
+func (m *Call_Accept) Reset()         { *m = Call_Accept{} }
+func (m *Call_Accept) String() string { return proto.CompactTextString(m) }
+func (*Call_Accept) ProtoMessage()    {}
+
+func (m *Call_Accept) GetOfferIds() []*OfferID {
+	if m != nil {
+		return m.OfferIds
+	}
+	return nil
+}
+
+func (m *Call_Accept) GetOperations() []*Offer_Operation {
+	if m != nil {
+		return m.Operations
+	}
+	return nil
+}
+
+func (m *Call_Accept) GetFilters() *Filters {
+	if m != nil {
+		return m.Filters
+	}
+	return nil
+}
+
+// Declines an offer, signaling the master to potentially reoffer
+// the resources to a different framework. Note that this is same
+// as sending an Accept call with no operations. See comments on
+// top of 'Accept' for semantics.
 type Call_Decline struct {
 	OfferIds         []*OfferID `protobuf:"bytes,1,rep,name=offer_ids" json:"offer_ids,omitempty"`
 	Filters          *Filters   `protobuf:"bytes,2,opt,name=filters" json:"filters,omitempty"`
@@ -532,41 +615,17 @@ func (m *Call_Decline) GetFilters() *Filters {
 	return nil
 }
 
-type Call_Launch struct {
-	TaskInfos        []*TaskInfo `protobuf:"bytes,1,rep,name=task_infos" json:"task_infos,omitempty"`
-	OfferIds         []*OfferID  `protobuf:"bytes,2,rep,name=offer_ids" json:"offer_ids,omitempty"`
-	Filters          *Filters    `protobuf:"bytes,3,opt,name=filters" json:"filters,omitempty"`
-	XXX_unrecognized []byte      `json:"-"`
-}
-
-func (m *Call_Launch) Reset()         { *m = Call_Launch{} }
-func (m *Call_Launch) String() string { return proto.CompactTextString(m) }
-func (*Call_Launch) ProtoMessage()    {}
-
-func (m *Call_Launch) GetTaskInfos() []*TaskInfo {
-	if m != nil {
-		return m.TaskInfos
-	}
-	return nil
-}
-
-func (m *Call_Launch) GetOfferIds() []*OfferID {
-	if m != nil {
-		return m.OfferIds
-	}
-	return nil
-}
-
-func (m *Call_Launch) GetFilters() *Filters {
-	if m != nil {
-		return m.Filters
-	}
-	return nil
-}
-
+// Kills a specific task. If the scheduler has a custom executor,
+// the kill is forwarded to the executor and it is up to the
+// executor to kill the task and send a TASK_KILLED (or TASK_FAILED)
+// update. Note that Mesos releases the resources for a task once it
+// receives a terminal update (See TaskState in mesos.proto) for it.
+// If the task is unknown to the master, a TASK_LOST update is
+// generated.
 type Call_Kill struct {
-	TaskId           *TaskID `protobuf:"bytes,1,req,name=task_id" json:"task_id,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	TaskId           *TaskID  `protobuf:"bytes,1,req,name=task_id" json:"task_id,omitempty"`
+	SlaveId          *SlaveID `protobuf:"bytes,2,opt,name=slave_id" json:"slave_id,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
 }
 
 func (m *Call_Kill) Reset()         { *m = Call_Kill{} }
@@ -580,6 +639,49 @@ func (m *Call_Kill) GetTaskId() *TaskID {
 	return nil
 }
 
+func (m *Call_Kill) GetSlaveId() *SlaveID {
+	if m != nil {
+		return m.SlaveId
+	}
+	return nil
+}
+
+// Shuts down a custom executor. When the executor gets a shutdown
+// event, it is expected to kill all its tasks (and send TASK_KILLED
+// updates) and terminate. If the executor doesn’t terminate within
+// a certain timeout (configurable via
+// '--executor_shutdown_grace_period' slave flag), the slave will
+// forcefully destroy the container (executor and its tasks) and
+// transition its active tasks to TASK_LOST.
+type Call_Shutdown struct {
+	ExecutorId       *ExecutorID `protobuf:"bytes,1,req,name=executor_id" json:"executor_id,omitempty"`
+	SlaveId          *SlaveID    `protobuf:"bytes,2,req,name=slave_id" json:"slave_id,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *Call_Shutdown) Reset()         { *m = Call_Shutdown{} }
+func (m *Call_Shutdown) String() string { return proto.CompactTextString(m) }
+func (*Call_Shutdown) ProtoMessage()    {}
+
+func (m *Call_Shutdown) GetExecutorId() *ExecutorID {
+	if m != nil {
+		return m.ExecutorId
+	}
+	return nil
+}
+
+func (m *Call_Shutdown) GetSlaveId() *SlaveID {
+	if m != nil {
+		return m.SlaveId
+	}
+	return nil
+}
+
+// Acknowledges the receipt of status update. Schedulers are
+// responsible for explicitly acknowledging the receipt of status
+// updates that have 'Update.status().uuid()' field set. Such status
+// updates are retried by the slave until they are acknowledged by
+// the scheduler.
 type Call_Acknowledge struct {
 	SlaveId          *SlaveID `protobuf:"bytes,1,req,name=slave_id" json:"slave_id,omitempty"`
 	TaskId           *TaskID  `protobuf:"bytes,2,req,name=task_id" json:"task_id,omitempty"`
@@ -612,30 +714,56 @@ func (m *Call_Acknowledge) GetUuid() []byte {
 	return nil
 }
 
-// Allows the framework to query the status for non-terminal tasks.
+// Allows the scheduler to query the status for non-terminal tasks.
 // This causes the master to send back the latest task status for
-// each task in 'statuses', if possible. Tasks that are no longer
-// known will result in a TASK_LOST update. If statuses is empty,
-// then the master will send the latest status for each task
-// currently known.
-// TODO(bmahler): Add a guiding document for reconciliation or
-// document reconciliation in-depth here.
+// each task in 'tasks', if possible. Tasks that are no longer known
+// will result in a TASK_LOST update. If 'statuses' is empty, then
+// the master will send the latest status for each task currently
+// known.
 type Call_Reconcile struct {
-	Statuses         []*TaskStatus `protobuf:"bytes,1,rep,name=statuses" json:"statuses,omitempty"`
-	XXX_unrecognized []byte        `json:"-"`
+	Tasks            []*Call_Reconcile_Task `protobuf:"bytes,1,rep,name=tasks" json:"tasks,omitempty"`
+	XXX_unrecognized []byte                 `json:"-"`
 }
 
 func (m *Call_Reconcile) Reset()         { *m = Call_Reconcile{} }
 func (m *Call_Reconcile) String() string { return proto.CompactTextString(m) }
 func (*Call_Reconcile) ProtoMessage()    {}
 
-func (m *Call_Reconcile) GetStatuses() []*TaskStatus {
+func (m *Call_Reconcile) GetTasks() []*Call_Reconcile_Task {
 	if m != nil {
-		return m.Statuses
+		return m.Tasks
 	}
 	return nil
 }
 
+// TODO(vinod): Support arbitrary queries than just state of tasks.
+type Call_Reconcile_Task struct {
+	TaskId           *TaskID  `protobuf:"bytes,1,req,name=task_id" json:"task_id,omitempty"`
+	SlaveId          *SlaveID `protobuf:"bytes,2,opt,name=slave_id" json:"slave_id,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *Call_Reconcile_Task) Reset()         { *m = Call_Reconcile_Task{} }
+func (m *Call_Reconcile_Task) String() string { return proto.CompactTextString(m) }
+func (*Call_Reconcile_Task) ProtoMessage()    {}
+
+func (m *Call_Reconcile_Task) GetTaskId() *TaskID {
+	if m != nil {
+		return m.TaskId
+	}
+	return nil
+}
+
+func (m *Call_Reconcile_Task) GetSlaveId() *SlaveID {
+	if m != nil {
+		return m.SlaveId
+	}
+	return nil
+}
+
+// Sends arbitrary binary data to the executor. Note that Mesos
+// neither interprets this data nor makes any guarantees about the
+// delivery of this message to the executor.
 type Call_Message struct {
 	SlaveId          *SlaveID    `protobuf:"bytes,1,req,name=slave_id" json:"slave_id,omitempty"`
 	ExecutorId       *ExecutorID `protobuf:"bytes,2,req,name=executor_id" json:"executor_id,omitempty"`

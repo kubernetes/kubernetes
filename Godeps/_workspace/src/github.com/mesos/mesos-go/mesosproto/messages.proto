@@ -54,15 +54,14 @@ message Task {
   // NOTE: Either both the fields must be set or both must be unset.
   optional TaskState status_update_state = 9;
   optional bytes status_update_uuid = 10;
-}
 
+  optional Labels labels = 11;
 
-// Describes a role, which are used to group frameworks for allocation
-// decisions, depending on the allocation policy being used.
-// The weight field can be used to indicate forms of priority.
-message RoleInfo {
-  required string name = 1;
-  optional double weight = 2 [default = 1];
+  // Service discovery information for the task. It is not interpreted
+  // or acted upon by Mesos. It is up to a service discovery system
+  // to use this information as needed and to handle tasks without
+  // service discovery information.
+  optional DiscoveryInfo discovery = 12;
 }
 
 
@@ -73,7 +72,11 @@ message StatusUpdate {
   optional SlaveID slave_id = 3;
   required TaskStatus status = 4;
   required double timestamp = 5;
-  required bytes uuid = 6;
+
+  // This is being deprecated in favor of TaskStatus.uuid. In 0.23.0,
+  // we set the TaskStatus 'uuid' in the executor driver for all
+  // retryable status updates.
+  optional bytes uuid = 6;
 
   // This corresponds to the latest state of the task according to the
   // slave. Note that this state might be different than the state in
@@ -188,7 +191,8 @@ message ReviveOffersMessage {
 
 
 message RunTaskMessage {
-  required FrameworkID framework_id = 1;
+  // TODO(karya): Remove framework_id after MESOS-2559 has shipped.
+  optional FrameworkID framework_id = 1 [deprecated = true];
   required FrameworkInfo framework = 2;
   required string pid = 3;
   required TaskInfo task = 4;
@@ -244,6 +248,11 @@ message FrameworkErrorMessage {
 message RegisterSlaveMessage {
   required SlaveInfo slave = 1;
 
+  // Resources that are checkpointed by the slave (e.g., persistent
+  // volume or dynamic reservation). Frameworks need to release
+  // checkpointed resources explicitly.
+  repeated Resource checkpointed_resources = 3;
+
   // NOTE: This is a hack for the master to detect the slave's
   // version. If unset the slave is < 0.21.0.
   // TODO(bmahler): Do proper versioning: MESOS-986.
@@ -252,11 +261,13 @@ message RegisterSlaveMessage {
 
 
 message ReregisterSlaveMessage {
-  // TODO(bmahler): slave_id is deprecated.
-  // 0.21.0: Now an optional field. Always written, never read.
-  // 0.22.0: Remove this field.
-  optional SlaveID slave_id = 1;
   required SlaveInfo slave = 2;
+
+  // Resources that are checkpointed by the slave (e.g., persistent
+  // volume or dynamic reservation). Frameworks need to release
+  // checkpointed resources explicitly.
+  repeated Resource checkpointed_resources = 7;
+
   repeated ExecutorInfo executor_infos = 4;
   repeated Task tasks = 3;
   repeated Archive.Framework completed_frameworks = 5;
@@ -270,6 +281,7 @@ message ReregisterSlaveMessage {
 
 message SlaveRegisteredMessage {
   required SlaveID slave_id = 1;
+  optional MasterSlaveConnection connection = 2;
 }
 
 
@@ -277,11 +289,20 @@ message SlaveReregisteredMessage {
   required SlaveID slave_id = 1;
 
   repeated ReconcileTasksMessage reconciliations = 2;
+  optional MasterSlaveConnection connection = 3;
 }
 
 
 message UnregisterSlaveMessage {
   required SlaveID slave_id = 1;
+}
+
+
+message MasterSlaveConnection {
+  // Product of max_slave_ping_timeouts * slave_ping_timeout.
+  // If no pings are received within the total timeout,
+  // the master will remove the slave.
+  optional double total_ping_timeout_seconds = 1;
 }
 
 
@@ -303,14 +324,36 @@ message ShutdownFrameworkMessage {
 }
 
 
-// Tells the executor to initiate a shut down by invoking
-// Executor::shutdown.
-message ShutdownExecutorMessage {}
+// Tells a slave (and consequently executor) to shutdown an executor.
+message ShutdownExecutorMessage {
+  // TODO(vinod): Make these fields required. These are made optional
+  // for backwards compatibility between 0.23.0 slave and pre 0.23.0
+  // executor driver.
+  optional ExecutorID executor_id = 1;
+  optional FrameworkID framework_id = 2;
+}
 
 
 message UpdateFrameworkMessage {
   required FrameworkID framework_id = 1;
   required string pid = 2;
+}
+
+
+// This message is sent to the slave whenever there is an update of
+// the resources that need to be checkpointed (e.g., persistent volume
+// or dynamic reservation).
+message CheckpointResourcesMessage {
+  repeated Resource resources = 1;
+}
+
+
+// This message is sent by the slave to the master to inform the
+// master about the total amount of oversubscribed (allocated and
+// allocatable) resources.
+message UpdateSlaveMessage {
+  required SlaveID slave_id = 1;
+  repeated Resource oversubscribed_resources = 2;
 }
 
 
@@ -361,38 +404,6 @@ message ShutdownMessage {
 }
 
 
-message AuthenticateMessage {
-  required string pid = 1; // PID that needs to be authenticated.
-}
-
-
-message AuthenticationMechanismsMessage {
-  repeated string mechanisms = 1; // List of available SASL mechanisms.
-}
-
-
-message AuthenticationStartMessage {
-  required string mechanism = 1;
-  optional string data = 2;
-}
-
-
-message AuthenticationStepMessage {
-  required bytes data = 1;
-}
-
-
-message AuthenticationCompletedMessage {}
-
-
-message AuthenticationFailedMessage {}
-
-
-message AuthenticationErrorMessage {
-  optional string error = 1;
-}
-
-
 // TODO(adam-mesos): Move this to an 'archive' package.
 /**
  * Describes Completed Frameworks, etc. for archival.
@@ -426,28 +437,9 @@ message TaskHealthStatus {
 }
 
 
-// Collection of Modules.
-message Modules {
-  message Library {
-    // If "file" contains a slash ("/"), then it is interpreted as a
-    // (relative or absolute) pathname.  Otherwise a standard library
-    // search is performed.
-    optional string file = 1;
-
-    // We will add the proper prefix ("lib") and suffix (".so" for
-    // Linux and ".dylib" for OS X) to the "name".
-    optional string name = 2;
-
-    message Module {
-      // Module name.
-      optional string name = 1;
-
-      // Module-specific parameters.
-      repeated Parameter parameters = 2;
-    }
-
-    repeated Module modules = 3;
-  }
-
-  repeated Library libraries = 1;
+/**
+ * Message to signal completion of an event within a module.
+ */
+message HookExecuted {
+  optional string module = 1;
 }
