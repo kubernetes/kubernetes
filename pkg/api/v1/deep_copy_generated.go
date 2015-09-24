@@ -2098,6 +2098,14 @@ func deepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 	} else {
 		out.ExternalIPs = nil
 	}
+	if in.DeprecatedPublicIPs != nil {
+		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
+		}
+	} else {
+		out.DeprecatedPublicIPs = nil
+	}
 	out.SessionAffinity = in.SessionAffinity
 	out.LoadBalancerIP = in.LoadBalancerIP
 	return nil
