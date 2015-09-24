@@ -1,4 +1,4 @@
-// +build integration,!no-etcd,!race
+// +build integration,!no-etcd
 
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
