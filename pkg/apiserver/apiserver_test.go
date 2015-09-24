@@ -194,7 +194,7 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	group := &APIGroupVersion{
 		Storage: storage,
 
-		Root: "/api",
+		Prefix: "/api",
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
@@ -2015,7 +2015,7 @@ func TestUpdateREST(t *testing.T) {
 	makeGroup := func(storage map[string]rest.Storage) *APIGroupVersion {
 		return &APIGroupVersion{
 			Storage:   storage,
-			Root:      "/api",
+			Prefix:    "/api",
 			Creater:   api.Scheme,
 			Convertor: api.Scheme,
 			Typer:     api.Scheme,
@@ -2080,7 +2080,7 @@ func TestUpdateREST(t *testing.T) {
 	// try to update a group that does not have an existing webservice with a matching prefix
 	// should not affect the existing registered webservice
 	invalidGroup := makeGroup(storage1)
-	invalidGroup.Root = "bad"
+	invalidGroup.Prefix = "bad"
 	if err := invalidGroup.UpdateREST(container); err == nil {
 		t.Fatal("expected an error from UpdateREST when updating a non-existing prefix but got none")
 	}
@@ -2096,7 +2096,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Storage: map[string]rest.Storage{
 			"simple/sub": storage,
 		},
-		Root:      "/api",
+		Prefix:    "/api",
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
@@ -2124,7 +2124,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple":     &SimpleRESTStorage{},
 			"simple/sub": storage,
 		},
-		Root:      "/api",
+		Prefix:    "/api",
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,

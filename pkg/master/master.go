@@ -573,7 +573,7 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
-	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
+	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(defaultVersion.Prefix, "/")), RestMapper: defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	// allGroups records all supported groups at /apis
@@ -608,7 +608,7 @@ func (m *Master) init(c *Config) {
 		}
 		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
 		allGroups = append(allGroups, group)
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Prefix, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
 
@@ -780,7 +780,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 
 func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
-		Root: m.apiPrefix,
+		Prefix: m.apiPrefix,
 
 		Mapper: latest.GroupOrDie("").RESTMapper,
 
@@ -926,14 +926,14 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := makeThirdPartyPath(group)
-
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root: apiRoot,
+		Prefix:  thirdpartyprefix,
+		Group:   group,
+		Version: version,
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
 		Convertor: api.Scheme,
@@ -943,7 +943,6 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
 		Linker:        latest.GroupOrDie("experimental").SelfLinker,
 		Storage:       storage,
-		Version:       version,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Context: m.requestContextMapper,
@@ -986,7 +985,9 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root: m.apiGroupPrefix + "/" + latest.GroupOrDie("experimental").Group,
+		Prefix:  m.apiGroupPrefix,
+		Group:   latest.GroupOrDie("experimental").Group,
+		Version: latest.GroupOrDie("experimental").Version,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
@@ -996,7 +997,6 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Codec:   latest.GroupOrDie("experimental").Codec,
 		Linker:  latest.GroupOrDie("experimental").SelfLinker,
 		Storage: storage,
-		Version: latest.GroupOrDie("experimental").Version,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

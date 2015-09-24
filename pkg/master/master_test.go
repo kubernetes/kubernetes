@@ -272,7 +272,7 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 
 	apiGroup := master.defaultAPIGroupVersion()
 
-	assert.Equal(apiGroup.Root, master.apiPrefix)
+	assert.Equal(apiGroup.Prefix, master.apiPrefix)
 	assert.Equal(apiGroup.Admit, master.admissionControl)
 	assert.Equal(apiGroup.Context, master.requestContextMapper)
 	assert.Equal(apiGroup.MinRequestTimeout, master.minRequestTimeout)
@@ -289,11 +289,12 @@ func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
 	expAPIGroup := master.experimental(&config)
-	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix+"/"+latest.GroupOrDie("experimental").Group)
+	assert.Equal(expAPIGroup.Prefix, master.apiGroupPrefix)
+	assert.Equal(expAPIGroup.Group, latest.GroupOrDie("experimental").Group)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
