@@ -220,6 +220,15 @@ func ValidatePositiveField(value int64, fieldName string) errs.ValidationErrorLi
 	return allErrs
 }
 
+// Validates that a Quantity is not negative
+func ValidatePositiveQuantity(value resource.Quantity, fieldName string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if value.Cmp(resource.Quantity{}) < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, value.String(), isNegativeErrorMsg))
+	}
+	return allErrs
+}
+
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
@@ -1701,14 +1710,17 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&resourceQuota.ObjectMeta, true, ValidateResourceQuotaName).Prefix("metadata")...)
 
-	for k := range resourceQuota.Spec.Hard {
+	for k, v := range resourceQuota.Spec.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
 	}
-	for k := range resourceQuota.Status.Hard {
+	for k, v := range resourceQuota.Status.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
 	}
-	for k := range resourceQuota.Status.Used {
+	for k, v := range resourceQuota.Status.Used {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
 	}
 	return allErrs
 }
