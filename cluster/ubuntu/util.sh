@@ -140,6 +140,8 @@ function verify-master(){
   printf "Validating master"
   local -a required_daemon=("kube-apiserver" "kube-controller-manager" "kube-scheduler")
   local validated="1"
+  local try_count=1
+  local max_try_count=30
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
@@ -147,6 +149,11 @@ function verify-master(){
       ssh $SSH_OPTS "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
         printf "."
         validated="1"
+        ((try_count=try_count+1))
+        if [[ ${try_count} -gt ${max_try_count} ]]; then
+          printf "\nWarning: Process \"${daemon}\" failed to run on ${MASTER}, please check.\n"
+          exit 1
+        fi
         sleep 2
       }
     done
@@ -160,6 +167,8 @@ function verify-node(){
   printf "Validating ${1}"
   local -a required_daemon=("kube-proxy" "kubelet" "docker")
   local validated="1"
+  local try_count=1
+  local max_try_count=30
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
@@ -167,6 +176,11 @@ function verify-node(){
       ssh $SSH_OPTS "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
         printf "."
         validated="1"
+        ((try_count=try_count+1))
+        if [[ ${try_count} -gt ${max_try_count} ]]; then
+          printf "\nWarning: Process \"${daemon}\" failed to run on ${1}, please check.\n"
+          exit 1
+        fi
         sleep 2
       }
     done
