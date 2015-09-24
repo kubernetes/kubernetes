@@ -53,7 +53,7 @@ var _ = Describe("Load capacity", func() {
 	var nodeCount int
 	var ns string
 	var configs []*RCConfig
-	framework := Framework{BaseName: "density"}
+	framework := Framework{BaseName: "load", NamespaceDeletionTimeout: time.Hour}
 
 	BeforeEach(func() {
 		framework.beforeEach()

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -53,7 +54,7 @@ var _ = Describe("hostPath", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
-		if err := deleteNS(c, namespace.Name); err != nil {
+		if err := deleteNS(c, namespace.Name, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})
