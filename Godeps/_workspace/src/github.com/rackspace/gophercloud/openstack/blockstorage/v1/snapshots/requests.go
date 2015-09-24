@@ -171,3 +171,36 @@ func UpdateMetadata(client *gophercloud.ServiceClient, id string, opts UpdateMet
 	})
 	return res
 }
+
+// IDFromName is a convienience function that returns a snapshot's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	snapshotCount := 0
+	snapshotID := ""
+	if name == "" {
+		return "", fmt.Errorf("A snapshot name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		snapshotList, err := ExtractSnapshots(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range snapshotList {
+			if s.Name == name {
+				snapshotCount++
+				snapshotID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch snapshotCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find snapshot: %s", name)
+	case 1:
+		return snapshotID, nil
+	default:
+		return "", fmt.Errorf("Found %d snapshots matching %s", snapshotCount, name)
+	}
+}

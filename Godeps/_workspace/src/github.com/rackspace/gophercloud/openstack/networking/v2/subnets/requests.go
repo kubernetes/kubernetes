@@ -1,6 +1,8 @@
 package subnets
 
 import (
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -200,10 +202,10 @@ func (opts UpdateOpts) ToSubnetUpdateMap() (map[string]interface{}, error) {
 	if opts.GatewayIP != "" {
 		s["gateway_ip"] = opts.GatewayIP
 	}
-	if len(opts.DNSNameservers) != 0 {
+	if opts.DNSNameservers != nil {
 		s["dns_nameservers"] = opts.DNSNameservers
 	}
-	if len(opts.HostRoutes) != 0 {
+	if opts.HostRoutes != nil {
 		s["host_routes"] = opts.HostRoutes
 	}
 
@@ -233,4 +235,37 @@ func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
 	_, res.Err = c.Delete(deleteURL(c, id), nil)
 	return res
+}
+
+// IDFromName is a convenience function that returns a subnet's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	subnetCount := 0
+	subnetID := ""
+	if name == "" {
+		return "", fmt.Errorf("A subnet name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		subnetList, err := ExtractSubnets(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range subnetList {
+			if s.Name == name {
+				subnetCount++
+				subnetID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch subnetCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find subnet: %s", name)
+	case 1:
+		return subnetID, nil
+	default:
+		return "", fmt.Errorf("Found %d subnets matching %s", subnetCount, name)
+	}
 }
