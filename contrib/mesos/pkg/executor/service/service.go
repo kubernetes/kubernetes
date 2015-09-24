@@ -235,6 +235,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		ResolverConfig:            s.ResolverConfig,
 		CPUCFSQuota:               s.CPUCFSQuota,
 		Writer:                    writer,
+		MaxOpenFiles:              s.MaxOpenFiles,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
