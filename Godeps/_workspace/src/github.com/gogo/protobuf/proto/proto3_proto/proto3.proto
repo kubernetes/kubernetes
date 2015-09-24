@@ -1,5 +1,7 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Go support for Protocol Buffers - Google's data interchange format
+//
+// Copyright 2014 The Go Authors.  All rights reserved.
+// https://github.com/golang/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -11,6 +13,9 @@
 // copyright notice, this list of conditions and the following disclaimer
 // in the documentation and/or other materials provided with the
 // distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -24,41 +29,40 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package proto
+syntax = "proto3";
 
-import (
-	"fmt"
-	"os"
-	"reflect"
-)
+package proto3_proto;
 
-func (p *Properties) setCustomEncAndDec(typ reflect.Type) {
-	p.ctype = typ
-	if p.Repeated {
-		p.enc = (*Buffer).enc_custom_slice_bytes
-		p.dec = (*Buffer).dec_custom_slice_bytes
-		p.size = size_custom_slice_bytes
-	} else if typ.Kind() == reflect.Ptr {
-		p.enc = (*Buffer).enc_custom_bytes
-		p.dec = (*Buffer).dec_custom_bytes
-		p.size = size_custom_bytes
-	} else {
-		p.enc = (*Buffer).enc_custom_ref_bytes
-		p.dec = (*Buffer).dec_custom_ref_bytes
-		p.size = size_custom_ref_bytes
-	}
+import "github.com/gogo/protobuf/proto/testdata/test.proto";
+
+message Message {
+  enum Humour {
+    UNKNOWN = 0;
+    PUNS = 1;
+    SLAPSTICK = 2;
+    BILL_BAILEY = 3;
+  }
+
+  string name = 1;
+  Humour hilarity = 2;
+  uint32 height_in_cm = 3;
+  bytes data = 4;
+  int64 result_count = 7;
+  bool true_scotsman = 8;
+  float score = 9;
+
+  repeated uint64 key = 5;
+  Nested nested = 6;
+
+  map<string, Nested> terrain = 10;
+  testdata.SubDefaults proto2_field = 11;
+  map<string, testdata.SubDefaults> proto2_value = 13;
 }
 
-func (p *Properties) setSliceOfNonPointerStructs(typ reflect.Type) {
-	t2 := typ.Elem()
-	p.sstype = typ
-	p.stype = t2
-	p.isMarshaler = isMarshaler(t2)
-	p.isUnmarshaler = isUnmarshaler(t2)
-	p.enc = (*Buffer).enc_slice_ref_struct_message
-	p.dec = (*Buffer).dec_slice_ref_struct_message
-	p.size = size_slice_ref_struct_message
-	if p.Wire != "bytes" {
-		fmt.Fprintf(os.Stderr, "proto: no ptr oenc for %T -> %T \n", typ, t2)
-	}
+message Nested {
+  string bunny = 1;
+}
+
+message MessageWithMap {
+  map<bool, bytes> byte_mapping = 1;
 }
