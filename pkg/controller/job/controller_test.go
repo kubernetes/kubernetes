@@ -29,8 +29,10 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -227,6 +229,15 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 		for _, pod := range newPodList(tc.unsuccessfulPods, api.PodFailed, job) {
 			manager.podStore.Store.Add(&pod)
+		}
+
+		// wait.ConditionFunc contract includes an error, so wrap and return nil
+		pollFn := func() (bool, error) {
+			return manager.podStoreSynced(), nil
+		}
+		if err := wait.Poll(replicationcontroller.PodStoreSyncedPollPeriod, replicationcontroller.PodStoreSyncedPollPeriod*10, pollFn); err != nil {
+			t.Errorf("pod store failed to sync: %v", err)
+			t.FailNow()
 		}
 
 		// run

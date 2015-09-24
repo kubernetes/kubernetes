@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -300,11 +301,15 @@ func (jm *JobController) syncJob(key string) error {
 	}
 	job := *obj.(*experimental.Job)
 	if !jm.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(replicationcontroller.PodStoreSyncedPollPeriod)
-		glog.V(4).Infof("Waiting for pods controller to sync, requeuing job %v", job.Name)
-		jm.enqueueController(&job)
-		return nil
+		// wait.ConditionFunc contract includes an error, so wrap and return nil
+		pollFn := func() (bool, error) {
+			return jm.podStoreSynced(), nil
+		}
+		if err := wait.Poll(replicationcontroller.PodStoreSyncedPollPeriod, replicationcontroller.PodStoreSyncedPollPeriod*10, pollFn); err != nil {
+			glog.Errorf("Error waiting for pod store sync: %v", err)
+			jm.enqueueController(&job)
+			return err
+		}
 	}
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
