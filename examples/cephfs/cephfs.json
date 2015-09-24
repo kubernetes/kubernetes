@@ -28,7 +28,7 @@
         						"10.16.154.83:6789"
     				 ],
                     "user": "admin",
-                    "scretFile": "/etc/ceph/admin.secret",
+                    "secretFile": "/etc/ceph/admin.secret",
                     "readOnly": true
                 }
             }
