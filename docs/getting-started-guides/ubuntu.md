@@ -36,12 +36,13 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes
 - [Introduction](#introduction)
 - [Prerequisites](#prerequisites)
 - [Starting a Cluster](#starting-a-cluster)
-    - [Download binaries](#download-binaries)
+    - [Set up working directory](#set-up-working-directory)
     - [Configure and start the kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
     - [Test it out](#test-it-out)
     - [Deploy addons](#deploy-addons)
     - [Trouble shooting](#trouble-shooting)
 - [Upgrading a Cluster](#upgrading-a-cluster)
+    - [Test it out](#test-it-out-ii)
 
 ## Introduction
 
@@ -55,41 +56,38 @@ work, which has been merge into this document.
 ## Prerequisites
 
 1. The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge.
-2. All machines can communicate with each other. Master node needs to connect the Internet to download the necessary files, while working nodes do not.
+2. All machines can communicate with each other. Master node needs to connect the Internet to download 
+the necessary files, while working nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
 Ubuntu 15 which use systemd instead of upstart. We are working around fixing this.
-4. Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.3, may work with higher versions.
+4. Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.6, may work with higher versions.
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
 
 ## Starting a Cluster
 
-### Download binaries
+### Set up working directory
 
-First clone the kubernetes github repo
+Clone the kubernetes github repo locally
 
 ``` console
 $ git clone https://github.com/kubernetes/kubernetes.git
 ```
 
-Then download all the needed binaries into given directory (cluster/ubuntu/binaries)
-
-``` console
-$ cd kubernetes/cluster/ubuntu
-$ ./build.sh
-```
+#### Configure and start the Kubernetes cluster
 
 You can customize your etcd version, flannel version, k8s version by changing corresponding variables
-`ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` in build.sh, by default etcd version is 2.0.12,
-flannel version is 0.4.0 and k8s version is 1.0.3.
+`ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` like following.
 
-Make sure that the involved binaries are located properly in the binaries/master
-or binaries/minion directory before you go ahead to the next step .
+```console
+$ export KUBE_VERSION=1.0.3
+$ export FLANNEL_VERSION=0.5.3
+$ export ETCD_VERSION=2.2.0
+```
+By default etcd version is 2.0.12, flannel version is 0.4.0 and k8s version is 1.0.6.
 
 Note that we use flannel here to set up overlay network, yet it's optional. Actually you can build up k8s
 cluster natively, or use flannel, Open vSwitch or any other SDN tool you like.
-
-#### Configure and start the Kubernetes cluster
 
 An example cluster is listed below:
 
@@ -99,7 +97,7 @@ An example cluster is listed below:
 |10.10.103.162|   node   |
 |10.10.103.250| both master and node|
 
-First configure the cluster information in cluster/ubuntu/config-default.sh, below is a simple sample.
+First configure the cluster information in cluster/ubuntu/config-default.sh, following is a simple sample.
 
 ```sh
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
@@ -113,7 +111,7 @@ export SERVICE_CLUSTER_IP_RANGE=192.168.3.0/24
 export FLANNEL_NET=172.16.0.0/16
 ```
 
-The first variable `nodes` defines all your cluster nodes, MASTER node comes first and
+The first variable `nodes` defines all your cluster nodes, master node comes first and
 separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
 
 Then the `role` variable defines the role of above machine in the same order, "ai" stands for machine
@@ -135,7 +133,9 @@ that conflicts with your own private network range.
 The `FLANNEL_NET` variable defines the IP range used for flannel overlay network,
 should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
 
-**Note:** When deploying, master needs to connect the Internet to download the necessary files. If your machines locate in a private network that need proxy setting to connect the Internet, you can set the config `PROXY_SETTING` in cluster/ubuntu/config-default.sh such as:
+**Note:** When deploying, master needs to connect the Internet to download the necessary files. 
+If your machines locate in a private network that need proxy setting to connect the Internet, 
+you can set the config `PROXY_SETTING` in cluster/ubuntu/config-default.sh such as:
 
      PROXY_SETTING="http_proxy=http://server:port https_proxy=https://server:port"
 
@@ -143,16 +143,16 @@ After all the above variables being set correctly, we can use following command 
 
 `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh`
 
-The scripts automatically scp binaries and config files to all the machines and start the k8s service on them.
+The scripts automatically scp binaries and config files to all the machines and start k8s service on them.
 The only thing you need to do is to type the sudo password when promoted.
 
 ```console
 Deploying minion on machine 10.10.103.223
 ...
-[sudo] password to copy files and start minion: 
+[sudo] password to start minion: 
 ```
 
-If all things goes right, you will see the below message from console indicating the k8s is up.
+If everything works expectedly, you will see the following message from console indicating the k8s cluster is up.
 
 ```console
 Cluster validation succeeded
@@ -250,17 +250,20 @@ the latter one could start it again.
 4. You can also customize your own settings in `/etc/default/{component_name}`.
 
 
-### Upgrading a Cluster
+## Upgrading a Cluster
 
 If you already have a kubernetes cluster, and want to upgrade to a new version,
-you can use following command in cluster/ directory to update the whole cluster or a specified node to a new version.
+you can use following command in cluster/ directory to update the whole cluster 
+or a specified node to a new version.
 
 ```console
 $ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh [-m|-n <node id>] <version>
 ```
 
 It can be done for all components (by default), master(`-m`) or specified node(`-n`).
-If the version is not specified, the script will try to use local binaries.You should ensure all the binaries are well prepared in path `cluster/ubuntu/binaries`.
+Upgrading single node is experimental now.
+If the version is not specified, the script will try to use local binaries. You should ensure all 
+the binaries are well prepared in the expected directory path cluster/ubuntu/binaries.
 
 ```console
 $ tree cluster/ubuntu/binaries
@@ -279,21 +282,29 @@ binaries/
     └── kube-proxy
 ```
 
-Upgrading single node is experimental now. You can use following command to get a help.
+You can use following command to get a help.
 
 ```console
 $ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -h
 ```
 
-Some examples are as follows:
+Here are some examples:
 
 * upgrade master to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -m 1.0.5`
 * upgrade node 10.10.103.223 to version 1.0.5 : `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -n 10.10.103.223 1.0.5`
 * upgrade master and all nodes to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh 1.0.5`
 
 The script will not delete any resources of your cluster, it just replaces the binaries.
-You can use `kubectl` command to check if the newly upgraded k8s is working correctly.
-For example, use `$ kubectl get nodes` to see if all of your nodes are ready.Or refer to [test-it-out](ubuntu.md#test-it-out)
+
+### Test it out
+
+You can use `kubectl` command to check if the newly upgraded k8s is working correctly. See 
+also [test-it-out](ubuntu.md#test-it-out)
+
+To make sure the version of upgraded cluster is expected, you will find these commands helpful.
+* upgrade all components or master: `$ kubectl version`. Check the *Server Version*.
+* upgrade node 10.10.102.223: `$ ssh -t vcap@10.10.102.223 'cd /opt/bin && sudo ./kubelet --version'`
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu.md?pixel)]()
