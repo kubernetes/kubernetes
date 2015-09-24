@@ -2819,10 +2819,6 @@ func autoconvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Ser
 	return nil
 }
 
-func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
-	return autoconvert_api_ServiceSpec_To_v1_ServiceSpec(in, out, s)
-}
-
 func autoconvert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceStatus))(in)
@@ -5798,13 +5794,10 @@ func autoconvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Ser
 	} else {
 		out.ExternalIPs = nil
 	}
+	// in.DeprecatedPublicIPs has no peer in out
 	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
 	out.LoadBalancerIP = in.LoadBalancerIP
 	return nil
-}
-
-func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
-	return autoconvert_v1_ServiceSpec_To_api_ServiceSpec(in, out, s)
 }
 
 func autoconvert_v1_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.ServiceStatus, s conversion.Scope) error {
