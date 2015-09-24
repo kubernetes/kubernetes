@@ -60,9 +60,10 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup
-#   influxdb - Heapster, InfluxDB, and Grafana
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
+#   none       - No cluster monitoring setup
+#   influxdb   - Heapster, InfluxDB, and Grafana
+#   standalone - Heapster.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"

@@ -29,7 +29,6 @@ spec:
           command:
             - /heapster
             - --source=kubernetes:''
-            - --sink=gcm
             - --sink=gcmautoscaling
             - --sink=gcl
             - --sink_frequency=2m

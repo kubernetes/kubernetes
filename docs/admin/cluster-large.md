@@ -82,7 +82,7 @@ These limits, however, are based on data collected from addons running on 4-node
 
 To avoid running into cluster addon resource issues, when creating a cluster with many nodes, consider the following:
 * Scale memory and CPU limits for each of the following addons, if used, along with the size of cluster (there is one replica of each handling the entire cluster so memory and CPU usage tends to grow proportionally with size/load on cluster):
-  * Heapster ([GCM/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/google/heapster-controller.yaml), [InfluxDB backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/heapster-controller.yaml), [InfluxDB/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/googleinfluxdb/heapster-controller-combined.yaml), [standalone](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/standalone/heapster-controller.yaml))
+  * Heapster ([Auto Scaling/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/google/heapster-controller.yaml), [InfluxDB backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/heapster-controller.yaml), [InfluxDB/Auto Scaling backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/googleinfluxdb/heapster-controller-combined.yaml), [standalone](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/standalone/heapster-controller.yaml))
   * [InfluxDB and Grafana](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml)
   * [skydns, kube2sky, and dns etcd](http://releases.k8s.io/HEAD/cluster/addons/dns/skydns-rc.yaml.in)
   * [Kibana](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml)
@@ -94,6 +94,20 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
 
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.md#troubleshooting).
 
+### Monitoring
+
+[Heapster](https://github.com/kubernetes/heapster) provides monitoring for Kubernetes cluster.
+Heapster supports multiple timeseries storage backends. Refer to heapster repo for more information.
+On GCE, Heapster is set to run with Google Cloud Logging and auto scaling backends turned on.
+
+On all other deployments, it is recommended to run Heapster in [standalone](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/standalone/heapster-controller.yaml) mode.
+
+We maintain an [InfluxDB & Grafana](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/heapster-controller.yaml) backend for Heapster.
+To enable long term storage of cluster compute resource usage metrics, it is recommended to run heapster with the InfluxDB backend (or some other heapster supported backend).
+Before running heapster with InfluxDB backend, update the [influxDB config](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml) to use [persistent volumes](../user-guide/persistent-volumes.md) instead of `empty directory` in the `volumes` section, and install InfluxDB and Grafana.
+
+[Kubedash](https://github.com/kubernetes/kubedash) provides an easy to use introspection UI that is powered by Heapster.
+Follow the instruction in kubedash repo to install Kubedash after running Heapster.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-large.md?pixel)]()

@@ -36,11 +36,16 @@ spec:
             mountPath: /data
         - image: grafana/grafana:2.1.0
           name: grafana
+          volumeMounts:
+            - name: grafana-persistent-storage
+              mountPath: /var/lib/grafana
           resources:
             limits:
               cpu: 100m
               memory: 100Mi
       volumes:
       - name: influxdb-persistent-storage
+        emptyDir: {}
+      - name: grafana-persistent-storage
         emptyDir: {}
 
