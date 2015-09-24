@@ -291,11 +291,11 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 			GenerateName: prefix,
 		},
 	}
-	if len(nodeName) != 0 {
-		pod.Spec.NodeName = nodeName
-	}
 	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
 		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
 	}
 	if labels.Set(pod.Labels).AsSelector().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
