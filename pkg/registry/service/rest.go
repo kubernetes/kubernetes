@@ -295,6 +295,9 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 	// Find a Subset that has the port.
 	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
 		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		if len(ss.Addresses) == 0 {
+			continue
+		}
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == portStr {
 				// Pick a random address.
