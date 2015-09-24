@@ -27,9 +27,9 @@ import (
 
 const (
 	// A PV created specifically for one claim must contain this annotation in order to bind to the claim.
-	// The value must be the name of the claim being bound to.
+	// The value must be the namespace and name of the claim being bound to (i.e, claim.Namespace/claim.Name)
 	// This is an experimental feature and likely to change in the future.
-	createdForKey = "persistent-volume-provisioning.experimental.kubernetes.io/created-for"
+	createdForKey = "volume.experimental.kubernetes.io/provisioned-for"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes indexed by AccessModes and ordered by storage capacity.
@@ -115,10 +115,9 @@ func (pvIndex *persistentVolumeOrderedIndex) Find(searchPV *api.PersistentVolume
 				if createdFor != searchPV.Annotations[createdForKey] {
 					// the volume is pre-bound and does not match the search criteria.
 					continue
-				} else {
-					// exact annotation match! No search required.
-					return volume, nil
 				}
+				// exact annotation match! No search required.
+				return volume, nil
 			}
 
 			// volume isn't currently bound or pre-bound.
