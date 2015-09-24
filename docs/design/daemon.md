@@ -28,15 +28,15 @@ The DaemonSet supports standard API features:
 - create
   - The spec for DaemonSets has a pod template field.
   - Using the pod’s nodeSelector field, DaemonSets can be restricted to operate over nodes that have a certain label. For example, suppose that in a cluster some nodes are labeled ‘app=database’. You can use a DaemonSet to launch a datastore pod on exactly those nodes labeled ‘app=database’.
-  - Using the pod's node name field, DaemonSets can be restricted to operate on a specified nodeName.
-  - The PodTemplateSpec used by the DaemonSet is the same as the PodTemplateSpec usedby the Replication Controller.
-  - We will not guarantee that daemon pods show up on nodes before regular pods - run ordering is out of scope for this abstraction in the initial implementation.
-  - The initial implementation of DaemonSet does not guarantee that Daemon pods show up on nodes (for example because of resource limitations of the node), but makes a best effort to launch Daemon pods (like Replication Controllers do with pods). Subsequent revisions might ensure that Daemon pods show up on nodes, preempting other pods if necessary.
+  - Using the pod's nodeName field, DaemonSets can be restricted to operate on a specified node.
+  - The PodTemplateSpec used by the DaemonSet is the same as the PodTemplateSpec used by the Replication Controller.
+  - The initial implementation will not guarnatee that DaemonSet pods are created on nodes before other pods.
+  - The initial implementation of DaemonSet does not guarantee that DaemonSet pods show up on nodes (for example because of resource limitations of the node), but makes a best effort to launch DaemonSet pods (like Replication Controllers do with pods). Subsequent revisions might ensure that DaemonSet pods show up on nodes, preempting other pods if necessary.
   - The DaemonSet controller adds an annotation "kubernetes.io/created-by: \<json API object reference\>"
   - YAML example:
 ```YAML
   apiVersion: v1
-  kind: Daemon
+  kind: DaemonSet
   metadata:
     labels:
       app: datastore
@@ -62,36 +62,28 @@ The DaemonSet supports standard API features:
   - Modifiers
     - delete (if --cascade=true, then first the client turns down all the pods controlled by the DaemonSet (by setting the nodeName to a non-existant name); then it deletes the DaemonSet; then it deletes the pods)
     - label
-    - update (only allowed to selector and to nodeSelector and nodeName of pod template)
-    - DaemonSets have labels, so you could, for example, list all DaemonSets with a certain label (the same way you would for a Replication Controller).
+	- annotate
+    - update operations like patch and replace (only allowed to selector and to nodeSelector and nodeName of pod template)
+    - DaemonSets have labels, so you could, for example, list all DaemonSets with certain labels (the same way you would for a Replication Controller).
   - In general, for all the supported features like get, describe, update, etc, the DaemonSet works in a similar way to the Replication Controller. However, note that the DaemonSet and the Replication Controller are different constructs.
 
 ### Persisting Pods
-  - Ordinary livenes probes specified in the pod template work to keep pods created by a DaemonSet running.
+  - Ordinary liveness probes specified in the pod template work to keep pods created by a DaemonSet running.
   - If a daemon pod is killed or stopped, the DaemonSet will create a new replica of the daemon pod on the node.
 
 ### Cluster Mutations
-  - When a new node is added to the cluster the DaemonSet starts the daemon on the node (if the node’s labels match the user-specified selectors).
+  - When a new node is added to the cluster, the DaemonSet controller starts daemon pods on the node for DaemonSets whose pod template nodeSelectors match the node’s labels.
   - Suppose the user launches a DaemonSet that runs a logging daemon on all nodes labeled “logger=fluentd”. If the user then adds the “logger=fluentd” label to a node (that did not initially have the label), the logging daemon will launch on the node. Additionally, if a user removes the label from a node, the logging daemon on that node will be killed.
 
 ## Alternatives Considered
 
-An alternative way to launch daemons is to avoid going through the API server, and instead provide ways to package the daemon into the node. For example, users could:
+We considered several alternatives, that were deemed inferior to the approach of creating a new DaemonSet abstraction.
 
-1. Include the daemon in the machine image
-2. Use static pod manifests to launch daemon pods when the node initializes
+One alternative is to include the daemon in the machine image. In this case it would run outside of Kubernetes proper, and thus not be monitored, health checked, usable as a service endpoint, easily upgradable, etc.
 
-These alternatives don’t work as well because the daemons won’t be well integrated into Kubernetes. In particular,
+A related alternative is to package daemons as static pods. This would address most of the problems described above, but they would still not be easily upgradable, and more generally could not be managed through the API server interface.
 
-1. In alternatives (1) and (2), health checking for the daemons would need to be re-implemented, or would not exist at all (because the daemons are not run inside pods). In the current proposal, the Kubelet will health-check daemon pods and restart them if necessary.
-2. In alternatives (1) and (2), binding services to a group of daemons is difficult (which is needed in use cases such as the sharded data store use case described above), because the daemons are not run inside pods
-3. A big disadvantage of these methods is that adding new daemons in existing nodes is difficult (for example, if a cluster manager wants to add a logging daemon after a cluster has been deployed).
-4. The above alternatives are less user-friendly. Users need to learn two ways of launching pods: using the API when launching pods associated with Replication Controllers, and using manifests when launching daemons. So in the alternatives, deployment is more difficult.
-5. It’s difficult to upgrade binaries launched in any of those three ways.
-
-Another alternative is for the user to explicitly assign pods to specific nodes (using the Pod spec) when creating pods. A big disadvantage of this alternative is that the user would need to manually check whether new nodes satisfy the desired labels, and if so add the daemon to the node. This makes deployment painful, and could lead to costly mistakes (if a certain daemon is not launched on a new node which it is supposed to run on). In essence, every user will be re-implementing the DaemonSet for themselves.
-
-A third alternative is to generalize the Replication Controller. We could add a field for the user to specify that she wishes to bind pods to certain nodes in the cluster. Or we could add a field to the pod-spec allowing the user to specify that each node can have exactly one instance of a pod (so the user would create a Replication Controller with a very large number of replicas, and set the anti-affinity field to true preventing more than one pod with that label from being scheduled onto a single node). The disadvantage of these methods is that the DaemonSet and the Replication Controller are very different concepts. The DaemonSet operates on a per-node basis, while the Replication Controller operates on a per-job basis (in particular, the DaemonSet will take action when a node is changed or added). So presenting them as different concepts makes for a better user interface. Having small and directed controllers for distinct purposes makes Kubernetes easier to understand and use, compared to having one controller to rule them all (see ["Convert ReplicationController to a plugin"](http://issues.k8s.io/3058)).
+A third alternative is to generalize the Replication Controller. We would do something like: if you set the `replicas` field of the ReplicationConrollerSpec to -1, then it means "run exactly one replica on every node matching the nodeSelector in the pod template." The ReplicationController would pretend `replicas` had been set to some large number -- larger than the largest number of nodes ever expected in the cluster -- and would use some anti-affinity mechanism to ensure that no more than one Pod from the ReplicationController runs on any given node. There are two downsides to this approach. First, there would always be a large number of Pending pods in the scheduler (these will be scheduled onto new machines when they are added to the cluster). The second downside is more philosophical: DaemonSet and the Replication Controller are very different concepts. We believe that having small, targeted controllers for distinct purposes makes Kubernetes easier to understand and use, compared to having larger multi-functional controllers (see ["Convert ReplicationController to a plugin"](http://issues.k8s.io/3058) for some discussion of this topic).
 
 ## Design
 
@@ -115,4 +107,4 @@ A third alternative is to generalize the Replication Controller. We could add a 
 - Does not need to be modified, but health checking will occur for the daemon pods and revive the pods if they are killed (we set the pod restartPolicy to Always). We reject DaemonSet objects with pod templates that don’t have restartPolicy set to Always.
 
 ## Open Issues
-- See how this can work with [Deployment design](http://issues.k8s.io/1743).
+- Should work similarly to [Deployment](http://issues.k8s.io/1743).
