@@ -562,22 +562,26 @@ func prepareResourceWithReplacedString(inputFile, old, new string) string {
 }
 
 func forEachPod(c *client.Client, ns, selectorKey, selectorValue string, fn func(api.Pod)) {
-	var pods *api.PodList
-	var err error
+	pods := []*api.Pod{}
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
-		pods, err = c.Pods(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything())
+		podList, err := c.Pods(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
-		if len(pods.Items) > 0 {
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == api.PodPending || pod.Status.Phase == api.PodRunning {
+				pods = append(pods, &pod)
+			}
+		}
+		if len(pods) > 0 {
 			break
 		}
 	}
-	if pods == nil || len(pods.Items) == 0 {
+	if pods == nil || len(pods) == 0 {
 		Failf("No pods found")
 	}
-	for _, pod := range pods.Items {
-		err = waitForPodRunningInNamespace(c, pod.Name, ns)
+	for _, pod := range pods {
+		err := waitForPodRunningInNamespace(c, pod.Name, ns)
 		Expect(err).NotTo(HaveOccurred())
-		fn(pod)
+		fn(*pod)
 	}
 }
 
