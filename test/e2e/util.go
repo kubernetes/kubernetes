@@ -1427,7 +1427,7 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("%v Scaling replication controller %s in namespace %s to %d", time.Now(), name, ns, size))
-	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(c))
+	scaler, err := kubectl.ScalerFor("ReplicationController", c)
 	if err != nil {
 		return err
 	}
