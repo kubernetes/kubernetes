@@ -55,6 +55,16 @@ MASTER_PASSWD=vagrant
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 
+# Optional: Enable experimental API features
+ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-true}"
+
+# Optional: Enable feature for autoscaling number of pods
+# Experimental feature, not ready for production use.
+ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-true}"
+if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
@@ -89,8 +99,7 @@ DNS_REPLICAS=1
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
-#RUNTIME_CONFIG=""
-RUNTIME_CONFIG="api/v1"
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Determine extra certificate names for master
 octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))

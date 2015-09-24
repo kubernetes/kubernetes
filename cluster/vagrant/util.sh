@@ -34,6 +34,18 @@ function detect-minions {
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
 # that our Vagrantfile doesn't error out.
 function verify-prereqs {
+  if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="experimental/v1alpha1"
+    else
+      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1=false" and appending "experimental/v1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+        exit 1
+      fi
+    fi
+  fi
+  
   for x in vagrant; do
     if ! which "$x" >/dev/null; then
       echo "Can't find $x in PATH, please fix and retry."
