@@ -198,6 +198,7 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
+    : ${ENABLE_DEPLOYMENTS:=true}
     ;;
 
   # Runs only the examples tests on GCE.
@@ -265,6 +266,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
+    : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
     NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
@@ -283,6 +285,7 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
     : ${PROJECT:="kubernetes-jenkins"}
+    : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
     NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
@@ -298,6 +301,7 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
+    : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
     NUM_MINIONS="6"
     ;;
@@ -526,6 +530,7 @@ fi
 export E2E_MIN_STARTUP_PODS=${E2E_MIN_STARTUP_PODS:-}
 export KUBE_ENABLE_CLUSTER_MONITORING=${ENABLE_CLUSTER_MONITORING:-}
 export KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER=${ENABLE_HORIZONTAL_POD_AUTOSCALER:-}
+export KUBE_ENABLE_DEPLOYMENTS=${ENABLE_DEPLOYMENTS:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
 export MINION_SIZE=${MINION_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
