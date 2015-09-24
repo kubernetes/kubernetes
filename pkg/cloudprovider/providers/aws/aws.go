@@ -1276,7 +1276,7 @@ func (self *AWSCloud) findVPCID() (string, error) {
 	return "", fmt.Errorf("Could not find VPC id in instance metadata")
 }
 
-// Find the kubernetes VPC
+// Find the VPC which self is attached to.
 func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 	request := &ec2.DescribeVPCsInput{}
 
@@ -1286,7 +1286,9 @@ func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 		return nil, err
 	}
 	filters := []*ec2.Filter{newEc2Filter("vpc-id", vpcID)}
-	request.Filters = self.addFilters(filters)
+	// Don't bother adding the filterTags as we know this VPC is valid for this instance from findVPCID above.
+	// This is important as sharing a single regional VPC with multiple per-AZ clusters is a common deployment.
+	request.Filters = filters
 
 	vpcs, err := self.ec2.DescribeVPCs(request)
 	if err != nil {
@@ -1628,6 +1630,9 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		request := &ec2.DescribeSubnetsInput{}
 		filters := []*ec2.Filter{}
 		filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VPCID)))
+		// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
+		// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
+		// only the public subnet (where the ELB will go) is so tagged.
 		filters = s.addFilters(filters)
 		request.Filters = filters
 
