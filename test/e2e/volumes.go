@@ -236,7 +236,7 @@ var _ = Describe("Volumes", func() {
 
 	AfterEach(func() {
 		if clean {
-			if err := deleteNS(c, namespace.Name); err != nil {
+			if err := deleteNS(c, namespace.Name, 5*time.Minute /* namespace deletion timeout */); err != nil {
 				Failf("Couldn't delete ns %s", err)
 			}
 		}
