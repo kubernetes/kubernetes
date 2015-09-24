@@ -68,8 +68,8 @@ $kube_provider_boxes = {
   },
   :libvirt => {
     'fedora' => {
-      :box_name => 'kube-fedora20',
-      :box_url => 'http://citozin.com/opscode_fedora-20_chef-provisionerless_libvirt.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'https://amadeus.box.com/shared/static/93mj2fajrii6afeh8b5v5ihuk2ows2yn.box'
     }
   },
   :vmware_desktop => {
