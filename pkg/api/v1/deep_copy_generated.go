@@ -1071,6 +1071,7 @@ func deepCopy_v1_ObjectMeta(in ObjectMeta, out *ObjectMeta, c *conversion.Cloner
 	if err := deepCopy_unversioned_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
 		return err
 	}
+	out.CreationUserName = in.CreationUserName
 	if in.DeletionTimestamp != nil {
 		out.DeletionTimestamp = new(unversioned.Time)
 		if err := deepCopy_unversioned_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {

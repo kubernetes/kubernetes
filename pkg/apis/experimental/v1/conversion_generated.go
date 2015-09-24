@@ -495,6 +495,7 @@ func convert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *v1.ObjectM
 	if err := s.Convert(&in.CreationTimestamp, &out.CreationTimestamp, 0); err != nil {
 		return err
 	}
+	out.CreationUserName = in.CreationUserName
 	if in.DeletionTimestamp != nil {
 		if err := s.Convert(&in.DeletionTimestamp, &out.DeletionTimestamp, 0); err != nil {
 			return err
@@ -1301,6 +1302,7 @@ func convert_v1_ObjectMeta_To_api_ObjectMeta(in *v1.ObjectMeta, out *api.ObjectM
 	if err := s.Convert(&in.CreationTimestamp, &out.CreationTimestamp, 0); err != nil {
 		return err
 	}
+	out.CreationUserName = in.CreationUserName
 	if in.DeletionTimestamp != nil {
 		if err := s.Convert(&in.DeletionTimestamp, &out.DeletionTimestamp, 0); err != nil {
 			return err

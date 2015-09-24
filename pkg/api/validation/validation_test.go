@@ -107,6 +107,27 @@ func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	}
 }
 
+func TestValidateObjectMetaUpdateIgnoresCreationUserName(t *testing.T) {
+	if errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationUserName: "test"},
+	); len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationUserName: "test"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+	); len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationUserName: "test1"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationUserName: "test2"},
+	); len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+}
+
 // Ensure trailing slash is allowed in generate name
 func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", GenerateName: "foo-"}, false, NameIsDNSSubdomain)

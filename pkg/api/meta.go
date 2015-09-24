@@ -26,6 +26,9 @@ import (
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
 	meta.CreationTimestamp = unversioned.Now()
+	if user, ok := UserFrom(ctx); ok {
+		meta.CreationUserName = user.GetName()
+	}
 	meta.UID = util.NewUUID()
 	meta.SelfLink = ""
 }

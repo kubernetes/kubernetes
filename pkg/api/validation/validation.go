@@ -269,11 +269,11 @@ func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList
 		new.UID = old.UID
 	}
 	// ignore changes to timestamp
-	if old.CreationTimestamp.IsZero() {
-		old.CreationTimestamp = new.CreationTimestamp
-	} else {
-		new.CreationTimestamp = old.CreationTimestamp
-	}
+	new.CreationTimestamp = old.CreationTimestamp
+
+	// ignore changes to user name
+	new.CreationUserName = old.CreationUserName
+
 	// an object can never remove a deletion timestamp or clear/change grace period seconds
 	if !old.DeletionTimestamp.IsZero() {
 		new.DeletionTimestamp = old.DeletionTimestamp
