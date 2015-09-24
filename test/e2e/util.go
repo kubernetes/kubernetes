@@ -531,12 +531,12 @@ func checkTestingNSDeletedExcept(c *client.Client, skip string) error {
 
 // deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
 // whether there are any pods remaining in a non-terminating state.
-func deleteNS(c *client.Client, namespace string) error {
+func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 	if err := c.Namespaces().Delete(namespace); err != nil {
 		return err
 	}
 
-	err := wait.Poll(5*time.Second, 5*time.Minute, func() (bool, error) {
+	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		if _, err := c.Namespaces().Get(namespace); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
