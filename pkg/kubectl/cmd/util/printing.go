@@ -112,7 +112,12 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 }
 
 func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
-	sorting := GetFlagString(cmd, "sort-by")
+	sorting, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
+		return printer
+	}
+
 	if len(sorting) != 0 {
 		return &kubectl.SortingPrinter{
 			Delegate:  printer,
