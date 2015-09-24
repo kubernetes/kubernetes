@@ -246,6 +246,7 @@ runtime-config
 scheduler-config
 schema-cache-dir
 secure-port
+selinux-integration
 service-account-key-file
 service-account-lookup
 service-account-private-key-file

@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/libcontainer/selinux"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -2346,10 +2348,13 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	// Check whether network is configured properly
 	networkConfigured := kl.doneNetworkConfigure()
 
+	selinuxRequired := capabilities.Get().EnableSELinuxIntegration
+	selinuxConfigured := (selinuxRequired && selinux.SelinuxEnabled()) || !selinuxRequired
+
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && networkConfigured {
+	if containerRuntimeUp && networkConfigured && selinuxConfigured {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -2365,6 +2370,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		if !networkConfigured {
 			messages = append(reasons, "network not configured correctly")
+		}
+		if !selinuxConfigured {
+			messages = append(reasons, "SELinux is required by the cluster but not enabled on this node")
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,

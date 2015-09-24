@@ -1921,6 +1921,10 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 			allErrs = append(allErrs, errs.NewFieldInvalid("runAsUser", *sc.RunAsUser, "runAsUser cannot be negative"))
 		}
 	}
+
+	if sc.SELinuxOptions != nil && !capabilities.Get().EnableSELinuxIntegration {
+		allErrs = append(allErrs, errs.NewFieldForbidden("selinuxOptions", "Cannot specify selinuxOptions if SELinux integration is not enabled"))
+	}
 	return allErrs
 }
 

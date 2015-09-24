@@ -31,6 +31,10 @@ type Capabilities struct {
 
 	// PerConnectionBandwidthLimitBytesPerSec limits the throughput of each connection (currently only used for proxy, exec, attach)
 	PerConnectionBandwidthLimitBytesPerSec int64
+
+	// EnableSELinuxIntegration controls whether SELinux
+	// integration is expected from Kubernets
+	EnableSELinuxIntegration bool
 }
 
 // PrivilegedSources defines the pod sources allowed to make privileged requests for certain types
@@ -60,9 +64,10 @@ func Initialize(c Capabilities) {
 }
 
 // Setup the capability set.  It wraps Initialize for improving usibility.
-func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64) {
+func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64, enableSELinuxIntegration bool) {
 	Initialize(Capabilities{
 		AllowPrivileged:                        allowPrivileged,
+		EnableSELinuxIntegration:               enableSELinuxIntegration,
 		PrivilegedSources:                      privilegedSources,
 		PerConnectionBandwidthLimitBytesPerSec: perConnectionBytesPerSec,
 	})

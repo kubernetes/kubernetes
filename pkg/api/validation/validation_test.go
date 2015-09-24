@@ -3795,6 +3795,10 @@ func TestValidateEndpoints(t *testing.T) {
 }
 
 func TestValidateSecurityContext(t *testing.T) {
+	capabilities.SetForTests(capabilities.Capabilities{
+		EnableSELinuxIntegration: true,
+	})
+
 	priv := false
 	var runAsUser int64 = 1
 	fullValidSC := func() *api.SecurityContext {
@@ -3851,6 +3855,12 @@ func TestValidateSecurityContext(t *testing.T) {
 	var negativeUser int64 = -1
 	negativeRunAsUser.RunAsUser = &negativeUser
 
+	selinuxOptionsSet := fullValidSC()
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		EnableSELinuxIntegration: false,
+	})
+
 	errorCases := map[string]struct {
 		sc          *api.SecurityContext
 		errorType   fielderrors.ValidationErrorType
@@ -3865,6 +3875,11 @@ func TestValidateSecurityContext(t *testing.T) {
 			sc:          negativeRunAsUser,
 			errorType:   "FieldValueInvalid",
 			errorDetail: "runAsUser cannot be negative",
+		},
+		"valid SC but selinuxOptions set": {
+			sc:          selinuxOptionsSet,
+			errorType:   "FieldValueForbidden",
+			errorDetail: "",
 		},
 	}
 	for k, v := range errorCases {

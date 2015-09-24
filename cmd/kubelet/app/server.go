@@ -69,6 +69,7 @@ const defaultRootDir = "/var/lib/kubelet"
 type KubeletServer struct {
 	Address                        net.IP
 	AllowPrivileged                bool
+	enableSELinuxIntegration       bool
 	APIServerList                  []string
 	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
 	CAdvisorPort                   uint
@@ -228,6 +229,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
 	fs.StringVar(&s.RootDirectory, "root-dir", s.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
+	fs.BoolVar(&s.enableSELinuxIntegration, "selinux-integration", s.enableSELinuxIntegration, "Enables SELinux integration. If true SELinux must be enabled on the node; otherwise it will report 'NotReady' status. [default=false]")
 	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. For all sources use \"*\" [default=\"file\"]")
 	fs.StringVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. For all sources use \"*\" [default=\"file\"]")
@@ -344,6 +346,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 	return &KubeletConfig{
 		Address:                   s.Address,
 		AllowPrivileged:           s.AllowPrivileged,
+		enableSELinuxIntegration:  s.enableSELinuxIntegration,
 		CAdvisorInterface:         nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
@@ -705,7 +708,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 		HostPIDSources:     kcfg.HostPIDSources,
 		HostIPCSources:     kcfg.HostIPCSources,
 	}
-	capabilities.Setup(kcfg.AllowPrivileged, privilegedSources, 0)
+	capabilities.Setup(kcfg.AllowPrivileged, privilegedSources, 0, kcfg.enableSELinuxIntegration)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
@@ -779,6 +782,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
+	enableSELinuxIntegration       bool
 	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface

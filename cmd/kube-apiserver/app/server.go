@@ -97,6 +97,7 @@ type APIServer struct {
 	EtcdPathPrefix             string
 	CorsAllowedOriginList      []string
 	AllowPrivileged            bool
+	EnableSELinuxIntegration   bool
 	ServiceClusterIPRange      net.IPNet // TODO: make this a list
 	ServiceNodePortRange       util.PortRange
 	EnableLogsSupport          bool
@@ -207,6 +208,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EtcdPathPrefix, "etcd-prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
+	fs.BoolVar(&s.EnableSELinuxIntegration, "selinux-integration", s.EnableSELinuxIntegration, "If true the api-server will not accept pods which specify SELinux context. [default=false]")
 	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
 	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange, "Deprecated: see --service-cluster-ip-range instead.")
 	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead.")
@@ -297,6 +299,7 @@ func (s *APIServer) Run(_ []string) error {
 			HostIPCSources:     []string{},
 		},
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
+		EnableSELinuxIntegration:               s.EnableSELinuxIntegration,
 	})
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
