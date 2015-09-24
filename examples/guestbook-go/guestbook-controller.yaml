@@ -1,0 +1,32 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: guestbook
+  # these labels can be applied automatically
+  # from the labels in the pod template if not set
+  labels:
+    app: guestbook
+spec:
+  # this replicas value is default
+  # modify it according to your case
+  replicas: 3
+  # selector can be applied automatically
+  # from the labels in the pod template if not set
+  # selector:
+  #   app: guestbook
+  #   tier: frontend
+  template:
+    metadata:
+      labels:
+        app: guestbook
+    spec:
+      containers:
+      - name: guestbook
+        image: kubernetes/guestbook:v2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        ports:
+        - name: http-server
+          containerPort: 3000
