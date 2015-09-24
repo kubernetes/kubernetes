@@ -73,11 +73,11 @@ Kubernetes API server to provide the following features:
 The `Kind` for an instance of a third-party object (e.g. CronTab) below is expected to be
 programmatically convertible to the name of the resource using
 the following conversion.  Kinds are expected to be of the form `<CamelCaseKind>`, the
-`APIVersion` for the object is expected to be `<domain-name>/<api-group>/<api-version>`.
+`APIVersion` for the object is expected to be `<api-group>/<api-version>`. To
+prevent collisions, it's expected that you'll use a fulling qualified domain
+name for the API group, e.g. `example.com`.
 
-For example `example.com/stable/v1`
-
-`domain-name` is expected to be a fully qualified domain name.
+For example `stable.example.com/v1`
 
 'CamelCaseKind' is the specific type name.
 
@@ -113,18 +113,17 @@ For example, if a user creates:
 
 ```yaml
 metadata:
-  name: cron-tab.example.com
+  name: cron-tab.stable.example.com
 apiVersion: experimental/v1alpha1
 kind: ThirdPartyResource
 description: "A specification of a Pod to run on a cron style schedule"
 versions:
-  - name: stable/v1
-  - name: experimental/v2
+- name: v1
+- name: v2
 ```
 
-Then the API server will program in two new RESTful resource paths:
-   * `/thirdparty/example.com/stable/v1/namespaces/<namespace>/crontabs/...`
-   * `/thirdparty/example.com/experimental/v2/namespaces/<namespace>/crontabs/...`
+Then the API server will program in the new RESTful resource path:
+   * `/apis/stable.example.com/v1/namespaces/<namespace>/crontabs/...`
 
 
 Now that this schema has been created, a user can `POST`:
@@ -134,19 +133,19 @@ Now that this schema has been created, a user can `POST`:
    "metadata": {
      "name": "my-new-cron-object"
    },
-   "apiVersion": "example.com/stable/v1",
+   "apiVersion": "stable.example.com/v1",
    "kind": "CronTab",
    "cronSpec": "* * * * /5",
    "image":     "my-awesome-chron-image"
 }
 ```
 
-to: `/third-party/example.com/stable/v1/namespaces/default/crontabs/my-new-cron-object`
+to: `/apis/stable.example.com/v1/namespaces/default/crontabs`
 
 and the corresponding data will be stored into etcd by the APIServer, so that when the user issues:
 
 ```
-GET /third-party/example.com/stable/v1/namespaces/default/crontabs/my-new-cron-object`
+GET /apis/stable.example.com/v1/namespaces/default/crontabs/my-new-cron-object`
 ```
 
 And when they do that, they will get back the same data, but with additional Kubernetes metadata
@@ -155,21 +154,21 @@ And when they do that, they will get back the same data, but with additional Kub
 Likewise, to list all resources, a user can issue:
 
 ```
-GET /third-party/example.com/stable/v1/namespaces/default/crontabs
+GET /apis/stable.example.com/v1/namespaces/default/crontabs
 ```
 
 and get back:
 
 ```json
 {
-   "apiVersion": "example.com/stable/v1",
+   "apiVersion": "stable.example.com/v1",
    "kind": "CronTabList",
    "items": [
      {
        "metadata": {
          "name": "my-new-cron-object"
        },
-       "apiVersion": "example.com/stable/v1",
+       "apiVersion": "stable.example.com/v1",
        "kind": "CronTab",
        "cronSpec": "* * * * /5",
        "image":     "my-awesome-chron-image"
