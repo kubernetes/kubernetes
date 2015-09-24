@@ -212,18 +212,22 @@ func (c *Controller) SetEndpoints(serviceName string, ip net.IP, port int) error
 		glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
 		return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 	} else if !ipCorrect {
-		// We *always* add our own IP address; if there are too many IP
-		// addresses, we remove the ones lexicographically after our
+		// We *always* add our own IP address.
+		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
+
+		// Lexicographic order is retained by this step.
+		e.Subsets = endpoints.RepackSubsets(e.Subsets)
+
+		// If too many IP addresses, remove the ones lexicographically after our
 		// own IP address.  Given the requirements stated at the top of
 		// this function, this should cause the list of IP addresses to
 		// become eventually correct.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
-		e.Subsets = endpoints.RepackSubsets(e.Subsets)
 		if addrs := &e.Subsets[0].Addresses; len(*addrs) > c.MasterCount {
 			// addrs is a pointer because we're going to mutate it.
 			for i, addr := range *addrs {
 				if addr.IP == ip.String() {
 					for len(*addrs) > c.MasterCount {
+						// wrap around if necessary.
 						remove := (i + 1) % len(*addrs)
 						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
 					}
