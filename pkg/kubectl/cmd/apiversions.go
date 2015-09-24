@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -57,12 +56,12 @@ func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
 		os.Exit(1)
 	}
 
-	var expAPIVersions *api.APIVersions
+	var expAPIVersions []string
 	expAPIVersions, err = client.Experimental().ServerAPIVersions()
 
-	fmt.Fprintf(w, "Available Server Api Versions: %#v\n", *apiVersions)
+	fmt.Fprintf(w, "Available Server Api Versions: %#v\n", apiVersions)
 	if err == nil {
-		fmt.Fprintf(w, "Available Server Experimental Api Versions: %#v\n", *expAPIVersions)
+		fmt.Fprintf(w, "Available Server Experimental Api Versions: %#v\n", expAPIVersions)
 	}
 
 	return nil

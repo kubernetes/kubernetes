@@ -104,7 +104,7 @@ func TestCertificateData(t *testing.T) {
 
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestBasicAuthData(t *testing.T) {
 
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCreateClean(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 
 		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-		clientConfig, err := clientBuilder.ClientConfig()
+		clientConfig, err := clientBuilder.ClientConfig("")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -206,7 +206,7 @@ func TestCreateCleanDefault(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewDefaultClientConfig(*config, &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestCreateMissingContext(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

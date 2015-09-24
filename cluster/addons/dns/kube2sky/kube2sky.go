@@ -492,7 +492,7 @@ func newKubeClient() (*kclient.Client, error) {
 		overrides := &kclientcmd.ConfigOverrides{}
 		overrides.ClusterInfo.Server = masterURL                                     // might be "", but that is OK
 		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile} // might be "", but that is OK
-		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
+		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(""); err != nil {
 			return nil, err
 		}
 	}

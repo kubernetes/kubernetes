@@ -485,13 +485,13 @@ func runAPIVersionsTest(c *client.Client) {
 		glog.Fatalf("failed to get api versions: %v", err)
 	}
 	// Verify that the server supports the API version used by the client.
-	for _, version := range v.Versions {
+	for _, version := range v {
 		if version == clientVersion {
 			glog.Infof("Version test passed")
 			return
 		}
 	}
-	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v.Versions, clientVersion)
+	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v, clientVersion)
 }
 
 func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {

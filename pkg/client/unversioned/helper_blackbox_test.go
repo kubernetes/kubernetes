@@ -40,14 +40,15 @@ func objBody(object interface{}) io.ReadCloser {
 
 func TestNegotiateVersion(t *testing.T) {
 	tests := []struct {
-		name, version, expectedVersion string
-		serverVersions                 []string
-		clientVersions                 []string
-		config                         *unversioned.Config
-		expectErr                      bool
+		name, group, version, expectedVersion string
+		serverVersions                        []string
+		clientVersions                        []string
+		config                                *unversioned.Config
+		expectErr                             bool
 	}{
 		{
 			name:            "server supports client default",
+			group:           "",
 			version:         "version1",
 			config:          &unversioned.Config{},
 			serverVersions:  []string{"version1", testapi.Default.Version()},
@@ -57,6 +58,7 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "server falls back to client supported",
+			group:           "",
 			version:         testapi.Default.Version(),
 			config:          &unversioned.Config{},
 			serverVersions:  []string{"version1"},
@@ -66,6 +68,7 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "explicit version supported",
+			group:           "",
 			version:         "",
 			config:          &unversioned.Config{Version: testapi.Default.Version()},
 			serverVersions:  []string{"version1", testapi.Default.Version()},
@@ -75,12 +78,33 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "explicit version not supported",
+			group:           "",
 			version:         "",
 			config:          &unversioned.Config{Version: testapi.Default.Version()},
 			serverVersions:  []string{"version1"},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "",
 			expectErr:       true,
+		},
+		{
+			name:            "group should match the group in config.Version",
+			group:           "group1",
+			version:         "version2",
+			config:          &unversioned.Config{Version: testapi.Default.Version()},
+			serverVersions:  []string{"version1", "group1/version2"},
+			clientVersions:  []string{"version1", "group1/version2", testapi.Default.Version()},
+			expectedVersion: "",
+			expectErr:       true,
+		},
+		{
+			name:            "support version in experimental group",
+			group:           "group1",
+			version:         "version2",
+			config:          &unversioned.Config{},
+			serverVersions:  []string{"version1", "group1/version2"},
+			clientVersions:  []string{"version1", "group1/version2", testapi.Default.Version()},
+			expectedVersion: "group1/version2",
+			expectErr:       false,
 		},
 	}
 	codec := testapi.Default.Codec()
@@ -98,7 +122,7 @@ func TestNegotiateVersion(t *testing.T) {
 		}
 		c := unversioned.NewOrDie(test.config)
 		c.Client = fakeClient.Client
-		response, err := unversioned.NegotiateVersion(c, test.config, test.version, test.clientVersions)
+		response, err := unversioned.NegotiateVersion(c, test.config, test.group, test.version, test.clientVersions)
 		if err == nil && test.expectErr {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

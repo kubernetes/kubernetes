@@ -26,6 +26,7 @@ import (
 	"path"
 	"reflect"
 	gruntime "runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -131,6 +133,7 @@ type TLSClientConfig struct {
 // replication controllers, daemons, and services. It allows operations such as list, get, update
 // and delete on these objects. An error is returned if the provided configuration
 // is not valid.
+// TODO: caesarxuchao: we should pass a list of config for each group.
 func New(c *Config) (*Client, error) {
 	config := *c
 	if err := SetKubernetesDefaults(&config); err != nil {
@@ -184,7 +187,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(client *Client, c *Config, version string, clientRegisteredVersions []string) (string, error) {
+func NegotiateVersion(client *Client, c *Config, group string, version string, clientRegisteredGroupVersions []string) (string, error) {
 	var err error
 	if client == nil {
 		client, err = New(c)
@@ -193,49 +196,72 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 		}
 	}
 	clientVersions := sets.String{}
-	for _, v := range clientRegisteredVersions {
+	for _, v := range clientRegisteredGroupVersions {
 		clientVersions.Insert(v)
 	}
 	apiVersions, err := client.ServerAPIVersions()
 	if err != nil {
 		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
-	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
-		serverVersions.Insert(v)
+	serverGroupVersions := sets.String{}
+	for _, v := range apiVersions {
+		serverGroupVersions.Insert(v)
+	}
+
+	// configVersion is the version specified for this group in the Config.
+	// It's expected to be "" if the group is not specified in the Config.
+	var configVersion string
+	if len(c.Version) == 0 {
+		// there is no preference
+		configVersion = ""
+	} else if apiutil.GetGroup(c.Version) == group {
+		// TODO: rename c.Version to c.GrupVersion. It's confusing.
+		configVersion = apiutil.GetVersion(c.Version)
+	} else {
+		return "", fmt.Errorf("The group (%q) in Config is different from the group (%q) passed in to NegotiateVersion", apiutil.GetGroup(c.Version), group)
 	}
 	// If no version requested, use config version (may also be empty).
 	if len(version) == 0 {
-		version = c.Version
+		version = configVersion
 	}
+
+
 	// If version explicitly requested verify that both client and server support it.
 	// If server does not support warn, but try to negotiate a lower version.
 	if len(version) != 0 {
-		if !clientVersions.Has(version) {
-			return "", fmt.Errorf("Client does not support API version '%s'. Client supported API versions: %v", version, clientVersions)
-
+		groupVersion := apiutil.GetGroupVersion(group, version)
+		if !clientVersions.Has(groupVersion) {
+			return "", fmt.Errorf("Client does not support API version '%s'. Client supported API versions: %v", groupVersion, clientVersions)
 		}
-		if serverVersions.Has(version) {
-			return version, nil
+		if serverGroupVersions.Has(groupVersion) {
+			return groupVersion, nil
 		}
 		// If we are using an explicit config version the server does not support, fail.
-		if version == c.Version {
+		if version == c.Version && version != "" {
 			return "", fmt.Errorf("Server does not support API version '%s'.", version)
 		}
 	}
 
-	for _, clientVersion := range clientRegisteredVersions {
-		if serverVersions.Has(clientVersion) {
+	// If we haven't tried configVersion yet, and it's non-empty, try configVersion first.
+	if version != configVersion && configVersion != "" {
+		groupVersion := apiutil.GetGroupVersion(group, configVersion)
+		if clientVersions.Has(groupVersion) && serverGroupVersions.Has(groupVersion) {
+			return groupVersion, nil
+		}
+	}
+
+	for _, clientGroupVersion := range clientRegisteredGroupVersions {
+		if apiutil.GetGroup(clientGroupVersion) == group && serverGroupVersions.Has(clientGroupVersion) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
 			if len(version) != 0 {
-				glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
+				glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", apiutil.GetGroupVersion(group, version), clientGroupVersion)
 			}
-			return clientVersion, nil
+			return clientGroupVersion, nil
 		}
 	}
 	return "", fmt.Errorf("Failed to negotiate an api version. Server supports: %v. Client supports: %v.",
-		serverVersions, clientRegisteredVersions)
+		serverGroupVersions, clientRegisteredGroupVersions)
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
@@ -310,6 +336,43 @@ func SetKubernetesDefaults(config *Config) error {
 	return nil
 }
 
+// SetKubernetesDefaults sets default values on the provided client config for accessing the
+// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
+func SetDefaultsForGroup(group string, config *Config) error {
+	if config.Prefix == "" {
+		if group == "" {
+			config.Prefix = "/api"
+		} else {
+			config.Prefix = "/apis"
+		}
+	}
+	if len(config.UserAgent) == 0 {
+		config.UserAgent = DefaultKubernetesUserAgent()
+	}
+	if len(config.Version) == 0 {
+		config.Version = defaultGroupVersionForGroup(group, config)
+	}
+	groupVersion := config.Version
+	g, err := latest.Group(group)
+	if err != nil {
+		return err
+	}
+	versionInterfaces, err := g.InterfacesFor(groupVersion)
+	if err != nil {
+		return err
+	}
+	if config.Codec == nil {
+		config.Codec = versionInterfaces.Codec
+	}
+	if config.QPS == 0.0 {
+		config.QPS = 5.0
+	}
+	if config.Burst == 0 {
+		config.Burst = 10
+	}
+	return nil
+}
+
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
 // object. Note that a RESTClient may require fields that are optional when initializing a Client.
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
@@ -319,6 +382,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("version is required when initializing a RESTClient")
 	}
 	if config.Codec == nil {
+		debug.PrintStack()
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
@@ -550,6 +614,17 @@ func defaultVersionFor(config *Config) string {
 		version = latest.GroupOrDie("").Version
 	}
 	return version
+}
+
+// defaultVersionForGroup is shared between defaultServerUrlFor and RESTClientFor
+func defaultGroupVersionForGroup(group string, config *Config) string {
+	groupVersion := config.Version
+	if groupVersion == "" {
+		// Clients default to the preferred code API version
+		// TODO: implement version negotiation (highest version supported by server)
+		groupVersion = latest.GroupOrDie(group).GroupVersion
+	}
+	return groupVersion
 }
 
 // DefaultKubernetesUserAgent returns the default user agent that clients can use.

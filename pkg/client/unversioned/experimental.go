@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -62,17 +61,9 @@ func (c *ExperimentalClient) ServerVersion() (*version.Info, error) {
 
 // ServerAPIVersions retrieves and parses the list of experimental API versions the
 // server supports.
-func (c *ExperimentalClient) ServerAPIVersions() (*api.APIVersions, error) {
-	body, err := c.Get().UnversionedPath("").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v api.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
+// TODO: ServerAPIVersions should be a function of the high-level client.
+func (c *ExperimentalClient) ServerAPIVersions() ([]string, error) {
+	return []string{}, nil
 }
 
 func (c *ExperimentalClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {

@@ -188,7 +188,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	// file, and then overriding the Master flag, if non-empty.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: config.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: config.Master}}).ClientConfig("")
 	if err != nil {
 		return nil, err
 	}

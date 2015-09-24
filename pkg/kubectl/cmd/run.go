@@ -211,7 +211,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 			Attach: &DefaultRemoteAttach{},
 		}
-		config, err := f.ClientConfig()
+		config, err := f.ClientConfig("")
 		if err != nil {
 			return err
 		}

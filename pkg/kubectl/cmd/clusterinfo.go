@@ -50,7 +50,7 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 		printDeprecationWarning("cluster-info", "clusterinfo")
 	}
 
-	client, err := factory.ClientConfig()
+	client, err := factory.ClientConfig("")
 	if err != nil {
 		return err
 	}

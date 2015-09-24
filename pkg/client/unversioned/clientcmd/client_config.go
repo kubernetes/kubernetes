@@ -46,7 +46,7 @@ type ClientConfig interface {
 	// RawConfig returns the merged result of all overrides
 	RawConfig() (clientcmdapi.Config, error)
 	// ClientConfig returns a complete client config
-	ClientConfig() (*client.Config, error)
+	ClientConfig(group string) (*client.Config, error)
 	// Namespace returns the namespace resulting from the merged
 	// result of all overrides and a boolean indicating if it was
 	// overridden
@@ -81,7 +81,7 @@ func (config DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 }
 
 // ClientConfig implements ClientConfig
-func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
+func (config DirectClientConfig) ClientConfig(group string) (*client.Config, error) {
 	if err := config.ConfirmUsable(); err != nil {
 		return nil, err
 	}
@@ -98,6 +98,7 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 		u.Fragment = ""
 		clientConfig.Host = u.String()
 	}
+	// TODO: caesarxuchao, JanetKuo: get the version for group from PreferredVersions list. Set it to "" if no version for group is specified in PrefferedVersions
 	clientConfig.Version = configClusterInfo.APIVersion
 
 	// only try to read the auth information if we are secure
@@ -310,7 +311,7 @@ func (inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
 }
 
-func (inClusterClientConfig) ClientConfig() (*client.Config, error) {
+func (inClusterClientConfig) ClientConfig(group string) (*client.Config, error) {
 	return client.InClusterConfig()
 }
 

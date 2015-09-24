@@ -37,3 +37,7 @@ func GetGroup(groupVersion string) string {
 	}
 	return s[0]
 }
+
+func GetGroupVersion(group, version string) string {
+	return strings.TrimLeft(group+"/"+version, "/")
+}

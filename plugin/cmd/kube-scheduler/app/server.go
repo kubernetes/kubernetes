@@ -91,7 +91,7 @@ func (s *SchedulerServer) Run(_ []string) error {
 	// file, and then overriding the Master flag, if non-empty.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig("")
 	if err != nil {
 		return err
 	}

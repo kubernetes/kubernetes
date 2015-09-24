@@ -87,6 +87,6 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 		}, nil
 	default:
 		g, _ := latest.Group("experimental")
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.GroupVersions, ", "))
 	}
 }

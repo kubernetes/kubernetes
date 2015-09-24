@@ -127,7 +127,7 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 	}
 	p.Namespace = namespace
 
-	config, err := f.ClientConfig()
+	config, err := f.ClientConfig("")
 	if err != nil {
 		return err
 	}
