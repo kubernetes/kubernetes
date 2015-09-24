@@ -226,7 +226,7 @@ func resizeRC(c *client.Client, ns, name string, replicas int) error {
 }
 
 func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList, error) {
-	timeout := time.Minute
+	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
