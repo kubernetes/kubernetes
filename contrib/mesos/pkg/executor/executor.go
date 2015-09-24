@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
+	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -376,21 +377,25 @@ func (k *KubernetesExecutor) handleChangedApiserverPod(pod *api.Pod) {
 	oldPod := k.pods[task.podName]
 
 	// terminating pod?
-	if oldPod != nil && oldPod.DeletionTimestamp == nil &&
-		pod.DeletionTimestamp != nil && pod.Status.Phase == api.PodRunning &&
-		pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds > 0 {
+	if oldPod != nil && pod.Status.Phase == api.PodRunning {
+		timeModified := differentTime(oldPod.DeletionTimestamp, pod.DeletionTimestamp)
+		graceModified := differentPeriod(oldPod.DeletionGracePeriodSeconds, pod.DeletionGracePeriodSeconds)
+		if timeModified || graceModified {
+			log.Infof("pod %s/%s is terminating at %v with %vs grace period, telling kubelet", pod.Namespace, pod.Name, *pod.DeletionTimestamp, *pod.DeletionGracePeriodSeconds)
 
-		log.Infof("pod %s/%s is terminating at %v with %vs grace period, telling kubelet", pod.Namespace, pod.Name, *pod.DeletionTimestamp, *pod.DeletionGracePeriodSeconds)
+			// modify the pod in our registry instead of sending the new pod. The later
+			// would allow that other changes bleed into the kubelet. For now we are
+			// very conservative changing this behaviour.
+			// TODO(sttts): check whether we can and should send all changes down to the kubelet
+			oldPod.DeletionTimestamp = pod.DeletionTimestamp
+			oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
 
-		// modify pod in our registry to avoid that other changed bleed into the kubelet
-		oldPod.DeletionTimestamp = pod.DeletionTimestamp
-		oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
-
-		update := kubelet.PodUpdate{
-			Op:   kubelet.UPDATE,
-			Pods: []*api.Pod{oldPod},
+			update := kubelet.PodUpdate{
+				Op:   kubelet.UPDATE,
+				Pods: []*api.Pod{oldPod},
+			}
+			k.updateChan <- update
 		}
-		k.updateChan <- update
 	}
 }
 
@@ -939,4 +944,12 @@ func (k *KubernetesExecutor) sendLoop() {
 			}
 		}
 	}
+}
+
+func differentTime(a, b *unversionedapi.Time) bool {
+	return (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b)
+}
+
+func differentPeriod(a, b *int64) bool {
+	return (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b)
 }
