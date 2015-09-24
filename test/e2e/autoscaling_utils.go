@@ -262,4 +262,6 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		MemLimit:  memLimitMb * 1024 * 1024, // MemLimit is in bytes
 	}
 	expectNoError(RunRC(config))
+	// Wait until endpoints are processed. Temporary workaround until #14477 is fixed.
+	time.Sleep(10 * time.Second)
 }
