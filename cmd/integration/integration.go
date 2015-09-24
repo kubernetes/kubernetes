@@ -289,8 +289,8 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 	return tempDir
 }
 
-// podsOnMinions returns true when all of the selected pods exist on a minion.
-func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
+// podsOnNodes returns true when all of the selected pods exist on a node.
+func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
 	// Wait until all pods are running on the node.
 	return func() (bool, error) {
 		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
@@ -466,13 +466,13 @@ func runReplicationControllerTest(c *client.Client) {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
-	// Poll till we can retrieve the status of all pods matching the given label selector from their minions.
+	// Poll till we can retrieve the status of all pods matching the given label selector from their nodes.
 	// This involves 3 operations:
-	//	- The scheduler must assign all pods to a minion
+	//	- The scheduler must assign all pods to a node
 	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
-	//  - We need to be able to query the kubelet on that minion for information about the pod
+	//  - We need to be able to query the kubelet on that node for information about the pod
 	if err := wait.Poll(
-		time.Second, longTestTimeout, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
+		time.Second, longTestTimeout, podsOnNodes(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 

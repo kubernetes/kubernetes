@@ -149,9 +149,9 @@ The scripts automatically `scp` binaries and config files to all the machines an
 service on them. The only thing you need to do is to type the sudo password when promoted.
 
 ```console
-Deploying minion on machine 10.10.103.223
+Deploying node on machine 10.10.103.223
 ...
-[sudo] password to start minion: 
+[sudo] password to start node: 
 ```
 
 If everything works correctly, you will see the following message from console indicating the k8s cluster is up.
