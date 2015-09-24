@@ -68,7 +68,7 @@ detect_lsb() {
     esac
 
     if command_exists lsb_release; then
-        lsb_dist="$(lsb_release -si)"
+        lsb_dist="$(lsb_release -sir | sed ':a;N;s/\n//g')"
     fi
     if [ -z ${lsb_dist} ] && [ -r /etc/lsb-release ]; then
         lsb_dist="$(. /etc/lsb-release && echo "$DISTRIB_ID")"
@@ -94,8 +94,6 @@ bootstrap_daemon() {
     sleep 5
 }
 
-DOCKER_CONF=""
-
 # Start k8s components in containers
 start_k8s() {
     # Start flannel
@@ -109,23 +107,34 @@ start_k8s() {
 
     # Configure docker net settings, then restart it
     case "$lsb_dist" in
-        fedora|centos|amzn)
-            DOCKER_CONF="/etc/sysconfig/docker"
+        fedora*|centos*|amzn*)
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a /etc/sysconfig/docker
         ;;
-        ubuntu|debian|linuxmint)
-            DOCKER_CONF="/etc/default/docker"
+        ubuntu15.04)
+            install -Dv /dev/null /etc/systemd/system/docker.service.d/bridge.conf
+            cat <<EOF > /etc/systemd/system/docker.service.d/bridge.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}
+EOF
+            systemctl daemon-reload
+        ;;
+        ubuntu*|debian*|linuxmint*)
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a /etc/default/docker
+        ;;
+        *)
+            echo "Unsupported operations system $lsb_dist"
+            exit 1
         ;;
     esac
-
-    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
 
     ifconfig docker0 down
 
     case "$lsb_dist" in
-        fedora|centos)
+        fedora*|centos*)
             yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
         ;;
-        ubuntu|debian|linuxmint)
+        ubuntu*|debian*|linuxmint*)
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
         ;;
     esac
