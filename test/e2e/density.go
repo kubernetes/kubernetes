@@ -82,7 +82,7 @@ var _ = Describe("Density", func() {
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
-	framework := Framework{BaseName: "density"}
+	framework := Framework{BaseName: "density", NamespaceDeletionTimeout: time.Hour}
 
 	BeforeEach(func() {
 		framework.beforeEach()

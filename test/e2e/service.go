@@ -65,7 +65,7 @@ var _ = Describe("Services", func() {
 	AfterEach(func() {
 		for _, ns := range namespaces {
 			By(fmt.Sprintf("Destroying namespace %v", ns))
-			if err := deleteNS(c, ns); err != nil {
+			if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 				Failf("Couldn't delete namespace %s: %s", ns, err)
 			}
 		}

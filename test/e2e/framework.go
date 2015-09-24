@@ -36,8 +36,9 @@ import (
 type Framework struct {
 	BaseName string
 
-	Namespace *api.Namespace
-	Client    *client.Client
+	Namespace                *api.Namespace
+	Client                   *client.Client
+	NamespaceDeletionTimeout time.Duration
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -101,7 +102,11 @@ func (f *Framework) afterEach() {
 
 	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
 
-	if err := deleteNS(f.Client, f.Namespace.Name); err != nil {
+	timeout := 5 * time.Minute
+	if f.NamespaceDeletionTimeout != 0 {
+		timeout = f.NamespaceDeletionTimeout
+	}
+	if err := deleteNS(f.Client, f.Namespace.Name, timeout); err != nil {
 		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
 	}
 	// Paranoia-- prevent reuse!
