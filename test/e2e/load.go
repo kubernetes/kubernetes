@@ -77,11 +77,12 @@ var _ = Describe("Load capacity", func() {
 	AfterEach(func() {
 		deleteAllRC(configs)
 
-		framework.afterEach()
 		// Verify latency metrics
 		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, sets.NewString("events"))
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+
+		framework.afterEach()
 	})
 
 	type Load struct {
