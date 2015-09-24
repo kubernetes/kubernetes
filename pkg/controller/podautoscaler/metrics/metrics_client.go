@@ -35,10 +35,10 @@ import (
 
 const (
 	heapsterNamespace = "kube-system"
-	heapsterService   = "monitoring-heapster"
+	heapsterService   = "heapster"
 )
 
-var heapsterQueryStart, _ = time.ParseDuration("-5m")
+var heapsterQueryStart = -5 * time.Minute
 
 // An interface for getting metrics for pods.
 type MetricsClient interface {
