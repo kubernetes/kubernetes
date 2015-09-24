@@ -19,6 +19,7 @@ package procfs
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -45,7 +46,15 @@ func containerNameFromProcCgroup(content string) (string, error) {
 // Eg. If the devices cgroup for the container is stored in /sys/fs/cgroup/devices/docker/nginx,
 // return docker/nginx. Assumes that the process is part of exactly one cgroup hierarchy.
 func (pfs *ProcFs) GetFullContainerName(pid int) (string, error) {
-	filePath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
+	var filePath string
+	// if kubelet was started with host's rootfs mounted, assume it's running as a container
+	_, err := os.Stat("/rootfs/proc")
+	if err != nil {
+		filePath = path.Join("/proc", strconv.Itoa(pid), "cgroup")
+	} else {
+		filePath = path.Join("/rootfs/proc", strconv.Itoa(pid), "cgroup")
+	}
+
 	content, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return "", err
