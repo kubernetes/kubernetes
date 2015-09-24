@@ -90,7 +90,7 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&s.ProxyMode, "proxy-mode", "", "Which proxy mode to use: 'userspace' (older, stable) or 'iptables' (experimental). If blank, look at the Node object on the Kubernetes API and respect the '"+experimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently userspace, but may change in future versions).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
-	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 5*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 30*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
 	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
 }
@@ -116,7 +116,7 @@ func NewProxyConfig() *ProxyServerConfig {
 		HealthzBindAddress: net.ParseIP("127.0.0.1"),
 		OOMScoreAdj:        qos.KubeProxyOomScoreAdj,
 		ResourceContainer:  "/kube-proxy",
-		SyncPeriod:         5 * time.Second,
+		SyncPeriod:         30 * time.Second,
 	}
 }
 
