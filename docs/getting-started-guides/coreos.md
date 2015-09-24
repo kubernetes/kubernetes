@@ -95,7 +95,7 @@ Guide to running an HA etcd cluster with a single master on Azure. Uses the Azur
 
 <hr/>
 
-[**Multi-node cluster using cloud-config, coreos and VMware ESXi**](https://github.com/xavierbaude/VMware-coreos-multi-nodes-Kubernetes)
+[**Multi-node cluster using cloud-config, CoreOS and VMware ESXi**](https://github.com/xavierbaude/VMware-coreos-multi-nodes-Kubernetes)
 
 Configure a single master, single worker cluster on VMware ESXi.
 
