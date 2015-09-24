@@ -82,6 +82,11 @@ func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string
 	return t.mapper.VersionAndKindForResource(resource)
 }
 
+// ResourceIsValid takes a string (kind) and checks if it's a valid resource
+func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource string) bool {
+	return t.isThirdPartyResource(resource) || t.mapper.ResourceIsValid(resource)
+}
+
 func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMapper {
 	return &thirdPartyResourceDataMapper{
 		mapper:  mapper,
