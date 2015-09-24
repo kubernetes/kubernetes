@@ -33,15 +33,8 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	var rc *ResourceConsumer
 	f := NewFramework("horizontal-pod-autoscaling")
 
-	BeforeEach(func() {
-		Skip("Skipped Horizontal pod autoscaling test")
-	})
-
-	AfterEach(func() {
-	})
-
 	// CPU tests
-	It("[Skipped][Horizontal pod autoscaling Suite] should scale from 1 pod to 3 pods (scale resource: CPU)", func() {
+	It("[Skipped][Autoscaling suite] should scale from 1 pod to 3 pods (scale resource: CPU)", func() {
 		rc = NewDynamicResourceConsumer("rc", 1, 700, 0, 800, 100, f)
 		createCPUHorizontalPodAutoscaler(rc, "0.3")
 		rc.WaitForReplicas(3)
@@ -72,7 +65,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	})
 
 	It("[Skipped][Horizontal pod autoscaling Suite] should scale from 1 pod to 3 pods and from 3 to 5 (scale resource: CPU)", func() {
-		rc = NewDynamicResourceConsumer("rc", 1, 300, 0, 400, 100, f)
+		rc = NewDynamicResourceConsumer("rc", 1, 250, 0, 400, 100, f)
 		createCPUHorizontalPodAutoscaler(rc, "0.1")
 		rc.WaitForReplicas(3)
 		rc.ConsumeCPU(700)
@@ -146,7 +139,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 		rc.WaitForReplicas(3)
 		rc.CleanUp()
 	})
-	It("[Skipped][Horizontal pod autoscaling Suite] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: Memory)", func() {
+	It("[Skipped][Autoscaling suite] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: Memory)", func() {
 		rc = NewDynamicResourceConsumer("rc", 5, 0, 700, 100, 800, f)
 		createMemoryHorizontalPodAutoscaler(rc, "300")
 		rc.WaitForReplicas(3)

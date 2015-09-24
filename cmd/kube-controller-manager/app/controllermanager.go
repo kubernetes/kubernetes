@@ -112,7 +112,7 @@ func NewCMServer() *CMServer {
 		ResourceQuotaSyncPeriod:           10 * time.Second,
 		NamespaceSyncPeriod:               5 * time.Minute,
 		PVClaimBinderSyncPeriod:           10 * time.Second,
-		HorizontalPodAutoscalerSyncPeriod: 1 * time.Minute,
+		HorizontalPodAutoscalerSyncPeriod: 30 * time.Second,
 		DeploymentControllerSyncPeriod:    1 * time.Minute,
 		RegisterRetryCount:                10,
 		PodEvictionTimeout:                5 * time.Minute,

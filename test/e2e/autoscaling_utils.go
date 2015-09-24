@@ -227,6 +227,8 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
 func (rc *ResourceConsumer) CleanUp() {
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
+	// Wait some time to ensure all child goroutines are finished.
+	time.Sleep(10 * time.Second)
 	expectNoError(DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
 	expectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
 }

@@ -53,9 +53,11 @@ POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup
-#   influxdb - Heapster, InfluxDB, and Grafana
-#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+#   none           - No cluster monitoring setup
+#   influxdb       - Heapster, InfluxDB, and Grafana
+#   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+#   googleinfluxdb - Enable influxdb and google (except GCM)
+#   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=4}"
