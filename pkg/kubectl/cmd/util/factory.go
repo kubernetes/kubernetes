@@ -31,7 +31,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -140,7 +139,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			switch group {
-			case "api":
+			case "":
 				return client.RESTClient, nil
 			case "experimental":
 				return client.ExperimentalClient.RESTClient, nil
@@ -309,9 +308,9 @@ type schemaClient interface {
 	Get() *client.Request
 }
 
-func getSchemaAndValidate(c schemaClient, data []byte, group, version, cacheDir string) (err error) {
+func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string) (err error) {
 	var schemaData []byte
-	cacheFile := path.Join(cacheDir, group, version, schemaFileName)
+	cacheFile := path.Join(cacheDir, prefix, groupVersion, schemaFileName)
 
 	if len(cacheDir) != 0 {
 		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
@@ -320,14 +319,14 @@ func getSchemaAndValidate(c schemaClient, data []byte, group, version, cacheDir 
 	}
 	if schemaData == nil {
 		schemaData, err = c.Get().
-			AbsPath("/swaggerapi", group, version).
+			AbsPath("/swaggerapi", prefix, groupVersion).
 			Do().
 			Raw()
 		if err != nil {
 			return err
 		}
 		if len(cacheDir) != 0 {
-			if err = os.MkdirAll(path.Join(cacheDir, group, version), 0755); err != nil {
+			if err = os.MkdirAll(path.Join(cacheDir, prefix, groupVersion), 0755); err != nil {
 				return err
 			}
 			tmpFile, err := ioutil.TempFile(cacheDir, "schema")
@@ -363,14 +362,10 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
 	}
 	if group == "experimental" {
-		g, err := latest.Group(group)
-		if err != nil {
-			return err
-		}
 		if c.c.ExperimentalClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
-		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/"+g.Group, version, c.cacheDir)
+		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/", version, c.cacheDir)
 	}
 	return getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 }
