@@ -126,6 +126,9 @@ type CreateResult struct {
 
 // ExtractNodes extracts a slice of Node structs from a CreateResult.
 func (res CreateResult) ExtractNodes() ([]Node, error) {
+	if res.Err != nil {
+		return nil, res.Err
+	}
 	return commonExtractNodes(res.Body)
 }
 
