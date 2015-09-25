@@ -140,7 +140,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.volumeManager = newVolumeManager()
 	kubelet.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), mockCadvisor, "", "", "")
-	kubelet.runtimeState.setNetworkError(nil)
+	kubelet.runtimeState.setNetworkState(nil)
 	fakeClock := &util.FakeClock{Time: time.Now()}
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
@@ -2996,8 +2996,8 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			},
 		},
 	}
-
 	kubelet.runtimeState = newRuntimeState(time.Duration(0))
+	kubelet.runtimeState.setNetworkState(nil)
 	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
