@@ -16,6 +16,8 @@ limitations under the License.
 
 package main
 
+import "fmt"
+
 // Blocks of ``` need to have blank lines on both sides or they don't look
 // right in HTML.
 func updatePreformatted(filePath string, mlines mungeLines) (mungeLines, error) {
@@ -38,4 +40,12 @@ func updatePreformatted(filePath string, mlines mungeLines) (mungeLines, error) 
 		}
 	}
 	return out, nil
+}
+
+// If the file ends on a preformatted line, there must have been an imbalance.
+func checkPreformatBalance(filePath string, mlines mungeLines) (mungeLines, error) {
+	if len(mlines) > 0 && mlines[len(mlines)-1].preformatted {
+		return nil, fmt.Errorf("file ends in preformatted block")
+	}
+	return mlines, nil
 }
