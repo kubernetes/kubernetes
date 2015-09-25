@@ -22,7 +22,6 @@ package network
 import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type fakeNetworkHost struct {
@@ -40,8 +39,4 @@ func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool
 
 func (fnh *fakeNetworkHost) GetKubeClient() client.Interface {
 	return nil
-}
-
-func (nh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
-	return &kubecontainer.FakeRuntime{}
 }
