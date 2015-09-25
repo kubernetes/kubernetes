@@ -362,7 +362,7 @@ func NewMainKubelet(
 
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
-	containerManager, err := newContainerManager(cadvisorInterface, dockerDaemonContainer, systemContainer, resourceContainer)
+	containerManager, err := newContainerManager(mounter, cadvisorInterface, dockerDaemonContainer, systemContainer, resourceContainer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
 	}
@@ -758,6 +758,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 
 	// Move Kubelet to a container.
 	if kl.resourceContainer != "" {
+		// Fixme: I need to reside inside ContainerManager interface.
 		err := util.RunInResourceContainer(kl.resourceContainer)
 		if err != nil {
 			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
