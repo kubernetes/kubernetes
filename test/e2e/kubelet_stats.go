@@ -155,6 +155,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsReque
 	}
 	data, err := c.Post().
 		Prefix("proxy").
+		GroupVersion(client.Core).
 		Resource("nodes").
 		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
 		Suffix("stats/container").
@@ -290,6 +291,7 @@ func formatResourceUsageStats(nodeName string, containerStats map[string]*contai
 func nodeProxyRequest(c *client.Client, node, endpoint string) client.Result {
 	return c.Get().
 		Prefix("proxy").
+		GroupVersion(client.Core).
 		Resource("nodes").
 		Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
 		Suffix(endpoint).

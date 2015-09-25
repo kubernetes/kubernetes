@@ -216,6 +216,7 @@ func (p *ExecOptions) Run() error {
 	// TODO: consider abstracting into a client invocation or client helper
 	req := p.Client.RESTClient.Post().
 		Resource("pods").
+		GroupVersion(client.Core).
 		Name(pod.Name).
 		Namespace(pod.Namespace).
 		SubResource("exec").

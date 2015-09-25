@@ -57,27 +57,27 @@ func (c *nodes) resourceName() string {
 // Create creates a new node.
 func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 	result := &api.Node{}
-	err := c.r.Post().Resource(c.resourceName()).Body(node).Do().Into(result)
+	err := c.r.Post().GroupVersion(Core).Resource(c.resourceName()).Body(node).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of nodes that match that selector in the cluster.
 func (c *nodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	result := &api.NodeList{}
-	err := c.r.Get().Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err := c.r.Get().GroupVersion(Core).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return result, err
 }
 
 // Get gets an existing node.
 func (c *nodes) Get(name string) (*api.Node, error) {
 	result := &api.Node{}
-	err := c.r.Get().Resource(c.resourceName()).Name(name).Do().Into(result)
+	err := c.r.Get().GroupVersion(Core).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return result, err
 }
 
 // Delete deletes an existing node.
 func (c *nodes) Delete(name string) error {
-	return c.r.Delete().Resource(c.resourceName()).Name(name).Do().Error()
+	return c.r.Delete().GroupVersion(Core).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Update updates an existing node.
@@ -87,7 +87,7 @@ func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
 	}
-	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
+	err := c.r.Put().GroupVersion(Core).Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
 	return result, err
 }
 
@@ -97,7 +97,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
 	}
-	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
+	err := c.r.Put().GroupVersion(Core).Resource(c.resourceName()).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
 	return result, err
 }
 
@@ -105,6 +105,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 func (c *nodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
+		GroupVersion(Core).
 		Namespace(api.NamespaceAll).
 		Resource(c.resourceName()).
 		Param("resourceVersion", resourceVersion).

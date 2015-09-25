@@ -118,6 +118,7 @@ func testPreStop(c *client.Client, ns string) {
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 		if body, err := c.Get().
+			GroupVersion(client.Core).
 			Namespace(ns).Prefix("proxy").
 			Resource("pods").
 			Name(podDescr.Name).

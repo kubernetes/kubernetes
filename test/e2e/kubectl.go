@@ -819,6 +819,7 @@ func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse strin
 func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (string, error) {
 	result, err := c.Get().
 		Prefix("proxy").
+		GroupVersion(client.Core).
 		Namespace(ns).
 		Resource("services").
 		Name("frontend").
@@ -845,6 +846,7 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 		Logf("validating pod %s", podID)
 		body, err := c.Get().
 			Prefix("proxy").
+			GroupVersion(client.Core).
 			Namespace(ns).
 			Resource("pods").
 			Name(podID).

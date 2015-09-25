@@ -19,6 +19,7 @@ package resource
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -38,6 +39,8 @@ type Helper struct {
 	Versioner runtime.ResourceVersioner
 	// True if the resource type is scoped to namespaces
 	NamespaceScoped bool
+	// The group/version pair of this resource
+	GroupVersion kclient.GroupVersion
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -48,11 +51,13 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 		Codec:           mapping.Codec,
 		Versioner:       mapping.MetadataAccessor,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		GroupVersion:    kclient.GroupVersion(mapping.APIVersion),
 	}
 }
 
 func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	return m.RESTClient.Get().
+		GroupVersion(m.GroupVersion).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
@@ -63,6 +68,7 @@ func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 // TODO: add field selector
 func (m *Helper) List(namespace, apiVersion string, selector labels.Selector) (runtime.Object, error) {
 	return m.RESTClient.Get().
+		GroupVersion(m.GroupVersion).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		LabelsSelectorParam(selector).
@@ -73,6 +79,7 @@ func (m *Helper) List(namespace, apiVersion string, selector labels.Selector) (r
 func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Prefix("watch").
+		GroupVersion(m.GroupVersion).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Param("resourceVersion", resourceVersion).
@@ -83,6 +90,7 @@ func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelec
 func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Prefix("watch").
+		GroupVersion(m.GroupVersion).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
@@ -92,6 +100,7 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 
 func (m *Helper) Delete(namespace, name string) error {
 	return m.RESTClient.Delete().
+		GroupVersion(m.GroupVersion).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
@@ -129,10 +138,11 @@ func (m *Helper) Create(namespace string, modify bool, data []byte) (runtime.Obj
 }
 
 func (m *Helper) createResource(c RESTClient, resource, namespace string, data []byte) (runtime.Object, error) {
-	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(data).Do().Get()
+	return c.Post().GroupVersion(m.GroupVersion).NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(data).Do().Get()
 }
 func (m *Helper) Patch(namespace, name string, pt api.PatchType, data []byte) (runtime.Object, error) {
 	return m.RESTClient.Patch(pt).
+		GroupVersion(m.GroupVersion).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
@@ -158,7 +168,7 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, data []byte) (r
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
-		serverObj, err := c.Get().Namespace(namespace).Resource(m.Resource).Name(name).Do().Get()
+		serverObj, err := c.Get().GroupVersion(m.GroupVersion).Namespace(namespace).Resource(m.Resource).Name(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
 			return m.replaceResource(c, m.Resource, namespace, name, data)
@@ -181,5 +191,5 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, data []byte) (r
 }
 
 func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string, data []byte) (runtime.Object, error) {
-	return c.Put().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Name(name).Body(data).Do().Get()
+	return c.Put().GroupVersion(m.GroupVersion).NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Name(name).Body(data).Do().Get()
 }

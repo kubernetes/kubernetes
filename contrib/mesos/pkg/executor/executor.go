@@ -493,7 +493,7 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 		// create binding on apiserver
 		log.Infof("Binding '%v/%v' to '%v' with annotations %+v...", pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
 		ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-		err := k.client.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+		err := k.client.Post().GroupVersion(client.Core).Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 		if err != nil {
 			deleteTask()
 			k.sendStatus(driver, newStatus(mutil.NewTaskID(taskId), mesos.TaskState_TASK_FAILED,
@@ -510,7 +510,7 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 		patch.Metadata.Annotations = pod.Annotations
 		patchJson, _ := json.Marshal(patch)
 		log.V(4).Infof("Patching annotations %v of pod %v/%v: %v", pod.Annotations, pod.Namespace, pod.Name, string(patchJson))
-		err := k.client.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
+		err := k.client.Patch(api.MergePatchType).GroupVersion(client.Core).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
 		if err != nil {
 			log.Errorf("Error updating annotations of ready-to-launch pod %v/%v: %v", pod.Namespace, pod.Name, err)
 			deleteTask()

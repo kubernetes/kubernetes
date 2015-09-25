@@ -133,13 +133,13 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		}),
 		s.cache,
 	)
-	lw := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "services", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "services", client.Core, api.NamespaceAll, fields.Everything())
 	cache.NewReflector(lw, &api.Service{}, serviceQueue, serviceSyncPeriod).Run()
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
 
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", client.Core, api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go s.nodeSyncLoop(nodeSyncPeriod)
 	return nil

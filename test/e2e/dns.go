@@ -126,14 +126,15 @@ func createProbeCommand(namesToResolve []string, fileNamePrefix string) (string,
 	return probeCmd, fileNames
 }
 
-func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *client.Client) {
+func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, c *client.Client) {
 	var failed []string
 
 	expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 		failed = []string{}
 		for _, fileName := range fileNames {
-			if _, err := client.Get().
+			if _, err := c.Get().
 				Prefix("proxy").
+				GroupVersion(client.Core).
 				Resource("pods").
 				Namespace(pod.Namespace).
 				Name(pod.Name).

@@ -53,6 +53,7 @@ func newSecrets(c *Client, ns string) *secrets {
 func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Post().
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("secrets").
 		Body(secret).
@@ -67,6 +68,7 @@ func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.Secre
 	result := &api.SecretList{}
 
 	err := s.client.Get().
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("secrets").
 		LabelsSelectorParam(label).
@@ -81,6 +83,7 @@ func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.Secre
 func (s *secrets) Get(name string) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Get().
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("secrets").
 		Name(name).
@@ -94,6 +97,7 @@ func (s *secrets) Get(name string) (*api.Secret, error) {
 func (s *secrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("secrets").
 		Param("resourceVersion", resourceVersion).
@@ -104,6 +108,7 @@ func (s *secrets) Watch(label labels.Selector, field fields.Selector, resourceVe
 
 func (s *secrets) Delete(name string) error {
 	return s.client.Delete().
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("secrets").
 		Name(name).
@@ -114,6 +119,7 @@ func (s *secrets) Delete(name string) error {
 func (s *secrets) Update(secret *api.Secret) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = s.client.Put().
+		GroupVersion(Core).
 		Namespace(s.namespace).
 		Resource("secrets").
 		Name(secret.Name).

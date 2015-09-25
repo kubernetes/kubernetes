@@ -28,6 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+type GroupVersion string
+
+const (
+	// A list of group version constants that logically belong to the high level client
+	Core         = GroupVersion("v1")
+	Experimental = GroupVersion("experimental/v1alpha1")
+)
+
 // Interface holds the methods for clients of Kubernetes,
 // an interface to allow mock testing.
 type Interface interface {
