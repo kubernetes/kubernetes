@@ -349,6 +349,27 @@ func makeFirewallName(name string) string {
 	return fmt.Sprintf("k8s-fw-%s", name)
 }
 
+func (gce *GCECloud) getAddress(name, region string) (string, bool, error) {
+	address, err := gce.service.Addresses.Get(gce.projectID, region, name).Do()
+	if err == nil {
+		return address.Address, true, nil
+	}
+	if isHTTPErrorCode(err, http.StatusNotFound) {
+		return "", false, nil
+	}
+	return "", false, err
+}
+
+func ownsAddress(ip net.IP, addrs []*compute.Address) bool {
+	ipStr := ip.String()
+	for _, addr := range addrs {
+		if addr.Address == ipStr {
+			return true
+		}
+	}
+	return false
+}
+
 // EnsureTCPLoadBalancer is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
@@ -358,6 +379,44 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP n
 	}
 
 	glog.V(2).Infof("Checking if load balancer already exists: %s", name)
+	if loadBalancerIP == nil {
+		glog.V(2).Info("Checking if the external ip address already exists: %s", name)
+		address, exists, err := gce.getAddress(name, region)
+		if err != nil {
+			return nil, fmt.Errorf("error looking for gce address: %v", err)
+		}
+		if !exists {
+			// Note, though static addresses that _aren't_ in use cost money, ones that _are_ in use don't.
+			// However, quota is limited.  TODO: determine quota here
+			op, err := gce.service.Addresses.Insert(gce.projectID, region, &compute.Address{Name: name}).Do()
+			if err != nil {
+				return nil, fmt.Errorf("error creating gce address: %v", err)
+			}
+			if err := gce.waitForRegionOp(op, region); err != nil {
+				return nil, fmt.Errorf("error waiting for gce address to complete: %v", err)
+			}
+			address, exists, err = gce.getAddress(name, region)
+			if err != nil {
+				return nil, fmt.Errorf("error re-getting gce address: %v", err)
+			}
+			if !exists {
+				return nil, fmt.Errorf("failed to re-get gce address for %s", name)
+			}
+		}
+		if loadBalancerIP = net.ParseIP(address); loadBalancerIP == nil {
+			return nil, fmt.Errorf("error parsing external IP: %s", address)
+		}
+	} else {
+		addresses, err := gce.service.Addresses.List(gce.projectID, region).Do()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list gce addresses: %v", err)
+		}
+		if !ownsAddress(loadBalancerIP, addresses.Items) {
+			return nil, fmt.Errorf("don't own the address: %s", loadBalancerIP.String())
+		}
+	}
+
+	glog.V(2).Info("Checking if load balancer already exists: %s", name)
 	_, exists, err := gce.GetTCPLoadBalancer(name, region)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if GCE load balancer already exists: %v", err)
@@ -395,6 +454,7 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP n
 	}
 	req := &compute.ForwardingRule{
 		Name:       name,
+		IPAddress:  loadBalancerIP.String(),
 		IPProtocol: "TCP",
 		PortRange:  fmt.Sprintf("%d-%d", minPort, maxPort),
 		Target:     gce.targetPoolURL(name, region),
@@ -538,6 +598,19 @@ func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 			return err
 		}
 	}
+
+	op, err = gce.service.Addresses.Delete(gce.projectID, region, name).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Address %s is already deleted.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete Address %s, got error %v", name, err)
+		return err
+	}
+	if err := gce.waitForRegionOp(op, region); err != nil {
+		glog.Warningf("Failed waiting for address %s to be deleted, got error: %v", name, err)
+		return err
+	}
+
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Target pool %s already deleted.", name)
