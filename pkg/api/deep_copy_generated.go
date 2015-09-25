@@ -28,6 +28,7 @@ import (
 	labels "k8s.io/kubernetes/pkg/labels"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	util "k8s.io/kubernetes/pkg/util"
+	sets "k8s.io/kubernetes/pkg/util/sets"
 	inf "speter.net/go/exp/math/dec/inf"
 )
 
@@ -1511,6 +1512,20 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if newVal, err := c.DeepCopy(in.AntiAffinitySelectors[i]); err != nil {
+				return err
+			} else if newVal == nil {
+				out.AntiAffinitySelectors[i] = nil
+			} else {
+				out.AntiAffinitySelectors[i] = newVal.(labels.LabelSelector)
+			}
+		}
+	} else {
+		out.AntiAffinitySelectors = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
@@ -2267,10 +2282,32 @@ func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.Typ
 	return nil
 }
 
+func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.StrValues != nil {
+		out.StrValues = make(sets.String)
+		for key, val := range in.StrValues {
+			newVal := new(sets.Empty)
+			if err := deepCopy_sets_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
 func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.IntVal = in.IntVal
 	out.StrVal = in.StrVal
+	return nil
+}
+
+func deepCopy_sets_Empty(in sets.Empty, out *sets.Empty, c *conversion.Cloner) error {
 	return nil
 }
 
@@ -2397,7 +2434,9 @@ func init() {
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
+		deepCopy_labels_Requirement,
 		deepCopy_util_IntOrString,
+		deepCopy_sets_Empty,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -1205,6 +1206,8 @@ type PodSpec struct {
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// AntiAffinitySelectors are selectors which must not match against existing pods labels for the pod to fit on a node
+	AntiAffinitySelectors []labels.LabelSelector `json:"antiAffinitySelectors,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
 	// More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md

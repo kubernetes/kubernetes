@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func addConversionFuncs() {
@@ -277,6 +278,16 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if err := s.Convert(&in.AntiAffinitySelectors[i], &out.AntiAffinitySelectors[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.AntiAffinitySelectors = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
 	out.DeprecatedServiceAccount = in.ServiceAccountName
@@ -342,6 +353,16 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		}
 	} else {
 		out.NodeSelector = nil
+	}
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if err := s.Convert(&in.AntiAffinitySelectors[i], &out.AntiAffinitySelectors[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.AntiAffinitySelectors = nil
 	}
 	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
 	// If both are specified, ServiceAccountName (the new field) wins.
