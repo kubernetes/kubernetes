@@ -1371,9 +1371,29 @@ type ReplicationControllerSpec struct {
 	Template *PodTemplateSpec `json:"template,omitempty"`
 }
 
+// ReplicationControllerPhase is a label for the condition of a replicationcontroller at the current time.
+type ReplicationControllerPhase string
+
+// These are the  statuses of replicationcontrollers
+const (
+// Conflicting means the replicationcontroller is conflicted with an older replicationcontroller,
+// which mean the newer rc has the same selector as the older one
+	ReplicationControllerConflicting	 ReplicationControllerPhase = "Conflicting"
+	ReplicationControllerRunning 		 ReplicationControllerPhase = "Running"
+)
+
 // ReplicationControllerStatus represents the current status of a replication
 // controller.
 type ReplicationControllerStatus struct {
+	// Phase indicates if a replicationcontroller is running or conflicting with others
+	Phase ReplicationControllerPhase `json:"phase,omitempty"`
+
+	// (brief) reason for the phase's last transition.
+	Reason string `json:"reason,omitempy"`
+
+	// Human readable message indicating details about the replication selector conflicting.
+	Message string `json:"message,omitempty"`
+
 	// Replicas is the most recently oberved number of replicas.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas int `json:"replicas"`

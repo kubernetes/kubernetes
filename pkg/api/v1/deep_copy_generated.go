@@ -1760,6 +1760,9 @@ func deepCopy_v1_ReplicationControllerSpec(in ReplicationControllerSpec, out *Re
 }
 
 func deepCopy_v1_ReplicationControllerStatus(in ReplicationControllerStatus, out *ReplicationControllerStatus, c *conversion.Cloner) error {
+	out.Phase = ReplicationControllerPhase(in.Phase)
+	out.Reason = in.Reason
+	out.Message = in.Message
 	out.Replicas = in.Replicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil

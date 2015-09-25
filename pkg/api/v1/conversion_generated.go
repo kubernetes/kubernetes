@@ -1899,6 +1899,9 @@ func convert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(i
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerStatus))(in)
 	}
+	out.Phase = ReplicationControllerPhase(in.Phase)
+	out.Reason = in.Reason
+	out.Message = in.Message
 	out.Replicas = in.Replicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
@@ -4334,6 +4337,9 @@ func convert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStatus(i
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerStatus))(in)
 	}
+	out.Phase = api.ReplicationControllerPhase(in.Phase)
+	out.Reason = in.Reason
+	out.Message = in.Message
 	out.Replicas = in.Replicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
