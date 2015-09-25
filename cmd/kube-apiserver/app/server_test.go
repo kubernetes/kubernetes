@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"reflect"
 	"regexp"
 	"testing"
 )
@@ -58,6 +59,42 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	for _, path := range doMatch {
 		if !regexp.MatchString(path) {
 			t.Errorf("path should have match regexp did not: %s", path)
+		}
+	}
+}
+
+func TestGenerateStorageVersionMap(t *testing.T) {
+	testCases := []struct {
+		legacyVersion   string
+		storageVersions string
+		expectedMap     map[string]string
+	}{
+		{
+			legacyVersion:   "v1",
+			storageVersions: "v1,experimental/v1alpha1",
+			expectedMap: map[string]string{
+				"":             "v1",
+				"experimental": "experimental/v1alpha1",
+			},
+		},
+		{
+			legacyVersion:   "",
+			storageVersions: "experimental/v1alpha1,v1",
+			expectedMap: map[string]string{
+				"":             "v1",
+				"experimental": "experimental/v1alpha1",
+			},
+		},
+		{
+			legacyVersion:   "",
+			storageVersions: "",
+			expectedMap:     map[string]string{},
+		},
+	}
+	for _, test := range testCases {
+		output := generateStorageVersionMap(test.legacyVersion, test.storageVersions)
+		if !reflect.DeepEqual(test.expectedMap, output) {
+			t.Errorf("unexpected error. expect: %v, got: %v", test.expectedMap, output)
 		}
 	}
 }
