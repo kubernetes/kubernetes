@@ -34,8 +34,8 @@ package proto_test
 import (
 	"testing"
 
-	pb "./testdata"
 	. "github.com/gogo/protobuf/proto"
+	pb "github.com/gogo/protobuf/proto/testdata"
 )
 
 // Four identical base messages.
@@ -154,6 +154,49 @@ var EqualTests = []struct {
 			},
 		},
 		true,
+	},
+
+	{
+		"map same",
+		&pb.MessageWithMap{NameMapping: map[int32]string{1: "Ken"}},
+		&pb.MessageWithMap{NameMapping: map[int32]string{1: "Ken"}},
+		true,
+	},
+	{
+		"map different entry",
+		&pb.MessageWithMap{NameMapping: map[int32]string{1: "Ken"}},
+		&pb.MessageWithMap{NameMapping: map[int32]string{2: "Rob"}},
+		false,
+	},
+	{
+		"map different key only",
+		&pb.MessageWithMap{NameMapping: map[int32]string{1: "Ken"}},
+		&pb.MessageWithMap{NameMapping: map[int32]string{2: "Ken"}},
+		false,
+	},
+	{
+		"map different value only",
+		&pb.MessageWithMap{NameMapping: map[int32]string{1: "Ken"}},
+		&pb.MessageWithMap{NameMapping: map[int32]string{1: "Rob"}},
+		false,
+	},
+	{
+		"oneof same",
+		&pb.Communique{Union: &pb.Communique_Number{Number: 41}},
+		&pb.Communique{Union: &pb.Communique_Number{Number: 41}},
+		true,
+	},
+	{
+		"oneof one nil",
+		&pb.Communique{Union: &pb.Communique_Number{Number: 41}},
+		&pb.Communique{},
+		false,
+	},
+	{
+		"oneof different",
+		&pb.Communique{Union: &pb.Communique_Number{Number: 41}},
+		&pb.Communique{Union: &pb.Communique_Name{Name: "Bobby Tables"}},
+		false,
 	},
 }
 

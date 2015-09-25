@@ -60,12 +60,17 @@ func TestAuthticatee_validLogin(t *testing.T) {
 	factory := transportFactoryFunc(func() messenger.Messenger {
 		transport = &MockTransport{messenger.NewMockedMessenger()}
 		transport.On("Install").Return(nil)
-		transport.On("UPID").Return(&tpid)
+		transport.On("UPID").Return(tpid)
 		transport.On("Start").Return(nil)
 		transport.On("Stop").Return(nil)
+
+		mechMsg := make(chan struct{})
+		stepMsg := make(chan struct{})
+
 		transport.On("Send", mock.Anything, &server, &mesos.AuthenticateMessage{
 			Pid: proto.String(client.String()),
 		}).Return(nil).Run(func(_ mock.Arguments) {
+			defer close(mechMsg)
 			transport.Recv(&server, &mesos.AuthenticationMechanismsMessage{
 				Mechanisms: []string{crammd5.Name},
 			})
@@ -73,8 +78,9 @@ func TestAuthticatee_validLogin(t *testing.T) {
 
 		transport.On("Send", mock.Anything, &server, &mesos.AuthenticationStartMessage{
 			Mechanism: proto.String(crammd5.Name),
-			Data:      proto.String(""), // may be nil, depends on init step
 		}).Return(nil).Run(func(_ mock.Arguments) {
+			defer close(stepMsg)
+			<-mechMsg
 			transport.Recv(&server, &mesos.AuthenticationStepMessage{
 				Data: []byte(`lsd;lfkgjs;dlfkgjs;dfklg`),
 			})
@@ -83,6 +89,7 @@ func TestAuthticatee_validLogin(t *testing.T) {
 		transport.On("Send", mock.Anything, &server, &mesos.AuthenticationStepMessage{
 			Data: []byte(`foo cc7fd96cd80123ea844a7dba29a594ed`),
 		}).Return(nil).Run(func(_ mock.Arguments) {
+			<-stepMsg
 			transport.Recv(&server, &mesos.AuthenticationCompletedMessage{})
 		}).Once()
 

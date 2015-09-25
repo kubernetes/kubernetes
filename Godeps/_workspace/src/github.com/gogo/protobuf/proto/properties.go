@@ -89,6 +89,12 @@ type decoder func(p *Buffer, prop *Properties, base structPointer) error
 // A valueDecoder decodes a single integer in a particular encoding.
 type valueDecoder func(o *Buffer) (x uint64, err error)
 
+// A oneofMarshaler does the marshaling for all oneof fields in a message.
+type oneofMarshaler func(Message, *Buffer) error
+
+// A oneofUnmarshaler does the unmarshaling for a oneof field in a message.
+type oneofUnmarshaler func(Message, int, int, *Buffer) (bool, error)
+
 // tagMap is an optimization over map[int]int for typical protocol buffer
 // use-cases. Encoded protocol buffers are often in tag order with small tag
 // numbers.
@@ -137,6 +143,21 @@ type StructProperties struct {
 	order            []int          // list of struct field numbers in tag order
 	unrecField       field          // field id of the XXX_unrecognized []byte field
 	extendable       bool           // is this an extendable proto
+
+	oneofMarshaler   oneofMarshaler
+	oneofUnmarshaler oneofUnmarshaler
+	stype            reflect.Type
+
+	// OneofTypes contains information about the oneof fields in this message.
+	// It is keyed by the original name of a field.
+	OneofTypes map[string]*OneofProperties
+}
+
+// OneofProperties represents information about a specific field in a oneof.
+type OneofProperties struct {
+	Type  reflect.Type // pointer to generated struct type for this oneof field
+	Field int          // struct field number of the containing oneof in the message
+	Prop  *Properties
 }
 
 // Implement the sorting interface so we can sort the fields in tag order, as recommended by the spec.
@@ -160,6 +181,8 @@ type Properties struct {
 	Repeated bool
 	Packed   bool   // relevant for repeated primitives only
 	Enum     string // set for enum types only
+	proto3   bool   // whether this is known to be a proto3 field; set for []byte only
+	oneof    bool   // whether this is a oneof field
 
 	Default    string // default value
 	HasDefault bool   // whether an explicit default was provided
@@ -177,6 +200,10 @@ type Properties struct {
 	sprop         *StructProperties // set for struct types only
 	isMarshaler   bool
 	isUnmarshaler bool
+
+	mtype    reflect.Type // set for map types only
+	mkeyprop *Properties  // set for map types only
+	mvalprop *Properties  // set for map types only
 
 	size    sizer
 	valSize valueSizer // set for bool and numeric types only
@@ -207,6 +234,12 @@ func (p *Properties) String() string {
 	}
 	if p.OrigName != p.Name {
 		s += ",name=" + p.OrigName
+	}
+	if p.proto3 {
+		s += ",proto3"
+	}
+	if p.oneof {
+		s += ",oneof"
 	}
 	if len(p.Enum) > 0 {
 		s += ",enum=" + p.Enum
@@ -282,6 +315,10 @@ func (p *Properties) Parse(s string) {
 			p.OrigName = f[5:]
 		case strings.HasPrefix(f, "enum="):
 			p.Enum = f[5:]
+		case f == "proto3":
+			p.proto3 = true
+		case f == "oneof":
+			p.oneof = true
 		case strings.HasPrefix(f, "def="):
 			p.HasDefault = true
 			p.Default = f[4:] // rest of string
@@ -305,7 +342,7 @@ func logNoSliceEnc(t1, t2 reflect.Type) {
 var protoMessageType = reflect.TypeOf((*Message)(nil)).Elem()
 
 // Initialize the fields for encoding and decoding.
-func (p *Properties) setEncAndDec(typ reflect.Type, lockGetProp bool) {
+func (p *Properties) setEncAndDec(typ reflect.Type, f *reflect.StructField, lockGetProp bool) {
 	p.enc = nil
 	p.dec = nil
 	p.size = nil
@@ -316,13 +353,96 @@ func (p *Properties) setEncAndDec(typ reflect.Type, lockGetProp bool) {
 	}
 	switch t1 := typ; t1.Kind() {
 	default:
-		if !p.setNonNullableEncAndDec(t1) {
-			fmt.Fprintf(os.Stderr, "proto: no coders for %v\n", t1)
+		fmt.Fprintf(os.Stderr, "proto: no coders for %v\n", t1)
+
+	// proto3 scalar types
+
+	case reflect.Bool:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_bool
+			p.dec = (*Buffer).dec_proto3_bool
+			p.size = size_proto3_bool
+		} else {
+			p.enc = (*Buffer).enc_ref_bool
+			p.dec = (*Buffer).dec_proto3_bool
+			p.size = size_ref_bool
 		}
+	case reflect.Int32:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_int32
+			p.dec = (*Buffer).dec_proto3_int32
+			p.size = size_proto3_int32
+		} else {
+			p.enc = (*Buffer).enc_ref_int32
+			p.dec = (*Buffer).dec_proto3_int32
+			p.size = size_ref_int32
+		}
+	case reflect.Uint32:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_uint32
+			p.dec = (*Buffer).dec_proto3_int32 // can reuse
+			p.size = size_proto3_uint32
+		} else {
+			p.enc = (*Buffer).enc_ref_uint32
+			p.dec = (*Buffer).dec_proto3_int32 // can reuse
+			p.size = size_ref_uint32
+		}
+	case reflect.Int64, reflect.Uint64:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_int64
+			p.dec = (*Buffer).dec_proto3_int64
+			p.size = size_proto3_int64
+		} else {
+			p.enc = (*Buffer).enc_ref_int64
+			p.dec = (*Buffer).dec_proto3_int64
+			p.size = size_ref_int64
+		}
+	case reflect.Float32:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_uint32 // can just treat them as bits
+			p.dec = (*Buffer).dec_proto3_int32
+			p.size = size_proto3_uint32
+		} else {
+			p.enc = (*Buffer).enc_ref_uint32 // can just treat them as bits
+			p.dec = (*Buffer).dec_proto3_int32
+			p.size = size_ref_uint32
+		}
+	case reflect.Float64:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_int64 // can just treat them as bits
+			p.dec = (*Buffer).dec_proto3_int64
+			p.size = size_proto3_int64
+		} else {
+			p.enc = (*Buffer).enc_ref_int64 // can just treat them as bits
+			p.dec = (*Buffer).dec_proto3_int64
+			p.size = size_ref_int64
+		}
+	case reflect.String:
+		if p.proto3 {
+			p.enc = (*Buffer).enc_proto3_string
+			p.dec = (*Buffer).dec_proto3_string
+			p.size = size_proto3_string
+		} else {
+			p.enc = (*Buffer).enc_ref_string
+			p.dec = (*Buffer).dec_proto3_string
+			p.size = size_ref_string
+		}
+	case reflect.Struct:
+		p.stype = typ
+		p.isMarshaler = isMarshaler(typ)
+		p.isUnmarshaler = isUnmarshaler(typ)
+		if p.Wire == "bytes" {
+			p.enc = (*Buffer).enc_ref_struct_message
+			p.dec = (*Buffer).dec_ref_struct_message
+			p.size = size_ref_struct_message
+		} else {
+			fmt.Fprintf(os.Stderr, "proto: no coders for struct %T\n", typ)
+		}
+
 	case reflect.Ptr:
 		switch t2 := t1.Elem(); t2.Kind() {
 		default:
-			fmt.Fprintf(os.Stderr, "proto: no encoder function for %T -> %T\n", t1, t2)
+			fmt.Fprintf(os.Stderr, "proto: no encoder function for %v -> %v\n", t1, t2)
 			break
 		case reflect.Bool:
 			p.enc = (*Buffer).enc_bool
@@ -416,6 +536,15 @@ func (p *Properties) setEncAndDec(typ reflect.Type, lockGetProp bool) {
 			p.enc = (*Buffer).enc_slice_byte
 			p.dec = (*Buffer).dec_slice_byte
 			p.size = size_slice_byte
+			// This is a []byte, which is either a bytes field,
+			// or the value of a map field. In the latter case,
+			// we always encode an empty []byte, so we should not
+			// use the proto3 enc/size funcs.
+			// f == nil iff this is the key/value of a map field.
+			if p.proto3 && f != nil {
+				p.enc = (*Buffer).enc_proto3_slice_byte
+				p.size = size_proto3_slice_byte
+			}
 		case reflect.Float32, reflect.Float64:
 			switch t2.Bits() {
 			case 32:
@@ -480,6 +609,23 @@ func (p *Properties) setEncAndDec(typ reflect.Type, lockGetProp bool) {
 		case reflect.Struct:
 			p.setSliceOfNonPointerStructs(t1)
 		}
+
+	case reflect.Map:
+		p.enc = (*Buffer).enc_new_map
+		p.dec = (*Buffer).dec_new_map
+		p.size = size_new_map
+
+		p.mtype = t1
+		p.mkeyprop = &Properties{}
+		p.mkeyprop.init(reflect.PtrTo(p.mtype.Key()), "Key", f.Tag.Get("protobuf_key"), nil, lockGetProp)
+		p.mvalprop = &Properties{}
+		vtype := p.mtype.Elem()
+		if vtype.Kind() != reflect.Ptr && vtype.Kind() != reflect.Slice {
+			// The value type is not a message (*T) or bytes ([]byte),
+			// so we need encoders for the pointer to this type.
+			vtype = reflect.PtrTo(vtype)
+		}
+		p.mvalprop.init(vtype, "Value", f.Tag.Get("protobuf_val"), nil, lockGetProp)
 	}
 	p.setTag(lockGetProp)
 }
@@ -539,11 +685,11 @@ func (p *Properties) init(typ reflect.Type, name, tag string, f *reflect.StructF
 		return
 	}
 	p.Parse(tag)
-	p.setEncAndDec(typ, lockGetProp)
+	p.setEncAndDec(typ, f, lockGetProp)
 }
 
 var (
-	mutex         sync.Mutex
+	propertiesMu  sync.RWMutex
 	propertiesMap = make(map[reflect.Type]*StructProperties)
 )
 
@@ -553,13 +699,26 @@ func GetProperties(t reflect.Type) *StructProperties {
 	if t.Kind() != reflect.Struct {
 		panic("proto: type must have kind struct")
 	}
-	mutex.Lock()
-	sprop := getPropertiesLocked(t)
-	mutex.Unlock()
+
+	// Most calls to GetProperties in a long-running program will be
+	// retrieving details for types we have seen before.
+	propertiesMu.RLock()
+	sprop, ok := propertiesMap[t]
+	propertiesMu.RUnlock()
+	if ok {
+		if collectStats {
+			stats.Chit++
+		}
+		return sprop
+	}
+
+	propertiesMu.Lock()
+	sprop = getPropertiesLocked(t)
+	propertiesMu.Unlock()
 	return sprop
 }
 
-// getPropertiesLocked requires that mutex is held.
+// getPropertiesLocked requires that propertiesMu is held.
 func getPropertiesLocked(t reflect.Type) *StructProperties {
 	if prop, ok := propertiesMap[t]; ok {
 		if collectStats {
@@ -601,6 +760,7 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 		if f.Name == "XXX_unrecognized" { // special case
 			prop.unrecField = toField(&f)
 		}
+		oneof := f.Tag.Get("protobuf_oneof") != "" // special case
 		prop.Prop[i] = p
 		prop.order[i] = i
 		if debug {
@@ -610,13 +770,48 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 			}
 			print("\n")
 		}
-		if p.enc == nil && !strings.HasPrefix(f.Name, "XXX_") {
+		if p.enc == nil && !strings.HasPrefix(f.Name, "XXX_") && !oneof {
 			fmt.Fprintln(os.Stderr, "proto: no encoder for", f.Name, f.Type.String(), "[GetProperties]")
 		}
 	}
 
 	// Re-order prop.order.
 	sort.Sort(prop)
+
+	type oneofMessage interface {
+		XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), []interface{})
+	}
+	if om, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); ok {
+		var oots []interface{}
+		prop.oneofMarshaler, prop.oneofUnmarshaler, oots = om.XXX_OneofFuncs()
+		prop.stype = t
+
+		// Interpret oneof metadata.
+		prop.OneofTypes = make(map[string]*OneofProperties)
+		for _, oot := range oots {
+			oop := &OneofProperties{
+				Type: reflect.ValueOf(oot).Type(), // *T
+				Prop: new(Properties),
+			}
+			sft := oop.Type.Elem().Field(0)
+			oop.Prop.Name = sft.Name
+			oop.Prop.Parse(sft.Tag.Get("protobuf"))
+			// There will be exactly one interface field that
+			// this new value is assignable to.
+			for i := 0; i < t.NumField(); i++ {
+				f := t.Field(i)
+				if f.Type.Kind() != reflect.Interface {
+					continue
+				}
+				if !oop.Type.AssignableTo(f.Type) {
+					continue
+				}
+				oop.Field = i
+				break
+			}
+			prop.OneofTypes[oop.Prop.OrigName] = oop
+		}
+	}
 
 	// build required counts
 	// build tags
