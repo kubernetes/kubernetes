@@ -131,7 +131,7 @@ func TestProc_multiAction(t *testing.T) {
 			defer called.Done()
 			log.Infof("deferred action invoked")
 			if next != idx {
-				t.Fatalf("expected index %d instead of %d", idx, next)
+				t.Errorf("expected index %d instead of %d", idx, next)
 			}
 			next++
 		})
@@ -181,7 +181,7 @@ func TestProc_doWith(t *testing.T) {
 	err := decorated.Do(func() {
 		defer close(executed)
 		if !delegated {
-			t.Fatalf("expected delegated execution")
+			t.Errorf("expected delegated execution")
 		}
 	})
 	if err == nil {
@@ -215,7 +215,7 @@ func TestProc_doWithNestedTwice(t *testing.T) {
 	err := decorated2.Do(func() {
 		defer close(executed)
 		if !delegated {
-			t.Fatalf("expected delegated execution")
+			t.Errorf("expected delegated execution")
 		}
 	})
 	if err == nil {
@@ -254,7 +254,7 @@ func TestProc_doWithNestedErrorPropagation(t *testing.T) {
 	errCh := decorated2.Do(func() {
 		defer close(executed)
 		if !delegated {
-			t.Fatalf("expected delegated execution")
+			t.Errorf("expected delegated execution")
 		}
 		errOnce.Report(expectedErr)
 	})
@@ -333,6 +333,9 @@ func runDelegationTest(t *testing.T, p Process, name string, errOnce ErrorOnce) 
 
 	<-executed
 	t.Logf("runDelegationTest received executed signal at " + time.Now().String())
+
+	wg.Wait()
+	t.Logf("runDelegationTest nested decorators finished at " + time.Now().String())
 }
 
 func TestProc_doWithNestedX(t *testing.T) {
@@ -367,7 +370,7 @@ func TestProc_doWithNestedXConcurrent(t *testing.T) {
 		go func() {
 			err, _ := <-errOnce.Err()
 			if err != nil {
-				t.Fatalf("delegate %d: unexpected error: %v", i, err)
+				t.Errorf("delegate %d: unexpected error: %v", i, err)
 			}
 		}()
 	}
