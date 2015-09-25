@@ -33,7 +33,7 @@ type Capabilities struct {
 	PerConnectionBandwidthLimitBytesPerSec int64
 
 	// EnableSELinuxIntegration controls whether SELinux
-	// integration is expected from Kubernets
+	// integration is expected from Kubernetes
 	EnableSELinuxIntegration bool
 }
 

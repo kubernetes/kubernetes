@@ -2349,12 +2349,12 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	networkConfigured := kl.doneNetworkConfigure()
 
 	selinuxRequired := capabilities.Get().EnableSELinuxIntegration
-	selinuxConfigured := (selinuxRequired && selinux.SelinuxEnabled()) || !selinuxRequired
+	selinuxOK := (selinuxRequired && selinux.SelinuxEnabled()) || !selinuxRequired
 
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && networkConfigured && selinuxConfigured {
+	if containerRuntimeUp && networkConfigured && selinuxOK {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -2371,8 +2371,8 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		if !networkConfigured {
 			messages = append(reasons, "network not configured correctly")
 		}
-		if !selinuxConfigured {
-			messages = append(reasons, "SELinux is required by the cluster but not enabled on this node")
+		if !selinuxOK {
+			messages = append(reasons, "SELinux integration is enabled in the cluster but SELinux is not enabled on this node.")
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,

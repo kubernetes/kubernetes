@@ -1923,7 +1923,7 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 	}
 
 	if sc.SELinuxOptions != nil && !capabilities.Get().EnableSELinuxIntegration {
-		allErrs = append(allErrs, errs.NewFieldForbidden("selinuxOptions", "Cannot specify selinuxOptions if SELinux integration is not enabled"))
+		allErrs = append(allErrs, errs.NewFieldForbidden("seLinuxOptions", "Cannot specify seLinuxOptions if SELinux integration is not enabled"))
 	}
 	return allErrs
 }
