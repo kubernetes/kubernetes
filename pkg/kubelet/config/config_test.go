@@ -298,3 +298,26 @@ func TestPodUpdateAnnotations(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 }
+
+func TestPodUpdateLables(t *testing.T) {
+	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
+
+	pod := CreateValidPod("foo2", "new")
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels["key"] = "value"
+
+	clone, err := conversion.NewCloner().DeepCopy(pod)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	podUpdate := CreatePodUpdate(kubelet.SET, TestSource, clone.(*api.Pod))
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, TestSource, pod))
+
+	pod.Labels["key"] = "newValue"
+	podUpdate = CreatePodUpdate(kubelet.SET, TestSource, pod)
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
+
+}
