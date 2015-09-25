@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -50,6 +51,9 @@ type jobs struct {
 func newJobs(c *ExperimentalClient, namespace string) *jobs {
 	return &jobs{c, namespace}
 }
+
+// Ensure statically that jobs implements JobInterface.
+var _ JobInterface = &jobs{}
 
 // List returns a list of jobs that match the label and field selectors.
 func (c *jobs) List(label labels.Selector, field fields.Selector) (result *experimental.JobList, err error) {
@@ -85,7 +89,7 @@ func (c *jobs) Delete(name string, options *api.DeleteOptions) (err error) {
 		return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Do().Error()
 	}
 
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, latest.GroupOrDie("").GroupVersion)
 	if err != nil {
 		return err
 	}
