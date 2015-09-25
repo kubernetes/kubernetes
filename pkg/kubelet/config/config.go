@@ -400,6 +400,7 @@ func updateAnnotations(existing, ref *api.Pod) {
 
 func podsDifferSemantically(existing, ref *api.Pod) bool {
 	if reflect.DeepEqual(existing.Spec, ref.Spec) &&
+		reflect.DeepEqual(existing.Labels, ref.Labels) &&
 		reflect.DeepEqual(existing.DeletionTimestamp, ref.DeletionTimestamp) &&
 		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) &&
 		isAnnotationMapEqual(existing.Annotations, ref.Annotations) {
@@ -423,6 +424,7 @@ func checkAndUpdatePod(existing, ref *api.Pod) bool {
 	ref.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubelet.ConfigFirstSeenAnnotationKey]
 
 	existing.Spec = ref.Spec
+	existing.Labels = ref.Labels
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
 	updateAnnotations(existing, ref)
