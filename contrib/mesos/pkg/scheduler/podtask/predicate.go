@@ -19,7 +19,6 @@ package podtask
 import (
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
-	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
@@ -59,22 +58,11 @@ func NodeSelectorPredicate(t *T, offer *mesos.Offer, n *api.Node) bool {
 
 	// check the NodeSelector
 	if len(t.Pod.Spec.NodeSelector) > 0 {
-		l := map[string]string{
-			"kubernetes.io/hostname": offer.GetHostname(),
+		if n.Labels == nil {
+			return false
 		}
-		if n != nil && n.Labels != nil {
-			for k, v := range n.Labels {
-				if !node.IsSlaveAttributeLabel(k) {
-					l[k] = v
-				}
-			}
-		}
-		for k, v := range node.SlaveAttributesToLabels(offer.Attributes) {
-			l[k] = v
-		}
-
 		selector := labels.SelectorFromSet(t.Pod.Spec.NodeSelector)
-		if !selector.Matches(labels.Set(l)) {
+		if !selector.Matches(labels.Set(n.Labels)) {
 			return false
 		}
 	}

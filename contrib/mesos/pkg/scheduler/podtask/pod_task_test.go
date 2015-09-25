@@ -19,14 +19,14 @@ package podtask
 import (
 	"testing"
 
+	"github.com/gogo/protobuf/proto"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-
-	"github.com/gogo/protobuf/proto"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -270,13 +270,6 @@ func TestGeneratePodName(t *testing.T) {
 func TestNodeSelector(t *testing.T) {
 	t.Parallel()
 
-	sel1 := map[string]string{"k8s.mesosphere.io/attribute-rack": "a"}
-	sel2 := map[string]string{"k8s.mesosphere.io/attribute-rack": "a", "k8s.mesosphere.io/attribute-gen": "2014"}
-	sel3 := map[string]string{"kubernetes.io/hostname": "node1"}
-	sel4 := map[string]string{"kubernetes.io/hostname": "node2"}
-	sel5 := map[string]string{"k8s.mesosphere.io/attribute-old": "42"}
-	sel6 := map[string]string{"some.other/label": "43"}
-
 	newNode := func(hostName string, l map[string]string) *api.Node {
 		nodeLabels := map[string]string{"kubernetes.io/hostname": hostName}
 		if l != nil {
@@ -294,37 +287,43 @@ func TestNodeSelector(t *testing.T) {
 			},
 		}
 	}
-	node1 := newNode("node1", nil)
-	node2 := newNode("node2", nil)
-	node3 := newNode("node3", map[string]string{
-		"k8s.mesosphere.io/attribute-old": "42",
-		"k8s.mesosphere.io/attribute-gen": "2015",
-		"some.other/label":                "43",
+	node1 := newNode("node1", node.SlaveAttributesToLabels([]*mesos.Attribute{
+		newTextAttribute("rack", "a"),
+		newTextAttribute("gen", "2014"),
+		newScalarAttribute("num", 42.0),
+	}))
+	node2 := newNode("node2", node.SlaveAttributesToLabels([]*mesos.Attribute{
+		newTextAttribute("rack", "b"),
+		newTextAttribute("gen", "2015"),
+		newScalarAttribute("num", 0.0),
+	}))
+	labels3 := node.SlaveAttributesToLabels([]*mesos.Attribute{
+		newTextAttribute("rack", "c"),
+		newTextAttribute("gen", "2015"),
+		newScalarAttribute("old", 42),
 	})
+	labels3["some.other/label"] = "43"
+	node3 := newNode("node3", labels3)
 
 	tests := []struct {
 		selector map[string]string
-		attrs    []*mesos.Attribute
 		node     *api.Node
 		ok       bool
 		desc     string
 	}{
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a")}, node1, true, "label value matches"},
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "b")}, node1, false, "label value does not match"},
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, node1, true, "required labels match"},
-		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newScalarAttribute("num", 42.0)}, node1, true, "scalar label matches"},
-		{sel1, []*mesos.Attribute{newScalarAttribute("rack", 42.0)}, node1, false, "scalar label does not match"},
-		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, node1, true, "all labels match"},
-		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2015")}, node1, false, "one label does not match"},
+		{map[string]string{"k8s.mesosphere.io/attribute-rack": "a"}, node1, true, "label value matches"},
+		{map[string]string{"k8s.mesosphere.io/attribute-rack": "b"}, node1, false, "label value does not match"},
+		{map[string]string{"k8s.mesosphere.io/attribute-rack": "a", "k8s.mesosphere.io/attribute-gen": "2014"}, node1, true, "multiple required labels match"},
+		{map[string]string{"k8s.mesosphere.io/attribute-rack": "a", "k8s.mesosphere.io/attribute-gen": "2015"}, node1, false, "one label does not match"},
+		{map[string]string{"k8s.mesosphere.io/attribute-rack": "a", "k8s.mesosphere.io/attribute-num": "42"}, node1, true, "scalar label matches"},
+		{map[string]string{"k8s.mesosphere.io/attribute-rack": "a", "k8s.mesosphere.io/attribute-num": "43"}, node1, false, "scalar label does not match"},
 
-		{sel3, []*mesos.Attribute{}, node1, true, "hostname label matches"},
-		{sel4, []*mesos.Attribute{}, node1, false, "hostname label does not match"},
-		{sel4, []*mesos.Attribute{}, node2, true, "hostname label does not match"},
+		{map[string]string{"kubernetes.io/hostname": "node1"}, node1, true, "hostname label matches"},
+		{map[string]string{"kubernetes.io/hostname": "node2"}, node1, false, "hostname label does not match"},
+		{map[string]string{"kubernetes.io/hostname": "node2"}, node2, true, "hostname label matches"},
 
-		{sel5, []*mesos.Attribute{}, node3, false, "old slave attribute is removed"},
-		{sel6, []*mesos.Attribute{}, node1, false, "non-slave attribute does not match"},
-		{sel6, []*mesos.Attribute{}, node3, true, "non-slave attribute matches"},
-		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, node3, true, "old slave attributes are overwritten"},
+		{map[string]string{"some.other/label": "43"}, node1, false, "non-slave attribute does not match"},
+		{map[string]string{"some.other/label": "43"}, node3, true, "non-slave attribute matches"},
 	}
 
 	for _, ts := range tests {
@@ -335,8 +334,7 @@ func TestNodeSelector(t *testing.T) {
 				mutil.NewScalarResource("cpus", t_min_cpu),
 				mutil.NewScalarResource("mem", t_min_mem),
 			},
-			Attributes: ts.attrs,
-			Hostname:   &ts.node.Name,
+			Hostname: &ts.node.Name,
 		}
 		if got, want := DefaultPredicate(task, offer, ts.node), ts.ok; got != want {
 			t.Fatalf("expected acceptance of offer for selector %v to be %v, got %v: %q", ts.selector, want, got, ts.desc)
