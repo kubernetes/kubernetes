@@ -60,32 +60,36 @@ func (f *FakePodControl) clear() {
 }
 
 func TestGC(t *testing.T) {
+	type nameToPhase struct {
+		name  string
+		phase api.PodPhase
+	}
 
 	testCases := []struct {
-		pods            map[string]api.PodPhase
+		pods            []nameToPhase
 		threshold       int
 		deletedPodNames sets.String
 	}{
 		{
-			pods: map[string]api.PodPhase{
-				"a": api.PodFailed,
-				"b": api.PodSucceeded,
+			pods: []nameToPhase{
+				{name: "a", phase: api.PodFailed},
+				{name: "b", phase: api.PodSucceeded},
 			},
 			threshold:       0,
 			deletedPodNames: sets.NewString("a", "b"),
 		},
 		{
-			pods: map[string]api.PodPhase{
-				"a": api.PodFailed,
-				"b": api.PodSucceeded,
+			pods: []nameToPhase{
+				{name: "a", phase: api.PodFailed},
+				{name: "b", phase: api.PodSucceeded},
 			},
 			threshold:       1,
 			deletedPodNames: sets.NewString("a"),
 		},
 		{
-			pods: map[string]api.PodPhase{
-				"a": api.PodFailed,
-				"b": api.PodSucceeded,
+			pods: []nameToPhase{
+				{name: "a", phase: api.PodFailed},
+				{name: "b", phase: api.PodSucceeded},
 			},
 			threshold:       5,
 			deletedPodNames: sets.NewString(),
@@ -99,11 +103,11 @@ func TestGC(t *testing.T) {
 		gcc.podControl = fake
 
 		creationTime := time.Unix(0, 0)
-		for name, phase := range test.pods {
+		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Store.Add(&api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: name, CreationTimestamp: unversioned.Time{creationTime}},
-				Status:     api.PodStatus{Phase: phase},
+				ObjectMeta: api.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{creationTime}},
+				Status:     api.PodStatus{Phase: pod.phase},
 			})
 		}
 
@@ -119,7 +123,7 @@ func TestGC(t *testing.T) {
 			pass = false
 		}
 		if !pass {
-			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v", i, test.deletedPodNames.List(), fake.deletePodName)
+			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v", i, test.deletedPodNames, fake.deletePodName)
 		}
 	}
 }
