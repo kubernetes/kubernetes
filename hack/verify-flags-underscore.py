@@ -55,6 +55,8 @@ def get_all_files(rootdir):
         # don't visit certain dirs
         if 'Godeps' in dirs:
             dirs.remove('Godeps')
+        if '_gopath' in dirs:
+            dirs.remove('_gopath')
         if 'third_party' in dirs:
             dirs.remove('third_party')
         if '.git' in dirs:
@@ -77,7 +79,7 @@ def get_all_files(rootdir):
 
 def normalize_files(rootdir, files):
     newfiles = []
-    a = ['Godeps', 'third_party', 'exceptions.txt', 'known-flags.txt']
+    a = ['Godeps', '_gopath', 'third_party', '.git', 'exceptions.txt', 'known-flags.txt']
     for f in files:
         if any(x in f for x in a):
             continue
