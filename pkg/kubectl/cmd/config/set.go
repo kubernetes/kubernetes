@@ -55,7 +55,9 @@ func NewCmdConfigSet(out io.Writer, configAccess ConfigAccess) *cobra.Command {
 
 			err := options.run()
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "property %q set.\n", options.propertyName)
 			}
 		},
 	}
@@ -103,11 +105,11 @@ func (o *setOptions) complete(cmd *cobra.Command) bool {
 
 func (o setOptions) validate() error {
 	if len(o.propertyValue) == 0 {
-		return errors.New("You cannot use set to unset a property")
+		return errors.New("you cannot use set to unset a property")
 	}
 
 	if len(o.propertyName) == 0 {
-		return errors.New("You must specify a property")
+		return errors.New("you must specify a property")
 	}
 
 	return nil
@@ -124,7 +126,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 	switch actualCurrValue.Kind() {
 	case reflect.Map:
 		if !steps.moreStepsRemaining() && !unset {
-			return fmt.Errorf("Can't set a map to a value: %v", actualCurrValue)
+			return fmt.Errorf("can't set a map to a value: %v", actualCurrValue)
 		}
 
 		mapKey := reflect.ValueOf(currStep.stepValue)
@@ -152,14 +154,14 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 	case reflect.String:
 		if steps.moreStepsRemaining() {
-			return fmt.Errorf("Can't have more steps after a string. %v", steps)
+			return fmt.Errorf("can't have more steps after a string. %v", steps)
 		}
 		actualCurrValue.SetString(propertyValue)
 		return nil
 
 	case reflect.Bool:
 		if steps.moreStepsRemaining() {
-			return fmt.Errorf("Can't have more steps after a bool. %v", steps)
+			return fmt.Errorf("can't have more steps after a bool. %v", steps)
 		}
 		boolValue, err := toBool(propertyValue)
 		if err != nil {
@@ -198,9 +200,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			}
 		}
 
-		return fmt.Errorf("Unable to locate path %#v under %v", currStep, actualCurrValue)
+		return fmt.Errorf("unable to locate path %#v under %v", currStep, actualCurrValue)
 
 	}
 
-	panic(fmt.Errorf("Unrecognized type: %v", actualCurrValue))
+	panic(fmt.Errorf("unrecognized type: %v", actualCurrValue))
 }
