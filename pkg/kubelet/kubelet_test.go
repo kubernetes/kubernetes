@@ -131,7 +131,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t:            t,
 	}
 	kubelet.volumeManager = newVolumeManager()
-	kubelet.containerManager, _ = newContainerManager(mockCadvisor, "", "", "")
+	kubelet.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), mockCadvisor, "", "", "")
 	kubelet.networkConfigured = true
 	fakeClock := &util.FakeClock{Time: time.Now()}
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
