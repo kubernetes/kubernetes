@@ -16,6 +16,10 @@ limitations under the License.
 
 package runtime
 
+import (
+	"io"
+)
+
 // ObjectScheme represents common conversions between formal external API versions
 // and the internal Go structs. ObjectScheme is typically used with ObjectCodec to
 // transform internal Go structs into serialized versions. There may be many valid
@@ -45,6 +49,7 @@ type Decoder interface {
 // Encoder defines methods for serializing API objects into bytes
 type Encoder interface {
 	Encode(obj Object) (data []byte, err error)
+	EncodeToStream(obj Object, stream io.Writer) error
 }
 
 // Codec defines methods for serializing and deserializing API objects.
@@ -67,6 +72,7 @@ type ObjectEncoder interface {
 	// to a specified output version. An error is returned if the object
 	// cannot be converted for any reason.
 	EncodeToVersion(obj Object, outVersion string) ([]byte, error)
+	EncodeToVersionStream(obj Object, outVersion string, stream io.Writer) error
 }
 
 // ObjectConvertor converts an object to a different version.
