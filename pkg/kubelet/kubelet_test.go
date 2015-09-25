@@ -96,7 +96,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname
-	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
+	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, "" /* Pod CIDR */)
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -139,8 +139,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.volumeManager = newVolumeManager()
-	kubelet.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), mockCadvisor, "", "", "")
-	kubelet.runtimeState.setNetworkState(nil)
+	kubelet.containerManager = cm.NewStubContainerManager()
 	fakeClock := &util.FakeClock{Time: time.Now()}
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
@@ -2996,8 +2995,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			},
 		},
 	}
-	kubelet.runtimeState = newRuntimeState(time.Duration(0))
-	kubelet.runtimeState.setNetworkState(nil)
+	kubelet.runtimeState = newRuntimeState(time.Duration(0), false, "" /* Pod CIDR */)
 	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)

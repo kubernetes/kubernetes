@@ -27,6 +27,7 @@ type runtimeState struct {
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
+	cidr                     string
 	initError                error
 }
 
@@ -40,6 +41,18 @@ func (s *runtimeState) setNetworkState(err error) {
 	s.Lock()
 	defer s.Unlock()
 	s.networkError = err
+}
+
+func (s *runtimeState) setPodCIDR(cidr string) {
+	s.Lock()
+	defer s.Unlock()
+	s.cidr = cidr
+}
+
+func (s *runtimeState) podCIDR() string {
+	s.Lock()
+	defer s.Unlock()
+	return s.cidr
 }
 
 func (s *runtimeState) setInitError(err error) {
@@ -64,10 +77,15 @@ func (s *runtimeState) errors() []string {
 	return ret
 }
 
-func newRuntimeState(runtimeSyncThreshold time.Duration) *runtimeState {
+func newRuntimeState(runtimeSyncThreshold time.Duration, configureNetwork bool, cidr string) *runtimeState {
+	var networkError error = nil
+	if configureNetwork {
+		networkError = fmt.Errorf("network state unknown")
+	}
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
-		networkError:             fmt.Errorf("network state unknown"),
+		networkError:             networkError,
+		cidr:                     cidr,
 	}
 }
