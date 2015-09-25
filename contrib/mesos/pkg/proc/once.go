@@ -55,12 +55,22 @@ func (b *errorOnce) Report(err error) {
 }
 
 func (b *errorOnce) Send(errIn <-chan error) ErrorOnce {
-	go b.forward(errIn)
+	if errIn == nil {
+		// don't execute this in a goroutine; save resources AND the caller
+		// likely wants this executed ASAP because some of some operation
+		// ordering semantics. forward() will not block here on a nil input
+		// so this is safe to do.
+		b.forward(nil)
+	} else {
+		go b.forward(errIn)
+	}
 	return b
 }
 
 func (b *errorOnce) forward(errIn <-chan error) {
 	if errIn == nil {
+		// important: nil never blocks; Report(nil) is guaranteed to be a
+		// non-blocking operation.
 		b.Report(nil)
 		return
 	}
