@@ -58,7 +58,9 @@ func NewCmdConfigSetContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 
 			err := options.run()
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "context %q set.\n", options.name)
 			}
 		},
 	}
@@ -124,7 +126,7 @@ func (o *createContextOptions) complete(cmd *cobra.Command) bool {
 
 func (o createContextOptions) validate() error {
 	if len(o.name) == 0 {
-		return errors.New("You must specify a non-empty context name")
+		return errors.New("you must specify a non-empty context name")
 	}
 
 	return nil
