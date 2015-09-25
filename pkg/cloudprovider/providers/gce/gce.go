@@ -387,32 +387,32 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP n
 		}
 		if !exists {
 			// Note, though static addresses that _aren't_ in use cost money, ones that _are_ in use don't.
-			// However, quota is limited.  TODO: determine quota here
+			// However, quota is limited to only 7 addresses per region by default.
 			op, err := gce.service.Addresses.Insert(gce.projectID, region, &compute.Address{Name: name}).Do()
 			if err != nil {
-				return nil, fmt.Errorf("error creating gce address: %v", err)
+				return nil, fmt.Errorf("error creating gce static IP address: %v", err)
 			}
 			if err := gce.waitForRegionOp(op, region); err != nil {
-				return nil, fmt.Errorf("error waiting for gce address to complete: %v", err)
+				return nil, fmt.Errorf("error waiting for gce static IP address to complete: %v", err)
 			}
 			address, exists, err = gce.getAddress(name, region)
 			if err != nil {
-				return nil, fmt.Errorf("error re-getting gce address: %v", err)
+				return nil, fmt.Errorf("error re-getting gce static IP address: %v", err)
 			}
 			if !exists {
-				return nil, fmt.Errorf("failed to re-get gce address for %s", name)
+				return nil, fmt.Errorf("failed to re-get gce static IP address for %s", name)
 			}
 		}
 		if loadBalancerIP = net.ParseIP(address); loadBalancerIP == nil {
-			return nil, fmt.Errorf("error parsing external IP: %s", address)
+			return nil, fmt.Errorf("error parsing gce static IP address: %s", address)
 		}
 	} else {
 		addresses, err := gce.service.Addresses.List(gce.projectID, region).Do()
 		if err != nil {
-			return nil, fmt.Errorf("failed to list gce addresses: %v", err)
+			return nil, fmt.Errorf("failed to list gce IP addresses: %v", err)
 		}
 		if !ownsAddress(loadBalancerIP, addresses.Items) {
-			return nil, fmt.Errorf("don't own the address: %s", loadBalancerIP.String())
+			return nil, fmt.Errorf("this gce project don't own the IP address: %s", loadBalancerIP.String())
 		}
 	}
 
@@ -585,9 +585,23 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 
 // EnsureTCPLoadBalancerDeleted is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
-	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
+	fwName := makeFirewallName(name)
+	op, err := gce.service.Firewalls.Delete(gce.projectID, fwName).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Forwarding rule %s already deleted. Continuing to delete target pool.", name)
+		glog.Infof("Firewall %s already deleted. Moving on to delete forwarding rule.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete firewall %s, got error %v", fwName, err)
+		return err
+	} else {
+		if err = gce.waitForGlobalOp(op); err != nil {
+			glog.Warningf("Failed waiting for Firewall %s to be deleted.  Got error: %v", fwName, err)
+			return err
+		}
+	}
+
+	op, err = gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Forwarding rule %s already deleted. Moving on to delete target pool.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete Forwarding Rules %s: got error %s.", name, err.Error())
 		return err
@@ -599,44 +613,33 @@ func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 		}
 	}
 
-	op, err = gce.service.Addresses.Delete(gce.projectID, region, name).Do()
-	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Address %s is already deleted.", name)
-	} else if err != nil {
-		glog.Warningf("Failed to delete Address %s, got error %v", name, err)
-		return err
-	}
-	if err := gce.waitForRegionOp(op, region); err != nil {
-		glog.Warningf("Failed waiting for address %s to be deleted, got error: %v", name, err)
-		return err
-	}
-
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Target pool %s already deleted.", name)
-		return nil
+		glog.Infof("Target pool %s already deleted. Moving on to delete static IP address.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete Target Pool %s, got error %s.", name, err.Error())
 		return err
-	}
-	err = gce.waitForRegionOp(op, region)
-	if err != nil {
-		glog.Warningf("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
-	}
-	fwName := makeFirewallName(name)
-	op, err = gce.service.Firewalls.Delete(gce.projectID, fwName).Do()
-	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Firewall doesn't exist, moving on to deleting target pool.")
-	} else if err != nil {
-		glog.Warningf("Failed to delete firewall %s, got error %v", fwName, err)
-		return err
 	} else {
-		if err = gce.waitForGlobalOp(op); err != nil {
-			glog.Warningf("Failed waiting for Firewall %s to be deleted.  Got error: %v", fwName, err)
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
 			return err
 		}
 	}
-	return err
+
+	op, err = gce.service.Addresses.Delete(gce.projectID, region, name).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Static IP address %s already deleted. Done deleting load balancer.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete static IP Address %s, got error %v", name, err)
+		return err
+	} else {
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for address %s to be deleted, got error: %v", name, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 // UrlMap management
