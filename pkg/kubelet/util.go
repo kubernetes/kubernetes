@@ -78,15 +78,6 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	// If SELinux sintegration is disabled ensure that the pod does not set SELinux context.
-	if !capabilities.Get().EnableSELinuxIntegration {
-		for _, container := range pod.Spec.Containers {
-			if securitycontext.HasSELinuxOptions(&container) {
-				return fmt.Errorf("pod with UID %q specifies 'seLinuxOptions' but SELinuxIntegration is disabled", pod.UID)
-			}
-		}
-	}
-
 	return nil
 }
 

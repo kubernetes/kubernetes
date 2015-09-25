@@ -47,14 +47,6 @@ func HasCapabilitiesRequest(container *api.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
-// HasSELinuxOptions returns true if the containers security context specifies SELinux options
-func HasSELinuxOptions(container *api.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	return container.SecurityContext.SELinuxOptions != nil
-}
-
 const expectedSELinuxContextFields = 4
 
 // ParseSELinuxOptions parses a string containing a full SELinux context
