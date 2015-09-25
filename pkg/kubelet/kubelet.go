@@ -32,7 +32,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -278,7 +277,7 @@ func NewMainKubelet(
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
-		runtimeState:                   newRuntimeState(maxWaitForContainerRuntime),
+		runtimeState:                   newRuntimeState(maxWaitForContainerRuntime, configureCBR0, podCIDR),
 		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
@@ -297,7 +296,6 @@ func NewMainKubelet(
 		chownRunner:                    chownRunner,
 		writer:                         writer,
 		configureCBR0:                  configureCBR0,
-		podCIDR:                        podCIDR,
 		reconcileCIDR:                  reconcileCIDR,
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
@@ -499,8 +497,7 @@ type Kubelet struct {
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
-	runtimeState       *runtimeState
-	networkConfigMutex sync.Mutex
+	runtimeState *runtimeState
 
 	// Volume plugins.
 	volumePluginMgr volume.VolumePluginMgr
@@ -588,7 +585,6 @@ type Kubelet struct {
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
 	configureCBR0 bool
-	podCIDR       string
 	reconcileCIDR bool
 
 	// Number of Pods which can be run by this Kubelet
@@ -2425,9 +2421,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
 			glog.Error(err)
 		}
-		kl.networkConfigMutex.Lock()
-		podCIDR := kl.podCIDR
-		kl.networkConfigMutex.Unlock()
+		podCIDR := kl.runtimeState.podCIDR()
 		if len(podCIDR) == 0 {
 			err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
 			glog.Warning(err)
@@ -2694,11 +2688,9 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
-	kl.networkConfigMutex.Lock()
 	if kl.reconcileCIDR {
-		kl.podCIDR = node.Spec.PodCIDR
+		kl.runtimeState.setPodCIDR(node.Spec.PodCIDR)
 	}
-	kl.networkConfigMutex.Unlock()
 
 	if err := kl.setNodeStatus(node); err != nil {
 		return err
