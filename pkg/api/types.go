@@ -204,6 +204,9 @@ type VolumeSource struct {
 	// CephFS represents a Cephfs mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
 
+	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
+	Flocker *FlockerVolumeSource `json:"flocker,omitempty"`
+
 	// DownwardAPI represents metadata about the pod that should populate this volume
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
@@ -239,6 +242,8 @@ type PersistentVolumeSource struct {
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	FC *FCVolumeSource `json:"fc,omitempty"`
+	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
+	Flocker *FlockerVolumeSource `json:"flocker,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -590,6 +595,12 @@ type CephFSVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// FlockerVolumeSource represents a Flocker volume mounted by the Flocker agent.
+type FlockerVolumeSource struct {
+	// Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
+	DatasetName string `json:"datasetName"`
 }
 
 // DownwardAPIVolumeSource represents a volume containing downward API info
