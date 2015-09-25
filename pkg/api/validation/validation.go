@@ -1924,33 +1924,6 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 	return allErrs
 }
 
-func ValidateThirdPartyResourceUpdate(old, update *api.ThirdPartyResource) errs.ValidationErrorList {
-	return ValidateThirdPartyResource(update)
-}
-
-func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
-	if len(obj.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
-	}
-	versions := sets.String{}
-	for ix := range obj.Versions {
-		version := &obj.Versions[ix]
-		if len(version.Name) == 0 {
-			allErrs = append(allErrs, errs.NewFieldInvalid("name", version, "name can not be empty"))
-		}
-		if versions.Has(version.Name) {
-			allErrs = append(allErrs, errs.NewFieldDuplicate("version", version))
-		}
-		versions.Insert(version.Name)
-	}
-	return allErrs
-}
-
-func ValidateSchemaUpdate(oldResource, newResource *api.ThirdPartyResource) errs.ValidationErrorList {
-	return errs.ValidationErrorList{fmt.Errorf("Schema update is not supported.")}
-}
-
 func ValidatePodLogOptions(opts *api.PodLogOptions) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {

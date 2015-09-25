@@ -67,9 +67,6 @@ func init() {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&ThirdPartyResourceData{},
 	)
 
 	// Register Unversioned types
@@ -117,6 +114,3 @@ func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
 func (*SerializedReference) IsAnAPIObject()       {}
 func (*RangeAllocation) IsAnAPIObject()           {}
-func (*ThirdPartyResource) IsAnAPIObject()        {}
-func (*ThirdPartyResourceList) IsAnAPIObject()    {}
-func (*ThirdPartyResourceData) IsAnAPIObject()    {}
