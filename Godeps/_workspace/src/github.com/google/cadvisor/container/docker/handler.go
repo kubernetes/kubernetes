@@ -25,7 +25,7 @@ import (
 	"github.com/docker/libcontainer/cgroups"
 	cgroup_fs "github.com/docker/libcontainer/cgroups/fs"
 	libcontainerConfigs "github.com/docker/libcontainer/configs"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/container"
 	containerLibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
@@ -83,6 +83,9 @@ type dockerContainerHandler struct {
 
 	// The network mode of the container
 	networkMode string
+
+	// Filesystem handler.
+	fsHandler fsHandler
 }
 
 func newDockerContainerHandler(
@@ -114,6 +117,9 @@ func newDockerContainerHandler(
 	}
 
 	id := ContainerNameToDockerId(name)
+
+	storageDirs := []string{path.Join(*dockerRootDir, pathToAufsDir, id)}
+
 	handler := &dockerContainerHandler{
 		id:                 id,
 		client:             client,
@@ -124,8 +130,13 @@ func newDockerContainerHandler(
 		usesAufsDriver:     usesAufsDriver,
 		fsInfo:             fsInfo,
 		rootFs:             rootFs,
+		storageDirs:        storageDirs,
+		fsHandler:          newFsHandler(time.Minute, storageDirs, fsInfo),
 	}
-	handler.storageDirs = append(handler.storageDirs, path.Join(*dockerRootDir, pathToAufsDir, id))
+
+	if usesAufsDriver {
+		handler.fsHandler.start()
+	}
 
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := client.InspectContainer(id)
@@ -136,8 +147,7 @@ func newDockerContainerHandler(
 	handler.pid = ctnr.State.Pid
 
 	// Add the name and bare ID as aliases of the container.
-	handler.aliases = append(handler.aliases, strings.TrimPrefix(ctnr.Name, "/"))
-	handler.aliases = append(handler.aliases, id)
+	handler.aliases = append(handler.aliases, strings.TrimPrefix(ctnr.Name, "/"), id)
 	handler.labels = ctnr.Config.Labels
 	handler.image = ctnr.Config.Image
 	handler.networkMode = ctnr.HostConfig.NetworkMode
@@ -256,16 +266,7 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 
 	fsStat := info.FsStats{Device: deviceInfo.Device, Limit: limit}
 
-	var usage uint64 = 0
-	for _, dir := range self.storageDirs {
-		// TODO(Vishh): Add support for external mounts.
-		dirUsage, err := self.fsInfo.GetDirUsage(dir)
-		if err != nil {
-			return err
-		}
-		usage += dirUsage
-	}
-	fsStat.Usage = usage
+	fsStat.Usage = self.fsHandler.usage()
 	stats.Filesystem = append(stats.Filesystem, fsStat)
 
 	return nil
@@ -295,32 +296,8 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 }
 
 func (self *dockerContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
-	if self.name != "/docker" {
-		return []info.ContainerReference{}, nil
-	}
-	opt := docker.ListContainersOptions{
-		All: true,
-	}
-	containers, err := self.client.ListContainers(opt)
-	if err != nil {
-		return nil, err
-	}
-
-	ret := make([]info.ContainerReference, 0, len(containers)+1)
-	for _, c := range containers {
-		if !strings.HasPrefix(c.Status, "Up ") {
-			continue
-		}
-
-		ref := info.ContainerReference{
-			Name:      FullContainerName(c.ID),
-			Aliases:   append(c.Names, c.ID),
-			Namespace: DockerNamespace,
-		}
-		ret = append(ret, ref)
-	}
-
-	return ret, nil
+	// No-op for Docker driver.
+	return []info.ContainerReference{}, nil
 }
 
 func (self *dockerContainerHandler) GetCgroupPath(resource string) (string, error) {

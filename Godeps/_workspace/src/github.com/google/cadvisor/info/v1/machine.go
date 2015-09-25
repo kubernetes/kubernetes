@@ -179,6 +179,8 @@ type VersionInfo struct {
 
 	// cAdvisor version.
 	CadvisorVersion string `json:"cadvisor_version"`
+	// cAdvisor git revision.
+	CadvisorRevision string `json:"cadvisor_revision"`
 }
 
 type MachineInfoFactory interface {
