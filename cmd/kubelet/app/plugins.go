@@ -22,6 +22,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 	// Network plugins
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/exec"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
@@ -78,6 +79,7 @@ func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
 
 	// for each existing plugin, add to the list
 	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins(pluginDir)...)
+	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(pluginDir)...)
 
 	return allPlugins
 }

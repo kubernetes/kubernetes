@@ -74,6 +74,8 @@ const (
 	kubernetesPodLabel                    = "io.kubernetes.pod.data"
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
+
+	DockerNetnsFmt = "/proc/%v/ns/net"
 )
 
 // DockerManager implements the Runtime interface.
@@ -1190,6 +1192,32 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	return command.Run()
 }
 
+// Get the IP address of a container's interface using nsenter
+func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (string, error) {
+	_, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return "", fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
+	}
+	container, err := dm.client.InspectContainer(containerID)
+	if err != nil {
+		return "", err
+	}
+
+	if !container.State.Running {
+		return "", fmt.Errorf("container not running (%s)", container.ID)
+	}
+
+	containerPid := container.State.Pid
+	extractIPCmd := fmt.Sprintf("ip -4 addr show %s | grep inet | awk -F\" \" '{print $2}'", interfaceName)
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
+	command := exec.Command("nsenter", args...)
+	out, err := command.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
 // Kills all containers in the specified pod
 func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	// Send the kills in parallel since they may take a long time. Len + 1 since there
@@ -1534,6 +1562,10 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	// Use host networking if specified.
 	netNamespace := ""
 	var ports []api.ContainerPort
+
+	if dm.networkPlugin.Name() == "cni" {
+		netNamespace = "none"
+	}
 
 	if pod.Spec.HostNetwork {
 		netNamespace = "host"
@@ -1948,4 +1980,15 @@ func getIPCMode(pod *api.Pod) string {
 		ipcMode = "host"
 	}
 	return ipcMode
+}
+
+// GetNetNs returns the network namespace path for the given container
+func (dm *DockerManager) GetNetNs(containerID string) (string, error) {
+	inspectResult, err := dm.client.InspectContainer(string(containerID))
+	if err != nil {
+		glog.Errorf("Error inspecting container: '%v'", err)
+		return "", err
+	}
+	netnsPath := fmt.Sprintf(DockerNetnsFmt, inspectResult.State.Pid)
+	return netnsPath, nil
 }
