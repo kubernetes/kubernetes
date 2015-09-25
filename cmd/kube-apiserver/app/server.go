@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -73,8 +74,8 @@ type APIServer struct {
 	CertDirectory              string
 	APIPrefix                  string
 	APIGroupPrefix             string
-	StorageVersion             string
-	ExpStorageVersion          string
+	DeprecatedStorageVersion   string
+	StorageVersions            string
 	CloudProvider              string
 	CloudConfigFile            string
 	EventTTL                   time.Duration
@@ -131,6 +132,7 @@ func NewAPIServer() *APIServer {
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
 		CertDirectory:          "/var/run/kubernetes",
+		StorageVersions:        latest.AllPreferredGroupVersions(),
 
 		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: client.KubeletConfig{
@@ -181,8 +183,13 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
-	fs.MarkDeprecated("api-prefix", "--api-prefix is deprecated and will be removed when the v1 API is retired")
-	fs.StringVar(&s.StorageVersion, "storage-version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
+	fs.MarkDeprecated("api-prefix", "--api-prefix is deprecated and will be removed when the v1 API is retired.")
+	fs.StringVar(&s.DeprecatedStorageVersion, "storage-version", s.DeprecatedStorageVersion, "The version to store the legacy v1 resources with. Defaults to server preferred")
+	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API is retired. See --storage-versions instead.")
+	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, "The versions to store resources with. "+
+		"Different groups may be stored in different versions. Specified in the format \"group1/version1,group2/version2...\". "+
+		"This flag expects a complete list of storage versions of ALL groups registered in the server. "+
+		"It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
@@ -272,6 +279,21 @@ func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta
 	return etcdStorage, err
 }
 
+// convert to a map between group and groupVersions.
+func generateStorageVersionMap(legacyVersion string, storageVersions string) map[string]string {
+	storageVersionMap := map[string]string{}
+	if legacyVersion != "" {
+		storageVersionMap[""] = legacyVersion
+	}
+	if storageVersions != "" {
+		groupVersions := strings.Split(storageVersions, ",")
+		for _, gv := range groupVersions {
+			storageVersionMap[apiutil.GetGroup(gv)] = gv
+		}
+	}
+	return storageVersionMap
+}
+
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
@@ -335,41 +357,40 @@ func (s *APIServer) Run(_ []string) error {
 
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
-		Version: s.StorageVersion,
+		Version: s.DeprecatedStorageVersion,
 	}
 	client, err := client.New(clientConfig)
 	if err != nil {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	g, err := latest.Group("")
+	legacyV1Group, err := latest.Group("")
 	if err != nil {
 		return err
 	}
-	storageVersions := make(map[string]string)
-	if s.StorageVersion == "" {
-		s.StorageVersion = g.Version
+
+	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
+	if _, found := storageVersions[legacyV1Group.Group]; !found {
+		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, s.StorageVersion, s.EtcdPathPrefix)
-	storageVersions[""] = s.StorageVersion
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.Group], s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
 
 	var expEtcdStorage storage.Interface
 	if enableExp {
-		g, err := latest.Group("experimental")
+		expGroup, err := latest.Group("experimental")
 		if err != nil {
 			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
-		if s.ExpStorageVersion == "" {
-			s.ExpStorageVersion = g.GroupVersion
+		if _, found := storageVersions[expGroup.Group]; !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.Group, storageVersions)
 		}
-		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, g.InterfacesFor, s.ExpStorageVersion, s.EtcdPathPrefix)
+		expEtcdStorage, err = newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.Group], s.EtcdPathPrefix)
 		if err != nil {
 			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 		}
-		storageVersions["experimental"] = s.StorageVersion
 	}
 
 	n := s.ServiceClusterIPRange
