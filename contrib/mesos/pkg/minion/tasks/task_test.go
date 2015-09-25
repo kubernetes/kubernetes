@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	log "github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
 )
 
 type badWriteCloser struct {
@@ -57,7 +58,7 @@ func (f *fakeProcess) Wait() error {
 	<-f.done
 	return f.err
 }
-func (f *fakeProcess) Kill() (int, error) {
+func (f *fakeProcess) Kill(_ bool) (int, error) {
 	close(f.done)
 	return f.pid, f.err
 }
@@ -77,8 +78,8 @@ func TestBadLogger(t *testing.T) {
 	fp := newFakeProcess()
 	tt := New("foo", "bar", nil, nil, func() io.WriteCloser {
 		defer func() {
-			fp.pid = 123 // sanity check
-			fp.Kill()    // this causes Wait() to return
+			fp.pid = 123   // sanity check
+			fp.Kill(false) // this causes Wait() to return
 		}()
 		return &badWriteCloser{err}
 	})
@@ -219,4 +220,74 @@ func TestMergeOutput(t *testing.T) {
 
 	log.Infoln("waiting for merge to complete")
 	<-te.Done() // wait for the merge to complete
+}
+
+func TestAfterDeath(t *testing.T) {
+	// test kill escalation since that's not covered by other unit tests
+	t1 := New("foo", "", nil, nil, devNull)
+	kills := 0
+	waitCh := make(chan *Completion, 1)
+	t1.killFunc = func(force bool) (int, error) {
+		// > 0 is intentional, multiple calls to close() should panic
+		if kills > 0 {
+			assert.True(t, force)
+			waitCh <- &Completion{name: t1.name, code: 123}
+			close(waitCh)
+		} else {
+			assert.False(t, force)
+		}
+		kills++
+		return 0, nil
+	}
+	wr := t1.awaitDeath(0, waitCh)
+	assert.Equal(t, "foo", wr.name)
+	assert.Equal(t, 123, wr.code)
+	assert.NoError(t, wr.err)
+
+	// test tie between shouldQuit and waitCh
+	waitCh = make(chan *Completion, 1)
+	waitCh <- &Completion{name: t1.name, code: 456}
+	close(waitCh)
+	t1.killFunc = func(force bool) (int, error) {
+		t.Fatalf("should not attempt to kill a task that has already reported completion")
+		return 0, nil
+	}
+	wr = t1.awaitDeath(0, waitCh)
+	assert.Equal(t, 456, wr.code)
+	assert.NoError(t, wr.err)
+
+	// test delayed killFunc failure
+	kills = 0
+	killFailed := errors.New("for some reason kill failed")
+	t1.killFunc = func(force bool) (int, error) {
+		// > 0 is intentional, multiple calls to close() should panic
+		if kills > 0 {
+			assert.True(t, force)
+			return -1, killFailed
+		} else {
+			assert.False(t, force)
+		}
+		kills++
+		return 0, nil
+	}
+	wr = t1.awaitDeath(0, nil)
+	assert.Equal(t, "foo", wr.name)
+	assert.Error(t, wr.err)
+
+	// test initial killFunc failure
+	kills = 0
+	t1.killFunc = func(force bool) (int, error) {
+		// > 0 is intentional, multiple calls to close() should panic
+		if kills > 0 {
+			assert.True(t, force)
+			t.Fatalf("killFunc should only be invoked once, not again after is has already failed")
+		} else {
+			assert.False(t, force)
+		}
+		kills++
+		return 0, killFailed
+	}
+	wr = t1.awaitDeath(0, nil)
+	assert.Equal(t, "foo", wr.name)
+	assert.Error(t, wr.err)
 }
