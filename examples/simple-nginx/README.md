@@ -33,10 +33,9 @@ Documentation for other releases can be found at
 
 ## Running your first containers in Kubernetes
 
-Ok, you've run one of the [getting started guides](../docs/getting-started-guides/) and you have
-successfully turned up a Kubernetes cluster.  Now what?  This guide will help you get oriented
-to Kubernetes and running your first containers on the cluster.
-The example is easy enough to use and understand.
+Once you've run one of the [getting started guides](../docs/getting-started-guides/) and you have
+successfully turned up a Kubernetes cluster.  This guide will help you running your first containers on the cluster. 
+The example is easy and simple enough, it is reliable and isn't involved other things.
 
 ### Create the nginx replicated pods
 
@@ -109,7 +108,7 @@ $ kubectl get services
 NAME                      CLUSTER_IP      EXTERNAL_IP   PORT(S)    SELECTOR     AGE
 kubernetes                192.168.3.1     <none>        443/TCP    <none>       1d
 nginx-service-clusterip   192.168.3.232   <none>        8001/TCP   name=nginx   6h
-
+nginx-service-nodeport    192.168.3.56    nodes         8000/TCP   name=nginx   6h
 ```
 
 In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a firewall to allow traffic on port 8001.
@@ -119,6 +118,9 @@ In order to access your nginx landing page, you also have to make sure that traf
 On any node in cluster, you can use curl to confirm service and nginx is running. 
 ```console
 $ curl  192.168.3.232:8001
+  or execute
+$ curl  192.168.3.56:8000
+
 <!DOCTYPE html>
 <html>
 <head>
