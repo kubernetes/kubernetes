@@ -51,6 +51,19 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 	return apivalidation.ValidateReplicationControllerName(name, prefix)
 }
 
+func validateResourceConsumption(consumption *extensions.ResourceConsumption, fieldName string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	resource := consumption.Resource.String()
+	if resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
+		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".resource", resource, "resource not supported by autoscaler"))
+	}
+	quantity := consumption.Quantity.Value()
+	if quantity < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".quantity", quantity, "must be non-negative"))
+	}
+	return allErrs
+}
+
 func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if autoscaler.MinReplicas < 0 {
@@ -84,6 +97,19 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscler, oldAutoscaler *extensio
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&newAutoscler.ObjectMeta, &oldAutoscaler.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscler.Spec)...)
+	return allErrs
+}
+
+func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *extensions.HorizontalPodAutoscaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+
+	status := controller.Status
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentReplicas), "currentReplicas")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredReplicas), "desiredReplicas")...)
+	if status.CurrentConsumption != nil {
+		allErrs = append(allErrs, validateResourceConsumption(status.CurrentConsumption, "currentConsumption")...)
+	}
 	return allErrs
 }
 
