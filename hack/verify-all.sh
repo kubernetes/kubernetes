@@ -35,6 +35,14 @@ function is-excluded {
   return 1
 }
 
+function run-cmd() {
+  if ${SILENT}; then
+    "$@" &> /dev/null
+  else
+    "$@"
+  fi
+}
+
 while getopts ":v" opt; do
   case $opt in
     v)
@@ -60,16 +68,12 @@ do
     echo "Skipping $t"
     continue
   fi
-  if $SILENT ; then
-    echo -e "Verifying $t"
-    if bash "$t" &> /dev/null; then
-      echo -e "${color_green}SUCCESS${color_norm}"
-    else
-      echo -e "${color_red}FAILED${color_norm}"
-      ret=1
-    fi
+  echo -e "Verifying $t"
+  if run-cmd bash "$t"; then
+    echo -e "${color_green}SUCCESS${color_norm}"
   else
-    bash "$t" || ret=1
+    echo -e "${color_red}FAILED${color_norm}"
+    ret=1
   fi
 done
 
@@ -79,16 +83,12 @@ do
     echo "Skipping $t"
     continue
   fi
-  if $SILENT ; then
-    echo -e "Verifying $t"
-    if python "$t" &> /dev/null; then
-      echo -e "${color_green}SUCCESS${color_norm}"
-    else
-      echo -e "${color_red}FAILED${color_norm}"
-      ret=1
-    fi
-  else 
-    python "$t" || ret=1
+  echo -e "Verifying $t"
+  if run-cmd python "$t"; then
+    echo -e "${color_green}SUCCESS${color_norm}"
+  else
+    echo -e "${color_red}FAILED${color_norm}"
+    ret=1
   fi
 done
 exit $ret
