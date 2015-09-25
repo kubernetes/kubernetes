@@ -2077,6 +2077,29 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "valid type - NamepsaceIP",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNamespaceIP
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid NamespaceIP service without NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNamespaceIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(12345)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid NamespaceIP service with NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNamespaceIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: util.NewIntOrStringFromInt(12345)})
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -3198,11 +3221,22 @@ func TestValidateNamespace(t *testing.T) {
 	successCases := []api.Namespace{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Labels: validLabels},
+			Spec: api.NamespaceSpec{
+				NetworkPolicy: api.NamespaceNetworkPolicyOpen,
+			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: api.NamespaceSpec{
-				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
+				Finalizers:    []api.FinalizerName{"example.com/something", "example.com/other"},
+				NetworkPolicy: api.NamespaceNetworkPolicyOpen,
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			Spec: api.NamespaceSpec{
+				Finalizers:    []api.FinalizerName{"example.com/something", "example.com/other"},
+				NetworkPolicy: api.NamespaceNetworkPolicyClosed,
 			},
 		},
 	}

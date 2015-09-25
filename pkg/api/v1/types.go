@@ -1442,6 +1442,10 @@ const (
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+
+	// ServiceTypeNamespaceIP means a service will only be accessible inside the
+	// namespace, via the Cluster IP.
+	ServiceTypeNamespaceIP ServiceType = "experimentalNamespaceIP"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -1491,7 +1495,7 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
 
-	// Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer.
+	// Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or experimentalNamespaceIP.
 	// Defaults to ClusterIP.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
@@ -1882,11 +1886,26 @@ const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
 )
 
+// NamespaceNetworkPolicy indicates who is authorized to access pods in the namespace
+type NamespaceNetworkPolicy string
+
+// These are the valid network policies of a namespace
+const (
+	// Closed namespaces are only accessible by pods within the namespace
+	NamespaceNetworkPolicyClosed NamespaceNetworkPolicy = "Closed"
+	// Open namespaces are accessible from any namespace
+	NamespaceNetworkPolicyOpen NamespaceNetworkPolicy = "Open"
+)
+
 // NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
 	// More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers
 	Finalizers []FinalizerName `json:"finalizers,omitempty"`
+
+	// NetworkPolicy indicates who is authorized to access pods in the namespace.
+	// Must be either Open or Closed. Defaults to Open.
+	NetworkPolicy NamespaceNetworkPolicy `json:"experimentalNetworkPolicy,omitempty"`
 }
 
 // NamespaceStatus is information about the current status of a Namespace.

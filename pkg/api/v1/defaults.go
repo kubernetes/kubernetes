@@ -168,6 +168,11 @@ func addDefaultingFuncs() {
 				obj.Phase = NamespaceActive
 			}
 		},
+		func(obj *NamespaceSpec) {
+			if obj.NetworkPolicy == "" {
+				obj.NetworkPolicy = NamespaceNetworkPolicyOpen
+			}
+		},
 		func(obj *Node) {
 			if obj.Spec.ExternalID == "" {
 				obj.Spec.ExternalID = obj.Name

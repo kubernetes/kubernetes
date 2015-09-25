@@ -41,12 +41,13 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	endpointRegistry := &registrytest.EndpointRegistry{
 		Endpoints: endpoints,
 	}
+	namespaceRegistry := &registrytest.NamespaceRegistry{}
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
 
 	portRange := util.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
-	storage := NewStorage(registry, endpointRegistry, r, portAllocator)
+	storage := NewStorage(registry, endpointRegistry, namespaceRegistry, r, portAllocator)
 
 	return storage, registry
 }

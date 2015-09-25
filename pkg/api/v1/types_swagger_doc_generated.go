@@ -603,8 +603,9 @@ func (NamespaceList) SwaggerDoc() map[string]string {
 }
 
 var map_NamespaceSpec = map[string]string{
-	"":           "NamespaceSpec describes the attributes on a Namespace.",
-	"finalizers": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
+	"":                          "NamespaceSpec describes the attributes on a Namespace.",
+	"finalizers":                "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
+	"experimentalNetworkPolicy": "NetworkPolicy indicates who is authorized to access pods in the namespace. Must be either Open or Closed. Defaults to Open.",
 }
 
 func (NamespaceSpec) SwaggerDoc() map[string]string {
@@ -1294,7 +1295,7 @@ var map_ServiceSpec = map[string]string{
 	"ports":           "The list of ports that are exposed by this service. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies",
 	"selector":        "This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If empty, all pods are selected, if not specified, endpoints must be manually specified. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview",
 	"clusterIP":       "ClusterIP is usually assigned by the master and is the IP address of the service. If specified, it will be allocated to the service if it is unused or else creation of the service will fail. Valid values are None, empty string (\"\"), or a valid IP address. 'None' can be specified for a headless service when proxying is not required. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies",
-	"type":            "Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer. Defaults to ClusterIP. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services",
+	"type":            "Type of exposed service. Must be ClusterIP, NodePort, LoadBalancer, or experimentalNamespaceIP. Defaults to ClusterIP. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services",
 	"externalIPs":     "ExternalIPs are used by external load balancers, or can be set by users to handle external traffic that arrives at a node. Externally visible IPs (e.g. load balancers) that should be proxied to this service.",
 	"sessionAffinity": "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies",
 	"loadBalancerIP":  "Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.",

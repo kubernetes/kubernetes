@@ -66,6 +66,9 @@ func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
 		}
 	}
+	if string(namespace.Spec.NetworkPolicy) == "" {
+		namespace.Spec.NetworkPolicy = api.NamespaceNetworkPolicyOpen
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -73,6 +76,7 @@ func (namespaceStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
+	newNamespace.Spec.NetworkPolicy = oldNamespace.Spec.NetworkPolicy
 	newNamespace.Status = oldNamespace.Status
 }
 

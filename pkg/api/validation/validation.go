@@ -1161,7 +1161,7 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 
 var supportedSessionAffinityType = sets.NewString(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
 var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
-	string(api.ServiceTypeLoadBalancer))
+	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypeNamespaceIP))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1225,6 +1225,15 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].NodePort != 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type ClusterIP"))
+			}
+		}
+	}
+
+	//  Check that NodePort is not specified with a service type NamespaceIP
+	if service.Spec.Type == api.ServiceTypeNamespaceIP {
+		for i := range service.Spec.Ports {
+			if service.Spec.Ports[i].NodePort != 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type experimentalNamespaceIP"))
 			}
 		}
 	}
@@ -1750,6 +1759,23 @@ func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]))...)
 	}
+
+	allErrs = append(allErrs, validateNamespaceNetworkPolicy(string(namespace.Spec.NetworkPolicy))...)
+
+	return allErrs
+}
+
+var supportedNamespaceNetworkPolicy = sets.NewString(string(api.NamespaceNetworkPolicyOpen), string(api.NamespaceNetworkPolicyClosed))
+
+func validateNamespaceNetworkPolicy(networkPolicy string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if networkPolicy == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.experimentalNetworkPolicy"))
+	} else if !supportedNamespaceNetworkPolicy.Has(networkPolicy) {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("spec.experimentalNetworkPolicy", networkPolicy, supportedNamespaceNetworkPolicy.List()))
+	}
+
 	return allErrs
 }
 

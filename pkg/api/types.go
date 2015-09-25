@@ -1158,6 +1158,10 @@ const (
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+
+	// ServiceTypeNamespaceIP means a service will only be accessible inside the
+	// namespace, via the Cluster IP.
+	ServiceTypeNamespaceIP ServiceType = "experimentalNamespaceIP"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1188,7 +1192,7 @@ type LoadBalancerIngress struct {
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
+	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer, experimentalNamespaceIP
 	Type ServiceType `json:"type,omitempty"`
 
 	// Required: The list of ports that are exposed by this service.
@@ -1507,10 +1511,26 @@ type NodeList struct {
 	Items []Node `json:"items"`
 }
 
-// NamespaceSpec describes the attributes on a Namespace
+// NamespaceNetworkPolicy determines who is authorized to access pods in the namespace
+type NamespaceNetworkPolicy string
+
+// These are the valid network policies of a namespace
+const (
+	// Closed namespaces are only accessible by pods within the namespace
+	NamespaceNetworkPolicyClosed NamespaceNetworkPolicy = "Closed"
+	// Open namespaces are accessible from any namespace
+	NamespaceNetworkPolicyOpen NamespaceNetworkPolicy = "Open"
+)
+
+// NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
-	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage
-	Finalizers []FinalizerName
+	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
+	// More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers
+	Finalizers []FinalizerName `json:"finalizers,omitempty"`
+
+	// NetworkPolicy indicates who is authorized to access pods in the namespace.
+	// Must be either Open or Closed. Defaults to Open.
+	NetworkPolicy NamespaceNetworkPolicy `json:"experimentalNetworkPolicy,omitempty"`
 }
 
 type FinalizerName string
