@@ -18,7 +18,6 @@ package daemon
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -39,45 +37,8 @@ var (
 	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
 )
 
-type FakePodControl struct {
-	podSpec       []api.PodTemplateSpec
-	deletePodName []string
-	lock          sync.Mutex
-	err           error
-}
-
 func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
-}
-
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
-	return nil
-}
-
-func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if f.err != nil {
-		return f.err
-	}
-	f.podSpec = append(f.podSpec, *spec)
-	return nil
-}
-
-func (f *FakePodControl) DeletePod(namespace string, podName string) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if f.err != nil {
-		return f.err
-	}
-	f.deletePodName = append(f.deletePodName, podName)
-	return nil
-}
-func (f *FakePodControl) clear() {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.deletePodName = []string{}
-	f.podSpec = []api.PodTemplateSpec{}
 }
 
 func newDaemonSet(name string) *experimental.DaemonSet {
@@ -157,24 +118,24 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 	}
 }
 
-func newTestController() (*DaemonSetsController, *FakePodControl) {
+func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewDaemonSetsController(client)
-	podControl := &FakePodControl{}
+	podControl := &controller.FakePodControl{}
 	manager.podControl = podControl
 	return manager, podControl
 }
 
-func validateSyncDaemonSets(t *testing.T, fakePodControl *FakePodControl, expectedCreates, expectedDeletes int) {
-	if len(fakePodControl.podSpec) != expectedCreates {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.podSpec))
+func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+	if len(fakePodControl.Templates) != expectedCreates {
+		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
 	}
-	if len(fakePodControl.deletePodName) != expectedDeletes {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodName))
+	if len(fakePodControl.DeletePodName) != expectedDeletes {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.DeletePodName))
 	}
 }
 
-func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *experimental.DaemonSet, podControl *FakePodControl, expectedCreates, expectedDeletes int) {
+func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *experimental.DaemonSet, podControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
