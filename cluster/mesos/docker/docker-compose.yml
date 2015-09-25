@@ -85,6 +85,7 @@ apiserver:
     --cloud-config=/opt/mesos-cloud.conf
     --tls-cert-file=/var/run/kubernetes/auth/apiserver.crt
     --tls-private-key-file=/var/run/kubernetes/auth/apiserver.key
+    --runtime-config=experimental/v1alpha1
     --v=4
   ports: [ "8888:8888", "6443:6443" ]
   environment:
