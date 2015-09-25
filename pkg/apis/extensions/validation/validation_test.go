@@ -744,7 +744,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: extensions.JobSpec{
 				Selector: validSelector,
-				Template: &validPodTemplateSpec,
+				Template: validPodTemplateSpec,
 			},
 		},
 	}
@@ -763,7 +763,7 @@ func TestValidateJob(t *testing.T) {
 			Spec: extensions.JobSpec{
 				Parallelism: &negative,
 				Selector:    validSelector,
-				Template:    &validPodTemplateSpec,
+				Template:    validPodTemplateSpec,
 			},
 		},
 		"spec.completions:must be non-negative": {
@@ -774,7 +774,7 @@ func TestValidateJob(t *testing.T) {
 			Spec: extensions.JobSpec{
 				Completions: &negative,
 				Selector:    validSelector,
-				Template:    &validPodTemplateSpec,
+				Template:    validPodTemplateSpec,
 			},
 		},
 		"spec.selector:required value": {
@@ -784,16 +784,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: extensions.JobSpec{
 				Selector: map[string]string{},
-				Template: &validPodTemplateSpec,
-			},
-		},
-		"spec.template:required value": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "myjob",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.JobSpec{
-				Selector: validSelector,
+				Template: validPodTemplateSpec,
 			},
 		},
 		"spec.template.labels:selector does not match template": {
@@ -803,7 +794,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: extensions.JobSpec{
 				Selector: validSelector,
-				Template: &api.PodTemplateSpec{
+				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
 					},
@@ -822,7 +813,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: extensions.JobSpec{
 				Selector: validSelector,
-				Template: &api.PodTemplateSpec{
+				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: validSelector,
 					},

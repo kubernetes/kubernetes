@@ -884,19 +884,13 @@ func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)
-		if job.Spec.Template != nil {
-			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
-		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
-		}
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
 		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(job.Spec.Selector))
 		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(job.Labels))
 		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Successful, job.Status.Unsuccessful)
-		if job.Spec.Template != nil {
-			describeVolumes(job.Spec.Template.Spec.Volumes, out)
-		}
+		describeVolumes(job.Spec.Template.Spec.Volumes, out)
 		if events != nil {
 			DescribeEvents(events, out)
 		}

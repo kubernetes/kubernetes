@@ -1240,13 +1240,8 @@ func deepCopy_extensions_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner)
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := deepCopy_api_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := deepCopy_api_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
+		return err
 	}
 	return nil
 }

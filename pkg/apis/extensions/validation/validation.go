@@ -325,19 +325,15 @@ func ValidateJobSpec(spec *extensions.JobSpec) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
 	}
 
-	if spec.Template == nil {
-		allErrs = append(allErrs, errs.NewFieldRequired("template"))
-	} else {
-		labels := labels.Set(spec.Template.Labels)
-		if !selector.Matches(labels) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
-		}
-		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
-		if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
-			spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
-			allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy",
-				spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
-		}
+	labels := labels.Set(spec.Template.Labels)
+	if !selector.Matches(labels) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
+	}
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template).Prefix("template")...)
+	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
+		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy",
+			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
 	}
 	return allErrs
 }
