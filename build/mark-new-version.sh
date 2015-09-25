@@ -92,6 +92,10 @@ fi
 
 echo "+++ Running ./versionize-docs"
 ${KUBE_ROOT}/build/versionize-docs.sh ${NEW_VERSION}
+
+echo "+++ Updating swagger"
+${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
+
 git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
@@ -102,6 +106,7 @@ $SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJO
 $SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
 $SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-${release_branch}+\$Format:%h\$\"/" "${VERSION_FILE}"
 gofmt -s -w "${VERSION_FILE}"
+
 
 echo "+++ Committing version change"
 git add "${VERSION_FILE}"
