@@ -29,7 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build !appengine appenginevm
+// +build !appengine
 
 // This file contains the implementation of the proto field accesses using package unsafe.
 
@@ -100,6 +100,11 @@ func structPointer_Bool(p structPointer, f field) **bool {
 	return (**bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
 }
 
+// BoolVal returns the address of a bool field in the struct.
+func structPointer_BoolVal(p structPointer, f field) *bool {
+	return (*bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+}
+
 // BoolSlice returns the address of a []bool field in the struct.
 func structPointer_BoolSlice(p structPointer, f field) *[]bool {
 	return (*[]bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
@@ -110,6 +115,11 @@ func structPointer_String(p structPointer, f field) **string {
 	return (**string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
 }
 
+// StringVal returns the address of a string field in the struct.
+func structPointer_StringVal(p structPointer, f field) *string {
+	return (*string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+}
+
 // StringSlice returns the address of a []string field in the struct.
 func structPointer_StringSlice(p structPointer, f field) *[]string {
 	return (*[]string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
@@ -118,6 +128,11 @@ func structPointer_StringSlice(p structPointer, f field) *[]string {
 // ExtMap returns the address of an extension map field in the struct.
 func structPointer_ExtMap(p structPointer, f field) *map[int32]Extension {
 	return (*map[int32]Extension)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+}
+
+// NewAt returns the reflect.Value for a pointer to a field in the struct.
+func structPointer_NewAt(p structPointer, f field, typ reflect.Type) reflect.Value {
+	return reflect.NewAt(typ, unsafe.Pointer(uintptr(p)+uintptr(f)))
 }
 
 // SetStructPointer writes a *struct field in the struct.
@@ -170,6 +185,24 @@ func structPointer_Word32(p structPointer, f field) word32 {
 	return word32((**uint32)(unsafe.Pointer(uintptr(p) + uintptr(f))))
 }
 
+// A word32Val is the address of a 32-bit value field.
+type word32Val *uint32
+
+// Set sets *p to x.
+func word32Val_Set(p word32Val, x uint32) {
+	*p = x
+}
+
+// Get gets the value pointed at by p.
+func word32Val_Get(p word32Val) uint32 {
+	return *p
+}
+
+// Word32Val returns the address of a *int32, *uint32, *float32, or *enum field in the struct.
+func structPointer_Word32Val(p structPointer, f field) word32Val {
+	return word32Val((*uint32)(unsafe.Pointer(uintptr(p) + uintptr(f))))
+}
+
 // A word32Slice is a slice of 32-bit values.
 type word32Slice []uint32
 
@@ -204,6 +237,21 @@ func word64_Get(p word64) uint64 {
 
 func structPointer_Word64(p structPointer, f field) word64 {
 	return word64((**uint64)(unsafe.Pointer(uintptr(p) + uintptr(f))))
+}
+
+// word64Val is like word32Val but for 64-bit values.
+type word64Val *uint64
+
+func word64Val_Set(p word64Val, o *Buffer, x uint64) {
+	*p = x
+}
+
+func word64Val_Get(p word64Val) uint64 {
+	return *p
+}
+
+func structPointer_Word64Val(p structPointer, f field) word64Val {
+	return word64Val((*uint64)(unsafe.Pointer(uintptr(p) + uintptr(f))))
 }
 
 // word64Slice is like word32Slice but for 64-bit values.

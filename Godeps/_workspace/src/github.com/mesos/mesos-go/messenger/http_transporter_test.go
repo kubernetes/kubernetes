@@ -1,7 +1,9 @@
 package messenger
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,11 +19,8 @@ import (
 )
 
 func TestTransporterNew(t *testing.T) {
-	id, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-	trans := NewHTTPTransporter(id, nil)
+	trans := NewHTTPTransporter(upid.UPID{ID: "mesos1", Host: "localhost"}, nil)
 	assert.NotNil(t, trans)
-	assert.NotNil(t, trans.upid)
 	assert.NotNil(t, trans.messageQueue)
 	assert.NotNil(t, trans.client)
 }
@@ -31,9 +30,6 @@ func TestTransporterSend(t *testing.T) {
 	serverId := "testserver"
 
 	// setup mesos client-side
-	fromUpid, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-
 	protoMsg := testmessage.GenerateSmallMessage()
 	msgName := getMessageName(protoMsg)
 	msg := &Message{
@@ -55,8 +51,8 @@ func TestTransporterSend(t *testing.T) {
 	assert.NoError(t, err)
 
 	// make transport call.
-	transport := NewHTTPTransporter(fromUpid, nil)
-	errch := transport.Start()
+	transport := NewHTTPTransporter(upid.UPID{ID: "mesos1", Host: "localhost"}, nil)
+	_, errch := transport.Start()
 	defer transport.Stop(false)
 
 	msg.UPID = toUpid
@@ -78,9 +74,6 @@ func TestTransporter_DiscardedSend(t *testing.T) {
 	serverId := "testserver"
 
 	// setup mesos client-side
-	fromUpid, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-
 	protoMsg := testmessage.GenerateSmallMessage()
 	msgName := getMessageName(protoMsg)
 	msg := &Message{
@@ -100,8 +93,8 @@ func TestTransporter_DiscardedSend(t *testing.T) {
 	assert.NoError(t, err)
 
 	// make transport call.
-	transport := NewHTTPTransporter(fromUpid, nil)
-	errch := transport.Start()
+	transport := NewHTTPTransporter(upid.UPID{ID: "mesos1", Host: "localhost"}, nil)
+	_, errch := transport.Start()
 	defer transport.Stop(false)
 
 	msg.UPID = toUpid
@@ -138,20 +131,18 @@ func TestTransporter_DiscardedSend(t *testing.T) {
 
 func TestTransporterStartAndRcvd(t *testing.T) {
 	serverId := "testserver"
-	serverPort := getNewPort()
-	serverAddr := "127.0.0.1:" + strconv.Itoa(serverPort)
+	serverAddr := "127.0.0.1"
 	protoMsg := testmessage.GenerateSmallMessage()
 	msgName := getMessageName(protoMsg)
 	ctrl := make(chan struct{})
 
 	// setup receiver (server) process
-	rcvPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
-	assert.NoError(t, err)
-	receiver := NewHTTPTransporter(rcvPid, nil)
+	receiver := NewHTTPTransporter(upid.UPID{ID: serverId, Host: serverAddr}, nil)
 	receiver.Install(msgName)
 
 	go func() {
 		defer close(ctrl)
+		t.Logf("received something...")
 		msg, err := receiver.Recv()
 		assert.Nil(t, err)
 		assert.NotNil(t, msg)
@@ -160,25 +151,23 @@ func TestTransporterStartAndRcvd(t *testing.T) {
 		}
 	}()
 
-	errch := receiver.Start()
+	rcvPid, errch := receiver.Start()
 	defer receiver.Stop(false)
 	assert.NotNil(t, errch)
 
 	time.Sleep(time.Millisecond * 7) // time to catchup
 
 	// setup sender (client) process
-	sndUpid, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-
-	sender := NewHTTPTransporter(sndUpid, nil)
+	sender := NewHTTPTransporter(upid.UPID{ID: "mesos1", Host: "localhost"}, nil)
 	msg := &Message{
-		UPID:         rcvPid,
+		UPID:         &rcvPid,
 		Name:         msgName,
 		ProtoMessage: protoMsg,
 	}
-	errch2 := sender.Start()
+	_, errch2 := sender.Start()
 	defer sender.Stop(false)
 
+	t.Logf("sending test message")
 	sender.Send(context.TODO(), msg)
 
 	select {
@@ -198,22 +187,18 @@ func TestTransporterStartAndRcvd(t *testing.T) {
 
 func TestTransporterStartAndInject(t *testing.T) {
 	serverId := "testserver"
-	serverPort := getNewPort()
-	serverAddr := "127.0.0.1:" + strconv.Itoa(serverPort)
 	protoMsg := testmessage.GenerateSmallMessage()
 	msgName := getMessageName(protoMsg)
 	ctrl := make(chan struct{})
 
 	// setup receiver (server) process
-	rcvPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
-	assert.NoError(t, err)
-	receiver := NewHTTPTransporter(rcvPid, nil)
+	receiver := NewHTTPTransporter(upid.UPID{ID: serverId, Host: "127.0.0.1"}, nil)
 	receiver.Install(msgName)
-	errch := receiver.Start()
+	rcvPid, errch := receiver.Start()
 	defer receiver.Stop(false)
 
 	msg := &Message{
-		UPID:         rcvPid,
+		UPID:         &rcvPid,
 		Name:         msgName,
 		ProtoMessage: protoMsg,
 	}
@@ -243,15 +228,11 @@ func TestTransporterStartAndInject(t *testing.T) {
 
 func TestTransporterStartAndStop(t *testing.T) {
 	serverId := "testserver"
-	serverPort := getNewPort()
-	serverAddr := "127.0.0.1:" + strconv.Itoa(serverPort)
 
 	// setup receiver (server) process
-	rcvPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
-	assert.NoError(t, err)
-	receiver := NewHTTPTransporter(rcvPid, nil)
+	receiver := NewHTTPTransporter(upid.UPID{ID: serverId, Host: "127.0.0.1"}, nil)
 
-	errch := receiver.Start()
+	_, errch := receiver.Start()
 	assert.NotNil(t, errch)
 
 	time.Sleep(1 * time.Second)
@@ -269,17 +250,20 @@ func TestTransporterStartAndStop(t *testing.T) {
 
 func TestMutatedHostUPid(t *testing.T) {
 	serverId := "testserver"
-	serverPort := getNewPort()
+	// NOTE(tsenart): This static port can cause conflicts if multiple instances
+	// of this test run concurrently or else if this port is already bound by
+	// another socket.
+	serverPort := 12345
 	serverHost := "127.0.0.1"
 	serverAddr := serverHost + ":" + strconv.Itoa(serverPort)
 
 	// override the upid.Host with this listener IP
-	addr := net.ParseIP("127.0.0.2")
+	addr := net.ParseIP("0.0.0.0")
 
 	// setup receiver (server) process
 	uPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
 	assert.NoError(t, err)
-	receiver := NewHTTPTransporter(uPid, addr)
+	receiver := NewHTTPTransporter(*uPid, addr)
 
 	err = receiver.listen()
 	assert.NoError(t, err)
@@ -294,36 +278,22 @@ func TestMutatedHostUPid(t *testing.T) {
 }
 
 func TestEmptyHostPortUPid(t *testing.T) {
-	serverId := "testserver"
-	serverPort := getNewPort()
-	serverHost := "127.0.0.1"
-	serverAddr := serverHost + ":" + strconv.Itoa(serverPort)
-
-	// setup receiver (server) process
-	uPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
-	assert.NoError(t, err)
-
-	// Unset upid host and port
-	uPid.Host = ""
-	uPid.Port = ""
+	uPid := upid.UPID{ID: "testserver"}
 
 	// override the upid.Host with this listener IP
-	addr := net.ParseIP("127.0.0.2")
-
+	addr := net.ParseIP("0.0.0.0")
 	receiver := NewHTTPTransporter(uPid, addr)
 
-	err = receiver.listen()
+	err := receiver.listen()
 	assert.NoError(t, err)
 
 	// This should be the host that overrides as uPid.Host is empty
-	if receiver.upid.Host != "127.0.0.2" {
-		t.Fatalf("reciever.upid.Host was expected to return %s, got %s\n", serverHost, receiver.upid.Host)
+	if receiver.upid.Host != "0.0.0.0" {
+		t.Fatalf("reciever.upid.Host was expected to return 0.0.0.0, got %q", receiver.upid.Host)
 	}
 
-	// This should end up being a random port, not the server port as uPid
-	// port is empty
-	if receiver.upid.Port == strconv.Itoa(serverPort) {
-		t.Fatalf("receiver.upid.Port was not expected to return %d, got %s\n", serverPort, receiver.upid.Port)
+	if receiver.upid.Port == "0" {
+		t.Fatalf("receiver.upid.Port was not expected to return 0, got %q", receiver.upid.Port)
 	}
 }
 
@@ -331,4 +301,50 @@ func makeMockServer(path string, handler func(rsp http.ResponseWriter, req *http
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, handler)
 	return httptest.NewServer(mux)
+}
+
+func TestProcessOneRequest(t *testing.T) {
+	ht := &HTTPTransporter{
+		messageQueue: make(chan *Message, 1),
+		shouldQuit:   make(chan struct{}),
+	}
+	testfunc := func(expectProceed bool) {
+		rchan := make(chan Response, 1)
+		proceed := ht.processOneRequest(&upid.UPID{ID: "james"}, &Request{
+			response: rchan,
+			Request: &http.Request{
+				Method:     "foo",
+				RequestURI: "a/z/bar",
+				Body:       ioutil.NopCloser(&bytes.Reader{}),
+			},
+		})
+		// expecting to get a 202 response since the request doesn't have libprocess headers
+		if proceed != expectProceed {
+			t.Fatalf("expected proceed signal %t instead of %t", expectProceed, proceed)
+		}
+		select {
+		case resp := <-rchan:
+			if resp.code != 202 {
+				t.Fatalf("expected a 202 response for all libprocess requests")
+			}
+		default:
+			t.Fatalf("expected a response since we're not a libprocess agent")
+		}
+		select {
+		case m := <-ht.messageQueue:
+			// From, Name, Data
+			assert.Equal(t, "james", m.UPID.ID)
+			assert.Equal(t, "bar", m.Name)
+		default:
+			t.Fatalf("expected a message for the request that was processed")
+		}
+	}
+	t.Log("testing w/o shouldQuit signal")
+	testfunc(true)
+
+	t.Log("testing w/ shouldQuit signal")
+	close(ht.shouldQuit)
+	for i := 0; i < 100; i++ {
+		testfunc(false) // do this in a loop to test determinism
+	}
 }

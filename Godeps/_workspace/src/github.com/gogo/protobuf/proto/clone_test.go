@@ -36,7 +36,8 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	pb "./testdata"
+	proto3pb "github.com/gogo/protobuf/proto/proto3_proto"
+	pb "github.com/gogo/protobuf/proto/testdata"
 )
 
 var cloneTestMessage = &pb.MyMessage{
@@ -188,6 +189,70 @@ var mergeTests = []struct {
 		src:  &pb.OtherMessage{Value: []byte("foo")},
 		dst:  &pb.OtherMessage{Value: []byte("bar")},
 		want: &pb.OtherMessage{Value: []byte("foo")},
+	},
+	{
+		src: &pb.MessageWithMap{
+			NameMapping: map[int32]string{6: "Nigel"},
+			MsgMapping: map[int64]*pb.FloatingPoint{
+				0x4001: {F: proto.Float64(2.0)},
+			},
+			ByteMapping: map[bool][]byte{true: []byte("wowsa")},
+		},
+		dst: &pb.MessageWithMap{
+			NameMapping: map[int32]string{
+				6: "Bruce", // should be overwritten
+				7: "Andrew",
+			},
+		},
+		want: &pb.MessageWithMap{
+			NameMapping: map[int32]string{
+				6: "Nigel",
+				7: "Andrew",
+			},
+			MsgMapping: map[int64]*pb.FloatingPoint{
+				0x4001: {F: proto.Float64(2.0)},
+			},
+			ByteMapping: map[bool][]byte{true: []byte("wowsa")},
+		},
+	},
+	// proto3 shouldn't merge zero values,
+	// in the same way that proto2 shouldn't merge nils.
+	{
+		src: &proto3pb.Message{
+			Name: "Aaron",
+			Data: []byte(""), // zero value, but not nil
+		},
+		dst: &proto3pb.Message{
+			HeightInCm: 176,
+			Data:       []byte("texas!"),
+		},
+		want: &proto3pb.Message{
+			Name:       "Aaron",
+			HeightInCm: 176,
+			Data:       []byte("texas!"),
+		},
+	},
+	// Oneof fields should merge by assignment.
+	{
+		src: &pb.Communique{
+			Union: &pb.Communique_Number{Number: 41},
+		},
+		dst: &pb.Communique{
+			Union: &pb.Communique_Name{Name: "Bobby Tables"},
+		},
+		want: &pb.Communique{
+			Union: &pb.Communique_Number{Number: 41},
+		},
+	},
+	// Oneof nil is the same as not set.
+	{
+		src: &pb.Communique{},
+		dst: &pb.Communique{
+			Union: &pb.Communique_Name{Name: "Bobby Tables"},
+		},
+		want: &pb.Communique{
+			Union: &pb.Communique_Name{Name: "Bobby Tables"},
+		},
 	},
 }
 
