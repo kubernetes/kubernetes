@@ -17,18 +17,21 @@ limitations under the License.
 package namespacecontroller
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestFinalized(t *testing.T) {
-	testNamespace := api.Namespace{
+	testNamespace := &api.Namespace{
 		Spec: api.NamespaceSpec{
 			Finalizers: []api.FinalizerName{"a", "b"},
 		},
@@ -42,9 +45,9 @@ func TestFinalized(t *testing.T) {
 	}
 }
 
-func TestFinalize(t *testing.T) {
+func TestFinalizeNamespaceFunc(t *testing.T) {
 	mockClient := &testclient.Fake{}
-	testNamespace := api.Namespace{
+	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
@@ -53,7 +56,7 @@ func TestFinalize(t *testing.T) {
 			Finalizers: []api.FinalizerName{"kubernetes", "other"},
 		},
 	}
-	finalize(mockClient, testNamespace)
+	finalizeNamespaceFunc(mockClient, testNamespace)
 	actions := mockClient.Actions()
 	if len(actions) != 1 {
 		t.Errorf("Expected 1 mock client action, but got %v", len(actions))
@@ -73,7 +76,7 @@ func TestFinalize(t *testing.T) {
 func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 	mockClient := &testclient.Fake{}
 	now := unversioned.Now()
-	testNamespace := api.Namespace{
+	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test",
 			ResourceVersion:   "1",
@@ -125,6 +128,26 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 	}
 }
 
+func TestRetryOnConflictError(t *testing.T) {
+	mockClient := &testclient.Fake{}
+	numTries := 0
+	retryOnce := func(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+		numTries++
+		if numTries <= 1 {
+			return namespace, errors.NewConflict(namespace.Kind, namespace.Name, fmt.Errorf("ERROR!"))
+		}
+		return namespace, nil
+	}
+	namespace := &api.Namespace{}
+	_, err := retryOnConflictError(mockClient, namespace, retryOnce)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if numTries != 2 {
+		t.Errorf("Expected %v, but got %v", 2, numTries)
+	}
+}
+
 func TestSyncNamespaceThatIsTerminatingNonExperimental(t *testing.T) {
 	testSyncNamespaceThatIsTerminating(t, false)
 }
@@ -135,7 +158,7 @@ func TestSyncNamespaceThatIsTerminatingExperimental(t *testing.T) {
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
 	mockClient := &testclient.Fake{}
-	testNamespace := api.Namespace{
+	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
