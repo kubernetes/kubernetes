@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,14 +29,32 @@ import (
 
 type testSubcontainersInfoProvider struct{}
 
+func (p testSubcontainersInfoProvider) GetVersionInfo() (*info.VersionInfo, error) {
+	return &info.VersionInfo{
+		KernelVersion:      "4.1.6-200.fc22.x86_64",
+		ContainerOsVersion: "Fedora 22 (Twenty Two)",
+		DockerVersion:      "1.8.1",
+		CadvisorVersion:    "0.16.0",
+	}, nil
+}
+
+func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, error) {
+	return &info.MachineInfo{
+		NumCores:       4,
+		MemoryCapacity: 1024,
+	}, nil
+}
+
 func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.ContainerInfoRequest) ([]*info.ContainerInfo, error) {
 	return []*info.ContainerInfo{
 		{
 			ContainerReference: info.ContainerReference{
-				Name: "testcontainer",
+				Name:    "testcontainer",
+				Aliases: []string{"testcontaineralias"},
 			},
 			Spec: info.ContainerSpec{
-				Image: "test",
+				Image:        "test",
+				CreationTime: time.Unix(1257894000, 0),
 			},
 			Stats: []*info.ContainerStats{
 				{
