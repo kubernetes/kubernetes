@@ -58,6 +58,7 @@ Familiarity with [pods](pods.md) is suggested.
       - [AWS EBS Example configuration](#aws-ebs-example-configuration)
     - [nfs](#nfs)
     - [iscsi](#iscsi)
+    - [flocker](#flocker)
     - [glusterfs](#glusterfs)
     - [rbd](#rbd)
     - [gitRepo](#gitrepo)
@@ -114,6 +115,7 @@ Kubernetes supports several types of Volumes:
    * `awsElasticBlockStore`
    * `nfs`
    * `iscsi`
+   * `flocker`
    * `glusterfs`
    * `rbd`
    * `gitRepo`
@@ -316,6 +318,21 @@ iSCSI volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
 See the [iSCSI example](../../examples/iscsi/) for more details.
+
+### flocker
+
+[Flocker](https://clusterhq.com/flocker) is an open-source clustered container data volume manager. It provides management
+and orchestration of data volumes backed by a variety of storage backends.
+
+A `flocker` volume allows a Flocker dataset to be mounted into a pod. If the
+dataset does not already exist in Flocker, it needs to be created with Flocker
+CLI or the using the Flocker API. If the dataset already exists it will
+reattached by Flocker to the node that the pod is scheduled. This means data
+can be "handed off" between pods as required.
+
+__Important: You must have your own Flocker installation running before you can use it__
+
+See the [Flocker example](../../examples/flocker/) for more details.
 
 ### glusterfs
 
