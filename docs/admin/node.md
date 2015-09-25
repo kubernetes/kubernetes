@@ -214,6 +214,10 @@ unschedulable, run this command:
 kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 ```
 
+Note that pods which are created by a daemonSet controller bypass the Kubernetes scheduler,
+and do not respect the unschedulable attribute on a node.   The assumption is that daemons belong on
+the machine even if it is being drained of applications in preparation for a reboot.
+
 ### Node capacity
 
 The capacity of the node (number of cpus and amount of memory) is part of the node resource.
