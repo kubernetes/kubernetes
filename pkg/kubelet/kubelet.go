@@ -33,7 +33,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/libcontainer/selinux"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -2349,7 +2348,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	networkConfigured := kl.doneNetworkConfigure()
 
 	selinuxRequired := capabilities.Get().EnableSELinuxIntegration
-	selinuxOK := (selinuxRequired && selinux.SelinuxEnabled()) || !selinuxRequired
+	selinuxOK := (selinuxRequired && kl.selinuxEnabled()) || !selinuxRequired
 
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition

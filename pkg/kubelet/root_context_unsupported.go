@@ -22,3 +22,7 @@ func (kl *Kubelet) getRootDirContext() (string, error) {
 	// For now, just return a blank security context on unsupported platforms
 	return "", nil
 }
+
+func (kl *Kubelet) selinuxEnabled() bool {
+	return false
+}
