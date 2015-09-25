@@ -33,6 +33,7 @@ type DaemonSetInterface interface {
 	Get(name string) (*experimental.DaemonSet, error)
 	Create(ctrl *experimental.DaemonSet) (*experimental.DaemonSet, error)
 	Update(ctrl *experimental.DaemonSet) (*experimental.DaemonSet, error)
+	UpdateStatus(ctrl *experimental.DaemonSet) (*experimental.DaemonSet, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -74,6 +75,13 @@ func (c *daemonSets) Create(daemon *experimental.DaemonSet) (result *experimenta
 func (c *daemonSets) Update(daemon *experimental.DaemonSet) (result *experimental.DaemonSet, err error) {
 	result = &experimental.DaemonSet{}
 	err = c.r.Put().Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).Body(daemon).Do().Into(result)
+	return
+}
+
+// UpdateStatus updates an existing daemon set status
+func (c *daemonSets) UpdateStatus(daemon *experimental.DaemonSet) (result *experimental.DaemonSet, err error) {
+	result = &experimental.DaemonSet{}
+	err = c.r.Put().Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).SubResource("status").Body(daemon).Do().Into(result)
 	return
 }
 
