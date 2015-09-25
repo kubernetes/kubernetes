@@ -50,7 +50,7 @@ func TestJobStrategy(t *testing.T) {
 		},
 		Spec: extensions.JobSpec{
 			Selector: validSelector,
-			Template: &validPodTemplateSpec,
+			Template: validPodTemplateSpec,
 		},
 		Status: extensions.JobStatus{
 			Active: 11,
@@ -116,7 +116,7 @@ func TestJobStatusStrategy(t *testing.T) {
 		},
 		Spec: extensions.JobSpec{
 			Selector:    validSelector,
-			Template:    &validPodTemplateSpec,
+			Template:    validPodTemplateSpec,
 			Parallelism: &oldParallelism,
 		},
 		Status: extensions.JobStatus{
@@ -131,7 +131,7 @@ func TestJobStatusStrategy(t *testing.T) {
 		},
 		Spec: extensions.JobSpec{
 			Selector:    validSelector,
-			Template:    &validPodTemplateSpec,
+			Template:    validPodTemplateSpec,
 			Parallelism: &newParallelism,
 		},
 		Status: extensions.JobStatus{
