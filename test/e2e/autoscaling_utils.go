@@ -250,7 +250,6 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		},
 	})
 	expectNoError(err)
-	expectNoError(waitForService(c, ns, name, true, startServiceInterval, startServiceTimeout))
 	config := RCConfig{
 		Client:    c,
 		Image:     image,
@@ -262,4 +261,7 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		MemLimit:  memLimitMb * 1024 * 1024, // MemLimit is in bytes
 	}
 	expectNoError(RunRC(config))
+	// Make sure endpoints are propagated.
+	// TODO(piosz): replace sleep with endpoints watch.
+	time.Sleep(10 * time.Second)
 }
