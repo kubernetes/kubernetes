@@ -120,6 +120,23 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 	c.Validate(t, response, err)
 }
 
+func TestHorizontalPodAutoscalerUpdateStatus(t *testing.T) {
+	ns := api.NamespaceDefault
+	horizontalPodAutoscaler := &extensions.HorizontalPodAutoscaler{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "abc",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+	}
+	c := &testClient{
+		Request:  testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc") + "/status", Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
+	}
+	response, err := c.Setup(t).Experimental().HorizontalPodAutoscalers(ns).UpdateStatus(horizontalPodAutoscaler)
+	c.Validate(t, response, err)
+}
+
 func TestHorizontalPodAutoscalerDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{

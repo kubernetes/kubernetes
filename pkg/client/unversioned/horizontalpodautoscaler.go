@@ -36,6 +36,7 @@ type HorizontalPodAutoscalerInterface interface {
 	Delete(name string, options *api.DeleteOptions) error
 	Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -91,6 +92,13 @@ func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.Ho
 func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Put().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).Body(horizontalPodAutoscaler).Do().Into(result)
+	return
+}
+
+// UpdateStatus takes the representation of a horizontalPodAutoscaler and updates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
+	err = c.client.Put().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
 	return
 }
 
