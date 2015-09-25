@@ -31,7 +31,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -348,8 +347,8 @@ type requestAttributeGetter struct {
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots []string, grouplessAPIRoots []string) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{sets.NewString(apiRoots...), sets.NewString(grouplessAPIRoots...), restMapper}}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, apiRequestInfoResolver *APIRequestInfoResolver) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper, apiRequestInfoResolver}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
@@ -407,8 +406,6 @@ type APIRequestInfo struct {
 	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
 	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
 	Subresource string
-	// Kind is the type of object being manipulated.  For example: Pod
-	Kind string
 	// Name is empty for some verbs, but if the request directly indicates a name (not in body content) then this field is filled in.
 	Name string
 	// Parts are the path parts for the request, always starting with /{resource}/{name}
@@ -421,7 +418,6 @@ type APIRequestInfo struct {
 type APIRequestInfoResolver struct {
 	APIPrefixes          sets.String
 	GrouplessAPIPrefixes sets.String
-	RestMapper           meta.RESTMapper
 }
 
 // TODO write an integration test against the swagger doc to test the APIRequestInfo and match up behavior to responses
@@ -532,11 +528,6 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
 		requestInfo.Verb = "list"
-	}
-
-	// if we have a resource, we have a good shot at being able to determine kind
-	if len(requestInfo.Resource) > 0 {
-		_, requestInfo.Kind, _ = r.RestMapper.VersionAndKindForResource(requestInfo.Resource)
 	}
 
 	return requestInfo, nil
