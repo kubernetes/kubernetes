@@ -57,6 +57,9 @@ func (daemonSetStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newDaemonSet := obj.(*experimental.DaemonSet)
 	oldDaemonSet := old.(*experimental.DaemonSet)
 
+	// update is not allowed to set status
+	newDaemonSet.Status = oldDaemonSet.Status
+
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
 	// the burden of managing the status onto the clients because we can't (in general)
@@ -119,4 +122,20 @@ func MatchDaemonSet(label labels.Selector, field fields.Selector) generic.Matche
 			return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), nil
 		},
 	}
+}
+
+type daemonSetStatusStrategy struct {
+	daemonSetStrategy
+}
+
+var StatusStrategy = daemonSetStatusStrategy{Strategy}
+
+func (daemonSetStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newDaemonSet := obj.(*experimental.DaemonSet)
+	oldDaemonSet := old.(*experimental.DaemonSet)
+	newDaemonSet.Spec = oldDaemonSet.Spec
+}
+
+func (daemonSetStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateDaemonSetStatusUpdate(obj.(*experimental.DaemonSet), old.(*experimental.DaemonSet))
 }
