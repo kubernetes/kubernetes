@@ -141,7 +141,8 @@ func (q *DelayQueue) Pop() interface{} {
 // returns a non-nil value from the queue, or else nil if/when cancelled; if cancel
 // is nil then cancellation is disabled and this func must return a non-nil value.
 func (q *DelayQueue) pop(next func() *qitem, cancel <-chan struct{}) interface{} {
-	var ch chan struct{}
+	var waitCh chan struct{}
+	var delayTimer *time.Timer
 	for {
 		item := next()
 		if item == nil {
@@ -149,27 +150,30 @@ func (q *DelayQueue) pop(next func() *qitem, cancel <-chan struct{}) interface{}
 			return nil
 		}
 		x := item.value
-		waitingPeriod := item.priority.ts.Sub(time.Now())
-		if waitingPeriod >= 0 {
+		delayedTime := item.priority.ts
+		if delayedTime.After(time.Now()) {
 			// listen for calls to Add() while we're waiting for the deadline
-			if ch == nil {
-				ch = make(chan struct{}, 1)
+			if waitCh == nil {
+				waitCh = make(chan struct{}, 1)
+			}
+			if delayTimer == nil {
+				delayTimer = time.NewTimer(delayedTime.Sub(time.Now()))
 			}
 			go func() {
 				q.lock.Lock()
 				defer q.lock.Unlock()
 				q.cond.Wait()
-				ch <- struct{}{}
+				waitCh <- struct{}{}
 			}()
 			select {
 			case <-cancel:
 				item.readd(item)
 				return nil
-			case <-ch:
+			case <-waitCh:
 				// we may no longer have the earliest deadline, re-try
 				item.readd(item)
 				continue
-			case <-time.After(waitingPeriod):
+			case <-delayTimer.C:
 				// noop
 			case <-item.priority.notify:
 				// noop
