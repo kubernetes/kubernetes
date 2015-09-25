@@ -109,6 +109,7 @@ func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
 }
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
+	defer GinkgoRecover()
 	var count int
 	var rest int
 	sleepTime := time.Duration(0)
@@ -134,6 +135,7 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 }
 
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
+	defer GinkgoRecover()
 	var count int
 	var rest int
 	sleepTime := time.Duration(0)
@@ -181,8 +183,7 @@ func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
 		Param("durationSec", strconv.Itoa(durationSec)).
-		Do().
-		Raw()
+		DoRaw()
 	expectNoError(err)
 }
 
@@ -197,8 +198,7 @@ func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec 
 		Suffix("ConsumeMem").
 		Param("megabytes", strconv.Itoa(megabytes)).
 		Param("durationSec", strconv.Itoa(durationSec)).
-		Do().
-		Raw()
+		DoRaw()
 	expectNoError(err)
 }
 
