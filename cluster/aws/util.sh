@@ -851,12 +851,12 @@ function kube-up {
         exit 1
       fi
     else
+      # We are not able to add an elastic ip, a route or volume to the instance until that instance is in "running" state.
+      wait-for-instance-running $master_id
+
       KUBE_MASTER=${MASTER_NAME}
       KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
-
-      # We are not able to add a route or volume to the instance until that instance is in "running" state.
-      wait-for-instance-running $master_id
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
