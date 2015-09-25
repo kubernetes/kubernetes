@@ -22,11 +22,12 @@ import (
 	"sync"
 	"time"
 
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -58,8 +59,8 @@ type ImageGCPolicy struct {
 }
 
 type realImageManager struct {
-	// Container runtime
-	runtime container.Runtime
+	// Connection to the Docker daemon.
+	dockerClient dockertools.DockerInterface
 
 	// Records of images and their use.
 	imageRecords     map[string]*imageRecord
@@ -90,7 +91,7 @@ type imageRecord struct {
 	size int64
 }
 
-func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
+func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -99,7 +100,7 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 		return nil, fmt.Errorf("invalid LowThresholdPercent %d, must be in range [0-100]", policy.LowThresholdPercent)
 	}
 	im := &realImageManager{
-		runtime:      runtime,
+		dockerClient: dockerClient,
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     cadvisorInterface,
@@ -129,21 +130,21 @@ func (im *realImageManager) Start() error {
 }
 
 func (im *realImageManager) detectImages(detected time.Time) error {
-	images, err := im.runtime.ListImages()
+	images, err := im.dockerClient.ListImages(docker.ListImagesOptions{})
 	if err != nil {
 		return err
 	}
-	pods, err := im.runtime.GetPods(true)
+	containers, err := im.dockerClient.ListContainers(docker.ListContainersOptions{
+		All: true,
+	})
 	if err != nil {
 		return err
 	}
 
 	// Make a set of images in use by containers.
 	imagesInUse := sets.NewString()
-	for _, pod := range pods {
-		for _, container := range pod.Containers {
-			imagesInUse.Insert(container.Image)
-		}
+	for _, container := range containers {
+		imagesInUse.Insert(container.Image)
 	}
 
 	// Add new images and record those being used.
@@ -162,11 +163,11 @@ func (im *realImageManager) detectImages(detected time.Time) error {
 		}
 
 		// Set last used time to now if the image is being used.
-		if isImageUsed(image, imagesInUse) {
+		if isImageUsed(&image, imagesInUse) {
 			im.imageRecords[image.ID].lastUsed = now
 		}
 
-		im.imageRecords[image.ID].size = image.Size
+		im.imageRecords[image.ID].size = image.VirtualSize
 	}
 
 	// Remove old images from our records.
@@ -252,7 +253,7 @@ func (im *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 
 		// Remove image. Continue despite errors.
 		glog.Infof("[ImageManager]: Removing image %q to free %d bytes", image.id, image.size)
-		err := im.runtime.RemoveImage(container.ImageSpec{Image: image.id})
+		err := im.dockerClient.RemoveImage(image.id)
 		if err != nil {
 			lastErr = err
 			continue
@@ -286,12 +287,12 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 	}
 }
 
-func isImageUsed(image container.Image, imagesInUse sets.String) bool {
+func isImageUsed(image *docker.APIImages, imagesInUse sets.String) bool {
 	// Check the image ID and all the RepoTags.
 	if _, ok := imagesInUse[image.ID]; ok {
 		return true
 	}
-	for _, tag := range image.Tags {
+	for _, tag := range image.RepoTags {
 		if _, ok := imagesInUse[tag]; ok {
 			return true
 		}
