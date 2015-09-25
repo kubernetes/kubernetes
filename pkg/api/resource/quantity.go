@@ -323,9 +323,6 @@ func (q *Quantity) Cmp(y Quantity) int {
 }
 
 func (q *Quantity) Add(y Quantity) error {
-	if q.Format != y.Format {
-		return fmt.Errorf("format mismatch: %v vs. %v", q.Format, y.Format)
-	}
 	q.Amount.Add(q.Amount, y.Amount)
 	return nil
 }
