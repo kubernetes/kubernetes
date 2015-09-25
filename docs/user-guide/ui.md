@@ -1,33 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/ui.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -46,7 +18,7 @@ kubectl create -f cluster/addons/kube-ui/kube-ui-rc.yaml --namespace=kube-system
 kubectl create -f cluster/addons/kube-ui/kube-ui-svc.yaml --namespace=kube-system
 ```
 
-Normally, this should be taken care of automatically by the [`kube-addons.sh`](http://releases.k8s.io/HEAD/cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
+Normally, this should be taken care of automatically by the [`kube-addons.sh`](http://releases.k8s.io/v1.1.0/cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
 
 ## Using the UI
 
@@ -79,7 +51,14 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 
 ## More Information
 
-For more information, see the [Kubernetes UI development document](http://releases.k8s.io/HEAD/www/README.md) in the www directory.
+For more information, see the [Kubernetes UI development document](http://releases.k8s.io/v1.1.0/www/README.md) in the www directory.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+  <!-- TAG IS_VERSIONED -->
+  <!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
