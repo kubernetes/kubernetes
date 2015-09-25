@@ -417,7 +417,7 @@ type JobSpec struct {
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
-	Template *v1.PodTemplateSpec `json:"template"`
+	Template v1.PodTemplateSpec `json:"template"`
 }
 
 // JobStatus represents the current state of a Job.
