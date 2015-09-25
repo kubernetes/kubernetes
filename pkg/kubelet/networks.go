@@ -19,6 +19,7 @@ package kubelet
 import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // This just exports required functions from kubelet proper, for use by network
@@ -33,4 +34,8 @@ func (nh *networkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
 
 func (nh *networkHost) GetKubeClient() client.Interface {
 	return nh.kubelet.kubeClient
+}
+
+func (nh *networkHost) GetRuntime() kubecontainer.Runtime {
+	return nh.kubelet.GetRuntime()
 }
