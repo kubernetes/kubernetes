@@ -33,7 +33,6 @@ type FakeRuntime struct {
 	sync.Mutex
 	CalledFunctions   []string
 	PodList           []*Pod
-	ContainerList     []*Container
 	ImageList         []Image
 	PodStatus         api.PodStatus
 	StartedPods       []string
@@ -88,7 +87,6 @@ func (f *FakeRuntime) ClearCalls() {
 
 	f.CalledFunctions = []string{}
 	f.PodList = []*Pod{}
-	f.ContainerList = []*Container{}
 	f.PodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
@@ -217,14 +215,6 @@ func (f *FakeRuntime) GetPodStatus(*api.Pod) (*api.PodStatus, error) {
 	f.CalledFunctions = append(f.CalledFunctions, "GetPodStatus")
 	status := f.PodStatus
 	return &status, f.Err
-}
-
-func (f *FakeRuntime) GetContainers(all bool) ([]*Container, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetContainers")
-	return f.ContainerList, f.Err
 }
 
 func (f *FakeRuntime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
