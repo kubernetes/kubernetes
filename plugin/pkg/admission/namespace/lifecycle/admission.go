@@ -82,7 +82,10 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
 		namespaceObj, err = l.client.Namespaces().Get(a.GetNamespace())
 		if err != nil {
-			return admission.NewNotFound(a)
+			if errors.IsNotFound(err) {
+				return err
+			}
+			return errors.NewInternalError(err)
 		}
 	}
 
