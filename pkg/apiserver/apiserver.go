@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -78,12 +77,12 @@ type Mux interface {
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
-	// Root is the APIPrefix under which this is being served.  It can also be the APIPrefix/APIGroup that is being served
-	// Since the APIGroup may not contain a '/', you can get the APIGroup by parsing from the last '/'
-	// TODO Currently, an APIPrefix with a '/' is not supported in conjunction with an empty APIGroup.  This struct should
-	// be refactored to keep separate information separate to avoid this sort of problem in the future.
 	Root    string
 	Version string
+
+	// APIRequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
+	// TODO: refactor proxy handler to use sub resources
+	APIRequestInfoResolver *APIRequestInfoResolver
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
@@ -115,38 +114,6 @@ const (
 	// Maximum duration before timing out read/write requests
 	MaxTimeoutSecs = 600
 )
-
-func (g *APIGroupVersion) GetAPIPrefix() string {
-	slashlessRoot := strings.Trim(g.Root, "/")
-	if lastSlashIndex := strings.LastIndex(slashlessRoot, "/"); lastSlashIndex != -1 {
-		return slashlessRoot[:lastSlashIndex]
-	}
-
-	return slashlessRoot
-}
-
-func (g *APIGroupVersion) GetAPIGroup() string {
-	slashlessRoot := strings.Trim(g.Root, "/")
-	if lastSlashIndex := strings.LastIndex(slashlessRoot, "/"); lastSlashIndex != -1 {
-		return slashlessRoot[lastSlashIndex:]
-	}
-
-	return ""
-}
-
-func (g *APIGroupVersion) GetAPIVersion() string {
-	return g.Version
-}
-
-func (g *APIGroupVersion) GetAPIRequestInfoResolver() *APIRequestInfoResolver {
-	apiPrefix := g.GetAPIPrefix()
-	info := &APIRequestInfoResolver{sets.NewString(apiPrefix), sets.String{}, g.Mapper}
-	if len(g.GetAPIGroup()) == 0 {
-		info.GrouplessAPIPrefixes.Insert(apiPrefix)
-	}
-
-	return info
-}
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
@@ -190,7 +157,7 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
 		group:             g,
-		info:              g.GetAPIRequestInfoResolver(),
+		info:              g.APIRequestInfoResolver,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 		proxyDialerFn:     g.ProxyDialerFn,
