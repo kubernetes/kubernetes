@@ -130,6 +130,70 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
+func TestValidateDaemonSetStatusUpdate(t *testing.T) {
+	type dsUpdateTest struct {
+		old    experimental.DaemonSet
+		update experimental.DaemonSet
+	}
+
+	successCases := []dsUpdateTest{
+		{
+			old: experimental.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Status: experimental.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+				},
+			},
+			update: experimental.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Status: experimental.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+				},
+			},
+		},
+	}
+
+	for _, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateDaemonSetStatusUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]dsUpdateTest{
+		"negative values": {
+			old: experimental.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Status: experimental.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+				},
+			},
+			update: experimental.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Status: experimental.DaemonSetStatus{
+					CurrentNumberScheduled: -1,
+					NumberMisscheduled:     -1,
+					DesiredNumberScheduled: -3,
+				},
+			},
+		},
+	}
+
+	for testName, errorCase := range errorCases {
+		if errs := ValidateDaemonSetStatusUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
+			t.Errorf("expected failure: %s", testName)
+		}
+	}
+
+}
+
 func TestValidateDaemonSetUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validSelector2 := map[string]string{"c": "d"}

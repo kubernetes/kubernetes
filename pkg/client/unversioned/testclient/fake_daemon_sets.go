@@ -66,6 +66,14 @@ func (c *FakeDaemonSets) Update(daemon *experimental.DaemonSet) (*experimental.D
 	return obj.(*experimental.DaemonSet), err
 }
 
+func (c *FakeDaemonSets) UpdateStatus(daemon *experimental.DaemonSet) (*experimental.DaemonSet, error) {
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("daemonsets", "status", c.Namespace, daemon), &experimental.DaemonSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*experimental.DaemonSet), err
+}
+
 func (c *FakeDaemonSets) Delete(name string) error {
 	_, err := c.Fake.Invokes(NewDeleteAction("daemonsets", c.Namespace, name), &experimental.DaemonSet{})
 	return err
