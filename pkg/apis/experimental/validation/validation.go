@@ -114,6 +114,23 @@ func ValidateDaemonSetUpdate(oldController, controller *experimental.DaemonSet) 
 	return allErrs
 }
 
+// validateDaemonSetStatus validates a DaemonSetStatus
+func validateDaemonSetStatus(status *experimental.DaemonSetStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentNumberScheduled), "currentNumberScheduled")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.NumberMisscheduled), "numberMisscheduled")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredNumberScheduled), "desiredNumberScheduled")...)
+	return allErrs
+}
+
+// ValidateDaemonSetStatus validates tests if required fields in the DaemonSet Status section
+func ValidateDaemonSetStatusUpdate(controller, oldController *experimental.DaemonSet) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, validateDaemonSetStatus(&controller.Status)...)
+	return allErrs
+}
+
 // ValidateDaemonSetTemplateUpdate tests that certain fields in the daemon set's pod template are not updated.
 func ValidateDaemonSetTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplateSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -314,16 +331,9 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 
 func ValidateJobStatus(status *experimental.JobStatus) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-
-	if status.Active < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("active", status.Active, isNegativeErrorMsg))
-	}
-	if status.Successful < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("successful", status.Successful, isNegativeErrorMsg))
-	}
-	if status.Unsuccessful < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("unsuccessful", status.Unsuccessful, isNegativeErrorMsg))
-	}
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), "active")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Successful), "successful")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Unsuccessful), "unsuccessful")...)
 	return allErrs
 }
 
