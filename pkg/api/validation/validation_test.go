@@ -3131,9 +3131,20 @@ func TestValidateResourceQuota(t *testing.T) {
 			api.ResourceCPU:                    resource.MustParse("100"),
 			api.ResourceMemory:                 resource.MustParse("10000"),
 			api.ResourcePods:                   resource.MustParse("10"),
-			api.ResourceServices:               resource.MustParse("10"),
+			api.ResourceServices:               resource.MustParse("0"),
 			api.ResourceReplicationControllers: resource.MustParse("10"),
 			api.ResourceQuotas:                 resource.MustParse("10"),
+		},
+	}
+
+	negativeSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU:                    resource.MustParse("-100"),
+			api.ResourceMemory:                 resource.MustParse("-10000"),
+			api.ResourcePods:                   resource.MustParse("-10"),
+			api.ResourceServices:               resource.MustParse("-10"),
+			api.ResourceReplicationControllers: resource.MustParse("-10"),
+			api.ResourceQuotas:                 resource.MustParse("-10"),
 		},
 	}
 
@@ -3173,6 +3184,10 @@ func TestValidateResourceQuota(t *testing.T) {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
 			DNS1123LabelErrorMsg,
 		},
+		"negative-limits": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
+			isNegativeErrorMsg,
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateResourceQuota(&v.R)
@@ -3182,7 +3197,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "metadata.name" && field != "metadata.namespace" {
+			if field != "metadata.name" && field != "metadata.namespace" && !api.IsStandardResourceName(field) {
 				t.Errorf("%s: missing prefix for: %v", k, field)
 			}
 			if detail != v.D {
