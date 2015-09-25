@@ -32,28 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/election"
-	execcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
-	minioncfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/minion/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/profile"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler"
-	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/ha"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/uid"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
@@ -67,6 +45,30 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
+
+	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
+	"k8s.io/kubernetes/contrib/mesos/pkg/election"
+	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
+	minioncfg "k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
+	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/master/ports"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools"
 )
 
 const (
@@ -75,18 +77,17 @@ const (
 	defaultReconcileInterval = 300    // 5m default task reconciliation interval
 	defaultReconcileCooldown = 15 * time.Second
 	defaultFrameworkName     = "Kubernetes"
-
-	executorCPUs = mresource.CPUShares(0.25) // initial CPU allocated for executor
-	executorMem  = mresource.MegaBytes(64.0) // initial memory allocated for executor
+	defaultExecutorCPUs      = mresource.CPUShares(0.25)  // initial CPU allocated for executor
+	defaultExecutorMem       = mresource.MegaBytes(128.0) // initial memory allocated for executor
 )
 
 type SchedulerServer struct {
 	Port                int
-	Address             util.IP
+	Address             net.IP
 	EnableProfiling     bool
 	AuthPath            string
-	APIServerList       util.StringList
-	EtcdServerList      util.StringList
+	APIServerList       []string
+	EtcdServerList      []string
 	EtcdConfigFile      string
 	AllowPrivileged     bool
 	ExecutorPath        string
@@ -96,18 +97,21 @@ type SchedulerServer struct {
 	MesosRole           string
 	MesosAuthPrincipal  string
 	MesosAuthSecretFile string
+	MesosCgroupPrefix   string
+	MesosExecutorCPUs   mresource.CPUShares
+	MesosExecutorMem    mresource.MegaBytes
 	Checkpoint          bool
 	FailoverTimeout     float64
 
 	ExecutorLogV           int
 	ExecutorBindall        bool
 	ExecutorSuicideTimeout time.Duration
-	ExecutorCgroupPrefix   string
 
 	RunProxy     bool
 	ProxyBindall bool
 	ProxyLogV    int
 
+	MinionPathOverride    string
 	MinionLogMaxSize      resource.Quantity
 	MinionLogMaxBackups   int
 	MinionLogMaxAgeInDays int
@@ -125,10 +129,10 @@ type SchedulerServer struct {
 	FrameworkWebURI               string
 	HA                            bool
 	AdvertisedAddress             string
-	ServiceAddress                util.IP
+	ServiceAddress                net.IP
 	HADomain                      string
 	KMPath                        string
-	ClusterDNS                    util.IP
+	ClusterDNS                    net.IP
 	ClusterDomain                 string
 	KubeletRootDirectory          string
 	KubeletDockerEndpoint         string
@@ -138,6 +142,9 @@ type SchedulerServer struct {
 	KubeletSyncFrequency          time.Duration
 	KubeletNetworkPluginName      string
 	StaticPodsConfigPath          string
+	DockerCfgPath                 string
+	ContainPodResources           bool
+	AccountForPodResources        bool
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -157,28 +164,34 @@ type schedulerProcessInterface interface {
 func NewSchedulerServer() *SchedulerServer {
 	s := SchedulerServer{
 		Port:            ports.SchedulerPort,
-		Address:         util.IP(net.ParseIP("127.0.0.1")),
+		Address:         net.ParseIP("127.0.0.1"),
 		FailoverTimeout: time.Duration((1 << 62) - 1).Seconds(),
 
-		RunProxy:               true,
-		ExecutorSuicideTimeout: execcfg.DefaultSuicideTimeout,
-		ExecutorCgroupPrefix:   execcfg.DefaultCgroupPrefix,
+		RunProxy:                 true,
+		ExecutorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
+		DefaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
+		DefaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
 
 		MinionLogMaxSize:      minioncfg.DefaultLogMaxSize(),
 		MinionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
 		MinionLogMaxAgeInDays: minioncfg.DefaultLogMaxAgeInDays,
 
-		MesosAuthProvider:    sasl.ProviderName,
-		MesosMaster:          defaultMesosMaster,
-		MesosUser:            defaultMesosUser,
-		ReconcileInterval:    defaultReconcileInterval,
-		ReconcileCooldown:    defaultReconcileCooldown,
-		Checkpoint:           true,
-		FrameworkName:        defaultFrameworkName,
-		HA:                   false,
-		mux:                  http.NewServeMux(),
-		KubeletCadvisorPort:  4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
-		KubeletSyncFrequency: 10 * time.Second,
+		MesosAuthProvider:      sasl.ProviderName,
+		MesosCgroupPrefix:      minioncfg.DefaultCgroupPrefix,
+		MesosMaster:            defaultMesosMaster,
+		MesosUser:              defaultMesosUser,
+		MesosExecutorCPUs:      defaultExecutorCPUs,
+		MesosExecutorMem:       defaultExecutorMem,
+		ReconcileInterval:      defaultReconcileInterval,
+		ReconcileCooldown:      defaultReconcileCooldown,
+		Checkpoint:             true,
+		FrameworkName:          defaultFrameworkName,
+		HA:                     false,
+		mux:                    http.NewServeMux(),
+		KubeletCadvisorPort:    4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		KubeletSyncFrequency:   10 * time.Second,
+		ContainPodResources:    true,
+		AccountForPodResources: true,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -194,15 +207,15 @@ func NewSchedulerServer() *SchedulerServer {
 
 func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
-	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.IPVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.Var(&s.APIServerList, "api-servers", "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
+	fs.StringSliceVar(&s.APIServerList, "api-servers", s.APIServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.StringVar(&s.AuthPath, "auth-path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
-	fs.Var(&s.EtcdServerList, "etcd-servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with --etcd-config")
+	fs.StringSliceVar(&s.EtcdServerList, "etcd-servers", s.EtcdServerList, "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with --etcd-config")
 	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with --etcd-servers.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
-	fs.Var(&s.ClusterDNS, "cluster-dns", "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
+	fs.IPVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.StringVar(&s.StaticPodsConfigPath, "static-pods-config", s.StaticPodsConfigPath, "Path for specification of static pods. Path should point to dir containing the staticPods configuration files. Defaults to none.")
 
 	fs.StringVar(&s.MesosMaster, "mesos-master", s.MesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
@@ -211,6 +224,10 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.MesosAuthPrincipal, "mesos-authentication-principal", s.MesosAuthPrincipal, "Mesos authentication principal.")
 	fs.StringVar(&s.MesosAuthSecretFile, "mesos-authentication-secret-file", s.MesosAuthSecretFile, "Mesos authentication secret file.")
 	fs.StringVar(&s.MesosAuthProvider, "mesos-authentication-provider", s.MesosAuthProvider, fmt.Sprintf("Authentication provider to use, default is SASL that supports mechanisms: %+v", mech.ListSupported()))
+	fs.StringVar(&s.DockerCfgPath, "dockercfg-path", s.DockerCfgPath, "Path to a dockercfg file that will be used by the docker instance of the minions.")
+	fs.StringVar(&s.MesosCgroupPrefix, "mesos-cgroup-prefix", s.MesosCgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
+	fs.Var(&s.MesosExecutorCPUs, "mesos-executor-cpus", "Initial CPU shares to allocate for each Mesos executor container.")
+	fs.Var(&s.MesosExecutorMem, "mesos-executor-mem", "Initial memory (MB) to allocate for each Mesos executor container.")
 	fs.BoolVar(&s.Checkpoint, "checkpoint", s.Checkpoint, "Enable/disable checkpointing for the kubernetes-mesos framework.")
 	fs.Float64Var(&s.FailoverTimeout, "failover-timeout", s.FailoverTimeout, fmt.Sprintf("Framework failover timeout, in sec."))
 	fs.UintVar(&s.DriverPort, "driver-port", s.DriverPort, "Port that the Mesos scheduler driver process should listen on.")
@@ -223,19 +240,21 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.FrameworkName, "framework-name", s.FrameworkName, "The framework name to register with Mesos.")
 	fs.StringVar(&s.FrameworkWebURI, "framework-weburi", s.FrameworkWebURI, "A URI that points to a web-based interface for interacting with the framework.")
 	fs.StringVar(&s.AdvertisedAddress, "advertised-address", s.AdvertisedAddress, "host:port address that is advertised to clients. May be used to construct artifact download URIs.")
-	fs.Var(&s.ServiceAddress, "service-address", "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
+	fs.IPVar(&s.ServiceAddress, "service-address", s.ServiceAddress, "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
 	fs.Var(&s.DefaultContainerCPULimit, "default-container-cpu-limit", "Containers without a CPU resource limit are admitted this much CPU shares")
 	fs.Var(&s.DefaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
+	fs.BoolVar(&s.ContainPodResources, "contain-pod-resources", s.ContainPodResources, "Reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
+	fs.BoolVar(&s.AccountForPodResources, "account-for-pod-resources", s.AccountForPodResources, "Allocate pod CPU and memory resources from offers (Default: true)")
 
 	fs.IntVar(&s.ExecutorLogV, "executor-logv", s.ExecutorLogV, "Logging verbosity of spawned minion and executor processes.")
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
 	fs.DurationVar(&s.ExecutorSuicideTimeout, "executor-suicide-timeout", s.ExecutorSuicideTimeout, "Executor self-terminates after this period of inactivity. Zero disables suicide watch.")
-	fs.StringVar(&s.ExecutorCgroupPrefix, "executor-cgroup-prefix", s.ExecutorCgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 
 	fs.BoolVar(&s.ProxyBindall, "proxy-bindall", s.ProxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.RunProxy, "run-proxy", s.RunProxy, "Run the kube-proxy as a side process of the executor.")
 	fs.IntVar(&s.ProxyLogV, "proxy-logv", s.ProxyLogV, "Logging verbosity of spawned minion proxy processes.")
 
+	fs.StringVar(&s.MinionPathOverride, "minion-path-override", s.MinionPathOverride, "Override the PATH in the environment of the minion sub-processes.")
 	fs.Var(resource.NewQuantityFlagValue(&s.MinionLogMaxSize), "minion-max-log-size", "Maximum log file size for the executor and proxy before rotation")
 	fs.IntVar(&s.MinionLogMaxAgeInDays, "minion-max-log-age", s.MinionLogMaxAgeInDays, "Maximum log file age of the executor and proxy in days")
 	fs.IntVar(&s.MinionLogMaxBackups, "minion-max-log-backups", s.MinionLogMaxBackups, "Maximum log file backups of the executor and proxy to keep after rotation")
@@ -264,33 +283,39 @@ func (s *SchedulerServer) AddHyperkubeFlags(fs *pflag.FlagSet) {
 
 // returns (downloadURI, basename(path))
 func (s *SchedulerServer) serveFrameworkArtifact(path string) (string, string) {
-	serveFile := func(pattern string, filename string) {
+	pathSplit := strings.Split(path, "/")
+
+	var basename string
+	if len(pathSplit) > 0 {
+		basename = pathSplit[len(pathSplit)-1]
+	} else {
+		basename = path
+	}
+
+	return s.serveFrameworkArtifactWithFilename(path, basename), basename
+}
+
+// returns downloadURI
+func (s *SchedulerServer) serveFrameworkArtifactWithFilename(path string, filename string) string {
+	serveFile := func(pattern string, filepath string) {
 		s.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, filename)
+			http.ServeFile(w, r, filepath)
 		})
 	}
 
-	// Create base path (http://foobar:5000/<base>)
-	pathSplit := strings.Split(path, "/")
-	var base string
-	if len(pathSplit) > 0 {
-		base = pathSplit[len(pathSplit)-1]
-	} else {
-		base = path
-	}
-	serveFile("/"+base, path)
+	serveFile("/"+filename, path)
 
 	hostURI := ""
 	if s.AdvertisedAddress != "" {
-		hostURI = fmt.Sprintf("http://%s/%s", s.AdvertisedAddress, base)
+		hostURI = fmt.Sprintf("http://%s/%s", s.AdvertisedAddress, filename)
 	} else if s.HA && s.HADomain != "" {
-		hostURI = fmt.Sprintf("http://%s.%s:%d/%s", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort, base)
+		hostURI = fmt.Sprintf("http://%s.%s:%d/%s", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort, filename)
 	} else {
-		hostURI = fmt.Sprintf("http://%s:%d/%s", s.Address.String(), s.Port, base)
+		hostURI = fmt.Sprintf("http://%s:%d/%s", s.Address.String(), s.Port, filename)
 	}
-	log.V(2).Infof("Hosting artifact '%s' at '%s'", path, hostURI)
+	log.V(2).Infof("Hosting artifact '%s' at '%s'", filename, hostURI)
 
-	return hostURI, base
+	return hostURI
 }
 
 func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, *uid.UID, error) {
@@ -326,14 +351,19 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.ProxyBindall))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-logv=%d", s.ProxyLogV))
 
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--path-override=%s", s.MinionPathOverride))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-size=%v", s.MinionLogMaxSize.String()))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-backups=%d", s.MinionLogMaxBackups))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-age=%d", s.MinionLogMaxAgeInDays))
 	}
 
+	if s.DockerCfgPath != "" {
+		uri := s.serveFrameworkArtifactWithFilename(s.DockerCfgPath, ".dockercfg")
+		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(false), Extract: proto.Bool(false)})
+	}
+
 	//TODO(jdef): provide some way (env var?) for users to customize executor config
 	//TODO(jdef): set -address to 127.0.0.1 if `address` is 127.0.0.1
-	//TODO(jdef): propagate dockercfg from RootDirectory?
 
 	apiServerArgs := strings.Join(s.APIServerList, ",")
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--api-servers=%s", apiServerArgs))
@@ -348,9 +378,10 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, "--address=0.0.0.0")
 	}
 
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cgroup-prefix=%v", s.ExecutorCgroupPrefix))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--mesos-cgroup-prefix=%v", s.MesosCgroupPrefix))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.KubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.KubeletSyncFrequency))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.ContainPodResources))
 
 	if s.AuthPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
@@ -428,8 +459,8 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	}
 
 	execInfo.Resources = []*mesos.Resource{
-		mutil.NewScalarResource("cpus", float64(executorCPUs)+staticPodCPUs),
-		mutil.NewScalarResource("mem", float64(executorMem)+staticPodMem),
+		mutil.NewScalarResource("cpus", float64(s.MesosExecutorCPUs)+staticPodCPUs),
+		mutil.NewScalarResource("mem", float64(s.MesosExecutorMem)+staticPodMem),
 	}
 
 	// calculate ExecutorInfo hash to be used for validating compatibility
@@ -581,7 +612,7 @@ func validateLeadershipTransition(desired, current string) {
 }
 
 // hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (client tools.EtcdClient, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList []string) (client tools.EtcdClient, err error) {
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 	} else {
@@ -601,6 +632,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	metrics.Register()
 	runtime.Register()
 	s.mux.Handle("/metrics", prometheus.Handler())
+	healthz.InstallHandler(s.mux)
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		log.Fatalf("specify either --etcd-servers or --etcd-config")
@@ -635,17 +667,27 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("misconfigured etcd: %v", err)
 	}
 
+	as := scheduler.NewAllocationStrategy(
+		podtask.DefaultPredicate,
+		podtask.NewDefaultProcurement(s.DefaultContainerCPULimit, s.DefaultContainerMemLimit))
+
+	// downgrade allocation strategy if user disables "account-for-pod-resources"
+	if !s.AccountForPodResources {
+		as = scheduler.NewAllocationStrategy(
+			podtask.DefaultMinimalPredicate,
+			podtask.DefaultMinimalProcurement)
+	}
+
+	fcfs := scheduler.NewFCFSPodScheduler(as)
 	mesosPodScheduler := scheduler.New(scheduler.Config{
-		Schedcfg:                 *sc,
-		Executor:                 executor,
-		ScheduleFunc:             scheduler.FCFSScheduleFunc,
-		Client:                   client,
-		EtcdClient:               etcdClient,
-		FailoverTimeout:          s.FailoverTimeout,
-		ReconcileInterval:        s.ReconcileInterval,
-		ReconcileCooldown:        s.ReconcileCooldown,
-		DefaultContainerCPULimit: s.DefaultContainerCPULimit,
-		DefaultContainerMemLimit: s.DefaultContainerMemLimit,
+		Schedcfg:          *sc,
+		Executor:          executor,
+		Scheduler:         fcfs,
+		Client:            client,
+		EtcdClient:        etcdClient,
+		FailoverTimeout:   s.FailoverTimeout,
+		ReconcileInterval: s.ReconcileInterval,
+		ReconcileCooldown: s.ReconcileCooldown,
 	})
 
 	masterUri := s.MesosMaster
@@ -660,12 +702,12 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		Framework:        info,
 		Master:           masterUri,
 		Credential:       cred,
-		BindingAddress:   net.IP(s.Address),
+		BindingAddress:   s.Address,
 		BindingPort:      uint16(s.DriverPort),
 		HostnameOverride: s.HostnameOverride,
 		WithAuthContext: func(ctx context.Context) context.Context {
 			ctx = auth.WithLoginProvider(ctx, s.MesosAuthProvider)
-			ctx = sasl.WithBindingAddress(ctx, net.IP(s.Address))
+			ctx = sasl.WithBindingAddress(ctx, s.Address)
 			return ctx
 		},
 	}

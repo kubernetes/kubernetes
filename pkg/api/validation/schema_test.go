@@ -21,14 +21,14 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func readPod(filename string) (string, error) {
-	data, err := ioutil.ReadFile("testdata/" + testapi.Version() + "/" + filename)
+	data, err := ioutil.ReadFile("testdata/" + testapi.Default.Version() + "/" + filename)
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +36,7 @@ func readPod(filename string) (string, error) {
 }
 
 func loadSchemaForTest() (Schema, error) {
-	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Version() + ".json"
+	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func TestValidateOk(t *testing.T) {
 		for _, test := range tests {
 			testObj := test.obj
 			apiObjectFuzzer.Fuzz(testObj)
-			data, err := testapi.Codec().Encode(testObj)
+			data, err := testapi.Default.Codec().Encode(testObj)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -122,6 +122,34 @@ func TestValid(t *testing.T) {
 		err = schema.ValidateBytes([]byte(pod))
 		if err != nil {
 			t.Errorf("unexpected error %s, for pod %s", err, pod)
+		}
+	}
+}
+
+func TestVersionRegex(t *testing.T) {
+	testCases := []struct {
+		typeName string
+		match    bool
+	}{
+		{
+			typeName: "v1.Binding",
+			match:    true,
+		},
+		{
+			typeName: "v1alpha1.Binding",
+			match:    true,
+		},
+		{
+			typeName: "Binding",
+			match:    false,
+		},
+	}
+	for _, test := range testCases {
+		if versionRegexp.MatchString(test.typeName) && !test.match {
+			t.Errorf("unexpected error: expect %s not to match the regular expression", test.typeName)
+		}
+		if !versionRegexp.MatchString(test.typeName) && test.match {
+			t.Errorf("unexpected error: expect %s to match the regular expression", test.typeName)
 		}
 	}
 }

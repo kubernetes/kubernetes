@@ -17,23 +17,22 @@ limitations under the License.
 package etcd
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/resourcequota"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for resourcequotas against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewStorage returns a RESTStorage object that will work against ResourceQuota objects.
-func NewStorage(s storage.Interface) (*REST, *StatusREST) {
+// NewREST returns a RESTStorage object that will work against resource quotas.
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/resourcequotas"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
@@ -52,12 +51,12 @@ func NewStorage(s storage.Interface) (*REST, *StatusREST) {
 		},
 		EndpointName: "resourcequotas",
 
+		CreateStrategy:      resourcequota.Strategy,
+		UpdateStrategy:      resourcequota.Strategy,
+		ReturnDeletedObject: true,
+
 		Storage: s,
 	}
-
-	store.CreateStrategy = resourcequota.Strategy
-	store.UpdateStrategy = resourcequota.Strategy
-	store.ReturnDeletedObject = true
 
 	statusStore := *store
 	statusStore.UpdateStrategy = resourcequota.StatusStrategy

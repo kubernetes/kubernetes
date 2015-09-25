@@ -19,8 +19,9 @@ package apiserver
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	"github.com/emicklei/go-restful"
 )
@@ -43,7 +44,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 			Name:      "foo",
 			Namespace: "other",
 		},
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind: "Service",
 		},
 	}

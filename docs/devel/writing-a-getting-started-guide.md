@@ -76,13 +76,13 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
 
 If you have a cluster partially working, but doing all the above steps seems like too much work,
 we still want to hear from you.  We suggest you write a blog post or a Gist, and we will link to it on our wiki page.
-Just file an issue or chat us on IRC and one of the committers will link to it from the wiki.
+Just file an issue or chat us on [Slack](../troubleshooting.md#slack) and one of the committers will link to it from the wiki.
 
 ## Development Distro Guidelines
 
 These guidelines say *what* to do.  See the Rationale section for *why*.
   - the main reason to add a new development distro is to support a new IaaS provider (VM and
-    network management).  This means implementing a new `pkg/cloudprovider/$IAAS_NAME`.
+    network management).  This means implementing a new `pkg/cloudprovider/providers/$IAAS_NAME`.
   - Development distros should use Saltstack for Configuration Management.
   - development distros need to support automated cluster creation, deletion, upgrading, etc.
     This mean writing scripts in `cluster/$IAAS_NAME`.

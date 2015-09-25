@@ -21,20 +21,20 @@ import (
 	"os"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	volumeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
 // and the group will be set to allow containers to use emptyDir volumes
 // from the group attribute.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/issues/2630
+// http://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
 // This is the primary entrypoint for volume plugins.
@@ -63,24 +63,24 @@ func (plugin *emptyDirPlugin) Name() string {
 }
 
 func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.EmptyDir != nil {
+	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, mounter, &realMountDetector{mounter}, opts, newChconRunner())
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts, newChconRunner())
 }
 
 func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions, chconRunner chconRunner) (volume.Builder, error) {
 	medium := api.StorageMediumDefault
-	if spec.VolumeSource.EmptyDir != nil { // Support a non-specified source as EmptyDir.
-		medium = spec.VolumeSource.EmptyDir.Medium
+	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
+		medium = spec.Volume.EmptyDir.Medium
 	}
 	return &emptyDir{
 		pod:           pod,
-		volName:       spec.Name,
+		volName:       spec.Name(),
 		medium:        medium,
 		mounter:       mounter,
 		mountDetector: mountDetector,
@@ -90,9 +90,9 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 	}, nil
 }
 
-func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, mounter, &realMountDetector{mounter})
+	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
@@ -144,7 +144,7 @@ func (ed *emptyDir) SetUp() error {
 
 // SetUpAt creates new directory.
 func (ed *emptyDir) SetUpAt(dir string) error {
-	isMnt, err := ed.mounter.IsMountPoint(dir)
+	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
 	if err != nil && !os.IsNotExist(err) {
@@ -156,7 +156,7 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	// medium is memory, and a mountpoint is present, then the volume is
 	// ready.
 	if volumeutil.IsReady(ed.getMetaDir()) {
-		if ed.medium == api.StorageMediumMemory && isMnt {
+		if ed.medium == api.StorageMediumMemory && !notMnt {
 			return nil
 		} else if ed.medium == api.StorageMediumDefault {
 			return nil

@@ -301,6 +301,40 @@ func (q *Quantity) String() string {
 	return number + string(suffix)
 }
 
+// Cmp compares q and y and returns:
+//
+//   -1 if q <  y
+//    0 if q == y
+//   +1 if q >  y
+//
+func (q *Quantity) Cmp(y Quantity) int {
+	num1 := q.Value()
+	num2 := y.Value()
+	if num1 < MaxMilliValue && num2 < MaxMilliValue {
+		num1 = q.MilliValue()
+		num2 = y.MilliValue()
+	}
+	if num1 < num2 {
+		return -1
+	} else if num1 > num2 {
+		return 1
+	}
+	return 0
+}
+
+func (q *Quantity) Add(y Quantity) error {
+	q.Amount.Add(q.Amount, y.Amount)
+	return nil
+}
+
+func (q *Quantity) Sub(y Quantity) error {
+	if q.Format != y.Format {
+		return fmt.Errorf("format mismatch: %v vs. %v", q.Format, y.Format)
+	}
+	q.Amount.Sub(q.Amount, y.Amount)
+	return nil
+}
+
 // MarshalJSON implements the json.Marshaller interface.
 func (q Quantity) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + q.String() + `"`), nil

@@ -28,11 +28,12 @@ type Response struct {
 	statusCode    int      // HTTP status code that has been written explicity (if zero then net/http has written 200)
 	contentLength int      // number of bytes written for the response body
 	prettyPrint   bool     // controls the indentation feature of XML and JSON serialization. It is initialized using var PrettyPrintResponses.
+	err           error    // err property is kept when WriteError is called
 }
 
 // Creates a new response based on a http ResponseWriter.
 func NewResponse(httpWriter http.ResponseWriter) *Response {
-	return &Response{httpWriter, "", []string{}, http.StatusOK, 0, PrettyPrintResponses} // empty content-types
+	return &Response{httpWriter, "", []string{}, http.StatusOK, 0, PrettyPrintResponses, nil} // empty content-types
 }
 
 // If Accept header matching fails, fall back to this type, otherwise
@@ -182,6 +183,7 @@ func (r *Response) WriteJson(value interface{}, contentType string) error {
 
 // WriteError write the http status and the error string on the response.
 func (r *Response) WriteError(httpStatus int, err error) error {
+	r.err = err
 	return r.WriteErrorString(httpStatus, err.Error())
 }
 
@@ -203,21 +205,30 @@ func (r *Response) WriteErrorString(status int, errorReason string) error {
 
 // WriteHeader is overridden to remember the Status Code that has been written.
 // Note that using this method, the status value is only written when
-// - calling WriteEntity,
-// - or directly calling WriteAsXml or WriteAsJson,
-// - or if the status is one for which no response is allowed (i.e.,
-//   204 (http.StatusNoContent) or 304 (http.StatusNotModified))
+//  calling WriteEntity,
+//  or directly calling WriteAsXml or WriteAsJson,
+//  or if the status is one for which no response is allowed:
+//
+//  202 = http.StatusAccepted
+//  204 = http.StatusNoContent
+//  206 = http.StatusPartialContent
+//  304 = http.StatusNotModified
+//
+// If this behavior does not fit your need then you can write to the underlying response, such as:
+//   response.ResponseWriter.WriteHeader(http.StatusAccepted)
 func (r *Response) WriteHeader(httpStatus int) {
 	r.statusCode = httpStatus
-	// if 201,204,304 then WriteEntity will not be called so we need to pass this code
+	// if 202,204,206,304 then WriteEntity will not be called so we need to pass this code
 	if http.StatusNoContent == httpStatus ||
 		http.StatusNotModified == httpStatus ||
-		http.StatusPartialContent == httpStatus {
+		http.StatusPartialContent == httpStatus ||
+		http.StatusAccepted == httpStatus {
 		r.ResponseWriter.WriteHeader(httpStatus)
 	}
 }
 
 // StatusCode returns the code that has been written using WriteHeader.
+// If WriteHeader, WriteEntity or WriteAsXml has not been called (yet) then return 200 OK.
 func (r Response) StatusCode() int {
 	if 0 == r.statusCode {
 		// no status code has been written yet; assume OK
@@ -244,4 +255,9 @@ func (r Response) ContentLength() int {
 // CloseNotify is part of http.CloseNotifier interface
 func (r Response) CloseNotify() <-chan bool {
 	return r.ResponseWriter.(http.CloseNotifier).CloseNotify()
+}
+
+// Error returns the err created by WriteError
+func (r Response) Error() error {
+	return r.err
 }

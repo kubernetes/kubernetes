@@ -25,6 +25,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
+    source "${KUBE_ROOT}/cluster/env.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
@@ -36,8 +41,8 @@ verify-prereqs
 echo "... calling kube-up" >&2
 kube-up
 
-echo "... calling validate-cluster.sh" >&2
-"${KUBE_ROOT}/cluster/validate-cluster.sh"
+echo "... calling validate-cluster" >&2
+validate-cluster
 
 echo -e "Done, listing cluster services:\n" >&2
 "${KUBE_ROOT}/cluster/kubectl.sh" cluster-info

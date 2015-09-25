@@ -24,8 +24,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type ConversionGenerator interface {
@@ -33,7 +33,7 @@ type ConversionGenerator interface {
 	WriteConversionFunctions(w io.Writer) error
 	RegisterConversionFunctions(w io.Writer, pkg string) error
 	AddImport(pkg string) string
-	RepackImports(exclude util.StringSet)
+	RepackImports(exclude sets.String)
 	WriteImports(w io.Writer) error
 	OverwritePackage(pkg, overwrite string)
 	AssumePrivateConversions()
@@ -50,7 +50,7 @@ func NewConversionGenerator(scheme *conversion.Scheme, targetPkg string) Convers
 	}
 	g.targetPackage(targetPkg)
 	g.AddImport("reflect")
-	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/conversion")
+	g.AddImport("k8s.io/kubernetes/pkg/conversion")
 	return g
 }
 
@@ -92,7 +92,7 @@ func (g *conversionGenerator) GenerateConversionsForType(version string, reflect
 	}
 	internalObjType := reflect.TypeOf(internalObj)
 	if internalObjType.Kind() != reflect.Ptr {
-		return fmt.Errorf("created object should be of type Ptr: ", internalObjType.Kind())
+		return fmt.Errorf("created object should be of type Ptr: %v", internalObjType.Kind())
 	}
 	inErr := g.generateConversionsBetween(reflection, internalObjType.Elem())
 	outErr := g.generateConversionsBetween(internalObjType.Elem(), reflection)
@@ -173,7 +173,6 @@ func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect
 		// All simple types should be handled correctly with default conversion.
 		return nil
 	}
-	panic("This should never happen")
 }
 
 func isComplexType(reflection reflect.Type) bool {
@@ -195,8 +194,8 @@ func (g *conversionGenerator) generateConversionsForMap(inType, outType reflect.
 	}
 	inValue := inType.Elem()
 	outValue := outType.Elem()
-	g.addImportByPath(inKey.PkgPath())
-	g.addImportByPath(outKey.PkgPath())
+	g.addImportByPath(inValue.PkgPath())
+	g.addImportByPath(outValue.PkgPath())
 	if err := g.generateConversionsBetween(inValue, outValue); err != nil {
 		return err
 	}
@@ -280,7 +279,7 @@ func (g *conversionGenerator) targetPackage(pkg string) {
 	g.shortImports[""] = pkg
 }
 
-func (g *conversionGenerator) RepackImports(exclude util.StringSet) {
+func (g *conversionGenerator) RepackImports(exclude sets.String) {
 	var packages []string
 	for key := range g.imports {
 		packages = append(packages, key)

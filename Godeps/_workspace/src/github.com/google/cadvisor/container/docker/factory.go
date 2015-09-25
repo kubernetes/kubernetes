@@ -96,7 +96,7 @@ func (self *dockerFactory) String() string {
 	return DockerNamespace
 }
 
-func (self *dockerFactory) NewContainerHandler(name string) (handler container.ContainerHandler, err error) {
+func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := docker.NewClient(*ArgDockerEndpoint)
 	if err != nil {
 		return
@@ -108,6 +108,7 @@ func (self *dockerFactory) NewContainerHandler(name string) (handler container.C
 		self.fsInfo,
 		self.usesAufsDriver,
 		&self.cgroupSubsystems,
+		inHostNamespace,
 	)
 	return
 }

@@ -118,7 +118,7 @@ the Kubernetes runtime environment.
 ### kubelet
 
 [kubelet](kubelet.md) is the primary node agent. It:
-* Watches for pods that have been assigned to its node (either by apiserver or
+* Watches for pods that have been assigned to its node (either by apiserver
   or via local configuration file) and:
  * Mounts the pod's required volumes
  * Downloads the pod's secrets

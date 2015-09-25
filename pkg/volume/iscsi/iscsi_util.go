@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // stat a path, if not exists, retry maxRetries times
@@ -101,8 +101,8 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
-	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
-	if mountpoint {
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	if !notMnt {
 		glog.Infof("iscsi: %s already mounted", globalPDPath)
 		return nil
 	}

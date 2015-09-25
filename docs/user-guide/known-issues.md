@@ -46,7 +46,7 @@ Please consult this document before filing new bugs.
    * Wrong node cpu/memory limit metrics from Heapster (https://github.com/GoogleCloudPlatform/heapster/issues/399)
    * Services that set `type=LoadBalancer` can not use port `10250` because of Google Compute Engine firewall limitations
    * Add-on services can not be created or deleted via `kubectl` or the Kubernetes API (#11435)
-   * If a pod with a GCE PD is created and deleted in rapid succession, it may fail to attach/mount correctly leaving PD data inaccessible (or corrupted in the worst case). (https://github.com/GoogleCloudPlatform/kubernetes/issues/11231#issuecomment-122049113)
+   * If a pod with a GCE PD is created and deleted in rapid succession, it may fail to attach/mount correctly leaving PD data inaccessible (or corrupted in the worst case). (http://issue.k8s.io/11231#issuecomment-122049113)
       * Suggested temporary work around: introduce a 1-2 minute delay between deleting and recreating a pod with a PD on the same node.
    * Explicit errors while detaching GCE PD could prevent PD from ever being detached (#11321)
    * GCE PDs may sometimes fail to attach (#11302)

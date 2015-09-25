@@ -68,7 +68,7 @@ Kubernetes repository. Otherwise you will get "404 page not found" errors as the
 [here](../../../docs/user-guide/kubectl/kubectl_proxy.md).
 
 ```console
-$ kubectl proxy --www=examples/update-demo/local/ &
+$ kubectl proxy --www=docs/user-guide/update-demo/local/ &
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
@@ -114,7 +114,7 @@ But if the replica count had been specified, the final replica count of the new 
 ### Step Five: Bring down the pods
 
 ```console
-$ kubectl stop rc update-demo-kitten
+$ kubectl delete rc update-demo-kitten
 ```
 
 This first stops the replication controller by turning the target number of replicas to 0 and then deletes the controller.
@@ -143,10 +143,10 @@ If you want to build your own docker images, you can set `$DOCKER_HUB_USER` to y
 
 ```console
 $ export DOCKER_HUB_USER=my-docker-id
-$ ./examples/update-demo/build-images.sh
+$ ./docs/user-guide/update-demo/build-images.sh
 ```
 
-To use your custom docker image in the above examples, you will need to change the image name in `examples/update-demo/nautilus-rc.yaml` and `examples/update-demo/kitten-rc.yaml`.
+To use your custom docker image in the above examples, you will need to change the image name in `docs/user-guide/update-demo/nautilus-rc.yaml` and `docs/user-guide/update-demo/kitten-rc.yaml`.
 
 ### Image Copyright
 

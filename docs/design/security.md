@@ -127,11 +127,11 @@ A pod runs in a *security context* under a *service account* that is defined by 
 ### Related design discussion
 
 * [Authorization and authentication](access.md)
-* [Secret distribution via files](https://github.com/GoogleCloudPlatform/kubernetes/pull/2030)
+* [Secret distribution via files](http://pr.k8s.io/2030)
 * [Docker secrets](https://github.com/docker/docker/pull/6697)
 * [Docker vault](https://github.com/docker/docker/issues/10310)
 * [Service Accounts:](service_accounts.md)
-* [Secret volumes](https://github.com/GoogleCloudPlatform/kubernetes/pull/4126)
+* [Secret volumes](http://pr.k8s.io/4126)
 
 ## Specific Design Points
 

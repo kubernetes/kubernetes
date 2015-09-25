@@ -19,20 +19,30 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/iptables"
+	"k8s.io/kubernetes/pkg/proxy/userspace"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	utildbus "k8s.io/kubernetes/pkg/util/dbus"
+	"k8s.io/kubernetes/pkg/util/exec"
+	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/oom"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -40,43 +50,89 @@ import (
 
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
-	BindAddress        util.IP
+	BindAddress        net.IP
 	HealthzPort        int
-	HealthzBindAddress util.IP
+	HealthzBindAddress net.IP
 	OOMScoreAdj        int
 	ResourceContainer  string
 	Master             string
 	Kubeconfig         string
 	PortRange          util.PortRange
+	Recorder           record.EventRecorder
+	HostnameOverride   string
+	ProxyMode          string
+	SyncPeriod         time.Duration
+	nodeRef            *api.ObjectReference // Reference to this node.
+	MasqueradeAll      bool
+	CleanupAndExit     bool
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
 func NewProxyServer() *ProxyServer {
 	return &ProxyServer{
-		BindAddress:        util.IP(net.ParseIP("0.0.0.0")),
+		BindAddress:        net.ParseIP("0.0.0.0"),
 		HealthzPort:        10249,
-		HealthzBindAddress: util.IP(net.ParseIP("127.0.0.1")),
-		OOMScoreAdj:        -899,
+		HealthzBindAddress: net.ParseIP("127.0.0.1"),
+		OOMScoreAdj:        qos.KubeProxyOomScoreAdj,
 		ResourceContainer:  "/kube-proxy",
+		SyncPeriod:         5 * time.Second,
 	}
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
 func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
-	fs.Var(&s.BindAddress, "bind-address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.Var(&s.HealthzBindAddress, "healthz-bind-address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
-	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
+	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
+	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+	fs.StringVar(&s.ProxyMode, "proxy-mode", "", "Which proxy mode to use: 'userspace' (older, stable) or 'iptables' (experimental). If blank, look at the Node object on the Kubernetes API and respect the '"+experimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently userspace, but may change in future versions).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 5*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
+	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
 }
 
-// Run runs the specified ProxyServer.  This should never exit.
+const (
+	proxyModeUserspace              = "userspace"
+	proxyModeIptables               = "iptables"
+	experimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
+)
+
+func checkKnownProxyMode(proxyMode string) bool {
+	switch proxyMode {
+	case "", proxyModeUserspace, proxyModeIptables:
+		return true
+	}
+	return false
+}
+
+// Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 func (s *ProxyServer) Run(_ []string) error {
+	protocol := utiliptables.ProtocolIpv4
+	if s.BindAddress.To4() == nil {
+		protocol = utiliptables.ProtocolIpv6
+	}
+
+	// remove iptables rules and exit
+	if s.CleanupAndExit {
+		execer := exec.New()
+		dbus := utildbus.New()
+		ipt := utiliptables.New(execer, dbus, protocol)
+		encounteredError := userspace.CleanupLeftovers(ipt)
+		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+		if encounteredError {
+			return errors.New("Encountered an error while tearing down rules.")
+		}
+		return nil
+	}
+
 	// TODO(vmarmol): Use container config for this.
-	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOomAdjuster()
+	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.V(2).Info(err)
 	}
 
@@ -86,28 +142,6 @@ func (s *ProxyServer) Run(_ []string) error {
 	} else {
 		glog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 	}
-
-	serviceConfig := config.NewServiceConfig()
-	endpointsConfig := config.NewEndpointsConfig()
-
-	protocol := iptables.ProtocolIpv4
-	if net.IP(s.BindAddress).To4() == nil {
-		protocol = iptables.ProtocolIpv6
-	}
-	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier, err := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.PortRange)
-	if err != nil {
-		glog.Fatalf("Unable to create proxer: %v", err)
-	}
-
-	// Wire proxier to handle changes to services
-	serviceConfig.RegisterHandler(proxier)
-	// And wire loadBalancer to handle changes to endpoints to services
-	endpointsConfig.RegisterHandler(loadBalancer)
-
-	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
-	// only notify on changes, and the initial update (on process start) may be lost if no handlers
-	// are registered yet.
 
 	// define api config source
 	if s.Kubeconfig == "" && s.Master == "" {
@@ -128,6 +162,85 @@ func (s *ProxyServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
+	// Add event recorder
+	hostname := nodeutil.GetHostname(s.HostnameOverride)
+	eventBroadcaster := record.NewBroadcaster()
+	s.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: hostname})
+	eventBroadcaster.StartRecordingToSink(client.Events(""))
+
+	s.nodeRef = &api.ObjectReference{
+		Kind:      "Node",
+		Name:      hostname,
+		UID:       types.UID(hostname),
+		Namespace: "",
+	}
+
+	serviceConfig := config.NewServiceConfig()
+	endpointsConfig := config.NewEndpointsConfig()
+
+	var proxier proxy.ProxyProvider
+	var endpointsHandler config.EndpointsConfigHandler
+
+	execer := exec.New()
+	dbus := utildbus.New()
+	ipt := utiliptables.New(execer, dbus, protocol)
+
+	if !checkKnownProxyMode(s.ProxyMode) {
+		glog.Fatalf("Unknown proxy-mode flag: %s", s.ProxyMode)
+	}
+
+	useIptablesProxy := false
+	if mayTryIptablesProxy(s.ProxyMode, client.Nodes(), hostname) {
+		var err error
+		// guaranteed false on error, error only necessary for debugging
+		useIptablesProxy, err = iptables.ShouldUseIptablesProxier()
+		if err != nil {
+			glog.Errorf("Can't determine whether to use iptables proxy, using userspace proxier: %v", err)
+		}
+	}
+
+	if useIptablesProxy {
+		glog.V(2).Info("Using iptables Proxier.")
+
+		proxierIptables, err := iptables.NewProxier(ipt, execer, s.SyncPeriod, s.MasqueradeAll)
+		if err != nil {
+			glog.Fatalf("Unable to create proxier: %v", err)
+		}
+		proxier = proxierIptables
+		endpointsHandler = proxierIptables
+		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
+		glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
+		userspace.CleanupLeftovers(ipt)
+	} else {
+		glog.V(2).Info("Using userspace Proxier.")
+		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
+		// our config.EndpointsConfigHandler.
+		loadBalancer := userspace.NewLoadBalancerRR()
+		// set EndpointsConfigHandler to our loadBalancer
+		endpointsHandler = loadBalancer
+
+		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, ipt, s.PortRange, s.SyncPeriod)
+		if err != nil {
+			glog.Fatalf("Unable to create proxier: %v", err)
+		}
+		proxier = proxierUserspace
+		// Remove artifacts from the pure-iptables Proxier.
+		glog.V(2).Info("Tearing down pure-iptables proxy rules. Errors here are acceptable.")
+		iptables.CleanupLeftovers(ipt)
+	}
+
+	// Birth Cry after the birth is successful
+	s.birthCry()
+
+	// Wire proxier to handle changes to services
+	serviceConfig.RegisterHandler(proxier)
+	// And wire endpointsHandler to handle changes to endpoints to services
+	endpointsConfig.RegisterHandler(endpointsHandler)
+
+	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
+	// only notify on changes, and the initial update (on process start) may be lost if no handlers
+	// are registered yet.
+
 	config.NewSourceAPI(
 		client,
 		30*time.Second,
@@ -136,15 +249,59 @@ func (s *ProxyServer) Run(_ []string) error {
 	)
 
 	if s.HealthzPort > 0 {
-		go util.Forever(func() {
+		go util.Until(func() {
 			err := http.ListenAndServe(s.HealthzBindAddress.String()+":"+strconv.Itoa(s.HealthzPort), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second)
+		}, 5*time.Second, util.NeverStop)
 	}
+
+	ipt.AddReloadFunc(proxier.Sync)
 
 	// Just loop forever for now...
 	proxier.SyncLoop()
 	return nil
+}
+
+type nodeGetter interface {
+	Get(hostname string) (*api.Node, error)
+}
+
+func mayTryIptablesProxy(proxyMode string, client nodeGetter, hostname string) bool {
+	if proxyMode == proxyModeIptables {
+		glog.V(1).Infof("Flag proxy-mode allows iptables proxy")
+		return true
+	} else if proxyMode != "" {
+		glog.V(1).Infof("Flag proxy-mode=%q forbids iptables proxy", proxyMode)
+		return false
+	}
+	// proxyMode == "" - choose the best option.
+	if client == nil {
+		glog.Errorf("Not trying iptables proxy: nodeGetter is nil")
+		return false
+	}
+	node, err := client.Get(hostname)
+	if err != nil {
+		glog.Errorf("Not trying iptables proxy: can't get Node %q: %v", hostname, err)
+		return false
+	}
+	if node == nil {
+		glog.Errorf("Not trying iptables proxy: got nil Node %q", hostname)
+		return false
+	}
+	proxyMode, found := node.Annotations[experimentalProxyModeAnnotation]
+	if found {
+		glog.V(1).Infof("Found experimental annotation %q = %q", experimentalProxyModeAnnotation, proxyMode)
+	}
+	if proxyMode == proxyModeIptables {
+		glog.V(1).Infof("Annotation allows iptables proxy")
+		return true
+	}
+	glog.V(1).Infof("Not trying iptables proxy: %+v", node)
+	return false
+}
+
+func (s *ProxyServer) birthCry() {
+	s.Recorder.Eventf(s.nodeRef, "Starting", "Starting kube-proxy.")
 }

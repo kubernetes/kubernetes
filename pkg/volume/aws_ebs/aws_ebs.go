@@ -24,15 +24,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -60,7 +59,8 @@ func (plugin *awsElasticBlockStorePlugin) Name() string {
 }
 
 func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.PersistentVolumeSource.AWSElasticBlockStore != nil || spec.VolumeSource.AWSElasticBlockStore != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AWSElasticBlockStore != nil) ||
+		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -69,9 +69,9 @@ func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolum
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Builder, error) {
@@ -79,11 +79,11 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 	// EBSs used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	var readOnly bool
 	var ebs *api.AWSElasticBlockStoreVolumeSource
-	if spec.VolumeSource.AWSElasticBlockStore != nil {
-		ebs = spec.VolumeSource.AWSElasticBlockStore
+	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
+		ebs = spec.Volume.AWSElasticBlockStore
 		readOnly = ebs.ReadOnly
 	} else {
-		ebs = spec.PersistentVolumeSource.AWSElasticBlockStore
+		ebs = spec.PersistentVolume.Spec.AWSElasticBlockStore
 		readOnly = spec.ReadOnly
 	}
 
@@ -97,7 +97,7 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 	return &awsElasticBlockStoreBuilder{
 		awsElasticBlockStore: &awsElasticBlockStore{
 			podUID:   podUID,
-			volName:  spec.Name,
+			volName:  spec.Name(),
 			volumeID: volumeID,
 			manager:  manager,
 			mounter:  mounter,
@@ -106,12 +106,12 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
-		diskMounter: &awsSafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{plugin.host.GetMounter(), exec.New()}}, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -132,7 +132,7 @@ type ebsManager interface {
 	DetachDisk(c *awsElasticBlockStoreCleaner) error
 }
 
-// awsElasticBlockStore volumes are disk resources provided by Google Compute Engine
+// awsElasticBlockStore volumes are disk resources provided by Amazon Web Services
 // that are attached to the kubelet's host machine and exposed to the pod.
 type awsElasticBlockStore struct {
 	volName string
@@ -155,11 +155,7 @@ func detachDiskLogError(ebs *awsElasticBlockStore) {
 
 // getVolumeProvider returns the AWS Volumes interface
 func (ebs *awsElasticBlockStore) getVolumeProvider() (aws_cloud.Volumes, error) {
-	name := "aws"
-	cloud, err := cloudprovider.GetCloudProvider(name, nil)
-	if err != nil {
-		return nil, err
-	}
+	cloud := ebs.plugin.host.GetCloudProvider()
 	volumes, ok := cloud.(aws_cloud.Volumes)
 	if !ok {
 		return nil, fmt.Errorf("Cloud provider does not support volumes")
@@ -189,12 +185,12 @@ func (b *awsElasticBlockStoreBuilder) SetUp() error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
 	// TODO: handle failed mounts here.
-	mountpoint, err := b.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 
@@ -216,22 +212,22 @@ func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
 	}
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
-		mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("isMountpoint check failed: %v", mntErr)
+			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
-		if mountpoint {
+		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("isMountpoint check failed: %v", mntErr)
+				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
-			if mountpoint {
+			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
 				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
@@ -295,12 +291,12 @@ func (c *awsElasticBlockStoreCleaner) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *awsElasticBlockStoreCleaner) TearDownAt(dir string) error {
-	mountpoint, err := c.mounter.IsMountPoint(dir)
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		glog.V(2).Info("Error checking if mountpoint ", dir, ": ", err)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		glog.V(2).Info("Not mountpoint, deleting")
 		return os.Remove(dir)
 	}
@@ -334,12 +330,12 @@ func (c *awsElasticBlockStoreCleaner) TearDownAt(dir string) error {
 	} else {
 		glog.V(2).Infof("Found multiple refs; won't detach EBS volume: %v", refs)
 	}
-	mountpoint, mntErr := c.mounter.IsMountPoint(dir)
+	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("isMountpoint check failed: %v", mntErr)
+		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		if err := os.Remove(dir); err != nil {
 			glog.V(2).Info("Error removing mountpoint ", dir, ": ", err)
 			return err

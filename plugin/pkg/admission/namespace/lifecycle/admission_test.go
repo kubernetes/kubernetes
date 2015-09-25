@@ -17,12 +17,16 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // TestAdmission
@@ -36,14 +40,39 @@ func TestAdmission(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	store := cache.NewStore(cache.IndexFuncToKeyFuncAdapter(cache.MetaNamespaceIndexFunc))
+	var namespaceLock sync.RWMutex
+
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	store.Add(namespaceObj)
+	fakeWatch := watch.NewFake()
 	mockClient := &testclient.Fake{}
+	mockClient.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
+	mockClient.AddReactor("get", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+		namespaceLock.RLock()
+		defer namespaceLock.RUnlock()
+		if getAction, ok := action.(testclient.GetAction); ok && getAction.GetName() == namespaceObj.Name {
+			return true, namespaceObj, nil
+		}
+		return true, nil, fmt.Errorf("No result for action %v", action)
+	})
+	mockClient.AddReactor("list", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+		namespaceLock.RLock()
+		defer namespaceLock.RUnlock()
+		return true, &api.NamespaceList{Items: []api.Namespace{*namespaceObj}}, nil
+	})
+
 	lfhandler := NewLifecycle(mockClient).(*lifecycle)
 	lfhandler.store = store
 	handler := admission.NewChainHandler(lfhandler)
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespaceObj.Namespace},
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespaceObj.Name},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		},
+	}
+	badPod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "456", Namespace: "doesnotexist"},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
@@ -55,7 +84,9 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// change namespace state to terminating
+	namespaceLock.Lock()
 	namespaceObj.Status.Phase = api.NamespaceTerminating
+	namespaceLock.Unlock()
 	store.Add(namespaceObj)
 
 	// verify create operations in the namespace cause an error
@@ -88,4 +119,19 @@ func TestAdmission(t *testing.T) {
 		t.Errorf("Did not expect an error %v", err)
 	}
 
+	// verify create/update/delete of object in non-existant namespace throws error
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an aerror that objects cannot be created in non-existant namespaces", err)
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Update, nil))
+	if err == nil {
+		t.Errorf("Expected an aerror that objects cannot be updated in non-existant namespaces", err)
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Delete, nil))
+	if err == nil {
+		t.Errorf("Expected an aerror that objects cannot be deleted in non-existant namespaces", err)
+	}
 }

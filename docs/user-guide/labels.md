@@ -79,7 +79,7 @@ Unlike [names and UIDs](identifiers.md), labels do not provide uniqueness. In ge
 Via a _label selector_, the client/user can identify a set of objects. The label selector is the core grouping primitive in Kubernetes.
 
 The API currently supports two types of selectors: _equality-based_ and _set-based_.
-A label selector can be made of multiple _requirements_ which are comma-separated. In the case of multiple requirements, all must be satisfied so comma separator acts as an AND logical operator.
+A label selector can be made of multiple _requirements_ which are comma-separated. In the case of multiple requirements, all must be satisfied so the comma separator acts as an _AND_ logical operator.
 
 An empty label selector (that is, one with zero requirements) selects every object in the collection.
 
@@ -95,12 +95,12 @@ tier != frontend
 
 The former selects all resources with key equal to `environment` and value equal to `production`.
 The latter selects all resources with key equal to `tier` and value distinct from `frontend`.
-One could filter for resources in `production` but not `frontend` using the comma operator: `environment=production,tier!=frontend`
+One could filter for resources in `production` excluding `frontend` using the comma operator: `environment=production,tier!=frontend`
 
 
 ### _Set-based_ requirement
 
-_Set-based_ label requirements allow filtering keys according to a set of values. Matching objects must have all of the specified labels (i.e. all keys and at least one of the values specified for each key). Three kind of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
+_Set-based_ label requirements allow filtering keys according to a set of values. Matching objects must have all of the specified labels (i.e. all keys and at least one of the values specified for each key). Three kinds of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
 
 ```
 environment in (production, qa)
@@ -109,9 +109,9 @@ partition
 ```
 
 The first example selects all resources with key equal to `environment` and value equal to `production` or `qa`.
-The second example selects all resources with key equal to `tier` and value other than `frontend` and `backend`.
+The second example selects all resources with key equal to `tier` and values other than `frontend` and `backend`.
 The third example selects all resources including a label with key `partition`; no values are checked.
-Similarly the comma separator acts as an _AND_ operator for example filtering resource with a `partition` key (not matter the value) and with `environment` different than  `qa`. For example: `partition,environment notin (qa)`.
+Similarly the comma separator acts as an _AND_ operator. So filtering resources with a `partition` key (no matter the value) and with `environment` different than  `qa` can be achieved using `partition,environment notin (qa)`.
 The _set-based_ label selector is a general form of equality since `environment=production` is equivalent to `environment in (production)`; similarly for `!=` and `notin`.
 
 _Set-based_ requirements can be mixed with _equality-based_ requirements. For example: `partition in (customerA, customerB),environment!=qa`.
@@ -121,15 +121,58 @@ _Set-based_ requirements can be mixed with _equality-based_ requirements. For ex
 
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
 
-   * _equality-based_ requirements: `?labelSelector=key1%3Dvalue1,key2%3Dvalue2`
-   * _set-based_ requirements: `?labelSelector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3%29`
+    * _equality-based_ requirements: `?labelSelector=environment%3Dproduction,tier%3Dfrontend`
+    * _set-based_ requirements: `?labelSelector=environment+in+%28production%2Cqa%29%2Ctier+in+%28frontend%29`
 
-Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
+Both label selector styles can be used to list or watch resources via a REST client. For example targetting `apiserver` with `kubectl` and using _equality-based_ one may write:
 
-* `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
+```shell
+$ kubectl get pods -l environment=production,tier=frontend
+```
+
+or using _set-based_ requirements:
+
+```
+$kubectl get pods -l 'environment in (production),tier in (frontend)'
+```
+
+As already mentioned _set-based_ requirements are more expressive.  For instance, they can implement the _OR_ operator:
+
+```shell
+$kubectl get pods -l 'environment in (production, qa)'
+```
+
+or restricting negative matching via _exists_ operator:
+
+```shell
+$kubectl get pods -l 'environment,environment notin (frontend)'
+```
+
+Kubernetes also supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
+
+* `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
 * `replicationcontroller`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
 
-The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationcontroller` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationcontrollers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
+The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationcontroller` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationcontrollers` may themselves have labels and would generally carry the labels their corresponding pods have in common. Labels selectors for both objects are defined in `json` or `yaml` files using `map` and only _equality-based_ requirement selectors are supported:
+
+```json
+"selector": {
+    "name" : "redis",
+}
+```
+
+or
+
+```yaml
+selector:
+    name: redis
+```
+
+this selector (respectively in `json` or `yaml` format) is equivalent to `name=redis` or `name in (redis)`. At the moment in `json` or `yaml` format there is no way to represent inequalities or existence operators see [#341](https://github.com/kubernetes/kubernetes/issues/341).
+
+For example [redis-controller.yaml](../../examples/redis/redis-controller.yaml)`redis` `replicationcontroller` will monitor pods selected by the `name=redis` _equality-based_ requirement.
+
+Similarly for [redis-sentinel-service.yaml](../../examples/redis/redis-sentinel-service.yaml) `redis-sentinel` `service` will target pods selected by the `redis-sentinel=true` _equality-based_ requirement.
 
 Sets identified by labels could be overlapping (think Venn diagrams). For instance, a service might target all pods with `"tier": "frontend"` and  `"environment" : "prod"`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationcontroller` (with `replicas` set to 9) for the bulk of the replicas with labels `"tier" : "frontend"` and `"environment" : "prod"` and `"track" : "stable"` and another `replicationcontroller` (with `replicas` set to 1) for the canary with labels `"tier" : "frontend"` and  `"environment" : "prod"` and `"track" : "canary"`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationcontrollers` separately to test things out, monitor the results, etc.
 

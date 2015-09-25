@@ -38,7 +38,7 @@ etcd_initial_cluster_conf_kube = function (conf) {
     'name': 'kube-apiserver.service',
     'drop-ins': [{
       'name': '50-etcd-initial-cluster.conf',
-      'content': _.template("[Service]\nEnvironment=ETCD_SERVERS=--etcd_servers=<%= nodes.join(',') %>\n")(data),
+      'content': _.template("[Service]\nEnvironment=ETCD_SERVERS=--etcd-servers=<%= nodes.join(',') %>\n")(data),
     }],
   };
 };

@@ -43,7 +43,7 @@ Getting started on Microsoft Azure
 
 ## Prerequisites
 
-** Azure Prerequisites**
+**Azure Prerequisites**
 
 1. You need an Azure account. Visit http://azure.microsoft.com/ to get started.
 2. Install and configure the Azure cross-platform command-line interface. http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
@@ -76,7 +76,7 @@ You can create a virtual network:
 
 Now you're ready.
 
-You can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
+You can download and install the latest Kubernetes release from [this page](https://github.com/kubernetes/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
     cd kubernetes
     cluster/kube-up.sh

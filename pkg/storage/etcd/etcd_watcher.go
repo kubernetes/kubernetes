@@ -20,12 +20,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -38,6 +38,7 @@ const (
 	EtcdSet    = "set"
 	EtcdCAS    = "compareAndSwap"
 	EtcdDelete = "delete"
+	EtcdExpire = "expire"
 )
 
 // TransformFunc attempts to convert an object to another object for use with a watcher.
@@ -181,9 +182,9 @@ func (w *etcdWatcher) translate() {
 		case err := <-w.etcdError:
 			if err != nil {
 				w.emit(watch.Event{
-					watch.Error,
-					&api.Status{
-						Status:  api.StatusFailure,
+					Type: watch.Error,
+					Object: &unversioned.Status{
+						Status:  unversioned.StatusFailure,
 						Message: err.Error(),
 					},
 				})
@@ -353,7 +354,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 		w.sendAdd(res)
 	case EtcdSet, EtcdCAS:
 		w.sendModify(res)
-	case EtcdDelete:
+	case EtcdDelete, EtcdExpire:
 		w.sendDelete(res)
 	default:
 		glog.Errorf("unknown action: %v", res.Action)

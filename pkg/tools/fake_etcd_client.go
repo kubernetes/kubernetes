@@ -20,6 +20,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -52,6 +53,8 @@ type FakeEtcdClient struct {
 	TestIndex   bool
 	ChangeIndex uint64
 	LastSetTTL  uint64
+	// Will avoid setting the expires header on objects to make comparison easier
+	HideExpires bool
 	Machines    []string
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
@@ -136,13 +139,13 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		if _, ok := f.expectNotFoundGetSet[key]; !ok {
-			f.t.Fatalf("data for %s was not defined prior to invoking Get", key)
+			f.t.Logf("data for %s was not defined prior to invoking Get", key)
 		}
 		return &etcd.Response{}, f.NewError(EtcdErrorCodeNotFound)
 	}
 	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
 
-	// Sort response, note this will alter resutl.R.
+	// Sort response, note this will alter result.R.
 	if result.R.Node != nil && result.R.Node.Nodes != nil && sort {
 		f.sortResponse(result.R.Node.Nodes)
 	}
@@ -175,6 +178,11 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 		prevResult := f.Data[key]
 		createdIndex := prevResult.R.Node.CreatedIndex
 		f.t.Logf("updating %v, index %v -> %v (ttl: %d)", key, createdIndex, i, ttl)
+		var expires *time.Time
+		if !f.HideExpires && ttl > 0 {
+			now := time.Now()
+			expires = &now
+		}
 		result := EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
@@ -182,6 +190,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 					CreatedIndex:  createdIndex,
 					ModifiedIndex: i,
 					TTL:           int64(ttl),
+					Expiration:    expires,
 				},
 			},
 		}

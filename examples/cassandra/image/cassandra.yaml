@@ -215,7 +215,7 @@ counter_cache_save_period: 7200
 
 # saved caches
 # If not set, the default directory is $CASSANDRA_HOME/data/saved_caches.
-saved_caches_directory: /var/lib/cassandra/saved_caches
+saved_caches_directory: /cassandra_data/saved_caches
 
 # commitlog_sync may be either "periodic" or "batch." 
 # When in batch mode, Cassandra won't ack writes until the commit log
@@ -506,7 +506,7 @@ tombstone_failure_threshold: 100000
 # Increase if your rows are large, or if you have a very large
 # number of rows per partition.  The competing goals are these:
 #   1) a smaller granularity means more index entries are generated
-#      and looking up rows withing the partition by collation column
+#      and looking up rows within the partition by collation column
 #      is faster
 #   2) but, Cassandra will keep the collation index in memory for hot
 #      rows (as part of the key cache), so a larger granularity means

@@ -22,12 +22,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -50,7 +52,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -69,6 +71,7 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 
 func TestReadPodsFromFile(t *testing.T) {
 	hostname := "random-test-hostname"
+	grace := int64(30)
 	var testCases = []struct {
 		desc     string
 		pod      runtime.Object
@@ -77,7 +80,7 @@ func TestReadPodsFromFile(t *testing.T) {
 		{
 			desc: "Simple pod",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
@@ -98,9 +101,10 @@ func TestReadPodsFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
 				},
 				Spec: api.PodSpec{
-					NodeName:      hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					NodeName:                      hostname,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 					Containers: []api.Container{{
 						Name:  "image",
 						Image: "test/image",
@@ -115,11 +119,11 @@ func TestReadPodsFromFile(t *testing.T) {
 	for _, testCase := range testCases {
 		func() {
 			var versionedPod runtime.Object
-			err := testapi.Converter().Convert(&testCase.pod, &versionedPod)
+			err := testapi.Default.Converter().Convert(&testCase.pod, &versionedPod)
 			if err != nil {
 				t.Fatalf("%s: error in versioning the pod: %v", testCase.desc, err)
 			}
-			fileContents, err := testapi.Codec().Encode(versionedPod)
+			fileContents, err := testapi.Default.Codec().Encode(versionedPod)
 			if err != nil {
 				t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 			}
@@ -140,7 +144,7 @@ func TestReadPodsFromFile(t *testing.T) {
 				if !api.Semantic.DeepEqual(testCase.expected, update) {
 					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
-			case <-time.After(time.Second):
+			case <-time.After(util.ForeverTestTimeout):
 				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
 			}
 		}()

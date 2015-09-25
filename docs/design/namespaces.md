@@ -268,16 +268,16 @@ OpenShift creates a Namespace in Kubernetes
   "kind": "Namespace",
   "metadata": {
     "name": "development",
+    "labels": {
+      "name": "development"
+    }
   },
   "spec": {
-    "finalizers": ["openshift.com/origin", "kubernetes"],
+    "finalizers": ["openshift.com/origin", "kubernetes"]
   },
   "status": {
-    "phase": "Active",
-  },
-  "labels": {
-    "name": "development"
-  },
+    "phase": "Active"
+  }
 }
 ```
 
@@ -294,16 +294,16 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
   "metadata": {
     "name": "development",
     "deletionTimestamp": "..."
+    "labels": {
+      "name": "development"
+    }
   },
   "spec": {
-    "finalizers": ["openshift.com/origin", "kubernetes"],
+    "finalizers": ["openshift.com/origin", "kubernetes"]
   },
   "status": {
-    "phase": "Terminating",
-  },
-  "labels": {
-    "name": "development"
-  },
+    "phase": "Terminating"
+  }
 }
 ```
 
@@ -319,16 +319,16 @@ removing *kubernetes* from the list of finalizers:
   "metadata": {
     "name": "development",
     "deletionTimestamp": "..."
+    "labels": {
+      "name": "development"
+    }
   },
   "spec": {
-    "finalizers": ["openshift.com/origin"],
+    "finalizers": ["openshift.com/origin"]
   },
   "status": {
-    "phase": "Terminating",
-  },
-  "labels": {
-    "name": "development"
-  },
+    "phase": "Terminating"
+  }
 }
 ```
 
@@ -347,16 +347,16 @@ This results in the following state:
   "metadata": {
     "name": "development",
     "deletionTimestamp": "..."
+    "labels": {
+      "name": "development"
+    }
   },
   "spec": {
-    "finalizers": [],
+    "finalizers": []
   },
   "status": {
-    "phase": "Terminating",
-  },
-  "labels": {
-    "name": "development"
-  },
+    "phase": "Terminating"
+  }
 }
 ```
 

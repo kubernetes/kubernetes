@@ -19,8 +19,8 @@ package runtime
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (

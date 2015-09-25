@@ -107,7 +107,7 @@ func TestFIFO_addUpdate(t *testing.T) {
 func TestFIFO_addReplace(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
 	f.Add(mkFifoObj("foo", 10))
-	f.Replace([]interface{}{mkFifoObj("foo", 15)})
+	f.Replace([]interface{}{mkFifoObj("foo", 15)}, "15")
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {

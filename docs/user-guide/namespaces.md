@@ -45,7 +45,7 @@ need the features they provide.
 
 Namespaces provide a scope for names.  Names of resources need to be unique within a namespace, but not across namespaces.
 
-Namespaces are a way to divide cluster resources between multiple uses (via [resource quota](../../docs/admin/resource-quota.md).
+Namespaces are a way to divide cluster resources between multiple uses (via [resource quota](../../docs/admin/resource-quota.md)).
 
 In future versions of Kubernetes, objects in the same namespace will have the same
 access control policies by default.
@@ -57,7 +57,7 @@ resources within the same namespace.
 ## Working with Namespaces
 
 Creation and deletion of namespaces is described in the [Admin Guide documentation
-for namespaces](#../../docs/admin/namespaces.md)
+for namespaces](../../docs/admin/namespaces.md)
 
 ### Viewing namespaces
 
@@ -104,8 +104,8 @@ $ kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
 
 ## Namespaces and DNS
 
-When you create a [Service](services.md), it creates a corresponding [DNS entry](../admin/dns.md)1.
-This entry is of the form `<service-name>.<namespace-name>.cluster.local`, which means
+When you create a [Service](services.md), it creates a corresponding [DNS entry](../admin/dns.md).
+This entry is of the form `<service-name>.<namespace-name>.svc.cluster.local`, which means
 that if a container just uses `<service-name>` it will resolve to the service which
 is local to a namespace.  This is useful for using the same configuration across
 multiple namespaces such as Development, Staging and Production.  If you want to reach

@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"code.google.com/p/go-uuid/uuid"
 	log "github.com/golang/glog"
+	"github.com/pborman/uuid"
 )
 
 type UID struct {

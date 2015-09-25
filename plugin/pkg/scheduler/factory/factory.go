@@ -23,26 +23,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/validation"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/plugin/pkg/scheduler"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api/validation"
 
 	"github.com/golang/glog"
-)
-
-// Rate limitations for binding pods to hosts.
-// TODO: expose these as cmd line flags.
-const (
-	BindPodsQps   = 15
-	BindPodsBurst = 20
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -54,7 +48,7 @@ type ConfigFactory struct {
 	ScheduledPodLister *cache.StoreToPodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
 	PodLister algorithm.PodLister
-	// a means to list all minions
+	// a means to list all nodes
 	NodeLister *cache.StoreToNodeLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
@@ -71,21 +65,21 @@ type ConfigFactory struct {
 }
 
 // Initializes the factory.
-func NewConfigFactory(client *client.Client) *ConfigFactory {
+func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter) *ConfigFactory {
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
-		NodeLister:       &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ServiceLister:    &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ControllerLister: &cache.StoreToReplicationControllerLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		NodeLister:       &cache.StoreToNodeLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		StopEverything:   make(chan struct{}),
 	}
-	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
+	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{Store: c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
 	c.PodLister = modeler.PodLister()
-	c.BindPodsRateLimiter = util.NewTokenBucketRateLimiter(BindPodsQps, BindPodsBurst)
+	c.BindPodsRateLimiter = rateLimiter
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
@@ -144,13 +138,13 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		return nil, err
 	}
 
-	predicateKeys := util.NewStringSet()
+	predicateKeys := sets.NewString()
 	for _, predicate := range policy.Predicates {
 		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
 		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
 	}
 
-	priorityKeys := util.NewStringSet()
+	priorityKeys := sets.NewString()
 	for _, priority := range policy.Priorities {
 		glog.V(2).Infof("Registering priority: %s", priority.Name)
 		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
@@ -160,7 +154,7 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
+func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 	pluginArgs := PluginFactoryArgs{
 		PodLister:        f.PodLister,
@@ -186,9 +180,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	// Begin populating scheduled pods.
 	go f.scheduledPodPopulator.Run(f.StopEverything)
 
-	// Watch minions.
-	// Minions may be listed frequently, so provide a local up-to-date cache.
-	cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
+	// Watch nodes.
+	// Nodes may be listed frequently, so provide a local up-to-date cache.
+	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers, so that it can spread them correctly.
@@ -215,9 +209,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	return &scheduler.Config{
 		Modeler: f.modeler,
 		// The scheduler only needs to consider schedulable nodes.
-		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
-		Algorithm:    algo,
-		Binder:       &binder{f.Client},
+		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		Algorithm:  algo,
+		Binder:     &binder{f.Client},
 		NextPod: func() *api.Pod {
 			pod := f.PodQueue.Pop().(*api.Pod)
 			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
@@ -251,8 +245,8 @@ func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 		parseSelectorOrDie(client.PodHost+"!="))
 }
 
-// createMinionLW returns a cache.ListWatch that gets all changes to minions.
-func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
+// createNodeLW returns a cache.ListWatch that gets all changes to nodes.
+func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// TODO: Filter out nodes that doesn't have NodeReady condition.
 	fields := fields.Set{client.NodeUnschedulable: "false"}.AsSelector()
 	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)

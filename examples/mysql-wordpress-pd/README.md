@@ -131,7 +131,7 @@ spec:
         fsType: ext4
 ```
 
-[Download example](mysql.yaml)
+[Download example](mysql.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE mysql.yaml -->
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
@@ -186,7 +186,7 @@ spec:
     name: mysql
 ```
 
-[Download example](mysql-service.yaml)
+[Download example](mysql-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE mysql-service.yaml -->
 
 Start the service like this:
@@ -241,7 +241,7 @@ spec:
         fsType: ext4
 ```
 
-[Download example](wordpress.yaml)
+[Download example](wordpress.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE wordpress.yaml -->
 
 Create the pod:
@@ -282,7 +282,7 @@ spec:
   type: LoadBalancer
 ```
 
-[Download example](wordpress-service.yaml)
+[Download example](wordpress-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE wordpress-service.yaml -->
 
 Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.
@@ -302,8 +302,10 @@ $ kubectl get services
 
 Then, find the external IP for your WordPress service by running:
 
-```
-$ kubectl get services/wpfrontend --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+```console
+$ kubectl get services/wpfrontend
+NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+wpfrontend            10.0.0.2         1.2.3.4           80/TCP        ...                    ...
 ```
 
 or by listing the forwarding rules for your project:
@@ -328,7 +330,7 @@ Now, we can visit the running WordPress app.
 Use the external IP that you obtained above, and visit it on port 80:
 
 ```
-http://<external_ip>
+http://<external-ip>
 ```
 
 You should see the familiar WordPress init page.

@@ -16,7 +16,7 @@ history of clients that, on purpose or on accident, do not respect DNS TTLs
 ## Where does resolution work?
 Kubernetes Service DNS names can be resolved using standard methods (e.g. [`gethostbyname`](
 http://linux.die.net/man/3/gethostbyname)) inside any pod, except pods which
-have the `hostNet` field set to `true`.
+have the `hostNetwork` field set to `true`.
 
 ## Supported DNS schema
 The following sections detail the supported record types and layout that is
@@ -43,17 +43,12 @@ For a regular service, this resolves to the port number and the CNAME:
 `my-svc.my-namespace.svc.cluster.local`.
 For a headless service, this resolves to multiple answers, one for each pod
 that is backing the service, and contains the port number and a CNAME of the pod
-with the format `auto-generated-name.my-svc.my-namespace.svc.cluster.local`
-SRV records always contain the 'svc' segment in them and are not supported for
-old-style CNAMEs where the 'svc' segment was omitted.
-
+of the form `auto-generated-name.my-svc.my-namespace.svc.cluster.local`.
 
 ### Backwards compatibility
 Previous versions of kube-dns made names of the for
-`my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  For
-compatibility, kube-dns supports both names for the time being.  Users should
-avoid creating a namespace named 'svc', to avoid conflicts.  The old name
-format is deprecated and will be removed in a future release.
+`my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  This
+is no longer supported.
 
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
@@ -89,8 +84,8 @@ of this yourself.  First, each kubelet needs to run with the following flags
 set:
 
 ```
---cluster_dns=<DNS service ip>
---cluster_domain=<default local domain>
+--cluster-dns=<DNS service ip>
+--cluster-domain=<default local domain>
 ```
 
 Second, you need to start the DNS server ReplicationController and Service. See
@@ -147,7 +142,7 @@ busybox   1/1       Running   0          <some-time>
 ### 3 Validate DNS works
 Once that pod is running, you can exec nslookup in that environment:
 ```
-kubectl exec busybox -- nslookup kubernetes
+kubectl exec busybox -- nslookup kubernetes.default
 ```
 
 You should see something like:
@@ -155,7 +150,7 @@ You should see something like:
 Server:    10.0.0.10
 Address 1: 10.0.0.10
 
-Name:      kubernetes
+Name:      kubernetes.default
 Address 1: 10.0.0.1
 ```
 
@@ -164,7 +159,7 @@ If you see that, DNS is working correctly.
 
 ## How does it work?
 SkyDNS depends on etcd for what to serve, but it doesn't really need all of
-what etcd offers (at least not in the way we use it).  For simplicty, we run
+what etcd offers (at least not in the way we use it).  For simplicity, we run
 etcd and SkyDNS together in a pod, and we do not try to link etcd instances
 across replicas.  A helper container called [kube2sky](kube2sky/) also runs in
 the pod and acts a bridge between Kubernetes and SkyDNS.  It finds the
@@ -178,6 +173,11 @@ paths to the node's own DNS settings.  If the node is able to resolve DNS names
 specific to the larger environment, pods should be able to, also.  See "Known
 issues" below for a caveat.
 
+If you don't want this, or if you want a different DNS config for pods, you can
+use the kubelet's `--resolv-conf` flag.  Setting it to "" means that pods will
+not inherit DNS.  Setting it to a valid file path means that kubelet will use
+this file instead of `/etc/resolv.conf` for DNS inheritance.
+
 ## Known issues
 Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
@@ -190,7 +190,7 @@ consume 1 `nameserver` record and 3 `search` records.  This means that if a
 local installation already uses 3 `nameserver`s or uses more than 3 `search`es,
 some of those settings will be lost.  As a partial workaround, the node can run
 `dnsmasq` which will provide more `nameserver` entries, but not more `search`
-entries.
+entries.  You can also use kubelet's `--resolv-conf` flag.
 
 ## Making changes
 Please observe the release process for making changes to the `kube2sky`

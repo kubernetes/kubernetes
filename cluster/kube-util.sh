@@ -39,6 +39,13 @@ function verify-prereqs {
 	echo "TODO: verify-prereqs" 1>&2
 }
 
+# Validate a kubernetes cluster
+function validate-cluster {
+	# by default call the generic validate-cluster.sh script, customizable by
+	# any cluster provider if this does not fit.
+	"${KUBE_ROOT}/cluster/validate-cluster.sh"
+}
+
 # Instantiate a kubernetes cluster
 function kube-up {
 	echo "TODO: kube-up" 1>&2
@@ -82,11 +89,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
 	echo "TODO: test-teardown" 1>&2
-}
-
-# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
-function get-password {
-	echo "TODO: get-password" 1>&2
 }
 
 # Providers util.sh scripts should define functions that override the above default functions impls

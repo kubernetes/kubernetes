@@ -22,9 +22,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/api"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 
 	"github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
@@ -68,7 +68,10 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 		SelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
 		Latest()
-	b.Do().Visit(func(r *resource.Info) error {
+	b.Do().Visit(func(r *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		services := r.Object.(*api.ServiceList).Items
 		for _, service := range services {
 			var link string

@@ -25,12 +25,16 @@ JSON and YAML formats are accepted.
     Filename, directory, or URL to file to use to create the resource
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for create
-
-.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
+
+.PP
+\fB\-\-schema\-cache\-dir\fP="/tmp/kubectl.schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'
+
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -123,10 +127,6 @@ JSON and YAML formats are accepted.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -136,10 +136,10 @@ JSON and YAML formats are accepted.
 .RS
 
 .nf
-// Create a pod using the data in pod.json.
+# Create a pod using the data in pod.json.
 $ kubectl create \-f ./pod.json
 
-// Create a pod based on the JSON passed into stdin.
+# Create a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl create \-f \-
 
 .fi

@@ -19,35 +19,18 @@ limitations under the License.
 package kubectl
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"strings"
+
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
-func AddJsonFilenameFlag(cmd *cobra.Command, value *util.StringList, usage string) {
-	annotations := []string{"json", "yaml", "yml"}
-	annotation := make(map[string][]string)
-	annotation[cobra.BashCompFilenameExt] = annotations
-
-	flag := &pflag.Flag{
-		Name:        "filename",
-		Shorthand:   "f",
-		Usage:       usage,
-		Value:       value,
-		DefValue:    value.String(),
-		Annotations: annotation,
+func AddJsonFilenameFlag(cmd *cobra.Command, value *[]string, usage string) {
+	cmd.Flags().StringSliceVarP(value, "filename", "f", *value, usage)
+	annotations := []string{}
+	for _, ext := range resource.FileExtensions {
+		annotations = append(annotations, strings.TrimLeft(ext, "."))
 	}
-	cmd.Flags().AddFlag(flag)
-}
-
-// AddLabelsToColumnsFlag added a user flag to print resource labels into columns. Currently used in kubectl get command
-func AddLabelsToColumnsFlag(cmd *cobra.Command, value *util.StringList, usage string) {
-	flag := &pflag.Flag{
-		Name:      "label-columns",
-		Shorthand: "L",
-		Usage:     usage,
-		Value:     value,
-		DefValue:  value.String(),
-	}
-	cmd.Flags().AddFlag(flag)
+	cmd.Flags().SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }

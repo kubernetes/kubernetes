@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/spf13/pflag"
 )
@@ -365,6 +366,24 @@ func TestChildSameName(t *testing.T) {
 	c := initializeWithSameName()
 	c.AddCommand(cmdPrint, cmdEcho)
 	c.SetArgs(strings.Split("print one two", " "))
+	c.Execute()
+
+	if te != nil || tt != nil {
+		t.Error("Wrong command called")
+	}
+	if tp == nil {
+		t.Error("Wrong command called")
+	}
+	if strings.Join(tp, " ") != "one two" {
+		t.Error("Command didn't parse correctly")
+	}
+}
+
+func TestGrandChildSameName(t *testing.T) {
+	c := initializeWithSameName()
+	cmdTimes.AddCommand(cmdPrint)
+	c.AddCommand(cmdTimes)
+	c.SetArgs(strings.Split("times print one two", " "))
 	c.Execute()
 
 	if te != nil || tt != nil {
@@ -750,8 +769,13 @@ func TestRootNoCommandHelp(t *testing.T) {
 
 func TestRootUnknownCommand(t *testing.T) {
 	r := noRRSetupTest("bogus")
-	s := "Error: unknown command \"bogus\"\nRun 'cobra-test help' for usage.\n"
+	s := "Error: unknown command \"bogus\" for \"cobra-test\"\nRun 'cobra-test --help' for usage.\n"
 
+	if r.Output != s {
+		t.Errorf("Unexpected response.\nExpecting to be:\n %q\nGot:\n %q\n", s, r.Output)
+	}
+
+	r = noRRSetupTest("--strtwo=a bogus")
 	if r.Output != s {
 		t.Errorf("Unexpected response.\nExpecting to be:\n %q\nGot:\n %q\n", s, r.Output)
 	}
@@ -938,5 +962,30 @@ func TestGlobalNormFuncPropagation(t *testing.T) {
 	if reflect.ValueOf(cmdPrint.GlobalNormalizationFunc()).Pointer() != reflect.ValueOf(rootCmd.GlobalNormalizationFunc()).Pointer() ||
 		reflect.ValueOf(cmdEchoSub.GlobalNormalizationFunc()).Pointer() != reflect.ValueOf(rootCmd.GlobalNormalizationFunc()).Pointer() {
 		t.Error("cmdPrint and cmdEchoSub should had the normalization function of rootCmd")
+	}
+}
+
+func TestFlagOnPflagCommandLine(t *testing.T) {
+	flagName := "flagOnCommandLine"
+	pflag.CommandLine.String(flagName, "", "about my flag")
+	r := fullSetupTest("--help")
+
+	checkResultContains(t, r, flagName)
+}
+
+func TestAddTemplateFunctions(t *testing.T) {
+	AddTemplateFunc("t", func() bool { return true })
+	AddTemplateFuncs(template.FuncMap{
+		"f": func() bool { return false }, 
+		"h": func() string { return "Hello," }, 
+		"w": func() string { return "world." }})
+
+	const usage = "Hello, world."
+	
+	c := &Command{}
+	c.SetUsageTemplate(`{{if t}}{{h}}{{end}}{{if f}}{{h}}{{end}} {{w}}`)
+	
+	if us := c.UsageString(); us != usage {
+		t.Errorf("c.UsageString() != \"%s\", is \"%s\"", usage, us)
 	}
 }

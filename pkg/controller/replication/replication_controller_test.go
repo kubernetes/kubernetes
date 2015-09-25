@@ -14,43 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication
+package replicationcontroller
 
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 type FakePodControl struct {
-	controllerSpec []api.ReplicationController
+	controllerSpec []api.PodTemplateSpec
 	deletePodName  []string
 	lock           sync.Mutex
 	err            error
 }
-
-// Give each test that starts a background controller upto 1/2 a second.
-// Since we need to start up a goroutine to test watch, this routine needs
-// to get cpu before the test can complete. If the test is starved of cpu,
-// the watch test will take upto 1/2 a second before timing out.
-const controllerTimeout = 500 * time.Millisecond
 
 var alwaysReady = func() bool { return true }
 
@@ -58,13 +51,17 @@ func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
-func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationController) error {
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.err != nil {
 		return f.err
 	}
 	f.controllerSpec = append(f.controllerSpec, *spec)
+	return nil
+}
+
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
 	return nil
 }
 
@@ -81,7 +78,7 @@ func (f *FakePodControl) clear() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.deletePodName = []string{}
-	f.controllerSpec = []api.ReplicationController{}
+	f.controllerSpec = []api.PodTemplateSpec{}
 }
 
 func getKey(rc *api.ReplicationController, t *testing.T) string {
@@ -95,7 +92,7 @@ func getKey(rc *api.ReplicationController, t *testing.T) string {
 
 func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             util.NewUUID(),
 			Name:            "foobar",
@@ -173,53 +170,8 @@ type serverResponse struct {
 	obj        interface{}
 }
 
-func makeTestServer(t *testing.T, namespace, name string, podResponse, controllerResponse, updateResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakePodHandler := util.FakeHandler{
-		StatusCode:   podResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), podResponse.obj.(runtime.Object)),
-	}
-	fakeControllerHandler := util.FakeHandler{
-		StatusCode:   controllerResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), controllerResponse.obj.(runtime.Object)),
-	}
-	fakeUpdateHandler := util.FakeHandler{
-		StatusCode:   updateResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), updateResponse.obj.(runtime.Object)),
-	}
-	mux := http.NewServeMux()
-	mux.Handle(testapi.ResourcePath("pods", namespace, ""), &fakePodHandler)
-	mux.Handle(testapi.ResourcePath(replicationControllerResourceName(), "", ""), &fakeControllerHandler)
-	if namespace != "" {
-		mux.Handle(testapi.ResourcePath(replicationControllerResourceName(), namespace, ""), &fakeControllerHandler)
-	}
-	if name != "" {
-		mux.Handle(testapi.ResourcePath(replicationControllerResourceName(), namespace, name), &fakeUpdateHandler)
-	}
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		t.Errorf("unexpected request: %v", req.RequestURI)
-		res.WriteHeader(http.StatusNotFound)
-	})
-	return httptest.NewServer(mux), &fakeUpdateHandler
-}
-
-func startManagerAndWait(manager *ReplicationManager, pods int, t *testing.T) chan struct{} {
-	stopCh := make(chan struct{})
-	go manager.Run(1, stopCh)
-	err := wait.Poll(10*time.Millisecond, 100*time.Millisecond, func() (bool, error) {
-		podList, err := manager.podStore.List(labels.Everything())
-		if err != nil {
-			return false, err
-		}
-		return len(podList) == pods, nil
-	})
-	if err != nil {
-		t.Errorf("Failed to observe %d pods in 100ms", pods)
-	}
-	return stopCh
-}
-
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
@@ -235,7 +187,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
@@ -251,7 +203,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
@@ -278,13 +230,13 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 		if key != expected {
 			t.Errorf("Unexpected sync all for rc %v, expected %v", key, expected)
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Processing DeleteFinalStateUnknown took longer than expected")
 	}
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -306,7 +258,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -328,15 +280,15 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 
 	// This response body is just so we don't err out decoding the http response, all
 	// we care about is the request body sent below.
-	response := runtime.EncodeOrDie(testapi.Codec(), &api.ReplicationController{})
+	response := runtime.EncodeOrDie(testapi.Default.Codec(), &api.ReplicationController{})
 	fakeHandler.ResponseBody = response
 
 	rc.Generation = rc.Generation + 1
 	manager.syncReplicationController(getKey(rc, t))
 
 	rc.Status.ObservedGeneration = rc.Generation
-	updatedRc := runtime.EncodeOrDie(testapi.Codec(), rc)
-	fakeHandler.ValidateRequest(t, testapi.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &updatedRc)
+	updatedRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &updatedRc)
 }
 
 func TestControllerUpdateReplicas(t *testing.T) {
@@ -348,7 +300,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -361,7 +313,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	newPodList(manager.podStore.Store, 4, api.PodRunning, rc)
 
 	// This response body is just so we don't err out decoding the http response
-	response := runtime.EncodeOrDie(testapi.Codec(), &api.ReplicationController{})
+	response := runtime.EncodeOrDie(testapi.Default.Codec(), &api.ReplicationController{})
 	fakeHandler.ResponseBody = response
 
 	fakePodControl := FakePodControl{}
@@ -373,8 +325,8 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// 2. Every update to the status should include the Generation of the spec.
 	rc.Status = api.ReplicationControllerStatus{Replicas: 4, ObservedGeneration: 1}
 
-	decRc := runtime.EncodeOrDie(testapi.Codec(), rc)
-	fakeHandler.ValidateRequest(t, testapi.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
+	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
 	validateSyncReplication(t, &fakePodControl, 1, 0)
 }
 
@@ -386,7 +338,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
 
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, BurstReplicas)
@@ -435,7 +387,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 }
 
 func TestPodControllerLookup(t *testing.T) {
-	manager := NewReplicationManager(client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()}), BurstReplicas)
+	manager := NewReplicationManager(client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()}), BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
 		inRCs     []*api.ReplicationController
@@ -501,7 +453,8 @@ type FakeWatcher struct {
 
 func TestWatchControllers(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{}
+	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -536,14 +489,15 @@ func TestWatchControllers(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(controllerTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
 
 func TestWatchPods(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{}
+	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -580,14 +534,15 @@ func TestWatchPods(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(controllerTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
 
 func TestUpdatePods(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{}
+	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -623,7 +578,7 @@ func TestUpdatePods(t *testing.T) {
 	// both controllers
 	manager.updatePod(&pod1, &pod2)
 
-	expected := util.NewStringSet(testControllerSpec1.Name, testControllerSpec2.Name)
+	expected := sets.NewString(testControllerSpec1.Name, testControllerSpec2.Name)
 	for _, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
 		select {
@@ -631,14 +586,14 @@ func TestUpdatePods(t *testing.T) {
 			if !expected.Has(got) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
-		case <-time.After(controllerTimeout):
+		case <-time.After(util.ForeverTestTimeout):
 			t.Errorf("Expected update notifications for controllers within 100ms each")
 		}
 	}
 }
 
 func TestControllerUpdateRequeue(t *testing.T) {
-	// This server should force a requeue of the controller becuase it fails to update status.Replicas.
+	// This server should force a requeue of the controller because it fails to update status.Replicas.
 	fakeHandler := util.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
@@ -646,7 +601,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -671,7 +626,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 		if key != expectedKey {
 			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
 		}
-	case <-time.After(controllerTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		manager.queue.ShutDown()
 		t.Errorf("Expected to find an rc in the queue, found none.")
 	}
@@ -681,31 +636,35 @@ func TestControllerUpdateRequeue(t *testing.T) {
 
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	rc := newReplicationController(1)
-	fakeClient := &testclient.Fake{
-		ReactFn: func(f testclient.FakeAction) (runtime.Object, error) {
-			if f.Action == testclient.GetControllerAction {
-				return rc, nil
-			}
-			return &api.ReplicationController{}, fmt.Errorf("Fake error")
-		},
-	}
+	fakeClient := &testclient.Fake{}
+	fakeClient.AddReactor("get", "replicationcontrollers", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, rc, nil
+	})
+	fakeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, &api.ReplicationController{}, fmt.Errorf("Fake error")
+	})
 	fakeRCClient := &testclient.FakeReplicationControllers{fakeClient, "default"}
 	numReplicas := 10
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
-		switch a.Action {
-		case testclient.GetControllerAction:
+		if a.GetResource() != "replicationcontrollers" {
+			t.Errorf("Unexpected action %+v", a)
+			continue
+		}
+
+		switch action := a.(type) {
+		case testclient.GetAction:
 			gets++
 			// Make sure the get is for the right rc even though the update failed.
-			if s, ok := a.Value.(string); !ok || s != rc.Name {
-				t.Errorf("Expected get for rc %v, got %+v instead", rc.Name, s)
+			if action.GetName() != rc.Name {
+				t.Errorf("Expected get for rc %v, got %+v instead", rc.Name, action.GetName())
 			}
-		case testclient.UpdateControllerAction:
+		case testclient.UpdateAction:
 			updates++
 			// Confirm that the update has the right status.Replicas even though the Get
 			// returned an rc with replicas=1.
-			if c, ok := a.Value.(*api.ReplicationController); !ok {
+			if c, ok := action.GetObject().(*api.ReplicationController); !ok {
 				t.Errorf("Expected an rc as the argument to update, got %T", c)
 			} else if c.Status.Replicas != numReplicas {
 				t.Errorf("Expected update for rc to contain replicas %v, got %v instead",
@@ -722,7 +681,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 }
 
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, burstReplicas)
 	manager.podStoreSynced = alwaysReady
@@ -801,7 +760,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 			// Create/Delete the last pod
 			// The last add pod will decrease the expectation of the rc to 0,
-			// which will cause it to create/delete the remaining replicas upto burstReplicas.
+			// which will cause it to create/delete the remaining replicas up to burstReplicas.
 			if replicas != 0 {
 				manager.podStore.Store.Add(&pods.Items[expectedPods-1])
 				manager.addPod(&pods.Items[expectedPods-1])
@@ -842,7 +801,7 @@ func (fe FakeRCExpectations) SatisfiedExpectations(controllerKey string) bool {
 // TestRCSyncExpectations tests that a pod cannot sneak in between counting active pods
 // and checking expectations.
 func TestRCSyncExpectations(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, 2)
 	manager.podStoreSynced = alwaysReady
@@ -867,7 +826,7 @@ func TestRCSyncExpectations(t *testing.T) {
 }
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	manager := NewReplicationManager(client, 10)
 	manager.podStoreSynced = alwaysReady
 
@@ -903,13 +862,13 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 
 	// This should have no effect, since we've deleted the rc.
 	podExp.Seen(1, 0)
-	manager.podStore.Store.Replace(make([]interface{}, 0))
+	manager.podStore.Store.Replace(make([]interface{}, 0), "0")
 	manager.syncReplicationController(getKey(rc, t))
 	validateSyncReplication(t, &fakePodControl, 0, 0)
 }
 
 func TestRCManagerNotReady(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 	fakePodControl := FakePodControl{}
 	manager := NewReplicationManager(client, 2)
 	manager.podControl = &fakePodControl
@@ -946,7 +905,7 @@ func shuffle(controllers []*api.ReplicationController) []*api.ReplicationControl
 }
 
 func TestOverlappingRCs(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.Version()})
 
 	for i := 0; i < 5; i++ {
 		manager := NewReplicationManager(client, 10)
@@ -956,7 +915,7 @@ func TestOverlappingRCs(t *testing.T) {
 		var controllers []*api.ReplicationController
 		for j := 1; j < 10; j++ {
 			controllerSpec := newReplicationController(1)
-			controllerSpec.CreationTimestamp = util.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
+			controllerSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
 			controllerSpec.Name = string(util.NewUUID())
 			controllers = append(controllers, controllerSpec)
 		}

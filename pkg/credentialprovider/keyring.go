@@ -27,8 +27,8 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a
@@ -90,7 +90,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		}
 	}
 
-	eliminateDupes := util.NewStringSet(dk.index...)
+	eliminateDupes := sets.NewString(dk.index...)
 	dk.index = eliminateDupes.List()
 
 	// Update the index used to identify which credentials to use for a given
@@ -277,7 +277,14 @@ func (k *unionDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, b
 func MakeDockerKeyring(passedSecrets []api.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
 	passedCredentials := []DockerConfig{}
 	for _, passedSecret := range passedSecrets {
-		if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
+		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[api.DockerConfigJsonKey]; (passedSecret.Type == api.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
+			dockerConfigJson := DockerConfigJson{}
+			if err := json.Unmarshal(dockerConfigJsonBytes, &dockerConfigJson); err != nil {
+				return nil, err
+			}
+
+			passedCredentials = append(passedCredentials, dockerConfigJson.Auths)
+		} else if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
 			dockercfg := DockerConfig{}
 			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
 				return nil, err

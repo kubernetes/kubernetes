@@ -25,15 +25,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
-	schedulerapilatest "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/latest"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	expValidation "k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/yaml"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func validateObject(obj runtime.Object) (errors []error) {
@@ -99,6 +101,21 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
+	case *experimental.Deployment:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateDeployment(t)
+	case *experimental.Job:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateJob(t)
+	case *experimental.DaemonSet:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -194,6 +211,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/glusterfs": {
 			"glusterfs-pod":       &api.Pod{},
 			"glusterfs-endpoints": &api.Endpoints{},
+			"glusterfs-service":   &api.Service{},
 		},
 		"../docs/user-guide/liveness": {
 			"exec-liveness": &api.Pod{},
@@ -203,6 +221,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"multi-pod":   nil,
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
+			"job":         &experimental.Job{},
+		},
+		"../docs/admin": {
+			"daemon": &experimental.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
@@ -236,10 +258,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../docs/user-guide/downward-api": {
 			"dapi-pod": &api.Pod{},
 		},
+		"../docs/user-guide/downward-api/volume/": {
+			"dapi-volume": &api.Pod{},
+		},
 		"../examples/elasticsearch": {
-			"apiserver-secret": nil,
-			"music-rc":         &api.ReplicationController{},
-			"music-service":    &api.Service{},
+			"es-rc":           &api.ReplicationController{},
+			"es-svc":          &api.Service{},
+			"service-account": nil,
 		},
 		"../examples/explorer": {
 			"pod": &api.Pod{},
@@ -252,7 +277,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace-dev":  &api.Namespace{},
 			"namespace-prod": &api.Namespace{},
 		},
-		"../docs/user-guide/limitrange": {
+		"../docs/admin/limitrange": {
 			"invalid-pod": &api.Pod{},
 			"limits":      &api.LimitRange{},
 			"namespace":   &api.Namespace{},
@@ -283,8 +308,14 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod": &api.Pod{},
 		},
 		"../examples/openshift-origin": {
-			"openshift-controller": &api.ReplicationController{},
-			"openshift-service":    &api.Service{},
+			"openshift-origin-namespace": &api.Namespace{},
+			"openshift-controller":       &api.ReplicationController{},
+			"openshift-service":          &api.Service{},
+			"etcd-controller":            &api.ReplicationController{},
+			"etcd-service":               &api.Service{},
+			"etcd-discovery-controller":  &api.ReplicationController{},
+			"etcd-discovery-service":     &api.Service{},
+			"secret":                     nil,
 		},
 		"../examples/phabricator": {
 			"authenticator-controller": &api.ReplicationController{},
@@ -298,7 +329,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-sentinel-controller": &api.ReplicationController{},
 			"redis-sentinel-service":    &api.Service{},
 		},
-		"../docs/user-guide/resourcequota": {
+		"../docs/admin/resourcequota": {
 			"namespace": &api.Namespace{},
 			"limits":    &api.LimitRange{},
 			"quota":     &api.ResourceQuota{},
@@ -326,6 +357,16 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"zookeeper-service":       &api.Service{},
 			"zookeeper":               &api.Pod{},
 		},
+		"../examples/cephfs/": {
+			"cephfs":             &api.Pod{},
+			"cephfs-with-secret": &api.Pod{},
+		},
+		"../examples/fibre_channel": {
+			"fc": &api.Pod{},
+		},
+		"../examples/experimental": {
+			"deployment": &experimental.Deployment{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -352,7 +393,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 				}
 				//TODO: Add validate method for &schedulerapi.Policy
 			} else {
-				if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
+				codec, err := testapi.GetCodecForObject(expectedType)
+				if err != nil {
+					t.Errorf("Could not get codec for %s: %s", expectedType, err)
+				}
+				if err := codec.DecodeInto(data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -438,14 +483,14 @@ func TestReadme(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
 			}
-			if err := latest.Codec.DecodeInto(json, expectedType); err != nil {
+			if err := testapi.Default.Codec().DecodeInto(json, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
 				continue
 			}
 			if errors := validateObject(expectedType); len(errors) > 0 {
 				t.Errorf("%s did not validate correctly: %v", path, errors)
 			}
-			_, err = latest.Codec.Encode(expectedType)
+			_, err = testapi.Default.Codec().Encode(expectedType)
 			if err != nil {
 				t.Errorf("Could not encode object: %v", err)
 				continue

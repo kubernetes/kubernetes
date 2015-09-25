@@ -21,8 +21,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 func TestSelectorSpreadPriority(t *testing.T) {
@@ -217,7 +217,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		selectorSpread := SelectorSpread{serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs)}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(makeNodeList(test.nodes)))
+		list, err := selectorSpread.CalculateSpreadPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -379,13 +379,13 @@ func TestZoneSpreadPriority(t *testing.T) {
 			expectedList: []algorithm.HostPriority{{"machine11", 7}, {"machine12", 7},
 				{"machine21", 5}, {"machine22", 5},
 				{"machine01", 0}, {"machine02", 0}},
-			test: "service pod on non-zoned minion",
+			test: "service pod on non-zoned node",
 		},
 	}
 
 	for _, test := range tests {
 		zoneSpread := ServiceAntiAffinity{serviceLister: algorithm.FakeServiceLister(test.services), label: "zone"}
-		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(makeLabeledMinionList(test.nodes)))
+		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeLabeledNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -398,7 +398,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 }
 
-func makeLabeledMinionList(nodeMap map[string]map[string]string) (result api.NodeList) {
+func makeLabeledNodeList(nodeMap map[string]map[string]string) (result api.NodeList) {
 	nodes := []api.Node{}
 	for nodeName, labels := range nodeMap {
 		nodes = append(nodes, api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName, Labels: labels}})

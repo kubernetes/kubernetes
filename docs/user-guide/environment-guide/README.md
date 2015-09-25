@@ -81,7 +81,7 @@ Pod Name: show-rc-xxu6i
 Pod Namespace: default
 USER_VAR: important information
 
-Kubenertes environment variables
+Kubernetes environment variables
 BACKEND_SRV_SERVICE_HOST = 10.147.252.185
 BACKEND_SRV_SERVICE_PORT = 5000
 KUBERNETES_RO_SERVICE_HOST = 10.147.240.1
@@ -99,7 +99,7 @@ Backend Namespace: default
 ```
 
 First the frontend pod's information is printed. The pod name and
-[namespace](../../../docs/design/namespaces.md) are retreived from the
+[namespace](../../../docs/design/namespaces.md) are retrieved from the
 [Downward API](../../../docs/user-guide/downward-api.md). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
 definition](show-rc.yaml). Then, the dynamic Kubernetes environment

@@ -76,16 +76,19 @@ Through integration with some cloud providers (for example Google Compute Engine
 
 ```console
 $ kubectl expose rc my-nginx --port=80 --type=LoadBalancer
-NAME       LABELS         SELECTOR       IP(S)     PORT(S)
-my-nginx   run=my-nginx   run=my-nginx             80/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
+my-nginx     10.179.240.1     <none>            80/TCP                 run=nginx    8d
 ```
 
 To find the public IP address assigned to your application, execute:
 
 ```console
-$ kubectl get svc my-nginx -o json | grep \"ip\"
-                   "ip": "130.111.122.213"
+$ kubectl get svc my-nginx
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
+my-nginx     10.179.240.1     25.1.2.3          80/TCP                 run=nginx    8d
 ```
+
+You may need to wait for a minute or two for the external ip address to be provisioned.
 
 In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a [firewall to allow traffic on port 80](services-firewalls.md).
 

@@ -18,8 +18,9 @@ limitations under the License.
 package slice
 
 import (
-	"math/rand"
 	"sort"
+
+	utilrand "k8s.io/kubernetes/pkg/util/rand"
 )
 
 // CopyStrings copies the contents of the specified string slice
@@ -41,7 +42,7 @@ func SortStrings(s []string) []string {
 // order. It returns a new slice.
 func ShuffleStrings(s []string) []string {
 	shuffled := make([]string, len(s))
-	perm := rand.Perm(len(s))
+	perm := utilrand.Perm(len(s))
 	for i, j := range perm {
 		shuffled[j] = s[i]
 	}

@@ -43,7 +43,7 @@ var exampleMungeTagRE = regexp.MustCompile(beginMungeTag(fmt.Sprintf("%s %s", ex
 //    bar:
 // ```
 //
-// [Download example](../../examples/guestbook/frontend-controller.yaml)
+// [Download example](../../examples/guestbook/frontend-controller.yaml?raw=true)
 // <!-- END MUNGE: EXAMPLE -->
 func syncExamples(filePath string, mlines mungeLines) (mungeLines, error) {
 	var err error
@@ -108,7 +108,7 @@ func exampleContent(filePath, linkPath, fileType string) (mungeLines, error) {
 
 	// remove leading and trailing spaces and newlines
 	trimmedFileContent := strings.TrimSpace(string(dat))
-	content := fmt.Sprintf("\n```%s\n%s\n```\n\n[Download example](%s)", fileType, trimmedFileContent, fileRel)
+	content := fmt.Sprintf("\n```%s\n%s\n```\n\n[Download example](%s?raw=true)", fileType, trimmedFileContent, fileRel)
 	out := getMungeLines(content)
 	return out, nil
 }

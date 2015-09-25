@@ -25,7 +25,7 @@
 # LIMITATIONS
 # 1. controllers are not updated unless their name is changed
 # 3. Services will not be updated unless their name is changed,
-#    but for services we acually want updates without name change.
+#    but for services we actually want updates without name change.
 # 4. Json files are not handled at all. Currently addons must be
 #    in yaml files
 # 5. exit code is probably not always correct (I haven't checked
@@ -44,7 +44,9 @@
 
 
 # global config
-KUBECTL=${TEST_KUBECTL:-/usr/local/bin/kubectl}   # substitute for tests
+KUBECTL=${TEST_KUBECTL:-}   # substitute for tests
+KUBECTL=${KUBECTL:-${KUBECTL_BIN:-}}
+KUBECTL=${KUBECTL:-/usr/local/bin/kubectl}
 if [[ ! -x ${KUBECTL} ]]; then
     echo "ERROR: kubectl command (${KUBECTL}) not found or is not executable" 1>&2
     exit 1
@@ -196,7 +198,7 @@ function run-until-success() {
 # returns a list of <namespace>/<name> pairs (nsnames)
 function get-addon-nsnames-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" get "${obj_type}" --all-namespaces -o template -t "{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
+    "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
 }
 
 # returns the characters after the last separator (including)
@@ -468,12 +470,14 @@ function update-addons() {
     # be careful, reconcile-objects uses global variables
     reconcile-objects ${addon_path} ReplicationController "-" &
 
-    # We don't expect service names to be versioned, so
-    # we match entire name, ignoring version suffix.
+    # We don't expect names to be versioned for the following kinds, so
+    # we match the entire name, ignoring version suffix.
     # That's why we pass an empty string as the version separator.
-    # If the service description differs on disk, the service should be recreated.
+    # If the description differs on disk, the object should be recreated.
     # This is not implemented in this version.
     reconcile-objects ${addon_path} Service "" &
+    reconcile-objects ${addon_path} PersistentVolume "" &
+    reconcile-objects ${addon_path} PersistentVolumeClaim "" &
 
     wait-for-jobs
     if [[ $? -eq 0 ]]; then

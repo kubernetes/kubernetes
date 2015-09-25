@@ -24,8 +24,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // TODO(wojtek-t): As suggested in #8320, we should consider the strategy
@@ -69,7 +69,7 @@ type DeepCopyGenerator interface {
 	OverwritePackage(pkg, overwrite string)
 }
 
-func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include util.StringSet) DeepCopyGenerator {
+func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include sets.String) DeepCopyGenerator {
 	g := &deepCopyGenerator{
 		scheme:        scheme,
 		targetPkg:     targetPkg,
@@ -81,7 +81,7 @@ func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include u
 		include:       include,
 	}
 	g.targetPackage(targetPkg)
-	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/conversion")
+	g.AddImport("k8s.io/kubernetes/pkg/conversion")
 	return g
 }
 
@@ -100,7 +100,7 @@ type deepCopyGenerator struct {
 	shortImports  map[string]string
 	pkgOverwrites map[string]string
 	replace       map[pkgPathNamePair]reflect.Type
-	include       util.StringSet
+	include       sets.String
 }
 
 func (g *deepCopyGenerator) addImportByPath(pkg string) string {
@@ -420,6 +420,8 @@ func (g *deepCopyGenerator) writeDeepCopyForPtr(b *buffer, inField reflect.Struc
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
 			b.addLine(ifStmt, indent+1)
 			b.addLine("return err\n", indent+2)
+			b.addLine("} else if newVal == nil {\n", indent+1)
+			b.addLine(fmt.Sprintf("out.%s = nil\n", inField.Name), indent+2)
 			b.addLine("} else {\n", indent+1)
 			assignFormat := "out.%s = newVal.(%s)\n"
 			assignStmt := fmt.Sprintf(assignFormat, inField.Name, g.typeName(inField.Type))
@@ -467,6 +469,8 @@ func (g *deepCopyGenerator) writeDeepCopyForSlice(b *buffer, inField reflect.Str
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
 			b.addLine(ifStmt, indent+2)
 			b.addLine("return err\n", indent+3)
+			b.addLine("} else if newVal == nil {\n", indent+2)
+			b.addLine(fmt.Sprintf("out.%s[i] = nil\n", inField.Name), indent+3)
 			b.addLine("} else {\n", indent+2)
 			assignFormat := "out.%s[i] = newVal.(%s)\n"
 			assignStmt := fmt.Sprintf(assignFormat, inField.Name, g.typeName(inField.Type.Elem()))
@@ -508,6 +512,8 @@ func (g *deepCopyGenerator) writeDeepCopyForStruct(b *buffer, inType reflect.Typ
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
 			b.addLine(ifStmt, indent)
 			b.addLine("return err\n", indent+1)
+			b.addLine("} else if newVal == nil {\n", indent)
+			b.addLine(fmt.Sprintf("out.%s = nil\n", inField.Name), indent+1)
 			b.addLine("} else {\n", indent)
 			copyFormat := "out.%s = newVal.(%s)\n"
 			copyStmt := fmt.Sprintf(copyFormat, inField.Name, g.typeName(inField.Type))

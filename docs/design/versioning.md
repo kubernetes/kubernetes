@@ -68,6 +68,14 @@ Here is an example major release cycle:
 
 It may seem a bit strange to complete the v2 API before v2.0 is released, but *adding* a v2 API is not a breaking change. *Removing* the v2beta\* APIs *is* a breaking change, which is what necessitates the major version bump. There are other ways to do this, but having the major release be the fresh start of that release's API without the baggage of its beta versions seems most intuitive out of the available options.
 
+# Patches
+
+Patch releases are intended for critical bug fixes to the latest minor version, such as addressing security vulnerabilities, fixes to problems affecting a large number of users, severe problems with no workaround, and blockers for products based on Kubernetes.
+
+They should not contain miscellaneous feature additions or improvements, and especially no incompatibilities should be introduced between patch versions of the same minor version (or even major version).
+
+Dependencies, such as Docker or Etcd, should also not be changed unless absolutely necessary, and also just to fix critical bugs (so, at most patch version changes, not new major nor minor versions).
+
 # Upgrades
 
 * Users can upgrade from any Kube 1.x release to any other Kube 1.x release as a rolling upgrade across their cluster. (Rolling upgrade means being able to upgrade the master first, then one node at a time. See #4855 for details.)

@@ -41,6 +41,8 @@ With Kubernetes, you are able to quickly and efficiently respond to customer dem
  - Seamlessly roll out new features.
  - Optimize use of your hardware by using only the resources you need.
 
+Our goal is to foster an ecosystem of components and tools that relieve the burden of running applications in public and private clouds.
+
 #### Kubernetes is:
 
 * **lean**: lightweight, simple, accessible
@@ -61,13 +63,13 @@ Here are some key points:
 * **Application-centric management**:
     Raises the level of abstraction from running an OS on virtual hardware to running an application on an OS using logical resources. This provides the simplicity of PaaS with the flexibility of IaaS and enables you to run much more than just [12-factor apps](http://12factor.net/).
 * **Dev and Ops separation of concerns**:
-    Provides separatation of build and deployment; therefore, decoupling applications from infrastructure.
+    Provides separation of build and deployment; therefore, decoupling applications from infrastructure.
 * **Agile application creation and deployment**:
     Increased ease and efficiency of container image creation compared to VM image use.
 * **Continuous development, integration, and deployment**:
     Provides for reliable and frequent container image build and deployment with quick and easy rollbacks (due to image immutability).
 * **Loosely coupled, distributed, elastic, liberated [micro-services](http://martinfowler.com/articles/microservices.html)**:
-	Applications are broken into smaller, independent pieces and can be deployed and managed dynamically -- not a fat monolithic stack running on one big single-purpose machine.
+    Applications are broken into smaller, independent pieces and can be deployed and managed dynamically -- not a fat monolithic stack running on one big single-purpose machine.
 * **Environmental consistency across development, testing, and production**:
     Runs the same on a laptop as it does in the cloud.
 * **Cloud and OS distribution portability**:
@@ -76,6 +78,17 @@ Here are some key points:
     Predictable application performance.
 * **Resource utilization**:
     High efficiency and density.
+
+#### Kubernetes is not:
+
+Kubernetes is not a PaaS (Platform as a Service).
+* Kubernetes does not limit the types of applications supported. It does not dictate application frameworks, restrict the set of supported language runtimes, nor cater to only [12-factor applications](http://12factor.net/). Kubernetes aims to support an extremely diverse variety of workloads: if an application can run in a container, it should run great on Kubernetes.
+* Kubernetes is unopinionated in the source-to-image space. It does not build your application. CI workflow is an area where different users and projects have their own requirements and preferences, so we support layering CI workflows on Kubernetes but don't dictate how it should work.
+* On the other hand, a number of PaaS systems run *on* Kubernetes, such as [Openshift](https://github.com/openshift/origin) and [Deis](http://deis.io/). You could also roll your own custom PaaS, integrate with a CI system of your choice, or get along just fine with just Kubernetes: bring your container images and deploy them on Kubernetes.
+* Since Kubernetes operates at the application level rather than at just the hardware level, it provides some generally applicable features common to PaaS offerings, such as deployment, scaling, load balancing, logging, monitoring, etc. However, Kubernetes is not monolithic, and these default solutions are optional and pluggable.
+
+Kubernetes is not a mere "orchestration system"; it eliminates the need for orchestration:
+* The technical definition of "orchestration" is execution of a defined workflow: do A, then B, then C. In contrast, Kubernetes is comprised of a set of control processes that continuously drive current state towards the provided desired state. It shouldn't matter how you get from A to C: make it so. This results in a system that is easier to use and more powerful, robust, and resilient.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

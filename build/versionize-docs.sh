@@ -44,7 +44,7 @@ fi
 echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
-HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/GoogleCloudPlatform/kubernetes"
+HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/kubernetes/kubernetes"
 
 md_dirs=(docs examples)
 md_files=()
@@ -71,5 +71,5 @@ done
 # Update API descriptions to match this version.
 $SED -ri -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
 
-${KUBE_ROOT}/hack/run-gendocs.sh
+${KUBE_ROOT}/hack/update-generated-docs.sh
 ${KUBE_ROOT}/hack/update-swagger-spec.sh

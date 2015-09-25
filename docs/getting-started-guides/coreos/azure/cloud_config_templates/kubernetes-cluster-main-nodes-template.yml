@@ -1,4 +1,4 @@
-## This file is used as input to deployment script, which ammends it as needed.
+## This file is used as input to deployment script, which amends it as needed.
 ## More specifically, we need to add environment files for as many nodes as we
 ## are going to deploy.
 
@@ -288,11 +288,11 @@ coreos:
         ExecStart=/opt/kubernetes/server/bin/kubelet \
             --address=0.0.0.0 \
             --port=10250 \
-            --hostname_override=%H \
-            --api_servers=http://kube-00:8080 \
+            --hostname-override=%H \
+            --api-servers=http://kube-00:8080 \
             --logtostderr=true \
-            --cluster_dns=10.1.0.3 \
-            --cluster_domain=kube.local \
+            --cluster-dns=10.1.0.3 \
+            --cluster-domain=kube.local \
             --config=/etc/kubernetes/manifests/
         Restart=always
         RestartSec=10

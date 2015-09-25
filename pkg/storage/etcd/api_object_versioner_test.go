@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestObjectVersioner(t *testing.T) {
@@ -39,7 +39,7 @@ func TestObjectVersioner(t *testing.T) {
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
 		t.Errorf("unexpected resource version: %#v", obj)
 	}
-	now := util.Time{time.Now()}
+	now := unversioned.Time{Time: time.Now()}
 	obj = &TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
 	if err := v.UpdateObject(obj, &now.Time, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)

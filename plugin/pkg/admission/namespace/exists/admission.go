@@ -17,19 +17,19 @@ limitations under the License.
 package exists
 
 import (
-	"fmt"
 	"io"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -50,11 +50,11 @@ type exists struct {
 func (e *exists) Admit(a admission.Attributes) (err error) {
 	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return errors.NewInternalError(err)
 	}
 	mapping, err := api.RESTMapper.RESTMapping(kind, defaultVersion)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return errors.NewInternalError(err)
 	}
 	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 		return nil
@@ -68,7 +68,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 	_, exists, err := e.store.Get(namespace)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return errors.NewInternalError(err)
 	}
 	if exists {
 		return nil
@@ -77,7 +77,10 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
 	_, err = e.client.Namespaces().Get(a.GetNamespace())
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+		if errors.IsNotFound(err) {
+			return err
+		}
+		return errors.NewInternalError(err)
 	}
 
 	return nil

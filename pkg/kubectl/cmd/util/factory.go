@@ -17,26 +17,29 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/validation"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -49,7 +52,7 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients    *clientCache
+	clients    *ClientCache
 	flags      *pflag.FlagSet
 	generators map[string]kubectl.Generator
 
@@ -65,7 +68,7 @@ type Factory struct {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error)
+	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
 	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
@@ -77,26 +80,29 @@ type Factory struct {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
-	Validator func() (validation.Schema, error)
+	Validator func(validate bool, cacheDir string) (validation.Schema, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overriden.
 	DefaultNamespace func() (string, bool, error)
 	// Returns the generator for the provided generator name
 	Generator func(name string) (kubectl.Generator, bool)
+	// Check whether the kind of resources could be exposed
+	CanBeExposed func(kind string) error
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
 func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
-	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
+	mapper := kubectl.ShortcutExpander{RESTMapper: api.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	generators := map[string]kubectl.Generator{
 		"run/v1":     kubectl.BasicReplicationController{},
+		"run-pod/v1": kubectl.BasicPod{},
 		"service/v1": kubectl.ServiceGeneratorV1{},
 		"service/v2": kubectl.ServiceGeneratorV2{},
 	}
@@ -118,7 +124,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			CheckErr(err)
 			cmdApiVersion := cfg.Version
 
-			return kubectl.OutputVersionMapper{mapper, cmdApiVersion}, api.Scheme
+			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersion: cmdApiVersion}, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion("")
@@ -127,25 +133,35 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return clients.ClientConfigForVersion("")
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
 			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			return client.RESTClient, nil
+			switch group {
+			case "":
+				return client.RESTClient, nil
+			case "experimental":
+				return client.ExperimentalClient.RESTClient, nil
+			}
+			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
+			if err != nil {
+				return nil, err
+			}
 			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			describer, ok := kubectl.DescriberFor(mapping.Kind, client)
-			if !ok {
-				return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
+			if describer, ok := kubectl.DescriberFor(group, mapping.Kind, client); ok {
+				return describer, nil
 			}
-			return describer, nil
+			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
-			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, columnLabels), nil
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, columnLabels), nil
 		},
 		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
@@ -195,7 +211,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.Kind, kubectl.NewScalerClient(client))
+			return kubectl.ScalerFor(mapping.Kind, client)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
@@ -204,13 +220,25 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return kubectl.ReaperFor(mapping.Kind, client)
 		},
-		Validator: func() (validation.Schema, error) {
-			if flags.Lookup("validate").Value.String() == "true" {
+		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
+			if validate {
 				client, err := clients.ClientForVersion("")
 				if err != nil {
 					return nil, err
 				}
-				return &clientSwaggerSchema{client, api.Scheme}, nil
+				dir := cacheDir
+				if len(dir) > 0 {
+					version, err := client.ServerVersion()
+					if err != nil {
+						return nil, err
+					}
+					dir = path.Join(cacheDir, version.String())
+				}
+				return &clientSwaggerSchema{
+					c:        client,
+					cacheDir: dir,
+					mapper:   api.RESTMapper,
+				}, nil
 			}
 			return validation.NullSchema{}, nil
 		},
@@ -221,26 +249,22 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			generator, ok := generators[name]
 			return generator, ok
 		},
+		CanBeExposed: func(kind string) error {
+			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
+		},
 	}
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
-	util.AddFlagSetToPFlagSet(flag.CommandLine, flags)
-
-	// This is necessary as github.com/spf13/cobra doesn't support "global"
-	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
-	util.AddPFlagSetToPFlagSet(pflag.CommandLine, flags)
-
-	// Hack for global access to validation flag.
-	// TODO: Refactor out after configuration flag overhaul.
-	if f.flags.Lookup("validate") == nil {
-		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
-	}
+	flags.AddGoFlagSet(flag.CommandLine)
 
 	// Merge factory's flags
-	util.AddPFlagSetToPFlagSet(f.flags, flags)
+	flags.AddFlagSet(f.flags)
 
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
@@ -248,7 +272,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 
-	// Normalize all flags that are comming from other packages or pre-configurations
+	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 }
@@ -273,30 +297,77 @@ func getServicePorts(spec api.ServiceSpec) []string {
 }
 
 type clientSwaggerSchema struct {
-	c *client.Client
-	t runtime.ObjectTyper
+	c        *client.Client
+	cacheDir string
+	mapper   meta.RESTMapper
 }
 
-func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
-	if err != nil {
-		return err
+const schemaFileName = "schema.json"
+
+type schemaClient interface {
+	Get() *client.Request
+}
+
+func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string) (err error) {
+	var schemaData []byte
+	cacheFile := path.Join(cacheDir, prefix, groupVersion, schemaFileName)
+
+	if len(cacheDir) != 0 {
+		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
-	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
-	}
-	schemaData, err := c.c.RESTClient.Get().
-		AbsPath("/swaggerapi/api", version).
-		Do().
-		Raw()
-	if err != nil {
-		return err
+	if schemaData == nil {
+		schemaData, err = c.Get().
+			AbsPath("/swaggerapi", prefix, groupVersion).
+			Do().
+			Raw()
+		if err != nil {
+			return err
+		}
+		if len(cacheDir) != 0 {
+			if err = os.MkdirAll(path.Join(cacheDir, prefix, groupVersion), 0755); err != nil {
+				return err
+			}
+			tmpFile, err := ioutil.TempFile(cacheDir, "schema")
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
+				return err
+			}
+			if err := os.Link(tmpFile.Name(), cacheFile); err != nil && !os.IsExist(err) {
+				return err
+			}
+		}
 	}
 	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
 	if err != nil {
 		return err
 	}
 	return schema.ValidateBytes(data)
+}
+
+func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
+	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	if err != nil {
+		return err
+	}
+	if ok := registered.IsRegisteredAPIVersion(version); !ok {
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
+	}
+	resource, _ := meta.KindToResource(kind, false)
+	group, err := c.mapper.GroupForResource(resource)
+	if err != nil {
+		return fmt.Errorf("could not find api group for %s: %v", kind, err)
+	}
+	if group == "experimental" {
+		if c.c.ExperimentalClient == nil {
+			return errors.New("unable to validate: no experimental client")
+		}
+		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/", version, c.cacheDir)
+	}
+	return getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
@@ -396,10 +467,16 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		}
 		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.APIVersion)
 	} else {
-		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), GetFlagStringList(cmd, "label-columns"))
+		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
+		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
+		if err != nil {
+			columnLabel = []string{}
+		}
+		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), GetFlagBool(cmd, "show-all"), columnLabel)
 		if err != nil {
 			return nil, err
 		}
+		printer = maybeWrapSortingPrinter(cmd, printer)
 	}
 	return printer, nil
 }

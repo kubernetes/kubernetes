@@ -40,15 +40,24 @@ Resource quotas are a tool for administrators to address this concern. Resource 
 work like this:
 - Different teams work in different namespaces.  Currently this is voluntary, but
   support for making this mandatory via ACLs is planned.
-- Users put [compute resource limits](../user-guide/compute-resources.md) on their pods.
 - The administrator creates a Resource Quota for each namespace.
+- Users put compute resource requests on their pods. The sum of all resource requests across
+  all pods in the same namespace must not exceed any hard resource limit in any Resource Quota
+  document for the namespace. Note that we used to verify Resource Quota by taking the sum of
+  resource limits of the pods, but this was altered to use resource requests. Backwards compatibility
+  for those pods previously created is preserved because pods that only specify a resource limit have
+  their resource requests defaulted to match their defined limits. The user is only charged for the
+  resources they request in the Resource Quota versus their limits because the request is the minimum
+  amount of resource guaranteed by the cluster during scheduling. For more information on over commit,
+  see [compute-resources](../user-guide/compute-resources.md).
 - If creating a pod would cause the namespace to exceed any of the limits specified in the
   the Resource Quota for that namespace, then the request will fail with HTTP status
   code `403 FORBIDDEN`.
-- If quota is enabled in a namespace and the user does not specify limits on the pod for each
+- If quota is enabled in a namespace and the user does not specify *requests* on the pod for each
   of the resources for which quota is enabled, then the POST of the pod will fail with HTTP
   status code `403 FORBIDDEN`.  Hint: Use the LimitRange admission controller to force default
-  values of limits before the quota is checked to avoid this problem.
+  values of *limits* (then resource *requests* would be equal to *limits* by default, see
+  [admission controller](admission-controllers.md)) before the quota is checked to avoid this problem.
 
 Examples of policies that could be created using namespaces and quotas are:
 - In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A use 20 Gib and 10 cores,
@@ -64,7 +73,7 @@ Neither contention nor changes to quota will affect already-running pods.
 ## Enabling Resource Quota
 
 Resource Quota support is enabled by default for many Kubernetes distributions.  It is
-enabled when the apiserver `--admission_control=` flag has `ResourceQuota` as
+enabled when the apiserver `--admission-control=` flag has `ResourceQuota` as
 one of its arguments.
 
 Resource Quota is enforced in a particular namespace when there is a
@@ -78,10 +87,10 @@ in a namespace can be limited.  The following compute resource types are support
 
 | ResourceName | Description |
 | ------------ | ----------- |
-| cpu | Total cpu limits of containers |
-| memory | Total memory limits of containers
+| cpu | Total cpu requests of containers |
+| memory | Total memory requests of containers
 
-For example, `cpu` quota sums up the `resources.limits.cpu` fields of every
+For example, `cpu` quota sums up the `resources.requests.cpu` fields of every
 container of every pod in the namespace, and enforces a maximum on that sum.
 
 ## Object Count Quota
@@ -107,7 +116,7 @@ supply of Pod IPs.
 
 ## Viewing and Setting Quotas
 
-Kubectl supports creating, updating, and viewing quotas
+Kubectl supports creating, updating, and viewing quotas:
 
 ```console
 $ kubectl namespace myspace
@@ -167,7 +176,7 @@ restrictions around nodes: pods from several namespaces may run on the same node
 
 ## Example
 
-See a [detailed example for how to use resource quota](../user-guide/resourcequota/).
+See a [detailed example for how to use resource quota](resourcequota/)..
 
 ## Read More
 

@@ -23,8 +23,9 @@ import (
 	"hash"
 	"sort"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // RepackSubsets takes a slice of EndpointSubset objects, expands it to the full
@@ -33,66 +34,97 @@ import (
 // form for things like comparison.  The result is a newly allocated slice.
 func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	// First map each unique port definition to the sets of hosts that
-	// offer it.  The sets of hosts must be de-duped, using IP as the key.
-	type ipString string
-	allAddrs := map[ipString]*api.EndpointAddress{}
-	portsToAddrs := map[api.EndpointPort]addressSet{}
+	// offer it.
+	allAddrs := map[addressKey]*api.EndpointAddress{}
+	portToAddrReadyMap := map[api.EndpointPort]addressSet{}
 	for i := range subsets {
-		for j := range subsets[i].Ports {
-			epp := &subsets[i].Ports[j]
+		for _, port := range subsets[i].Ports {
 			for k := range subsets[i].Addresses {
-				epa := &subsets[i].Addresses[k]
-				ipstr := ipString(epa.IP)
-				// Accumulate the most "complete" address we can.
-				if allAddrs[ipstr] == nil {
-					// Make a copy so we don't write to the
-					// input args of this function.
-					p := &api.EndpointAddress{}
-					*p = *epa
-					allAddrs[ipstr] = p
-				} else if allAddrs[ipstr].TargetRef == nil {
-					allAddrs[ipstr].TargetRef = epa.TargetRef
-				}
-				// Remember that this port maps to this address.
-				if _, found := portsToAddrs[*epp]; !found {
-					portsToAddrs[*epp] = addressSet{}
-				}
-				portsToAddrs[*epp].Insert(allAddrs[ipstr])
+				mapAddressByPort(&subsets[i].Addresses[k], port, true, allAddrs, portToAddrReadyMap)
+			}
+			for k := range subsets[i].NotReadyAddresses {
+				mapAddressByPort(&subsets[i].NotReadyAddresses[k], port, false, allAddrs, portToAddrReadyMap)
 			}
 		}
 	}
 
 	// Next, map the sets of hosts to the sets of ports they offer.
 	// Go does not allow maps or slices as keys to maps, so we have
-	// to synthesize and artificial key and do a sort of 2-part
+	// to synthesize an artificial key and do a sort of 2-part
 	// associative entity.
 	type keyString string
-	addrSets := map[keyString]addressSet{}
-	addrSetsToPorts := map[keyString][]api.EndpointPort{}
-	for epp, addrs := range portsToAddrs {
+	keyToAddrReadyMap := map[keyString]addressSet{}
+	addrReadyMapKeyToPorts := map[keyString][]api.EndpointPort{}
+	for port, addrs := range portToAddrReadyMap {
 		key := keyString(hashAddresses(addrs))
-		addrSets[key] = addrs
-		addrSetsToPorts[key] = append(addrSetsToPorts[key], epp)
+		keyToAddrReadyMap[key] = addrs
+		addrReadyMapKeyToPorts[key] = append(addrReadyMapKeyToPorts[key], port)
 	}
 
 	// Next, build the N-to-M association the API wants.
 	final := []api.EndpointSubset{}
-	for key, ports := range addrSetsToPorts {
-		addrs := []api.EndpointAddress{}
-		for k := range addrSets[key] {
-			addrs = append(addrs, *k)
+	for key, ports := range addrReadyMapKeyToPorts {
+		var readyAddrs, notReadyAddrs []api.EndpointAddress
+		for addr, ready := range keyToAddrReadyMap[key] {
+			if ready {
+				readyAddrs = append(readyAddrs, *addr)
+			} else {
+				notReadyAddrs = append(notReadyAddrs, *addr)
+			}
 		}
-		final = append(final, api.EndpointSubset{Addresses: addrs, Ports: ports})
+		final = append(final, api.EndpointSubset{Addresses: readyAddrs, NotReadyAddresses: notReadyAddrs, Ports: ports})
 	}
 
 	// Finally, sort it.
 	return SortSubsets(final)
 }
 
-type addressSet map[*api.EndpointAddress]struct{}
+// The sets of hosts must be de-duped, using IP+UID as the key.
+type addressKey struct {
+	ip  string
+	uid types.UID
+}
 
-func (set addressSet) Insert(addr *api.EndpointAddress) {
-	set[addr] = struct{}{}
+// mapAddressByPort adds an address into a map by its ports, registering the address with a unique pointer, and preserving
+// any existing ready state.
+func mapAddressByPort(addr *api.EndpointAddress, port api.EndpointPort, ready bool, allAddrs map[addressKey]*api.EndpointAddress, portToAddrReadyMap map[api.EndpointPort]addressSet) *api.EndpointAddress {
+	// use addressKey to distinguish between two endpoints that are identical addresses
+	// but may have come from different hosts, for attribution. For instance, Mesos
+	// assigns pods the node IP, but the pods are distinct.
+	key := addressKey{ip: addr.IP}
+	if addr.TargetRef != nil {
+		key.uid = addr.TargetRef.UID
+	}
+
+	// Accumulate the address. The full EndpointAddress structure is preserved for use when
+	// we rebuild the subsets so that the final TargetRef has all of the necessary data.
+	existingAddress := allAddrs[key]
+	if existingAddress == nil {
+		// Make a copy so we don't write to the
+		// input args of this function.
+		existingAddress = &api.EndpointAddress{}
+		*existingAddress = *addr
+		allAddrs[key] = existingAddress
+	}
+
+	// Remember that this port maps to this address.
+	if _, found := portToAddrReadyMap[port]; !found {
+		portToAddrReadyMap[port] = addressSet{}
+	}
+	// if we have not yet recorded this port for this address, or if the previous
+	// state was ready, write the current ready state. not ready always trumps
+	// ready.
+	if wasReady, found := portToAddrReadyMap[port][existingAddress]; !found || wasReady {
+		portToAddrReadyMap[port][existingAddress] = ready
+	}
+	return existingAddress
+}
+
+type addressSet map[*api.EndpointAddress]bool
+
+type addrReady struct {
+	addr  *api.EndpointAddress
+	ready bool
 }
 
 func hashAddresses(addrs addressSet) string {
@@ -100,22 +132,49 @@ func hashAddresses(addrs addressSet) string {
 	// map key.  Unfortunately, DeepHashObject is implemented in terms of
 	// spew, and spew does not handle non-primitive map keys well.  So
 	// first we collapse it into a slice, sort the slice, then hash that.
-	slice := []*api.EndpointAddress{}
-	for k := range addrs {
-		slice = append(slice, k)
+	slice := make([]addrReady, 0, len(addrs))
+	for k, ready := range addrs {
+		slice = append(slice, addrReady{k, ready})
 	}
-	sort.Sort(addrPtrsByIP(slice))
+	sort.Sort(addrsReady(slice))
 	hasher := md5.New()
 	util.DeepHashObject(hasher, slice)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-type addrPtrsByIP []*api.EndpointAddress
+func lessAddrReady(a, b addrReady) bool {
+	// ready is not significant to hashing since we can't have duplicate addresses
+	return LessEndpointAddress(a.addr, b.addr)
+}
 
-func (sl addrPtrsByIP) Len() int      { return len(sl) }
-func (sl addrPtrsByIP) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrPtrsByIP) Less(i, j int) bool {
-	return bytes.Compare([]byte(sl[i].IP), []byte(sl[j].IP)) < 0
+type addrsReady []addrReady
+
+func (sl addrsReady) Len() int      { return len(sl) }
+func (sl addrsReady) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrsReady) Less(i, j int) bool {
+	return lessAddrReady(sl[i], sl[j])
+}
+
+func LessEndpointAddress(a, b *api.EndpointAddress) bool {
+	ipComparison := bytes.Compare([]byte(a.IP), []byte(b.IP))
+	if ipComparison != 0 {
+		return ipComparison < 0
+	}
+	if b.TargetRef == nil {
+		return false
+	}
+	if a.TargetRef == nil {
+		return true
+	}
+	return a.TargetRef.UID < b.TargetRef.UID
+}
+
+type addrPtrsByIpAndUID []*api.EndpointAddress
+
+func (sl addrPtrsByIpAndUID) Len() int      { return len(sl) }
+func (sl addrPtrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
+	return LessEndpointAddress(sl[i], sl[j])
 }
 
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of
@@ -123,7 +182,8 @@ func (sl addrPtrsByIP) Less(i, j int) bool {
 func SortSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	for i := range subsets {
 		ss := &subsets[i]
-		sort.Sort(addrsByIP(ss.Addresses))
+		sort.Sort(addrsByIpAndUID(ss.Addresses))
+		sort.Sort(addrsByIpAndUID(ss.NotReadyAddresses))
 		sort.Sort(portsByHash(ss.Ports))
 	}
 	sort.Sort(subsetsByHash(subsets))
@@ -146,12 +206,12 @@ func (sl subsetsByHash) Less(i, j int) bool {
 	return bytes.Compare(h1, h2) < 0
 }
 
-type addrsByIP []api.EndpointAddress
+type addrsByIpAndUID []api.EndpointAddress
 
-func (sl addrsByIP) Len() int      { return len(sl) }
-func (sl addrsByIP) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrsByIP) Less(i, j int) bool {
-	return bytes.Compare([]byte(sl[i].IP), []byte(sl[j].IP)) < 0
+func (sl addrsByIpAndUID) Len() int      { return len(sl) }
+func (sl addrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrsByIpAndUID) Less(i, j int) bool {
+	return LessEndpointAddress(&sl[i], &sl[j])
 }
 
 type portsByHash []api.EndpointPort

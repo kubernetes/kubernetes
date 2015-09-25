@@ -43,12 +43,13 @@ Documentation for other releases can be found at
   - [What does each plug-in do?](#what-does-each-plug-in-do)
     - [AlwaysAdmit](#alwaysadmit)
     - [AlwaysDeny](#alwaysdeny)
-    - [DenyExecOnPrivileged](#denyexeconprivileged)
+    - [DenyExecOnPrivileged (deprecated)](#denyexeconprivileged-deprecated)
+    - [DenyEscalatingExec](#denyescalatingexec)
     - [ServiceAccount](#serviceaccount)
     - [SecurityContextDeny](#securitycontextdeny)
     - [ResourceQuota](#resourcequota)
     - [LimitRanger](#limitranger)
-    - [NamespaceExists](#namespaceexists)
+    - [NamespaceExists (deprecated)](#namespaceexists-deprecated)
     - [NamespaceAutoProvision (deprecated)](#namespaceautoprovision-deprecated)
     - [NamespaceLifecycle](#namespacelifecycle)
   - [Is there a recommended set of plug-ins to use?](#is-there-a-recommended-set-of-plug-ins-to-use)
@@ -79,7 +80,7 @@ support all the features you expect.
 
 ## How do I turn on an admission control plug-in?
 
-The Kubernetes API server supports a flag, `admission_control` that takes a comma-delimited,
+The Kubernetes API server supports a flag, `admission-control` that takes a comma-delimited,
 ordered list of admission control choices to invoke prior to modifying objects in the cluster.
 
 ## What does each plug-in do?
@@ -92,12 +93,24 @@ Use this plugin by itself to pass-through all requests.
 
 Rejects all requests.  Used for testing.
 
-### DenyExecOnPrivileged
+### DenyExecOnPrivileged (deprecated)
 
 This plug-in will intercept all requests to exec a command in a pod if that pod has a privileged container.
 
 If your cluster supports privileged containers, and you want to restrict the ability of end-users to exec
 commands in those containers, we strongly encourage enabling this plug-in.
+
+This functionality has been merged into [DenyEscalatingExec](#denyescalatingexec).
+
+### DenyEscalatingExec
+
+This plug-in will deny exec and attach commands to pods that run with escalated privileges that
+allow host access.  This includes pods that run as privileged, have access to the host IPC namespace, and
+have access to the host PID namespace.
+
+If your cluster supports containers that run with escalated privileges, and you want to
+restrict the ability of end-users to exec commands in those containers, we strongly encourage
+enabling this plug-in.
 
 ### ServiceAccount
 
@@ -114,7 +127,7 @@ This plug-in will observe the incoming request and ensure that it does not viola
 enumerated in the `ResourceQuota` object in a `Namespace`.  If you are using `ResourceQuota`
 objects in your Kubernetes deployment, you MUST use this plug-in to enforce quota constraints.
 
-See the [resourceQuota design doc](../design/admission_control_resource_quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more details.
+See the [resourceQuota design doc](../design/admission_control_resource_quota.md) and the [example of Resource Quota](resourcequota/) for more details.
 
 It is strongly encouraged that this plug-in is configured last in the sequence of admission control plug-ins.  This is
 so that quota is not prematurely incremented only for the request to be rejected later in admission control.
@@ -127,30 +140,30 @@ your Kubernetes deployment, you MUST use this plug-in to enforce those constrain
 be used to apply default resource requests to Pods that don't specify any; currently, the default LimitRanger
 applies a 0.1 CPU requirement to all Pods in the `default` namespace.
 
-See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](../user-guide/limitrange/) for more details.
+See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](limitrange/) for more details.
 
-### NamespaceExists
+### NamespaceExists (deprecated)
 
 This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes `Namespace`
 and reject the request if the `Namespace` was not previously created.  We strongly recommend running
 this plug-in to ensure integrity of your data.
+
+The functionality of this admission controller has been merged into `NamespaceLifecycle`
 
 ### NamespaceAutoProvision (deprecated)
 
 This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes `Namespace`
 and create a new `Namespace` if one did not already exist previously.
 
-We strongly recommend `NamespaceExists` over `NamespaceAutoProvision`.
+We strongly recommend `NamespaceLifecycle` over `NamespaceAutoProvision`.
 
 ### NamespaceLifecycle
 
-This plug-in enforces that a `Namespace` that is undergoing termination cannot have new objects created in it.
+This plug-in enforces that a `Namespace` that is undergoing termination cannot have new objects created in it,
+and ensures that requests in a non-existant `Namespace` are rejected.
 
 A `Namespace` deletion kicks off a sequence of operations that remove all objects (pods, services, etc.) in that
 namespace.  In order to enforce integrity of that process, we strongly recommend running this plug-in.
-
-Once `NamespaceAutoProvision` is deprecated, we anticipate `NamespaceLifecycle` and `NamespaceExists` will
-be merged into a single plug-in that enforces the life-cycle of a `Namespace` in Kubernetes.
 
 ## Is there a recommended set of plug-ins to use?
 
@@ -159,7 +172,7 @@ Yes.
 For Kubernetes 1.0, we strongly recommend running the following set of admission control plug-ins (order matters):
 
 ```
---admission_control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 ```
 
 

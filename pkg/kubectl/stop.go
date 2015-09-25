@@ -21,10 +21,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	fuzz "github.com/google/gofuzz"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -56,10 +59,14 @@ func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 	switch kind {
 	case "ReplicationController":
 		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
+	case "DaemonSet":
+		return &DaemonSetReaper{c, Interval, Timeout}, nil
 	case "Pod":
 		return &PodReaper{c}, nil
 	case "Service":
 		return &ServiceReaper{c}, nil
+	case "Job":
+		return &JobReaper{c, Interval, Timeout}, nil
 	}
 	return nil, &NoSuchReaperError{kind}
 }
@@ -69,6 +76,14 @@ func ReaperForReplicationController(c client.Interface, timeout time.Duration) (
 }
 
 type ReplicationControllerReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+type DaemonSetReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+type JobReaper struct {
 	client.Interface
 	pollInterval, timeout time.Duration
 }
@@ -103,7 +118,7 @@ func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
-	scaler, err := ScalerFor("ReplicationController", NewScalerClient(*reaper))
+	scaler, err := ScalerFor("ReplicationController", *reaper)
 	if err != nil {
 		return "", err
 	}
@@ -117,19 +132,20 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 
 	// The rc manager will try and detect all matching rcs for a pod's labels,
 	// and only sync the oldest one. This means if we have a pod with labels
-	// [(k1, v1)] and rcs with selectors [(k1, v2)] and [(k1, v1), (k2, v2)],
+	// [(k1: v1), (k2: v2)] and two rcs: rc1 with selector [(k1=v1)], and rc2 with selector [(k1=v1),(k2=v2)],
 	// the rc manager will sync the older of the two rcs.
 	//
 	// If there are rcs with a superset of labels, eg:
-	// deleting: (k1:v1), superset: (k2:v2, k1:v1)
+	// deleting: (k1=v1), superset: (k2=v2, k1=v1)
 	//	- It isn't safe to delete the rc because there could be a pod with labels
-	//	  (k1:v1) that isn't managed by the superset rc. We can't scale it down
-	//	  either, because there could be a pod (k2:v2, k1:v1) that it deletes
+	//	  (k1=v1) that isn't managed by the superset rc. We can't scale it down
+	//	  either, because there could be a pod (k2=v2, k1=v1) that it deletes
 	//	  causing a fight with the superset rc.
 	// If there are rcs with a subset of labels, eg:
-	// deleting: (k2:v2, k1:v1), subset: (k1: v1), superset: (k2:v2, k1:v1, k3:v3)
-	//  - It's safe to delete this rc without a scale down because all it's pods
-	//	  are being controlled by the subset rc.
+	// deleting: (k2=v2, k1=v1), subset: (k1=v1), superset: (k2=v2, k1=v1, k3=v3)
+	//  - Even if it's safe to delete this rc without a scale down because all it's pods
+	//	  are being controlled by the subset rc the code returns an error.
+
 	// In theory, creating overlapping controllers is user error, so the loop below
 	// tries to account for this logic only in the common case, where we end up
 	// with multiple rcs that have an exact match on selectors.
@@ -161,6 +177,81 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 		}
 	}
 	if err := rc.Delete(name); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s stopped", name), nil
+}
+
+func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
+	daemon, err := reaper.Experimental().DaemonSets(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	// Update the daemon set to select for a non-existent NodeName.
+	// The daemon set controller will then kill all the daemon pods corresponding to daemon set.
+	nodes, err := reaper.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return "", err
+	}
+	var fuzzer = fuzz.New()
+	var nameExists bool
+
+	var nodeName string
+	fuzzer.Fuzz(&nodeName)
+	nameExists = false
+	for _, node := range nodes.Items {
+		nameExists = nameExists || node.Name == nodeName
+	}
+	if nameExists {
+		// Probability of reaching here is extremely low, most likely indicates a programming bug/library error.
+		return "", fmt.Errorf("Name collision generating an unused node name. Please retry this operation.")
+	}
+
+	daemon.Spec.Template.Spec.NodeName = nodeName
+
+	reaper.Experimental().DaemonSets(namespace).Update(daemon)
+
+	// Wait for the daemon set controller to kill all the daemon pods.
+	if err := wait.Poll(reaper.pollInterval, reaper.timeout, func() (bool, error) {
+		updatedDS, err := reaper.Experimental().DaemonSets(namespace).Get(name)
+		if err != nil {
+			return false, nil
+		}
+		return updatedDS.Status.CurrentNumberScheduled+updatedDS.Status.NumberMisscheduled == 0, nil
+	}); err != nil {
+		return "", err
+	}
+
+	if err := reaper.Experimental().DaemonSets(namespace).Delete(name); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s stopped", name), nil
+}
+
+func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
+	jobs := reaper.Experimental().Jobs(namespace)
+	scaler, err := ScalerFor("Job", *reaper)
+	if err != nil {
+		return "", err
+	}
+	job, err := jobs.Get(name)
+	if err != nil {
+		return "", err
+	}
+	if timeout == 0 {
+		// we will never have more active pods than job.Spec.Parallelism
+		parallelism := *job.Spec.Parallelism
+		timeout = Timeout + time.Duration(10*parallelism)*time.Second
+	}
+
+	// TODO: handle overlapping jobs
+	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForJobs := NewRetryParams(reaper.pollInterval, timeout)
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil {
+		return "", err
+	}
+	if err := jobs.Delete(name, gracePeriod); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%s stopped", name), nil

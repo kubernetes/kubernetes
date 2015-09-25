@@ -16,7 +16,7 @@ limitations under the License.
 
 package tokentest
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+import "k8s.io/kubernetes/pkg/auth/user"
 
 type TokenAuthenticator struct {
 	Tokens map[string]*user.DefaultInfo

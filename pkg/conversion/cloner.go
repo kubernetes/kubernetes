@@ -58,7 +58,7 @@ func verifyDeepCopyFunctionSignature(ft reflect.Type) error {
 		return fmt.Errorf("expected func, got: %v", ft)
 	}
 	if ft.NumIn() != 3 {
-		return fmt.Errorf("expected three 'in' params, got $v", ft)
+		return fmt.Errorf("expected three 'in' params, got %v", ft)
 	}
 	if ft.NumOut() != 1 {
 		return fmt.Errorf("expected one 'out' param, got %v", ft)
@@ -117,6 +117,13 @@ func (c *Cloner) RegisterGeneratedDeepCopyFunc(deepCopyFunc interface{}) error {
 
 // DeepCopy will perform a deep copy of a given object.
 func (c *Cloner) DeepCopy(in interface{}) (interface{}, error) {
+	// Can be invalid if we run DeepCopy(X) where X is a nil interface type.
+	// For example, we get an invalid value when someone tries to deep-copy
+	// a nil labels.Selector.
+	// This does not occur if X is nil and is a pointer to a concrete type.
+	if in == nil {
+		return nil, nil
+	}
 	inValue := reflect.ValueOf(in)
 	outValue, err := c.deepCopy(inValue)
 	if err != nil {

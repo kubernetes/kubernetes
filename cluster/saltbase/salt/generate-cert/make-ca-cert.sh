@@ -20,8 +20,8 @@ set -o pipefail
 
 cert_ip=$1
 extra_sans=${2:-}
-cert_dir=/srv/kubernetes
-cert_group=kube-cert
+cert_dir=${CERT_DIR:-/srv/kubernetes}
+cert_group=${CERT_GROUP:-kube-cert}
 
 mkdir -p "$cert_dir"
 
@@ -46,7 +46,7 @@ if [[ -n "${extra_sans}" ]]; then
   sans="${sans},${extra_sans}"
 fi
 
-tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
+tmpdir=$(mktemp -d -t kubernetes_cacert.XXXXXX)
 trap 'rm -rf "${tmpdir}"' EXIT
 cd "${tmpdir}"
 

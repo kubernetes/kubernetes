@@ -27,8 +27,8 @@ fi
 
 # Make sure k8s version env is properly set
 if [ -z ${K8S_VERSION} ]; then
-    echo "Please export K8S_VERSION in your env"
-    exit 1
+    K8S_VERSION="1.0.3"
+    echo "K8S_VERSION is not set, using default: ${K8S_VERSION}"
 else
     echo "k8s version is set to: ${K8S_VERSION}"
 fi
@@ -94,7 +94,7 @@ start_k8s(){
 
     sleep 5
     # Set flannel net config
-    docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+    docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
 
     # iface may change to a private network interface, eth0 is for default
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run --restart=always -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld -iface="eth0")
@@ -135,8 +135,32 @@ start_k8s(){
     sleep 5
 
     # Start kubelet & proxy, then start master components as pods
-    docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
-    docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2   
+    docker run \
+        --net=host \
+        --privileged \
+        --restart=always \
+        -d \
+        -v /sys:/sys:ro \
+        -v /var/run:/var/run:rw \
+        -v /:/rootfs:ro \
+        -v /dev:/dev \
+        -v /var/lib/docker/:/var/lib/docker:ro \
+        -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        /hyperkube kubelet \
+        --api-servers=http://localhost:8080 \
+        --v=2 --address=0.0.0.0 --enable-server \
+        --hostname-override=127.0.0.1 \
+        --config=/etc/kubernetes/manifests-multi \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local
+    
+    docker run \
+        -d \
+        --net=host \
+        --privileged \
+        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        /hyperkube proxy --master=http://127.0.0.1:8080 --v=2   
 }
 
 echo "Detecting your OS distro ..."

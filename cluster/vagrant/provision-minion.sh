@@ -72,15 +72,22 @@ EOF
 # See: https://github.com/mitchellh/vagrant/issues/2430
 hostnamectl set-hostname ${MINION_NAME}
 
-# Workaround to vagrant inability to guess interface naming sequence
-# Tell system to abandon the new naming scheme and use eth* instead
-rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
+if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
+  # Workaround to vagrant inability to guess interface naming sequence
+  # Tell system to abandon the new naming scheme and use eth* instead
+  rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
 
-# Disable network interface being managed by Network Manager (needed for Fedora 21+)
-NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-grep -q ^NM_CONTROLLED= ${NETWORK_CONF_PATH}ifcfg-eth1 || echo 'NM_CONTROLLED=no' >> ${NETWORK_CONF_PATH}ifcfg-eth1
-sed -i 's/^#NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
-systemctl restart network
+  # Disable network interface being managed by Network Manager (needed for Fedora 21+)
+  NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+  if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
+  for if_conf in ${if_to_edit}; do
+    grep -q ^NM_CONTROLLED= ${if_conf} || echo 'NM_CONTROLLED=no' >> ${if_conf}
+    sed -i 's/#^NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${if_conf}
+  done;
+  systemctl restart network
+fi
+
+NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
 
 # Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
@@ -100,7 +107,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 done
 
 # Configure network
-provision-network
+provision-network-minion
 
 # Placeholder for any other manifests that may be per-node.
 mkdir -p /etc/kubernetes/manifests
@@ -140,7 +147,7 @@ grains:
   network_mode: openvswitch
   node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
-  networkInterfaceName: eth1
+  networkInterfaceName: '$(echo "$NETWORK_IF_NAME" | sed -e "s/'/''/g")'
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
@@ -148,10 +155,37 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 
+# QoS support requires that swap memory is disabled on each of the minions
+echo "Disable swap memory to ensure proper QoS"
+swapoff -a
+
 # we will run provision to update code each time we test, so we do not want to do salt install each time
 if ! which salt-minion >/dev/null 2>&1; then
   # Install Salt
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+  
+  # Edit the Salt minion unit file to do restart always
+  # needed because vagrant uses this as basis for registration of nodes in cloud provider
+  # set a oom_score_adj to -999 to prevent our node from being killed with salt-master and then making kubelet NotReady
+  # because its not found in salt cloud provider call
+  cat <<EOF >/usr/lib/systemd/system/salt-minion.service 
+[Unit]
+Description=The Salt Minion
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/salt-minion
+Restart=Always
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  
+  systemctl daemon-reload
+  systemctl restart salt-minion.service
+
 else
   # Sometimes the minion gets wedged when it comes up along with the master.
   # Restarting it here un-wedges it.

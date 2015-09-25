@@ -99,6 +99,9 @@ type CreateOpts struct {
 	// attribute matches the specified IP prefix as the source IP address of the
 	// IP packet.
 	RemoteIPPrefix string
+
+	// Required for admins. Indicates the owner of the VIP.
+	TenantID string
 }
 
 // Create is an operation which provisions a new security group with default
@@ -133,6 +136,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 		Protocol       string `json:"protocol,omitempty"`
 		RemoteGroupID  string `json:"remote_group_id,omitempty"`
 		RemoteIPPrefix string `json:"remote_ip_prefix,omitempty"`
+		TenantID       string `json:"tenant_id,omitempty"`
 	}
 
 	type request struct {
@@ -148,6 +152,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 		Protocol:       opts.Protocol,
 		RemoteGroupID:  opts.RemoteGroupID,
 		RemoteIPPrefix: opts.RemoteIPPrefix,
+		TenantID:       opts.TenantID,
 	}}
 
 	_, res.Err = c.Post(rootURL(c), reqBody, &res.Body, nil)

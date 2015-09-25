@@ -61,6 +61,9 @@ type ContainerSpec struct {
 
 	HasCustomMetrics bool         `json:"has_custom_metrics"`
 	CustomMetrics    []MetricSpec `json:"custom_metrics,omitempty"`
+
+	// Image name used for this container.
+	Image string `json:"image,omitempty"`
 }
 
 // Container reference contains enough information to uniquely identify a container
@@ -427,7 +430,7 @@ type ContainerStats struct {
 	TaskStats LoadStats `json:"task_stats,omitempty"`
 
 	//Custom metrics from all collectors
-	CustomMetrics map[string]MetricVal `json:"custom_metrics,omitempty"`
+	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {

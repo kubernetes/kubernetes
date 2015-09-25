@@ -119,7 +119,7 @@ A single parameter named reason is passed to the handler which contains the reas
 * `Health` - indicating that a health check of the container failed.
 * `Dependency` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the pod infra container crashing, or persistent disk failing for a container that mounts PD.
 
-Eventually, user specified reasons may be [added to the API](https://github.com/GoogleCloudPlatform/kubernetes/issues/137).
+Eventually, user specified reasons may be [added to the API](http://issue.k8s.io/137).
 
 
 ### Hook Handler Execution

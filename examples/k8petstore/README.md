@@ -89,7 +89,7 @@ The web front end provides users an interface for watching pet store transaction
 
 To generate those transactions, you can use the bigpetstore data generator.  Alternatively, you could just write a
 
-shell script which calls "curl localhost:3000/k8petstore/rpush/blahblahblah" over and over again :).  But thats not nearly
+shell script which calls "curl localhost:3000/k8petstore/rpush/blahblahblah" over and over again :).  But that's not nearly
 
 as fun, and its not a good test of a real world scenario where payloads scale and have lots of information content.
 
@@ -137,7 +137,7 @@ Thus we plan to add another tier of queueing, which empties the REDIS transactio
 
 ## Questions
 
-For questions on running this app, you can ask on the google containers group (freenode ~ google-containers@googlegroups.com or #google-containers on IRC)
+For questions on running this app, you can ask on [Slack](../../docs/troubleshooting.md#slack).
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
 

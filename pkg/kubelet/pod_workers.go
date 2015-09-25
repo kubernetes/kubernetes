@@ -20,18 +20,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
 	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func())
 	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
+	ForgetWorker(uid types.UID)
 }
 
 type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, SyncPodType) error
@@ -109,7 +110,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID), newWork.updateType)
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
-				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
+				p.recorder.Eventf(newWork.pod, "FailedSync", "Error syncing pod, skipping: %v", err)
 				return
 			}
 			minRuntimeCacheTime = time.Now()
@@ -171,19 +172,30 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 	}
 }
 
+func (p *podWorkers) removeWorker(uid types.UID) {
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+		delete(p.podUpdates, uid)
+		// If there is an undelivered work update for this pod we need to remove it
+		// since per-pod goroutine won't be able to put it to the already closed
+		// channel when it finish processing the current work update.
+		if _, cached := p.lastUndeliveredWorkUpdate[uid]; cached {
+			delete(p.lastUndeliveredWorkUpdate, uid)
+		}
+	}
+}
+func (p *podWorkers) ForgetWorker(uid types.UID) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	p.removeWorker(uid)
+}
+
 func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	for key, channel := range p.podUpdates {
+	for key := range p.podUpdates {
 		if _, exists := desiredPods[key]; !exists {
-			close(channel)
-			delete(p.podUpdates, key)
-			// If there is an undelivered work update for this pod we need to remove it
-			// since per-pod goroutine won't be able to put it to the already closed
-			// channel when it finish processing the current work update.
-			if _, cached := p.lastUndeliveredWorkUpdate[key]; cached {
-				delete(p.lastUndeliveredWorkUpdate, key)
-			}
+			p.removeWorker(key)
 		}
 	}
 }

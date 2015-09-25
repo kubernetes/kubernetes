@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Config contains all the settings for a Controller.
@@ -104,6 +104,16 @@ func (c *Controller) HasSynced() bool {
 		return false
 	}
 	return c.reflector.LastSyncResourceVersion() != ""
+}
+
+// Requeue adds the provided object back into the queue if it does not already exist.
+func (c *Controller) Requeue(obj interface{}) error {
+	return c.config.Queue.AddIfNotPresent(cache.Deltas{
+		cache.Delta{
+			Type:   cache.Sync,
+			Object: obj,
+		},
+	})
 }
 
 // processLoop drains the work queue.

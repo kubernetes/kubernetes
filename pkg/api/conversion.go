@@ -17,12 +17,12 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
@@ -35,13 +35,18 @@ func init() {
 			obj.LabelSelector = labels.Everything()
 			obj.FieldSelector = fields.Everything()
 		},
+		// TODO: see about moving this into v1/defaults.go
 		func(obj *PodExecOptions) {
+			obj.Stderr = true
+			obj.Stdout = true
+		},
+		func(obj *PodAttachOptions) {
 			obj.Stderr = true
 			obj.Stdout = true
 		},
 	)
 	Scheme.AddConversionFuncs(
-		func(in *util.Time, out *util.Time, s conversion.Scope) error {
+		func(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
 			// Cannot deep copy these, because time.Time has unexported fields.
 			*out = *in
 			return nil

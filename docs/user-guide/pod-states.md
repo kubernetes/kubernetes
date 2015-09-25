@@ -47,6 +47,7 @@ The number and meanings of `PodPhase` values are tightly guarded.  Other than wh
 * Running: The pod has been bound to a node, and all of the containers have been created.  At least one container is still running, or is in the process of starting or restarting.
 * Succeeded: All containers in the pod have terminated in success, and will not be restarted.
 * Failed: All containers in the pod have terminated, at least one container has terminated in failure (exited with non-zero exit status or was terminated by the system).
+* Unknown: For some reason the state of the pod could not be obtained, typically due to an error in communicating with the host of the pod.
 
 ## Pod Conditions
 
@@ -54,11 +55,11 @@ A pod containing containers that specify readiness probes will also report the R
 
 ## Container Probes
 
-A [Probe](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Handler):
+A [Probe](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#Handler):
 
 * `ExecAction`: executes a specified command inside the container expecting on success that the command exits with status code 0.
 * `TCPSocketAction`: performs a tcp check against the container's IP address on a specified port expecting on success that the port is open.
-* `HTTPGetAction`: performs an HTTP Get againsts the container's IP address on a specified port and path expecting on success that the response has a status code greater than or equal to 200 and less than 400.
+* `HTTPGetAction`: performs an HTTP Get against the container's IP address on a specified port and path expecting on success that the response has a status code greater than or equal to 200 and less than 400.
 
 Each probe will have one of three results:
 
@@ -73,19 +74,33 @@ Currently, the kubelet optionally performs two independent diagnostics on runnin
 
 ## Container Statuses
 
-More detailed information about the current (and previous) container statuses can be found in [ContainerStatuses](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#PodStatus). The information reported depends on the current [ContainerState](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#ContainerState), which may be Waiting, Running, or Terminated.
+More detailed information about the current (and previous) container statuses can be found in [ContainerStatuses](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#PodStatus). The information reported depends on the current [ContainerState](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#ContainerState), which may be Waiting, Running, or Terminated.
 
 ## RestartPolicy
 
-The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If RestartPolicy is not set, the default value is `Always`. RestartPolicy applies to all containers in the pod. RestartPolicy only refers to restarts of the containers by the Kubelet on the same node. As discussed in the [pods document](pods.md#durability-of-pods-or-lack-thereof), once bound to a node, a pod will never be rebound to another node. This means that some kind of controller is necessary in order for a pod to survive node failure, even if just a single pod at a time is desired.
+The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If RestartPolicy is not set, the default value is `Always`. RestartPolicy applies to all containers in the pod. RestartPolicy only refers to restarts of the containers by the Kubelet on the same node. Failed containers that are restarted by Kubelet, are restarted with an exponential back-off delay, the delay is in multiples of sync-frequency 0, 1x, 2x, 4x, 8x ... capped at 5 minutes and is reset after 10 minutes of successful execution. As discussed in the [pods document](pods.md#durability-of-pods-or-lack-thereof), once bound to a node, a pod will never be rebound to another node. This means that some kind of controller is necessary in order for a pod to survive node failure, even if just a single pod at a time is desired.
 
-The only controller we have today is [`ReplicationController`](replication-controller.md).  `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`.  `ReplicationController` should refuse to instantiate any pod that has a different restart policy.
+Three types of controllers are currently available:
 
-There is a legitimate need for a controller which keeps pods with other policies alive. Pods having any of the other policies (`OnFailure` or `Never`) eventually terminate, at which point the controller should stop recreating them.  Because of this fundamental distinction, let's hypothesize a new controller, called [`JobController`](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624) for the sake of this document, which can implement this policy.
+- Use a [`Job`](jobs.md) for pods which are expected to terminate (e.g. batch computations).
+- Use a [`ReplicationController`](replication-controller.md) for pods which are not expected to
+  terminate, and where (e.g. web servers).
+- Use a [`DaemonSet`](../admin/daemons.md): Use for pods which need to run 1 per machine because they provide a
+  machine-specific system service.
+If you are unsure whether to use ReplicationController or Daemon, then see [Daemon Set versus
+Replication Controller](../admin/daemons.md#daemon-set-versus-replication-controller).
+
+`ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`.
+`Job` is *only* appropriate for pods with `RestartPolicy` equal to `OnFailure` or `Never`.
+
+All 3 types of controllers contain a PodTemplate, which has all the same fields as a Pod.
+It is recommended to create the appropriate controller and let it create pods, rather than to
+directly create pods yourself.  That is because pods alone are not resilient to machine failures,
+but Controllers are.
 
 ## Pod lifetime
 
-In general, pods which are created do not disappear until someone destroys them.  This might be a human or a `ReplicationController`.  The only exception to this rule is that pods with a `PodPhase` of `Succeeded` or `Failed` for more than some duration (determined by the master) will expire and be automatically reaped.
+In general, pods which are created do not disappear until someone destroys them.  This might be a human or a `ReplicationController`, or another controller.  The only exception to this rule is that pods with a `PodPhase` of `Succeeded` or `Failed` for more than some duration (determined by the master) will expire and be automatically reaped.
 
 If a node dies or is disconnected from the rest of the cluster, some entity within the system (call it the NodeController for now) is responsible for applying policy (e.g. a timeout) and marking any pods on the lost node as `Failed`.
 

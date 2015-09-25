@@ -1,7 +1,10 @@
   {
 "apiVersion": "v1",
 "kind": "Pod",
-"metadata": {"name":"kube-apiserver"},
+"metadata": {
+  "name":"kube-apiserver",
+  "namespace": "kube-system"
+},
 "spec":{
 "hostNetwork": true,
 "containers":[
@@ -11,8 +14,17 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-apiserver --address=0.0.0.0 --etcd_servers=http://kube0.ha:2379 --service-cluster-ip-range=10.0.0.0/16 --v=4 --allow_privileged=True 1>>/var/log/kube-apiserver.log 2>&1"
+                 "/usr/local/bin/kube-apiserver --address=0.0.0.0 --etcd-servers=http://kube0.ha:2379 --service-cluster-ip-range=10.0.0.0/16 --v=4 --allow-privileged=True 1>>/var/log/kube-apiserver.log 2>&1"
                ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
     "ports":[
       { "name": "https",
         "containerPort": 443,

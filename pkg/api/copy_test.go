@@ -21,14 +21,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {
 	for i := 0; i < *fuzzIters; i++ {
-		for _, version := range []string{"", testapi.Version()} {
+		for _, version := range []string{"", testapi.Default.Version()} {
 			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
 			for kind := range api.Scheme.KnownTypes(version) {
 				item, err := api.Scheme.New(version, kind)

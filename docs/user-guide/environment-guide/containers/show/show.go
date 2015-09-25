@@ -70,7 +70,7 @@ func printInfo(resp http.ResponseWriter, req *http.Request) {
 	envvar := os.Getenv("USER_VAR")
 	fmt.Fprintf(resp, "USER_VAR: %v \n", envvar)
 
-	fmt.Fprintf(resp, "\nKubenertes environment variables\n")
+	fmt.Fprintf(resp, "\nKubernetes environment variables\n")
 	var keys []string
 	for key := range kubeVars {
 		keys = append(keys, key)

@@ -33,8 +33,8 @@ Documentation for other releases can be found at
 **Note: this is a design doc, which describes features that have not been completely implemented.
 User documentation of the current state is [here](../user-guide/compute-resources.md).  The tracking issue for
 implementation of this model is
-[#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168).  Currently, only memory and
-cpu limits on containers (not pods) are supported.  "memory" is in bytes and "cpu" is in
+[#168](http://issue.k8s.io/168).  Currently, both limits and requests of memory and
+cpu on containers (not pods) are supported.  "memory" is in bytes and "cpu" is in
 milli-cores.**
 
 # The Kubernetes resource model
@@ -123,7 +123,6 @@ Where:
   * Internally, the Kubernetes master can decide the defaulting behavior and the kubelet implementation may expected an absolute specification.  For example, if the master decided that "the default is unbounded" it would pass 2^64 to the kubelet.
 
 
-
 ## Kubernetes-defined resource types
 
 The following resource types are predefined ("reserved") by Kubernetes in the `kubernetes.io` namespace, and so cannot be used for user-defined resources.  Note that the syntax of all resource types in the resource spec is deliberately similar, but some resource types (e.g., CPU) may receive significantly more support than simply tracking quantities in the schedulers and/or the Kubelet.
@@ -134,7 +133,7 @@ The following resource types are predefined ("reserved") by Kubernetes in the `k
   * Units: Kubernetes Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "Kubernetes CPU")
   * Internal representation: milli-KCUs
   * Compressible? yes
-  * Qualities: this is a placeholder for the kind of thing that may be supported in the future &mdash; see [#147](https://github.com/GoogleCloudPlatform/kubernetes/issues/147)
+  * Qualities: this is a placeholder for the kind of thing that may be supported in the future &mdash; see [#147](http://issue.k8s.io/147)
     * [future] `schedulingLatency`: as per lmctfy
     * [future] `cpuConversionFactor`: property of a node: the speed of a CPU core on the node's processor divided by the speed of the canonical Kubernetes CPU (a floating point value; default = 1.0).
 

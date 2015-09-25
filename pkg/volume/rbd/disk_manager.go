@@ -25,8 +25,8 @@ package rbd
 import (
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Abstract interface to disk operations.
@@ -42,13 +42,13 @@ type diskManager interface {
 func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.Interface) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	// TODO: handle failed mounts here.
-	mountpoint, err := mounter.IsMountPoint(volPath)
+	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 	if err := manager.AttachDisk(b); err != nil {
@@ -75,12 +75,12 @@ func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.
 
 // utility to tear down a disk based filesystem
 func diskTearDown(manager diskManager, c rbdCleaner, volPath string, mounter mount.Interface) error {
-	mountpoint, err := mounter.IsMountPoint(volPath)
+	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		return os.Remove(volPath)
 	}
 
@@ -103,12 +103,12 @@ func diskTearDown(manager diskManager, c rbdCleaner, volPath string, mounter mou
 		}
 	}
 
-	mountpoint, mntErr := mounter.IsMountPoint(volPath)
+	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
 	if mntErr != nil {
-		glog.Errorf("isMountpoint check failed: %v", mntErr)
+		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		if err := os.Remove(volPath); err != nil {
 			return err
 		}

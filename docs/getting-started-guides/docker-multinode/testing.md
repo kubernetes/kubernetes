@@ -47,8 +47,7 @@ NAME           LABELS                                 STATUS
 127.0.0.1      kubernetes.io/hostname=127.0.0.1       Ready
 ```
 
-If the status of any node is `Unknown` or `NotReady` your cluster is broken, double check that all containers are running properly, and if all else fails, contact us on IRC at
-[`#google-containers`](http://webchat.freenode.net/?channels=google-containers) for advice.
+If the status of any node is `Unknown` or `NotReady` your cluster is broken, double check that all containers are running properly, and if all else fails, contact us on [Slack](../../troubleshooting.md#slack).
 
 ### Run an application
 
@@ -67,8 +66,8 @@ kubectl expose rc nginx --port=80
 This should print:
 
 ```console
-NAME      LABELS    SELECTOR              IP          PORT(S)
-nginx     <none>    run=nginx             <ip-addr>   80/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
+nginx        10.179.240.1     <none>            80/TCP                 run=nginx    8d
 ```
 
 Hit the webserver:

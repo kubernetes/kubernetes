@@ -24,28 +24,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	kutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 
-	assertext "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/assert"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/messages"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/queue"
-	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/ha"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	util "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 )
 
 // A apiserver mock which partially mocks the pods API
@@ -61,13 +61,13 @@ func NewTestServer(t *testing.T, namespace string, mockPodListWatch *MockPodsLis
 	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(testapi.ResourcePath("pods", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(testapi.Default.ResourcePath("pods", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		pods := mockPodListWatch.Pods()
-		w.Write([]byte(runtime.EncodeOrDie(testapi.Codec(), &pods)))
+		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &pods)))
 	})
 
-	podsPrefix := testapi.ResourcePath("pods", namespace, "") + "/"
+	podsPrefix := testapi.Default.ResourcePath("pods", namespace, "") + "/"
 	mux.HandleFunc(podsPrefix, func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Path[len(podsPrefix):]
 
@@ -79,13 +79,13 @@ func NewTestServer(t *testing.T, namespace string, mockPodListWatch *MockPodsLis
 		p := mockPodListWatch.GetPod(name)
 		if p != nil {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(runtime.EncodeOrDie(testapi.Codec(), p)))
+			w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), p)))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	mux.HandleFunc(testapi.ResourcePath("events", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(testapi.Default.ResourcePath("events", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -196,10 +196,10 @@ func NewTestPod() (*api.Pod, int) {
 	currentPodNum = currentPodNum + 1
 	name := fmt.Sprintf("pod%d", currentPodNum)
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
-			Namespace: "default",
+			Namespace: api.NamespaceDefault,
 			SelfLink:  fmt.Sprintf("http://1.2.3.4/api/v1beta1/pods/%s", name),
 		},
 		Spec: api.PodSpec{
@@ -272,7 +272,7 @@ func (o *EventObserver) Event(object runtime.Object, reason, message string) {
 func (o *EventObserver) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
 	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
-func (o *EventObserver) PastEventf(object runtime.Object, timestamp kutil.Time, reason, messageFmt string, args ...interface{}) {
+func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
 	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
 
@@ -393,13 +393,14 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	executor.Data = []byte{0, 1, 2}
 
 	// create scheduler
+	as := NewAllocationStrategy(
+		podtask.DefaultPredicate,
+		podtask.NewDefaultProcurement(mresource.DefaultDefaultContainerCPULimit, mresource.DefaultDefaultContainerMemLimit))
 	testScheduler := New(Config{
-		Executor:                 executor,
-		Client:                   client.NewOrDie(&client.Config{Host: testApiServer.server.URL, Version: testapi.Version()}),
-		ScheduleFunc:             FCFSScheduleFunc,
-		Schedcfg:                 *schedcfg.CreateDefaultConfig(),
-		DefaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
-		DefaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
+		Executor:  executor,
+		Client:    client.NewOrDie(&client.Config{Host: testApiServer.server.URL, Version: testapi.Default.Version()}),
+		Scheduler: NewFCFSPodScheduler(as),
+		Schedcfg:  *schedcfg.CreateDefaultConfig(),
 	})
 
 	assert.NotNil(testScheduler.client, "client is nil")
@@ -418,7 +419,7 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	c.Recorder = eventObserver
 
 	// create plugin
-	p := NewPlugin(c)
+	p := NewPlugin(c).(*schedulingPlugin)
 	assert.NotNil(p)
 
 	// run plugin
@@ -514,11 +515,8 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		t.Fatalf("timed out waiting for launchTasks call")
 	}
 
-	// define generic pod startup
-	startPodWithOffers := func(pod *api.Pod, offers []*mesos.Offer) (*api.Pod, *LaunchedTask, *mesos.Offer) {
-		// notify watchers of new pod
-		podListWatch.Add(pod, true)
-
+	// Launch a pod and wait until the scheduler driver is called
+	schedulePodWithOffers := func(pod *api.Pod, offers []*mesos.Offer) (*api.Pod, *LaunchedTask, *mesos.Offer) {
 		// wait for failedScheduling event because there is no offer
 		assert.EventWithReason(eventObserver, "failedScheduling", "failedScheduling event not received")
 
@@ -531,8 +529,6 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		// wait for driver.launchTasks call
 		select {
 		case launchedTask := <-launchedTasks:
-			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_STAGING))
-			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_RUNNING))
 			for _, offer := range offers {
 				if offer.Id.GetValue() == launchedTask.offerId.GetValue() {
 					return pod, &launchedTask, offer
@@ -540,11 +536,29 @@ func TestPlugin_LifeCycle(t *testing.T) {
 			}
 			t.Fatalf("unknown offer used to start a pod")
 			return nil, nil, nil
-
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for launchTasks")
 			return nil, nil, nil
 		}
+	}
+	// Launch a pod and wait until the scheduler driver is called
+	launchPodWithOffers := func(pod *api.Pod, offers []*mesos.Offer) (*api.Pod, *LaunchedTask, *mesos.Offer) {
+		podListWatch.Add(pod, true)
+		return schedulePodWithOffers(pod, offers)
+	}
+
+	// Launch a pod, wait until the scheduler driver is called and report back that it is running
+	startPodWithOffers := func(pod *api.Pod, offers []*mesos.Offer) (*api.Pod, *LaunchedTask, *mesos.Offer) {
+		// notify about pod, offer resources and wait for scheduling
+		pod, launchedTask, offer := launchPodWithOffers(pod, offers)
+		if pod != nil {
+			// report back status
+			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_STAGING))
+			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_RUNNING))
+			return pod, launchedTask, offer
+		}
+
+		return nil, nil, nil
 	}
 
 	startTestPod := func() (*api.Pod, *LaunchedTask, *mesos.Offer) {
@@ -610,31 +624,42 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		// wait until pod is looked up at the apiserver
 		assertext.EventuallyTrue(t, time.Second, func() bool {
 			return testApiServer.Stats(pod.Name) == beforePodLookups+1
-		}, "expect that reconcilePod will access apiserver for pod %v", pod.Name)
+		}, "expect that reconcileTask will access apiserver for pod %v", pod.Name)
+	}
+
+	launchTestPod := func() (*api.Pod, *LaunchedTask, *mesos.Offer) {
+		pod, i := NewTestPod()
+		offers := []*mesos.Offer{NewTestOffer(fmt.Sprintf("offer%d", i))}
+		return launchPodWithOffers(pod, offers)
 	}
 
 	// 1. with pod deleted from the apiserver
-	pod, launchedTask, _ = startTestPod()
+	//    expected: pod is removed from internal task registry
+	pod, launchedTask, _ = launchTestPod()
 	podListWatch.Delete(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask.taskInfo)
 
+	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
+	assertext.EventuallyTrue(t, time.Second, func() bool {
+		t, _ := p.api.tasks().ForPod(podKey)
+		return t == nil
+	})
+
 	// 2. with pod still on the apiserver, not bound
-	pod, launchedTask, _ = startTestPod()
+	//    expected: pod is rescheduled
+	pod, launchedTask, _ = launchTestPod()
 	failPodFromExecutor(launchedTask.taskInfo)
 
-	// 3. with pod still on the apiserver, bound i.e. host!=""
+	retryOffers := []*mesos.Offer{NewTestOffer("retry-offer")}
+	schedulePodWithOffers(pod, retryOffers)
+
+	// 3. with pod still on the apiserver, bound, notified via ListWatch
+	// expected: nothing, pod updates not supported, compare ReconcileTask function
 	pod, launchedTask, usedOffer = startTestPod()
 	pod.Annotations = map[string]string{
 		meta.BindingHostKey: *usedOffer.Hostname,
 	}
-	podListWatch.Modify(pod, false) // not notifying the watchers
-	failPodFromExecutor(launchedTask.taskInfo)
-
-	// 4. with pod still on the apiserver, bound i.e. host!="", notified via ListWatch
-	pod, launchedTask, usedOffer = startTestPod()
-	pod.Annotations = map[string]string{
-		meta.BindingHostKey: *usedOffer.Hostname,
-	}
+	pod.Spec.NodeName = *usedOffer.Hostname
 	podListWatch.Modify(pod, true) // notifying the watchers
 	time.Sleep(time.Second / 2)
 	failPodFromExecutor(launchedTask.taskInfo)

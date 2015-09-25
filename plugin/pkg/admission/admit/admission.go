@@ -19,8 +19,8 @@ package admit
 import (
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/admission"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func init() {

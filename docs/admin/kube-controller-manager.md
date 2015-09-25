@@ -58,7 +58,7 @@ controller, and serviceaccounts controller.
       --cluster-cidr=<nil>: CIDR Range for Pods in cluster.
       --cluster-name="": The instance prefix for the cluster
       --concurrent-endpoint-syncs=0: The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load
-      --concurrent_rc_syncs=0: The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load
+      --concurrent-rc-syncs=0: The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load
       --deleting-pods-burst=10: Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.
       --deleting-pods-qps=0.1: Number of nodes per second on which pods are deleted in case of node failure.
   -h, --help=false: help for kube-controller-manager
@@ -73,7 +73,6 @@ controller, and serviceaccounts controller.
       --port=0: The port that the controller-manager's http service runs on
       --profiling=true: Enable profiling via web interface host:port/debug/pprof/
       --pvclaimbinder-sync-period=0: The period for syncing persistent volumes and persistent volume claims
-      --register-retry-count=0: The number of retries for initial node registration.  Retry interval equals node-sync-period.
       --resource-quota-sync-period=0: The period for syncing quota usage status in the system
       --root-ca-file="": If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.
       --service-account-private-key-file="": Filename containing a PEM-encoded private RSA key used to sign service account tokens.

@@ -73,7 +73,7 @@ Goals of this design:
     2.  As a cluster operator, I want to allow a pod to access a Docker registry using credentials
         from a `.dockercfg` file, so that containers can push images
     3.  As a cluster operator, I want to allow a pod to access a git repository using SSH keys,
-        so that I can push and fetch to and from the repository
+        so that I can push to and fetch from the repository
 2.  As a user, I want to allow containers to consume supplemental information about services such
     as username and password which should be kept secret, so that I can share secrets about a
     service amongst the containers in my application securely
@@ -119,7 +119,7 @@ which consumes this type of secret, the Kubelet may take a number of actions:
     file system
 2.  Configure that node's `kube-proxy` to decorate HTTP requests from that pod to the
     `kubernetes-master` service with the auth token, e. g. by adding a header to the request
-    (see the [LOAS Daemon](https://github.com/GoogleCloudPlatform/kubernetes/issues/2209) proposal)
+    (see the [LOAS Daemon](http://issue.k8s.io/2209) proposal)
 
 #### Example: service account consumes docker registry credentials
 
@@ -263,11 +263,11 @@ the right storage size for their installation and configuring their Kubelets cor
 
 Configuring each Kubelet is not the ideal story for operator experience; it is more intuitive that
 the cluster-wide storage size be readable from a central configuration store like the one proposed
-in [#1553](https://github.com/GoogleCloudPlatform/kubernetes/issues/1553).  When such a store
+in [#1553](http://issue.k8s.io/1553).  When such a store
 exists, the Kubelet could be modified to read this configuration item from the store.
 
 When the Kubelet is modified to advertise node resources (as proposed in
-[#4441](https://github.com/GoogleCloudPlatform/kubernetes/issues/4441)), the capacity calculation
+[#4441](http://issue.k8s.io/4441)), the capacity calculation
 for available memory should factor in the potential size of the node-level tmpfs in order to avoid
 memory overcommit on the node.
 
@@ -321,9 +321,9 @@ type Secret struct {
 type SecretType string
 
 const (
-    SecretTypeOpaque              SecretType = "Opaque"              // Opaque (arbitrary data; default)
-    SecretTypeKubernetesAuthToken SecretType = "KubernetesAuth"      // Kubernetes auth token
-    SecretTypeDockerRegistryAuth  SecretType = "DockerRegistryAuth"  // Docker registry auth
+    SecretTypeOpaque              SecretType = "Opaque"                                 // Opaque (arbitrary data; default)
+    SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"    // Kubernetes auth token
+    SecretTypeDockercfg           SecretType = "kubernetes.io/dockercfg"                // Docker registry auth
     // FUTURE: other type values
 )
 

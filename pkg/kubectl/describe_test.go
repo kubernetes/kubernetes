@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
 type describeClient struct {
@@ -85,22 +85,22 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 			{
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
-				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 			{
 				Source:         api.EventSource{Component: "scheduler"},
 				Message:        "Item 2",
-				FirstTimestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 			{
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 3",
-				FirstTimestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 		},
@@ -131,7 +131,7 @@ func TestDescribeContainers(t *testing.T) {
 				Name: "test",
 				State: api.ContainerState{
 					Running: &api.ContainerStateRunning{
-						StartedAt: util.NewTime(time.Now()),
+						StartedAt: unversioned.NewTime(time.Now()),
 					},
 				},
 				Ready:        true,
@@ -161,8 +161,8 @@ func TestDescribeContainers(t *testing.T) {
 				Name: "test",
 				State: api.ContainerState{
 					Terminated: &api.ContainerStateTerminated{
-						StartedAt:  util.NewTime(time.Now()),
-						FinishedAt: util.NewTime(time.Now()),
+						StartedAt:  unversioned.NewTime(time.Now()),
+						FinishedAt: unversioned.NewTime(time.Now()),
 						Reason:     "potato",
 						ExitCode:   2,
 					},
@@ -171,6 +171,29 @@ func TestDescribeContainers(t *testing.T) {
 				RestartCount: 7,
 			},
 			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato", "Started", "Finished", "Exit Code", "2"},
+		},
+		// Last Terminated
+		{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
+				Name: "test",
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{
+						StartedAt: unversioned.NewTime(time.Now()),
+					},
+				},
+				LastTerminationState: api.ContainerState{
+					Terminated: &api.ContainerStateTerminated{
+						StartedAt:  unversioned.NewTime(time.Now().Add(time.Second * 3)),
+						FinishedAt: unversioned.NewTime(time.Now()),
+						Reason:     "crashing",
+						ExitCode:   3,
+					},
+				},
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Started", "Finished", "Exit Code", "2", "crashing", "3"},
 		},
 		// No state defaults to waiting.
 		{
@@ -311,5 +334,148 @@ func TestDefaultDescribers(t *testing.T) {
 	}
 	if !strings.Contains(out, "foo") {
 		t.Errorf("unexpected output: %s", out)
+	}
+}
+
+func TestGetPodsTotalRequests(t *testing.T) {
+	testCases := []struct {
+		pods                         []*api.Pod
+		expectedReqs, expectedLimits map[api.ResourceName]resource.Quantity
+	}{
+		{
+			pods: []*api.Pod{
+				{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("1"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("300Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+									},
+								},
+							},
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("90m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("120Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("200M"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("60m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("43Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("500M"),
+									},
+								},
+							},
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("34m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("83Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("700M"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedReqs: map[api.ResourceName]resource.Quantity{
+				api.ResourceName(api.ResourceCPU):     resource.MustParse("1.184"),
+				api.ResourceName(api.ResourceMemory):  resource.MustParse("546Mi"),
+				api.ResourceName(api.ResourceStorage): resource.MustParse("2.4G"),
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		reqs, _, err := getPodsTotalRequestsAndLimits(testCase.pods)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if !reflect.DeepEqual(reqs, testCase.expectedReqs) {
+			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
+		}
+	}
+}
+
+func TestPersistentVolumeDescriber(t *testing.T) {
+	tests := map[string]*api.PersistentVolume{
+
+		"hostpath": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{},
+				},
+			},
+		},
+		"gce": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+			},
+		},
+		"ebs": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+				},
+			},
+		},
+		"nfs": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					NFS: &api.NFSVolumeSource{},
+				},
+			},
+		},
+		"iscsi": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{},
+				},
+			},
+		},
+		"gluster": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Glusterfs: &api.GlusterfsVolumeSource{},
+				},
+			},
+		},
+		"rbd": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					RBD: &api.RBDVolumeSource{},
+				},
+			},
+		},
+	}
+
+	for name, pv := range tests {
+		fake := testclient.NewSimpleFake(pv)
+		c := PersistentVolumeDescriber{fake}
+		str, err := c.Describe("foo", "bar")
+		if err != nil {
+			t.Errorf("Unexpected error for test %s: %v", name, err)
+		}
+		if str == "" {
+			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", name)
+		}
+
 	}
 }

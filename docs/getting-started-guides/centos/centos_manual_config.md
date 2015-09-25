@@ -104,7 +104,7 @@ echo "192.168.121.9	centos-master
 
 ```sh
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://centos-master:4001"
+KUBE_ETCD_SERVERS="--etcd-servers=http://centos-master:4001"
 
 # logging to stderr means we get it in the systemd journal
 KUBE_LOGTOSTDERR="--logtostderr=true"
@@ -113,7 +113,7 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 KUBE_LOG_LEVEL="--v=0"
 
 # Should this cluster be allowed to run privileged docker containers
-KUBE_ALLOW_PRIV="--allow_privileged=false"
+KUBE_ALLOW_PRIV="--allow-privileged=false"
 ```
 
 * Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers
@@ -138,7 +138,7 @@ KUBE_API_PORT="--port=8080"
 KUBE_MASTER="--master=http://centos-master:8080"
 
 # Port kubelets listen on
-KUBELET_PORT="--kubelet_port=10250"
+KUBELET_PORT="--kubelet-port=10250"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
@@ -171,7 +171,10 @@ KUBELET_ADDRESS="--address=0.0.0.0"
 KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-KUBELET_HOSTNAME="--hostname_override=centos-minion"
+KUBELET_HOSTNAME="--hostname-override=centos-minion"
+
+# Location of the api-server
+KUBELET_API_SERVER="--api-servers=http://centos-master:8080"
 
 # Add your own!
 KUBELET_ARGS=""

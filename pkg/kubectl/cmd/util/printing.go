@@ -19,19 +19,25 @@ package util
 import (
 	"fmt"
 	"io"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/kubectl"
 
 	"github.com/spf13/cobra"
 )
 
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|template|templatefile|wide.")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
-	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]")
+	// template shorthand -t is deprecated to support -t for --tty
+	// TODO: remove template flag shorthand -t
+	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
+	cmd.Flags().MarkShorthandDeprecated("template", "please use --template instead")
+	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
+	cmd.Flags().BoolP("show-all", "a", false, "When printing, show all resources (default hide terminated pods.)")
 }
 
 // AddOutputFlagsForMutation adds output related flags to a command. Used by mutations only.
@@ -81,10 +87,42 @@ func OutputVersion(cmd *cobra.Command, defaultVersion string) string {
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
 func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error) {
 	outputFormat := GetFlagString(cmd, "output")
-	templateFile := GetFlagString(cmd, "template")
+
+	// templates are logically optional for specifying a format.
+	// TODO once https://github.com/kubernetes/kubernetes/issues/12668 is fixed, this should fall back to GetFlagString
+	templateFile, _ := cmd.Flags().GetString("template")
 	if len(outputFormat) == 0 && len(templateFile) != 0 {
 		outputFormat = "template"
 	}
 
-	return kubectl.GetPrinter(outputFormat, templateFile)
+	templateFormat := []string{"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file="}
+	for _, format := range templateFormat {
+		if strings.HasPrefix(outputFormat, format) {
+			templateFile = outputFormat[len(format):]
+			outputFormat = format[:len(format)-1]
+		}
+	}
+
+	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile)
+	if err != nil {
+		return nil, generic, err
+	}
+
+	return maybeWrapSortingPrinter(cmd, printer), generic, nil
+}
+
+func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
+	sorting, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
+		return printer
+	}
+
+	if len(sorting) != 0 {
+		return &kubectl.SortingPrinter{
+			Delegate:  printer,
+			SortField: fmt.Sprintf("{%s}", sorting),
+		}
+	}
+	return printer
 }

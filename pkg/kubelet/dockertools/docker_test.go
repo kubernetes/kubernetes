@@ -22,18 +22,20 @@ import (
 	"hash/adler32"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/docker/docker/pkg/jsonmessage"
 	docker "github.com/fsouza/go-dockerclient"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
@@ -99,7 +101,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
-	name := BuildDockerName(KubeletContainerName{podFullName, types.UID(podUID), container.Name}, container)
+	_, name := BuildDockerName(KubeletContainerName{podFullName, types.UID(podUID), container.Name}, container)
 	returned, hash, err := ParseDockerName(name)
 	if err != nil {
 		t.Errorf("Failed to parse Docker container name %q: %v", name, err)
@@ -254,7 +256,7 @@ func TestPullWithJSONError(t *testing.T) {
 		"Bad gateway": {
 			"ubuntu",
 			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
-			"because the registry is temporarily unavailbe",
+			"because the registry is temporarily unavailable",
 		},
 	}
 	for i, test := range tests {
@@ -268,7 +270,7 @@ func TestPullWithJSONError(t *testing.T) {
 		}
 		err := puller.Pull(test.imageName, []api.Secret{})
 		if err == nil || !strings.Contains(err.Error(), test.expectedError) {
-			t.Errorf("%d: expect error %s, got : %s", i, test.expectedError, err)
+			t.Errorf("%s: expect error %s, got : %s", i, test.expectedError, err)
 			continue
 		}
 	}
@@ -278,6 +280,12 @@ func TestPullWithSecrets(t *testing.T) {
 	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
 	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	dockerConfigJson := map[string]map[string]map[string]string{"auths": dockerCfg}
+	dockerConfigJsonContent, err := json.Marshal(dockerConfigJson)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -309,6 +317,12 @@ func TestPullWithSecrets(t *testing.T) {
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
+		},
+		"builtin keyring secrets, but use passed with new docker config": {
+			"ubuntu",
+			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
@@ -655,7 +669,7 @@ func TestFindContainersByPod(t *testing.T) {
 	}
 	fakeClient := &FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorApi.MachineInfo{}, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList
@@ -697,42 +711,121 @@ func TestMakePortsAndBindings(t *testing.T) {
 			HostPort:      445,
 			Protocol:      "foobar",
 		},
+		{
+			ContainerPort: 443,
+			HostPort:      446,
+			Protocol:      "tcp",
+		},
+		{
+			ContainerPort: 443,
+			HostPort:      446,
+			Protocol:      "udp",
+		},
 	}
+
 	exposedPorts, bindings := makePortsAndBindings(ports)
-	if len(ports) != len(exposedPorts) ||
-		len(ports) != len(bindings) {
+
+	// Count the expected exposed ports and bindings
+	expectedExposedPorts := map[string]struct{}{}
+
+	for _, binding := range ports {
+		dockerKey := strconv.Itoa(binding.ContainerPort) + "/" + string(binding.Protocol)
+		expectedExposedPorts[dockerKey] = struct{}{}
+	}
+
+	// Should expose right ports in docker
+	if len(expectedExposedPorts) != len(exposedPorts) {
 		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", ports, exposedPorts, bindings)
 	}
-	for key, value := range bindings {
-		switch value[0].HostPort {
-		case "8080":
-			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
+
+	// Construct expected bindings
+	expectPortBindings := map[string][]docker.PortBinding{
+		"80/tcp": {
+			docker.PortBinding{
+				HostPort: "8080",
+				HostIP:   "127.0.0.1",
+			},
+		},
+		"443/tcp": {
+			docker.PortBinding{
+				HostPort: "443",
+				HostIP:   "",
+			},
+			docker.PortBinding{
+				HostPort: "446",
+				HostIP:   "",
+			},
+		},
+		"443/udp": {
+			docker.PortBinding{
+				HostPort: "446",
+				HostIP:   "",
+			},
+		},
+		"444/udp": {
+			docker.PortBinding{
+				HostPort: "444",
+				HostIP:   "",
+			},
+		},
+		"445/tcp": {
+			docker.PortBinding{
+				HostPort: "445",
+				HostIP:   "",
+			},
+		},
+	}
+
+	// interate the bindings by dockerPort, and check its portBindings
+	for dockerPort, portBindings := range bindings {
+		switch dockerPort {
+		case "80/tcp", "443/tcp", "443/udp", "444/udp", "445/tcp":
+			if !reflect.DeepEqual(expectPortBindings[string(dockerPort)], portBindings) {
+				t.Errorf("Unexpected portbindings for %#v, expected: %#v, but got: %#v",
+					dockerPort, expectPortBindings[string(dockerPort)], portBindings)
 			}
-			if value[0].HostIP != "127.0.0.1" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "443":
-			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "444":
-			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "445":
-			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
+		default:
+			t.Errorf("Unexpected docker port: %#v with portbindings: %#v", dockerPort, portBindings)
+		}
+	}
+}
+
+func TestMilliCPUToQuota(t *testing.T) {
+	testCases := []struct {
+		input  int64
+		quota  int64
+		period int64
+	}{
+		{
+			input:  int64(0),
+			quota:  int64(0),
+			period: int64(0),
+		},
+		{
+			input:  int64(200),
+			quota:  int64(20000),
+			period: int64(100000),
+		},
+		{
+			input:  int64(500),
+			quota:  int64(50000),
+			period: int64(100000),
+		},
+		{
+			input:  int64(1000),
+			quota:  int64(100000),
+			period: int64(100000),
+		},
+		{
+			input:  int64(1500),
+			quota:  int64(150000),
+			period: int64(100000),
+		},
+	}
+	for _, testCase := range testCases {
+		quota, period := milliCPUToQuota(testCase.input)
+		if quota != testCase.quota || period != testCase.period {
+			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
 		}
 	}
 }

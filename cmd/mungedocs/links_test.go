@@ -29,8 +29,8 @@ func TestBadLinks(t *testing.T) {
 	var cases = []struct {
 		in string
 	}{
-		{"[NOTREADME](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/NOTREADME.md)"},
-		{"[NOTREADME](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/NOTREADME.md)"},
+		{"[NOTREADME](https://github.com/kubernetes/kubernetes/tree/master/NOTREADME.md)"},
+		{"[NOTREADME](https://github.com/kubernetes/kubernetes/tree/master/docs/NOTREADME.md)"},
 		{"[NOTREADME](../NOTREADME.md)"},
 	}
 	for _, c := range cases {
@@ -45,14 +45,14 @@ func TestGoodLinks(t *testing.T) {
 		expected string
 	}{
 		{"", ""},
-		{"[README](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/README.md)",
+		{"[README](https://github.com/kubernetes/kubernetes/tree/master/README.md)",
 			"[README](README.md)"},
 		{"[README](../README.md)",
 			"[README](README.md)"},
 		{"[README](https://lwn.net)",
 			"[README](https://lwn.net)"},
 		// _ to -
-		{"[README](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/devel/cli_roadmap.md)",
+		{"[README](https://github.com/kubernetes/kubernetes/tree/master/docs/devel/cli_roadmap.md)",
 			"[README](../../docs/devel/cli-roadmap.md)"},
 		// - to _
 		{"[README](../../docs/devel/api-changes.md)",
@@ -61,7 +61,7 @@ func TestGoodLinks(t *testing.T) {
 		// Does this even make sense?  i dunno
 		{"[README](/docs/README.md)",
 			"[README](https://github.com/docs/README.md)"},
-		{"[README](/GoogleCloudPlatform/kubernetes/tree/master/docs/README.md)",
+		{"[README](/kubernetes/kubernetes/tree/master/docs/README.md)",
 			"[README](../../docs/README.md)"},
 	}
 	for i, c := range cases {

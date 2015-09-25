@@ -201,3 +201,36 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 	})
 	return res
 }
+
+// IDFromName is a convienience function that returns a server's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	volumeCount := 0
+	volumeID := ""
+	if name == "" {
+		return "", fmt.Errorf("A volume name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		volumeList, err := ExtractVolumes(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range volumeList {
+			if s.Name == name {
+				volumeCount++
+				volumeID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch volumeCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find volume: %s", name)
+	case 1:
+		return volumeID, nil
+	default:
+		return "", fmt.Errorf("Found %d volumes matching %s", volumeCount, name)
+	}
+}

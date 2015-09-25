@@ -117,8 +117,8 @@ Services find the containers to load balance based on pod labels. The pod that y
 
     ```console
     $ kubectl get services
-    NAME               LABELS                    SELECTOR                     IP(S)          PORT(S)
-    redis-master       app=redis,role=master     app=redis,role=master        10.0.136.3     6379/TCP
+    NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+    redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master  1h
     ...
     ```
 
@@ -183,9 +183,9 @@ Just like the master, we want to have a service to proxy connections to the read
 
     ```console
     $ kubectl get services
-    NAME               LABELS                    SELECTOR                        IP(S)          PORT(S)
-    redis-master       app=redis,role=master     app=redis,role=master           10.0.136.3     6379/TCP
-    redis-slave        app=redis,role=slave      app=redis,role=slave            10.0.21.92     6379/TCP
+    NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+    redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master  1h
+    redis-slave       10.0.21.92       <none>            6379/TCP      app-redis,role=slave   1h
     ...
     ```
 
@@ -206,7 +206,7 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
 
 <nop>2. To verify that the guestbook replication controller is running, run the `kubectl get rc` command:
 
-    ```
+    ```console
     $ kubectl get rc
     CONTROLLER            CONTAINER(S)         IMAGE(S)                    SELECTOR                  REPLICAS
     guestbook             guestbook            kubernetes/guestbook:v2     app=guestbook             3
@@ -244,13 +244,12 @@ Just like the others, we create a service to group the guestbook pods but this t
 
 <nop>2. To verify that the guestbook service is up, list all the services in the cluster with the `kubectl get services` command:
 
-    ```
+    ```console
     $ kubectl get services
-    NAME             LABELS                     SELECTOR                        IP(S)          PORT(S)
-    guestbook        app=guestbook              app=guestbook                   10.0.217.218   3000/TCP
-                                                                                146.148.81.8   
-    redis-master     app=redis,role=master      app=redis,role=master           10.0.136.3     6379/TCP
-    redis-slave      app=redis,role=slave       app=redis,role=slave            10.0.21.92     6379/TCP
+    NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+    guestbook         10.0.217.218     146.148.81.8      3000/TCP      app=guestbook          1h
+    redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master  1h
+    redis-slave       10.0.21.92       <none>            6379/TCP      app-redis,role=slave   1h
     ...
     ```
 
@@ -280,7 +279,7 @@ You can now play with the guestbook that you just created by opening it in a bro
 
 ### Step Eight: Cleanup <a id="step-eight"></a>
 
-After you're done playing with the guestbook, you can cleanup by deleting the guestbook service and removing the associated resources that were created, including load balancers, forwarding rules, target pools, and Kuberentes replication controllers and services.
+After you're done playing with the guestbook, you can cleanup by deleting the guestbook service and removing the associated resources that were created, including load balancers, forwarding rules, target pools, and Kubernetes replication controllers and services.
 
 Delete all the resources by running the following `kubectl delete -f` *`filename`* command:
 

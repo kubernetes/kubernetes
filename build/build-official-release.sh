@@ -41,7 +41,7 @@ function sha1() {
   fi
 }
 
-declare -r KUBE_GITHUB="https://github.com/GoogleCloudPlatform/kubernetes.git"
+declare -r KUBE_GITHUB="https://github.com/kubernetes/kubernetes.git"
 declare -r KUBE_RELEASE_VERSION=${1-}
 declare -r KUBE_RELEASE_UMASK=${KUBE_RELEASE_UMASK:-022}
 

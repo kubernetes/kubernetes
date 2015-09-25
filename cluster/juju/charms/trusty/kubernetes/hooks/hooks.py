@@ -17,10 +17,7 @@
 """
 The main hook file that is called by Juju.
 """
-import json
-import httplib
 import os
-import time
 import socket
 import subprocess
 import sys
@@ -28,7 +25,7 @@ import urlparse
 
 from charmhelpers.core import hookenv, host
 from kubernetes_installer import KubernetesInstaller
-from path import path
+from path import Path
 
 from lib.registrator import Registrator
 
@@ -43,10 +40,10 @@ def api_relation_changed():
     from the kubernetes-master charm and installs it locally on this machine.
     """
     hookenv.log('Starting api-relation-changed')
-    charm_dir = path(hookenv.charm_dir())
+    charm_dir = Path(hookenv.charm_dir())
     # Get the package architecture, rather than the from the kernel (uname -m).
     arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
-    kubernetes_bin_dir = path('/opt/kubernetes/bin')
+    kubernetes_bin_dir = Path('/opt/kubernetes/bin')
     # Get the version of kubernetes to install.
     version = subprocess.check_output(['relation-get', 'version']).strip()
     print('Relation version: ', version)
@@ -204,8 +201,9 @@ def register_machine(apiserver, retry=False):
         mem = info.strip().split(':')[1].strip().split()[0]
     cpus = os.sysconf('SC_NPROCESSORS_ONLN')
 
+    # https://github.com/kubernetes/kubernetes/blob/master/docs/admin/node.md
     registration_request = Registrator()
-    registration_request.data['Kind'] = 'Minion'
+    registration_request.data['kind'] = 'Node'
     registration_request.data['id'] = private_address
     registration_request.data['name'] = private_address
     registration_request.data['metadata']['name'] = private_address
@@ -226,6 +224,7 @@ def register_machine(apiserver, retry=False):
         # This happens when we have already registered
         # for now this is OK
         pass
+
 
 def setup_kubernetes_group():
     output = subprocess.check_output(['groups', 'kubernetes'])

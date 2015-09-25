@@ -103,18 +103,18 @@ Let’s say you specified `entrypoint` instead of `command`. You’d see output 
 
 ```console
 I0709 06:33:05.600829   14160 schema.go:126] unknown field: entrypoint
-I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
+I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see http://issue.k8s.io/6842
 pods/hello-world
 ```
 
 `kubectl create --validate` currently warns about problems it detects, but creates the resource anyway, unless a required field is absent or a field value is invalid. Unknown API fields are ignored, so be careful. This pod was created, but with no `command`, which is an optional field, since the image may specify an `Entrypoint`.
 View the [Pod API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_pod)
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_pod)
 to see the list of valid fields.
 
 ## Environment variables and variable expansion
 
-Kubernetes [does not automatically run commands in a shell](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ#use-of-environment-variables-on-the-command-line) (not all images contain shells). If you would like to run your command in a shell, such as to expand environment variables (specified using `env`), you could do the following:
+Kubernetes [does not automatically run commands in a shell](https://github.com/kubernetes/kubernetes/wiki/User-FAQ#use-of-environment-variables-on-the-command-line) (not all images contain shells). If you would like to run your command in a shell, such as to expand environment variables (specified using `env`), you could do the following:
 
 ```yaml
 apiVersion: v1

@@ -21,10 +21,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -94,7 +96,7 @@ func (c *Repair) RunOnce() error {
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	list, err := c.registry.ListServices(ctx)
+	list, err := c.registry.ListServices(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
@@ -122,7 +124,7 @@ func (c *Repair) RunOnce() error {
 			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// TODO: send event
-			return fmt.Errorf("the service CIDR %s is full; you must widen the CIDR in order to create new services")
+			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", r)
 		default:
 			return fmt.Errorf("unable to allocate cluster IP %s for service %s/%s due to an unknown error, exiting: %v", ip, svc.Name, svc.Namespace, err)
 		}

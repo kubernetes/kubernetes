@@ -54,7 +54,7 @@ log_level: debug
 log_level_logfile: debug
 EOF
 
-cat <<EOF >/etc/salt/master.d/log-level-debug.d
+cat <<EOF >/etc/salt/master.d/log-level-debug.conf
 log_level: debug
 log_level_logfile: debug
 EOF

@@ -19,12 +19,13 @@ package podtask
 import (
 	"testing"
 
-	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -145,10 +146,10 @@ func TestEmptyOffer(t *testing.T) {
 	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
 	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
 
-	if ok := task.AcceptOffer(nil); ok {
+	if ok := DefaultPredicate(task, nil); ok {
 		t.Fatalf("accepted nil offer")
 	}
-	if ok := task.AcceptOffer(&mesos.Offer{}); ok {
+	if ok := DefaultPredicate(task, &mesos.Offer{}); ok {
 		t.Fatalf("accepted empty offer")
 	}
 }
@@ -175,7 +176,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", 0.001),
 		},
 	}
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
@@ -185,7 +186,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", t_min_mem),
 		},
 	}
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 }
@@ -202,7 +203,7 @@ func TestAcceptOfferPorts(t *testing.T) {
 			rangeResource("ports", []uint64{1, 1}),
 		},
 	}
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -217,17 +218,17 @@ func TestAcceptOfferPorts(t *testing.T) {
 	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
 	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
 
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 0
-	if ok := task.AcceptOffer(offer); !ok {
+	if ok := DefaultPredicate(task, offer); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -235,12 +236,12 @@ func TestAcceptOfferPorts(t *testing.T) {
 		mutil.NewScalarResource("cpus", t_min_cpu),
 		mutil.NewScalarResource("mem", t_min_mem),
 	}
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := task.AcceptOffer(offer); ok {
+	if ok := DefaultPredicate(task, offer); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 }
@@ -263,5 +264,57 @@ func TestGeneratePodName(t *testing.T) {
 	expected = "foo.default.pods"
 	if name != expected {
 		t.Fatalf("expected %q instead of %q", expected, name)
+	}
+}
+
+func TestNodeSelector(t *testing.T) {
+	t.Parallel()
+
+	sel1 := map[string]string{"rack": "a"}
+	sel2 := map[string]string{"rack": "a", "gen": "2014"}
+
+	tests := []struct {
+		selector map[string]string
+		attrs    []*mesos.Attribute
+		ok       bool
+	}{
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a")}, true},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "b")}, false},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, true},
+		{sel1, []*mesos.Attribute{newTextAttribute("rack", "a"), newScalarAttribute("num", 42.0)}, true},
+		{sel1, []*mesos.Attribute{newScalarAttribute("rack", 42.0)}, false},
+		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2014")}, true},
+		{sel2, []*mesos.Attribute{newTextAttribute("rack", "a"), newTextAttribute("gen", "2015")}, false},
+	}
+
+	for _, ts := range tests {
+		task, _ := fakePodTask("foo")
+		task.Pod.Spec.NodeSelector = ts.selector
+		offer := &mesos.Offer{
+			Resources: []*mesos.Resource{
+				mutil.NewScalarResource("cpus", t_min_cpu),
+				mutil.NewScalarResource("mem", t_min_mem),
+			},
+			Attributes: ts.attrs,
+		}
+		if got, want := DefaultPredicate(task, offer), ts.ok; got != want {
+			t.Fatalf("expected acceptance of offer %v for selector %v to be %v, got %v:", want, got, ts.attrs, ts.selector)
+		}
+	}
+}
+
+func newTextAttribute(name string, val string) *mesos.Attribute {
+	return &mesos.Attribute{
+		Name: proto.String(name),
+		Type: mesos.Value_TEXT.Enum(),
+		Text: &mesos.Value_Text{Value: &val},
+	}
+}
+
+func newScalarAttribute(name string, val float64) *mesos.Attribute {
+	return &mesos.Attribute{
+		Name:   proto.String(name),
+		Type:   mesos.Value_SCALAR.Enum(),
+		Scalar: &mesos.Value_Scalar{Value: proto.Float64(val)},
 	}
 }

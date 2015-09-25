@@ -22,8 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // Selector represents a label selector.
@@ -79,7 +80,7 @@ func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 type Requirement struct {
 	key       string
 	operator  Operator
-	strValues util.StringSet
+	strValues sets.String
 }
 
 // NewRequirement is the constructor for a Requirement.
@@ -91,7 +92,7 @@ type Requirement struct {
 //     of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
-func NewRequirement(key string, op Operator, vals util.StringSet) (*Requirement, error) {
+func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, error) {
 	if err := validateLabelKey(key); err != nil {
 		return nil, err
 	}
@@ -198,7 +199,7 @@ func (lsel LabelSelector) Add(key string, operator Operator, values []string) Se
 	for _, item := range lsel {
 		reqs = append(reqs, item)
 	}
-	if r, err := NewRequirement(key, operator, util.NewStringSet(values...)); err == nil {
+	if r, err := NewRequirement(key, operator, sets.NewString(values...)); err == nil {
 		reqs = append(reqs, *r)
 	}
 	return LabelSelector(reqs)
@@ -445,7 +446,7 @@ func (p *Parser) parse() ([]Requirement, error) {
 		case IdentifierToken:
 			r, err := p.parseRequirement()
 			if err != nil {
-				return nil, fmt.Errorf("unable to parse requiremnt: %v", err)
+				return nil, fmt.Errorf("unable to parse requirement: %v", err)
 			}
 			requirements = append(requirements, *r)
 			t, l := p.consume(Values)
@@ -466,7 +467,6 @@ func (p *Parser) parse() ([]Requirement, error) {
 			return nil, fmt.Errorf("found '%s', expected: identifier or 'end of string'", lit)
 		}
 	}
-	return requirements, nil
 }
 
 func (p *Parser) parseRequirement() (*Requirement, error) {
@@ -481,7 +481,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	if err != nil {
 		return nil, err
 	}
-	var values util.StringSet
+	var values sets.String
 	switch operator {
 	case InOperator, NotInOperator:
 		values, err = p.parseValues()
@@ -536,7 +536,7 @@ func (p *Parser) parseOperator() (op Operator, err error) {
 }
 
 // parseValues parses the values for set based matching (x,y,z)
-func (p *Parser) parseValues() (util.StringSet, error) {
+func (p *Parser) parseValues() (sets.String, error) {
 	tok, lit := p.consume(Values)
 	if tok != OpenParToken {
 		return nil, fmt.Errorf("found '%s' expected: '('", lit)
@@ -554,17 +554,16 @@ func (p *Parser) parseValues() (util.StringSet, error) {
 		return s, nil
 	case ClosedParToken: // handles "()"
 		p.consume(Values)
-		return util.NewStringSet(""), nil
+		return sets.NewString(""), nil
 	default:
 		return nil, fmt.Errorf("found '%s', expected: ',', ')' or identifier", lit)
 	}
-	return util.NewStringSet(), nil
 }
 
 // parseIdentifiersList parses a (possibly empty) list of
 // of comma separated (possibly empty) identifiers
-func (p *Parser) parseIdentifiersList() (util.StringSet, error) {
-	s := util.NewStringSet()
+func (p *Parser) parseIdentifiersList() (sets.String, error) {
+	s := sets.NewString()
 	for {
 		tok, lit := p.consume(Values)
 		switch tok {
@@ -599,8 +598,8 @@ func (p *Parser) parseIdentifiersList() (util.StringSet, error) {
 }
 
 // parseExactValue parses the only value for exact match style
-func (p *Parser) parseExactValue() (util.StringSet, error) {
-	s := util.NewStringSet()
+func (p *Parser) parseExactValue() (sets.String, error) {
+	s := sets.NewString()
 	tok, lit := p.consume(Values)
 	if tok == IdentifierToken {
 		s.Insert(lit)
@@ -648,17 +647,17 @@ func Parse(selector string) (Selector, error) {
 	return nil, error
 }
 
-const qualifiedNameErrorMsg string = "must match regex [" + util.DNS1123SubdomainFmt + " / ] " + util.DNS1123LabelFmt
+const qualifiedNameErrorMsg string = "must match regex [" + validation.DNS1123SubdomainFmt + " / ] " + validation.DNS1123LabelFmt
 
 func validateLabelKey(k string) error {
-	if !util.IsQualifiedName(k) {
+	if !validation.IsQualifiedName(k) {
 		return fielderrors.NewFieldInvalid("label key", k, qualifiedNameErrorMsg)
 	}
 	return nil
 }
 
 func validateLabelValue(v string) error {
-	if !util.IsValidLabelValue(v) {
+	if !validation.IsValidLabelValue(v) {
 		return fielderrors.NewFieldInvalid("label value", v, qualifiedNameErrorMsg)
 	}
 	return nil
@@ -672,7 +671,7 @@ func SelectorFromSet(ls Set) Selector {
 	}
 	var requirements []Requirement
 	for label, value := range ls {
-		if r, err := NewRequirement(label, EqualsOperator, util.NewStringSet(value)); err != nil {
+		if r, err := NewRequirement(label, EqualsOperator, sets.NewString(value)); err != nil {
 			//TODO: double check errors when input comes from serialization?
 			return LabelSelector{}
 		} else {

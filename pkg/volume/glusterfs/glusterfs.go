@@ -17,16 +17,16 @@ limitations under the License.
 package glusterfs
 
 import (
-	"math/rand"
 	"os"
+	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -54,7 +54,8 @@ func (plugin *glusterfsPlugin) Name() string {
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.Glusterfs != nil || spec.PersistentVolumeSource.Glusterfs != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs != nil) ||
+		(spec.Volume != nil && spec.Volume.Glusterfs != nil)
 }
 
 func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -65,7 +66,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	ns := pod.Namespace
@@ -75,16 +76,16 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 		return nil, err
 	}
 	glog.V(1).Infof("Glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, pod, mounter, exec.New())
+	return plugin.newBuilderInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
 }
 
 func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
 	// Glusterfs volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// Glusterfs volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	if spec.VolumeSource.Glusterfs != nil {
-		return spec.VolumeSource.Glusterfs, spec.VolumeSource.Glusterfs.ReadOnly
+	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
+		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly
 	} else {
-		return spec.PersistentVolumeSource.Glusterfs, spec.ReadOnly
+		return spec.PersistentVolume.Spec.Glusterfs, spec.ReadOnly
 	}
 }
 
@@ -92,7 +93,7 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 	source, readOnly := plugin.getGlusterVolumeSource(spec)
 	return &glusterfsBuilder{
 		glusterfs: &glusterfs{
-			volName: spec.Name,
+			volName: spec.Name(),
 			mounter: mounter,
 			pod:     pod,
 			plugin:  plugin,
@@ -103,8 +104,8 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 		exe:      exe}, nil
 }
 
-func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, mounter)
+func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter())
 }
 
 func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -140,12 +141,12 @@ func (b *glusterfsBuilder) SetUp() error {
 }
 
 func (b *glusterfsBuilder) SetUpAt(dir string) error {
-	mountpoint, err := b.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("Glusterfs: mount set up: %s %v %v", dir, mountpoint, err)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	glog.V(4).Infof("Glusterfs: mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 
@@ -185,12 +186,12 @@ func (c *glusterfsCleaner) TearDownAt(dir string) error {
 }
 
 func (c *glusterfsCleaner) cleanup(dir string) error {
-	mountpoint, err := c.mounter.IsMountPoint(dir)
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.Errorf("Glusterfs: Error checking IsMountPoint: %v", err)
+		glog.Errorf("Glusterfs: Error checking IsLikelyNotMountPoint: %v", err)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		return os.RemoveAll(dir)
 	}
 
@@ -198,12 +199,12 @@ func (c *glusterfsCleaner) cleanup(dir string) error {
 		glog.Errorf("Glusterfs: Unmounting failed: %v", err)
 		return err
 	}
-	mountpoint, mntErr := c.mounter.IsMountPoint(dir)
+	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("Glusterfs: IsMountpoint check failed: %v", mntErr)
+		glog.Errorf("Glusterfs: IsLikelyNotMountPoint check failed: %v", mntErr)
 		return mntErr
 	}
-	if !mountpoint {
+	if notMnt {
 		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
@@ -220,12 +221,23 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 		options = append(options, "ro")
 	}
 
-	l := len(b.hosts.Subsets)
+	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
+	if err := os.MkdirAll(p, 0750); err != nil {
+		return err
+	}
+	log := path.Join(p, "glusterfs.log")
+	options = append(options, "log-file="+log)
+
+	addr := make(map[string]struct{})
+	for _, s := range b.hosts.Subsets {
+		for _, a := range s.Addresses {
+			addr[a.IP] = struct{}{}
+		}
+	}
+
 	// Avoid mount storm, pick a host randomly.
-	start := rand.Int() % l
 	// Iterate all hosts until mount succeeds.
-	for i := start; i < start+l; i++ {
-		hostIP := b.hosts.Subsets[i%l].Addresses[0].IP
+	for hostIP := range addr {
 		errs = b.mounter.Mount(hostIP+":"+b.path, dir, "glusterfs", options)
 		if errs == nil {
 			return nil

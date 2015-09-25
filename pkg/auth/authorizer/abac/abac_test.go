@@ -21,8 +21,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 func TestEmptyFile(t *testing.T) {
@@ -33,15 +33,15 @@ func TestEmptyFile(t *testing.T) {
 }
 
 func TestOneLineFileNoNewLine(t *testing.T) {
-	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "kind": "pods", "namespace":"ns1"}`)
+	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "resource": "pods", "namespace":"ns1"}`)
 	if err != nil {
 		t.Errorf("unable to read policy file: %v", err)
 	}
 }
 
 func TestTwoLineFile(t *testing.T) {
-	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "kind": "pods"}
-{"user":"scheduler",  "readonly": true, "kind": "services"}
+	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "resource": "pods"}
+{"user":"scheduler",  "readonly": true, "resource": "services"}
 `)
 	if err != nil {
 		t.Errorf("unable to read policy file: %v", err)
@@ -56,14 +56,14 @@ func TestExampleFile(t *testing.T) {
 	}
 }
 
-func NotTestAuthorize(t *testing.T) {
-	a, err := newWithContents(t, `{                     "readonly": true, "kind": "events"}
-{"user":"scheduler",  "readonly": true, "kind": "pods"}
-{"user":"scheduler",              "kind": "bindings"}
-{"user":"kubelet",    "readonly": true, "kind": "bindings"}
-{"user":"kubelet",                "kind": "events"}
-{"user":"alice",                                     "ns": "projectCaribou"}
-{"user":"bob",        "readonly": true,                    "ns": "projectCaribou"}
+func TestNotAuthorized(t *testing.T) {
+	a, err := newWithContents(t, `{                    "readonly": true, "resource": "events"   }
+{"user":"scheduler", "readonly": true, "resource": "pods"     }
+{"user":"scheduler",                   "resource": "bindings" }
+{"user":"kubelet",   "readonly": true, "resource": "bindings" }
+{"user":"kubelet",                     "resource": "events"   }
+{"user":"alice",                                              "namespace": "projectCaribou"}
+{"user":"bob",       "readonly": true,                        "namespace": "projectCaribou"}
 `)
 	if err != nil {
 		t.Fatalf("unable to read policy file: %v", err)
@@ -110,11 +110,11 @@ func NotTestAuthorize(t *testing.T) {
 		{User: uChuck, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: false},
 		{User: uChuck, RO: true, Resource: "floop", NS: "ns1", ExpectAllow: false},
 		// Chunk can't access things with no kind or namespace
-		// TODO: find a way to give someone access to miscelaneous endpoints, such as
+		// TODO: find a way to give someone access to miscellaneous endpoints, such as
 		// /healthz, /version, etc.
 		{User: uChuck, RO: true, Resource: "", NS: "", ExpectAllow: false},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		attr := authorizer.AttributesRecord{
 			User:      &tc.User,
 			ReadOnly:  tc.RO,
@@ -125,8 +125,8 @@ func NotTestAuthorize(t *testing.T) {
 		err := a.Authorize(attr)
 		actualAllow := bool(err == nil)
 		if tc.ExpectAllow != actualAllow {
-			t.Errorf("Expected allowed=%v but actually allowed=%v, for case %v",
-				tc.ExpectAllow, actualAllow, tc)
+			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
+				i, tc.ExpectAllow, actualAllow, tc)
 		}
 	}
 }

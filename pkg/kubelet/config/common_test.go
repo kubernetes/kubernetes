@@ -20,10 +20,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
 )
@@ -31,8 +32,9 @@ import (
 func noDefault(*api.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
+	grace := int64(30)
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -41,8 +43,9 @@ func TestDecodeSinglePod(t *testing.T) {
 			Namespace: "mynamespace",
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 			Containers: []api.Container{{
 				Name:                   "image",
 				Image:                  "test/image",
@@ -52,7 +55,7 @@ func TestDecodeSinglePod(t *testing.T) {
 			}},
 		},
 	}
-	json, err := testapi.Codec().Encode(pod)
+	json, err := testapi.Default.Codec().Encode(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -67,8 +70,8 @@ func TestDecodeSinglePod(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, podOut, string(json))
 	}
 
-	for _, version := range registered.RegisteredVersions {
-		externalPod, err := testapi.Converter().ConvertToVersion(pod, version)
+	for _, version := range registered.GroupVersionsForGroup("") {
+		externalPod, err := testapi.Default.Converter().ConvertToVersion(pod, version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -91,8 +94,9 @@ func TestDecodeSinglePod(t *testing.T) {
 }
 
 func TestDecodePodList(t *testing.T) {
+	grace := int64(30)
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -101,8 +105,9 @@ func TestDecodePodList(t *testing.T) {
 			Namespace: "mynamespace",
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 			Containers: []api.Container{{
 				Name:                   "image",
 				Image:                  "test/image",
@@ -115,7 +120,7 @@ func TestDecodePodList(t *testing.T) {
 	podList := &api.PodList{
 		Items: []api.Pod{*pod},
 	}
-	json, err := testapi.Codec().Encode(podList)
+	json, err := testapi.Default.Codec().Encode(podList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -130,8 +135,8 @@ func TestDecodePodList(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", podList, &podListOut, string(json))
 	}
 
-	for _, version := range registered.RegisteredVersions {
-		externalPodList, err := testapi.Converter().ConvertToVersion(podList, version)
+	for _, version := range registered.GroupVersionsForGroup("") {
+		externalPodList, err := testapi.Default.Converter().ConvertToVersion(podList, version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

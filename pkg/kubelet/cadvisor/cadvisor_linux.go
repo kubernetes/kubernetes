@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/events"
@@ -33,6 +32,7 @@ import (
 	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type cadvisorClient struct {
@@ -64,12 +64,9 @@ func New(port uint) (Interface, error) {
 		Manager: m,
 	}
 
-	// Export the HTTP endpoint if a port was specified.
-	if port > 0 {
-		err = cadvisorClient.exportHTTP(port)
-		if err != nil {
-			return nil, err
-		}
+	err = cadvisorClient.exportHTTP(port)
+	if err != nil {
+		return nil, err
 	}
 	return cadvisorClient, nil
 }
@@ -79,30 +76,35 @@ func (cc *cadvisorClient) Start() error {
 }
 
 func (cc *cadvisorClient) exportHTTP(port uint) error {
+	// Register the handlers regardless as this registers the prometheus
+	// collector properly.
 	mux := http.NewServeMux()
 	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "", "/metrics")
 	if err != nil {
 		return err
 	}
 
-	serv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: mux,
-	}
-
-	// TODO(vmarmol): Remove this when the cAdvisor port is once again free.
-	// If export failed, retry in the background until we are able to bind.
-	// This allows an existing cAdvisor to be killed before this one registers.
-	go func() {
-		defer util.HandleCrash()
-
-		err := serv.ListenAndServe()
-		for err != nil {
-			glog.Infof("Failed to register cAdvisor on port %d, retrying. Error: %v", port, err)
-			time.Sleep(time.Minute)
-			err = serv.ListenAndServe()
+	// Only start the http server if port > 0
+	if port > 0 {
+		serv := &http.Server{
+			Addr:    fmt.Sprintf(":%d", port),
+			Handler: mux,
 		}
-	}()
+
+		// TODO(vmarmol): Remove this when the cAdvisor port is once again free.
+		// If export failed, retry in the background until we are able to bind.
+		// This allows an existing cAdvisor to be killed before this one registers.
+		go func() {
+			defer util.HandleCrash()
+
+			err := serv.ListenAndServe()
+			for err != nil {
+				glog.Infof("Failed to register cAdvisor on port %d, retrying. Error: %v", port, err)
+				time.Sleep(time.Minute)
+				err = serv.ListenAndServe()
+			}
+		}()
+	}
 
 	return nil
 }

@@ -17,26 +17,29 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 const (
-	proxy_example = `// Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+	default_port  = 8001
+	proxy_example = `# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 $ kubectl proxy --port=8011 --www=./local/www/
 
-// Run a proxy to kubernetes apiserver on an arbitrary local port.
-// The chosen port for the server will be output to stdout.
+# Run a proxy to kubernetes apiserver on an arbitrary local port.
+# The chosen port for the server will be output to stdout.
 $ kubectl proxy --port=0
 
-// Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-// This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
+# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
+# This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
 $ kubectl proxy --api-prefix=/k8s-api`
 )
 
@@ -73,13 +76,19 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
 	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
-	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy. Set to 0 to pick a random port.")
-	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.")
+	cmd.Flags().IntP("port", "p", default_port, "The port on which to run the proxy. Set to 0 to pick a random port.")
+	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
+	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
 	return cmd
 }
 
 func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")
+
+	if port != default_port && path != "" {
+		return errors.New("Don't specify both --unix-socket and --port")
+	}
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
@@ -101,18 +110,22 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		AcceptHosts: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
 	}
 	if cmdutil.GetFlagBool(cmd, "disable-filter") {
-		glog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
+		if path == "" {
+			glog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
+		}
 		filter = nil
 	}
 
-	server, err := kubectl.NewProxyServer(port, cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
-	if err != nil {
-		return err
-	}
+	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
 
 	// Separate listening from serving so we can report the bound port
-	// when it is chosen by os (port == 0)
-	l, err := server.Listen()
+	// when it is chosen by os (eg: port == 0)
+	var l net.Listener
+	if path == "" {
+		l, err = server.Listen(port)
+	} else {
+		l, err = server.ListenUnix(path)
+	}
 	if err != nil {
 		glog.Fatal(err)
 	}

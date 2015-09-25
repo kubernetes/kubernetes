@@ -23,13 +23,15 @@ import (
 	gpath "path"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
@@ -302,13 +304,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeInto(body, obj); err != nil {
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
-		if admit.Handles(admission.Create) {
+		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
@@ -320,7 +322,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			out, err := r.Create(ctx, name, obj)
-			if status, ok := out.(*api.Status); ok && err == nil && status.Code == 0 {
+			if status, ok := out.(*unversioned.Status); ok && err == nil && status.Code == 0 {
 				status.Code = http.StatusCreated
 			}
 			return out, err
@@ -469,7 +471,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeInto(body, obj); err != nil {
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -480,7 +482,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		if admit.Handles(admission.Update) {
+		if admit != nil && admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
@@ -545,7 +547,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		if admit.Handles(admission.Delete) {
+		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
@@ -566,17 +568,17 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
-			result = &api.Status{
-				Status: api.StatusSuccess,
+			result = &unversioned.Status{
+				Status: unversioned.StatusSuccess,
 				Code:   http.StatusOK,
-				Details: &api.StatusDetails{
+				Details: &unversioned.StatusDetails{
 					Name: name,
 					Kind: scope.Kind,
 				},
 			}
 		} else {
 			// when a non-status response is returned, set the self link
-			if _, ok := result.(*api.Status); !ok {
+			if _, ok := result.(*unversioned.Status); !ok {
 				if err := setSelfLink(result, req, scope.Namer); err != nil {
 					errorJSON(err, scope.Codec, w)
 					return
@@ -618,7 +620,14 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	// when the select statement reads something other than the one the goroutine sends on.
 	ch := make(chan runtime.Object, 1)
 	errCh := make(chan error, 1)
+	panicCh := make(chan interface{}, 1)
 	go func() {
+		// panics don't cross goroutine boundaries, so we have to handle ourselves
+		defer util.HandleCrash(func(panicReason interface{}) {
+			// Propagate to parent goroutine
+			panicCh <- panicReason
+		})
+
 		if result, err := fn(); err != nil {
 			errCh <- err
 		} else {
@@ -628,12 +637,14 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 	select {
 	case result = <-ch:
-		if status, ok := result.(*api.Status); ok {
+		if status, ok := result.(*unversioned.Status); ok {
 			return nil, errors.FromObject(status)
 		}
 		return result, nil
 	case err = <-errCh:
 		return nil, err
+	case p := <-panicCh:
+		panic(p)
 	case <-time.After(timeout):
 		return nil, errors.NewTimeoutError("request did not complete within allowed duration", 0)
 	}

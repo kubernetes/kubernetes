@@ -20,23 +20,23 @@ This command joins many API calls together to form a detailed description of a
 given resource or group of resources.
 
 .PP
-$ kubectl describe RESOURCE NAME\_PREFIX
+$ kubectl describe TYPE NAME\_PREFIX
 
 .PP
-will first check for an exact match on RESOURCE and NAME\_PREFIX. If no such resource
+will first check for an exact match on TYPE and NAME\_PREFIX. If no such resource
 exists, it will output details for every resource that has a name prefixed with NAME\_PREFIX
 
 .PP
-Possible resources include (case insensitive): pods (po), services (svc),
+Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
 persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota),
-namespaces (ns) or secrets.
+namespaces (ns), serviceaccounts or secrets.
 
 
 .SH OPTIONS
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for describe
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file containing the resource to describe
 
 .PP
 \fB\-l\fP, \fB\-\-selector\fP=""
@@ -133,10 +133,6 @@ namespaces (ns) or secrets.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -146,17 +142,23 @@ namespaces (ns) or secrets.
 .RS
 
 .nf
-// Describe a node
+# Describe a node
 $ kubectl describe nodes kubernetes\-minion\-emt8.c.myproject.internal
 
-// Describe a pod
+# Describe a pod
 $ kubectl describe pods/nginx
 
-// Describe pods by label name=myLabel
+# Describe a pod identified by type and name in "pod.json"
+$ kubectl describe \-f pod.json
+
+# Describe all pods
+$ kubectl describe pods
+
+# Describe pods by label name=myLabel
 $ kubectl describe po \-l name=myLabel
 
-// Describe all pods managed by the 'frontend' replication controller (rc\-created pods
-// get the name of the rc as a prefix in the pod the name).
+# Describe all pods managed by the 'frontend' replication controller (rc\-created pods
+# get the name of the rc as a prefix in the pod the name).
 $ kubectl describe pods frontend
 
 .fi

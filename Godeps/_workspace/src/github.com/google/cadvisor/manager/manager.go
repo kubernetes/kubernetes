@@ -161,8 +161,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	if err != nil {
 		return nil, err
 	}
-	newManager.versionInfo = *versionInfo
-	glog.Infof("Version: %+v", newManager.versionInfo)
+	glog.Infof("Version: %+v", *versionInfo)
 
 	newManager.eventHandler = events.NewEventManager(parseEventsStoragePolicy())
 	return newManager, nil
@@ -183,7 +182,6 @@ type manager struct {
 	memoryCache              *memory.InMemoryCache
 	fsInfo                   fs.FsInfo
 	machineInfo              info.MachineInfo
-	versionInfo              info.VersionInfo
 	quitChannels             []chan error
 	cadvisorContainer        string
 	inHostNamespace          bool
@@ -221,7 +219,7 @@ func (self *manager) Start() error {
 		} else {
 			err = cpuLoadReader.Start()
 			if err != nil {
-				glog.Warning("Could not start cpu load stat collector: %s", err)
+				glog.Warningf("Could not start cpu load stat collector: %s", err)
 			} else {
 				self.loadReader = cpuLoadReader
 			}
@@ -382,6 +380,7 @@ func (self *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
 		HasNetwork:       specV1.HasNetwork,
 		HasDiskIo:        specV1.HasDiskIo,
 		HasCustomMetrics: specV1.HasCustomMetrics,
+		Image:            specV1.Image,
 	}
 	if specV1.HasCpu {
 		specV2.Cpu.Limit = specV1.Cpu.Limit
@@ -658,7 +657,11 @@ func (m *manager) GetMachineInfo() (*info.MachineInfo, error) {
 }
 
 func (m *manager) GetVersionInfo() (*info.VersionInfo, error) {
-	return &m.versionInfo, nil
+	// TODO: Consider caching this and periodically updating.  The VersionInfo may change if
+	// the docker daemon is started after the cAdvisor client is created.  Caching the value
+	// would be helpful so we would be able to return the last known docker version if
+	// docker was down at the time of a query.
+	return getVersionInfo()
 }
 
 func (m *manager) Exists(containerName string) bool {
@@ -705,15 +708,28 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 		}
 		glog.V(3).Infof("Got config from %q: %q", v, configFile)
 
-		newCollector, err := collector.NewCollector(k, configFile)
-		if err != nil {
-			glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
-			return err
-		}
-		err = cont.collectorManager.RegisterCollector(newCollector)
-		if err != nil {
-			glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
-			return err
+		if strings.HasPrefix(k, "prometheus") || strings.HasPrefix(k, "Prometheus") {
+			newCollector, err := collector.NewPrometheusCollector(k, configFile)
+			if err != nil {
+				glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
+			err = cont.collectorManager.RegisterCollector(newCollector)
+			if err != nil {
+				glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
+		} else {
+			newCollector, err := collector.NewCollector(k, configFile)
+			if err != nil {
+				glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
+			err = cont.collectorManager.RegisterCollector(newCollector)
+			if err != nil {
+				glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
 		}
 	}
 	return nil
@@ -721,7 +737,7 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 
 // Create a container.
 func (m *manager) createContainer(containerName string) error {
-	handler, accept, err := container.NewContainerHandler(containerName)
+	handler, accept, err := container.NewContainerHandler(containerName, m.inHostNamespace)
 	if err != nil {
 		return err
 	}
@@ -1136,8 +1152,12 @@ func (m *manager) DockerInfo() (DockerStatus, error) {
 	if err != nil {
 		return DockerStatus{}, err
 	}
+	versionInfo, err := m.GetVersionInfo()
+	if err != nil {
+		return DockerStatus{}, err
+	}
 	out := DockerStatus{}
-	out.Version = m.versionInfo.DockerVersion
+	out.Version = versionInfo.DockerVersion
 	if val, ok := info["KernelVersion"]; ok {
 		out.KernelVersion = val
 	}

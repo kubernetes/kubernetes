@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -102,7 +102,7 @@ func (v *ValidationError) ErrorBody() string {
 		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
 	}
 	if len(v.Detail) != 0 {
-		s += fmt.Sprintf(": %s", v.Detail)
+		s += fmt.Sprintf(", Details: %s", v.Detail)
 	}
 	return s
 }

@@ -26,15 +26,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/fs"
 	"github.com/docker/libcontainer/configs"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/oom"
 )
 
 const (
@@ -136,8 +137,6 @@ func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonConta
 		systemContainers = append(systemContainers, newSystemContainer(kubeletContainerName))
 	}
 
-	// TODO(vmarmol): Add Kube-proxy container.
-
 	return &containerManagerImpl{
 		systemContainers: systemContainers,
 	}, nil
@@ -228,8 +227,9 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 			}
 		}
 
-		// Also apply oom_score_adj to processes
-		if err := util.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
+		// Also apply oom-score-adj to processes
+		oomAdjuster := oom.NewOomAdjuster()
+		if err := oomAdjuster.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
 			errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
 		}
 	}
@@ -248,8 +248,16 @@ func getContainer(pid int) (string, error) {
 	return cgroups.ParseCgroupFile("cpu", f)
 }
 
-// Ensures the system container is created and all non-kernel processes without
-// a container are moved to it.
+// Ensures the system container is created and all non-kernel threads and process 1
+// without a container are moved to it.
+//
+// The reason of leaving kernel threads at root cgroup is that we don't want to tie the
+// execution of these threads with to-be defined /system quota and create priority inversions.
+//
+// The reason of leaving process 1 at root cgroup is that libcontainer hardcoded on
+// the base cgroup path based on process 1. Please see:
+// https://github.com/kubernetes/kubernetes/issues/12789#issuecomment-132384126
+// for detail explanation.
 func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
@@ -265,13 +273,18 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 			continue
 		}
 
-		// Remove kernel pids
+		// Remove kernel pids and process 1
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
 			if isKernelPid(pid) {
 				continue
 			}
 
+			// TODO(dawnchen): Remove this once the hard dependency on process 1 is removed
+			// on systemd node.
+			if pid == 1 {
+				continue
+			}
 			pids = append(pids, pid)
 		}
 		glog.Infof("Found %d PIDs in root, %d of them are kernel related", len(allPids), len(allPids)-len(pids))

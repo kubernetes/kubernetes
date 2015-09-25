@@ -17,77 +17,39 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 )
-
-type listContainersResult struct {
-	label      string
-	containers []docker.APIContainers
-	err        error
-}
-
-type inspectContainersResult struct {
-	label     string
-	container docker.Container
-	err       error
-}
-
-type testDocker struct {
-	listContainersResults    []listContainersResult
-	inspectContainersResults []inspectContainersResult
-	dockertools.FakeDockerClient
-	t *testing.T
-}
-
-func (d *testDocker) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	if len(d.listContainersResults) > 0 {
-		result := d.listContainersResults[0]
-		d.listContainersResults = d.listContainersResults[1:]
-		d.t.Logf("ListContainers: %q, returning: (%v, %v)", result.label, result.containers, result.err)
-		return result.containers, result.err
-	}
-	return nil, fmt.Errorf("ListContainers error: no more test results")
-}
-
-func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
-	if len(d.inspectContainersResults) > 0 {
-		result := d.inspectContainersResults[0]
-		d.inspectContainersResults = d.inspectContainersResults[1:]
-		d.t.Logf("InspectContainers: %q, returning: (%v, %v)", result.label, result.container, result.err)
-		return &result.container, result.err
-	}
-	return nil, fmt.Errorf("InspectContainer error: no more test results")
-}
 
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 
 	podManager, _ := newFakePodManager()
+	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
+	fakeRuntime := &kubecontainer.FakeRuntime{}
 
 	kb := &Kubelet{
 		rootDirectory:       "/tmp/kubelet",
 		recorder:            &record.FakeRecorder{},
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
-		statusManager:       newStatusManager(nil),
+		statusManager:       status.NewManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
 		readinessManager:    kubecontainer.NewReadinessManager(),
 		podManager:          podManager,
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
+		diskSpaceManager:    diskSpaceManager,
+		containerRuntime:    fakeRuntime,
 	}
 	kb.containerManager, _ = newContainerManager(cadvisor, "", "", "")
 
@@ -95,74 +57,6 @@ func TestRunOnce(t *testing.T) {
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
-	podContainers := []docker.APIContainers{
-		{
-			Names:  []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
-			ID:     "1234",
-			Status: "running",
-		},
-		{
-			Names:  []string{"/k8s_net_foo.new.test_abcdefgh_42"},
-			ID:     "9876",
-			Status: "running",
-		},
-	}
-	kb.dockerClient = &testDocker{
-		listContainersResults: []listContainersResult{
-			{label: "list pod container", containers: []docker.APIContainers{}},
-			{label: "syncPod", containers: []docker.APIContainers{}},
-			{label: "list pod container", containers: []docker.APIContainers{}},
-			{label: "syncPod", containers: podContainers},
-			{label: "list pod container", containers: podContainers},
-			{label: "list pod container", containers: podContainers},
-		},
-		inspectContainersResults: []inspectContainersResult{
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-			{
-				label: "syncPod",
-				container: docker.Container{
-					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true, Pid: 42},
-				},
-			},
-		},
-		t: t,
-	}
-
-	kb.containerRuntime = dockertools.NewFakeDockerManager(
-		kb.dockerClient,
-		kb.recorder,
-		kb.readinessManager,
-		kb.containerRefManager,
-		dockertools.PodInfraContainerImage,
-		0,
-		0,
-		"",
-		kubecontainer.FakeOS{},
-		kb.networkPlugin,
-		kb,
-		nil,
-		newKubeletRuntimeHooks(kb.recorder))
 
 	pods := []*api.Pod{
 		{

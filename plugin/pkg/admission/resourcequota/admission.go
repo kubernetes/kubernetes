@@ -22,16 +22,17 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/resourcequota"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -102,7 +103,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 	items, err := q.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
+		return admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
 	}
 	if len(items) == 0 {
 		return nil
@@ -149,7 +150,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 				// we have concurrent requests to update quota, so look to retry if needed
 				if retry == numRetries {
-					return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
+					return admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
 				}
 				time.Sleep(interval)
 				// manually get the latest quota
@@ -167,7 +168,8 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 // Return true if the usage must be recorded prior to admitting the new resource
 // Return an error if the operation should not pass admission control
 func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
-	dirty := false
+	var errs []error
+	dirty := true
 	set := map[api.ResourceName]bool{}
 	for k := range status.Hard {
 		set[k] = true
@@ -180,65 +182,84 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 		if hardFound {
 			used, usedFound := status.Used[resourceName]
 			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
+				return false, fmt.Errorf("quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
 			}
 			if used.Value() >= hard.Value() {
-				return false, fmt.Errorf("Limited to %s %s", hard.String(), resourceName)
+				errs = append(errs, fmt.Errorf("limited to %s %s", hard.String(), resourceName))
+				dirty = false
 			} else {
 				status.Used[resourceName] = *resource.NewQuantity(used.Value()+int64(1), resource.DecimalSI)
-				dirty = true
 			}
 		}
 	}
-	// handle memory/cpu constraints, and any diff of usage based on memory/cpu on updates
-	if a.GetResource() == "pods" && (set[api.ResourceMemory] || set[api.ResourceCPU]) {
-		pod := obj.(*api.Pod)
-		deltaCPU := resourcequota.PodCPU(pod)
-		deltaMemory := resourcequota.PodMemory(pod)
-		// if this is an update, we need to find the delta cpu/memory usage from previous state
-		if a.GetOperation() == admission.Update {
-			oldPod, err := client.Pods(a.GetNamespace()).Get(pod.Name)
-			if err != nil {
-				return false, err
-			}
-			oldCPU := resourcequota.PodCPU(oldPod)
-			oldMemory := resourcequota.PodMemory(oldPod)
-			deltaCPU = resource.NewMilliQuantity(deltaCPU.MilliValue()-oldCPU.MilliValue(), resource.DecimalSI)
-			deltaMemory = resource.NewQuantity(deltaMemory.Value()-oldMemory.Value(), resource.DecimalSI)
-		}
 
-		hardMem, hardMemFound := status.Hard[api.ResourceMemory]
-		if hardMemFound {
-			if set[api.ResourceMemory] && resourcequota.IsPodMemoryUnbounded(pod) {
-				return false, fmt.Errorf("Limited to %s memory, but pod has no specified memory limit", hardMem.String())
+	if a.GetResource() == "pods" {
+		for _, resourceName := range []api.ResourceName{api.ResourceMemory, api.ResourceCPU} {
+
+			// ignore tracking the resource if it's not in the quota document
+			if !set[resourceName] {
+				continue
 			}
-			used, usedFound := status.Used[api.ResourceMemory]
+
+			hard, hardFound := status.Hard[resourceName]
+			if !hardFound {
+				continue
+			}
+
+			// if we do not yet know how much of the current resource is used, we cannot accept any request
+			used, usedFound := status.Used[resourceName]
 			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
+				return false, fmt.Errorf("unable to admit pod until quota usage stats are calculated.")
 			}
-			if used.Value()+deltaMemory.Value() > hardMem.Value() {
-				return false, fmt.Errorf("Limited to %s memory", hardMem.String())
+
+			// the amount of resource being requested, or an error if it does not make a request that is tracked
+			pod := obj.(*api.Pod)
+			delta, err := resourcequotacontroller.PodRequests(pod, resourceName)
+
+			if err != nil {
+				return false, fmt.Errorf("must make a non-zero request for %s since it is tracked by quota.", resourceName)
+			}
+
+			// if this operation is an update, we need to find the delta usage from the previous state
+			if a.GetOperation() == admission.Update {
+				oldPod, err := client.Pods(a.GetNamespace()).Get(pod.Name)
+				if err != nil {
+					return false, err
+				}
+
+				// if the previous version of the resource made a resource request, we need to subtract the old request
+				// from the current to get the actual resource request delta.  if the previous version of the pod
+				// made no request on the resource, then we get an err value.  we ignore the err value, and delta
+				// will just be equal to the total resource request on the pod since there is nothing to subtract.
+				oldRequest, err := resourcequotacontroller.PodRequests(oldPod, resourceName)
+				if err == nil {
+					err = delta.Sub(*oldRequest)
+					if err != nil {
+						return false, err
+					}
+				}
+			}
+
+			newUsage := used.Copy()
+			newUsage.Add(*delta)
+
+			// make the most precise comparison possible
+			newUsageValue := newUsage.Value()
+			hardUsageValue := hard.Value()
+			if newUsageValue <= resource.MaxMilliValue && hardUsageValue <= resource.MaxMilliValue {
+				newUsageValue = newUsage.MilliValue()
+				hardUsageValue = hard.MilliValue()
+			}
+
+			if newUsageValue > hardUsageValue {
+				errs = append(errs, fmt.Errorf("unable to admit pod without exceeding quota for resource %s:  limited to %s but require %s to succeed.", resourceName, hard.String(), newUsage.String()))
+				dirty = false
 			} else {
-				status.Used[api.ResourceMemory] = *resource.NewQuantity(used.Value()+deltaMemory.Value(), resource.DecimalSI)
-				dirty = true
+				status.Used[resourceName] = *newUsage
 			}
-		}
-		hardCPU, hardCPUFound := status.Hard[api.ResourceCPU]
-		if hardCPUFound {
-			if set[api.ResourceCPU] && resourcequota.IsPodCPUUnbounded(pod) {
-				return false, fmt.Errorf("Limited to %s CPU, but pod has no specified cpu limit", hardCPU.String())
-			}
-			used, usedFound := status.Used[api.ResourceCPU]
-			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
-			}
-			if used.MilliValue()+deltaCPU.MilliValue() > hardCPU.MilliValue() {
-				return false, fmt.Errorf("Limited to %s CPU", hardCPU.String())
-			} else {
-				status.Used[api.ResourceCPU] = *resource.NewMilliQuantity(used.MilliValue()+deltaCPU.MilliValue(), resource.DecimalSI)
-				dirty = true
-			}
+
 		}
 	}
-	return dirty, nil
+
+	return dirty, errors.NewAggregate(errs)
 }

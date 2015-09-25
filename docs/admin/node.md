@@ -192,16 +192,6 @@ For self-registration, the kubelet is started with the following options:
 Currently, any kubelet is authorized to create/modify any node resource, but in practice it only creates/modifies
 its own.  (In the future, we plan to limit authorization to only allow a kubelet to modify its own Node resource.)
 
-If your cluster runs short on resources you can easily add more machines to it if your cluster is running in Node self-registration mode. If you're using GCE or GKE it's done by resizing Instance Group managing your Nodes. It can be accomplished by modifying number of instances on `Compute > Compute Engine > Instance groups > your group > Edit group` [Google Cloud Console page](https://console.developers.google.com) or using gcloud CLI:
-
-```
-gcloud preview managed-instance-groups --zone compute-zone resize my-cluster-minon-group --new-size 42
-```
-
-Instance Group will take care of putting appropriate image on new machines and start them, while Kubelet will register its Node with API server to make it available for scheduling. If you scale the instance group down, system will randomly choose Nodes to kill.
-
-In other environments you may need to configure the machine yourself and tell the Kubelet on which machine API server is running.
-
 #### Manual Node Administration
 
 A cluster administrator can create and modify Node objects.
@@ -224,6 +214,10 @@ unschedulable, run this command:
 kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 ```
 
+Note that pods which are created by a daemonSet controller bypass the Kubernetes scheduler,
+and do not respect the unschedulable attribute on a node.   The assumption is that daemons belong on
+the machine even if it is being drained of applications in preparation for a reboot.
+
 ### Node capacity
 
 The capacity of the node (number of cpus and amount of memory) is part of the node resource.
@@ -232,7 +226,7 @@ you are doing [manual node administration](#manual-node-administration), then yo
 capacity when adding a node.
 
 The Kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
-checks that the sum of the limits of containers on the node is no greater than than the node capacity.  It
+checks that the sum of the limits of containers on the node is no greater than the node capacity.  It
 includes all containers started by kubelet, but not containers started directly by docker, nor
 processes not in containers.
 
@@ -258,11 +252,12 @@ Set the `cpu` and `memory` values to the amount of resources you want to reserve
 Place the file in the manifest directory (`--config=DIR` flag of kubelet).  Do this
 on each kubelet where you want to reserve resources.
 
+
 ## API Object
 
 Node is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Node API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

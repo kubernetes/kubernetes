@@ -19,7 +19,7 @@ package queue
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 type EventType int
@@ -58,7 +58,7 @@ type FIFO interface {
 	// Pop waits until an item is ready and returns it. If multiple items are
 	// ready, they are returned in the order in which they were added/updated.
 	// The item is removed from the queue (and the store) before it is returned,
-	// so if you don't succesfully process it, you need to add it back with Add().
+	// so if you don't successfully process it, you need to add it back with Add().
 	Pop() interface{}
 
 	// Await attempts to Pop within the given interval; upon success the non-nil

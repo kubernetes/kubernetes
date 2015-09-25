@@ -3,7 +3,8 @@ package volumes
 import (
 	"testing"
 
-	os "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
+	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
+	os "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes/testing"
 	"github.com/rackspace/gophercloud/pagination"
 	th "github.com/rackspace/gophercloud/testhelper"
 	fake "github.com/rackspace/gophercloud/testhelper/client"
@@ -64,7 +65,7 @@ func TestCreate(t *testing.T) {
 
 	os.MockCreateResponse(t)
 
-	n, err := Create(fake.ServiceClient(), CreateOpts{os.CreateOpts{Size: 75}}).Extract()
+	n, err := Create(fake.ServiceClient(), CreateOpts{volumes.CreateOpts{Size: 75}}).Extract()
 	th.AssertNoErr(t, err)
 
 	th.AssertEquals(t, n.Size, 4)
@@ -72,12 +73,12 @@ func TestCreate(t *testing.T) {
 }
 
 func TestSizeRange(t *testing.T) {
-	_, err := Create(fake.ServiceClient(), CreateOpts{os.CreateOpts{Size: 1}}).Extract()
+	_, err := Create(fake.ServiceClient(), CreateOpts{volumes.CreateOpts{Size: 1}}).Extract()
 	if err == nil {
 		t.Fatalf("Expected error, got none")
 	}
 
-	_, err = Create(fake.ServiceClient(), CreateOpts{os.CreateOpts{Size: 2000}}).Extract()
+	_, err = Create(fake.ServiceClient(), CreateOpts{volumes.CreateOpts{Size: 2000}}).Extract()
 	if err == nil {
 		t.Fatalf("Expected error, got none")
 	}

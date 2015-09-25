@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 // NsenterMounter is part of experimental support for running the kubelet
@@ -71,8 +71,8 @@ func NewNsenterMounter() *NsenterMounter {
 		// default to root
 		m.paths[binary] = filepath.Join("/", binary)
 		for _, path := range []string{"/bin", "/usr/sbin", "/usr/bin"} {
-			binPath := filepath.Join(hostRootFsPath, path, binary)
-			if _, err := os.Stat(binPath); err != nil {
+			binPath := filepath.Join(path, binary)
+			if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
 				continue
 			}
 			m.paths[binary] = binPath
@@ -162,12 +162,12 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 	return listProcMounts(hostProcMountsPath)
 }
 
-// IsMountPoint determines whether a path is a mountpoint by calling findmnt
+// IsLikelyNotMountPoint determines whether a path is a mountpoint by calling findmnt
 // in the host's root mount namespace.
-func (n *NsenterMounter) IsMountPoint(file string) (bool, error) {
+func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	file, err := filepath.Abs(file)
 	if err != nil {
-		return false, err
+		return true, err
 	}
 
 	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "--", n.absHostPath("findmnt"), "-o", "target", "--noheadings", "--target", file}
@@ -176,17 +176,18 @@ func (n *NsenterMounter) IsMountPoint(file string) (bool, error) {
 	exec := exec.New()
 	out, err := exec.Command(nsenterPath, args...).CombinedOutput()
 	if err != nil {
-		// If findmnt didn't run, just claim it's not a mount point.
-		return false, nil
+		// If the command itself is correct, then if we encountered error
+		// then most likely this means that the directory does not exist.
+		return true, os.ErrNotExist
 	}
 	strOut := strings.TrimSuffix(string(out), "\n")
 
-	glog.V(5).Infof("IsMountPoint findmnt output: %v", strOut)
+	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output: %v", strOut)
 	if strOut == file {
-		return true, nil
+		return false, nil
 	}
 
-	return false, nil
+	return true, nil
 }
 
 func (n *NsenterMounter) absHostPath(command string) string {

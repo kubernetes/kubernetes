@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # The golang package that we are building.
-readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
+readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
 # Load contrib target functions
@@ -33,7 +33,6 @@ kube::golang::server_targets() {
     cmd/kube-controller-manager
     cmd/kubelet
     cmd/hyperkube
-    cmd/kubernetes
     cmd/linkcheck
     plugin/cmd/kube-scheduler
   )
@@ -69,6 +68,7 @@ kube::golang::test_targets() {
     cmd/genbashcomp
     cmd/genconversion
     cmd/gendeepcopy
+    cmd/genswaggertypedocs
     examples/k8petstore/web-server
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
@@ -84,8 +84,8 @@ readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
-  contrib/for-tests/network-tester/rc.json
-  contrib/for-tests/network-tester/service.json
+  test/images/network-tester/rc.json
+  test/images/network-tester/service.json
   hack/e2e.go
   hack/e2e-internal
   hack/ginkgo-e2e.sh
@@ -369,7 +369,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
     done
@@ -377,7 +377,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
     done
@@ -386,12 +386,12 @@ kube::golang::build_binaries_for_platform() {
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       go install "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
       CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
     fi
   fi
@@ -405,7 +405,7 @@ kube::golang::build_binaries_for_platform() {
     pushd "$(dirname ${outfile})" >/dev/null
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
-      -ldflags "${version_ldflags}" \
+      -ldflags "${goldflags}" \
       "$(dirname ${test})"
     popd >/dev/null
   done
@@ -447,16 +447,13 @@ kube::golang::build_binaries() {
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
 
-    # Fetch the version.
-    local version_ldflags
-    version_ldflags=$(kube::version::ldflags)
-
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags
+    local goflags goldflags
     eval "goflags=(${KUBE_GOFLAGS:-})"
+    goldflags="${KUBE_GOLDFLAGS:-} $(kube::version::ldflags)"
 
     local use_go_build
     local -a targets=()

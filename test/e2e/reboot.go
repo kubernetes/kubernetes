@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -86,7 +86,7 @@ var _ = Describe("Reboot", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A INPUT -s 127.0.0.1 -j ACCEPT && sudo iptables -A INPUT -j DROP && "+
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 
@@ -94,7 +94,7 @@ var _ = Describe("Reboot", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
-		testReboot(c, "nohup sh -c 'sleep 10 &&  sudo iptables -A OUTPUT -s 127.0.0.1 -j ACCEPT && sudo iptables -A OUTPUT -j DROP && "+
+		testReboot(c, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 })
@@ -112,7 +112,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 
 	// Wait for all to finish and check the final result.
 	failed := false
-	// TODO(mbforbes): Change to `for range` syntax and remove logging once
+	// TODO(a-robinson): Change to `for range` syntax and remove logging once
 	// we support only Go >= 1.4.
 	for _, n := range nodelist.Items {
 		if !<-result {

@@ -22,10 +22,6 @@ Attach to a a process that is already running inside an existing container.
     Container name
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for attach
-
-.PP
 \fB\-i\fP, \fB\-\-stdin\fP=false
     Pass stdin to the container
 
@@ -124,10 +120,6 @@ Attach to a a process that is already running inside an existing container.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -137,14 +129,14 @@ Attach to a a process that is already running inside an existing container.
 .RS
 
 .nf
-// get output from running pod 123456\-7890, using the first container by default
+# Get output from running pod 123456\-7890, using the first container by default
 $ kubectl attach 123456\-7890
-	
-// get output from ruby\-container from pod 123456\-7890
+
+# Get output from ruby\-container from pod 123456\-7890
 $ kubectl attach 123456\-7890 \-c ruby\-container date
 
-// switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
-// and sends stdout/stderr from 'bash' back to the client
+# Switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
+# and sends stdout/stderr from 'bash' back to the client
 $ kubectl attach 123456\-7890 \-c ruby\-container \-i \-t
 
 .fi

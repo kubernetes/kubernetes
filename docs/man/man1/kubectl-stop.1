@@ -16,7 +16,7 @@ kubectl stop \- Deprecated: Gracefully shut down a resource by name or filename.
 Deprecated: Gracefully shut down a resource by name or filename.
 
 .PP
-stop command is deprecated, all its functionalities are covered by delete command.
+The stop command is deprecated, all its functionalities are covered by delete command.
 See 'kubectl delete \-\-help' for more details.
 
 .PP
@@ -36,10 +36,6 @@ If the resource is scalable it will be scaled to 0 before deletion.
 .PP
 \fB\-\-grace\-period\fP=\-1
     Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for stop
 
 .PP
 \fB\-\-ignore\-not\-found\fP=false
@@ -148,10 +144,6 @@ If the resource is scalable it will be scaled to 0 before deletion.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -161,16 +153,16 @@ If the resource is scalable it will be scaled to 0 before deletion.
 .RS
 
 .nf
-// Shut down foo.
+# Shut down foo.
 $ kubectl stop replicationcontroller foo
 
-// Stop pods and services with label name=myLabel.
+# Stop pods and services with label name=myLabel.
 $ kubectl stop pods,services \-l name=myLabel
 
-// Shut down the service defined in service.json
+# Shut down the service defined in service.json
 $ kubectl stop \-f service.json
 
-// Shut down all resources in the path/to/resources directory
+# Shut down all resources in the path/to/resources directory
 $ kubectl stop \-f path/to/resources
 
 .fi

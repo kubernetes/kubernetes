@@ -113,8 +113,8 @@ Once that's up you can list the service in the cluster:
 
 ```sh
 $ kubectl get service dns-backend
-NAME          LABELS    SELECTOR           IP(S)          PORT(S)
-dns-backend   <none>    name=dns-backend   10.0.236.129   8000/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR          AGE
+dns-backend  10.0.2.3         <none>            8000/TCP               name=dns-backend  1d
 ```
 
 Again, repeat the same process for prod namespace:
@@ -123,8 +123,8 @@ Again, repeat the same process for prod namespace:
 $ kubectl config use-context prod
 $ kubectl create -f examples/cluster-dns/dns-backend-service.yaml
 $ kubectl get service dns-backend
-NAME          LABELS    SELECTOR           IP(S)         PORT(S)
-dns-backend   <none>    name=dns-backend   10.0.35.246   8000/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR          AGE
+dns-backend  10.0.2.4         <none>            8000/TCP               name=dns-backend  1d
 ```
 
 ### Step Four: Create client pod in one namespace

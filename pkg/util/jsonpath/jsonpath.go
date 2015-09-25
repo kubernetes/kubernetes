@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strconv"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/template"
+	"k8s.io/kubernetes/third_party/golang/template"
 )
 
 type JSONPath struct {
@@ -53,17 +53,31 @@ func (j *JSONPath) Parse(text string) (err error) {
 
 // Execute bounds data into template and write the result
 func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
+	fullResults, err := j.FindResults(data)
+	if err != nil {
+		return err
+	}
+	for ix := range fullResults {
+		if err := j.PrintResults(wr, fullResults[ix]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 	if j.parser == nil {
-		return fmt.Errorf("%s is an incomplete jsonpath template", j.name)
+		return nil, fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
 
 	j.cur = []reflect.Value{reflect.ValueOf(data)}
 	nodes := j.parser.Root.Nodes
+	fullResult := [][]reflect.Value{}
 	for i := 0; i < len(nodes); i++ {
 		node := nodes[i]
 		results, err := j.walk(j.cur, node)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		//encounter an end node, break the current block
@@ -80,20 +94,17 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 				if k == len(results)-1 {
 					j.inRange -= 1
 				}
-				err := j.Execute(wr, value.Interface())
+				nextResults, err := j.FindResults(value.Interface())
 				if err != nil {
-					return err
+					return nil, err
 				}
-
+				fullResult = append(fullResult, nextResults...)
 			}
 			break
 		}
-		err = j.PrintResults(wr, results)
-		if err != nil {
-			return err
-		}
+		fullResult = append(fullResult, results)
 	}
-	return nil
+	return fullResult, nil
 }
 
 // PrintResults write the results into writer
@@ -203,11 +214,10 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
 	for _, value := range input {
-		if value.Kind() == reflect.Interface {
-			value = reflect.ValueOf(value.Interface())
-		}
-		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
-			return input, fmt.Errorf("%v is not array or slice", value)
+
+		value, isNil := template.Indirect(value)
+		if isNil || (value.Kind() != reflect.Array && value.Kind() != reflect.Slice) {
+			return input, fmt.Errorf("%v is not array or slice", value.Type())
 		}
 		params := node.Params
 		if !params[0].Known {
@@ -249,16 +259,58 @@ func (j *JSONPath) evalUnion(input []reflect.Value, node *UnionNode) ([]reflect.
 	return result, nil
 }
 
+func (j *JSONPath) findFieldInValue(value *reflect.Value, node *FieldNode) (reflect.Value, error) {
+	t := value.Type()
+	var inlineValue *reflect.Value
+	for ix := 0; ix < t.NumField(); ix++ {
+		f := t.Field(ix)
+		jsonTag := f.Tag.Get("json")
+		parts := strings.Split(jsonTag, ",")
+		if len(parts) == 0 {
+			continue
+		}
+		if parts[0] == node.Value {
+			return value.Field(ix), nil
+		}
+		if len(parts[0]) == 0 {
+			val := value.Field(ix)
+			inlineValue = &val
+		}
+	}
+	if inlineValue != nil {
+		if inlineValue.Kind() == reflect.Struct {
+			// handle 'inline'
+			match, err := j.findFieldInValue(inlineValue, node)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			if match.IsValid() {
+				return match, nil
+			}
+		}
+	}
+	return value.FieldByName(node.Value), nil
+}
+
 // evalField evaluates filed of struct or key of map.
 func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
+	// If there's no input, there's no output
+	if len(input) == 0 {
+		return results, nil
+	}
 	for _, value := range input {
 		var result reflect.Value
-		if value.Kind() == reflect.Interface {
-			value = reflect.ValueOf(value.Interface())
+		value, isNil := template.Indirect(value)
+		if isNil {
+			continue
 		}
+
 		if value.Kind() == reflect.Struct {
-			result = value.FieldByName(node.Value)
+			var err error
+			if result, err = j.findFieldInValue(&value, node); err != nil {
+				return nil, err
+			}
 		} else if value.Kind() == reflect.Map {
 			result = value.MapIndex(reflect.ValueOf(node.Value))
 		}
@@ -276,6 +328,11 @@ func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.
 func (j *JSONPath) evalWildcard(input []reflect.Value, node *WildcardNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
 	for _, value := range input {
+		value, isNil := template.Indirect(value)
+		if isNil {
+			continue
+		}
+
 		kind := value.Kind()
 		if kind == reflect.Struct {
 			for i := 0; i < value.NumField(); i++ {
@@ -299,6 +356,11 @@ func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]
 	result := []reflect.Value{}
 	for _, value := range input {
 		results := []reflect.Value{}
+		value, isNil := template.Indirect(value)
+		if isNil {
+			continue
+		}
+
 		kind := value.Kind()
 		if kind == reflect.Struct {
 			for i := 0; i < value.NumField(); i++ {
@@ -329,9 +391,8 @@ func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]
 func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
 	for _, value := range input {
-		if value.Kind() == reflect.Interface {
-			value = reflect.ValueOf(value.Interface())
-		}
+		value, _ = template.Indirect(value)
+
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice", value)
 		}
@@ -396,77 +457,11 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 
 // evalToText translates reflect value to corresponding text
 func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
-	if v.Kind() == reflect.Interface {
-		v = reflect.ValueOf(v.Interface())
+	iface, ok := template.PrintableValue(v)
+	if !ok {
+		return nil, fmt.Errorf("can't print type %s", v.Type())
 	}
 	var buffer bytes.Buffer
-	switch v.Kind() {
-	case reflect.Invalid:
-		//pass
-	case reflect.Ptr:
-		text, err := j.evalToText(reflect.Indirect(v))
-		if err != nil {
-			return nil, err
-		}
-		buffer.Write(text)
-	case reflect.Bool:
-		if variable := v.Bool(); variable {
-			buffer.WriteString("True")
-		} else {
-			buffer.WriteString("False")
-		}
-	case reflect.Float32:
-		buffer.WriteString(strconv.FormatFloat(v.Float(), 'f', -1, 32))
-	case reflect.Float64:
-		buffer.WriteString(strconv.FormatFloat(v.Float(), 'f', -1, 64))
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		buffer.WriteString(strconv.FormatInt(v.Int(), 10))
-	case reflect.String:
-		buffer.WriteString(v.String())
-	case reflect.Array, reflect.Slice:
-		buffer.WriteString("[")
-		for i := 0; i < v.Len(); i++ {
-			text, err := j.evalToText(v.Index(i))
-			if err != nil {
-				return nil, err
-			}
-			buffer.Write(text)
-			if i != v.Len()-1 {
-				buffer.WriteString(", ")
-			}
-		}
-		buffer.WriteString("]")
-	case reflect.Struct:
-		buffer.WriteString("{")
-		for i := 0; i < v.NumField(); i++ {
-			text, err := j.evalToText(v.Field(i))
-			if err != nil {
-				return nil, err
-			}
-			pair := fmt.Sprintf("%s: %s", v.Type().Field(i).Name, text)
-			buffer.WriteString(pair)
-			if i != v.NumField()-1 {
-				buffer.WriteString(", ")
-			}
-		}
-		buffer.WriteString("}")
-	case reflect.Map:
-		buffer.WriteString("{")
-		for i, key := range v.MapKeys() {
-			text, err := j.evalToText(v.MapIndex(key))
-			if err != nil {
-				return nil, err
-			}
-			pair := fmt.Sprintf("%s: %s", key, text)
-			buffer.WriteString(pair)
-			if i != len(v.MapKeys())-1 {
-				buffer.WriteString(", ")
-			}
-		}
-		buffer.WriteString("}")
-
-	default:
-		return nil, fmt.Errorf("%v is not printable", v.Kind())
-	}
+	fmt.Fprint(&buffer, iface)
 	return buffer.Bytes(), nil
 }

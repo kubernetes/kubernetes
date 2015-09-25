@@ -51,6 +51,13 @@ Getting started on AWS EC2
 2. Install and configure [AWS Command Line Interface](http://aws.amazon.com/cli)
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
+NOTE: This script use the 'default' AWS profile by default.
+You may explicitly set AWS profile to use using the `AWS_DEFAULT_PROFILE` environment variable:
+
+```bash
+export AWS_DEFAULT_PROFILE=myawsprofile
+```
+
 ## Cluster turnup
 
 ### Supported procedure: `get-kube`
@@ -69,7 +76,7 @@ using [cluster/aws/config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/co
 
 This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
 as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
-tokens are written in `~/.kube/kubeconfig`, they will be necessary to use the CLI or the HTTP Basic Auth.
+tokens are written in `~/.kube/config`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
 By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with `t2.micro` instances running on Ubuntu.
 You can override the variables defined in [config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/config-default.sh) to change this behavior as follows:
@@ -91,15 +98,15 @@ NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS
 
 ### Alternatives
 
-A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
-AWS CloudFormation or EC2 with user data (cloud-config).
+A contributed [example](coreos/coreos_multinode_cluster.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), using
+EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
 
 ### Command line administration tool: `kubectl`
 
 The cluster startup script will leave you with a `kubernetes` directory on your workstation.
-Alternately, you can download the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+Alternately, you can download the latest Kubernetes release from [this page](https://github.com/kubernetes/kubernetes/releases).
 
 Next, add the appropriate binary folder to your `PATH` to access kubectl:
 

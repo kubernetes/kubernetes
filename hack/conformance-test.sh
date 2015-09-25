@@ -23,11 +23,9 @@
 #    cluster to be tested, and with suitable auth setting.
 #  - Specify the location of that kubeconfig with, e.g.:
 #    declare -x KUBECONFIG="$HOME/.kube/config"
-#  - Specify the location of the master with, e.g.:
-#    declare -x KUBE_MASTER_IP="1.2.3.4"
 #  - Make sure only essential pods are running and there are no failed/pending pods.
 #  - Go to a git tree that contains the kubernetes source.
-#    - git clone git://github.com/GoogleCloudPlatform/kubernetes.git
+#    - git clone git://github.com/kubernetes/kubernetes.git
 #  - Checkout the upstream/conformance-test-v1 branch
 #    - git checkout upstream/conformance-test-v1
 #    - The working tree will be in a "detached HEAD" state.
@@ -65,8 +63,7 @@
 
 
 : ${KUBECONFIG:?"Must set KUBECONFIG before running conformance test."}
-: ${KUBE_MASTER_IP:?"Must set KUBE_MASTER_IP before running conformance test."}
-echo "Conformance test using ${KUBECONFIG} against master at ${KUBE_MASTER_IP}"
+echo "Conformance test using current-context of ${KUBECONFIG}"
 echo -n "Conformance test run date:"
 date
 echo -n "Conformance test SHA:"
@@ -106,7 +103,7 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 #  MaxPods\slimit\snumber\sof\spods: not sure why this wasn't working on GCE but it wasn't.
 #  Kubectl\sclient\sSimple\spod: not sure why this wasn't working on GCE but it wasn't
 #  DNS: not sure why this wasn't working on GCE but it wasn't
-export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging|Etcd\sfailure|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Services.*nodeport|Shell|SSH|Addon\supdate|Volumes|Clean\sup\spods\son\snode|Skipped|skipped|MaxPods\slimit\snumber\sof\spods|Kubectl\sclient\sSimple\spod|DNS"
+export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging|Etcd\sfailure|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Services.*nodeport|Shell|SSH|Addon\supdate|Volumes|Clean\sup\spods\son\snode|Skipped|skipped|MaxPods\slimit\snumber\sof\spods|Kubectl\sclient\sSimple\spod|DNS|Resource\susage\sof\ssystem\scontainers"
 
 declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_MINIONS=4

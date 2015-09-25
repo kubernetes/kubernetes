@@ -20,10 +20,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // APIObjectVersioner implements versioning and extracting etcd node information
@@ -37,7 +37,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Ti
 		return err
 	}
 	if expiration != nil {
-		objectMeta.DeletionTimestamp = &util.Time{*expiration}
+		objectMeta.DeletionTimestamp = &unversioned.Time{Time: *expiration}
 	}
 	versionString := ""
 	if resourceVersion != 0 {

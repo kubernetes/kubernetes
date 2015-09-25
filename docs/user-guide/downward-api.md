@@ -51,14 +51,14 @@ The following information is available to a `Pod` through the downward API:
 
 *   The pod's name
 *   The pod's namespace
+*   The pod's IP
 
 More information will be exposed through this same API over time.
 
 ## Exposing pod information into a container
 
 Containers consume information from the downward API using environment
-variables.  In the future, containers will also be able to consume the downward
-API via a volume plugin.
+variables or using a volume plugin.
 
 ### Environment variables
 
@@ -101,11 +101,85 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
   restartPolicy: Never
 ```
 
-[Download example](downward-api/dapi-pod.yaml)
+[Download example](downward-api/dapi-pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE downward-api/dapi-pod.yaml -->
+
+
+
+### Downward API volume
+
+Using a similar syntax it's possible to expose pod information to containers using plain text files.
+Downward API are dumped to a mounted volume. This is achieved using a `downwardAPI`
+volume type and the different items represent the files to be created. `fieldPath` references the field to be exposed.
+
+Downward API volume permits to store more complex data like [`metadata.labels`](labels.md) and [`metadata.annotations`](annotations.md). Currently key/value pair set fields are saved using `key="value"` format:
+
+```
+key1="value1"
+key2="value2"
+```
+
+In future, it will be possible to specify an output format option.
+
+Downward API volumes can expose:
+
+*   The pod's name
+*   The pod's namespace
+*   The pod's labels
+*   The pod's annotations
+
+The downward API volume refreshes its data in step with the kubelet refresh loop. When labels will be modifiable on the fly without respawning the pod containers will be able to detect changes through mechanisms such as [inotify](https://en.wikipedia.org/wiki/Inotify).
+
+In future, it will be possible to specify a specific annotation or label.
+
+## Example
+
+This is an example of a pod that consumes its labels and annotations via the downward API volume, labels and annotations are dumped in `/etc/podlabels` and in `/etc/annotations`, respectively:
+
+<!-- BEGIN MUNGE: EXAMPLE downward-api/volume/dapi-volume.yaml -->
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubernetes-downwardapi-volume-example
+  labels:
+    zone: us-est-coast
+    cluster: test-cluster1
+    rack: rack-22
+  annotations:
+    build: two
+    builder: john-doe
+spec:
+  containers:
+    - name: client-container
+      image: gcr.io/google_containers/busybox
+      command: ["sh", "-c", "while true; do if [[ -e /etc/labels ]]; then cat /etc/labels; fi; if [[ -e /etc/annotations ]]; then cat /etc/annotations; fi; sleep 5; done"]
+      volumeMounts:
+        - name: podinfo
+          mountPath: /etc
+          readOnly: false
+  volumes:
+    - name: podinfo
+      downwardAPI:
+        items:
+          - path: "labels"
+            fieldRef:
+              fieldPath: metadata.labels
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
+```
+
+[Download example](downward-api/volume/dapi-volume.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE downward-api/volume/dapi-volume.yaml -->
 
 Some more thorough examples:
    * [environment variables](environment-guide/)

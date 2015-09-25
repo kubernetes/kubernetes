@@ -42,6 +42,9 @@ Session.vim
 .vagrant
 network_closure.sh
 
+# Local cluster env variables
+/cluster/env.sh
+
 # Compiled binaries in third_party
 /third_party/pkg
 
@@ -61,6 +64,6 @@ www/master/shared/config/development.json
 # Karma output
 www/test_out
 
-# precommit temporary directories created by ./hack/verify-gendocs.sh and ./hack/lib/util.sh
+# precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
 _tmp/
 doc_tmp/

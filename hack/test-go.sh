@@ -28,15 +28,16 @@ kube::test::find_dirs() {
     cd ${KUBE_ROOT}
     find . -not \( \
         \( \
-          -wholename './output' \
-          -o -wholename './_output' \
-          -o -wholename './release' \
-          -o -wholename './target' \
-          -o -wholename '*/Godeps/*' \
-          -o -wholename './release*' \
-          -o -wholename '*/contrib/podex/*' \
-          -o -wholename '*/test/e2e/*' \
-          -o -wholename '*/test/integration/*' \
+          -path './_artifacts/*' \
+          -o -path './_output/*' \
+          -o -path './_gopath/*' \
+          -o -path './Godeps/*' \
+          -o -path './contrib/podex/*' \
+          -o -path './output/*' \
+          -o -path './release/*' \
+          -o -path './target/*' \
+          -o -path './test/e2e/*' \
+          -o -path './test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
@@ -52,11 +53,18 @@ KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
-# Comma separated list of API Versions that should be tested.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1"}
+# Lists of API Versions of each groups that should be tested, groups are
+# separated by comma, lists are separated by semicolon. e.g.,
+# "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
+# TODO: It's going to be:
+# KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
+# once we have multiple group supports
 # Run tests with the standard (registry) and a custom etcd prefix
 # (kubernetes.io/registry).
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
+# Create a junit-style XML test report in this directory if set.
+KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -103,6 +111,17 @@ shift $((OPTIND - 1))
 eval "goflags=(${KUBE_GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
+# Used to filter verbose test output.
+go_test_grep_pattern=".*"
+
+# The go-junit-report tool needs full test case information to produce a
+# meaningful report.
+if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
+  goflags+=(-v)
+  # Show only summary lines by matching lines like "status package/test"
+  go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
+fi
+
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
 for arg; do
@@ -116,6 +135,36 @@ if [[ ${#testcases[@]} -eq 0 ]]; then
   testcases=($(kube::test::find_dirs))
 fi
 set -- "${testcases[@]+${testcases[@]}}"
+
+junitFilenamePrefix() {
+  if [[ -z "${KUBE_JUNIT_REPORT_DIR}" ]]; then
+    echo ""
+    return
+  fi
+  mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
+  local KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API//\//-}"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
+}
+
+produceJUnitXMLReport() {
+  local -r junit_filename_prefix=$1
+  if [[ -z "${junit_filename_prefix}" ]]; then
+    return
+  fi
+
+  local test_stdout_filenames
+  local junit_xml_filename
+  test_stdout_filenames=$(ls ${junit_filename_prefix}*.stdout)
+  junit_xml_filename="${junit_filename_prefix}.xml"
+  if ! command -v go-junit-report >/dev/null 2>&1; then
+    kube::log::error "go-junit-report not found; please install with " \
+      "go get -u github.com/jstemmer/go-junit-report"
+    return
+  fi
+  cat ${test_stdout_filenames} | go-junit-report > "${junit_xml_filename}"
+  rm ${test_stdout_filenames}
+  kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
+}
 
 runTests() {
   # TODO: this should probably be refactored to avoid code duplication with the
@@ -152,18 +201,24 @@ runTests() {
     fi
   fi
 
+  local junit_filename_prefix
+  junit_filename_prefix=$(junitFilenamePrefix)
+
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running unit tests without code coverage"
+    kube::log::status "Running tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
-     "${testargs[@]:+${testargs[@]}}"
-    return 0
+     "${testargs[@]:+${testargs[@]}}" \
+     | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
+     | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
+    produceJUnitXMLReport "${junit_filename_prefix}"
+    return ${rc}
   fi
 
   # Create coverage report directories.
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_API_VERSION}/$(kube::util::sortable_date)"
+  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API}/$(kube::util::sortable_date)"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
@@ -173,15 +228,24 @@ runTests() {
   # separate 'go test' commands for each package and then combine at the end.
   # To speed things up considerably, we can at least use xargs -P to run multiple
   # 'go test' commands at once.
+  # To properly parse the test results if generating a JUnit test report, we
+  # must make sure the output from parallel runs is not mixed. To achieve this,
+  # we spawn a subshell for each parallel process, redirecting the output to
+  # separate files.
   printf "%s\n" "${@}" | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-      go test "${goflags[@]:+${goflags[@]}}" \
+    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
+        go test ${goflags[@]:+${goflags[@]}} \
           ${KUBE_RACE} \
           ${KUBE_TIMEOUT} \
-          -cover -covermode="${KUBE_COVERMODE}" \
-          -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
-          "${cover_params[@]+${cover_params[@]}}" \
-          "${KUBE_GO_PACKAGE}/{}" \
-          "${testargs[@]:+${testargs[@]}}"
+          -cover -covermode=\"${KUBE_COVERMODE}\" \
+          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+          ${testargs[@]:+${testargs[@]}} \
+        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
+        | grep \"${go_test_grep_pattern}\"" \
+      && test_result=$? || test_result=$?
+
+  produceJUnitXMLReport "${junit_filename_prefix}"
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {
@@ -201,16 +265,22 @@ runTests() {
   coverage_html_file="${cover_report_dir}/combined-coverage.html"
   go tool cover -html="${COMBINED_COVER_PROFILE}" -o="${coverage_html_file}"
   kube::log::status "Combined coverage report: ${coverage_html_file}"
+
+  return ${test_result}
 }
 
 reportCoverageToCoveralls() {
-  if [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
-    ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" || true
+  if [[ ${KUBE_COVER} =~ ^[yY]$ ]] && [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
+    kube::log::status "Reporting coverage results to Coveralls for service ${CI_NAME:-}"
+    ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" \
+    ${CI_NAME:+"-service=${CI_NAME}"} \
+    ${COVERALLS_REPO_TOKEN:+"-repotoken=${COVERALLS_REPO_TOKEN}"} \
+      || true
   fi
 }
 
 # Convert the CSVs to arrays.
-IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
 apiVersionsCount=${#apiVersions[@]}
 etcdPrefixesCount=${#etcdPrefixes[@]}
@@ -218,7 +288,10 @@ for (( i=0, j=0; ; )); do
   apiVersion=${apiVersions[i]}
   etcdPrefix=${etcdPrefixes[j]}
   echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
-  KUBE_API_VERSION="${apiVersion}" KUBE_API_VERSIONS="v1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  # KUBE_TEST_API sets the version of each group to be tested. KUBE_API_VERSIONS
+  # register the groups/versions as supported by k8s. So KUBE_API_VERSIONS
+  # needs to be the superset of KUBE_TEST_API.
+  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1,experimental/v1alpha1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then

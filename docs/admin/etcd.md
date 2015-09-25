@@ -41,7 +41,7 @@ objects.
 
 Access Control: give *only* kube-apiserver read/write access to etcd. You do not
 want apiserver's etcd exposed to every node in your cluster (or worse, to the
-internet at large), because access to etcd is equivilent to root in your
+internet at large), because access to etcd is equivalent to root in your
 cluster.
 
 Data Reliability: for reasonable safety, either etcd needs to be run as a

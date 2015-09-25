@@ -33,6 +33,13 @@ Documentation for other releases can be found at
 
 # So you want to change the API?
 
+Before attempting a change to the API, you should familiarize yourself
+with a number of existing API types and with the [API
+conventions](api-conventions.md).  If creating a new API
+type/resource, we also recommend that you first send a PR containing
+just a proposal for the new API types, and that you initially target
+the experimental API (pkg/apis/experimental).
+
 The Kubernetes API has two major components - the internal structures and
 the versioned APIs.  The versioned APIs are intended to be stable, while the
 internal structures are implemented to best reflect the needs of the Kubernetes
@@ -92,9 +99,12 @@ backward-compatibly.
 Before talking about how to make API changes, it is worthwhile to clarify what
 we mean by API compatibility.  An API change is considered backward-compatible
 if it:
-   * adds new functionality that is not required for correct behavior
-   * does not change existing semantics
-   * does not change existing defaults
+   * adds new functionality that is not required for correct behavior (e.g.,
+     does not add a new required field)
+   * does not change existing semantics, including:
+     * default values and behavior
+     * interpretation of existing API types, fields, and values
+     * which fields are required and which are not
 
 Put another way:
 
@@ -104,11 +114,11 @@ Put another way:
    degrade behavior) when issued against servers that do not include your change.
 3. It must be possible to round-trip your change (convert to different API
    versions and back) with no loss of information.
+4. Existing clients need not be aware of your change in order for them to continue
+   to function as they did previously, even when your change is utilized
 
 If your change does not meet these criteria, it is not considered strictly
-compatible.  There are times when this might be OK, but mostly we want changes
-that meet this definition.  If you think you need to break compatibility, you
-should talk to the Kubernetes team first.
+compatible.
 
 Let's consider some examples.  In a hypothetical API (assume we're at version
 v6), the `Frobber` struct looks something like this:
@@ -181,12 +191,121 @@ v7beta1 API it would be unacceptable to have lost all but `Params[0]`.  This
 means that, even though it is ugly, a compatible change must be made to the v6
 API.
 
-As another interesting example, enumerated values provide a unique challenge.
+However, this is very challenging to do correctly. It often requires
+multiple representations of the same information in the same API resource, which
+need to be kept in sync in the event that either is changed. For example,
+let's say you decide to rename a field within the same API version. In this case,
+you add units to `height` and `width`. You implement this by adding duplicate
+fields:
+
+```go
+type Frobber struct {
+	Height         *int          `json:"height"`
+	Width          *int          `json:"width"`
+	HeightInInches *int          `json:"heightInInches"`
+	WidthInInches  *int          `json:"widthInInches"`
+}
+```
+
+You convert all of the fields to pointers in order to distinguish between unset and
+set to 0, and then set each corresponding field from the other in the defaulting
+pass (e.g., `heightInInches` from `height`, and vice versa), which runs just prior
+to conversion. That works fine when the user creates a resource from a hand-written
+configuration -- clients can write either field and read either field, but what about
+creation or update from the output of GET, or update via PATCH (see
+[In-place updates](../user-guide/managing-deployments.md#in-place-updates-of-resources))?
+In this case, the two fields will conflict, because only one field would be updated
+in the case of an old client that was only aware of the old field (e.g., `height`).
+
+Say the client creates:
+
+```json
+{
+  "height": 10,
+  "width": 5
+}
+```
+
+and GETs:
+
+```json
+{
+  "height": 10,
+  "heightInInches": 10,
+  "width": 5,
+  "widthInInches": 5
+}
+```
+
+then PUTs back:
+
+```json
+{
+  "height": 13,
+  "heightInInches": 10,
+  "width": 5,
+  "widthInInches": 5
+}
+```
+
+The update should not fail, because it would have worked before `heightInInches` was added.
+
+Therefore, when there are duplicate fields, the old field MUST take precedence
+over the new, and the new field should be set to match by the server upon write.
+A new client would be aware of the old field as well as the new, and so can ensure
+that the old field is either unset or is set consistently with the new field. However,
+older clients would be unaware of the new field. Please avoid introducing duplicate
+fields due to the complexity they incur in the API.
+
+A new representation, even in a new API version, that is more expressive than an old one
+breaks backward compatibility, since clients that only understood the old representation
+would not be aware of the new representation nor its semantics. Examples of
+proposals that have run into this challenge include [generalized label
+selectors](http://issues.k8s.io/341) and [pod-level security
+context](http://prs.k8s.io/12823).
+
+As another interesting example, enumerated values cause similar challenges.
 Adding a new value to an enumerated set is *not* a compatible change.  Clients
 which assume they know how to handle all possible values of a given field will
 not be able to handle the new values.  However, removing value from an
 enumerated set *can* be a compatible change, if handled properly (treat the
-removed value as deprecated but allowed).
+removed value as deprecated but allowed). This is actually a special case of
+a new representation, discussed above.
+
+## Incompatible API changes
+
+There are times when this might be OK, but mostly we want changes that
+meet this definition.  If you think you need to break compatibility,
+you should talk to the Kubernetes team first.
+
+Breaking compatibility of a beta or stable API version, such as v1, is unacceptable.
+Compatibility for experimental or alpha APIs is not strictly required, but
+breaking compatibility should not be done lightly, as it disrupts all users of the
+feature. Experimental APIs may be removed. Alpha and beta API versions may be deprecated
+and eventually removed wholesale, as described in the [versioning document](../design/versioning.md).
+Document incompatible changes across API versions under the [conversion tips](../api.md).
+
+If your change is going to be backward incompatible or might be a breaking change for API
+consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
+the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
+the release notes for the next release by labeling the PR with the "release-note" github label.
+
+If you found that your change accidentally broke clients, it should be reverted.
+
+In short, the expected API evolution is as follows:
+* `experimental/v1alpha1` ->
+* `newapigroup/v1alpha1` -> ... -> `newapigroup/v1alphaN` ->
+* `newapigroup/v1beta1` -> ... -> `newapigroup/v1betaN` ->
+* `newapigroup/v1` ->
+* `newapigroup/v2alpha1` -> ...
+
+While in experimental we have no obligation to move forward with the API at all and may delete or break it at any time.
+
+While in alpha we expect to move forward with it, but may break it.
+
+Once in beta we will preserve forward compatibility, but may introduce new versions and delete old ones.
+
+v1 must be backward-compatible for an extended length of time.
 
 ## Changing versioned APIs
 
@@ -199,9 +318,12 @@ before starting "all the rest".
 ### Edit types.go
 
 The struct definitions for each API are in `pkg/api/<version>/types.go`.  Edit
-those files to reflect the change you want to make.  Note that all non-online
-fields in versioned APIs must have description tags - these are used to generate
+those files to reflect the change you want to make.  Note that all types and non-inline
+fields in versioned APIs must be preceded by descriptive comments - these are used to generate
 documentation.
+
+Optional fields should have the `,omitempty` json tag; fields are interpreted as being
+required otherwise.
 
 ### Edit defaults.go
 
@@ -227,6 +349,12 @@ should jump to that topic below.  In the very rare case that you are making an
 incompatible change you might or might not want to do this now, but you will
 have to do more later.  The files you want are
 `pkg/api/<version>/conversion.go` and `pkg/api/<version>/conversion_test.go`.
+
+Note that the conversion machinery doesn't generically handle conversion of values,
+such as various kinds of field references and API constants. [The client
+library](../../pkg/client/unversioned/request.go) has custom conversion code for
+field references. You also need to add a call to api.Scheme.AddFieldLabelConversionFunc
+with a mapping function that understands supported translations.
 
 ## Changing the internal structures
 
@@ -271,6 +399,10 @@ The conversion code resides with each versioned API. There are two files:
      functions
    - `pkg/api/<version>/conversion_generated.go` containing auto-generated
      conversion functions
+   - `pkg/apis/experimental/<version>/conversion.go` containing manually written
+     conversion functions
+   - `pkg/apis/experimental/<version>/conversion_generated.go` containing
+     auto-generated conversion functions
 
 Since auto-generated conversion functions are using manually written ones,
 those manually written should be named with a defined convention, i.e. a function
@@ -296,6 +428,40 @@ generator to create it from scratch.
 
 Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
+
+## Edit deep copy files
+
+At this point you have both the versioned API changes and the internal
+structure changes done.  You now need to generate code to handle deep copy
+of your versioned api objects.
+
+The deep copy code resides with each versioned API:
+   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
+   - `pkg/apis/experimental/<version>/deep_copy_generated.go` containing auto-generated copy functions
+
+To regenerate them:
+   - run
+
+```sh
+hack/update-generated-deep-copies.sh
+```
+
+## Making a new API Group
+
+This section is under construction, as we make the tooling completely generic.
+
+At the moment, you'll have to make a new directory under pkg/apis/; copy the
+directory structure from pkg/apis/experimental. Add the new group/version to all
+of the hack/{verify,update}-generated-{deep-copy,conversions,swagger}.sh files
+in the appropriate places--it should just require adding your new group/version
+to a bash array. You will also need to make sure your new types are imported by
+the generation commands (cmd/gendeepcopy/ & cmd/genconversion). These
+instructions may not be complete and will be updated as we gain experience.
+
+Adding API groups outside of the pkg/apis/ directory is not currently supported,
+but is clearly desirable. The deep copy & conversion generators need to work by
+parsing go files instead of by reflection; then they will be easy to point at
+arbitrary directories: see issue [#13775](http://issue.k8s.io/13775).
 
 ## Update the fuzzer
 
@@ -342,8 +508,8 @@ doing!
 
 ## Write end-to-end tests
 
-This is, sadly, still sort of painful.  Talk to us and we'll try to help you
-figure out the best way to make sure your cool feature keeps working forever.
+Check out the [E2E docs](e2e-tests.md) for detailed information about how to write end-to-end
+tests for your feature.
 
 ## Examples and docs
 
@@ -364,13 +530,6 @@ hack/update-swagger-spec.sh
 ```
 
 The API spec changes should be in a commit separate from your other changes.
-
-## Incompatible API changes
-
-If your change is going to be backward incompatible or might be a breaking change for API
-consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
-the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
-`CHANGELOG.md` for the next release.
 
 ## Adding new REST objects
 

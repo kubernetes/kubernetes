@@ -24,43 +24,39 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
 	registry         Registry
-	machines         minion.Registry
 	endpoints        endpoint.Registry
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
-	clusterName      string
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface, clusterName string) *REST {
+func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
+	serviceNodePorts portallocator.Interface) *REST {
 	return &REST{
 		registry:         registry,
-		machines:         machines,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
-		clusterName:      clusterName,
 	}
 }
 
@@ -149,6 +145,13 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		return nil, err
 	}
 
+	// TODO: can leave dangling endpoints, and potentially return incorrect
+	// endpoints if a new service is created with the same name
+	err = rs.endpoints.DeleteEndpoints(ctx, id)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
 	if api.IsServiceIPSet(service) {
 		rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
 	}
@@ -161,30 +164,15 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		}
 	}
 
-	return &api.Status{Status: api.StatusSuccess}, nil
+	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	service, err := rs.registry.GetService(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return service, err
+	return rs.registry.GetService(ctx, id)
 }
 
 func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	list, err := rs.registry.ListServices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var filtered []api.Service
-	for _, service := range list.Items {
-		if label.Matches(labels.Set(service.Labels)) {
-			filtered = append(filtered, service)
-		}
-	}
-	list.Items = filtered
-	return list, err
+	return rs.registry.ListServices(ctx, label, field)
 }
 
 // Watch returns Services events via a watch.Interface.
@@ -307,6 +295,9 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 	// Find a Subset that has the port.
 	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
 		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		if len(ss.Addresses) == 0 {
+			continue
+		}
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == portStr {
 				// Pick a random address.

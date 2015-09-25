@@ -25,84 +25,37 @@ import (
 	"sync"
 	"time"
 
-	execcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/messages"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	offerMetrics "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/proc"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/uid"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	offerMetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-type Slave struct {
-	HostName string
-}
-
-func newSlave(hostName string) *Slave {
-	return &Slave{
-		HostName: hostName,
-	}
-}
-
-type slaveStorage struct {
-	sync.Mutex
-	slaves map[string]*Slave // SlaveID => slave.
-}
-
-func newSlaveStorage() *slaveStorage {
-	return &slaveStorage{
-		slaves: make(map[string]*Slave),
-	}
-}
-
-// Create a mapping between a slaveID and slave if not existing.
-func (self *slaveStorage) checkAndAdd(slaveId, slaveHostname string) {
-	self.Lock()
-	defer self.Unlock()
-	_, exists := self.slaves[slaveId]
-	if !exists {
-		self.slaves[slaveId] = newSlave(slaveHostname)
-	}
-}
-
-func (self *slaveStorage) getSlaveIds() []string {
-	self.Lock()
-	defer self.Unlock()
-	slaveIds := make([]string, 0, len(self.slaves))
-	for slaveID := range self.slaves {
-		slaveIds = append(slaveIds, slaveID)
-	}
-	return slaveIds
-}
-
-func (self *slaveStorage) getSlave(slaveId string) (*Slave, bool) {
-	self.Lock()
-	defer self.Unlock()
-	slave, exists := self.slaves[slaveId]
-	return slave, exists
-}
 
 type PluginInterface interface {
 	// the apiserver may have a different state for the pod than we do
 	// so reconcile our records, but only for this one pod
-	reconcilePod(api.Pod)
+	reconcileTask(*podtask.T)
 
 	// execute the Scheduling plugin, should start a go routine and return immediately
 	Run(<-chan struct{})
@@ -118,19 +71,17 @@ type KubernetesScheduler struct {
 	// and the invoking the pod registry interfaces.
 	// In particular, changes to podtask.T objects are currently guarded by this lock.
 	*sync.RWMutex
+	PodScheduler
 
 	// Config related, write-once
 
-	schedcfg                 *schedcfg.Config
-	executor                 *mesos.ExecutorInfo
-	executorGroup            uint64
-	scheduleFunc             PodScheduleFunc
-	client                   *client.Client
-	etcdClient               tools.EtcdClient
-	failoverTimeout          float64 // in seconds
-	reconcileInterval        int64
-	defaultContainerCPULimit mresource.CPUShares
-	defaultContainerMemLimit mresource.MegaBytes
+	schedcfg          *schedcfg.Config
+	executor          *mesos.ExecutorInfo
+	executorGroup     uint64
+	client            *client.Client
+	etcdClient        tools.EtcdClient
+	failoverTimeout   float64 // in seconds
+	reconcileInterval int64
 
 	// Mesos context.
 
@@ -141,7 +92,7 @@ type KubernetesScheduler struct {
 	registration   chan struct{} // signal chan that closes upon first successful registration
 	onRegistration sync.Once
 	offers         offers.Registry
-	slaves         *slaveStorage
+	slaveHostNames *slave.Registry
 
 	// unsafe state, needs to be guarded
 
@@ -157,33 +108,29 @@ type KubernetesScheduler struct {
 }
 
 type Config struct {
-	Schedcfg                 schedcfg.Config
-	Executor                 *mesos.ExecutorInfo
-	ScheduleFunc             PodScheduleFunc
-	Client                   *client.Client
-	EtcdClient               tools.EtcdClient
-	FailoverTimeout          float64
-	ReconcileInterval        int64
-	ReconcileCooldown        time.Duration
-	DefaultContainerCPULimit mresource.CPUShares
-	DefaultContainerMemLimit mresource.MegaBytes
+	Schedcfg          schedcfg.Config
+	Executor          *mesos.ExecutorInfo
+	Scheduler         PodScheduler
+	Client            *client.Client
+	EtcdClient        tools.EtcdClient
+	FailoverTimeout   float64
+	ReconcileInterval int64
+	ReconcileCooldown time.Duration
 }
 
 // New creates a new KubernetesScheduler
 func New(config Config) *KubernetesScheduler {
 	var k *KubernetesScheduler
 	k = &KubernetesScheduler{
-		schedcfg:                 &config.Schedcfg,
-		RWMutex:                  new(sync.RWMutex),
-		executor:                 config.Executor,
-		executorGroup:            uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
-		scheduleFunc:             config.ScheduleFunc,
-		client:                   config.Client,
-		etcdClient:               config.EtcdClient,
-		failoverTimeout:          config.FailoverTimeout,
-		reconcileInterval:        config.ReconcileInterval,
-		defaultContainerCPULimit: config.DefaultContainerCPULimit,
-		defaultContainerMemLimit: config.DefaultContainerMemLimit,
+		schedcfg:          &config.Schedcfg,
+		RWMutex:           new(sync.RWMutex),
+		executor:          config.Executor,
+		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
+		PodScheduler:      config.Scheduler,
+		client:            config.Client,
+		etcdClient:        config.EtcdClient,
+		failoverTimeout:   config.FailoverTimeout,
+		reconcileInterval: config.ReconcileInterval,
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				// filter the offers: the executor IDs must not identify a kubelet-
@@ -212,7 +159,7 @@ func New(config Config) *KubernetesScheduler {
 			TTL:           config.Schedcfg.OfferTTL.Duration,
 			ListenerDelay: config.Schedcfg.ListenerDelay.Duration,
 		}),
-		slaves:            newSlaveStorage(),
+		slaveHostNames:    slave.NewRegistry(),
 		taskRegistry:      podtask.NewInMemoryRegistry(),
 		reconcileCooldown: config.ReconcileCooldown,
 		registration:      make(chan struct{}),
@@ -277,7 +224,7 @@ func (k *KubernetesScheduler) InstallDebugHandlers(mux *http.ServeMux) {
 	requestReconciliation("/debug/actions/requestImplicit", k.reconciler.RequestImplicit)
 
 	wrappedHandler("/debug/actions/kamikaze", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slaves := k.slaves.getSlaveIds()
+		slaves := k.slaveHostNames.SlaveIDs()
 		for _, slaveId := range slaves {
 			_, err := k.driver.SendFrameworkMessage(
 				k.executor.ExecutorId,
@@ -375,7 +322,7 @@ func (k *KubernetesScheduler) ResourceOffers(driver bindings.SchedulerDriver, of
 	k.offers.Add(offers)
 	for _, offer := range offers {
 		slaveId := offer.GetSlaveId().GetValue()
-		k.slaves.checkAndAdd(slaveId, offer.GetHostname())
+		k.slaveHostNames.Register(slaveId, offer.GetHostname())
 	}
 }
 
@@ -400,14 +347,21 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 	taskState := taskStatus.GetState()
 	metrics.StatusUpdates.WithLabelValues(source, reason, taskState.String()).Inc()
 
+	message := "none"
+	if taskStatus.Message != nil {
+		message = *taskStatus.Message
+	}
+
 	log.Infof(
-		"task status update %q from %q for task %q on slave %q executor %q for reason %q",
+		"task status update %q from %q for task %q on slave %q executor %q for reason %q with message %q",
 		taskState.String(),
 		source,
 		taskStatus.TaskId.GetValue(),
 		taskStatus.SlaveId.GetValue(),
 		taskStatus.ExecutorId.GetValue(),
-		reason)
+		reason,
+		message,
+	)
 
 	switch taskState {
 	case mesos.TaskState_TASK_RUNNING, mesos.TaskState_TASK_FINISHED, mesos.TaskState_TASK_STARTING, mesos.TaskState_TASK_STAGING:
@@ -423,16 +377,16 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 			} // else, we don't really care about FINISHED tasks that aren't registered
 			return
 		}
-		if _, exists := k.slaves.getSlave(taskStatus.GetSlaveId().GetValue()); !exists {
+		if hostName := k.slaveHostNames.HostName(taskStatus.GetSlaveId().GetValue()); hostName != "" {
 			// a registered task has an update reported by a slave that we don't recognize.
 			// this should never happen! So we don't reconcile it.
 			log.Errorf("Ignore status %+v because the slave does not exist", taskStatus)
 			return
 		}
-	case mesos.TaskState_TASK_FAILED:
+	case mesos.TaskState_TASK_FAILED, mesos.TaskState_TASK_ERROR:
 		if task, _ := k.taskRegistry.UpdateStatus(taskStatus); task != nil {
 			if task.Has(podtask.Launched) && !task.Has(podtask.Bound) {
-				go k.plugin.reconcilePod(task.Pod)
+				go k.plugin.reconcileTask(task)
 				return
 			}
 		} else {
@@ -443,13 +397,24 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 		fallthrough
 	case mesos.TaskState_TASK_LOST, mesos.TaskState_TASK_KILLED:
 		k.reconcileTerminalTask(driver, taskStatus)
+	default:
+		log.Errorf(
+			"unknown task status %q from %q for task %q on slave %q executor %q for reason %q with message %q",
+			taskState.String(),
+			source,
+			taskStatus.TaskId.GetValue(),
+			taskStatus.SlaveId.GetValue(),
+			taskStatus.ExecutorId.GetValue(),
+			reason,
+			message,
+		)
 	}
 }
 
 func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
 	task, state := k.taskRegistry.UpdateStatus(taskStatus)
 
-	if (state == podtask.StateRunning || state == podtask.StatePending) && taskStatus.SlaveId != nil &&
+	if (state == podtask.StateRunning || state == podtask.StatePending) &&
 		((taskStatus.GetSource() == mesos.TaskStatus_SOURCE_MASTER && taskStatus.GetReason() == mesos.TaskStatus_REASON_RECONCILIATION) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED)) {
@@ -476,7 +441,7 @@ func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDri
 		//to do anything. The underlying driver transport may be able to send a
 		//FrameworkMessage directly to the slave to terminate the task.
 		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
-		data := fmt.Sprintf("task-lost:%s", task.ID) //TODO(jdef) use a real message type
+		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) //TODO(jdef) use a real message type
 		if _, err := driver.SendFrameworkMessage(taskStatus.ExecutorId, taskStatus.SlaveId, data); err != nil {
 			log.Error(err.Error())
 		}
@@ -671,8 +636,7 @@ func (k *KubernetesScheduler) makeTaskRegistryReconciler() ReconcilerAction {
 // tasks identified by annotations in the Kubernetes pod registry.
 func (k *KubernetesScheduler) makePodRegistryReconciler() ReconcilerAction {
 	return ReconcilerAction(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
-		ctx := api.NewDefaultContext()
-		podList, err := k.client.Pods(api.NamespaceValue(ctx)).List(labels.Everything(), fields.Everything())
+		podList, err := k.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return proc.ErrorChanf("failed to reconcile pod registry: %v", err)
 		}
@@ -701,7 +665,7 @@ func (k *KubernetesScheduler) explicitlyReconcileTasks(driver bindings.Scheduler
 
 	// tell mesos to send us the latest status updates for all the non-terminal tasks that we know about
 	statusList := []*mesos.TaskStatus{}
-	remaining := util.KeySet(reflect.ValueOf(taskToSlave))
+	remaining := sets.KeySet(reflect.ValueOf(taskToSlave))
 	for taskId, slaveId := range taskToSlave {
 		if slaveId == "" {
 			delete(taskToSlave, taskId)
@@ -902,8 +866,7 @@ requestLoop:
 }
 
 func (ks *KubernetesScheduler) recoverTasks() error {
-	ctx := api.NewDefaultContext()
-	podList, err := ks.client.Pods(api.NamespaceValue(ctx)).List(labels.Everything(), fields.Everything())
+	podList, err := ks.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		log.V(1).Infof("failed to recover pod registry, madness may ensue: %v", err)
 		return err
@@ -911,9 +874,15 @@ func (ks *KubernetesScheduler) recoverTasks() error {
 	recoverSlave := func(t *podtask.T) {
 
 		slaveId := t.Spec.SlaveID
-		ks.slaves.checkAndAdd(slaveId, t.Offer.Host())
+		ks.slaveHostNames.Register(slaveId, t.Offer.Host())
 	}
 	for _, pod := range podList.Items {
+		if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
+			// mirrored pods are never reconciled because the scheduler isn't responsible for
+			// scheduling them; they're started by the executor/kubelet upon instantiation and
+			// reflected in the apiserver afterward. the scheduler has no knowledge of them.
+			continue
+		}
 		if t, ok, err := podtask.RecoverFrom(pod); err != nil {
 			log.Errorf("failed to recover task from pod, will attempt to delete '%v/%v': %v", pod.Namespace, pod.Name, err)
 			err := ks.client.Pods(pod.Namespace).Delete(pod.Name, nil)

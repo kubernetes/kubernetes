@@ -25,7 +25,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
 // TODO: make this into a real API object.  Note that when that happens, it
@@ -44,7 +44,7 @@ type policy struct {
 	// providers are in use. Either add "Realm", or assume "user@example.com"
 	// format.
 
-	// TODO: Make the "cluster" Kinds be one API group (minions, bindings,
+	// TODO: Make the "cluster" Kinds be one API group (nodes, bindings,
 	// events, endpoints).  The "user" Kinds are another (pods, services,
 	// replicationControllers, operations) Make a "plugin", e.g. build
 	// controller, be another group.  That way when we add a new object to a

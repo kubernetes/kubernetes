@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func TestAccept(t *testing.T) {
@@ -287,7 +287,7 @@ func TestPathHandling(t *testing.T) {
 
 	for _, item := range table {
 		func() {
-			p, err := NewProxyServer(0, "", item.prefix, "/not/used/for/this/test", nil, cc)
+			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", nil, cc)
 			if err != nil {
 				t.Fatalf("%#v: %v", item, err)
 			}

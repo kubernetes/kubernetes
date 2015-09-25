@@ -19,10 +19,10 @@ package main
 import (
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 
 	"github.com/spf13/pflag"
 )

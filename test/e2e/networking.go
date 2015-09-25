@@ -22,10 +22,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -55,7 +56,7 @@ var _ = Describe("Networking", func() {
 		podName := "wget-test"
 		contName := "wget-test-container"
 		pod := &api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -129,7 +130,6 @@ var _ = Describe("Networking", func() {
 
 		// Clean up service
 		defer func() {
-			defer GinkgoRecover()
 			By("Cleaning up the service")
 			if err = f.Client.Services(f.Namespace.Name).Delete(svc.Name); err != nil {
 				Failf("unable to delete svc %v: %v", svc.Name, err)
@@ -166,7 +166,6 @@ var _ = Describe("Networking", func() {
 
 		// Clean up the pods
 		defer func() {
-			defer GinkgoRecover()
 			By("Cleaning up the webserver pods")
 			for _, podName := range podNames {
 				if err = f.Client.Pods(f.Namespace.Name).Delete(podName, nil); err != nil {
@@ -217,7 +216,7 @@ var _ = Describe("Networking", func() {
 				Logf("Attempt %v: service/pod still starting. (error: '%v')", i, err)
 				continue
 			}
-			// Finally, we pass/fail the test based on if the container's response body, as to wether or not it was able to find peers.
+			// Finally, we pass/fail the test based on if the container's response body, as to whether or not it was able to find peers.
 			switch {
 			case string(body) == "pass":
 				Logf("Passed on attempt %v. Cleaning up.", i)

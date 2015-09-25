@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/queue"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 // wrapper for the k8s pod type so that we can define additional methods on a "pod"
@@ -77,4 +77,9 @@ func (p *Pod) String() string {
 		displayDeadline = deadline.String()
 	}
 	return fmt.Sprintf("{pod:%v, deadline:%v, delay:%v}", p.Pod.Name, displayDeadline, p.GetDelay())
+}
+
+func (p *Pod) InGracefulTermination() bool {
+	return p.Pod.DeletionTimestamp != nil &&
+		p.Pod.DeletionGracePeriodSeconds != nil && *p.Pod.DeletionGracePeriodSeconds > 0
 }

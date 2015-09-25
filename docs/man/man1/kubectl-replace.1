@@ -16,13 +16,19 @@ kubectl replace \- Replace a resource by filename or stdin.
 Replace a resource by filename or stdin.
 
 .PP
-JSON and YAML formats are accepted.
+JSON and YAML formats are accepted. If replacing an existing resource, the
+complete resource spec must be provided. This can be obtained by
+$ kubectl get TYPE NAME \-o yaml
+
+.PP
+Please refer to the models in 
+\[la]https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html\[ra] to find if a field is mutable.
 
 
 .SH OPTIONS
 .PP
 \fB\-\-cascade\fP=false
-    Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
+    Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).
 
 .PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
@@ -37,16 +43,20 @@ JSON and YAML formats are accepted.
     Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for replace
-
-.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
+\fB\-\-schema\-cache\-dir\fP="/tmp/kubectl.schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'
+
+.PP
 \fB\-\-timeout\fP=0
     Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
+
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -139,10 +149,6 @@ JSON and YAML formats are accepted.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -152,13 +158,16 @@ JSON and YAML formats are accepted.
 .RS
 
 .nf
-// Replace a pod using the data in pod.json.
+# Replace a pod using the data in pod.json.
 $ kubectl replace \-f ./pod.json
 
-// Replace a pod based on the JSON passed into stdin.
+# Replace a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl replace \-f \-
 
-// Force replace, delete and then re\-create the resource
+# Update a single\-container pod's image version (tag) to v4
+kubectl get pod mypod \-o yaml | sed 's/\\(image: myimage\\):.*$/\\1:v4/' | kubectl replace \-f \-
+
+# Force replace, delete and then re\-create the resource
 kubectl replace \-\-force \-f ./pod.json
 
 .fi

@@ -17,20 +17,23 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/google/gofuzz"
 	"speter.net/go/exp/math/dec/inf"
@@ -52,7 +55,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.APIVersion = ""
 			j.Kind = ""
 		},
-		func(j *api.TypeMeta, c fuzz.Continue) {
+		func(j *unversioned.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
 			j.APIVersion = ""
@@ -68,7 +71,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			var sec, nsec int64
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = unversioned.Unix(sec, nsec).Rfc3339Copy()
 		},
 		func(j *api.ObjectReference, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
@@ -80,7 +83,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.FieldPath = c.RandString()
 		},
-		func(j *api.ListMeta, c fuzz.Continue) {
+		func(j *unversioned.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
 		},
@@ -88,6 +91,15 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			// TODO: add some parsing
 			j.LabelSelector, _ = labels.Parse("a=b")
 			j.FieldSelector, _ = fields.ParseSelector("a=b")
+		},
+		func(j *api.PodSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			// has a default value
+			ttl := int64(30)
+			if c.RandBool() {
+				ttl = int64(c.Uint32())
+			}
+			j.TerminationGracePeriodSeconds = &ttl
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
@@ -110,9 +122,30 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
-		func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
-			// only replicas round trips
-			j.Replicas = int(c.RandUint64())
+		func(j *experimental.DeploymentStrategy, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			// Ensure that strategyType is one of valid values.
+			strategyTypes := []experimental.DeploymentStrategyType{experimental.RecreateDeploymentStrategyType, experimental.RollingUpdateDeploymentStrategyType}
+			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
+			if j.Type != experimental.RollingUpdateDeploymentStrategyType {
+				j.RollingUpdate = nil
+			} else {
+				rollingUpdate := experimental.RollingUpdateDeployment{}
+				if c.RandBool() {
+					rollingUpdate.MaxUnavailable = util.NewIntOrStringFromInt(int(c.RandUint64()))
+					rollingUpdate.MaxSurge = util.NewIntOrStringFromInt(int(c.RandUint64()))
+				} else {
+					rollingUpdate.MaxSurge = util.NewIntOrStringFromString(fmt.Sprintf("%d%%", c.RandUint64()))
+				}
+				j.RollingUpdate = &rollingUpdate
+			}
+		},
+		func(j *experimental.JobSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			completions := c.Rand.Int()
+			parallelism := c.Rand.Int()
+			j.Completions = &completions
+			j.Parallelism = &parallelism
 		},
 		func(j *api.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
@@ -159,6 +192,44 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
 			q.Amount.SetUnscaled(c.Int63n(1000))
 		},
+		func(q *api.ResourceRequirements, c fuzz.Continue) {
+			randomQuantity := func() resource.Quantity {
+				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+			}
+			q.Limits = make(api.ResourceList)
+			q.Requests = make(api.ResourceList)
+			cpuLimit := randomQuantity()
+			q.Limits[api.ResourceCPU] = *cpuLimit.Copy()
+			q.Requests[api.ResourceCPU] = *cpuLimit.Copy()
+			memoryLimit := randomQuantity()
+			q.Limits[api.ResourceMemory] = *memoryLimit.Copy()
+			q.Requests[api.ResourceMemory] = *memoryLimit.Copy()
+			storageLimit := randomQuantity()
+			q.Limits[api.ResourceStorage] = *storageLimit.Copy()
+			q.Requests[api.ResourceStorage] = *storageLimit.Copy()
+		},
+		func(q *api.LimitRangeItem, c fuzz.Continue) {
+			randomQuantity := func() resource.Quantity {
+				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+			}
+			cpuLimit := randomQuantity()
+
+			q.Type = api.LimitTypeContainer
+			q.Default = make(api.ResourceList)
+			q.Default[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.DefaultRequest = make(api.ResourceList)
+			q.DefaultRequest[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.Max = make(api.ResourceList)
+			q.Max[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.Min = make(api.ResourceList)
+			q.Min[api.ResourceCPU] = *(cpuLimit.Copy())
+
+			q.MaxLimitRequestRatio = make(api.ResourceList)
+			q.MaxLimitRequestRatio[api.ResourceCPU] = resource.MustParse("10")
+		},
 		func(p *api.PullPolicy, c fuzz.Continue) {
 			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
 			*p = policies[c.Rand.Intn(len(policies))]
@@ -173,7 +244,18 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			i := int(c.RandUint64() % uint64(v.NumField()))
 			v = v.Field(i).Addr()
 			// Use a new fuzzer which cannot populate nil to ensure one field will be set.
-			fuzz.New().NilChance(0).NumElements(1, 1).Fuzz(v.Interface())
+			f := fuzz.New().NilChance(0).NumElements(1, 1)
+			f.Funcs(
+				// Only api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
+				// defaulted to a version otherwise roundtrip will fail
+				// For the remaining volume plugins the default fuzzer is enough.
+				func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
+					m.Path = c.RandString()
+					versions := []string{"v1"}
+					m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
+					m.FieldRef.FieldPath = c.RandString()
+				},
+			).Fuzz(v.Interface())
 		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
@@ -276,6 +358,11 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(n *api.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)
 			n.Spec.ExternalID = "external"
+		},
+		func(s *experimental.APIVersion, c fuzz.Continue) {
+			// We can't use c.RandString() here because it may generate empty
+			// string, which will cause tests failure.
+			s.APIGroup = "something"
 		},
 	)
 	return f

@@ -31,10 +31,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/node"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // stat a path, if not exists, retry maxRetries times
@@ -143,7 +143,7 @@ func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
 	return nil
 }
 
-func (util *RBDUtil) loadRBD(rbd *rbd, mnt string) error {
+func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Open(file)
 	if err != nil {
@@ -152,7 +152,7 @@ func (util *RBDUtil) loadRBD(rbd *rbd, mnt string) error {
 	defer fp.Close()
 
 	decoder := json.NewDecoder(fp)
-	if err = decoder.Decode(rbd); err != nil {
+	if err = decoder.Decode(builder); err != nil {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
 
@@ -173,7 +173,7 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 		return nil
 	}
 
-	return util.rbdLock(rbdBuilder{rbd: c.rbd}, false)
+	return util.rbdLock(*c.rbdBuilder, false)
 }
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
@@ -215,12 +215,12 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
-	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
-	// in the first time, the path shouldn't exist and IsMountPoint is expected to get NotExist
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	// in the first time, the path shouldn't exist and IsLikelyNotMountPoint is expected to get NotExist
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("rbd: %s failed to check mountpoint", globalPDPath)
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 
@@ -262,7 +262,7 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 		}
 
 		// load ceph and image/pool info to remove fencing
-		if err := util.loadRBD(c.rbd, mntPath); err == nil {
+		if err := util.loadRBD(c.rbdBuilder, mntPath); err == nil {
 			// remove rbd lock
 			util.defencing(c)
 		}

@@ -16,10 +16,10 @@ kubectl get \- Display one or many resources
 Display one or many resources.
 
 .PP
-Possible resources include (case insensitive): pods (po), services (svc),
+Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), endpoints (ep) or secrets.
+resourcequotas (quota), namespaces (ns), endpoints (ep), serviceaccounts or secrets.
 
 .PP
 By specifying the output as 'template' and providing a Go template as the value
@@ -32,8 +32,8 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with \-\-namespace.
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for get
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to get from a server.
 
 .PP
 \fB\-L\fP, \fB\-\-label\-columns\fP=[]
@@ -45,7 +45,9 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide.
+    Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -56,9 +58,17 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
     Selector (label query) to filter on
 
 .PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
+\fB\-\-sort\-by\fP=""
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
+
+.PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
 .PP
 \fB\-w\fP, \fB\-\-watch\fP=false
@@ -159,10 +169,6 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -172,25 +178,31 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 .RS
 
 .nf
-// List all pods in ps output format.
+# List all pods in ps output format.
 $ kubectl get pods
 
-// List all pods in ps output format with more information (such as node name).
+# List all pods in ps output format with more information (such as node name).
 $ kubectl get pods \-o wide
 
-// List a single replication controller with specified NAME in ps output format.
+# List all pods in resource/name format (such as pod/nginx).
+$ kubectl get pods \-o name
+
+# List a single replication controller with specified NAME in ps output format.
 $ kubectl get replicationcontroller web
 
-// List a single pod in JSON output format.
+# List a single pod in JSON output format.
 $ kubectl get \-o json pod web\-pod\-13je7
 
-// Return only the phase value of the specified pod.
-$ kubectl get \-o template web\-pod\-13je7 \-\-template=\{\{.status.phase\}\} \-\-api\-version=v1
+# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
+$ kubectl get \-f pod.yaml \-o json
 
-// List all replication controllers and services together in ps output format.
+# Return only the phase value of the specified pod.
+$ kubectl get \-o template pod/web\-pod\-13je7 \-\-template={{.status.phase}} \-\-api\-version=v1
+
+# List all replication controllers and services together in ps output format.
 $ kubectl get rc,services
 
-// List one or more resources by their type and names.
+# List one or more resources by their type and names.
 $ kubectl get rc/web service/frontend pods/web\-pod\-13je7
 
 .fi

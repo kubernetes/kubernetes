@@ -19,20 +19,20 @@ package algorithm
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
-// MinionLister interface represents anything that can list minions for a scheduler.
-type MinionLister interface {
+// NodeLister interface represents anything that can list nodes for a scheduler.
+type NodeLister interface {
 	List() (list api.NodeList, err error)
 }
 
-// FakeMinionLister implements MinionLister on a []string for test purposes.
-type FakeMinionLister api.NodeList
+// FakeNodeLister implements NodeLister on a []string for test purposes.
+type FakeNodeLister api.NodeList
 
-// List returns minions as a []string.
-func (f FakeMinionLister) List() (api.NodeList, error) {
+// List returns nodes as a []string.
+func (f FakeNodeLister) List() (api.NodeList, error) {
 	return api.NodeList(f), nil
 }
 
@@ -98,6 +98,19 @@ type ControllerLister interface {
 	List() ([]api.ReplicationController, error)
 	// Gets the services for the given pod
 	GetPodControllers(*api.Pod) ([]api.ReplicationController, error)
+}
+
+// EmptyControllerLister implements ControllerLister on []api.ReplicationController returning empty data
+type EmptyControllerLister struct{}
+
+// List returns nil
+func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
+	return nil, nil
+}
+
+// GetPodControllers returns nil
+func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	return nil, nil
 }
 
 // FakeControllerLister implements ControllerLister on []api.ReplicationController for test purposes.

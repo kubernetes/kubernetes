@@ -107,9 +107,9 @@ mypod     1/1       Running   0          1h
 
 $ kubectl create -f docs/user-guide/persistent-volumes/simpletest/service.json
 $ kubectl get services
-NAME              LABELS                                    SELECTOR            IP(S)        PORT(S)
-frontendservice   <none>                                    name=frontendhttp   10.0.0.241   3000/TCP
-kubernetes        component=apiserver,provider=kubernetes   <none>              10.0.0.2     443/TCP
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR           AGE
+frontendservice   10.0.0.241       <none>            3000/TCP      name=frontendhttp  1d
+kubernetes        10.0.0.2         <none>            443/TCP       <none>             2d
 ```
 
 ## Next steps
@@ -122,8 +122,7 @@ $ curl 10.0.0.241:3000
 I love Kubernetes storage!
 ```
 
-Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join
-[`#google-containers`](https://botbot.me/freenode/google-containers/) on IRC and ask!
+Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join the team on [Slack](../../troubleshooting.md#slack) and ask!
 
 Enjoy!
 

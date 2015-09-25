@@ -48,8 +48,8 @@ function verify-prereqs {
       # either provider_ctl_executable or vagrant_provider_plugin_re can
       # be blank (i.e., '') if none is needed by Vagrant (see, e.g.,
       # virtualbox entry)
-      vmrun vmware_fusion vagrant-vmware-fusion
-      vmrun vmware_workstation vagrant-vmware-workstation
+      '' vmware_fusion vagrant-vmware-fusion
+      '' vmware_workstation vagrant-vmware-workstation
       prlctl parallels vagrant-parallels
       VBoxManage virtualbox ''
       virsh libvirt vagrant-libvirt
@@ -83,7 +83,12 @@ function verify-prereqs {
 
   if [ -z "${provider_found}" ]; then
     if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
-      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider, please fix and retry."
+      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider."
+      echo "Possible reasons could be: "
+      echo -e "\t- vmrun utility is not in your path"
+      echo -e "\t- Vagrant plugin was not found."
+      echo -e "\t- VAGRANT_DEFAULT_PROVIDER is set, but not found."
+      echo "Please fix and retry."
     else
       echo "Can't find the necessary components for any viable vagrant providers (e.g., virtualbox), please fix and retry."
     fi
@@ -133,7 +138,9 @@ function create-provision-scripts {
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
     echo "KUBE_USER='${KUBE_USER}'"
     echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
+    echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
     echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+    echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
     echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
@@ -141,12 +148,13 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
+    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
     echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
     echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
     echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
     echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
@@ -166,12 +174,12 @@ function create-provision-scripts {
       echo "CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
       echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
-      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
+      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
       echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
       echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
       echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
@@ -191,6 +199,9 @@ function verify-cluster {
   local machine="master"
   local -a required_daemon=("salt-master" "salt-minion" "kubelet")
   local validated="1"
+  # This is a hack, but sometimes the salt-minion gets stuck on the master, so we just restart it
+  # to ensure that users never wait forever
+  vagrant ssh "$machine" -c "sudo systemctl restart salt-minion"
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
@@ -230,7 +241,7 @@ function verify-cluster {
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
-      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template -t '{{range.items}}{{.metadata.name}}:{{end}}' --api-version=v1)
+      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o go-template='{{range.items}}{{.metadata.name}}:{{end}}' --api-version=v1)
       count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
         printf "."
         sleep 2
@@ -246,19 +257,29 @@ function verify-cluster {
   }
 
   (
+    # ensures KUBECONFIG is set
+    get-kubeconfig-basicauth
     echo
-    echo "Kubernetes cluster is running.  The master is running at:"
+    echo "Kubernetes cluster is running."
+    echo
+    echo "The master is running at:"
     echo
     echo "  https://${MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
+    echo "Administer and visualize its resources using Cockpit:"
     echo
-    )
+    echo "  https://${MASTER_IP}:9090"
+    echo
+    echo "For more information on Cockpit, visit http://cockpit-project.org"
+    echo 
+    echo "The user name and password to use is located in ${KUBECONFIG}"
+    echo
+  )
 }
 
 # Instantiate a kubernetes cluster
 function kube-up {
-  get-password
+  gen-kube-basicauth
   get-tokens
   create-provision-scripts
 
@@ -288,7 +309,7 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
-  get-password
+  get-kubeconfig-basicauth
   create-provision-scripts
   vagrant provision
 }
@@ -307,13 +328,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
   kube-down
-}
-
-# Set the {user} and {password} environment values required to interact with provider
-function get-password {
-  export KUBE_USER=vagrant
-  export KUBE_PASSWORD=vagrant
-  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD" 1>&2
 }
 
 # Find the minion name based on the IP address

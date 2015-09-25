@@ -80,14 +80,20 @@ type ContainerSpec struct {
 	HasNetwork    bool `json:"has_network"`
 	HasFilesystem bool `json:"has_filesystem"`
 	HasDiskIo     bool `json:"has_diskio"`
+
+	// Image name used for this container.
+	Image string `json:"image,omitempty"`
 }
 
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time `json:"timestamp"`
 	// CPU statistics
-	HasCpu bool        `json:"has_cpu"`
-	Cpu    v1.CpuStats `json:"cpu,omitempty"`
+	HasCpu bool `json:"has_cpu"`
+	// In nanoseconds (aggregated)
+	Cpu v1.CpuStats `json:"cpu,omitempty"`
+	// In nanocores per second (instantaneous)
+	CpuInst *CpuInstStats `json:"cpu_inst,omitempty"`
 	// Disk IO statistics
 	HasDiskIo bool           `json:"has_diskio"`
 	DiskIo    v1.DiskIoStats `json:"diskio,omitempty"`
@@ -104,8 +110,8 @@ type ContainerStats struct {
 	HasLoad bool         `json:"has_load"`
 	Load    v1.LoadStats `json:"load_stats,omitempty"`
 	// Custom Metrics
-	HasCustomMetrics bool                    `json:"has_custom_metrics"`
-	CustomMetrics    map[string]v1.MetricVal `json:"custom_metrics,omitempty"`
+	HasCustomMetrics bool                      `json:"has_custom_metrics"`
+	CustomMetrics    map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
 }
 
 type Percentiles struct {
@@ -203,4 +209,28 @@ type ProcessInfo struct {
 type NetworkStats struct {
 	// Network stats by interface.
 	Interfaces []v1.InterfaceStats `json:"interfaces,omitempty"`
+}
+
+// Instantaneous CPU stats
+type CpuInstStats struct {
+	Usage CpuInstUsage `json:"usage"`
+}
+
+// CPU usage time statistics.
+type CpuInstUsage struct {
+	// Total CPU usage.
+	// Units: nanocores per second
+	Total uint64 `json:"total"`
+
+	// Per CPU/core usage of the container.
+	// Unit: nanocores per second
+	PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
+
+	// Time spent in user space.
+	// Unit: nanocores per second
+	User uint64 `json:"user"`
+
+	// Time spent in kernel space.
+	// Unit: nanocores per second
+	System uint64 `json:"system"`
 }

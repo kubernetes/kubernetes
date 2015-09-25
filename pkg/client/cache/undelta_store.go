@@ -66,8 +66,8 @@ func (u *UndeltaStore) Delete(obj interface{}) error {
 	return nil
 }
 
-func (u *UndeltaStore) Replace(list []interface{}) error {
-	if err := u.Store.Replace(list); err != nil {
+func (u *UndeltaStore) Replace(list []interface{}, resourceVersion string) error {
+	if err := u.Store.Replace(list, resourceVersion); err != nil {
 		return err
 	}
 	u.PushFunc(u.Store.List())

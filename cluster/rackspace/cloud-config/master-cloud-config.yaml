@@ -87,9 +87,9 @@ coreos:
         ExecStartPre=/usr/bin/mkdir -p /var/lib/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
         --address=127.0.0.1 \
-        --cloud_provider=rackspace \
-        --cloud_config=/etc/cloud.conf \
-        --etcd_servers=http://127.0.0.1:4001 \
+        --cloud-provider=rackspace \
+        --cloud-config=/etc/cloud.conf \
+        --etcd-servers=http://127.0.0.1:4001 \
         --logtostderr=true \
         --port=8080 \
         --service-cluster-ip-range=SERVICE_CLUSTER_IP_RANGE \
@@ -122,8 +122,8 @@ coreos:
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-controller-manager /opt/bin/kube-controller-manager
         ExecStart=/opt/bin/kube-controller-manager \
-        --cloud_provider=rackspace \
-        --cloud_config=/etc/cloud.conf \
+        --cloud-provider=rackspace \
+        --cloud-config=/etc/cloud.conf \
         --logtostderr=true \
         --master=127.0.0.1:8080 \
         --v=2

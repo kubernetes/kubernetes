@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
 	"github.com/golang/glog"
 )
@@ -36,7 +36,7 @@ var (
 )
 
 // ExtendedPodLister: SimpleModeler needs to be able to check for a pod's
-// existance in addition to listing the pods.
+// existence in addition to listing the pods.
 type ExtendedPodLister interface {
 	algorithm.PodLister
 	Exists(pod *api.Pod) (bool, error)
@@ -105,7 +105,7 @@ func NewSimpleModeler(queuedPods, scheduledPods ExtendedPodLister) *SimpleModele
 		queuedPods:    queuedPods,
 		scheduledPods: scheduledPods,
 		assumedPods: &cache.StoreToPodLister{
-			cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 30*time.Second),
+			Store: cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 30*time.Second),
 		},
 	}
 }

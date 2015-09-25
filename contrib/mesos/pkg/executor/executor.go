@@ -25,27 +25,30 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/messages"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
 	containerPollTime = 1 * time.Second
 	launchGracePeriod = 5 * time.Minute
+	podRelistPeriod   = 5 * time.Minute
 )
 
 type stateType int32
@@ -88,15 +91,6 @@ type kuberTask struct {
 	podName       string
 }
 
-// func that attempts suicide
-type jumper func(bindings.ExecutorDriver, <-chan struct{})
-
-type suicideWatcher interface {
-	Next(time.Duration, bindings.ExecutorDriver, jumper) suicideWatcher
-	Reset(time.Duration) bool
-	Stop() bool
-}
-
 type podStatusFunc func() (*api.PodStatus, error)
 
 // KubeletInterface consists of the kubelet.Kubelet API's that we actually use
@@ -129,6 +123,7 @@ type KubernetesExecutor struct {
 	staticPodsConfig     []byte
 	staticPodsConfigPath string
 	initialRegComplete   chan struct{}
+	podController        *framework.Controller
 }
 
 type Config struct {
@@ -144,6 +139,7 @@ type Config struct {
 	ExitFunc             func(int)
 	PodStatusFunc        func(KubeletInterface, *api.Pod) (*api.PodStatus, error)
 	StaticPodsConfigPath string
+	PodLW                cache.ListerWatcher
 }
 
 func (k *KubernetesExecutor) isConnected() bool {
@@ -172,6 +168,7 @@ func New(config Config) *KubernetesExecutor {
 		initialRegComplete:   make(chan struct{}),
 		staticPodsConfigPath: config.StaticPodsConfigPath,
 	}
+
 	//TODO(jdef) do something real with these events..
 	if config.Watch != nil {
 		events := config.Watch.ResultChan()
@@ -185,12 +182,33 @@ func New(config Config) *KubernetesExecutor {
 			k.events = events
 		}
 	}
+
+	// watch pods from the given pod ListWatch
+	_, k.podController = framework.NewInformer(config.PodLW, &api.Pod{}, podRelistPeriod, &framework.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pod := obj.(*api.Pod)
+			log.V(4).Infof("pod %s/%s created on apiserver", pod.Namespace, pod.Name)
+			k.handleChangedApiserverPod(pod)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			pod := newObj.(*api.Pod)
+			log.V(4).Infof("pod %s/%s updated on apiserver", pod.Namespace, pod.Name)
+			k.handleChangedApiserverPod(pod)
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod := obj.(*api.Pod)
+			log.V(4).Infof("pod %s/%s deleted on apiserver", pod.Namespace, pod.Name)
+		},
+	})
+
 	return k
 }
 
 func (k *KubernetesExecutor) Init(driver bindings.ExecutorDriver) {
 	k.killKubeletContainers()
 	k.resetSuicideWatch(driver)
+
+	go k.podController.Run(k.done)
 	go k.sendLoop()
 	//TODO(jdef) monitor kubeletFinished and shutdown if it happens
 }
@@ -338,36 +356,43 @@ func (k *KubernetesExecutor) LaunchTask(driver bindings.ExecutorDriver, taskInfo
 	go k.launchTask(driver, taskId, pod)
 }
 
-// TODO(jdef) add metrics for this?
-type suicideTimer struct {
-	timer *time.Timer
-}
-
-func (w *suicideTimer) Next(d time.Duration, driver bindings.ExecutorDriver, f jumper) suicideWatcher {
-	return &suicideTimer{
-		timer: time.AfterFunc(d, func() {
-			log.Warningf("Suicide timeout (%v) expired", d)
-			f(driver, nil)
-		}),
+func (k *KubernetesExecutor) handleChangedApiserverPod(pod *api.Pod) {
+	// exclude "pre-scheduled" pods which have a NodeName set to this node without being scheduled already
+	taskId := pod.Annotations[meta.TaskIdKey]
+	if taskId == "" {
+		log.V(5).Infof("ignoring pod update for %s/%s because %s annotation is missing", pod.Namespace, pod.Name, meta.TaskIdKey)
+		return
 	}
-}
 
-func (w *suicideTimer) Stop() (result bool) {
-	if w != nil && w.timer != nil {
-		log.Infoln("stopping suicide watch") //TODO(jdef) debug
-		result = w.timer.Stop()
-	}
-	return
-}
+	k.lock.Lock()
+	defer k.lock.Unlock()
 
-// return true if the timer was successfully reset
-func (w *suicideTimer) Reset(d time.Duration) bool {
-	if w != nil && w.timer != nil {
-		log.Infoln("resetting suicide watch") //TODO(jdef) debug
-		w.timer.Reset(d)
-		return true
+	// exclude tasks which are already deleted from our task registry
+	task := k.tasks[taskId]
+	if task == nil {
+		log.Warningf("task %s for pod %s/%s not found", taskId, pod.Namespace, pod.Name)
+		return
 	}
-	return false
+
+	oldPod := k.pods[task.podName]
+
+	// terminating pod?
+	if oldPod != nil && oldPod.DeletionTimestamp == nil &&
+		pod.DeletionTimestamp != nil && pod.Status.Phase == api.PodRunning &&
+		pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds > 0 {
+
+		log.Infof("pod %s/%s is terminating at %v with %vs grace period, telling kubelet", pod.Namespace, pod.Name, *pod.DeletionTimestamp, *pod.DeletionGracePeriodSeconds)
+
+		// modify pod in our registry to avoid that other changed bleed into the kubelet
+		oldPod.DeletionTimestamp = pod.DeletionTimestamp
+		oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
+
+		update := kubelet.PodUpdate{
+			Op:   kubelet.UPDATE,
+			Pods: []*api.Pod{oldPod},
+		}
+		k.updateChan <- update
+	}
 }
 
 // determine whether we need to start a suicide countdown. if so, then start
@@ -533,11 +558,10 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 	task.podName = podFullName
 	k.pods[podFullName] = pod
 
-	// send the latest snapshot of the set of pods to the kubelet via the pod update channel.
-	// this results in the kubelet spinning up the new pod.
-	update := kubelet.PodUpdate{Op: kubelet.SET}
-	for _, p := range k.pods {
-		update.Pods = append(update.Pods, p)
+	// send the new pod to the kubelet which will spin it up
+	update := kubelet.PodUpdate{
+		Op:   kubelet.ADD,
+		Pods: []*api.Pod{pod},
 	}
 	k.updateChan <- update
 
@@ -729,16 +753,17 @@ func (k *KubernetesExecutor) removePodTask(driver bindings.ExecutorDriver, tid, 
 	k.resetSuicideWatch(driver)
 
 	pid := task.podName
-	if _, found := k.pods[pid]; !found {
+	pod, found := k.pods[pid]
+	if !found {
 		log.Warningf("Cannot remove unknown pod %v for task %v", pid, tid)
 	} else {
 		log.V(2).Infof("deleting pod %v for task %v", pid, tid)
 		delete(k.pods, pid)
 
-		// Send the pod updates to the channel.
-		update := kubelet.PodUpdate{Op: kubelet.SET}
-		for _, p := range k.pods {
-			update.Pods = append(update.Pods, p)
+		// tell the kubelet to remove the pod
+		update := kubelet.PodUpdate{
+			Op:   kubelet.REMOVE,
+			Pods: []*api.Pod{pod},
 		}
 		k.updateChan <- update
 	}
@@ -758,8 +783,8 @@ func (k *KubernetesExecutor) FrameworkMessage(driver bindings.ExecutorDriver, me
 
 	log.Infof("Receives message from framework %v\n", message)
 	//TODO(jdef) master reported a lost task, reconcile this! @see scheduler.go:handleTaskLost
-	if strings.HasPrefix(message, "task-lost:") && len(message) > 10 {
-		taskId := message[10:]
+	if strings.HasPrefix(message, messages.TaskLost+":") {
+		taskId := message[len(messages.TaskLost)+1:]
 		if taskId != "" {
 			// clean up pod state
 			k.lock.Lock()

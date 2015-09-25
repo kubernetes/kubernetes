@@ -129,18 +129,19 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 			return err
 		}
 		data = &pageData{
-			DisplayName:        displayName,
-			ContainerName:      escapeContainerName(cont.Name),
-			ParentContainers:   parentContainers,
-			Spec:               cont.Spec,
-			Stats:              cont.Stats,
-			MachineInfo:        machineInfo,
-			ResourcesAvailable: cont.Spec.HasCpu || cont.Spec.HasMemory || cont.Spec.HasNetwork,
-			CpuAvailable:       cont.Spec.HasCpu,
-			MemoryAvailable:    cont.Spec.HasMemory,
-			NetworkAvailable:   cont.Spec.HasNetwork,
-			FsAvailable:        cont.Spec.HasFilesystem,
-			Root:               rootDir,
+			DisplayName:            displayName,
+			ContainerName:          escapeContainerName(cont.Name),
+			ParentContainers:       parentContainers,
+			Spec:                   cont.Spec,
+			Stats:                  cont.Stats,
+			MachineInfo:            machineInfo,
+			ResourcesAvailable:     cont.Spec.HasCpu || cont.Spec.HasMemory || cont.Spec.HasNetwork,
+			CpuAvailable:           cont.Spec.HasCpu,
+			MemoryAvailable:        cont.Spec.HasMemory,
+			NetworkAvailable:       cont.Spec.HasNetwork,
+			FsAvailable:            cont.Spec.HasFilesystem,
+			CustomMetricsAvailable: cont.Spec.HasCustomMetrics,
+			Root: rootDir,
 		}
 	}
 

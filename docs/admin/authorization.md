@@ -45,9 +45,9 @@ the request, (such as user, resource, and namespace) with access
 policies.  An API call must be allowed by some policy in order to proceed.
 
 The following implementations are available, and are selected by flag:
-  - `--authorization_mode=AlwaysDeny`
-  - `--authorization_mode=AlwaysAllow`
-  - `--authorization_mode=ABAC`
+  - `--authorization-mode=AlwaysDeny`
+  - `--authorization-mode=AlwaysAllow`
+  - `--authorization-mode=ABAC`
 
 `AlwaysDeny` blocks all requests (used in tests).
 `AlwaysAllow` allows all requests; use if you don't need authorization.
@@ -57,10 +57,11 @@ The following implementations are available, and are selected by flag:
 
 ### Request Attributes
 
-A request has 4 attributes that can be considered for authorization:
+A request has 5 attributes that can be considered for authorization:
   - user (the user-string which a user was authenticated as).
-  - whether the request is readonly (GETs are readonly)
-  - what resource is being accessed
+  - group (the list of group names the authenticated user is a member of).
+  - whether the request is readonly (GETs are readonly).
+  - what resource is being accessed.
     - applies only to the API endpoints, such as
         `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
@@ -72,13 +73,14 @@ to assist in policy management.
 
 ### Policy File Format
 
-For mode `ABAC`, also specify `--authorization_policy_file=SOME_FILENAME`.
+For mode `ABAC`, also specify `--authorization-policy-file=SOME_FILENAME`.
 
 The file format is [one JSON object per line](http://jsonlines.org/).  There should be no enclosing list or map, just
 one map per line.
 
 Each line is a "policy object".  A policy object is a map with the following properties:
-  - `user`, type string; the user-string from `--token_auth_file`
+  - `user`, type string; the user-string from `--token-auth-file`. If you specify `user`, it must match the username of the authenticated user.
+  - `group`, type string; if you specify `group`, it must match one of the groups of the authenticated user.
   - `readonly`, type boolean, when true, means that the policy only applies to GET
       operations.
   - `resource`, type string; a resource from an URL, such as `pods`.
@@ -111,7 +113,7 @@ To permit an action Policy with an unset namespace applies regardless of namespa
  1. Alice can do anything: `{"user":"alice"}`
  2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
- 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
+ 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "namespace": "projectCaribou"}`
 
 [Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
@@ -151,7 +153,7 @@ type Authorizer interface {
 to determine whether or not to allow each API action.
 
 An authorization plugin is a module that implements this interface.
-Authorization plugin code goes in `pkg/auth/authorization/$MODULENAME`.
+Authorization plugin code goes in `pkg/auth/authorizer/$MODULENAME`.
 
 An authorization module can be completely implemented in go, or can call out
 to a remote authorization service.  Authorization modules can implement

@@ -21,15 +21,16 @@ import (
 	"io/ioutil"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/io"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 var errUnsupportedVolumeType = fmt.Errorf("unsupported volume type")
@@ -56,15 +57,15 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, pod, opts, mounter)
+func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, pod, opts)
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
 	}
 	return b, nil
 }
 
-func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (volume.Cleaner, error) {
 	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -73,27 +74,39 @@ func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mou
 		// Not found but not an error
 		return nil, nil
 	}
-	c, err := plugin.NewCleaner(spec.Name, podUID, mounter)
+	c, err := plugin.NewCleaner(spec.Name(), podUID)
 	if err == nil && c == nil {
 		return nil, errUnsupportedVolumeType
 	}
 	return c, nil
 }
 
-func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (vh *volumeHost) GetCloudProvider() cloudprovider.Interface {
+	return vh.kubelet.cloud
+}
+
+func (vh *volumeHost) GetMounter() mount.Interface {
+	return vh.kubelet.mounter
+}
+
+func (vh *volumeHost) GetWriter() io.Writer {
+	return vh.kubelet.writer
+}
+
+func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spew.Sprintf("%#v", *spec), err)
+		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
 	}
 	if plugin == nil {
 		// Not found but not an error
 		return nil, nil
 	}
-	builder, err := plugin.NewBuilder(spec, pod, opts, mounter)
+	builder, err := plugin.NewBuilder(spec, pod, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spew.Sprintf("%#v", *spec), err)
+		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spec.Name(), err)
 	}
-	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spew.Sprintf("%#v", *spec))
+	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spec.Name())
 	return builder, nil
 }
 
@@ -109,7 +122,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 
 		// Try to use a plugin for this volume.
 		internal := volume.NewSpecFromVolume(volSpec)
-		builder, err := kl.newVolumeBuilderFromPlugins(internal, pod, volume.VolumeOptions{rootContext}, kl.mounter)
+		builder, err := kl.newVolumeBuilderFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume builder for pod %s: %v", pod.UID, err)
 			return nil, err
@@ -126,57 +139,79 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	return podVolumes, nil
 }
 
+type volumeTuple struct {
+	Kind string
+	Name string
+}
+
+func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
+	var volumes []*volumeTuple
+	podVolDir := kl.getPodVolumesDir(podUID)
+	volumeKindDirs, err := ioutil.ReadDir(podVolDir)
+	if err != nil {
+		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+	}
+	for _, volumeKindDir := range volumeKindDirs {
+		volumeKind := volumeKindDir.Name()
+		volumeKindPath := path.Join(podVolDir, volumeKind)
+		// ioutil.ReadDir exits without returning any healthy dir when encountering the first lstat error
+		// but skipping dirs means no cleanup for healthy volumes. switching to a no-exit api solves this problem
+		volumeNameDirs, volumeNameDirsStat, err := util.ReadDirNoExit(volumeKindPath)
+		if err != nil {
+			return []*volumeTuple{}, fmt.Errorf("could not read directory %s: %v", volumeKindPath, err)
+		}
+		for i, volumeNameDir := range volumeNameDirs {
+			if volumeNameDir != nil {
+				volumes = append(volumes, &volumeTuple{Kind: volumeKind, Name: volumeNameDir.Name()})
+			} else {
+				lerr := volumeNameDirsStat[i]
+				glog.Errorf("Could not read directory %s: %v", podVolDir, lerr)
+			}
+		}
+	}
+	return volumes, nil
+}
+
 // getPodVolumesFromDisk examines directory structure to determine volumes that
 // are presently active and mounted. Returns a map of volume.Cleaner types.
 func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 	currentVolumes := make(map[string]volume.Cleaner)
-
 	podUIDs, err := kl.listPodsFromDisk()
 	if err != nil {
 		glog.Errorf("Could not get pods from disk: %v", err)
 		return map[string]volume.Cleaner{}
 	}
-
 	// Find the volumes for each on-disk pod.
 	for _, podUID := range podUIDs {
-		podVolDir := kl.getPodVolumesDir(podUID)
-		volumeKindDirs, err := ioutil.ReadDir(podVolDir)
+		volumes, err := kl.getPodVolumes(podUID)
 		if err != nil {
-			glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+			glog.Errorf("%v", err)
+			continue
 		}
-		for _, volumeKindDir := range volumeKindDirs {
-			volumeKind := volumeKindDir.Name()
-			volumeKindPath := path.Join(podVolDir, volumeKind)
-			volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
-			if err != nil {
-				glog.Errorf("Could not read directory %s: %v", volumeKindPath, err)
-			}
-			for _, volumeNameDir := range volumeNameDirs {
-				volumeName := volumeNameDir.Name()
-				identifier := fmt.Sprintf("%s/%s", podUID, volumeName)
-				glog.V(4).Infof("Making a volume.Cleaner for %s", volumeKindPath)
-				// TODO(thockin) This should instead return a reference to an extant
-				// volume object, except that we don't actually hold on to pod specs
-				// or volume objects.
+		for _, volume := range volumes {
+			identifier := fmt.Sprintf("%s/%s", podUID, volume.Name)
+			glog.V(4).Infof("Making a volume.Cleaner for volume %s/%s of pod %s", volume.Kind, volume.Name, podUID)
+			// TODO(thockin) This should instead return a reference to an extant
+			// volume object, except that we don't actually hold on to pod specs
+			// or volume objects.
 
-				// Try to use a plugin for this volume.
-				cleaner, err := kl.newVolumeCleanerFromPlugins(volumeKind, volumeName, podUID, kl.mounter)
-				if err != nil {
-					glog.Errorf("Could not create volume cleaner for %s: %v", volumeNameDir.Name(), err)
-					continue
-				}
-				if cleaner == nil {
-					glog.Errorf("Could not create volume cleaner for %s: %v", volumeNameDir.Name(), errUnsupportedVolumeType)
-					continue
-				}
-				currentVolumes[identifier] = cleaner
+			// Try to use a plugin for this volume.
+			cleaner, err := kl.newVolumeCleanerFromPlugins(volume.Kind, volume.Name, podUID)
+			if err != nil {
+				glog.Errorf("Could not create volume cleaner for %s: %v", volume.Name, err)
+				continue
 			}
+			if cleaner == nil {
+				glog.Errorf("Could not create volume cleaner for %s: %v", volume.Name, errUnsupportedVolumeType)
+				continue
+			}
+			currentVolumes[identifier] = cleaner
 		}
 	}
 	return currentVolumes
 }
 
-func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
 	plugName := util.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -187,7 +222,7 @@ func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID 
 		// Not found but not an error.
 		return nil, nil
 	}
-	cleaner, err := plugin.NewCleaner(name, podUID, mounter)
+	cleaner, err := plugin.NewCleaner(name, podUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s/%s: %v", podUID, kind, err)
 	}

@@ -209,16 +209,16 @@ walk-through - you can use your own `Service`'s details here.
 
 ```console
 $ kubectl expose rc hostnames --port=80 --target-port=9376
-NAME        LABELS          SELECTOR        IP(S)     PORT(S)
-hostnames   app=hostnames   app=hostnames             80/TCP
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
 ```
 
 And read it back, just to be sure:
 
 ```console
 $ kubectl get svc hostnames
-NAME        LABELS          SELECTOR        IP(S)        PORT(S)
-hostnames   app=hostnames   app=hostnames   10.0.1.175   80/TCP
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
 ```
 
 As before, this is the same as if you had started the `Service` with YAML:
@@ -295,8 +295,8 @@ Address: 10.0.1.175
 
 If you are able to do a fully-qualified name lookup but not a relative one, you
 need to check that your `kubelet` is running with the right flags.
-The `--cluster_dns` flag needs to point to your DNS `Service`'s IP and the
-`--cluster_domain` flag needs to be your cluster's domain - we assumed
+The `--cluster-dns` flag needs to point to your DNS `Service`'s IP and the
+`--cluster-domain` flag needs to be your cluster's domain - we assumed
 "cluster.local" in this document, but yours might be different, in which case
 you should change that in all of the commands above.
 
@@ -546,9 +546,9 @@ misbehaving.  And yet your `Service` is not working.  You should probably let
 us know, so we can help investigate!
 
 Contact us on
-[IRC](http://webchat.freenode.net/?channels=google-containers) or
+[Slack](../troubleshooting.md#slack) or
 [email](https://groups.google.com/forum/#!forum/google-containers) or
-[GitHub](https://github.com/GoogleCloudPlatform/kubernetes).
+[GitHub](https://github.com/kubernetes/kubernetes).
 
 ## More information
 

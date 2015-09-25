@@ -28,13 +28,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/proxy"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/proxy"
 
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"
+	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // UpgradeAwareProxyHandler is a handler for proxy requests that may require an upgrade
@@ -89,7 +89,7 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 
 	// From pkg/apiserver/proxy.go#ServeHTTP:
 	// Redirect requests with an empty path to a location that ends with a '/'
-	// This is essentially a hack for https://github.com/GoogleCloudPlatform/kubernetes/issues/4958.
+	// This is essentially a hack for http://issue.k8s.io/4958.
 	// Note: Keep this code after tryUpgrade to not break that flow.
 	if len(loc.Path) == 0 {
 		var queryPart string

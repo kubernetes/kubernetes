@@ -48,13 +48,11 @@ cluster's shared state through which all other components interact.
 
 ```
       --address=<nil>: DEPRECATED: see --insecure-bind-address instead
-      --admission-control="": Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: AlwaysAdmit, AlwaysDeny, DenyExecOnPrivileged, LimitRanger, NamespaceAutoProvision, NamespaceExists, NamespaceLifecycle, ResourceQuota, SecurityContextDeny, ServiceAccount
+      --admission-control="": Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: AlwaysAdmit, AlwaysDeny, DenyExecOnPrivileged, DenyEscalatingExec, LimitRanger, NamespaceAutoProvision, NamespaceExists, NamespaceLifecycle, ResourceQuota, SecurityContextDeny, ServiceAccount
       --admission-control-config-file="": File with admission control configuration.
       --advertise-address=<nil>: The IP address on which to advertise the apiserver to members of the cluster. This address must be reachable by the rest of the cluster. If blank, the --bind-address will be used. If --bind-address is unspecified, the host's default interface will be used.
       --allow-privileged=false: If true, allow privileged containers.
-      --api-burst=0: API burst amount for the read only port
       --api-prefix="": The prefix for API requests on the server. Default '/api'.
-      --api-rate=0: API rate limit as QPS for the read only port
       --authorization-mode="": Selects how to do authorization on the secure port.  One of: AlwaysAllow,AlwaysDeny,ABAC
       --authorization-policy-file="": File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.
       --basic-auth-file="": If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.
@@ -73,12 +71,12 @@ cluster's shared state through which all other components interact.
   -h, --help=false: help for kube-apiserver
       --insecure-bind-address=<nil>: The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). Defaults to localhost.
       --insecure-port=0: The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed that firewall rules are set up such that this port is not reachable from outside of the cluster and that port 443 on the cluster's public address is proxied to this port. This is performed by nginx in the default setup.
-      --kubelet_certificate_authority="": Path to a cert. file for the certificate authority.
-      --kubelet_client_certificate="": Path to a client key file for TLS.
-      --kubelet_client_key="": Path to a client key file for TLS.
-      --kubelet_https=false: Use https for kubelet connections
-      --kubelet_port=0: Kubelet port
-      --kubelet_timeout=0: Timeout for kubelet operations
+      --kubelet-certificate-authority="": Path to a cert. file for the certificate authority.
+      --kubelet-client-certificate="": Path to a client key file for TLS.
+      --kubelet-client-key="": Path to a client key file for TLS.
+      --kubelet-https=false: Use https for kubelet connections
+      --kubelet-port=0: Kubelet port
+      --kubelet-timeout=0: Timeout for kubelet operations
       --long-running-request-regexp="(/|^)((watch|proxy)(/|$)|(logs|portforward|exec)/?$)": A regular expression matching long running requests which should be excluded from maximum inflight request handling.
       --master-service-namespace="": The namespace from which the Kubernetes master services should be injected into pods
       --max-requests-inflight=400: The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.

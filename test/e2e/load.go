@@ -23,10 +23,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -53,11 +53,12 @@ var _ = Describe("Load capacity", func() {
 	var nodeCount int
 	var ns string
 	var configs []*RCConfig
+	framework := Framework{BaseName: "load", NamespaceDeletionTimeout: time.Hour}
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
@@ -66,11 +67,7 @@ var _ = Describe("Load capacity", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = deleteTestingNS(c)
-		expectNoError(err)
-
-		nsForTesting, err := createTestingNS("load", c)
-		ns = nsForTesting.Name
+		err = checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
@@ -80,15 +77,12 @@ var _ = Describe("Load capacity", func() {
 	AfterEach(func() {
 		deleteAllRC(configs)
 
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, sets.NewString("events"))
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+
+		framework.afterEach()
 	})
 
 	type Load struct {
@@ -213,7 +207,7 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 
 	sleepUpTo(resizingTime)
 	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
-	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize),
+	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 	_, err := config.Client.Pods(config.Namespace).List(selector, fields.Everything())

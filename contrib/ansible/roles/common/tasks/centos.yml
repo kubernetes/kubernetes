@@ -1,6 +1,0 @@
----
-- name: CentOS | Install Testing centos7 repo
-  copy: src=virt7-testing.repo dest=/etc/yum.repos.d/virt7-testing.repo
-
-- name: CentOS | Install docker-common-candidate centos7 repo
-  copy: src=virt7-docker-common-candidate.repo dest=/etc/yum.repos.d/virt7-docker-common-candidate.repo

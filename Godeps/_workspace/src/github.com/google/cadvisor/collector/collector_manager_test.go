@@ -28,7 +28,7 @@ type fakeCollector struct {
 	collectedFrom      int
 }
 
-func (fc *fakeCollector) Collect(metric map[string]v1.MetricVal) (time.Time, map[string]v1.MetricVal, error) {
+func (fc *fakeCollector) Collect(metric map[string][]v1.MetricVal) (time.Time, map[string][]v1.MetricVal, error) {
 	fc.collectedFrom++
 	return fc.nextCollectionTime, metric, fc.err
 }

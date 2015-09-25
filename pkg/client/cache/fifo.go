@@ -163,7 +163,7 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 // Pop waits until an item is ready and returns it. If multiple items are
 // ready, they are returned in the order in which they were added/updated.
 // The item is removed from the queue (and the store) before it is returned,
-// so if you don't succesfully process it, you need to add it back with
+// so if you don't successfully process it, you need to add it back with
 // AddIfNotPresent().
 func (f *FIFO) Pop() interface{} {
 	f.lock.Lock()
@@ -188,7 +188,7 @@ func (f *FIFO) Pop() interface{} {
 // 'f' takes ownership of the map, you should not reference the map again
 // after calling this function. f's queue is reset, too; upon return, it
 // will contain the items in the map, in no particular order.
-func (f *FIFO) Replace(list []interface{}) error {
+func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	items := map[string]interface{}{}
 	for _, item := range list {
 		key, err := f.keyFunc(item)

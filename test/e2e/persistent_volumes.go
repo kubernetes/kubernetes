@@ -18,14 +18,15 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // Marked with [Skipped] to skip the test by default (see driver.go),
@@ -46,7 +47,7 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})
@@ -63,7 +64,8 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 			volumeTestCleanup(c, config)
 		}()
 
-		serverIP := startVolumeServer(c, config)
+		pod := startVolumeServer(c, config)
+		serverIP := pod.Status.PodIP
 		Logf("NFS server IP address: %v", serverIP)
 
 		pv := makePersistentVolume(serverIP)
@@ -160,9 +162,9 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 	// Prepare pod that mounts the NFS volume again and
 	// checks that /mnt/index.html was scrubbed there
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Version(),
+			APIVersion: testapi.Default.Version(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "checker-",

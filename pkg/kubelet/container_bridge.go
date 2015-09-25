@@ -23,8 +23,8 @@ import (
 	"os/exec"
 	"regexp"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
@@ -121,13 +121,23 @@ func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
 // TODO(dawnchen): Using pkg/util/iptables
 func ensureIPTablesMasqRule() error {
 	// Check if the MASQUERADE rule exist or not
-	if err := exec.Command("iptables", "-t", "nat", "-C", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE", "!", "-d", "10.0.0.0/8").Run(); err == nil {
+	if err := exec.Command("iptables",
+		"-t", "nat",
+		"-C", "POSTROUTING",
+		"!", "-d", "10.0.0.0/8",
+		"-m", "addrtype", "!", "--dst-type", "LOCAL",
+		"-j", "MASQUERADE").Run(); err == nil {
 		// The MASQUERADE rule exists
 		return nil
 	}
 
 	glog.Infof("MASQUERADE rule doesn't exist, recreate it")
-	if err := exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE", "!", "-d", "10.0.0.0/8").Run(); err != nil {
+	if err := exec.Command("iptables",
+		"-t", "nat",
+		"-A", "POSTROUTING",
+		"!", "-d", "10.0.0.0/8",
+		"-m", "addrtype", "!", "--dst-type", "LOCAL",
+		"-j", "MASQUERADE").Run(); err != nil {
 		return err
 	}
 	return nil

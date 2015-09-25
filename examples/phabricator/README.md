@@ -98,7 +98,7 @@ To start Phabricator server use the file [`examples/phabricator/phabricator-cont
 }
 ```
 
-[Download example](phabricator-controller.json)
+[Download example](phabricator-controller.json?raw=true)
 <!-- END MUNGE: EXAMPLE phabricator-controller.json -->
 
 Create the phabricator pod in your Kubernetes cluster by running:
@@ -188,7 +188,7 @@ To automate this process and make sure that a proper host is authorized even if 
 }
 ```
 
-[Download example](authenticator-controller.json)
+[Download example](authenticator-controller.json?raw=true)
 <!-- END MUNGE: EXAMPLE authenticator-controller.json -->
 
 To create the pod run:
@@ -237,7 +237,7 @@ Use the file [`examples/phabricator/phabricator-service.json`](phabricator-servi
 }
 ```
 
-[Download example](phabricator-service.json)
+[Download example](phabricator-service.json?raw=true)
 <!-- END MUNGE: EXAMPLE phabricator-service.json -->
 
 To create the service run:
@@ -247,10 +247,12 @@ $ kubectl create -f examples/phabricator/phabricator-service.json
 phabricator
 ```
 
-To play with the service itself, find the external IP of the load balancer:
+To play with the service itself, find the `EXTERNAL_IP` of the load balancer:
 
-```sh
-$ kubectl get services phabricator -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}{{"\n"}}'
+```console
+$ kubectl get services phabricator
+NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+phabricator           10.0.0.2         1.2.3.4           8080/TCP      ...                    ...
 ```
 
 and then visit port 80 of that IP address.

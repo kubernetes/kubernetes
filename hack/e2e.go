@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -84,6 +85,7 @@ type TestResult struct {
 type ResultsByTest map[string]TestResult
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 
 	if *isup {
@@ -297,6 +299,10 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 		cmd.Stderr = os.Stderr
 	}
 	log.Printf("Running: %v", stepName)
+	defer func(start time.Time) {
+		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
+	}(time.Now())
+
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
 		return false
@@ -318,7 +324,7 @@ func printPrefixedLines(prefix, s string) {
 }
 
 // returns either "", or a list of args intended for appending with the
-// kubectl command (begining with a space).
+// kubectl command (beginning with a space).
 func kubectlArgs() string {
 	if *checkVersionSkew {
 		return " --match-server-version"

@@ -29,13 +29,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 var (
@@ -47,12 +49,13 @@ var (
 )
 
 const (
-	deleteTimeout        = 2 * time.Minute
-	endpointTimeout      = 5 * time.Minute
-	nodeListTimeout      = 2 * time.Minute
-	podCreateTimeout     = 2 * time.Minute
-	podStartTimeout      = 30 * time.Minute
-	serviceCreateTimeout = 2 * time.Minute
+	deleteTimeout          = 2 * time.Minute
+	endpointTimeout        = 5 * time.Minute
+	nodeListTimeout        = 2 * time.Minute
+	podCreateTimeout       = 2 * time.Minute
+	podStartTimeout        = 30 * time.Minute
+	serviceCreateTimeout   = 2 * time.Minute
+	namespaceDeleteTimeout = 5 * time.Minute
 )
 
 func main() {
@@ -116,6 +119,16 @@ func main() {
 	defer func(ns string) {
 		if err := c.Namespaces().Delete(ns); err != nil {
 			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
+		} else {
+			// wait until the namespace disappears
+			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
+				if _, err := c.Namespaces().Get(ns); err != nil {
+					if errors.IsNotFound(err) {
+						return
+					}
+				}
+				time.Sleep(time.Second)
+			}
 		}
 	}(ns)
 	glog.Infof("Created namespace %s", ns)
@@ -252,11 +265,11 @@ func main() {
 			glog.Infof("After %v while making a proxy call got error %v", time.Since(start), err)
 			continue
 		}
-		var r api.Status
+		var r unversioned.Status
 		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
 			break
 		}
-		if r.Status == api.StatusFailure {
+		if r.Status == unversioned.StatusFailure {
 			glog.Infof("After %v got status %v", time.Since(start), string(hostname))
 			continue
 		}

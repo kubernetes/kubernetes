@@ -21,10 +21,10 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
@@ -36,17 +36,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		{
 			watch.Added,
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			testapi.Codec(),
+			testapi.Default.Codec(),
 		},
 		{
 			watch.Modified,
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			testapi.Codec(),
+			testapi.Default.Codec(),
 		},
 		{
 			watch.Deleted,
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			testapi.Codec(),
+			testapi.Default.Codec(),
 		},
 	}
 	for i, testCase := range testCases {

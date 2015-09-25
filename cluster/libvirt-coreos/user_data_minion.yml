@@ -6,19 +6,19 @@ coreos:
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount etcd.service docker.socket
+        After=opt-kubernetes.mount docker.socket
         ConditionFileIsExecutable=/opt/kubernetes/bin/kubelet
         Description=Kubernetes Kubelet
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount etcd.service docker.socket
+        Requires=opt-kubernetes.mount docker.socket
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kubelet \
         --address=0.0.0.0 \
-        --hostname_override=${MINION_IPS[$i]} \
-        --api_servers=http://${MASTER_IP}:8080 \
-        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster_dns=${DNS_SERVER_IP}" ) \
-        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster_domain=${DNS_DOMAIN}" ) \
+        --hostname-override=${MINION_IPS[$i]} \
+        --api-servers=http://${MASTER_IP}:8080 \
+        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-dns=${DNS_SERVER_IP}" ) \
+        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-domain=${DNS_DOMAIN}" ) \
         --config=/opt/kubernetes/manifests
         Restart=always
         RestartSec=2
@@ -29,11 +29,11 @@ coreos:
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount etcd.service
+        After=opt-kubernetes.mount
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-proxy
         Description=Kubernetes Proxy
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount etcd.service
+        Requires=opt-kubernetes.mount
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-proxy \

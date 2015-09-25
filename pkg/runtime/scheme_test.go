@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type TypeMeta struct {
@@ -87,14 +87,15 @@ func TestScheme(t *testing.T) {
 		TestString: "foo",
 	}
 
-	// Test Encode, Decode, and DecodeInto
+	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
 	data, err := scheme.EncodeToVersion(obj, "externalVersion")
 	obj2, err2 := scheme.Decode(data)
 	obj3 := &InternalSimple{}
 	err3 := scheme.DecodeInto(data, obj3)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v' '%v'", err, err2, err3)
+	obj4, err4 := scheme.DecodeToVersion(data, "externalVersion")
+	if err != nil || err2 != nil || err3 != nil || err4 != nil {
+		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
 	if _, ok := obj2.(*InternalSimple); !ok {
 		t.Fatalf("Got wrong type")
@@ -104,6 +105,9 @@ func TestScheme(t *testing.T) {
 	}
 	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
+	}
+	if _, ok := obj4.(*ExternalSimple); !ok {
+		t.Fatalf("Got wrong type")
 	}
 
 	// Test Convert
@@ -203,7 +207,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{nil}},
+			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
 			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
 		},
 	}
@@ -241,13 +245,13 @@ func TestExtensionMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionB{TestString: "bar"}}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{nil}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
 		},
 	}

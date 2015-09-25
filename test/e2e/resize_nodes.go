@@ -19,34 +19,37 @@ package e2e
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 )
 
-const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"
-
-const resizeNodeReadyTimeout = 2 * time.Minute
-const resizeNodeNotReadyTimeout = 2 * time.Minute
+const (
+	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:1.1"
+	resizeNodeReadyTimeout    = 2 * time.Minute
+	resizeNodeNotReadyTimeout = 2 * time.Minute
+)
 
 func resizeGroup(size int) error {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
-		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
-			"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
+			testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--size=%v", size),
+			"--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			Logf("Failed to resize node instance group: %v", string(output))
 		}
@@ -65,27 +68,14 @@ func groupSize() (int, error) {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
-		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
-			"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"list-instances", testContext.CloudConfig.NodeInstanceGroup, "--project="+testContext.CloudConfig.ProjectID,
+			"--zone="+testContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			return -1, err
 		}
-		pattern := "currentSize: "
-		i := strings.Index(string(output), pattern)
-		if i == -1 {
-			return -1, fmt.Errorf("could not find '%s' in the output '%s'", pattern, output)
-		}
-		truncated := output[i+len(pattern):]
-		j := strings.Index(string(truncated), "\n")
-		if j == -1 {
-			return -1, fmt.Errorf("could not find new line in the truncated output '%s'", truncated)
-		}
-
-		currentSize, err := strconv.Atoi(string(truncated[:j]))
-		if err != nil {
-			return -1, err
-		}
-		return currentSize, nil
+		re := regexp.MustCompile("RUNNING")
+		return len(re.FindAllString(string(output), -1)), nil
 	} else {
 		// Supported by aws
 		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
@@ -104,7 +94,7 @@ func groupSize() (int, error) {
 }
 
 func waitForGroupSize(size int) error {
-	timeout := 4 * time.Minute
+	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		currentSize, err := groupSize()
 		if err != nil {
@@ -119,28 +109,6 @@ func waitForGroupSize(size int) error {
 		return nil
 	}
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
-}
-
-func waitForClusterSize(c *client.Client, size int) error {
-	timeout := 10 * time.Minute
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-		if err != nil {
-			Logf("Failed to list nodes: %v", err)
-			continue
-		}
-		// Filter out not-ready nodes.
-		filterNodes(nodes, func(node api.Node) bool {
-			return isNodeReadySetAsExpected(&node, true)
-		})
-
-		if len(nodes.Items) == size {
-			Logf("Cluster has reached the desired size %d", size)
-			return nil
-		}
-		Logf("Waiting for cluster size %d, current size %d", size, len(nodes.Items))
-	}
-	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
 }
 
 func svcByName(name string) *api.Service {
@@ -216,9 +184,9 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
 	return &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: latest.Version,
+			APIVersion: latest.GroupOrDie("").Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -267,8 +235,17 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 			return nil, err
 		}
 
-		Logf("Pod name %s: Found %d pods out of %d", name, len(pods.Items), replicas)
-		if len(pods.Items) == replicas {
+		created := []api.Pod{}
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
+			created = append(created, pod)
+		}
+		Logf("Pod name %s: Found %d pods out of %d", name, len(created), replicas)
+
+		if len(created) == replicas {
+			pods.Items = created
 			return pods, nil
 		}
 	}
@@ -325,23 +302,25 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	if host == "" {
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
+
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
-
-	// TODO marekbiskup 2015-06-19 #10085
-	// The use of MasterName will cause iptables to do a DNS lookup to
-	// resolve the name to an IP address, which will slow down the test
-	// and cause it to fail if DNS is absent or broken.
-	// Use the IP address instead.
-
-	destination := testContext.CloudConfig.MasterName
-	if providerIs("aws") {
-		// This is the (internal) IP address used on AWS for the master
-		// TODO: Use IP address for all clouds?
-		// TODO: Avoid hard-coding this
-		destination = "172.20.0.9"
+	master := ""
+	switch testContext.Provider {
+	case "gce":
+		// TODO(#10085): The use of MasterName will cause iptables to do a DNS
+		// lookup to resolve the name to an IP address, which will slow down the
+		// test and cause it to fail if DNS is absent or broken. Use the
+		// internal IP address instead (i.e. NOT the one in testContext.Host).
+		master = testContext.CloudConfig.MasterName
+	case "gke":
+		master = strings.TrimPrefix(testContext.Host, "https://")
+	case "aws":
+		// TODO(justinsb): Avoid hardcoding this.
+		master = "172.20.0.9"
+	default:
+		Failf("This test is not supported for provider %s and should be disabled", testContext.Provider)
 	}
-
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", destination)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", master)
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
@@ -357,7 +336,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		// may fail). Manual intervention is required in such case (recreating the
 		// cluster solves the problem too).
 		err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-			_, _, code, err := SSH(undropCmd, host, testContext.Provider)
+			_, _, code, err := SSHVerbose(undropCmd, host, testContext.Provider)
 			if code == 0 && err == nil {
 				return true, nil
 			} else {
@@ -383,7 +362,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// We could also block network traffic from the master(s) to this node,
 	// but blocking it one way is sufficient for this test.
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if _, _, code, err := SSH(dropCmd, host, testContext.Provider); code != 0 || err != nil {
+	if _, _, code, err := SSHVerbose(dropCmd, host, testContext.Provider); code != 0 || err != nil {
 		Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
 			dropCmd, node.Name, code, err)
 	}
@@ -423,8 +402,11 @@ var _ = Describe("Nodes", func() {
 			Failf("Not all nodes are ready: %v", err)
 		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
+		}
+		if err := checkTestingNSDeletedExcept(c, ""); err != nil {
+			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
 		}
 	})
 
@@ -450,7 +432,7 @@ var _ = Describe("Nodes", func() {
 			if err := waitForGroupSize(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes); err != nil {
+			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				Failf("Couldn't restore the original cluster size: %v", err)
 			}
 		})
@@ -469,7 +451,7 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas-1)
+			err = waitForClusterSize(c, replicas-1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying whether the pods from the removed node are recreated")
@@ -493,7 +475,7 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas+1)
+			err = waitForClusterSize(c, replicas+1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
@@ -541,9 +523,12 @@ var _ = Describe("Nodes", func() {
 				By(fmt.Sprintf("block network traffic from node %s", node.Name))
 				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
 				Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-				if !waitForNodeToBe(c, node.Name, true, resizeNodeReadyTimeout) {
+				if !waitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
 					Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 				}
+
+				// sleep a bit, to allow Watch in NodeController to catch up.
+				time.Sleep(5 * time.Second)
 
 				By("verify whether new pods can be created on the re-attached node")
 				// increasing the RC size is not a valid way to test this
@@ -559,7 +544,7 @@ var _ = Describe("Nodes", func() {
 					pod, err := c.Pods(ns).Get(additionalPod)
 					Expect(err).NotTo(HaveOccurred())
 					if pod.Spec.NodeName != node.Name {
-						Logf("Pod %s found on invalid node: %s instead of %s", pod.Spec.NodeName, node.Name)
+						Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
 					}
 				}
 			})

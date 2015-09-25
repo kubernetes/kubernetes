@@ -20,9 +20,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.

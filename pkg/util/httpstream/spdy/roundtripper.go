@@ -25,10 +25,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
+	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -141,8 +142,8 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 			responseError = "unable to read error from server response"
 		} else {
 			if obj, err := api.Scheme.Decode(responseErrorBytes); err == nil {
-				if status, ok := obj.(*api.Status); ok {
-					return nil, &apierrors.StatusError{*status}
+				if status, ok := obj.(*unversioned.Status); ok {
+					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}
 			responseError = string(responseErrorBytes)

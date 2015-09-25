@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/operationmanager"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/operationmanager"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -63,7 +63,7 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 	if err != nil {
 		glog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
 	}
-	sdBeforeSet := util.NewStringSet(sdBefore...)
+	sdBeforeSet := sets.NewString(sdBefore...)
 
 	devicePath, err := attachDiskAndVerify(b, sdBeforeSet)
 	if err != nil {
@@ -71,13 +71,13 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 	}
 
 	// Only mount the PD globally once.
-	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 				return err
 			}
-			mountpoint = false
+			notMnt = true
 		} else {
 			return err
 		}
@@ -86,7 +86,7 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	if !mountpoint {
+	if notMnt {
 		err = b.diskMounter.Mount(devicePath, globalPDPath, b.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)
@@ -121,7 +121,7 @@ func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskCleaner) error {
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
-func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet util.StringSet) (string, error) {
+func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (string, error) {
 	devicePaths := getDiskByIdPaths(b.gcePersistentDisk)
 	var gce cloudprovider.Interface
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
@@ -158,8 +158,8 @@ func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet util.StringSet
 					// Retry on error. See issue #11321
 					glog.Errorf("Error checking if path exists: %v", err)
 				} else if pathExists {
-					// A device path has succesfully been created for the PD
-					glog.Infof("Succesfully attached GCE PD %q.", b.pdName)
+					// A device path has successfully been created for the PD
+					glog.Infof("Successfully attached GCE PD %q.", b.pdName)
 					return path, nil
 				}
 			}
@@ -181,7 +181,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 	defer util.HandleCrash()
 
 	// Start operation, so that other threads can wait on this detach operation.
-	// Set bufferSize to 0 so senders are blocked on send until we recieve.
+	// Set bufferSize to 0 so senders are blocked on send until we receive.
 	ch, err := detachCleanupManager.Start(c.pdName, 0 /* bufferSize */)
 	if err != nil {
 		glog.Errorf("Error adding %q to detachCleanupManager: %v", c.pdName, err)
@@ -244,7 +244,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 			}
 			if allPathsRemoved {
 				// All paths to the PD have been succefully removed
-				glog.Infof("Succesfully detached GCE PD %q.", c.pdName)
+				glog.Infof("Successfully detached GCE PD %q.", c.pdName)
 				return
 			}
 
@@ -288,7 +288,7 @@ func pathExists(path string) (bool, error) {
 
 // Calls "udevadm trigger --action=change" for newly created "/dev/sd*" drives (exist only in after set).
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToNewDrives(sdBeforeSet util.StringSet) error {
+func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 	sdAfter, err := filepath.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
@@ -331,37 +331,4 @@ func udevadmChangeToDrive(drivePath string) error {
 		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v.", drive, err)
 	}
 	return nil
-}
-
-// safe_format_and_mount is a utility script on GCE VMs that probes a persistent disk, and if
-// necessary formats it before mounting it.
-// This eliminates the necesisty to format a PD before it is used with a Pod on GCE.
-// TODO: port this script into Go and use it for all Linux platforms
-type gceSafeFormatAndMount struct {
-	mount.Interface
-	runner exec.Interface
-}
-
-// uses /usr/share/google/safe_format_and_mount to optionally mount, and format a disk
-func (mounter *gceSafeFormatAndMount) Mount(source string, target string, fstype string, options []string) error {
-	// Don't attempt to format if mounting as readonly. Go straight to mounting.
-	for _, option := range options {
-		if option == "ro" {
-			return mounter.Interface.Mount(source, target, fstype, options)
-		}
-	}
-	args := []string{}
-	// ext4 is the default for safe_format_and_mount
-	if len(fstype) > 0 && fstype != "ext4" {
-		args = append(args, "-m", fmt.Sprintf("mkfs.%s", fstype))
-	}
-	args = append(args, options...)
-	args = append(args, source, target)
-	glog.V(5).Infof("exec-ing: /usr/share/google/safe_format_and_mount %v", args)
-	cmd := mounter.runner.Command("/usr/share/google/safe_format_and_mount", args...)
-	dataOut, err := cmd.CombinedOutput()
-	if err != nil {
-		glog.Errorf("error running /usr/share/google/safe_format_and_mount\n%s", string(dataOut))
-	}
-	return err
 }

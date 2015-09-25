@@ -26,16 +26,32 @@ Print the logs for a container in a pod. If the pod has only one container, the 
     Specify if the logs should be streamed.
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for logs
-
-.PP
 \fB\-\-interactive\fP=true
     If true, prompt the user for input when required. Default true.
 
 .PP
+\fB\-\-limit\-bytes\fP=0
+    Maximum bytes of logs to return. Defaults to no limit.
+
+.PP
 \fB\-p\fP, \fB\-\-previous\fP=false
     If true, print the logs for the previous instance of the container in a pod if it exists.
+
+.PP
+\fB\-\-since\fP=0
+    Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since\-time / since may be used.
+
+.PP
+\fB\-\-since\-time\fP=""
+    Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since\-time / since may be used.
+
+.PP
+\fB\-\-tail\fP=\-1
+    Lines of recent log file to display. Defaults to \-1, showing all log lines.
+
+.PP
+\fB\-\-timestamps\fP=false
+    Include timestamps on each line in the log output
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -128,10 +144,6 @@ Print the logs for a container in a pod. If the pod has only one container, the 
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -141,14 +153,20 @@ Print the logs for a container in a pod. If the pod has only one container, the 
 .RS
 
 .nf
-// Returns snapshot of ruby\-container logs from pod 123456\-7890.
-$ kubectl logs 123456\-7890 ruby\-container
+# Return snapshot logs from pod nginx with only one container
+$ kubectl logs nginx
 
-// Returns snapshot of previous terminated ruby\-container logs from pod 123456\-7890.
-$ kubectl logs \-p 123456\-7890 ruby\-container
+# Return snapshot of previous terminated ruby container logs from pod web\-1
+$ kubectl logs \-p \-c ruby web\-1
 
-// Starts streaming of ruby\-container logs from pod 123456\-7890.
-$ kubectl logs \-f 123456\-7890 ruby\-container
+# Begin streaming the logs of the ruby container in pod web\-1
+$ kubectl logs \-f \-c ruby web\-1
+
+# Display only the most recent 20 lines of output in pod nginx
+$ kubectl logs \-\-tail=20 nginx
+
+# Show all logs from pod nginx written in the last hour
+$ kubectl logs \-\-since=1h nginx
 
 .fi
 .RE

@@ -21,11 +21,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -54,24 +54,24 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := api.FieldSelectorQueryParam(testapi.Version())
+	fieldSelectorQueryParamName := api.FieldSelectorQueryParam(testapi.Default.Version())
 	table := []struct {
 		location      string
 		resource      string
 		namespace     string
 		fieldSelector fields.Selector
 	}{
-		// Minion
+		// Node
 		{
-			location:      testapi.ResourcePath("minions", api.NamespaceAll, ""),
-			resource:      "minions",
+			location:      testapi.Default.ResourcePath("nodes", api.NamespaceAll, ""),
+			resource:      "nodes",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.ResourcePath("pods", api.NamespaceAll, ""),
+				testapi.Default.ResourcePath("pods", api.NamespaceAll, ""),
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
@@ -80,7 +80,7 @@ func TestListWatchesCanList(t *testing.T) {
 		// pod in namespace "foo"
 		{
 			location: buildLocation(
-				testapi.ResourcePath("pods", "foo", ""),
+				testapi.Default.ResourcePath("pods", "foo", ""),
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
 			namespace:     "foo",
@@ -95,7 +95,7 @@ func TestListWatchesCanList(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.List()
@@ -104,7 +104,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := api.FieldSelectorQueryParam(testapi.Version())
+	fieldSelectorQueryParamName := api.FieldSelectorQueryParam(testapi.Default.Version())
 	table := []struct {
 		rv            string
 		location      string
@@ -112,29 +112,29 @@ func TestListWatchesCanWatch(t *testing.T) {
 		namespace     string
 		fieldSelector fields.Selector
 	}{
-		// Minion
+		// Node
 		{
 			location: buildLocation(
-				testapi.ResourcePathWithPrefix("watch", "minions", api.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
 				buildQueryValues(url.Values{"resourceVersion": []string{""}})),
 			rv:            "",
-			resource:      "minions",
+			resource:      "nodes",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		{
 			location: buildLocation(
-				testapi.ResourcePathWithPrefix("watch", "minions", api.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
 				buildQueryValues(url.Values{"resourceVersion": []string{"42"}})),
 			rv:            "42",
-			resource:      "minions",
+			resource:      "nodes",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.ResourcePathWithPrefix("watch", "pods", api.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "pods", api.NamespaceAll, ""),
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
@@ -144,7 +144,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with namespace foo and assigned field selector
 		{
 			location: buildLocation(
-				testapi.ResourcePathWithPrefix("watch", "pods", "foo", ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "pods", "foo", ""),
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
@@ -161,7 +161,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.Watch(item.rv)

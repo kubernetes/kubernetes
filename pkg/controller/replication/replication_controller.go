@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication
+package replicationcontroller
 
 import (
 	"reflect"
@@ -22,24 +22,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/workqueue"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/workqueue"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
 	// We'll attempt to recompute the required replicas of all replication controllers
-	// the have fulfilled their expectations at least this often. This recomputation
+	// that have fulfilled their expectations at least this often. This recomputation
 	// happens based on contents in local pod storage.
 	FullControllerResyncPeriod = 30 * time.Second
 
@@ -63,6 +63,8 @@ const (
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
+// TODO: this really should be called ReplicationController. The only reason why it's a Manager
+// is to distinguish this type from API object "ReplicationController". We should fix this.
 type ReplicationManager struct {
 	kubeClient client.Interface
 	podControl controller.PodControlInterface
@@ -73,23 +75,22 @@ type ReplicationManager struct {
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(rcKey string) error
 
-	// podStoreSynced returns true if the pod store has been synced at least once.
-	// Added as a member to the struct to allow injection for testing.
-	podStoreSynced func() bool
-
 	// A TTLCache of pod creates/deletes each rc expects to see
 	expectations controller.ControllerExpectationsInterface
 
 	// A store of replication controllers, populated by the rcController
 	rcStore cache.StoreToReplicationControllerLister
-
-	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
 	// Watches changes to all replication controllers
 	rcController *framework.Controller
+	// A store of pods, populated by the podController
+	podStore cache.StoreToPodLister
 	// Watches changes to all pods
 	podController *framework.Controller
-	// Controllers that need to be updated
+	// podStoreSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	podStoreSynced func() bool
+
+	// Controllers that need to be synced
 	queue *workqueue.Type
 }
 
@@ -124,12 +125,18 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				// We only really need to do this when spec changes, but for correctness it is safer to
-				// periodically double check. It is overkill for 2 reasons:
-				// 1. Status.Replica updates will cause a sync
-				// 2. Every 30s we will get a full resync (this will happen anyway every 5 minutes when pods relist)
-				// However, it shouldn't be that bad as rcs that haven't met expectations won't sync, and all
-				// the listing is done using local stores.
+				// You might imagine that we only really need to enqueue the
+				// controller when Spec changes, but it is safer to sync any
+				// time this function is triggered. That way a full informer
+				// resync can requeue any controllers that don't yet have pods
+				// but whose last attempts at creating a pod have failed (since
+				// we don't block on creation of pods) instead of those
+				// controllers stalling indefinitely. Enqueueing every time
+				// does result in some spurious syncs (like when Status.Replica
+				// is updated and the watch notification from it retriggers
+				// this function), but in general extra resyncs shouldn't be
+				// that bad as rcs that haven't met expectations yet won't
+				// sync, and all the listing is done using local stores.
 				oldRC := old.(*api.ReplicationController)
 				curRC := cur.(*api.ReplicationController)
 				if oldRC.Status.Replicas != curRC.Status.Replicas {
@@ -137,7 +144,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 				}
 				rm.enqueueController(cur)
 			},
-			// This will enter the sync loop and no-op, becuase the controller has been deleted from the store.
+			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
 			// way of achieving this is by performing a `stop` operation on the controller.
 			DeleteFunc: rm.enqueueController,
@@ -175,7 +182,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
 	// need to pass in a fake.
-	rm.podControl = controller.RealPodControl{rm.kubeClient, recorder}
+	rm.podControl = controller.RealPodControl{KubeClient: rm.kubeClient, Recorder: recorder}
 }
 
 // Run begins watching and syncing.
@@ -200,10 +207,10 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 		return nil
 	}
 	// In theory, overlapping controllers is user error. This sorting will not prevent
-	// osciallation of replicas in all cases, eg:
-	// rc1 (older rc): [(k1:v1)], replicas=1 rc2: [(k2:v2), (k1:v1)], replicas=2
-	// pod: [(k1:v1)] will wake both rc1 and rc2, and we will sync rc1.
-	// pod: [(k2:v2), (k1:v1)] will wake rc2 which creates a new replica.
+	// oscillation of replicas in all cases, eg:
+	// rc1 (older rc): [(k1=v1)], replicas=1 rc2: [(k2=v2)], replicas=2
+	// pod: [(k1:v1), (k2:v2)] will wake both rc1 and rc2, and we will sync rc1.
+	// pod: [(k2:v2)] will wake rc2 which creates a new replica.
 	sort.Sort(overlappingControllers(controllers))
 	return &controllers[0]
 }
@@ -211,6 +218,12 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
 func (rm *ReplicationManager) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
+	if pod.DeletionTimestamp != nil {
+		// on a restart of the controller manager, it's possible a new pod shows up in a state that
+		// is already pending deletion. Prevent the pod from being a creation observation.
+		rm.deletePod(pod)
+		return
+	}
 	if rc := rm.getPodController(pod); rc != nil {
 		rcKey, err := controller.KeyFunc(rc)
 		if err != nil {
@@ -232,6 +245,15 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 	}
 	// TODO: Write a unittest for this case
 	curPod := cur.(*api.Pod)
+	if curPod.DeletionTimestamp != nil {
+		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
+		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
+		// for modification of the deletion timestamp and expect an rc to create more replicas asap, not wait
+		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
+		// an rc never initiates a phase change, and so is never asleep waiting for the same.
+		rm.deletePod(curPod)
+		return
+	}
 	if rc := rm.getPodController(curPod); rc != nil {
 		rm.enqueueController(rc)
 	}
@@ -333,7 +355,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := rm.podControl.CreateReplica(rc.Namespace, rc); err != nil {
+				if err := rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc); err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)

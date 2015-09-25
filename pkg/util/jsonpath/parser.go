@@ -151,7 +151,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		return fmt.Errorf("unclosed action")
 	case r == ' ':
 		p.consumeText()
-	case r == '@': //the current object, just pass it
+	case r == '@' || r == '$': //the current object, just pass it
 		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
@@ -166,7 +166,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		p.backup()
 		return p.parseIdentifier(cur)
 	default:
-		return fmt.Errorf("unrecognized charactor in action: %#U", r)
+		return fmt.Errorf("unrecognized character in action: %#U", r)
 	}
 	return p.parseInsideAction(cur)
 }
@@ -298,7 +298,7 @@ Loop:
 				params[i].Known = true
 				params[i].Value, err = strconv.Atoi(value[i])
 				if err != nil {
-					return fmt.Errorf("array index %s is not a number", params[i].Value)
+					return fmt.Errorf("array index %s is not a number", value[i])
 				}
 			}
 		} else {

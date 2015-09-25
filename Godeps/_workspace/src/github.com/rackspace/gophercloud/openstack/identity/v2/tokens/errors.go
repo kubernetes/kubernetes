@@ -18,7 +18,7 @@ var (
 	// ErrDomainNameProvided is returned if you attempt to authenticate with a DomainName.
 	ErrDomainNameProvided = unacceptedAttributeErr("DomainName")
 
-	// ErrUsernameRequired is returned if you attempt ot authenticate without a Username.
+	// ErrUsernameRequired is returned if you attempt to authenticate without a Username.
 	ErrUsernameRequired = errors.New("You must supply a Username in your AuthOptions.")
 
 	// ErrPasswordRequired is returned if you don't provide a password.

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/spdy"
+	"github.com/docker/spdystream/spdy"
 )
 
 var (
@@ -593,6 +593,11 @@ func (s *Connection) remoteStreamFinish(stream *Stream) {
 // the stream Wait or WaitTimeout function on the stream returned
 // by this function.
 func (s *Connection) CreateStream(headers http.Header, parent *Stream, fin bool) (*Stream, error) {
+	// MUST synchronize stream creation (all the way to writing the frame)
+	// as stream IDs **MUST** increase monotonically.
+	s.nextIdLock.Lock()
+	defer s.nextIdLock.Unlock()
+
 	streamId := s.getNextStreamId()
 	if streamId == 0 {
 		return nil, fmt.Errorf("Unable to get new stream id")
@@ -833,8 +838,6 @@ func (s *Connection) sendStream(stream *Stream, fin bool) error {
 // getNextStreamId returns the next sequential id
 // every call should produce a unique value or an error
 func (s *Connection) getNextStreamId() spdy.StreamId {
-	s.nextIdLock.Lock()
-	defer s.nextIdLock.Unlock()
 	sid := s.nextStreamId
 	if sid > 0x7fffffff {
 		return 0

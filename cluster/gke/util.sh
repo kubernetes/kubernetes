@@ -99,7 +99,7 @@ function verify-prereqs() {
     sudo_prefix="sudo"
   fi
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update "${CMD_GROUP}"|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update ${CMD_GROUP:-} || true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update kubectl|| true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
@@ -113,6 +113,7 @@ function verify-prereqs() {
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
 #   MINION_SCOPES
+#   MACHINE_TYPE
 function kube-up() {
   echo "... in gke:kube-up()" >&2
   detect-project >&2
@@ -144,15 +145,12 @@ function kube-up() {
     "--num-nodes=${NUM_MINIONS}"
     "--network=${NETWORK}"
     "--scopes=${MINION_SCOPES}"
+    "--cluster-version=${CLUSTER_API_VERSION}"
+    "--machine-type=${MACHINE_TYPE}"
   )
-  if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
-    create_args+=("--cluster-version=${CLUSTER_API_VERSION:-}")
-  else
-    create_args+=("--cluster-api-version=${CLUSTER_API_VERSION:-}")
-  fi
 
   # Bring up the cluster.
-  "${GCLOUD}" "${CMD_GROUP}" container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+  "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -177,52 +175,32 @@ function test-setup() {
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-http-alt" \
+    "${CLUSTER_NAME}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-nodeports" \
+    "${CLUSTER_NAME}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 }
 
-# Ensure that we have a password created for validating to the master.
-#
-# Assumed vars:
-#  ZONE
-#  CLUSTER_NAME
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password() {
-  echo "... in gke:get-password()" >&2
-  detect-project >&2
-  KUBE_USER=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep password | cut -f 4 -d ' ')
-}
-
-# Detect the instance name and IP for the master
+# Detect the IP for the master. Note that on GKE, we don't know the name of the
+# master, so KUBE_MASTER is not set.
 #
 # Assumed vars:
 #   ZONE
 #   CLUSTER_NAME
 # Vars set:
-#   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master() {
   echo "... in gke:detect-master()" >&2
   detect-project >&2
-  KUBE_MASTER="k8s-${CLUSTER_NAME}-master"
-  KUBE_MASTER_IP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
+  KUBE_MASTER_IP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
 }
@@ -246,9 +224,10 @@ function detect-minion-names {
   echo "... in gke:detect-minion-names()" >&2
   detect-project
   detect-node-instance-group
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_GROUP}" list --quiet \
-    | cut -d'/' -f11))
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
+    --format=yaml | grep instance: | cut -d ' ' -f 2))
+
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
 
@@ -263,7 +242,7 @@ function detect-minion-names {
 #   NODE_INSTANCE_GROUP
 function detect-node-instance-group {
   echo "... in gke:detect-node-instance-group()" >&2
-  NODE_INSTANCE_GROUP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
+  NODE_INSTANCE_GROUP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep instanceGroupManagers | cut -d '/' -f 11)
 }
@@ -315,15 +294,12 @@ function test-teardown() {
   echo "... in gke:test-teardown()" >&2
 
   detect-project >&2
-  detect-minions >&2
-  # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-http-alt" \
+  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-http-alt" \
     --project="${PROJECT}" || true
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-nodeports" \
+  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-nodeports" \
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.
@@ -339,6 +315,6 @@ function test-teardown() {
 function kube-down() {
   echo "... in gke:kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" "${CMD_GROUP}" container clusters delete --project="${PROJECT}" \
+  "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
 }

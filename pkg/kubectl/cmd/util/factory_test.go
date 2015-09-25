@@ -17,15 +17,26 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path"
 	"sort"
+	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
@@ -117,7 +128,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "successful re-use of labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "svc=test",
 			err:      nil,
@@ -126,7 +137,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "empty labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -135,7 +146,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "nil labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -155,6 +166,33 @@ func TestLabelsForObject(t *testing.T) {
 	}
 }
 
+func TestCanBeExposed(t *testing.T) {
+	factory := NewFactory(nil)
+	tests := []struct {
+		kind      string
+		expectErr bool
+	}{
+		{
+			kind:      "ReplicationController",
+			expectErr: false,
+		},
+		{
+			kind:      "Node",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		err := factory.CanBeExposed(test.kind)
+		if test.expectErr && err == nil {
+			t.Error("unexpected non-error")
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+}
+
 func TestFlagUnderscoreRenaming(t *testing.T) {
 	factory := NewFactory(nil)
 
@@ -164,5 +202,103 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 	// In case of failure of this test check this PR: spf13/pflag#23
 	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
 		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
+	}
+}
+
+func loadSchemaForTest() (validation.Schema, error) {
+	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
+	data, err := ioutil.ReadFile(pathToSwaggerSpec)
+	if err != nil {
+		return nil, err
+	}
+	return validation.NewSwaggerSchemaFromBytes(data)
+}
+
+func TestValidateCachesSchema(t *testing.T) {
+	schema, err := loadSchemaForTest()
+	if err != nil {
+		t.Errorf("Error loading schema: %v", err)
+		t.FailNow()
+	}
+	output, err := json.Marshal(schema)
+	if err != nil {
+		t.Errorf("Error serializing schema: %v", err)
+		t.FailNow()
+	}
+	requests := map[string]int{}
+
+	c := &fake.RESTClient{
+		Codec: testapi.Default.Codec(),
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
+				requests[p] = requests[p] + 1
+				return &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	dir := os.TempDir() + "/schemaCache"
+	os.RemoveAll(dir)
+
+	obj := &api.Pod{}
+	data, err := testapi.Default.Codec().Encode(obj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+
+	// Initial request, should use HTTP and write
+	if getSchemaAndValidate(c, data, "foo", "bar", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
+		t.Errorf("unexpected missing cache file: %v", err)
+	}
+	if requests["/swaggerapi/foo/bar"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
+	}
+
+	// Same version and group, should skip HTTP
+	if getSchemaAndValidate(c, data, "foo", "bar", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if requests["/swaggerapi/foo/bar"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
+	}
+
+	// Different API group, should go to HTTP and write
+	if getSchemaAndValidate(c, data, "foo", "baz", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
+		t.Errorf("unexpected missing cache file: %v", err)
+	}
+	if requests["/swaggerapi/foo/baz"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/baz"])
+	}
+
+	// Different version, should go to HTTP and write
+	if getSchemaAndValidate(c, data, "foo2", "bar", dir); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
+		t.Errorf("unexpected missing cache file: %v", err)
+	}
+	if requests["/swaggerapi/foo2/bar"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo2/bar"])
+	}
+
+	// No cache dir, should go straight to HTTP and not write
+	if getSchemaAndValidate(c, data, "foo", "blah", ""); err != nil {
+		t.Errorf("unexpected error validating: %v", err)
+	}
+	if requests["/swaggerapi/foo/blah"] != 1 {
+		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/blah"])
+	}
+	if _, err := os.Stat(path.Join(dir, "foo", "blah", schemaFileName)); err == nil || !os.IsNotExist(err) {
+		t.Errorf("unexpected cache file error: %v", err)
 	}
 }

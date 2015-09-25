@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // ErrMatchFunc can be used to filter errors that may not be true failures.
@@ -98,7 +99,10 @@ func (r *Result) Infos() ([]*Info, error) {
 	}
 
 	infos := []*Info{}
-	err := r.visitor.Visit(func(info *Info) error {
+	err := r.visitor.Visit(func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
 		infos = append(infos, info)
 		return nil
 	})
@@ -120,7 +124,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		return nil, err
 	}
 
-	versions := util.StringSet{}
+	versions := sets.String{}
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object != nil {
@@ -144,7 +148,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		version = versions.List()[0]
 	}
 	return &api.List{
-		ListMeta: api.ListMeta{
+		ListMeta: unversioned.ListMeta{
 			ResourceVersion: version,
 		},
 		Items: objects,
@@ -217,7 +221,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, latest.Version)
+		converted, err := tryConvert(api.Scheme, object, version, latest.GroupOrDie("").Version)
 		if err != nil {
 			return nil, err
 		}

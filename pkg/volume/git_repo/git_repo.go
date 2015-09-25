@@ -21,13 +21,12 @@ import (
 	"io/ioutil"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	volumeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -54,31 +53,29 @@ func (plugin *gitRepoPlugin) Name() string {
 }
 
 func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.GitRepo != nil
+	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return &gitRepoVolumeBuilder{
 		gitRepoVolume: &gitRepoVolume{
-			volName: spec.Name,
+			volName: spec.Name(),
 			podUID:  pod.UID,
-			mounter: mounter,
 			plugin:  plugin,
 		},
 		pod:      *pod,
-		source:   spec.VolumeSource.GitRepo.Repository,
-		revision: spec.VolumeSource.GitRepo.Revision,
+		source:   spec.Volume.GitRepo.Repository,
+		revision: spec.Volume.GitRepo.Revision,
 		exec:     exec.New(),
 		opts:     opts,
 	}, nil
 }
 
-func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	return &gitRepoVolumeCleaner{
 		&gitRepoVolume{
 			volName: volName,
 			podUID:  podUID,
-			mounter: mounter,
 			plugin:  plugin,
 		},
 	}, nil
@@ -89,7 +86,6 @@ func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID, mounte
 type gitRepoVolume struct {
 	volName string
 	podUID  types.UID
-	mounter mount.Interface
 	plugin  *gitRepoPlugin
 }
 
@@ -124,8 +120,7 @@ func (b *gitRepoVolumeBuilder) IsReadOnly() bool {
 
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
-	Name:         "not-used",
-	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 }
 
 // SetUpAt creates new directory and clones a git repo.
@@ -135,7 +130,7 @@ func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &b.pod, b.opts, b.mounter)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &b.pod, b.opts)
 	if err != nil {
 		return err
 	}
@@ -197,7 +192,7 @@ func (c *gitRepoVolumeCleaner) TearDown() error {
 // TearDownAt simply deletes everything in the directory.
 func (c *gitRepoVolumeCleaner) TearDownAt(dir string) error {
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID, c.mounter)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

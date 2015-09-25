@@ -66,18 +66,18 @@ This document is primarily concerned with K8s API paths, and secondarily with In
 ### Assets to protect
 
 External User assets:
-   - Personal information like private messages, or images uploaded by External Users
-   - web server logs
+   - Personal information like private messages, or images uploaded by External Users.
+   - web server logs.
 
 K8s User assets:
-  - External User assets of each K8s User
+  - External User assets of each K8s User.
   - things private to the K8s app, like:
     - credentials for accessing other services (docker private repos, storage services, facebook, etc)
     - SSL certificates for web servers
     - proprietary data and code
 
 K8s Cluster assets:
-  - Assets of each K8s User
+  - Assets of each K8s User.
   - Machine Certificates or secrets.
   - The value of K8s cluster computing resources (cpu, memory, etc).
 
@@ -104,7 +104,7 @@ Org-run cluster:
    - Nodes may be on-premises VMs or physical machines; Cloud VMs; or a mix.
 
 Hosted cluster:
-  - Offering K8s API as a service, or offering a Paas or Saas built on K8s
+  - Offering K8s API as a service, or offering a Paas or Saas built on K8s.
   - May already offer web services, and need to integrate with existing customer account concept, and existing authentication, accounting, auditing, and security policy infrastructure.
   - May want to leverage K8s User accounts and accounting to manage their User accounts (not a priority to support this use case.)
   - Precise and accurate accounting of resources needed.  Resource controls needed for hard limits (Users given limited slice of data) and soft limits (Users can grow up to some limit and then be expanded).
@@ -118,8 +118,8 @@ Pods configs should be largely portable between Org-run and hosted configuration
 # Design
 
 Related discussion:
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/442
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/443
+- http://issue.k8s.io/442
+- http://issue.k8s.io/443
 
 This doc describes two security profiles:
   - Simple profile:  like single-user mode.  Make it easy to evaluate K8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
@@ -137,7 +137,7 @@ K8s will have a `userAccount` API object.
 - `userAccount` has a UID which is immutable.  This is used to associate users with objects and to record actions in audit logs.
 - `userAccount` has a name which is a string and human readable and unique among userAccounts.  It is used to refer to users in Policies, to ensure that the Policies are human readable.  It can be changed only when there are no Policy objects or other objects which refer to that name.  An email address is a suggested format for this field.
 - `userAccount` is not related to the unix username of processes in Pods created by that userAccount.
-- `userAccount` API objects can have labels
+- `userAccount` API objects can have labels.
 
 The system may associate one or more Authentication Methods with a
 `userAccount` (but they are not formally part of the userAccount object.)
@@ -176,7 +176,7 @@ Initially:
 Improvements:
 - Kubelet allocates disjoint blocks of root-namespace uids for each container.  This may provide some defense-in-depth against container escapes. (https://github.com/docker/docker/pull/4572)
 - requires docker to integrate user namespace support, and deciding what getpwnam() does for these uids.
-- any features that help users avoid use of privileged containers (https://github.com/GoogleCloudPlatform/kubernetes/issues/391)
+- any features that help users avoid use of privileged containers (http://issue.k8s.io/391)
 
 ### Namespaces
 
@@ -253,7 +253,7 @@ Policy objects may be applicable only to a single namespace or to all namespaces
 
 ## Accounting
 
-The API should have a `quota` concept (see https://github.com/GoogleCloudPlatform/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
+The API should have a `quota` concept (see http://issue.k8s.io/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
 
 Initially:
 - a `quota` object is immutable.

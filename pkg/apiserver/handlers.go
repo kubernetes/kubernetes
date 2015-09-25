@@ -28,13 +28,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
@@ -92,17 +92,6 @@ func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler 
 		default:
 			tooManyRequests(w)
 		}
-	})
-}
-
-// RateLimit uses rl to rate limit accepting requests to 'handler'.
-func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if rl.CanAccept() {
-			handler.ServeHTTP(w, req)
-			return
-		}
-		tooManyRequests(w)
 	})
 }
 
@@ -229,6 +218,15 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	return tw.w.Write(p)
 }
 
+func (tw *baseTimeoutWriter) Flush() {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+
+	if flusher, ok := tw.w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
@@ -351,7 +349,7 @@ type requestAttributeGetter struct {
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
 func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
+	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{sets.NewString(apiRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
@@ -417,7 +415,7 @@ type APIRequestInfo struct {
 }
 
 type APIRequestInfoResolver struct {
-	APIPrefixes util.StringSet
+	APIPrefixes sets.String
 	RestMapper  meta.RESTMapper
 }
 
@@ -485,6 +483,8 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 			requestInfo.Verb = "get"
 		case "PUT":
 			requestInfo.Verb = "update"
+		case "PATCH":
+			requestInfo.Verb = "patch"
 		case "DELETE":
 			requestInfo.Verb = "delete"
 		}

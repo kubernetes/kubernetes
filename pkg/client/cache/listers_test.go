@@ -19,14 +19,15 @@ package cache
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func TestStoreToMinionLister(t *testing.T) {
+func TestStoreToNodeLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
-	ids := util.NewStringSet("foo", "bar", "baz")
+	ids := sets.NewString("foo", "bar", "baz")
 	for id := range ids {
 		store.Add(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
@@ -51,7 +52,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 	testCases := []struct {
 		inRCs      []*api.ReplicationController
 		list       func() ([]api.ReplicationController, error)
-		outRCNames util.StringSet
+		outRCNames sets.String
 		expectErr  bool
 	}{
 		// Basic listing with all labels and no selectors
@@ -62,9 +63,9 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			list: func() ([]api.ReplicationController, error) {
 				return lister.List()
 			},
-			outRCNames: util.NewStringSet("basic"),
+			outRCNames: sets.NewString("basic"),
 		},
-		// No pod lables
+		// No pod labels
 		{
 			inRCs: []*api.ReplicationController{
 				{
@@ -80,7 +81,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: util.NewStringSet(),
+			outRCNames: sets.NewString(),
 			expectErr:  true,
 		},
 		// No RC selectors
@@ -100,7 +101,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: util.NewStringSet(),
+			outRCNames: sets.NewString(),
 			expectErr:  true,
 		},
 		// Matching labels to selectors and namespace
@@ -129,7 +130,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: util.NewStringSet("bar"),
+			outRCNames: sets.NewString("bar"),
 		},
 	}
 	for _, c := range testCases {
@@ -151,6 +152,128 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 		}
 		if !c.outRCNames.HasAll(gotNames...) || len(gotNames) != len(c.outRCNames) {
 			t.Errorf("Unexpected got controllers %+v expected %+v", gotNames, c.outRCNames)
+		}
+	}
+}
+
+func TestStoreToDaemonSetLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	lister := StoreToDaemonSetLister{store}
+	testCases := []struct {
+		inDSs             []*experimental.DaemonSet
+		list              func() ([]experimental.DaemonSet, error)
+		outDaemonSetNames sets.String
+		expectErr         bool
+	}{
+		// Basic listing
+		{
+			inDSs: []*experimental.DaemonSet{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			},
+			list: func() ([]experimental.DaemonSet, error) {
+				return lister.List()
+			},
+			outDaemonSetNames: sets.NewString("basic"),
+		},
+		// Listing multiple daemon sets
+		{
+			inDSs: []*experimental.DaemonSet{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
+				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
+			},
+			list: func() ([]experimental.DaemonSet, error) {
+				return lister.List()
+			},
+			outDaemonSetNames: sets.NewString("basic", "complex", "complex2"),
+		},
+		// No pod labels
+		{
+			inDSs: []*experimental.DaemonSet{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: experimental.DaemonSetSpec{
+						Selector: map[string]string{"foo": "baz"},
+					},
+				},
+			},
+			list: func() ([]experimental.DaemonSet, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+				}
+				return lister.GetPodDaemonSets(pod)
+			},
+			outDaemonSetNames: sets.NewString(),
+			expectErr:         true,
+		},
+		// No DS selectors
+		{
+			inDSs: []*experimental.DaemonSet{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+				},
+			},
+			list: func() ([]experimental.DaemonSet, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "ns",
+						Labels:    map[string]string{"foo": "bar"},
+					},
+				}
+				return lister.GetPodDaemonSets(pod)
+			},
+			outDaemonSetNames: sets.NewString(),
+			expectErr:         true,
+		},
+		// Matching labels to selectors and namespace
+		{
+			inDSs: []*experimental.DaemonSet{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Spec: experimental.DaemonSetSpec{
+						Selector: map[string]string{"foo": "bar"},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: experimental.DaemonSetSpec{
+						Selector: map[string]string{"foo": "bar"},
+					},
+				},
+			},
+			list: func() ([]experimental.DaemonSet, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Labels:    map[string]string{"foo": "bar"},
+						Namespace: "ns",
+					},
+				}
+				return lister.GetPodDaemonSets(pod)
+			},
+			outDaemonSetNames: sets.NewString("bar"),
+		},
+	}
+	for _, c := range testCases {
+		for _, r := range c.inDSs {
+			store.Add(r)
+		}
+
+		daemonSets, err := c.list()
+		if err != nil && c.expectErr {
+			continue
+		} else if c.expectErr {
+			t.Fatalf("Expected error, got none")
+		} else if err != nil {
+			t.Fatalf("Unexpected error %#v", err)
+		}
+		daemonSetNames := make([]string, len(daemonSets))
+		for ix := range daemonSets {
+			daemonSetNames[ix] = daemonSets[ix].Name
+		}
+		if !c.outDaemonSetNames.HasAll(daemonSetNames...) || len(daemonSetNames) != len(c.outDaemonSetNames) {
+			t.Errorf("Unexpected got controllers %+v expected %+v", daemonSetNames, c.outDaemonSetNames)
 		}
 	}
 }

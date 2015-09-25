@@ -26,11 +26,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func newRedFederalCowHammerConfig() clientcmdapi.Config {
@@ -95,13 +95,13 @@ func TestSetCurrentContext(t *testing.T) {
 	test.run(t)
 }
 
-func TestSetNonExistantContext(t *testing.T) {
+func TestSetNonExistentContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
-		args:            []string{"use-context", "non-existant-config"},
+		args:            []string{"use-context", "non-existent-config"},
 		startingConfig:  expectedConfig,
 		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{`No context exists with the name: "non-existant-config"`},
+		expectedOutputs: []string{`No context exists with the name: "non-existent-config"`},
 	}
 	test.run(t)
 }
@@ -577,13 +577,13 @@ func TestNewEmptyCluster(t *testing.T) {
 func TestAdditionalCluster(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	cluster := clientcmdapi.NewCluster()
-	cluster.APIVersion = testapi.Version()
+	cluster.APIVersion = testapi.Default.Version()
 	cluster.CertificateAuthority = "/ca-location"
 	cluster.InsecureSkipTLSVerify = false
 	cluster.Server = "serverlocation"
 	expectedConfig.Clusters["different-cluster"] = cluster
 	test := configCommandTest{
-		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=false", "--" + clientcmd.FlagCAFile + "=/ca-location", "--" + clientcmd.FlagAPIVersion + "=" + testapi.Version()},
+		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=false", "--" + clientcmd.FlagCAFile + "=/ca-location", "--" + clientcmd.FlagAPIVersion + "=" + testapi.Default.Version()},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}

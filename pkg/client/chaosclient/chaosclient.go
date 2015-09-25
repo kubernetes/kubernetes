@@ -103,7 +103,7 @@ type pIntercept struct {
 	p float64
 }
 
-// P returns a ChaosFunc that fires with a probabilty of p (p between 0.0
+// P returns a ChaosFunc that fires with a probability of p (p between 0.0
 // and 1.0 with 0.0 meaning never and 1.0 meaning always).
 func (s Seed) P(p float64, c Chaos) Chaos {
 	return pIntercept{c, s, p}
