@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -35,10 +36,7 @@ func (s *runtimeState) setRuntimeSync(t time.Time) {
 	s.lastBaseRuntimeSync = t
 }
 
-func (s *runtimeState) setNetworkError(err error) {
-	if err == nil {
-		return
-	}
+func (s *runtimeState) setNetworkState(err error) {
 	s.Lock()
 	defer s.Unlock()
 	s.networkError = err
@@ -70,5 +68,6 @@ func newRuntimeState(runtimeSyncThreshold time.Duration) *runtimeState {
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
+		networkError:             fmt.Errorf("network state unknown"),
 	}
 }
