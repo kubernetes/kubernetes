@@ -189,7 +189,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 	// care about.
 	exec.Command("modprobe", "br-netfilter").CombinedOutput()
 	if err := setSysctl(sysctlBridgeCallIptables, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 
 	return &Proxier{
