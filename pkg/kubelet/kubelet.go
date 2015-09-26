@@ -396,10 +396,6 @@ func NewMainKubelet(
 	}
 	klet.containerManager = containerManager
 
-	// Wait for the runtime to be up with a timeout.
-	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
-		return nil, fmt.Errorf("timed out waiting for %q to come up: %v", containerRuntime, err)
-	}
 	klet.runtimeState.setRuntimeSync(time.Now())
 
 	klet.runner = klet.containerRuntime
@@ -429,7 +425,6 @@ func NewMainKubelet(
 
 	klet.backOff = util.NewBackOff(resyncInterval, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
-
 	klet.sourcesSeen = sets.NewString()
 	return klet, nil
 }
@@ -842,12 +837,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		kl.runtimeState.setInitError(err)
 	}
 
-	go util.Until(kl.syncNetworkStatus, 30*time.Second, util.NeverStop)
 	if kl.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
 		go util.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, util.NeverStop)
 	}
-
+	go util.Until(kl.syncNetworkStatus, 30*time.Second, util.NeverStop)
 	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
 
 	// Start a goroutine responsible for killing pods (that are not properly

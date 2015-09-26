@@ -76,6 +76,9 @@ type realImageManager struct {
 
 	// Reference to this node.
 	nodeRef *api.ObjectReference
+
+	// Track initialization
+	initialized bool
 }
 
 // Information about the images we track.
@@ -105,23 +108,24 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 		cadvisor:     cadvisorInterface,
 		recorder:     recorder,
 		nodeRef:      nodeRef,
+		initialized:  false,
 	}
 
 	return im, nil
 }
 
 func (im *realImageManager) Start() error {
-	// Initial detection make detected time "unknown" in the past.
-	var zero time.Time
-	err := im.detectImages(zero)
-	if err != nil {
-		return err
-	}
-
 	go util.Until(func() {
-		err := im.detectImages(time.Now())
+		// Initial detection make detected time "unknown" in the past.
+		var ts time.Time
+		if im.initialized {
+			ts = time.Now()
+		}
+		err := im.detectImages(ts)
 		if err != nil {
 			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
+		} else {
+			im.initialized = true
 		}
 	}, 5*time.Minute, util.NeverStop)
 
