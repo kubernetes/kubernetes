@@ -58,7 +58,6 @@ type NodeController struct {
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
 	deletingPodsRateLimiter util.RateLimiter
-	knownNodeSet            sets.String
 	kubeClient              client.Interface
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
@@ -126,7 +125,6 @@ func NewNodeController(
 	evictorLock := sync.Mutex{}
 	return &NodeController{
 		cloud:                  cloud,
-		knownNodeSet:           make(sets.String),
 		kubeClient:             kubeClient,
 		recorder:               recorder,
 		podEvictionTimeout:     podEvictionTimeout,
@@ -246,26 +244,26 @@ func (nc *NodeController) monitorNodeStatus() error {
 		return err
 	}
 	for _, node := range nodes.Items {
-		if !nc.knownNodeSet.Has(node.Name) {
+		if _, exists := nc.nodeStatusMap[node.Name]; !exists {
 			glog.V(1).Infof("NodeController observed a new Node: %#v", node)
 			nc.recordNodeEvent(node.Name, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", node.Name))
 			nc.cancelPodEviction(node.Name)
-			nc.knownNodeSet.Insert(node.Name)
 		}
 	}
 	// If there's a difference between lengths of known Nodes and observed nodes
 	// we must have removed some Node.
-	if len(nc.knownNodeSet) != len(nodes.Items) {
+	if len(nc.nodeStatusMap) != len(nodes.Items) {
 		observedSet := make(sets.String)
 		for _, node := range nodes.Items {
 			observedSet.Insert(node.Name)
 		}
-		deleted := nc.knownNodeSet.Difference(observedSet)
-		for nodeName := range deleted {
-			glog.V(1).Infof("NodeController observed a Node deletion: %v", nodeName)
-			nc.recordNodeEvent(nodeName, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", nodeName))
-			nc.evictPods(nodeName)
-			nc.knownNodeSet.Delete(nodeName)
+		for nodeName, _ := range nc.nodeStatusMap {
+			if !observedSet.Has(nodeName) {
+				glog.V(1).Infof("NodeController observed a Node deletion: %v", nodeName)
+				nc.recordNodeEvent(nodeName, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", nodeName))
+				nc.evictPods(nodeName)
+				delete(nc.nodeStatusMap, nodeName)
+			}
 		}
 	}
 
