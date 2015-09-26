@@ -384,7 +384,7 @@ func TestUpdate(t *testing.T) {
 			go func(name string, f func(string)) {
 				defer wg.Done()
 				f(name)
-			}(fmt.Sprintf("%v-%v", i, j), f)
+			}(fmt.Sprintf("%d-%d", i, j), f)
 		}
 	}
 	wg.Wait()
