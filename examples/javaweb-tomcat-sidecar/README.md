@@ -49,7 +49,7 @@ As you can see, user can create a `sample:v2` container as sidecar to "provide" 
 
 For example, if you are going to change the configurations of your Tomcat:
 
-```sh
+```console
 $ docker exec -it <tomcat_container_id> /bin/bash
 # make some change, and then commit it to a new image
 $ docker commit <tomcat_container_id> mytomcat:7.0-dev
@@ -186,13 +186,13 @@ Done! Now your `war` container contains nothing except `sample.war`, clean enoug
 
 Create the Java web pod:
 
-```sh
+```console
 $ kubectl create -f examples/javaweb-tomcat-sidecar/javaweb-2.yaml
 ```
 
 Check status of the pod:
 
-```sh
+```console
 $ kubectl get -w po
 NAME        READY     STATUS    RESTARTS   AGE
 javaweb-2   2/2       Running   0         7s
@@ -206,7 +206,7 @@ You can also test `javaweb.yaml` in the same way.
 
 All resources created in this application can be deleted:
 
-```sh
+```console
 $ kubectl delete -f examples/javaweb-tomcat-sidecar/javaweb-2.yaml
 ```
 
