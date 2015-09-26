@@ -413,12 +413,12 @@ func (r *resourceCollector) LogLatest() {
 	defer r.lock.RUnlock()
 	stats := make(map[string]*containerResourceUsage)
 	for _, name := range r.containers {
-		s := r.buffers[name][len(r.buffers)-1]
-		if s == nil {
+		contStats, ok := r.buffers[name]
+		if !ok || len(contStats) == 0 {
 			Logf("Resource usage on node %q is not ready yet", r.node)
 			return
 		}
-		stats[name] = s
+		stats[name] = contStats[len(contStats)-1]
 	}
 	Logf("\n%s", formatResourceUsageStats(r.node, stats))
 }
