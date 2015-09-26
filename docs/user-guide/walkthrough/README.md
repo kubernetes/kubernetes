@@ -124,7 +124,7 @@ That's great for a simple static web server, but what about persistent storage?
 
 The container file system only lives as long as the container does. So if your app's state needs to survive relocation, reboots, and crashes, you'll need to configure some persistent storage.
 
-For this example we'll be creating a Redis pod with a named volume and volume mount that defines the path to mount the volume.
+For this example we'll be creating a Redis pod with a named `volumes` and `volumeMounts` that defines the path to mount the volume within the container.
 
 1. Define a volume:
 
