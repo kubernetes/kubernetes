@@ -31,6 +31,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
 
+# Give integration tests longer to run
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 
@@ -48,6 +50,7 @@ runTests() {
   # KUBE_RACE="-race"
   KUBE_GOFLAGS="-tags 'integration no-docker' " \
     KUBE_RACE="" \
+    KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
     KUBE_API_VERSIONS="v1,experimental/v1alpha1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
