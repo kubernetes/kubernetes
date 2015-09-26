@@ -174,7 +174,7 @@ Notes:
 
 ##### Volume Types
 
-- **EmptyDir**: Creates a new directory that will persist across container failures and restarts.
+- **EmptyDir**: Creates a new directory that will exist as long as the Pod is running on the node, but it can persist across container failures and restarts.
 - **HostPath**: Mounts an existing directory on the node's file system (e.g. `/var/logs`).
 
 See [volumes](../../../docs/user-guide/volumes.md) for more details.
