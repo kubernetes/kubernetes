@@ -14,43 +14,60 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package delay
 
 import (
 	"time"
+
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
-type Priority struct {
+type DelayPriority struct {
 	ts     time.Time // timestamp
 	notify BreakChan // notification channel
 }
 
-func (p Priority) Equal(other Priority) bool {
-	return p.ts.Equal(other.ts) && p.notify == other.notify
+func (p DelayPriority) Equal(other priority.Priority) bool {
+	otherVal, ok := other.(DelayPriority)
+	if !ok {
+		return false
+	}
+
+	return p.ts.Equal(otherVal.ts) && p.notify == otherVal.notify
 }
 
-func extractFromDelayed(d Delayed) Priority {
+func (pq DelayPriority) Before(other priority.Priority) bool {
+	otherVal, ok := other.(DelayPriority)
+	if !ok {
+		return false
+	}
+
+	return pq.ts.Before(otherVal.ts)
+}
+
+func extractFromDelayed(d Delayed) DelayPriority {
 	deadline := time.Now().Add(d.GetDelay())
 	breaker := BreakChan(nil)
 	if breakout, good := d.(Breakout); good {
 		breaker = breakout.Breaker()
 	}
-	return Priority{
+
+	return DelayPriority{
 		ts:     deadline,
 		notify: breaker,
 	}
 }
 
-func extractFromDeadlined(d Deadlined) (Priority, bool) {
+func extractFromDeadlined(d Deadlined) (DelayPriority, bool) {
 	if ts, ok := d.Deadline(); ok {
 		breaker := BreakChan(nil)
 		if breakout, good := d.(Breakout); good {
 			breaker = breakout.Breaker()
 		}
-		return Priority{
+		return DelayPriority{
 			ts:     ts,
 			notify: breaker,
 		}, true
 	}
-	return Priority{}, false
+	return DelayPriority{}, false
 }

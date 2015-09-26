@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package delay
 
 import (
 	"sync/atomic"
@@ -55,7 +55,7 @@ func (td *testjob) Deadline() (deadline time.Time, ok bool) {
 func TestDQ_sanity_check(t *testing.T) {
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	dq := NewQueue()
 	delay := 2 * time.Second
 	dq.Add(&testjob{d: delay})
 
@@ -81,7 +81,7 @@ func TestDQ_Offer(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	dq := NewDelayQueue()
+	dq := NewQueue()
 	delay := time.Second
 
 	added := dq.Offer(&testjob{})
@@ -111,7 +111,7 @@ func TestDQ_Offer(t *testing.T) {
 func TestDQ_ordered_add_pop(t *testing.T) {
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	dq := NewQueue()
 	dq.Add(&testjob{d: 2 * time.Second})
 	dq.Add(&testjob{d: 1 * time.Second})
 	dq.Add(&testjob{d: 3 * time.Second})
@@ -166,7 +166,7 @@ func TestDQ_always_pop_earliest_deadline(t *testing.T) {
 	// add a testjob with a delay of 1s
 	// check that the func f1 actually popped the 1s task (not the 2s task)
 
-	dq := NewDelayQueue()
+	dq := NewQueue()
 	dq.Add(&testjob{d: 2 * time.Second})
 	ch := make(chan *testjob)
 	started := make(chan bool)
@@ -200,7 +200,7 @@ func TestDQ_always_pop_earliest_deadline_multi(t *testing.T) {
 	t.Skip("disabled due to flakiness; see #11821")
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	dq := NewQueue()
 	dq.Add(&testjob{d: 2 * time.Second})
 
 	ch := make(chan *testjob)
@@ -241,7 +241,7 @@ func TestDQ_always_pop_earliest_deadline_multi(t *testing.T) {
 func TestDQ_negative_delay(t *testing.T) {
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	dq := NewQueue()
 	delay := -2 * time.Second
 	dq.Add(&testjob{d: delay})
 

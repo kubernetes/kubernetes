@@ -14,5 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package queue provides several queue implementations
-package queue
+package priority
+
+// NumericPriority is a basic Priority implementation backed by an integer (lower numbers come before higher numbers).
+type NumericPriority int
+
+func (p NumericPriority) Equal(other Priority) bool {
+	val, ok := other.(NumericPriority)
+	if !ok {
+		return false
+	}
+
+	return p == val
+}
+
+func (p NumericPriority) Before(other Priority) bool {
+	otherVal, ok := other.(NumericPriority)
+	if !ok {
+		return false
+	}
+
+	return p < otherVal
+}

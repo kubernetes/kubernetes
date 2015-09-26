@@ -14,5 +14,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package queue provides several queue implementations
-package queue
+package priority
+
+type Indexable interface {
+	Index() int
+	SetIndex(int)
+}
+
+type Item interface {
+	Indexable
+	Value() interface{}
+	Priority() Priority
+}
+
+type item struct {
+	value    interface{}
+	priority Priority
+	index    int
+}
+
+func NewItem(value interface{}, priority Priority) *item {
+	return &item{
+		value:    value,
+		priority: priority,
+		index:    -1,
+	}
+}
+
+func (i *item) Value() interface{} {
+	return i.value
+}
+
+func (i *item) Priority() Priority {
+	return i.priority
+}
+
+func (i *item) Index() int {
+	return i.index
+}
+
+func (i *item) SetIndex(index int) {
+	i.index = index
+}

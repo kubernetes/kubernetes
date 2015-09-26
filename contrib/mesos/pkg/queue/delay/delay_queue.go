@@ -14,94 +14,110 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package delay
 
 import (
 	"container/heap"
 	"sync"
 	"time"
+
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
+
+type pushableItem interface {
+	priority.Item
+	// Push this Item into a heap.
+	Push(heap.Interface)
+}
 
 // concurrency-safe, deadline-oriented queue that returns items after their
 // delay period has expired.
-type DelayQueue struct {
-	queue priorityQueue
-	lock  sync.RWMutex
-	cond  sync.Cond
+type Queue struct {
+	*priority.Queue
+	lock *sync.RWMutex
+	cond *sync.Cond
 }
 
-func NewDelayQueue() *DelayQueue {
-	q := &DelayQueue{}
-	q.cond.L = &q.lock
-	return q
+func NewQueue() *Queue {
+	var lock sync.RWMutex
+	return &Queue{
+		Queue: priority.NewPriorityQueue(),
+		lock:  &lock,
+		cond:  sync.NewCond(&lock),
+	}
 }
 
-func (q *DelayQueue) Add(d Delayed) {
+func (q *Queue) Add(d Delayed) {
 	deadline := extractFromDelayed(d)
 
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	// readd using the original deadline computed from the original delay
-	var readd func(*qitem)
-	readd = func(qp *qitem) {
-		q.lock.Lock()
-		defer q.lock.Unlock()
-		heap.Push(&q.queue, &qitem{
-			value:    d,
-			priority: deadline,
-			readd:    readd,
-		})
-		q.cond.Broadcast()
+	item := &addItem{
+		Item: priority.NewItem(d, deadline),
+		lock: q.lock,
+		cond: q.cond,
 	}
-	heap.Push(&q.queue, &qitem{
-		value:    d,
-		priority: deadline,
-		readd:    readd,
-	})
-	q.cond.Broadcast()
+	item.Push(q.Queue)
+}
+
+// addItem adds locking and broadcasting to priority.Item.Push
+type addItem struct {
+	priority.Item
+	lock *sync.RWMutex
+	cond *sync.Cond
+}
+
+func (di *addItem) Push(queue heap.Interface) {
+	di.lock.Lock()
+	defer di.lock.Unlock()
+	heap.Push(queue, di)
+	di.cond.Broadcast()
 }
 
 // If there's a deadline reported by d.Deadline() then `d` is added to the
 // queue and this func returns true.
-func (q *DelayQueue) Offer(d Deadlined) bool {
+func (q *Queue) Offer(d Deadlined) bool {
 	deadline, ok := extractFromDeadlined(d)
 	if ok {
 		q.lock.Lock()
 		defer q.lock.Unlock()
-		heap.Push(&q.queue, &qitem{
-			value:    d,
-			priority: deadline,
-			readd: func(qp *qitem) {
-				q.Offer(qp.value.(Deadlined))
-			},
+		heap.Push(q.Queue, &offerItem{
+			Item: priority.NewItem(d, deadline),
 		})
 		q.cond.Broadcast()
 	}
 	return ok
 }
 
+// offerItem offers the value priority.Item.Push
+type offerItem struct {
+	priority.Item
+}
+
+func (di *offerItem) Push(queue heap.Interface) {
+	dq := queue.(*Queue)
+	dq.Offer(di.Value().(Deadlined))
+}
+
 // wait for the delay of the next item in the queue to expire, blocking if
 // there are no items in the queue. does not guarantee first-come-first-serve
 // ordering with respect to clients.
-func (q *DelayQueue) Pop() interface{} {
+func (q *Queue) Pop() interface{} {
 	// doesn't implement cancellation, will always return a non-nil value
-	return q.pop(func() *qitem {
+	return q.pop(func() pushableItem {
 		q.lock.Lock()
 		defer q.lock.Unlock()
-		for q.queue.Len() == 0 {
+		for q.Len() == 0 {
 			q.cond.Wait()
 		}
-		x := heap.Pop(&q.queue)
-		item := x.(*qitem)
+		x := heap.Pop(q.Queue)
+		item := x.(pushableItem)
 		return item
 	}, nil)
 }
 
 // returns a non-nil value from the queue, or else nil if/when cancelled; if cancel
 // is nil then cancellation is disabled and this func must return a non-nil value.
-func (q *DelayQueue) pop(next func() *qitem, cancel <-chan struct{}) interface{} {
-	var waitCh chan struct{}
+func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{} {
+	var condCh chan struct{}
 	var delayTimer *time.Timer
 	for {
 		item := next()
@@ -109,33 +125,38 @@ func (q *DelayQueue) pop(next func() *qitem, cancel <-chan struct{}) interface{}
 			// cancelled
 			return nil
 		}
-		x := item.value
-		delayedTime := item.priority.ts
+		x := item.Value()
+		delayPriority := item.Priority().(DelayPriority)
+		delayedTime := delayPriority.ts
 		if delayedTime.After(time.Now()) {
 			// listen for calls to Add() while we're waiting for the deadline
-			if waitCh == nil {
-				waitCh = make(chan struct{}, 1)
+			if condCh == nil {
+				condCh = make(chan struct{}, 1)
 			}
 			if delayTimer == nil {
 				delayTimer = time.NewTimer(delayedTime.Sub(time.Now()))
+				defer delayTimer.Stop()
+				//TODO: delayTimer.Stop() sooner
 			}
 			go func() {
 				q.lock.Lock()
-				defer q.lock.Unlock()
+				defer func() {
+					q.lock.Unlock()
+					condCh <- struct{}{}
+				}()
 				q.cond.Wait()
-				waitCh <- struct{}{}
 			}()
 			select {
 			case <-cancel:
-				item.readd(item)
+				item.Push(q.Queue)
 				return nil
-			case <-waitCh:
+			case <-condCh:
 				// we may no longer have the earliest deadline, re-try
-				item.readd(item)
+				item.Push(q.Queue)
 				continue
 			case <-delayTimer.C:
 				// noop
-			case <-item.priority.notify:
+			case <-delayPriority.notify:
 				// noop
 			}
 		}

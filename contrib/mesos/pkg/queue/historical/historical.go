@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package historical
 
 import (
 	"fmt"
@@ -22,12 +22,13 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type entry struct {
 	value UniqueCopyable
-	event EventType
+	event queue.EventType
 }
 
 type deletedEntry struct {
@@ -46,7 +47,7 @@ func (e *entry) Copy() Copyable {
 	return &entry{e.value.Copy().(UniqueCopyable), e.event}
 }
 
-func (e *entry) Is(types EventType) bool {
+func (e *entry) Is(types queue.EventType) bool {
 	return types&e.event != 0
 }
 
@@ -79,6 +80,28 @@ type HistoricalFIFO struct {
 	lingerTTL time.Duration
 }
 
+// NewHistorical returns a Store which can be used to queue up items to
+// process. If a non-nil Mux is provided, then modifications to the
+// the FIFO are delivered on a channel specific to this fifo.
+func NewQueue(ch chan<- Entry) *HistoricalFIFO {
+	carrier := dead
+	if ch != nil {
+		carrier = func(msg Entry) {
+			if msg != nil {
+				ch <- msg.Copy().(Entry)
+			}
+		}
+	}
+	f := &HistoricalFIFO{
+		items:     map[string]Entry{},
+		queue:     []string{},
+		carrier:   carrier,
+		lingerTTL: 5 * time.Minute, // TODO(jdef): extract constant
+	}
+	f.cond.L = &f.lock
+	return f
+}
+
 // panics if obj doesn't implement UniqueCopyable; otherwise returns the same, typecast object
 func checkType(obj interface{}) UniqueCopyable {
 	if v, ok := obj.(UniqueCopyable); !ok {
@@ -106,7 +129,7 @@ func (f *HistoricalFIFO) Add(v interface{}) error {
 	if entry, exists := f.items[id]; !exists {
 		f.queue = append(f.queue, id)
 	} else {
-		if entry.Is(DELETE_EVENT | POP_EVENT) {
+		if entry.Is(queue.DELETE_EVENT | queue.POP_EVENT) {
 			f.queue = append(f.queue, id)
 		}
 	}
@@ -134,9 +157,9 @@ func (f *HistoricalFIFO) Delete(v interface{}) error {
 	defer f.lock.Unlock()
 	id := obj.GetUID()
 	item, exists := f.items[id]
-	if exists && !item.Is(DELETE_EVENT) {
+	if exists && !item.Is(queue.DELETE_EVENT) {
 		e := item.(*entry)
-		e.event = DELETE_EVENT
+		e.event = queue.DELETE_EVENT
 		deleteEvent = &deletedEntry{e, time.Now().Add(f.lingerTTL)}
 		f.items[id] = deleteEvent
 	}
@@ -152,7 +175,7 @@ func (f *HistoricalFIFO) List() []interface{} {
 	list := make([]interface{}, 0, len(f.queue))
 
 	for _, entry := range f.items {
-		if entry.Is(DELETE_EVENT | POP_EVENT) {
+		if entry.Is(queue.DELETE_EVENT | queue.POP_EVENT) {
 			continue
 		}
 		list = append(list, entry.Value().Copy())
@@ -169,7 +192,7 @@ func (f *HistoricalFIFO) ListKeys() []string {
 	list := make([]string, 0, len(f.queue))
 
 	for key, entry := range f.items {
-		if entry.Is(DELETE_EVENT | POP_EVENT) {
+		if entry.Is(queue.DELETE_EVENT | queue.POP_EVENT) {
 			continue
 		}
 		list = append(list, key)
@@ -185,7 +208,7 @@ func (c *HistoricalFIFO) ContainedIDs() sets.String {
 	defer c.lock.RUnlock()
 	set := sets.String{}
 	for id, entry := range c.items {
-		if entry.Is(DELETE_EVENT | POP_EVENT) {
+		if entry.Is(queue.DELETE_EVENT | queue.POP_EVENT) {
 			continue
 		}
 		set.Insert(id)
@@ -204,14 +227,14 @@ func (f *HistoricalFIFO) GetByKey(id string) (interface{}, bool, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	entry, exists := f.items[id]
-	if exists && !entry.Is(DELETE_EVENT|POP_EVENT) {
+	if exists && !entry.Is(queue.DELETE_EVENT|queue.POP_EVENT) {
 		return entry.Value().Copy(), true, nil
 	}
 	return nil, false, nil
 }
 
 // Get returns the requested item, or sets exists=false.
-func (f *HistoricalFIFO) Poll(id string, t EventType) bool {
+func (f *HistoricalFIFO) Poll(id string, t queue.EventType) bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	entry, exists := f.items[id]
@@ -223,11 +246,13 @@ func (q *HistoricalFIFO) Await(timeout time.Duration) interface{} {
 	cancel := make(chan struct{})
 	ch := make(chan interface{}, 1)
 	go func() { ch <- q.pop(cancel) }()
+	timer := time.NewTimer(timeout)
 	select {
-	case <-time.After(timeout):
+	case <-timer.C:
 		close(cancel)
 		return <-ch
 	case x := <-ch:
+		timer.Stop()
 		return x
 	}
 }
@@ -266,12 +291,12 @@ func (f *HistoricalFIFO) pop(cancel chan struct{}) interface{} {
 		id := f.queue[0]
 		f.queue = f.queue[1:]
 		item, ok := f.items[id]
-		if !ok || item.Is(DELETE_EVENT|POP_EVENT) {
+		if !ok || item.Is(queue.DELETE_EVENT|queue.POP_EVENT) {
 			// Item may have been deleted subsequently.
 			continue
 		}
 		value := item.Value()
-		popEvent = &entry{value, POP_EVENT}
+		popEvent = &entry{value, queue.POP_EVENT}
 		f.items[id] = popEvent
 		return value.Copy()
 	}
@@ -297,11 +322,11 @@ func (f *HistoricalFIFO) Replace(objs []interface{}, resourceVersion string) err
 	f.queue = f.queue[:0]
 	now := time.Now()
 	for id, v := range f.items {
-		if _, exists := idToObj[id]; !exists && !v.Is(DELETE_EVENT) {
+		if _, exists := idToObj[id]; !exists && !v.Is(queue.DELETE_EVENT) {
 			// a non-deleted entry in the items list that doesn't show up in the
 			// new list: mark it as deleted
 			ent := v.(*entry)
-			ent.event = DELETE_EVENT
+			ent.event = queue.DELETE_EVENT
 			e := &deletedEntry{ent, now.Add(f.lingerTTL)}
 			f.items[id] = e
 			notifications = append(notifications, e)
@@ -325,7 +350,7 @@ func (f *HistoricalFIFO) gc() {
 	now := time.Now()
 	deleted := make(map[string]struct{})
 	for id, v := range f.items {
-		if v.Is(DELETE_EVENT) {
+		if v.Is(queue.DELETE_EVENT) {
 			ent := v.(*deletedEntry)
 			if ent.expiration.Before(now) {
 				delete(f.items, id)
@@ -348,25 +373,25 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 	item, exists := f.items[id]
 	now := time.Now()
 	if !exists {
-		e := &entry{obj.Copy().(UniqueCopyable), ADD_EVENT}
+		e := &entry{obj.Copy().(UniqueCopyable), queue.ADD_EVENT}
 		f.items[id] = e
 		notifications = append(notifications, e)
 	} else {
-		if !item.Is(DELETE_EVENT) && item.Value().GetUID() != obj.GetUID() {
+		if !item.Is(queue.DELETE_EVENT) && item.Value().GetUID() != obj.GetUID() {
 			// hidden DELETE!
 			// (1) append a DELETE
 			// (2) append an ADD
 			// .. and notify listeners in that order
 			ent := item.(*entry)
-			ent.event = DELETE_EVENT
+			ent.event = queue.DELETE_EVENT
 			e1 := &deletedEntry{ent, now.Add(f.lingerTTL)}
-			e2 := &entry{obj.Copy().(UniqueCopyable), ADD_EVENT}
+			e2 := &entry{obj.Copy().(UniqueCopyable), queue.ADD_EVENT}
 			f.items[id] = e2
 			notifications = append(notifications, e1, e2)
 		} else if !reflect.DeepEqual(obj, item.Value()) {
 			//TODO(jdef): it would be nice if we could rely on resource versions
 			//instead of doing a DeepEqual. Maybe someday we'll be able to.
-			e := &entry{obj.Copy().(UniqueCopyable), UPDATE_EVENT}
+			e := &entry{obj.Copy().(UniqueCopyable), queue.UPDATE_EVENT}
 			f.items[id] = e
 			notifications = append(notifications, e)
 		}
@@ -378,26 +403,4 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 		f.gc()
 	}
 	return
-}
-
-// NewHistorical returns a Store which can be used to queue up items to
-// process. If a non-nil Mux is provided, then modifications to the
-// the FIFO are delivered on a channel specific to this fifo.
-func NewHistorical(ch chan<- Entry) FIFO {
-	carrier := dead
-	if ch != nil {
-		carrier = func(msg Entry) {
-			if msg != nil {
-				ch <- msg.Copy().(Entry)
-			}
-		}
-	}
-	f := &HistoricalFIFO{
-		items:     map[string]Entry{},
-		queue:     []string{},
-		carrier:   carrier,
-		lingerTTL: 5 * time.Minute, // TODO(jdef): extract constant
-	}
-	f.cond.L = &f.lock
-	return f
 }

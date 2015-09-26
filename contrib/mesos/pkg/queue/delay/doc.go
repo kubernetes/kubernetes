@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package queue provides several queue implementations
-package queue
+// Package delay provides several delay queue implementations, originally
+// inspired by Kubernetes pkg/client/cache/fifo.
+package delay

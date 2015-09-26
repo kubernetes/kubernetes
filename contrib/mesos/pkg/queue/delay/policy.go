@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package delay
 
 // Decide whether a pre-existing deadline for an item in a delay-queue should be
 // updated if an attempt is made to offer/add a new deadline for said item. Whether
@@ -49,7 +49,7 @@ func (rp ReplacementPolicy) replacementValue(original, replacement interface{}) 
 	return
 }
 
-func (dp DeadlinePolicy) nextDeadline(a, b Priority) (result Priority) {
+func (dp DeadlinePolicy) nextDeadline(a, b DelayPriority) (result DelayPriority) {
 	switch dp {
 	case PreferEarliest:
 		if a.ts.Before(b.ts) {

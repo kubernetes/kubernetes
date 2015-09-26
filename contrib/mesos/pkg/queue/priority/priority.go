@@ -14,5 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package queue provides several queue implementations
-package queue
+package priority
+
+// Priority is a generic comparison interface that uses a before/equal/after semantic.
+// This deliberately avoids the traditional less/equal/more semantic used by sort algorithms,
+// which is ambiguous when used in prose about Priority.
+type Priority interface {
+	// Equal returns true if this Priority is equivalent to the supplied Priority
+	Equal(Priority) bool
+	// Before returns true if this Priority should come before the supplied Priority
+	Before(Priority) bool
+}

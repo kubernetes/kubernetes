@@ -27,7 +27,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
-	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/delay"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -85,10 +85,10 @@ type RegistryConfig struct {
 
 type offerStorage struct {
 	RegistryConfig
-	offers    *cache.FIFO       // collection of Perishable, both live and expired
-	listeners *queue.DelayFIFO  // collection of *offerListener
-	delayed   *queue.DelayQueue // deadline-oriented offer-event queue
-	slaves    *slaveStorage     // slave to offer mappings
+	offers    *cache.FIFO      // collection of Perishable, both live and expired
+	listeners *delay.FIFOQueue // collection of *offerListener
+	delayed   *delay.Queue     // deadline-oriented offer-event queue
+	slaves    *slaveStorage    // slave to offer mappings
 }
 
 type liveOffer struct {
@@ -126,10 +126,10 @@ type Perishable interface {
 	Id() string
 	// return the slave host for this offer
 	Host() string
-	addTo(*queue.DelayQueue)
+	addTo(*delay.Queue)
 }
 
-func (e *expiredOffer) addTo(q *queue.DelayQueue) {
+func (e *expiredOffer) addTo(q *delay.Queue) {
 	q.Add(e)
 }
 
@@ -199,7 +199,7 @@ func (to *liveOffer) Host() string {
 	return to.Offer.GetHostname()
 }
 
-func (to *liveOffer) addTo(q *queue.DelayQueue) {
+func (to *liveOffer) addTo(q *delay.Queue) {
 	q.Add(to)
 }
 
@@ -219,8 +219,8 @@ func CreateRegistry(c RegistryConfig) Registry {
 				return perishable.Id(), nil
 			}
 		})),
-		listeners: queue.NewDelayFIFO(),
-		delayed:   queue.NewDelayQueue(),
+		listeners: delay.NewFIFOQueue(),
+		delayed:   delay.NewQueue(),
 		slaves:    newSlaveStorage(),
 	}
 }
@@ -421,7 +421,7 @@ func (s *offerStorage) Listen(id string, f Filter) <-chan struct{} {
 		deadline: time.Now().Add(s.ListenerDelay),
 	}
 	log.V(3).Infof("Registering offer listener %s", listen.id)
-	s.listeners.Offer(listen, queue.ReplaceExisting)
+	s.listeners.Offer(listen, delay.ReplaceExisting)
 	return ch
 }
 
@@ -460,7 +460,7 @@ func (s *offerStorage) notifyListeners(ids func() (sets.String, uint64)) {
 	if listener.sawVersion == version {
 		// no changes to offer list, avoid growing older - just wait for new offers to arrive
 		listener.deadline = time.Now().Add(s.ListenerDelay)
-		s.listeners.Offer(listener, queue.KeepExisting)
+		s.listeners.Offer(listener, delay.KeepExisting)
 		return
 	}
 	listener.sawVersion = version
@@ -480,7 +480,7 @@ func (s *offerStorage) notifyListeners(ids func() (sets.String, uint64)) {
 	listener.age++
 	if listener.age < offerListenerMaxAge {
 		listener.deadline = time.Now().Add(s.ListenerDelay)
-		s.listeners.Offer(listener, queue.KeepExisting)
+		s.listeners.Offer(listener, delay.KeepExisting)
 	} else {
 		// garbage collection is as simple as not re-adding the listener to the queue
 		log.V(3).Infof("garbage collecting offer listener %s", listener.id)

@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/delay"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/historical"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -30,11 +31,11 @@ type Pod struct {
 	*api.Pod
 	deadline *time.Time
 	delay    *time.Duration
-	notify   queue.BreakChan
+	notify   delay.BreakChan
 }
 
 // implements Copyable
-func (p *Pod) Copy() queue.Copyable {
+func (p *Pod) Copy() historical.Copyable {
 	if p == nil {
 		return nil
 	}
@@ -67,7 +68,7 @@ func (dp *Pod) GetDelay() time.Duration {
 	return 0
 }
 
-func (p *Pod) Breaker() queue.BreakChan {
+func (p *Pod) Breaker() delay.BreakChan {
 	return p.notify
 }
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package delay
 
 import (
 	"testing"
@@ -27,7 +27,7 @@ func TestDFIFO_sanity_check(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	df := NewDelayFIFO()
+	df := NewFIFOQueue()
 	delay := 2 * time.Second
 	df.Add(&testjob{d: delay, uid: "a", instance: 1}, ReplaceExisting)
 	assert.True(df.ContainedIDs().Has("a"))
@@ -72,7 +72,7 @@ func TestDFIFO_Offer(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	dq := NewDelayFIFO()
+	dq := NewFIFOQueue()
 	delay := time.Second
 
 	added := dq.Offer(&testjob{instance: 1}, ReplaceExisting)

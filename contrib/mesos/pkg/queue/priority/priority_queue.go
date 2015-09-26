@@ -14,42 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package priority
 
-type qitem struct {
-	value    interface{}
-	priority Priority
-	index    int
-	readd    func(item *qitem) // re-add the value of the item to the queue
+// Queue is a priority queue of Items that implements container/heap.Interface.
+type Queue []Item
+
+func NewPriorityQueue() *Queue {
+	var queue Queue
+	return &queue
 }
 
-// A priorityQueue implements heap.Interface and holds qitems.
-type priorityQueue []*qitem
+func (pq Queue) Len() int { return len(pq) }
 
-func (pq priorityQueue) Len() int { return len(pq) }
-
-func (pq priorityQueue) Less(i, j int) bool {
-	return pq[i].priority.ts.Before(pq[j].priority.ts)
+func (pq Queue) Less(i, j int) bool {
+	return pq[i].Priority().Before(pq[j].Priority())
 }
 
-func (pq priorityQueue) Swap(i, j int) {
+func (pq Queue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
+	pq[i].SetIndex(i)
+	pq[j].SetIndex(j)
 }
 
-func (pq *priorityQueue) Push(x interface{}) {
+func (pq *Queue) Push(x interface{}) {
 	n := len(*pq)
-	item := x.(*qitem)
-	item.index = n
+	item := x.(Item)
+	item.SetIndex(n)
 	*pq = append(*pq, item)
 }
 
-func (pq *priorityQueue) Pop() interface{} {
+func (pq *Queue) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
-	item.index = -1 // for safety
+	item.SetIndex(-1) // for safety
 	*pq = old[0 : n-1]
 	return item
 }

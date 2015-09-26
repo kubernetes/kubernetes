@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/delay"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/historical"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
@@ -349,14 +351,14 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 type queuer struct {
 	lock            sync.Mutex       // shared by condition variables of this struct
 	podUpdates      queue.FIFO       // queue of pod updates to be processed
-	podQueue        *queue.DelayFIFO // queue of pods to be scheduled
+	podQueue        *delay.FIFOQueue // queue of pods to be scheduled
 	deltaCond       sync.Cond        // pod changes are available for processing
 	unscheduledCond sync.Cond        // there are unscheduled pods for processing
 }
 
 func newQueuer(store queue.FIFO) *queuer {
 	q := &queuer{
-		podQueue:   queue.NewDelayFIFO(),
+		podQueue:   delay.NewFIFOQueue(),
 		podUpdates: store,
 	}
 	q.deltaCond.L = &q.lock
@@ -396,7 +398,7 @@ func (q *queuer) dequeue(id string) {
 func (q *queuer) requeue(pod *Pod) {
 	// use KeepExisting in case the pod has already been updated (can happen if binding fails
 	// due to constraint voilations); we don't want to overwrite a newer entry with stale data.
-	q.podQueue.Add(pod, queue.KeepExisting)
+	q.podQueue.Add(pod, delay.KeepExisting)
 	q.unscheduledCond.Broadcast()
 }
 
@@ -404,7 +406,7 @@ func (q *queuer) requeue(pod *Pod) {
 func (q *queuer) reoffer(pod *Pod) {
 	// use KeepExisting in case the pod has already been updated (can happen if binding fails
 	// due to constraint voilations); we don't want to overwrite a newer entry with stale data.
-	if q.podQueue.Offer(pod, queue.KeepExisting) {
+	if q.podQueue.Offer(pod, delay.KeepExisting) {
 		q.unscheduledCond.Broadcast()
 	}
 }
@@ -449,7 +451,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 				// use ReplaceExisting because we are always pushing the latest state
 				now := time.Now()
 				pod.deadline = &now
-				if q.podQueue.Offer(pod, queue.ReplaceExisting) {
+				if q.podQueue.Offer(pod, delay.ReplaceExisting) {
 					q.unscheduledCond.Broadcast()
 					log.V(3).Infof("queued pod for scheduling: %v", pod.Pod.Name)
 				} else {
@@ -540,10 +542,10 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 			log.V(2).Infof("Skipping re-scheduling for already-launched pod %v", podKey)
 			return
 		}
-		breakoutEarly := queue.BreakChan(nil)
+		breakoutEarly := delay.BreakChan(nil)
 		if schedulingErr == noSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
-			breakoutEarly = queue.BreakChan(k.api.offers().Listen(podKey, func(offer *mesos.Offer) bool {
+			breakoutEarly = delay.BreakChan(k.api.offers().Listen(podKey, func(offer *mesos.Offer) bool {
 				k.api.Lock()
 				defer k.api.Unlock()
 				switch task, state := k.api.tasks().Get(task.ID); state {
@@ -571,7 +573,7 @@ type deleter struct {
 
 // currently monitors for "pod deleted" events, upon which handle()
 // is invoked.
-func (k *deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
+func (k *deleter) Run(updates <-chan historical.Entry, done <-chan struct{}) {
 	go runtime.Until(func() {
 		for {
 			entry := <-updates
@@ -657,8 +659,8 @@ func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *ht
 	podsWatcher *cache.ListWatch) *PluginConfig {
 
 	// Watch and queue pods that need scheduling.
-	updates := make(chan queue.Entry, k.schedcfg.UpdatesBacklog)
-	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
+	updates := make(chan historical.Entry, k.schedcfg.UpdatesBacklog)
+	podUpdates := &podStoreAdapter{historical.NewQueue(updates)}
 	reflector := cache.NewReflector(podsWatcher, &api.Pod{}, podUpdates, 0)
 
 	// lock that guards critial sections that involve transferring pods from

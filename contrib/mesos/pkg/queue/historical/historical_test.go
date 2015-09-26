@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package historical
 
 import (
 	"fmt"
@@ -59,7 +59,7 @@ func (i *testObj) GetUID() string {
 }
 
 func TestFIFO_basic(t *testing.T) {
-	f := NewHistorical(nil)
+	f := NewQueue(nil)
 	const amount = 500
 	go func() {
 		for i := 0; i < amount; i++ {
@@ -94,7 +94,7 @@ func TestFIFO_basic(t *testing.T) {
 }
 
 func TestFIFO_addUpdate(t *testing.T) {
-	f := NewHistorical(nil)
+	f := NewQueue(nil)
 	f.Add(&testObj{"foo", 10})
 	f.Update(&testObj{"foo", 15})
 	got := make(chan *testObj, 2)
@@ -108,10 +108,12 @@ func TestFIFO_addUpdate(t *testing.T) {
 	if e, a := 15, first.value; e != a {
 		t.Errorf("Didn't get updated value (%v), got %v", e, a)
 	}
+	timer := time.NewTimer(50 * time.Millisecond)
 	select {
 	case unexpected := <-got:
+		timer.Stop()
 		t.Errorf("Got second value %v", unexpected)
-	case <-time.After(50 * time.Millisecond):
+	case <-timer.C:
 	}
 	_, exists, _ := f.GetByKey("foo")
 	if exists {
@@ -120,7 +122,7 @@ func TestFIFO_addUpdate(t *testing.T) {
 }
 
 func TestFIFO_addReplace(t *testing.T) {
-	f := NewHistorical(nil)
+	f := NewQueue(nil)
 	f.Add(&testObj{"foo", 10})
 	f.Replace([]interface{}{&testObj{"foo", 15}}, "0")
 	got := make(chan *testObj, 2)
@@ -134,10 +136,12 @@ func TestFIFO_addReplace(t *testing.T) {
 	if e, a := 15, first.value; e != a {
 		t.Errorf("Didn't get updated value (%v), got %v", e, a)
 	}
+	timer := time.NewTimer(50 * time.Millisecond)
 	select {
 	case unexpected := <-got:
+		timer.Stop()
 		t.Errorf("Got second value %v", unexpected)
-	case <-time.After(50 * time.Millisecond):
+	case <-timer.C:
 	}
 	_, exists, _ := f.GetByKey("foo")
 	if exists {
@@ -146,7 +150,7 @@ func TestFIFO_addReplace(t *testing.T) {
 }
 
 func TestFIFO_detectLineJumpers(t *testing.T) {
-	f := NewHistorical(nil)
+	f := NewQueue(nil)
 
 	f.Add(&testObj{"foo", 10})
 	f.Add(&testObj{"bar", 1})
@@ -180,12 +184,14 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 			return
 		}
 	}()
+	timer := time.NewTimer(1 * time.Second)
 	select {
 	case <-done:
+		timer.Stop()
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(1 * time.Second):
+	case <-timer.C:
 		t.Fatal("Deadlocked unit test")
 	}
 }
