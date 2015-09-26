@@ -74,7 +74,8 @@ var _ = Describe("Kubelet", func() {
 
 	Describe("resource usage tracking", func() {
 		density := []int{0, 50}
-		for _, podsPerNode := range density {
+		for i := range density {
+			podsPerNode := density[i]
 			name := fmt.Sprintf(
 				"over %v with %d pods per node.", monitoringTime, podsPerNode)
 			It(name, func() {
@@ -103,8 +104,8 @@ var _ = Describe("Kubelet", func() {
 				// entries if we plan to monitor longer (e.g., 8 hours).
 				deadline := time.Now().Add(monitoringTime)
 				for time.Now().Before(deadline) {
+					Logf("Still running...%v left", deadline.Sub(time.Now()))
 					time.Sleep(reportingPeriod)
-					Logf("Still running...")
 					logPodsOnNodes(framework.Client, nodeNames.List())
 				}
 
