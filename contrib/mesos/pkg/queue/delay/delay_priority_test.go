@@ -23,10 +23,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
-func timedPriority(t time.Time) DelayPriority {
-	return DelayPriority{ts: t}
-}
-
 func TestPQWithDelayPriority(t *testing.T) {
 	t.Parallel()
 
@@ -35,8 +31,8 @@ func TestPQWithDelayPriority(t *testing.T) {
 		t.Fatalf("pq should be empty")
 	}
 
-	now := timedPriority(time.Now())
-	now2 := timedPriority(now.ts.Add(2 * time.Second))
+	now := NewPriority(time.Now())
+	now2 := NewPriority(now.eventTime.Add(2 * time.Second))
 	pq.Push(priority.NewItem(nil, now2))
 	if pq.Len() != 1 {
 		t.Fatalf("pq.len should be 1")
@@ -66,8 +62,8 @@ func TestPQWithDelayPriority(t *testing.T) {
 	if pq.Len() != 0 {
 		t.Fatalf("pq should be empty")
 	}
-	now4 := timedPriority(now.ts.Add(4 * time.Second))
-	now6 := timedPriority(now.ts.Add(4 * time.Second))
+	now4 := NewPriority(now.eventTime.Add(4 * time.Second))
+	now6 := NewPriority(now.eventTime.Add(4 * time.Second))
 	pq.Push(priority.NewItem(nil, now2))
 	pq.Push(priority.NewItem(nil, now4))
 	pq.Push(priority.NewItem(nil, now6))

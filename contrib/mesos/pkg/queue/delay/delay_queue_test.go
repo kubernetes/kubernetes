@@ -29,11 +29,11 @@ const (
 )
 
 type testjob struct {
-	d        time.Duration
-	t        time.Time
-	deadline *time.Time
-	uid      string
-	instance int
+	d         time.Duration
+	t         time.Time
+	eventTime *time.Time
+	uid       string
+	instance  int
 }
 
 func (j *testjob) GetDelay() time.Duration {
@@ -44,9 +44,9 @@ func (j testjob) GetUID() string {
 	return j.uid
 }
 
-func (td *testjob) Deadline() (deadline time.Time, ok bool) {
-	if td.deadline != nil {
-		return *td.deadline, true
+func (td *testjob) EventTime() (t time.Time, ok bool) {
+	if td.eventTime != nil {
+		return *td.eventTime, true
 	} else {
 		return time.Now(), false
 	}
@@ -86,13 +86,13 @@ func TestDQ_Offer(t *testing.T) {
 
 	added := dq.Offer(&testjob{})
 	if added {
-		t.Fatalf("DelayQueue should not add offered job without deadline")
+		t.Fatalf("DelayQueue should not add offered job without eventTime")
 	}
 
-	deadline := time.Now().Add(delay)
-	added = dq.Offer(&testjob{deadline: &deadline})
+	eventTime := time.Now().Add(delay)
+	added = dq.Offer(&testjob{eventTime: &eventTime})
 	if !added {
-		t.Fatalf("DelayQueue should add offered job with deadline")
+		t.Fatalf("DelayQueue should add offered job with eventTime")
 	}
 
 	before := time.Now()
@@ -105,7 +105,7 @@ func TestDQ_Offer(t *testing.T) {
 		t.Fatalf("delay too short: %v, expected: %v", waitPeriod, delay)
 	}
 	assert.NotNil(x)
-	assert.Equal(x.(*testjob).deadline, &deadline)
+	assert.Equal(x.(*testjob).eventTime, &eventTime)
 }
 
 func TestDQ_ordered_add_pop(t *testing.T) {
@@ -157,7 +157,7 @@ func TestDQ_ordered_add_pop(t *testing.T) {
 	}
 }
 
-func TestDQ_always_pop_earliest_deadline(t *testing.T) {
+func TestDQ_always_pop_earliest_event_time(t *testing.T) {
 	t.Skip("disabled due to flakiness; see #11857")
 	t.Parallel()
 
@@ -196,7 +196,7 @@ func TestDQ_always_pop_earliest_deadline(t *testing.T) {
 	}
 }
 
-func TestDQ_always_pop_earliest_deadline_multi(t *testing.T) {
+func TestDQ_always_pop_earliest_event_time_multi(t *testing.T) {
 	t.Skip("disabled due to flakiness; see #11821")
 	t.Parallel()
 

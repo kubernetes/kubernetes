@@ -22,52 +22,56 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
-type DelayPriority struct {
-	ts     time.Time // timestamp
-	notify BreakChan // notification channel
+type Priority struct {
+	eventTime time.Time
+	notify    BreakChan // notification channel
 }
 
-func (p DelayPriority) Equal(other priority.Priority) bool {
-	otherVal, ok := other.(DelayPriority)
+func NewPriority(eventTime time.Time) Priority {
+	return Priority{eventTime: eventTime}
+}
+
+func (p Priority) Equal(other priority.Priority) bool {
+	otherVal, ok := other.(Priority)
 	if !ok {
 		return false
 	}
 
-	return p.ts.Equal(otherVal.ts) && p.notify == otherVal.notify
+	return p.eventTime.Equal(otherVal.eventTime) && p.notify == otherVal.notify
 }
 
-func (pq DelayPriority) Before(other priority.Priority) bool {
-	otherVal, ok := other.(DelayPriority)
+func (pq Priority) Before(other priority.Priority) bool {
+	otherVal, ok := other.(Priority)
 	if !ok {
 		return false
 	}
 
-	return pq.ts.Before(otherVal.ts)
+	return pq.eventTime.Before(otherVal.eventTime)
 }
 
-func extractFromDelayed(d Delayed) DelayPriority {
-	deadline := time.Now().Add(d.GetDelay())
-	breaker := BreakChan(nil)
+func NewDelayedPriority(d Delayed) Priority {
+	eventTime := time.Now().Add(d.GetDelay())
+	var breaker BreakChan
 	if breakout, good := d.(Breakout); good {
 		breaker = breakout.Breaker()
 	}
 
-	return DelayPriority{
-		ts:     deadline,
-		notify: breaker,
+	return Priority{
+		eventTime: eventTime,
+		notify:    breaker,
 	}
 }
 
-func extractFromDeadlined(d Deadlined) (DelayPriority, bool) {
-	if ts, ok := d.Deadline(); ok {
+func NewScheduledPriority(d Scheduled) (Priority, bool) {
+	if eventTime, ok := d.EventTime(); ok {
 		breaker := BreakChan(nil)
 		if breakout, good := d.(Breakout); good {
 			breaker = breakout.Breaker()
 		}
-		return DelayPriority{
-			ts:     ts,
-			notify: breaker,
+		return Priority{
+			eventTime: eventTime,
+			notify:    breaker,
 		}, true
 	}
-	return DelayPriority{}, false
+	return Priority{}, false
 }

@@ -27,61 +27,69 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// If multiple adds/updates of a single item happen while an item is in the
-// queue before it has been processed, it will only be processed once, and
-// when it is processed, the most recent version will be processed. Items are
-// popped in order of their priority, currently controlled by a delay or
-// deadline assigned to each item in the queue.
-type FIFOQueue struct {
+// FIFODelayQueue is a thread-safe, time-based queue with uniquely identified items.
+//
+// Adding or offering an item with an ID matching an item still in the queue will
+// invoke the configured SchedulingPolicy and supplied ValueReplacementPolicy to
+// determine the desired behavior.
+//
+// Items can only be popped after their event time has been reached.
+// Use Add to specify a delay duration and have the event time calculated.
+// Use Offer to specify a specific event time.
+type FIFODelayQueue struct {
 	*Queue
-	// We depend on the property that items in the set are in the queue and vice versa.
-	items          map[string]priority.Item
-	deadlinePolicy DeadlinePolicy
+	// items mapped by UniqueID - item set must match queue contents
+	items            map[string]priority.Item
+	schedulingPolicy SchedulingPolicy
 }
 
-func NewFIFOQueue() *FIFOQueue {
-	return &FIFOQueue{
+func NewFIFOQueue() *FIFODelayQueue {
+	return &FIFODelayQueue{
 		Queue: NewQueue(),
 		items: map[string]priority.Item{},
 	}
 }
 
-// Add inserts an item, and puts it in the queue. The item is only enqueued
-// if it doesn't already exist in the set.
-func (q *FIFOQueue) Add(d UniqueDelayed, rp ReplacementPolicy) {
-	deadline := extractFromDelayed(d)
-	id := d.GetUID()
-	q.push(id, &fifoAddItem{
-		Item: priority.NewItem(d, deadline),
-		id:   id,
+// Add inserts an uniquely identified item into the queue,
+// provided another item with the same ID is not already present.
+func (q *FIFODelayQueue) Add(d UniqueDelayed, rp ValueReplacementPolicy) {
+	q.push(&fifoAddedItem{
+		Item: priority.NewItem(d, NewDelayedPriority(d)),
+		id:   d.GetUID(),
 	}, rp)
 }
 
-// fifoAddItem adds locking and broadcasting to priority.Item.Push
-type fifoAddItem struct {
+// fifoAddedItem wraps an item that was added to the queue.
+type fifoAddedItem struct {
 	priority.Item
 	id string
 }
 
-func (di *fifoAddItem) Push(queue heap.Interface) {
-	dq := queue.(*FIFOQueue)
-	dq.push(di.id, di, KeepExisting)
+func (di fifoAddedItem) GetUID() string {
+	return di.id
 }
 
-func (q *FIFOQueue) Offer(d UniqueDeadlined, rp ReplacementPolicy) bool {
-	if deadline, ok := extractFromDeadlined(d); ok {
-		id := d.GetUID()
-		q.push(id, &fifoOfferItem{
-			Item: priority.NewItem(d, deadline),
+// Push puts the item back into the queue (with the same ID)
+func (di *fifoAddedItem) Push(queue heap.Interface) {
+	dq := queue.(*FIFODelayQueue)
+	dq.push(di, KeepExisting)
+}
+
+func (q *FIFODelayQueue) Offer(d UniqueScheduled, rp ValueReplacementPolicy) bool {
+	if p, ok := NewScheduledPriority(d); ok {
+		q.push(&fifoOfferedItem{
+			Item: priority.NewItem(d, p),
+			id:   d.GetUID(),
 		}, rp)
 		return true
 	}
 	return false
 }
 
-func (q *FIFOQueue) push(id string, newItem priority.Item, rp ReplacementPolicy) {
+func (q *FIFODelayQueue) push(newItem UniqueItem, rp ValueReplacementPolicy) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
+	id := newItem.GetUID()
 	item, exists := q.items[id]
 	if !exists {
 		item = newItem
@@ -89,17 +97,17 @@ func (q *FIFOQueue) push(id string, newItem priority.Item, rp ReplacementPolicy)
 		q.items[id] = item
 	} else {
 		// replace existing item
-		newValue := rp.replacementValue(item.Value(), newItem.Value())
-		oldPriority := item.Priority().(DelayPriority)
-		newPriority := newItem.Priority().(DelayPriority)
-		newPriority = q.deadlinePolicy.nextDeadline(oldPriority, newPriority)
+		newValue := rp.Value(item.Value(), newItem.Value())
+		oldPriority := item.Priority().(Priority)
+		newPriority := newItem.Priority().(Priority)
+		newPriority = q.schedulingPolicy.EventTime(oldPriority, newPriority)
 		item = priority.NewItem(newValue, newPriority)
 
 		switch i := newItem.(type) {
-		case *fifoAddItem:
-			item = &fifoAddItem{Item: item, id: i.id}
-		case *fifoOfferItem:
-			item = &fifoOfferItem{Item: item}
+		case *fifoAddedItem:
+			item = &fifoAddedItem{Item: item, id: i.id}
+		case *fifoOfferedItem:
+			item = &fifoOfferedItem{Item: item, id: i.id}
 		default:
 			panic(fmt.Sprintf("unsupported newItem type: %v", reflect.TypeOf(i)))
 		}
@@ -110,27 +118,33 @@ func (q *FIFOQueue) push(id string, newItem priority.Item, rp ReplacementPolicy)
 	q.cond.Broadcast()
 }
 
-// fifoOfferItem offers the value priority.Item.Push
-type fifoOfferItem struct {
+// fifoOfferedItem represents an item that was offered to the queue.
+type fifoOfferedItem struct {
 	priority.Item
+	id string
 }
 
-func (i *fifoOfferItem) Push(queue heap.Interface) {
-	dq := queue.(*FIFOQueue)
-	dq.Offer(i.Value().(UniqueDeadlined), KeepExisting)
+func (oi fifoOfferedItem) GetUID() string {
+	return oi.id
+}
+
+// Push offers the item to be rescheduled (with a new ID)
+func (oi *fifoOfferedItem) Push(queue heap.Interface) {
+	dq := queue.(*FIFODelayQueue)
+	dq.Offer(oi.Value().(UniqueScheduled), KeepExisting)
 }
 
 // Delete removes an item. It doesn't add it to the queue, because
 // this implementation assumes the consumer only cares about the objects,
 // not their priority order.
-func (q *FIFOQueue) Delete(id string) {
+func (q *FIFODelayQueue) Delete(id string) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	delete(q.items, id)
 }
 
 // List returns a list of all the items.
-func (q *FIFOQueue) List() []queue.UniqueID {
+func (q *FIFODelayQueue) List() []queue.UniqueID {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	list := make([]queue.UniqueID, 0, len(q.items))
@@ -143,7 +157,7 @@ func (q *FIFOQueue) List() []queue.UniqueID {
 // ContainedIDs returns a stringset.StringSet containing all IDs of the stored items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (q *FIFOQueue) ContainedIDs() sets.String {
+func (q *FIFODelayQueue) ContainedIDs() sets.String {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	set := sets.String{}
@@ -154,7 +168,7 @@ func (q *FIFOQueue) ContainedIDs() sets.String {
 }
 
 // Get returns the requested item, or sets exists=false.
-func (q *FIFOQueue) Get(id string) (queue.UniqueID, bool) {
+func (q *FIFODelayQueue) Get(id string) (queue.UniqueID, bool) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	if item, exists := q.items[id]; exists {
@@ -164,7 +178,7 @@ func (q *FIFOQueue) Get(id string) (queue.UniqueID, bool) {
 }
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
-func (q *FIFOQueue) Await(timeout time.Duration) queue.UniqueID {
+func (q *FIFODelayQueue) Await(timeout time.Duration) queue.UniqueID {
 	cancel := make(chan struct{})
 	ch := make(chan interface{}, 1)
 	go func() { ch <- q.pop(cancel) }()
@@ -184,12 +198,12 @@ func (q *FIFOQueue) Await(timeout time.Duration) queue.UniqueID {
 }
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
-func (q *FIFOQueue) Pop() interface{} {
+func (q *FIFODelayQueue) Pop() interface{} {
 	return q.pop(nil).(queue.UniqueID)
 }
 
 // variant of DelayQueue.Pop that implements optional cancellation
-func (q *FIFOQueue) pop(cancel chan struct{}) interface{} {
+func (q *FIFODelayQueue) pop(cancel chan struct{}) interface{} {
 	next := func() pushableItem {
 		q.lock.Lock()
 		defer q.lock.Unlock()

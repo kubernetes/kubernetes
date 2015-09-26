@@ -77,13 +77,13 @@ func TestDFIFO_Offer(t *testing.T) {
 
 	added := dq.Offer(&testjob{instance: 1}, ReplaceExisting)
 	if added {
-		t.Fatalf("DelayFIFO should not add offered job without deadline")
+		t.Fatalf("DelayFIFO should not add offered job without eventTime")
 	}
 
-	deadline := time.Now().Add(delay)
-	added = dq.Offer(&testjob{deadline: &deadline, instance: 2}, ReplaceExisting)
+	eventTime := time.Now().Add(delay)
+	added = dq.Offer(&testjob{eventTime: &eventTime, instance: 2}, ReplaceExisting)
 	if !added {
-		t.Fatalf("DelayFIFO should add offered job with deadline")
+		t.Fatalf("DelayFIFO should add offered job with eventTime")
 	}
 
 	before := time.Now()

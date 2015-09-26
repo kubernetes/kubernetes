@@ -24,14 +24,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
-type pushableItem interface {
-	priority.Item
-	// Push this Item into a heap.
-	Push(heap.Interface)
-}
-
-// concurrency-safe, deadline-oriented queue that returns items after their
-// delay period has expired.
+// Queue is a thread-safe, time-based queue.
+//
+// Items can only be popped after their event time has been reached.
+// Use Add to specify a delay duration and have the event time calculated.
+// Use Offer to specify a specific event time.
 type Queue struct {
 	*priority.Queue
 	lock *sync.RWMutex
@@ -48,10 +45,10 @@ func NewQueue() *Queue {
 }
 
 func (q *Queue) Add(d Delayed) {
-	deadline := extractFromDelayed(d)
+	p := NewDelayedPriority(d)
 
 	item := &addItem{
-		Item: priority.NewItem(d, deadline),
+		Item: priority.NewItem(d, p),
 		lock: q.lock,
 		cond: q.cond,
 	}
@@ -72,15 +69,15 @@ func (di *addItem) Push(queue heap.Interface) {
 	di.cond.Broadcast()
 }
 
-// If there's a deadline reported by d.Deadline() then `d` is added to the
+// If there's a eventTime reported by d.EventTime() then `d` is added to the
 // queue and this func returns true.
-func (q *Queue) Offer(d Deadlined) bool {
-	deadline, ok := extractFromDeadlined(d)
+func (q *Queue) Offer(d Scheduled) bool {
+	eventTime, ok := NewScheduledPriority(d)
 	if ok {
 		q.lock.Lock()
 		defer q.lock.Unlock()
 		heap.Push(q.Queue, &offerItem{
-			Item: priority.NewItem(d, deadline),
+			Item: priority.NewItem(d, eventTime),
 		})
 		q.cond.Broadcast()
 	}
@@ -94,7 +91,7 @@ type offerItem struct {
 
 func (di *offerItem) Push(queue heap.Interface) {
 	dq := queue.(*Queue)
-	dq.Offer(di.Value().(Deadlined))
+	dq.Offer(di.Value().(Scheduled))
 }
 
 // wait for the delay of the next item in the queue to expire, blocking if
@@ -126,10 +123,10 @@ func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{
 			return nil
 		}
 		x := item.Value()
-		delayPriority := item.Priority().(DelayPriority)
-		delayedTime := delayPriority.ts
+		delayPriority := item.Priority().(Priority)
+		delayedTime := delayPriority.eventTime
 		if delayedTime.After(time.Now()) {
-			// listen for calls to Add() while we're waiting for the deadline
+			// listen for calls to Add() while we're waiting for the eventTime
 			if condCh == nil {
 				condCh = make(chan struct{}, 1)
 			}
@@ -151,7 +148,7 @@ func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{
 				item.Push(q.Queue)
 				return nil
 			case <-condCh:
-				// we may no longer have the earliest deadline, re-try
+				// we may no longer have the earliest eventTime, re-try
 				item.Push(q.Queue)
 				continue
 			case <-delayTimer.C:
@@ -162,4 +159,11 @@ func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{
 		}
 		return x
 	}
+}
+
+// pushableItem is an item that can push itself onto a heap.
+type pushableItem interface {
+	priority.Item
+	// Push this Item into a heap.
+	Push(heap.Interface)
 }

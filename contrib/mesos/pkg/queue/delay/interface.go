@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
 type Delayed interface {
@@ -27,9 +28,10 @@ type Delayed interface {
 	GetDelay() time.Duration
 }
 
-type Deadlined interface {
-	// when ok, returns the time when this object should be activated/executed/evaluated
-	Deadline() (deadline time.Time, ok bool)
+//TODO: did this need to match Context.Deadline()
+type Scheduled interface {
+	// when ok, returns the time when this event should be scheduled
+	EventTime() (t time.Time, ok bool)
 }
 
 // No objects are ever expected to be sent over this channel. References to BreakChan
@@ -50,7 +52,12 @@ type UniqueDelayed interface {
 	Delayed
 }
 
-type UniqueDeadlined interface {
+type UniqueScheduled interface {
 	queue.UniqueID
-	Deadlined
+	Scheduled
+}
+
+type UniqueItem interface {
+	queue.UniqueID
+	priority.Item
 }

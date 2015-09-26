@@ -349,11 +349,11 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 }
 
 type queuer struct {
-	lock            sync.Mutex       // shared by condition variables of this struct
-	podUpdates      queue.FIFO       // queue of pod updates to be processed
-	podQueue        *delay.FIFOQueue // queue of pods to be scheduled
-	deltaCond       sync.Cond        // pod changes are available for processing
-	unscheduledCond sync.Cond        // there are unscheduled pods for processing
+	lock            sync.Mutex            // shared by condition variables of this struct
+	podUpdates      queue.FIFO            // queue of pod updates to be processed
+	podQueue        *delay.FIFODelayQueue // queue of pods to be scheduled
+	deltaCond       sync.Cond             // pod changes are available for processing
+	unscheduledCond sync.Cond             // there are unscheduled pods for processing
 }
 
 func newQueuer(store queue.FIFO) *queuer {
@@ -450,7 +450,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 			} else {
 				// use ReplaceExisting because we are always pushing the latest state
 				now := time.Now()
-				pod.deadline = &now
+				pod.eventTime = &now
 				if q.podQueue.Offer(pod, delay.ReplaceExisting) {
 					q.unscheduledCond.Broadcast()
 					log.V(3).Infof("queued pod for scheduling: %v", pod.Pod.Name)
@@ -824,8 +824,8 @@ func (s *schedulingPlugin) reconcileTask(t *podtask.T) {
 			now := time.Now()
 			log.V(3).Infof("reoffering pod %v", podKey)
 			s.qr.reoffer(&Pod{
-				Pod:      pod,
-				deadline: &now,
+				Pod:       pod,
+				eventTime: &now,
 			})
 		} else {
 			// pod is scheduled.
