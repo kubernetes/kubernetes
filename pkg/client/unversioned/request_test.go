@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -154,6 +153,22 @@ func TestRequestParam(t *testing.T) {
 	r.Param("bar", "1")
 	r.Param("bar", "2")
 	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}, "bar": []string{"1", "2"}}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+}
+
+func TestRequestVersionedParams(t *testing.T) {
+	r := (&Request{}).Param("foo", "a")
+	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+	r.VersionedParams(&api.PodLogOptions{Follow: true, Container: "bar"}, api.Scheme)
+
+	if !api.Semantic.DeepDerivative(r.params, url.Values{
+		"foo":       []string{"a"},
+		"container": []string{"bar"},
+		"follow":    []string{"1"},
+	}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 }
@@ -593,88 +608,6 @@ func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 
 func (f *fakeUpgradeRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
 	return f.conn, nil
-}
-
-func TestRequestUpgrade(t *testing.T) {
-	uri, _ := url.Parse("http://localhost/")
-	testCases := []struct {
-		Request          *Request
-		Config           *Config
-		RoundTripper     *fakeUpgradeRoundTripper
-		Err              bool
-		AuthBasicHeader  bool
-		AuthBearerHeader bool
-	}{
-		{
-			Request: &Request{err: errors.New("bail")},
-			Err:     true,
-		},
-		{
-			Request: &Request{},
-			Config: &Config{
-				TLSClientConfig: TLSClientConfig{
-					CAFile: "foo",
-				},
-				Insecure: true,
-			},
-			Err: true,
-		},
-		{
-			Request: &Request{},
-			Config: &Config{
-				Username:    "u",
-				Password:    "p",
-				BearerToken: "b",
-			},
-			Err: true,
-		},
-		{
-			Request: NewRequest(nil, "", uri, testapi.Default.Version(), testapi.Default.Codec()),
-			Config: &Config{
-				Username: "u",
-				Password: "p",
-			},
-			AuthBasicHeader: true,
-			Err:             false,
-		},
-		{
-			Request: NewRequest(nil, "", uri, testapi.Default.Version(), testapi.Default.Codec()),
-			Config: &Config{
-				BearerToken: "b",
-			},
-			AuthBearerHeader: true,
-			Err:              false,
-		},
-	}
-	for i, testCase := range testCases {
-		r := testCase.Request
-		rt := &fakeUpgradeRoundTripper{}
-		expectedConn := &fakeUpgradeConnection{}
-		conn, err := r.Upgrade(testCase.Config, func(config *tls.Config) httpstream.UpgradeRoundTripper {
-			rt.conn = expectedConn
-			return rt
-		})
-		_ = conn
-		hasErr := err != nil
-		if hasErr != testCase.Err {
-			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, r.err)
-		}
-		if testCase.Err {
-			continue
-		}
-
-		if testCase.AuthBasicHeader && !strings.Contains(rt.req.Header.Get("Authorization"), "Basic") {
-			t.Errorf("%d: expected basic auth header, got: %s", i, rt.req.Header.Get("Authorization"))
-		}
-
-		if testCase.AuthBearerHeader && !strings.Contains(rt.req.Header.Get("Authorization"), "Bearer") {
-			t.Errorf("%d: expected bearer auth header, got: %s", i, rt.req.Header.Get("Authorization"))
-		}
-
-		if e, a := expectedConn, conn; e != a {
-			t.Errorf("%d: conn: expected %#v, got %#v", i, e, a)
-		}
-	}
 }
 
 func TestRequestDo(t *testing.T) {

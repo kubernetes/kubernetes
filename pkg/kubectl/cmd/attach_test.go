@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -32,12 +33,14 @@ import (
 )
 
 type fakeRemoteAttach struct {
-	req       *client.Request
+	method    string
+	url       *url.URL
 	attachErr error
 }
 
-func (f *fakeRemoteAttach) Attach(req *client.Request, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	f.req = req
+func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+	f.method = method
+	f.url = url
 	return f.attachErr
 }
 
@@ -173,9 +176,15 @@ func TestAttach(t *testing.T) {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
 			continue
 		}
-		if !test.attachErr && ex.req.URL().Path != test.attachPath {
+		if test.attachErr {
+			continue
+		}
+		if ex.url.Path != test.attachPath {
 			t.Errorf("%s: Did not get expected path for exec request", test.name)
 			continue
+		}
+		if ex.method != "POST" {
+			t.Errorf("%s: Did not get method for attach request: %s", test.name, ex.method)
 		}
 	}
 }

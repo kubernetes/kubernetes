@@ -31,9 +31,22 @@ import (
 	"time"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 )
+
+type fakeDialer struct {
+	dialed bool
+	conn   httpstream.Connection
+	err    error
+}
+
+func (d *fakeDialer) Dial() (httpstream.Connection, error) {
+	d.dialed = true
+	return d.conn, d.err
+}
 
 func TestParsePortsAndNew(t *testing.T) {
 	tests := []struct {
@@ -71,10 +84,9 @@ func TestParsePortsAndNew(t *testing.T) {
 			t.Fatalf("%d: parsePorts: error expected=%t, got %t: %s", i, e, a, err)
 		}
 
-		expectedRequest := &client.Request{}
-		expectedConfig := &client.Config{}
+		dialer := &fakeDialer{}
 		expectedStopChan := make(chan struct{})
-		pf, err := New(expectedRequest, expectedConfig, test.input, expectedStopChan)
+		pf, err := New(dialer, test.input, expectedStopChan)
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
 			t.Fatalf("%d: New: error expected=%t, got %t: %s", i, e, a, err)
@@ -93,11 +105,8 @@ func TestParsePortsAndNew(t *testing.T) {
 			}
 		}
 
-		if e, a := expectedRequest, pf.req; e != a {
-			t.Fatalf("%d: req: expected %#v, got %#v", i, e, a)
-		}
-		if e, a := expectedConfig, pf.config; e != a {
-			t.Fatalf("%d: config: expected %#v, got %#v", i, e, a)
+		if dialer.dialed {
+			t.Fatalf("%d: expected not dialed", i)
 		}
 		if e, a := test.expected, pf.ports; !reflect.DeepEqual(e, a) {
 			t.Fatalf("%d: ports: expected %#v, got %#v", i, e, a)
@@ -293,17 +302,16 @@ func TestForwardPorts(t *testing.T) {
 
 	for testName, test := range tests {
 		server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
-		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "x", nil, -1, -1)
-		req := c.Post().Resource("testing")
 
-		conf := &client.Config{
-			Host: server.URL,
+		url, _ := url.Parse(server.URL)
+		exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		stopChan := make(chan struct{}, 1)
 
-		pf, err := New(req, conf, test.ports, stopChan)
+		pf, err := New(exec, test.ports, stopChan)
 		if err != nil {
 			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
@@ -363,18 +371,17 @@ func TestForwardPorts(t *testing.T) {
 func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	server := httptest.NewServer(fakePortForwardServer(t, "allBindsFailed", nil, nil))
 	defer server.Close()
-	url, _ := url.ParseRequestURI(server.URL)
-	c := client.NewRESTClient(url, "x", nil, -1, -1)
-	req := c.Post().Resource("testing")
 
-	conf := &client.Config{
-		Host: server.URL,
+	url, _ := url.Parse(server.URL)
+	exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	stopChan1 := make(chan struct{}, 1)
 	defer close(stopChan1)
 
-	pf1, err := New(req, conf, []string{"5555"}, stopChan1)
+	pf1, err := New(exec, []string{"5555"}, stopChan1)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
@@ -382,7 +389,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	<-pf1.Ready
 
 	stopChan2 := make(chan struct{}, 1)
-	pf2, err := New(&client.Request{}, &client.Config{}, []string{"5555"}, stopChan2)
+	pf2, err := New(exec, []string{"5555"}, stopChan2)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}
