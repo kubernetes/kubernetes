@@ -58,6 +58,7 @@ spec:
         # command = "/skydns"
         - -machines=http://localhost:4001
         - -addr=0.0.0.0:53
+        - -rtimeout=1s
         - -domain={{ pillar['dns_domain'] }}.
         ports:
         - containerPort: 53
