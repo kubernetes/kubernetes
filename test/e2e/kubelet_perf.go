@@ -78,6 +78,10 @@ var _ = Describe("Kubelet", func() {
 			name := fmt.Sprintf(
 				"over %v with %d pods per node.", monitoringTime, podsPerNode)
 			It(name, func() {
+				// Skip this test for GKE.
+				// TODO: Re-activate this for GKE
+				SkipIfProviderIs("gke")
+
 				totalPods := podsPerNode * numNodes
 				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 				rcName := fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID()))
