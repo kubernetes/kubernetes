@@ -25,6 +25,8 @@ import (
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"github.com/pivotal-golang/clock"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/delay"
@@ -210,6 +212,7 @@ func (to *liveOffer) GetDelay() time.Duration {
 
 func CreateRegistry(c RegistryConfig) Registry {
 	metrics.Register()
+	clock := clock.NewClock()
 	return &offerStorage{
 		RegistryConfig: c,
 		offers: cache.NewFIFO(cache.KeyFunc(func(v interface{}) (string, error) {
@@ -219,8 +222,8 @@ func CreateRegistry(c RegistryConfig) Registry {
 				return perishable.Id(), nil
 			}
 		})),
-		listeners:  delay.NewIndexedDelayQueue(),
-		delayQueue: delay.NewDelayQueue(),
+		listeners:  delay.NewIndexedDelayQueue(clock),
+		delayQueue: delay.NewDelayQueue(clock),
 		slaves:     newSlaveStorage(),
 	}
 }
@@ -442,12 +445,12 @@ func (s *offerStorage) ageOffers() {
 
 func (s *offerStorage) nextListener() *offerListener {
 	obj := s.listeners.Pop()
-	if listen, ok := obj.(*offerListener); !ok {
+	listen, ok := obj.(*offerListener)
+	if !ok {
 		//programming error
 		panic(fmt.Sprintf("unexpected listener object %v", obj))
-	} else {
-		return listen
 	}
+	return listen
 }
 
 // notify listeners if we find an acceptable offer for them. listeners

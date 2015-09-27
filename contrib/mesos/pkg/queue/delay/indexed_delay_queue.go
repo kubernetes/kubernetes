@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/pivotal-golang/clock"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -41,12 +43,14 @@ type IndexedDelayQueue struct {
 	// items mapped by UniqueID - item set must match queue contents
 	items            map[string]priority.Item
 	schedulingPolicy SchedulingPolicy
+	clock            clock.Clock
 }
 
-func NewIndexedDelayQueue() *IndexedDelayQueue {
+func NewIndexedDelayQueue(clock clock.Clock) *IndexedDelayQueue {
 	return &IndexedDelayQueue{
-		Queue: NewDelayQueue(),
+		Queue: NewDelayQueue(clock),
 		items: map[string]priority.Item{},
+		clock: clock,
 	}
 }
 
@@ -54,7 +58,7 @@ func NewIndexedDelayQueue() *IndexedDelayQueue {
 // provided another item with the same ID is not already present.
 func (q *IndexedDelayQueue) Add(d UniqueDelayed, rp ValueReplacementPolicy) {
 	q.push(&indexedAddedItem{
-		Item: priority.NewItem(d, NewDelayedPriority(d)),
+		Item: priority.NewItem(d, NewDelayedPriority(d, q.clock)),
 		id:   d.GetUID(),
 	}, rp)
 }
@@ -183,9 +187,9 @@ func (q *IndexedDelayQueue) Await(timeout time.Duration) queue.UniqueID {
 	ch := make(chan interface{}, 1)
 	go func() { ch <- q.pop(cancel) }()
 	var x interface{}
-	timer := time.NewTimer(timeout)
+	timer := q.clock.NewTimer(timeout)
 	select {
-	case <-timer.C:
+	case <-timer.C():
 		close(cancel)
 		x = <-ch
 	case x = <-ch:

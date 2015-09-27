@@ -19,6 +19,7 @@ package delay
 import (
 	"time"
 
+	"github.com/pivotal-golang/clock"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
@@ -49,8 +50,8 @@ func (pq Priority) Before(other priority.Priority) bool {
 	return pq.eventTime.Before(otherVal.eventTime)
 }
 
-func NewDelayedPriority(d Delayed) Priority {
-	eventTime := time.Now().Add(d.GetDelay())
+func NewDelayedPriority(d Delayed, clock clock.Clock) Priority {
+	eventTime := clock.Now().Add(d.GetDelay())
 	var breaker BreakChan
 	if breakout, good := d.(Breakout); good {
 		breaker = breakout.Breaker()

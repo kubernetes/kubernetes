@@ -20,24 +20,35 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pivotal-golang/clock/fakeclock"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
 
 func TestPQWithDelayPriority(t *testing.T) {
 	t.Parallel()
 
-	var pq priority.Queue
+	pq := priority.NewPriorityQueue()
 	if pq.Len() != 0 {
 		t.Fatalf("pq should be empty")
 	}
 
-	now := NewPriority(time.Now())
-	now2 := NewPriority(now.eventTime.Add(2 * time.Second))
+	clock := fakeclock.NewFakeClock(time.Now())
+	start := clock.Now()
+
+	now2 := NewPriority(start.Add(2 * time.Second))
 	pq.Push(priority.NewItem(nil, now2))
 	if pq.Len() != 1 {
 		t.Fatalf("pq.len should be 1")
 	}
-	x := pq.Pop()
+
+	popCh := make(chan interface{})
+	go func() {
+		// blocks until 2 seconds have passed
+		popCh <- pq.Pop()
+	}()
+	clock.Increment(2 * time.Second)
+	x := <-popCh
 	if x == nil {
 		t.Fatalf("x is nil")
 	}
@@ -54,6 +65,11 @@ func TestPQWithDelayPriority(t *testing.T) {
 	pq.Push(priority.NewItem(nil, now2))
 	pq.Push(priority.NewItem(nil, now2))
 	pq.Push(priority.NewItem(nil, now2))
+	if pq.Len() != 5 {
+		t.Fatalf("pq.len should be 5")
+	}
+
+	// none of these pops block, because the event time has already elapsed
 	pq.Pop()
 	pq.Pop()
 	pq.Pop()
@@ -62,13 +78,27 @@ func TestPQWithDelayPriority(t *testing.T) {
 	if pq.Len() != 0 {
 		t.Fatalf("pq should be empty")
 	}
-	now4 := NewPriority(now.eventTime.Add(4 * time.Second))
-	now6 := NewPriority(now.eventTime.Add(4 * time.Second))
+
+	now4 := NewPriority(start.Add(4 * time.Second))
+	now6 := NewPriority(start.Add(6 * time.Second))
 	pq.Push(priority.NewItem(nil, now2))
 	pq.Push(priority.NewItem(nil, now4))
 	pq.Push(priority.NewItem(nil, now6))
+
+	qList := *pq
+	// list order based on insertion (not time)
+	if !qList[0].Priority().Equal(now2) {
+		t.Fatalf("now2 should be first")
+	}
+	if !qList[1].Priority().Equal(now4) {
+		t.Fatalf("now4 should be second")
+	}
+	if !qList[2].Priority().Equal(now6) {
+		t.Fatalf("now4 should be third")
+	}
+
 	pq.Swap(0, 2)
-	if !pq[0].Priority().Equal(now6) || !pq[2].Priority().Equal(now2) {
+	if !qList[0].Priority().Equal(now6) || !qList[2].Priority().Equal(now2) {
 		t.Fatalf("swap failed")
 	}
 	if pq.Less(1, 2) {

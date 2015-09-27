@@ -27,6 +27,8 @@ import (
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	"github.com/pivotal-golang/clock"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
@@ -357,8 +359,9 @@ type queuer struct {
 }
 
 func newQueuer(store queue.FIFO) *queuer {
+	clock := clock.NewClock()
 	q := &queuer{
-		podQueue:   delay.NewIndexedDelayQueue(),
+		podQueue:   delay.NewIndexedDelayQueue(clock),
 		podUpdates: store,
 	}
 	q.deltaCond.L = &q.lock

@@ -19,7 +19,8 @@ package delay
 import (
 	"container/heap"
 	"sync"
-	"time"
+
+	"github.com/pivotal-golang/clock"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue/priority"
 )
@@ -31,21 +32,23 @@ import (
 // Use Offer to specify a specific event time.
 type Queue struct {
 	*priority.Queue
-	lock *sync.RWMutex
-	cond *sync.Cond
+	lock  *sync.RWMutex
+	cond  *sync.Cond
+	clock clock.Clock
 }
 
-func NewDelayQueue() *Queue {
+func NewDelayQueue(clock clock.Clock) *Queue {
 	var lock sync.RWMutex
 	return &Queue{
 		Queue: priority.NewPriorityQueue(),
 		lock:  &lock,
 		cond:  sync.NewCond(&lock),
+		clock: clock,
 	}
 }
 
 func (q *Queue) Add(d Delayed) {
-	p := NewDelayedPriority(d)
+	p := NewDelayedPriority(d, q.clock)
 
 	item := &addItem{
 		Item: priority.NewItem(d, p),
@@ -115,7 +118,7 @@ func (q *Queue) Pop() interface{} {
 // is nil then cancellation is disabled and this func must return a non-nil value.
 func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{} {
 	var condCh chan struct{}
-	var delayTimer *time.Timer
+	var delayTimer clock.Timer
 	for {
 		item := next()
 		if item == nil {
@@ -125,13 +128,13 @@ func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{
 		x := item.Value()
 		delayPriority := item.Priority().(Priority)
 		delayedTime := delayPriority.eventTime
-		if delayedTime.After(time.Now()) {
+		if delayedTime.After(q.clock.Now()) {
 			// listen for calls to Add() while we're waiting for the eventTime
 			if condCh == nil {
 				condCh = make(chan struct{}, 1)
 			}
 			if delayTimer == nil {
-				delayTimer = time.NewTimer(delayedTime.Sub(time.Now()))
+				delayTimer = q.clock.NewTimer(delayedTime.Sub(q.clock.Now()))
 				defer delayTimer.Stop()
 				//TODO: delayTimer.Stop() sooner
 			}
@@ -151,7 +154,7 @@ func (q *Queue) pop(next func() pushableItem, cancel <-chan struct{}) interface{
 				// we may no longer have the earliest eventTime, re-try
 				item.Push(q.Queue)
 				continue
-			case <-delayTimer.C:
+			case <-delayTimer.C():
 				// noop
 			case <-delayPriority.notify:
 				// noop

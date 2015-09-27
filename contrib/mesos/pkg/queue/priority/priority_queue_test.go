@@ -23,7 +23,7 @@ import (
 func TestPQ(t *testing.T) {
 	t.Parallel()
 
-	var pq Queue
+	pq := NewPriorityQueue()
 	if pq.Len() != 0 {
 		t.Fatalf("pq should be empty")
 	}
@@ -65,9 +65,12 @@ func TestPQ(t *testing.T) {
 	pq.Push(NewItem(nil, now4))
 	pq.Push(NewItem(nil, now6))
 	pq.Swap(0, 2)
-	if !pq[0].Priority().Equal(now6) || !pq[2].Priority().Equal(now2) {
+
+	qList := *pq
+	if !qList[0].Priority().Equal(now6) || !qList[2].Priority().Equal(now2) {
 		t.Fatalf("swap failed")
 	}
+
 	if pq.Less(1, 2) {
 		t.Fatalf("now4 < now2")
 	}

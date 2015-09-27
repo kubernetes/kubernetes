@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pivotal-golang/clock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,8 @@ func TestIDQ_sanity_check(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	df := NewIndexedDelayQueue()
+	clock := clock.NewClock()
+	df := NewIndexedDelayQueue(clock)
 	delay := 2 * time.Second
 	df.Add(&testjob{d: delay, uid: "a", instance: 1}, ReplaceExisting)
 	assert.True(df.ContainedIDs().Has("a"))
@@ -72,7 +74,8 @@ func TestIDQ_Offer(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	dq := NewIndexedDelayQueue()
+	clock := clock.NewClock()
+	dq := NewIndexedDelayQueue(clock)
 	delay := time.Second
 
 	added := dq.Offer(&testjob{instance: 1}, ReplaceExisting)

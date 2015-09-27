@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pivotal-golang/clock"
+	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,22 +49,22 @@ func (j testjob) GetUID() string {
 func (td *testjob) EventTime() (t time.Time, ok bool) {
 	if td.eventTime != nil {
 		return *td.eventTime, true
-	} else {
-		return time.Now(), false
 	}
+	return t, false
 }
 
 func TestDQ_sanity_check(t *testing.T) {
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	clock := clock.NewClock()
+	dq := NewDelayQueue(clock)
 	delay := 2 * time.Second
 	dq.Add(&testjob{d: delay})
 
-	before := time.Now()
+	before := clock.Now()
 	x := dq.Pop()
 
-	now := time.Now()
+	now := clock.Now()
 	waitPeriod := now.Sub(before)
 
 	if waitPeriod+tolerance < delay {
@@ -81,7 +83,8 @@ func TestDQ_Offer(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	dq := NewDelayQueue()
+	clock := clock.NewClock()
+	dq := NewDelayQueue(clock)
 	delay := time.Second
 
 	added := dq.Offer(&testjob{})
@@ -89,16 +92,16 @@ func TestDQ_Offer(t *testing.T) {
 		t.Fatalf("DelayQueue should not add offered job without eventTime")
 	}
 
-	eventTime := time.Now().Add(delay)
+	eventTime := clock.Now().Add(delay)
 	added = dq.Offer(&testjob{eventTime: &eventTime})
 	if !added {
 		t.Fatalf("DelayQueue should add offered job with eventTime")
 	}
 
-	before := time.Now()
+	before := clock.Now()
 	x := dq.Pop()
 
-	now := time.Now()
+	now := clock.Now()
 	waitPeriod := now.Sub(before)
 
 	if waitPeriod+tolerance < delay {
@@ -111,13 +114,14 @@ func TestDQ_Offer(t *testing.T) {
 func TestDQ_ordered_add_pop(t *testing.T) {
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	clock := clock.NewClock()
+	dq := NewDelayQueue(clock)
 	dq.Add(&testjob{d: 2 * time.Second})
 	dq.Add(&testjob{d: 1 * time.Second})
 	dq.Add(&testjob{d: 3 * time.Second})
 
 	var finished [3]*testjob
-	before := time.Now()
+	before := clock.Now()
 	idx := int32(-1)
 	ch := make(chan bool, 3)
 	//TODO: replace with `for range finished` once Go 1.3 support is dropped
@@ -129,7 +133,7 @@ func TestDQ_ordered_add_pop(t *testing.T) {
 			if finished[i], ok = x.(*testjob); !ok {
 				t.Fatalf("expected a *testjob, not %v", x)
 			}
-			finished[i].t = time.Now()
+			finished[i].t = clock.Now()
 			ch <- true
 		}()
 	}
@@ -137,7 +141,7 @@ func TestDQ_ordered_add_pop(t *testing.T) {
 	<-ch
 	<-ch
 
-	after := time.Now()
+	after := clock.Now()
 	totalDelay := after.Sub(before)
 	if totalDelay+tolerance < (3 * time.Second) {
 		t.Fatalf("totalDelay < 3s: %v", totalDelay)
@@ -158,37 +162,54 @@ func TestDQ_ordered_add_pop(t *testing.T) {
 }
 
 func TestDQ_always_pop_earliest_event_time(t *testing.T) {
-	t.Skip("disabled due to flakiness; see #11857")
 	t.Parallel()
 
+	// Test Plan:
 	// add a testjob with delay of 2s
-	// spawn a func f1 that attempts to Pop() and wait for f1 to begin
+	// spawn a goroutine that attempts to Pop()
 	// add a testjob with a delay of 1s
-	// check that the func f1 actually popped the 1s task (not the 2s task)
+	// wait 1s
+	// wait for the Pop() goroutine to return (with the second testjob)
+	// wait 1s
+	// inline Pop() (the first testjob)
 
-	dq := NewDelayQueue()
+	clock := fakeclock.NewFakeClock(time.Now())
+	dq := NewDelayQueue(clock)
 	dq.Add(&testjob{d: 2 * time.Second})
-	ch := make(chan *testjob)
-	started := make(chan bool)
 
+	popCh := make(chan *testjob)
 	go func() {
-		started <- true
-		x := dq.Pop()
-		job := x.(*testjob)
-		job.t = time.Now()
-		ch <- job
+		popCh <- dq.Pop().(*testjob)
 	}()
 
-	<-started
-	time.Sleep(500 * time.Millisecond) // give plently of time for Pop() to enter
-	expected := 1 * time.Second
-	dq.Add(&testjob{d: expected})
-	job := <-ch
+	clock.Increment(500 * time.Millisecond)
 
+	// nothing should be popped yet
+	if dq.Len() != 1 {
+		t.Fatalf("pq should be 1")
+	}
+
+	dq.Add(&testjob{d: 1 * time.Second})
+
+	// nothing should be popped yet
+	if dq.Len() != 2 {
+		t.Fatalf("pq should be 2")
+	}
+
+	clock.Increment(1 * time.Second)
+	job := <-popCh
+
+	// only one item should be popped
+	if dq.Len() != 1 {
+		t.Fatalf("pq should be 1")
+	}
+
+	expected := 1 * time.Second
 	if expected != job.d {
 		t.Fatalf("Expected delay-prority of %v got instead got %v", expected, job.d)
 	}
 
+	clock.Increment(500 * time.Millisecond)
 	job = dq.Pop().(*testjob)
 	expected = 2 * time.Second
 	if expected != job.d {
@@ -197,39 +218,53 @@ func TestDQ_always_pop_earliest_event_time(t *testing.T) {
 }
 
 func TestDQ_always_pop_earliest_event_time_multi(t *testing.T) {
-	t.Skip("disabled due to flakiness; see #11821")
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	clock := fakeclock.NewFakeClock(time.Now())
+	dq := NewDelayQueue(clock)
 	dq.Add(&testjob{d: 2 * time.Second})
 
-	ch := make(chan *testjob)
+	popCh := make(chan *testjob)
 	multi := 10
-	started := make(chan bool, multi)
 
 	go func() {
-		started <- true
 		for i := 0; i < multi; i++ {
-			x := dq.Pop()
-			job := x.(*testjob)
-			job.t = time.Now()
-			ch <- job
+			popCh <- dq.Pop().(*testjob)
 		}
 	}()
 
-	<-started
-	time.Sleep(500 * time.Millisecond) // give plently of time for Pop() to enter
-	expected := 1 * time.Second
+	clock.Increment(500 * time.Millisecond)
 
+	// nothing should be popped yet
+	if dq.Len() != 1 {
+		t.Fatalf("pq should be 1")
+	}
+
+	expected := 1 * time.Second
 	for i := 0; i < multi; i++ {
 		dq.Add(&testjob{d: expected})
 	}
+
+	// no items should have been popped yet
+	if dq.Len() != multi+1 {
+		t.Fatalf("pq should be %d", multi+1)
+	}
+
+	clock.Increment(1 * time.Second)
+
 	for i := 0; i < multi; i++ {
-		job := <-ch
+		job := <-popCh
 		if expected != job.d {
 			t.Fatalf("Expected delay-prority of %v got instead got %v", expected, job.d)
 		}
 	}
+
+	// only one should be left
+	if dq.Len() != 1 {
+		t.Fatalf("pq should be 1")
+	}
+
+	clock.Increment(500 * time.Millisecond)
 
 	job := dq.Pop().(*testjob)
 	expected = 2 * time.Second
@@ -241,14 +276,15 @@ func TestDQ_always_pop_earliest_event_time_multi(t *testing.T) {
 func TestDQ_negative_delay(t *testing.T) {
 	t.Parallel()
 
-	dq := NewDelayQueue()
+	clock := clock.NewClock()
+	dq := NewDelayQueue(clock)
 	delay := -2 * time.Second
 	dq.Add(&testjob{d: delay})
 
-	before := time.Now()
+	before := clock.Now()
 	x := dq.Pop()
 
-	now := time.Now()
+	now := clock.Now()
 	waitPeriod := now.Sub(before)
 
 	if waitPeriod > tolerance {
