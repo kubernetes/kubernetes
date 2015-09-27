@@ -349,16 +349,16 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 }
 
 type queuer struct {
-	lock            sync.Mutex            // shared by condition variables of this struct
-	podUpdates      queue.FIFO            // queue of pod updates to be processed
-	podQueue        *delay.FIFODelayQueue // queue of pods to be scheduled
-	deltaCond       sync.Cond             // pod changes are available for processing
-	unscheduledCond sync.Cond             // there are unscheduled pods for processing
+	lock            sync.Mutex               // shared by condition variables of this struct
+	podUpdates      queue.FIFO               // queue of pod updates to be processed
+	podQueue        *delay.IndexedDelayQueue // queue of pods to be scheduled
+	deltaCond       sync.Cond                // pod changes are available for processing
+	unscheduledCond sync.Cond                // there are unscheduled pods for processing
 }
 
 func newQueuer(store queue.FIFO) *queuer {
 	q := &queuer{
-		podQueue:   delay.NewFIFOQueue(),
+		podQueue:   delay.NewIndexedDelayQueue(),
 		podUpdates: store,
 	}
 	q.deltaCond.L = &q.lock

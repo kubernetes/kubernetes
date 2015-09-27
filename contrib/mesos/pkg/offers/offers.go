@@ -85,10 +85,10 @@ type RegistryConfig struct {
 
 type offerStorage struct {
 	RegistryConfig
-	offers     *cache.FIFO           // collection of Perishable, both live and expired
-	listeners  *delay.FIFODelayQueue // collection of *offerListener
-	delayQueue *delay.Queue          // time-based event queue
-	slaves     *slaveStorage         // slave to offer mappings
+	offers     *cache.FIFO              // collection of Perishable, both live and expired
+	listeners  *delay.IndexedDelayQueue // collection of *offerListener
+	delayQueue *delay.Queue             // time-based event queue
+	slaves     *slaveStorage            // slave to offer mappings
 }
 
 type liveOffer struct {
@@ -219,8 +219,8 @@ func CreateRegistry(c RegistryConfig) Registry {
 				return perishable.Id(), nil
 			}
 		})),
-		listeners:  delay.NewFIFOQueue(),
-		delayQueue: delay.NewQueue(),
+		listeners:  delay.NewIndexedDelayQueue(),
+		delayQueue: delay.NewDelayQueue(),
 		slaves:     newSlaveStorage(),
 	}
 }

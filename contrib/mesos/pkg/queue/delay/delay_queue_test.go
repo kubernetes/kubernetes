@@ -55,7 +55,7 @@ func (td *testjob) EventTime() (t time.Time, ok bool) {
 func TestDQ_sanity_check(t *testing.T) {
 	t.Parallel()
 
-	dq := NewQueue()
+	dq := NewDelayQueue()
 	delay := 2 * time.Second
 	dq.Add(&testjob{d: delay})
 
@@ -81,7 +81,7 @@ func TestDQ_Offer(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	dq := NewQueue()
+	dq := NewDelayQueue()
 	delay := time.Second
 
 	added := dq.Offer(&testjob{})
@@ -111,7 +111,7 @@ func TestDQ_Offer(t *testing.T) {
 func TestDQ_ordered_add_pop(t *testing.T) {
 	t.Parallel()
 
-	dq := NewQueue()
+	dq := NewDelayQueue()
 	dq.Add(&testjob{d: 2 * time.Second})
 	dq.Add(&testjob{d: 1 * time.Second})
 	dq.Add(&testjob{d: 3 * time.Second})
@@ -166,7 +166,7 @@ func TestDQ_always_pop_earliest_event_time(t *testing.T) {
 	// add a testjob with a delay of 1s
 	// check that the func f1 actually popped the 1s task (not the 2s task)
 
-	dq := NewQueue()
+	dq := NewDelayQueue()
 	dq.Add(&testjob{d: 2 * time.Second})
 	ch := make(chan *testjob)
 	started := make(chan bool)
@@ -200,7 +200,7 @@ func TestDQ_always_pop_earliest_event_time_multi(t *testing.T) {
 	t.Skip("disabled due to flakiness; see #11821")
 	t.Parallel()
 
-	dq := NewQueue()
+	dq := NewDelayQueue()
 	dq.Add(&testjob{d: 2 * time.Second})
 
 	ch := make(chan *testjob)
@@ -241,7 +241,7 @@ func TestDQ_always_pop_earliest_event_time_multi(t *testing.T) {
 func TestDQ_negative_delay(t *testing.T) {
 	t.Parallel()
 
-	dq := NewQueue()
+	dq := NewDelayQueue()
 	delay := -2 * time.Second
 	dq.Add(&testjob{d: delay})
 

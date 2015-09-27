@@ -23,11 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDFIFO_sanity_check(t *testing.T) {
+func TestIDQ_sanity_check(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	df := NewFIFOQueue()
+	df := NewIndexedDelayQueue()
 	delay := 2 * time.Second
 	df.Add(&testjob{d: delay, uid: "a", instance: 1}, ReplaceExisting)
 	assert.True(df.ContainedIDs().Has("a"))
@@ -68,22 +68,22 @@ func TestDFIFO_sanity_check(t *testing.T) {
 	}
 }
 
-func TestDFIFO_Offer(t *testing.T) {
+func TestIDQ_Offer(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
-	dq := NewFIFOQueue()
+	dq := NewIndexedDelayQueue()
 	delay := time.Second
 
 	added := dq.Offer(&testjob{instance: 1}, ReplaceExisting)
 	if added {
-		t.Fatalf("DelayFIFO should not add offered job without eventTime")
+		t.Fatalf("IndexedDelayQueue should not add offered job without eventTime")
 	}
 
 	eventTime := time.Now().Add(delay)
 	added = dq.Offer(&testjob{eventTime: &eventTime, instance: 2}, ReplaceExisting)
 	if !added {
-		t.Fatalf("DelayFIFO should add offered job with eventTime")
+		t.Fatalf("IndexedDelayQueue should add offered job with eventTime")
 	}
 
 	before := time.Now()

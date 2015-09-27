@@ -35,7 +35,7 @@ type Queue struct {
 	cond *sync.Cond
 }
 
-func NewQueue() *Queue {
+func NewDelayQueue() *Queue {
 	var lock sync.RWMutex
 	return &Queue{
 		Queue: priority.NewPriorityQueue(),

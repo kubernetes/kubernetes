@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// FIFODelayQueue is a thread-safe, time-based queue with uniquely identified items.
+// IndexedDelayQueue is a thread-safe, time-based queue with uniquely identified items.
 //
 // Adding or offering an item with an ID matching an item still in the queue will
 // invoke the configured SchedulingPolicy and supplied ValueReplacementPolicy to
@@ -36,48 +36,48 @@ import (
 // Items can only be popped after their event time has been reached.
 // Use Add to specify a delay duration and have the event time calculated.
 // Use Offer to specify a specific event time.
-type FIFODelayQueue struct {
+type IndexedDelayQueue struct {
 	*Queue
 	// items mapped by UniqueID - item set must match queue contents
 	items            map[string]priority.Item
 	schedulingPolicy SchedulingPolicy
 }
 
-func NewFIFOQueue() *FIFODelayQueue {
-	return &FIFODelayQueue{
-		Queue: NewQueue(),
+func NewIndexedDelayQueue() *IndexedDelayQueue {
+	return &IndexedDelayQueue{
+		Queue: NewDelayQueue(),
 		items: map[string]priority.Item{},
 	}
 }
 
 // Add inserts an uniquely identified item into the queue,
 // provided another item with the same ID is not already present.
-func (q *FIFODelayQueue) Add(d UniqueDelayed, rp ValueReplacementPolicy) {
-	q.push(&fifoAddedItem{
+func (q *IndexedDelayQueue) Add(d UniqueDelayed, rp ValueReplacementPolicy) {
+	q.push(&indexedAddedItem{
 		Item: priority.NewItem(d, NewDelayedPriority(d)),
 		id:   d.GetUID(),
 	}, rp)
 }
 
-// fifoAddedItem wraps an item that was added to the queue.
-type fifoAddedItem struct {
+// indexedAddedItem wraps an item that was added to the queue.
+type indexedAddedItem struct {
 	priority.Item
 	id string
 }
 
-func (di fifoAddedItem) GetUID() string {
+func (di indexedAddedItem) GetUID() string {
 	return di.id
 }
 
 // Push puts the item back into the queue (with the same ID)
-func (di *fifoAddedItem) Push(queue heap.Interface) {
-	dq := queue.(*FIFODelayQueue)
+func (di *indexedAddedItem) Push(queue heap.Interface) {
+	dq := queue.(*IndexedDelayQueue)
 	dq.push(di, KeepExisting)
 }
 
-func (q *FIFODelayQueue) Offer(d UniqueScheduled, rp ValueReplacementPolicy) bool {
+func (q *IndexedDelayQueue) Offer(d UniqueScheduled, rp ValueReplacementPolicy) bool {
 	if p, ok := NewScheduledPriority(d); ok {
-		q.push(&fifoOfferedItem{
+		q.push(&indexedOfferedItem{
 			Item: priority.NewItem(d, p),
 			id:   d.GetUID(),
 		}, rp)
@@ -86,7 +86,7 @@ func (q *FIFODelayQueue) Offer(d UniqueScheduled, rp ValueReplacementPolicy) boo
 	return false
 }
 
-func (q *FIFODelayQueue) push(newItem UniqueItem, rp ValueReplacementPolicy) {
+func (q *IndexedDelayQueue) push(newItem UniqueItem, rp ValueReplacementPolicy) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	id := newItem.GetUID()
@@ -104,10 +104,10 @@ func (q *FIFODelayQueue) push(newItem UniqueItem, rp ValueReplacementPolicy) {
 		item = priority.NewItem(newValue, newPriority)
 
 		switch i := newItem.(type) {
-		case *fifoAddedItem:
-			item = &fifoAddedItem{Item: item, id: i.id}
-		case *fifoOfferedItem:
-			item = &fifoOfferedItem{Item: item, id: i.id}
+		case *indexedAddedItem:
+			item = &indexedAddedItem{Item: item, id: i.id}
+		case *indexedOfferedItem:
+			item = &indexedOfferedItem{Item: item, id: i.id}
 		default:
 			panic(fmt.Sprintf("unsupported newItem type: %v", reflect.TypeOf(i)))
 		}
@@ -118,33 +118,33 @@ func (q *FIFODelayQueue) push(newItem UniqueItem, rp ValueReplacementPolicy) {
 	q.cond.Broadcast()
 }
 
-// fifoOfferedItem represents an item that was offered to the queue.
-type fifoOfferedItem struct {
+// indexedOfferedItem represents an item that was offered to the queue.
+type indexedOfferedItem struct {
 	priority.Item
 	id string
 }
 
-func (oi fifoOfferedItem) GetUID() string {
+func (oi indexedOfferedItem) GetUID() string {
 	return oi.id
 }
 
 // Push offers the item to be rescheduled (with a new ID)
-func (oi *fifoOfferedItem) Push(queue heap.Interface) {
-	dq := queue.(*FIFODelayQueue)
+func (oi *indexedOfferedItem) Push(queue heap.Interface) {
+	dq := queue.(*IndexedDelayQueue)
 	dq.Offer(oi.Value().(UniqueScheduled), KeepExisting)
 }
 
 // Delete removes an item. It doesn't add it to the queue, because
 // this implementation assumes the consumer only cares about the objects,
 // not their priority order.
-func (q *FIFODelayQueue) Delete(id string) {
+func (q *IndexedDelayQueue) Delete(id string) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	delete(q.items, id)
 }
 
 // List returns a list of all the items.
-func (q *FIFODelayQueue) List() []queue.UniqueID {
+func (q *IndexedDelayQueue) List() []queue.UniqueID {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	list := make([]queue.UniqueID, 0, len(q.items))
@@ -157,7 +157,7 @@ func (q *FIFODelayQueue) List() []queue.UniqueID {
 // ContainedIDs returns a stringset.StringSet containing all IDs of the stored items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (q *FIFODelayQueue) ContainedIDs() sets.String {
+func (q *IndexedDelayQueue) ContainedIDs() sets.String {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	set := sets.String{}
@@ -168,7 +168,7 @@ func (q *FIFODelayQueue) ContainedIDs() sets.String {
 }
 
 // Get returns the requested item, or sets exists=false.
-func (q *FIFODelayQueue) Get(id string) (queue.UniqueID, bool) {
+func (q *IndexedDelayQueue) Get(id string) (queue.UniqueID, bool) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	if item, exists := q.items[id]; exists {
@@ -178,7 +178,7 @@ func (q *FIFODelayQueue) Get(id string) (queue.UniqueID, bool) {
 }
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
-func (q *FIFODelayQueue) Await(timeout time.Duration) queue.UniqueID {
+func (q *IndexedDelayQueue) Await(timeout time.Duration) queue.UniqueID {
 	cancel := make(chan struct{})
 	ch := make(chan interface{}, 1)
 	go func() { ch <- q.pop(cancel) }()
@@ -198,12 +198,12 @@ func (q *FIFODelayQueue) Await(timeout time.Duration) queue.UniqueID {
 }
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
-func (q *FIFODelayQueue) Pop() interface{} {
+func (q *IndexedDelayQueue) Pop() interface{} {
 	return q.pop(nil).(queue.UniqueID)
 }
 
 // variant of DelayQueue.Pop that implements optional cancellation
-func (q *FIFODelayQueue) pop(cancel chan struct{}) interface{} {
+func (q *IndexedDelayQueue) pop(cancel chan struct{}) interface{} {
 	next := func() pushableItem {
 		q.lock.Lock()
 		defer q.lock.Unlock()
