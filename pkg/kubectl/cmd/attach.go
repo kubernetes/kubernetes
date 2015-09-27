@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -72,15 +73,18 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 
 // RemoteAttach defines the interface accepted by the Attach command - provided for test stubbing
 type RemoteAttach interface {
-	Attach(req *client.Request, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
 }
 
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
-func (*DefaultRemoteAttach) Attach(req *client.Request, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	attach := remotecommand.NewAttach(req, config, stdin, stdout, stderr, tty)
-	return attach.Execute()
+func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+	exec, err := remotecommand.NewExecutor(config, method, url)
+	if err != nil {
+		return err
+	}
+	return exec.Stream(stdin, stdout, stderr, tty)
 }
 
 // AttachOptions declare the arguments accepted by the Exec command
@@ -201,7 +205,7 @@ func (p *AttachOptions) Run() error {
 		SubResource("attach").
 		Param("container", p.GetContainerName(pod))
 
-	return p.Attach.Attach(req, p.Config, stdin, p.Out, p.Err, tty)
+	return p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.

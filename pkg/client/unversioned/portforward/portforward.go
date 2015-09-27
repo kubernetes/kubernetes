@@ -29,33 +29,19 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
-
-type upgrader interface {
-	upgrade(*client.Request, *client.Config) (httpstream.Connection, error)
-}
-
-type defaultUpgrader struct{}
-
-func (u *defaultUpgrader) upgrade(req *client.Request, config *client.Config) (httpstream.Connection, error) {
-	return req.Upgrade(config, spdy.NewRoundTripper)
-}
 
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
-	req      *client.Request
-	config   *client.Config
 	ports    []ForwardedPort
 	stopChan <-chan struct{}
 
+	dialer        httpstream.Dialer
 	streamConn    httpstream.Connection
 	listeners     []io.Closer
-	upgrader      upgrader
 	Ready         chan struct{}
 	requestIDLock sync.Mutex
 	requestID     int
@@ -120,7 +106,7 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 }
 
 // New creates a new PortForwarder.
-func New(req *client.Request, config *client.Config, ports []string, stopChan <-chan struct{}) (*PortForwarder, error) {
+func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}) (*PortForwarder, error) {
 	if len(ports) == 0 {
 		return nil, errors.New("You must specify at least 1 port")
 	}
@@ -128,10 +114,8 @@ func New(req *client.Request, config *client.Config, ports []string, stopChan <-
 	if err != nil {
 		return nil, err
 	}
-
 	return &PortForwarder{
-		req:      req,
-		config:   config,
+		dialer:   dialer,
 		ports:    parsedPorts,
 		stopChan: stopChan,
 		Ready:    make(chan struct{}),
@@ -143,11 +127,8 @@ func New(req *client.Request, config *client.Config, ports []string, stopChan <-
 func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
-	if pf.upgrader == nil {
-		pf.upgrader = &defaultUpgrader{}
-	}
 	var err error
-	pf.streamConn, err = pf.upgrader.upgrade(pf.req, pf.config)
+	pf.streamConn, err = pf.dialer.Dial()
 	if err != nil {
 		return fmt.Errorf("error upgrading connection: %s", err)
 	}
