@@ -242,7 +242,7 @@ readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 if [ ! -e "${BASIC_AUTH_FILE}" ]; then
   mkdir -p /srv/salt-overlay/salt/kube-apiserver
   (umask 077;
-    echo "${MASTER_USER},${MASTER_PASSWD},admin" > "${BASIC_AUTH_FILE}")
+    echo "${MASTER_PASSWD},${MASTER_USER},admin" > "${BASIC_AUTH_FILE}")
 fi
 
 echo "Running release install script"
