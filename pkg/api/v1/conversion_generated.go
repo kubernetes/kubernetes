@@ -1263,11 +1263,11 @@ func convert_api_NamespaceStatus_To_v1_NamespaceStatus(in *api.NamespaceStatus, 
 	return autoconvert_api_NamespaceStatus_To_v1_NamespaceStatus(in, out, s)
 }
 
-func convert_api_Network_To_v1_Network(in *api.Network, out *Network, s conversion.Scope) error {
+func autoconvert_api_Network_To_v1_Network(in *api.Network, out *Network, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Network))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -1282,14 +1282,18 @@ func convert_api_Network_To_v1_Network(in *api.Network, out *Network, s conversi
 	return nil
 }
 
-func convert_api_NetworkList_To_v1_NetworkList(in *api.NetworkList, out *NetworkList, s conversion.Scope) error {
+func convert_api_Network_To_v1_Network(in *api.Network, out *Network, s conversion.Scope) error {
+	return autoconvert_api_Network_To_v1_Network(in, out, s)
+}
+
+func autoconvert_api_NetworkList_To_v1_NetworkList(in *api.NetworkList, out *NetworkList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NetworkList))(in)
 	}
-	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -1305,7 +1309,11 @@ func convert_api_NetworkList_To_v1_NetworkList(in *api.NetworkList, out *Network
 	return nil
 }
 
-func convert_api_NetworkSpec_To_v1_NetworkSpec(in *api.NetworkSpec, out *NetworkSpec, s conversion.Scope) error {
+func convert_api_NetworkList_To_v1_NetworkList(in *api.NetworkList, out *NetworkList, s conversion.Scope) error {
+	return autoconvert_api_NetworkList_To_v1_NetworkList(in, out, s)
+}
+
+func autoconvert_api_NetworkSpec_To_v1_NetworkSpec(in *api.NetworkSpec, out *NetworkSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NetworkSpec))(in)
 	}
@@ -1326,12 +1334,20 @@ func convert_api_NetworkSpec_To_v1_NetworkSpec(in *api.NetworkSpec, out *Network
 	return nil
 }
 
-func convert_api_NetworkStatus_To_v1_NetworkStatus(in *api.NetworkStatus, out *NetworkStatus, s conversion.Scope) error {
+func convert_api_NetworkSpec_To_v1_NetworkSpec(in *api.NetworkSpec, out *NetworkSpec, s conversion.Scope) error {
+	return autoconvert_api_NetworkSpec_To_v1_NetworkSpec(in, out, s)
+}
+
+func autoconvert_api_NetworkStatus_To_v1_NetworkStatus(in *api.NetworkStatus, out *NetworkStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NetworkStatus))(in)
 	}
 	out.Phase = NetworkPhase(in.Phase)
 	return nil
+}
+
+func convert_api_NetworkStatus_To_v1_NetworkStatus(in *api.NetworkStatus, out *NetworkStatus, s conversion.Scope) error {
+	return autoconvert_api_NetworkStatus_To_v1_NetworkStatus(in, out, s)
 }
 
 func autoconvert_api_Node_To_v1_Node(in *api.Node, out *Node, s conversion.Scope) error {
@@ -2905,13 +2921,17 @@ func convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *S
 	return autoconvert_api_ServiceStatus_To_v1_ServiceStatus(in, out, s)
 }
 
-func convert_api_Subnet_To_v1_Subnet(in *api.Subnet, out *Subnet, s conversion.Scope) error {
+func autoconvert_api_Subnet_To_v1_Subnet(in *api.Subnet, out *Subnet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Subnet))(in)
 	}
 	out.CIDR = in.CIDR
 	out.Gateway = in.Gateway
 	return nil
+}
+
+func convert_api_Subnet_To_v1_Subnet(in *api.Subnet, out *Subnet, s conversion.Scope) error {
+	return autoconvert_api_Subnet_To_v1_Subnet(in, out, s)
 }
 
 func autoconvert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, out *TCPSocketAction, s conversion.Scope) error {
@@ -4325,11 +4345,11 @@ func convert_v1_NamespaceStatus_To_api_NamespaceStatus(in *NamespaceStatus, out 
 	return autoconvert_v1_NamespaceStatus_To_api_NamespaceStatus(in, out, s)
 }
 
-func convert_v1_Network_To_api_Network(in *Network, out *api.Network, s conversion.Scope) error {
+func autoconvert_v1_Network_To_api_Network(in *Network, out *api.Network, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Network))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
 	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
@@ -4344,14 +4364,18 @@ func convert_v1_Network_To_api_Network(in *Network, out *api.Network, s conversi
 	return nil
 }
 
-func convert_v1_NetworkList_To_api_NetworkList(in *NetworkList, out *api.NetworkList, s conversion.Scope) error {
+func convert_v1_Network_To_api_Network(in *Network, out *api.Network, s conversion.Scope) error {
+	return autoconvert_v1_Network_To_api_Network(in, out, s)
+}
+
+func autoconvert_v1_NetworkList_To_api_NetworkList(in *NetworkList, out *api.NetworkList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NetworkList))(in)
 	}
-	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
 	}
-	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -4367,7 +4391,11 @@ func convert_v1_NetworkList_To_api_NetworkList(in *NetworkList, out *api.Network
 	return nil
 }
 
-func convert_v1_NetworkSpec_To_api_NetworkSpec(in *NetworkSpec, out *api.NetworkSpec, s conversion.Scope) error {
+func convert_v1_NetworkList_To_api_NetworkList(in *NetworkList, out *api.NetworkList, s conversion.Scope) error {
+	return autoconvert_v1_NetworkList_To_api_NetworkList(in, out, s)
+}
+
+func autoconvert_v1_NetworkSpec_To_api_NetworkSpec(in *NetworkSpec, out *api.NetworkSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NetworkSpec))(in)
 	}
@@ -4388,12 +4416,20 @@ func convert_v1_NetworkSpec_To_api_NetworkSpec(in *NetworkSpec, out *api.Network
 	return nil
 }
 
-func convert_v1_NetworkStatus_To_api_NetworkStatus(in *NetworkStatus, out *api.NetworkStatus, s conversion.Scope) error {
+func convert_v1_NetworkSpec_To_api_NetworkSpec(in *NetworkSpec, out *api.NetworkSpec, s conversion.Scope) error {
+	return autoconvert_v1_NetworkSpec_To_api_NetworkSpec(in, out, s)
+}
+
+func autoconvert_v1_NetworkStatus_To_api_NetworkStatus(in *NetworkStatus, out *api.NetworkStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NetworkStatus))(in)
 	}
 	out.Phase = api.NetworkPhase(in.Phase)
 	return nil
+}
+
+func convert_v1_NetworkStatus_To_api_NetworkStatus(in *NetworkStatus, out *api.NetworkStatus, s conversion.Scope) error {
+	return autoconvert_v1_NetworkStatus_To_api_NetworkStatus(in, out, s)
 }
 
 func autoconvert_v1_Node_To_api_Node(in *Node, out *api.Node, s conversion.Scope) error {
@@ -5967,13 +6003,17 @@ func convert_v1_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.S
 	return autoconvert_v1_ServiceStatus_To_api_ServiceStatus(in, out, s)
 }
 
-func convert_v1_Subnet_To_api_Subnet(in *Subnet, out *api.Subnet, s conversion.Scope) error {
+func autoconvert_v1_Subnet_To_api_Subnet(in *Subnet, out *api.Subnet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Subnet))(in)
 	}
 	out.CIDR = in.CIDR
 	out.Gateway = in.Gateway
 	return nil
+}
+
+func convert_v1_Subnet_To_api_Subnet(in *Subnet, out *api.Subnet, s conversion.Scope) error {
+	return autoconvert_v1_Subnet_To_api_Subnet(in, out, s)
 }
 
 func autoconvert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {
@@ -6206,6 +6246,10 @@ func init() {
 		autoconvert_api_NamespaceSpec_To_v1_NamespaceSpec,
 		autoconvert_api_NamespaceStatus_To_v1_NamespaceStatus,
 		autoconvert_api_Namespace_To_v1_Namespace,
+		autoconvert_api_NetworkList_To_v1_NetworkList,
+		autoconvert_api_NetworkSpec_To_v1_NetworkSpec,
+		autoconvert_api_NetworkStatus_To_v1_NetworkStatus,
+		autoconvert_api_Network_To_v1_Network,
 		autoconvert_api_NodeAddress_To_v1_NodeAddress,
 		autoconvert_api_NodeCondition_To_v1_NodeCondition,
 		autoconvert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints,
@@ -6265,6 +6309,7 @@ func init() {
 		autoconvert_api_ServiceSpec_To_v1_ServiceSpec,
 		autoconvert_api_ServiceStatus_To_v1_ServiceStatus,
 		autoconvert_api_Service_To_v1_Service,
+		autoconvert_api_Subnet_To_v1_Subnet,
 		autoconvert_api_TCPSocketAction_To_v1_TCPSocketAction,
 		autoconvert_api_VolumeMount_To_v1_VolumeMount,
 		autoconvert_api_VolumeSource_To_v1_VolumeSource,
@@ -6323,6 +6368,10 @@ func init() {
 		autoconvert_v1_NamespaceSpec_To_api_NamespaceSpec,
 		autoconvert_v1_NamespaceStatus_To_api_NamespaceStatus,
 		autoconvert_v1_Namespace_To_api_Namespace,
+		autoconvert_v1_NetworkList_To_api_NetworkList,
+		autoconvert_v1_NetworkSpec_To_api_NetworkSpec,
+		autoconvert_v1_NetworkStatus_To_api_NetworkStatus,
+		autoconvert_v1_Network_To_api_Network,
 		autoconvert_v1_NodeAddress_To_api_NodeAddress,
 		autoconvert_v1_NodeCondition_To_api_NodeCondition,
 		autoconvert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints,
@@ -6382,18 +6431,11 @@ func init() {
 		autoconvert_v1_ServiceSpec_To_api_ServiceSpec,
 		autoconvert_v1_ServiceStatus_To_api_ServiceStatus,
 		autoconvert_v1_Service_To_api_Service,
+		autoconvert_v1_Subnet_To_api_Subnet,
 		autoconvert_v1_TCPSocketAction_To_api_TCPSocketAction,
 		autoconvert_v1_VolumeMount_To_api_VolumeMount,
 		autoconvert_v1_VolumeSource_To_api_VolumeSource,
 		autoconvert_v1_Volume_To_api_Volume,
-		autoconvert_api_NetworkList_To_v1_NetworkList,
-		autoconvert_api_NetworkSpec_To_v1_NetworkSpec,
-		autoconvert_api_NetworkStatus_To_v1_NetworkStatus,
-		autoconvert_api_Network_To_v1_Network,
-		autoconvert_v1_NetworkList_To_api_NetworkList,
-		autoconvert_v1_NetworkSpec_To_api_NetworkSpec,
-		autoconvert_v1_NetworkStatus_To_api_NetworkStatus,
-		autoconvert_v1_Network_To_api_Network,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

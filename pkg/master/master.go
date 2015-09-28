@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/network"
 	networketcd "k8s.io/kubernetes/pkg/registry/network/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
+	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
