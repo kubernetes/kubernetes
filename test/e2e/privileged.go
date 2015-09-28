@@ -52,6 +52,7 @@ var _ = Describe("PrivilegedPod", func() {
 		f: f,
 	}
 	It("should test privileged pod", func() {
+		SkipUnlessProviderIs(providersWithSSH...)
 
 		By("Getting ssh-able hosts")
 		hosts, err := NodeSSHHosts(config.f.Client)
