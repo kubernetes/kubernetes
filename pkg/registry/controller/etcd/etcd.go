@@ -32,7 +32,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/controllers"
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &api.ReplicationController{} },
@@ -67,5 +67,22 @@ func NewREST(s storage.Interface) *REST {
 
 		Storage: s,
 	}
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = controller.StatusStrategy
+
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a replication controller
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.ReplicationController{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }
