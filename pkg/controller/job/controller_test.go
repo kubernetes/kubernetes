@@ -395,9 +395,9 @@ type FakeWatcher struct {
 }
 
 func TestWatchJobs(t *testing.T) {
+	client := testclient.NewSimpleFake()
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{}
-	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
+	client.PrependWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewJobController(client)
 	manager.podStoreSynced = alwaysReady
 
@@ -458,9 +458,9 @@ func TestWatchJobs(t *testing.T) {
 }
 
 func TestWatchPods(t *testing.T) {
+	client := testclient.NewSimpleFake()
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{}
-	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
+	client.PrependWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewJobController(client)
 	manager.podStoreSynced = alwaysReady
 

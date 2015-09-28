@@ -502,10 +502,7 @@ func TestWatchPods(t *testing.T) {
 }
 
 func TestUpdatePods(t *testing.T) {
-	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{}
-	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewReplicationManager(client, BurstReplicas)
+	manager := NewReplicationManager(testclient.NewSimpleFake(), BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
 	received := make(chan string)
