@@ -39,7 +39,7 @@ $ kubectl attach 123456-7890
 # Get output from ruby-container from pod 123456-7890
 $ kubectl attach 123456-7890 -c ruby-container date
 
-# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-780
+# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 # and sends stdout/stderr from 'bash' back to the client
 $ kubectl attach 123456-7890 -c ruby-container -i -t`
 )
@@ -64,7 +64,7 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 		},
 	}
 	// TODO support UID
-	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name")
+	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
 	return cmd
