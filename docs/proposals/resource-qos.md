@@ -149,7 +149,7 @@ Container OOM score configuration
   - Hack, because these critical tasks might die if they conflict with guaranteed containers. in the future, we should place all user-pods into a separate cgroup, and set a limit on the memory they can consume.
 
 Setting OOM_SCORE_ADJ for a container
-- Refactor existing ApplyOomScoreAdj to util/oom.go
+- Refactor existing ApplyOOMScoreAdj to util/oom.go
 - To set OOM_SCORE_ADJ of a container, we loop through all processes in the container, and set OOM_SCORE_ADJ
 - We keep looping until the list of processes in the container stabilizes. This is sufficient because child processes inherit OOM_SCORE_ADJ.
 

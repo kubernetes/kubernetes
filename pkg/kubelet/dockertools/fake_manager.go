@@ -42,11 +42,11 @@ func NewFakeDockerManager(
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter) *DockerManager {
 
-	fakeOomAdjuster := oom.NewFakeOomAdjuster()
+	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFs()
 	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
-		fakeOomAdjuster, fakeProcFs, false)
+		fakeOOMAdjuster, fakeProcFs, false)
 	dm.dockerPuller = &FakeDockerPuller{}
 	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm
