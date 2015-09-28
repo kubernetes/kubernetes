@@ -201,6 +201,10 @@ func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namesp
 		if err != nil {
 			return estimate, err
 		}
+		err = deleteJobs(kubeClient.Experimental(), namespace)
+		if err != nil {
+			return estimate, err
+		}
 		err = deleteDeployments(kubeClient.Experimental(), namespace)
 		if err != nil {
 			return estimate, err
@@ -458,6 +462,20 @@ func deleteDaemonSets(expClient client.ExperimentalInterface, ns string) error {
 	}
 	for i := range items.Items {
 		err := expClient.DaemonSets(ns).Delete(items.Items[i].Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteJobs(expClient client.ExperimentalInterface, ns string) error {
+	items, err := expClient.Jobs(ns).List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.Jobs(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
