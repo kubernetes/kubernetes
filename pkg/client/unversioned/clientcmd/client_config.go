@@ -99,7 +99,7 @@ func (config DirectClientConfig) ClientConfig(group string) (*client.Config, err
 		clientConfig.Host = u.String()
 	}
 	// TODO: caesarxuchao, JanetKuo: get the version for group from PreferredVersions list. Set it to "" if no version for group is specified in PrefferedVersions
-	clientConfig.Version = configClusterInfo.APIVersion
+	clientConfig.GroupVersion = configClusterInfo.APIVersion
 
 	// only try to read the auth information if we are secure
 	if client.IsConfigTransportTLS(*clientConfig) {

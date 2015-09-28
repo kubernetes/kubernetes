@@ -126,13 +126,13 @@ func setExperimentalDefaults(config *Config) error {
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	config.GroupVersion = g.GroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.Version)
+	versionInterfaces, err := g.InterfacesFor(config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
+			config.GroupVersion, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

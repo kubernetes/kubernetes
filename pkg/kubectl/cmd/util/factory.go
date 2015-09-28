@@ -124,7 +124,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			// TODO: caesarxuchao: this needs to be fixed when we tackle OutputVersion
 			cfg, err := clientConfig.ClientConfig("")
 			CheckErr(err)
-			cmdApiVersion := cfg.Version
+			cmdApiVersion := cfg.GroupVersion
 
 			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersion: cmdApiVersion}, api.Scheme
 		},
@@ -495,7 +495,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
-		defaultVersion := clientConfig.Version
+		defaultVersion := clientConfig.GroupVersion
 
 		version := OutputVersion(cmd, defaultVersion)
 		if len(version) == 0 {

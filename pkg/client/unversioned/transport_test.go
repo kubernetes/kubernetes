@@ -108,7 +108,7 @@ func TestTLSConfigKey(t *testing.T) {
 		"empty":          {},
 		"host":           {Host: "foo"},
 		"prefix":         {Prefix: "foo"},
-		"version":        {Version: "foo"},
+		"version":        {GroupVersion: "foo"},
 		"codec":          {Codec: testapi.Default.Codec()},
 		"basic":          {Username: "bob", Password: "password"},
 		"bearer":         {BearerToken: "token"},

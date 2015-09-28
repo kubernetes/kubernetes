@@ -392,7 +392,7 @@ func TestAnnotateErrors(t *testing.T) {
 		f, tf, _ := NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+		tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupAndVersion()}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdAnnotate(f, buf)
@@ -448,7 +448,7 @@ func TestAnnotateObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+	tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupAndVersion()}
 
 	options := &AnnotateOptions{}
 	args := []string{"pods/foo", "a=b", "c-"}
@@ -495,7 +495,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+	tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupAndVersion()}
 
 	options := &AnnotateOptions{}
 	options.filenames = []string{"../../../examples/cassandra/cassandra.yaml"}
@@ -545,7 +545,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+	tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupAndVersion()}
 
 	options := &AnnotateOptions{}
 	options.all = true

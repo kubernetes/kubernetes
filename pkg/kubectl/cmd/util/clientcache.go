@@ -17,8 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api/registered"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -69,11 +67,11 @@ func (c *ClientCache) ClientConfigForVersion(group, version string) (*client.Con
 	if err != nil {
 		return nil, err
 	}
-	config.Version = negotiatedGroupVersion
+	config.GroupVersion = negotiatedGroupVersion
 	if err := client.SetDefaultsForGroup(group, &config); err != nil {
 		return nil, err
 	}
-	c.configs[config.Version] = &config
+	c.configs[config.GroupVersion] = &config
 
 	return &config, nil
 }
@@ -93,7 +91,7 @@ func (c *ClientCache) RESTClientForVersion(groupVersion string) (*client.RESTCli
 		return nil, err
 	}
 	// TODO: Version should be renamed to GroupVersion
-	c.clients[config.Version] = client
+	c.clients[config.GroupVersion] = client
 	return client, nil
 }
 
@@ -125,7 +123,7 @@ func (c *ClientCache) ClientForVersion(groupVersion string) (*client.Client, err
 			return nil, err
 		}
 		// TODO: Version should be renamed to GroupVersion
-		c.clients[config.Version] = legacyClient
+		c.clients[config.GroupVersion] = legacyClient
 	}
 
 	// initialize the ExperimentalClient
@@ -146,8 +144,7 @@ func (c *ClientCache) ClientForVersion(groupVersion string) (*client.Client, err
 		if err != nil {
 			return nil, err
 		}
-		// TODO: Version should be renamed to GroupVersion
-		c.clients[config.Version] = experimentalClient
+		c.clients[config.GroupVersion] = experimentalClient
 	}
 	return &client.Client{RESTClient: legacyClient, ExperimentalClient: &client.ExperimentalClient{experimentalClient}}, nil
 }

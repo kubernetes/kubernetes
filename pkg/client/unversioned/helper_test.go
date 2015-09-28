@@ -215,7 +215,7 @@ func TestTLSTransportCache(t *testing.T) {
 		"empty":          {Insecure: true},
 		"host":           {Insecure: true, Host: "foo"},
 		"prefix":         {Insecure: true, Prefix: "foo"},
-		"version":        {Insecure: true, Version: "foo"},
+		"version":        {Insecure: true, GroupVersion: "foo"},
 		"codec":          {Insecure: true, Codec: testapi.Default.Codec()},
 		"basic":          {Insecure: true, Username: "bob", Password: "password"},
 		"bearer":         {Insecure: true, BearerToken: "token"},
@@ -329,17 +329,17 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		{
 			Config{},
 			Config{
-				Prefix:  "/api",
-				Version: testapi.Default.Version(),
-				Codec:   testapi.Default.Codec(),
-				QPS:     5,
-				Burst:   10,
+				Prefix:       "/api",
+				GroupVersion: testapi.Default.Version(),
+				Codec:        testapi.Default.Codec(),
+				QPS:          5,
+				Burst:        10,
 			},
 			false,
 		},
 		{
 			Config{
-				Version: "not_an_api",
+				GroupVersion: "not_an_api",
 			},
 			Config{},
 			true,

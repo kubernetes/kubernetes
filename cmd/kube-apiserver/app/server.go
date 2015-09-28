@@ -356,8 +356,8 @@ func (s *APIServer) Run(_ []string) error {
 	enableExp := s.getRuntimeConfigValue("experimental/v1alpha1", false)
 
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
-		Version: s.DeprecatedStorageVersion,
+		Host:         net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
+		GroupVersion: s.DeprecatedStorageVersion,
 	}
 	client, err := client.New(clientConfig)
 	if err != nil {

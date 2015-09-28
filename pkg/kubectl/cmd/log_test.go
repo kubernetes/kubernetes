@@ -184,7 +184,7 @@ func TestLog(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{Version: test.version}
+		tf.ClientConfig = &client.Config{GroupVersion: test.version}
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdLog(f, buf)

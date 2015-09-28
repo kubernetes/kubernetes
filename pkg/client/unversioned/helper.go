@@ -26,7 +26,6 @@ import (
 	"path"
 	"reflect"
 	gruntime "runtime"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -41,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
-// Config holds the common attributes that can be passed to a Kubernetes client on
+// Config holds the common attributes that can be passed to a RESTClient on
 // initialization.
 type Config struct {
 	// Host must be a host string, a host:port pair, or a URL to the base of the API.
@@ -49,10 +48,10 @@ type Config struct {
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
 	Prefix string
-	// Version is the API version to talk to. Must be provided when initializing
+	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
-	Version string
+	GroupVersion string
 	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
 	// to a RESTClient or Client. Required when initializing a RESTClient, optional
 	// when initializing a Client.
@@ -195,9 +194,9 @@ func NegotiateVersion(client *Client, c *Config, group string, version string, c
 			return "", err
 		}
 	}
-	clientVersions := sets.String{}
+	clientGroupVersions := sets.String{}
 	for _, v := range clientRegisteredGroupVersions {
-		clientVersions.Insert(v)
+		clientGroupVersions.Insert(v)
 	}
 	apiVersions, err := client.ServerAPIVersions()
 	if err != nil {
@@ -211,33 +210,31 @@ func NegotiateVersion(client *Client, c *Config, group string, version string, c
 	// configVersion is the version specified for this group in the Config.
 	// It's expected to be "" if the group is not specified in the Config.
 	var configVersion string
-	if len(c.Version) == 0 {
+	if len(c.GroupVersion) == 0 {
 		// there is no preference
 		configVersion = ""
-	} else if apiutil.GetGroup(c.Version) == group {
-		// TODO: rename c.Version to c.GrupVersion. It's confusing.
-		configVersion = apiutil.GetVersion(c.Version)
+	} else if apiutil.GetGroup(c.GroupVersion) == group {
+		configVersion = apiutil.GetVersion(c.GroupVersion)
 	} else {
-		return "", fmt.Errorf("The group (%q) in Config is different from the group (%q) passed in to NegotiateVersion", apiutil.GetGroup(c.Version), group)
+		return "", fmt.Errorf("The group (%q) in Config is different from the group (%q) passed in to NegotiateVersion", apiutil.GetGroup(c.GroupVersion), group)
 	}
 	// If no version requested, use config version (may also be empty).
 	if len(version) == 0 {
 		version = configVersion
 	}
 
-
 	// If version explicitly requested verify that both client and server support it.
 	// If server does not support warn, but try to negotiate a lower version.
 	if len(version) != 0 {
 		groupVersion := apiutil.GetGroupVersion(group, version)
-		if !clientVersions.Has(groupVersion) {
-			return "", fmt.Errorf("Client does not support API version '%s'. Client supported API versions: %v", groupVersion, clientVersions)
+		if !clientGroupVersions.Has(groupVersion) {
+			return "", fmt.Errorf("Client does not support API version '%s'. Client supported API versions: %v", groupVersion, clientGroupVersions)
 		}
 		if serverGroupVersions.Has(groupVersion) {
 			return groupVersion, nil
 		}
 		// If we are using an explicit config version the server does not support, fail.
-		if version == c.Version && version != "" {
+		if version == configVersion && version != "" {
 			return "", fmt.Errorf("Server does not support API version '%s'.", version)
 		}
 	}
@@ -245,7 +242,7 @@ func NegotiateVersion(client *Client, c *Config, group string, version string, c
 	// If we haven't tried configVersion yet, and it's non-empty, try configVersion first.
 	if version != configVersion && configVersion != "" {
 		groupVersion := apiutil.GetGroupVersion(group, configVersion)
-		if clientVersions.Has(groupVersion) && serverGroupVersions.Has(groupVersion) {
+		if clientGroupVersions.Has(groupVersion) && serverGroupVersions.Has(groupVersion) {
 			return groupVersion, nil
 		}
 	}
@@ -316,10 +313,10 @@ func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if len(config.Version) == 0 {
-		config.Version = defaultVersionFor(config)
+	if len(config.GroupVersion) == 0 {
+		config.GroupVersion = defaultVersionFor(config)
 	}
-	version := config.Version
+	version := config.GroupVersion
 	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(version)
 	if err != nil {
 		return fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.GroupOrDie("").Versions, ", "))
@@ -349,10 +346,10 @@ func SetDefaultsForGroup(group string, config *Config) error {
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if len(config.Version) == 0 {
-		config.Version = defaultGroupVersionForGroup(group, config)
+	if len(config.GroupVersion) == 0 {
+		config.GroupVersion = defaultGroupVersionForGroup(group, config)
 	}
-	groupVersion := config.Version
+	groupVersion := config.GroupVersion
 	g, err := latest.Group(group)
 	if err != nil {
 		return err
@@ -378,11 +375,10 @@ func SetDefaultsForGroup(group string, config *Config) error {
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
 // the Kubernetes conventions, but may not be the Kubernetes API.
 func RESTClientFor(config *Config) (*RESTClient, error) {
-	if len(config.Version) == 0 {
+	if len(config.GroupVersion) == 0 {
 		return nil, fmt.Errorf("version is required when initializing a RESTClient")
 	}
 	if config.Codec == nil {
-		debug.PrintStack()
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
@@ -391,7 +387,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, config.GroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -581,7 +577,7 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 func IsConfigTransportTLS(config Config) bool {
 	// determination of TLS transport does not logically require a version to be specified
 	// modify the copy of the config we got to satisfy preconditions for defaultServerUrlFor
-	config.Version = defaultVersionFor(&config)
+	config.GroupVersion = defaultVersionFor(&config)
 
 	baseURL, err := defaultServerUrlFor(&config)
 	if err != nil {
@@ -602,12 +598,12 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	if host == "" {
 		host = "localhost"
 	}
-	return DefaultServerURL(host, config.Prefix, config.Version, defaultTLS)
+	return DefaultServerURL(host, config.Prefix, config.GroupVersion, defaultTLS)
 }
 
 // defaultVersionFor is shared between defaultServerUrlFor and RESTClientFor
 func defaultVersionFor(config *Config) string {
-	version := config.Version
+	version := config.GroupVersion
 	if version == "" {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
@@ -618,7 +614,7 @@ func defaultVersionFor(config *Config) string {
 
 // defaultVersionForGroup is shared between defaultServerUrlFor and RESTClientFor
 func defaultGroupVersionForGroup(group string, config *Config) string {
-	groupVersion := config.Version
+	groupVersion := config.GroupVersion
 	if groupVersion == "" {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)

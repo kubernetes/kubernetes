@@ -200,7 +200,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-		defaultVersion := clientConfig.Version
+		defaultVersion := clientConfig.GroupVersion
 
 		singular := false
 		r := b.Flatten().Do()

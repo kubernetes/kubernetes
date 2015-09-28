@@ -130,7 +130,7 @@ func (e *Executor) Execute() error {
 }
 
 func (e *Streamer) setupRequestParameters(obj runtime.Object) error {
-	versioned, err := api.Scheme.ConvertToVersion(obj, e.config.Version)
+	versioned, err := api.Scheme.ConvertToVersion(obj, e.config.GroupVersion)
 	if err != nil {
 		return err
 	}

@@ -84,8 +84,8 @@ func (c *testClient) Setup(t *testing.T) *testClient {
 			version = testapi.Default.Version()
 		}
 		c.Client = NewOrDie(&Config{
-			Host:    c.server.URL,
-			Version: version,
+			Host:         c.server.URL,
+			GroupVersion: version,
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
@@ -95,8 +95,8 @@ func (c *testClient) Setup(t *testing.T) *testClient {
 			version = testapi.Experimental.Version()
 		}
 		c.ExperimentalClient = NewExperimentalOrDie(&Config{
-			Host:    c.server.URL,
-			Version: version,
+			Host:         c.server.URL,
+			GroupVersion: version,
 		})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}

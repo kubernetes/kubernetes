@@ -353,9 +353,9 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	}))
 
 	// Anonymous client config
-	clientConfig := client.Config{Host: apiServer.URL, Version: testapi.Default.Version()}
+	clientConfig := client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupAndVersion()}
 	// Root client
-	rootClient := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Default.Version(), BearerToken: rootToken})
+	rootClient := client.NewOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), BearerToken: rootToken})
 
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
