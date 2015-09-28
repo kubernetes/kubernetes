@@ -250,7 +250,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 
 	rc.Status.ObservedGeneration = rc.Generation
 	updatedRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
-	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &updatedRc)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name)+"/status", "PUT", &updatedRc)
 }
 
 func TestControllerUpdateReplicas(t *testing.T) {
@@ -288,7 +288,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	rc.Status = api.ReplicationControllerStatus{Replicas: 4, ObservedGeneration: 1}
 
 	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
-	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name)+"/status", "PUT", &decRc)
 	validateSyncReplication(t, &fakePodControl, 1, 0)
 }
 

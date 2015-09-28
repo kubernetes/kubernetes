@@ -1352,6 +1352,15 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 	return allErrs
 }
 
+// ValidateReplicationControllerStatusUpdate tests if required fields in the replication controller are set.
+func ValidateReplicationControllerStatusUpdate(oldController, controller *api.ReplicationController) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.Replicas), "status.replicas")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.ObservedGeneration), "status.observedGeneration")...)
+	return allErrs
+}
+
 // Validates that the given selector is non-empty.
 func ValidateNonEmptySelector(selectorMap map[string]string, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}

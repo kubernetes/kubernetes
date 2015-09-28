@@ -43,7 +43,7 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 			controller.Name, controller.Status.Replicas, numReplicas, controller.Spec.Replicas, controller.Status.ObservedGeneration, generation)
 
 		rc.Status = api.ReplicationControllerStatus{Replicas: numReplicas, ObservedGeneration: generation}
-		_, updateErr = rcClient.Update(rc)
+		_, updateErr = rcClient.UpdateStatus(rc)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
 		}

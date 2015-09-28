@@ -66,6 +66,14 @@ func (c *FakeReplicationControllers) Update(controller *api.ReplicationControlle
 	return obj.(*api.ReplicationController), err
 }
 
+func (c *FakeReplicationControllers) UpdateStatus(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("replicationcontrollers", "status", c.Namespace, controller), &api.ReplicationController{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), err
+}
+
 func (c *FakeReplicationControllers) Delete(name string) error {
 	_, err := c.Fake.Invokes(NewDeleteAction("replicationcontrollers", c.Namespace, name), &api.ReplicationController{})
 	return err
