@@ -2095,20 +2095,20 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid load balancer protocol 1",
+			name: "valid load balancer protocol UDP 1",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
-			name: "invalid load balancer protocol 2",
+			name: "valid load balancer protocol UDP 2",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "valid 1",

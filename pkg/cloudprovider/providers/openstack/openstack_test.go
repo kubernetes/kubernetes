@@ -151,7 +151,7 @@ func TestInstances(t *testing.T) {
 	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
 }
 
-func TestTCPLoadBalancer(t *testing.T) {
+func TestLoadBalancer(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
 		t.Skipf("No config found in environment")
@@ -162,17 +162,17 @@ func TestTCPLoadBalancer(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
-	lb, ok := os.TCPLoadBalancer()
+	lb, ok := os.LoadBalancer()
 	if !ok {
-		t.Fatalf("TCPLoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 	}
 
-	_, exists, err := lb.GetTCPLoadBalancer("noexist", "region")
+	_, exists, err := lb.GetLoadBalancer("noexist", "region")
 	if err != nil {
-		t.Fatalf("GetTCPLoadBalancer(\"noexist\") returned error: %s", err)
+		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 	}
 	if exists {
-		t.Fatalf("GetTCPLoadBalancer(\"noexist\") returned exists")
+		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
 	}
 }
 

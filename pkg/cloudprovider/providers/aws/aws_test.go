@@ -693,24 +693,24 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 	badELBRegion := "bad-elb-region"
 	errorMessage := fmt.Sprintf("requested load balancer region '%s' does not match cluster region '%s'", badELBRegion, c.region)
 
-	_, _, err = c.GetTCPLoadBalancer("elb-name", badELBRegion)
+	_, _, err = c.GetLoadBalancer("elb-name", badELBRegion)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected GetTCPLoadBalancer region mismatch error.")
+		t.Errorf("Expected GetLoadBalancer region mismatch error.")
 	}
 
-	_, err = c.EnsureTCPLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
+	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected EnsureTCPLoadBalancer region mismatch error.")
+		t.Errorf("Expected EnsureLoadBalancer region mismatch error.")
 	}
 
-	err = c.EnsureTCPLoadBalancerDeleted("elb-name", badELBRegion)
+	err = c.EnsureLoadBalancerDeleted("elb-name", badELBRegion)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected EnsureTCPLoadBalancerDeleted region mismatch error.")
+		t.Errorf("Expected EnsureLoadBalancerDeleted region mismatch error.")
 	}
 
-	err = c.UpdateTCPLoadBalancer("elb-name", badELBRegion, nil)
+	err = c.UpdateLoadBalancer("elb-name", badELBRegion, nil)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected UpdateTCPLoadBalancer region mismatch error.")
+		t.Errorf("Expected UpdateLoadBalancer region mismatch error.")
 	}
 }
 

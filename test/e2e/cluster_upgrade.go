@@ -162,10 +162,10 @@ var _ = Describe("Cluster Upgrade [Skipped]", func() {
 	})
 
 	f := NewFramework("cluster-upgrade")
-	var w *WebserverTest
+	var w *ServerTest
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")
-		w = NewWebserverTest(f.Client, f.Namespace.Name, svcName)
+		w = NewServerTest(f.Client, f.Namespace.Name, svcName)
 		rc := w.CreateWebserverRC(replicas)
 		rcName = rc.ObjectMeta.Name
 		svc := w.BuildServiceSpec()
@@ -200,6 +200,38 @@ var _ = Describe("Cluster Upgrade [Skipped]", func() {
 		BeforeEach(func() {
 			SkipUnlessProviderIs("gce")
 		})
+			// The version is determined once at the beginning of the test so that
+			// the master and nodes won't be skewed if the value changes during the
+			// test.
+			By(fmt.Sprintf("Getting real version for %q", testContext.UpgradeTarget))
+			var err error
+			v, err = realVersion(testContext.UpgradeTarget)
+			expectNoError(err)
+			Logf("Version for %q is %q", testContext.UpgradeTarget, v)
+
+			By("Setting up the service, RC, and pods")
+			f.beforeEach()
+			w = NewServerTest(f.Client, f.Namespace.Name, svcName)
+			rc := w.CreateWebserverRC(replicas)
+			rcName = rc.ObjectMeta.Name
+			svc := w.BuildServiceSpec()
+			svc.Spec.Type = api.ServiceTypeLoadBalancer
+			w.CreateService(svc)
+
+			By("Waiting for the service to become reachable")
+			result, err := waitForLoadBalancerIngress(f.Client, svcName, f.Namespace.Name)
+			Expect(err).NotTo(HaveOccurred())
+			ingresses := result.Status.LoadBalancer.Ingress
+			if len(ingresses) != 1 {
+				Failf("Was expecting only 1 ingress IP but got %d (%v): %v", len(ingresses), ingresses, result)
+			}
+			ingress = ingresses[0]
+			Logf("Got load balancer ingress point %v", ingress)
+			ip = ingress.IP
+			if ip == "" {
+				ip = ingress.Hostname
+			}
+			testLoadBalancerReachable(ingress, 80)
 
 		It("of master should maintain responsive services", func() {
 			By("Validating cluster before master upgrade")

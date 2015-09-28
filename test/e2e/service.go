@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -354,7 +355,7 @@ var _ = Describe("Services", func() {
 		serviceName := "nodeportservice-test"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewServerTest(c, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -410,7 +411,7 @@ var _ = Describe("Services", func() {
 
 		serviceName := "mutability-service-test"
 
-		t := NewWebserverTest(f.Client, f.Namespace.Name, serviceName)
+		t := NewServerTest(f.Client, f.Namespace.Name, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -609,7 +610,7 @@ var _ = Describe("Services", func() {
 		serviceName2 := baseName + "2"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName1)
+		t := NewServerTest(c, ns, serviceName1)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -661,7 +662,7 @@ var _ = Describe("Services", func() {
 		serviceName := "nodeport-range-test"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewServerTest(c, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -727,7 +728,7 @@ var _ = Describe("Services", func() {
 		serviceName := "nodeport-reuse"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewServerTest(c, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -795,7 +796,7 @@ var _ = Describe("Services", func() {
 		servicePort := 9376
 
 		By("creating service " + serviceName + " with load balancer in namespace " + ns1)
-		t1 := NewWebserverTest(c, ns1, serviceName)
+		t1 := NewServerTest(c, ns1, serviceName)
 		svc1 := t1.BuildServiceSpec()
 		svc1.Spec.Type = api.ServiceTypeLoadBalancer
 		svc1.Spec.Ports[0].Port = servicePort
@@ -819,18 +820,20 @@ var _ = Describe("Services", func() {
 			}()
 		}
 
-		By("creating service " + serviceName + " with load balancer in namespace " + ns2)
-		t2 := NewWebserverTest(c, ns2, serviceName)
+		By("creating service " + serviceName + " with UDP load balancer in namespace " + ns2)
+		t2 := NewNetcatTest(c, ns2, serviceName)
 		svc2 := t2.BuildServiceSpec()
 		svc2.Spec.Type = api.ServiceTypeLoadBalancer
 		svc2.Spec.Ports[0].Port = servicePort
+		// Let this one be UDP so that we can test that as well without an additional test
+		svc2.Spec.Ports[0].Protocol = api.ProtocolUDP
 		svc2.Spec.Ports[0].TargetPort = intstr.FromInt(80)
 		svc2.Spec.LoadBalancerIP = loadBalancerIP
 		_, err = t2.CreateService(svc2)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating pod to be part of service " + serviceName + " in namespace " + ns2)
-		t2.CreateWebserverRC(2)
+		t2.CreateNetcatRC(2)
 
 		ingressPoints := []string{}
 		svcs := []*api.Service{svc1, svc2}
@@ -865,11 +868,19 @@ var _ = Describe("Services", func() {
 			}
 			ingressPoints = append(ingressPoints, ing) // Save 'em to check uniqueness
 
-			By("hitting the pod through the service's NodePort")
-			testReachable(pickNodeIP(c), port.NodePort)
+			if svc1.Spec.Ports[0].Protocol == api.ProtocolTCP {
+				By("hitting the pod through the service's NodePort")
+				testReachable(pickNodeIP(c), port.NodePort)
 
-			By("hitting the pod through the service's external load balancer")
-			testLoadBalancerReachable(ingress, servicePort)
+				By("hitting the pod through the service's external load balancer")
+				testLoadBalancerReachable(ingress, servicePort)
+			} else {
+				By("hitting the pod through the service's NodePort")
+				testNetcatReachable(pickNodeIP(c), port.NodePort)
+
+				By("hitting the pod through the service's external load balancer")
+				testNetcatLoadBalancerReachable(ingress, servicePort)
+			}
 		}
 		validateUniqueOrFail(ingressPoints)
 	})
@@ -1160,6 +1171,15 @@ func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
 	return testLoadBalancerReachableInTime(ingress, port, podStartTimeout)
 }
 
+func testNetcatLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) {
+	ip := ingress.IP
+	if ip == "" {
+		ip = ingress.Hostname
+	}
+
+	testNetcatReachable(ip, port)
+}
+
 func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
 	ip := ingress.IP
 	if ip == "" {
@@ -1180,6 +1200,31 @@ func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
 
 func testReachable(ip string, port int) bool {
 	return testReachableInTime(ip, port, podStartTimeout)
+}
+
+func testNetcatReachable(ip string, port int) {
+	con, err := net.Dial("udp", ip+":"+string(port))
+	if err != nil {
+		Failf("Failed to connect to: %s:%d (%s)", ip, port, err.Error())
+	}
+
+	_, err = con.Write([]byte("\n"))
+	if err != nil {
+		Failf("Failed to send newline: %s", err.Error())
+	}
+
+	var buf []byte = make([]byte, len("SUCCESS")+1)
+
+	_, err = con.Read(buf)
+	if err != nil {
+		Failf("Failed to read result: %s", err.Error())
+	}
+
+	if !strings.HasPrefix(string(buf), "SUCCESS") {
+		Failf("Failed to retrieve: \"SUCCESS\"")
+	}
+
+	Logf("Successfully retrieved \"SUCCESS\"")
 }
 
 func testReachableInTime(ip string, port int, timeout time.Duration) bool {
@@ -1427,7 +1472,7 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 }
 
 // Simple helper class to avoid too much boilerplate in tests
-type WebserverTest struct {
+type ServerTest struct {
 	ServiceName string
 	Namespace   string
 	Client      *client.Client
@@ -1441,8 +1486,8 @@ type WebserverTest struct {
 	image    string
 }
 
-func NewWebserverTest(client *client.Client, namespace string, serviceName string) *WebserverTest {
-	t := &WebserverTest{}
+func NewServerTest(client *client.Client, namespace string, serviceName string) *ServerTest {
+	t := &ServerTest{}
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
@@ -1460,8 +1505,27 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 	return t
 }
 
+func NewNetcatTest(client *client.Client, namespace string, serviceName string) *ServerTest {
+	t := &ServerTest{}
+	t.Client = client
+	t.Namespace = namespace
+	t.ServiceName = serviceName
+	t.TestId = t.ServiceName + "-" + string(util.NewUUID())
+	t.Labels = map[string]string{
+		"testid": t.TestId,
+	}
+
+	t.rcs = make(map[string]bool)
+	t.services = make(map[string]bool)
+
+	t.name = "netcat"
+	t.image = "ubuntu"
+
+	return t
+}
+
 // Build default config for a service (which can then be changed)
-func (t *WebserverTest) BuildServiceSpec() *api.Service {
+func (t *ServerTest) BuildServiceSpec() *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      t.ServiceName,
@@ -1480,8 +1544,24 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 
 // CreateWebserverRC creates rc-backed pods with the well-known webserver
 // configuration and records it for cleanup.
-func (t *WebserverTest) CreateWebserverRC(replicas int) *api.ReplicationController {
-	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, t.Labels)
+func (t *ServerTest) CreateWebserverRC(replicas int) *api.ReplicationController {
+	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolTCP, t.Labels)
+	rcAct, err := t.createRC(rcSpec)
+	if err != nil {
+		Failf("Failed to create rc %s: %v", rcSpec.Name, err)
+	}
+	if err := verifyPods(t.Client, t.Namespace, t.name, false, replicas); err != nil {
+		Failf("Failed to create %d pods with name %s: %v", replicas, t.name, err)
+	}
+	return rcAct
+}
+
+// CreateNetcatRC creates rc-backed pods with a netcat listener
+// configuration and records it for cleanup.
+func (t *ServerTest) CreateNetcatRC(replicas int) *api.ReplicationController {
+	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolUDP, t.Labels)
+	rcSpec.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash"}
+	rcSpec.Spec.Template.Spec.Containers[0].Args = []string{"-c", "echo SUCCESS | nc -q 0 -u -l 0.0.0.0 80"}
 	rcAct, err := t.createRC(rcSpec)
 	if err != nil {
 		Failf("Failed to create rc %s: %v", rcSpec.Name, err)
@@ -1493,7 +1573,7 @@ func (t *WebserverTest) CreateWebserverRC(replicas int) *api.ReplicationControll
 }
 
 // createRC creates a replication controller and records it for cleanup.
-func (t *WebserverTest) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
+func (t *ServerTest) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
 	rc, err := t.Client.ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
@@ -1502,7 +1582,7 @@ func (t *WebserverTest) createRC(rc *api.ReplicationController) (*api.Replicatio
 }
 
 // Create a service, and record it for cleanup
-func (t *WebserverTest) CreateService(service *api.Service) (*api.Service, error) {
+func (t *ServerTest) CreateService(service *api.Service) (*api.Service, error) {
 	result, err := t.Client.Services(t.Namespace).Create(service)
 	if err == nil {
 		t.services[service.Name] = true
@@ -1511,7 +1591,7 @@ func (t *WebserverTest) CreateService(service *api.Service) (*api.Service, error
 }
 
 // Delete a service, and remove it from the cleanup list
-func (t *WebserverTest) DeleteService(serviceName string) error {
+func (t *ServerTest) DeleteService(serviceName string) error {
 	err := t.Client.Services(t.Namespace).Delete(serviceName)
 	if err == nil {
 		delete(t.services, serviceName)
@@ -1519,7 +1599,7 @@ func (t *WebserverTest) DeleteService(serviceName string) error {
 	return err
 }
 
-func (t *WebserverTest) Cleanup() []error {
+func (t *ServerTest) Cleanup() []error {
 	var errs []error
 	for rcName := range t.rcs {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
