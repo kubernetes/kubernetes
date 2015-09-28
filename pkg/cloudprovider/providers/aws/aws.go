@@ -538,21 +538,20 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
 	}
 
-	zone := cfg.Global.Zone
-	if len(zone) <= 1 {
-		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
-	}
-
 	regionName := cfg.Global.Region
-	if len(regionName) <= 1 {
-		regionName = zone[:len(zone)-1]
-	}
-
 	endpoint := cfg.Global.Endpoint
+	zone := cfg.Global.Zone
 
-	valid := isRegionValid(regionName)
-	if len(cfg.Global.Region) <= 0 && !valid {
-		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", regionName)
+	if regionName == "" {
+		// Calculate region from availability zone
+		if len(zone) <= 1 {
+			return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
+		}
+		regionName = zone[:len(zone)-1]
+
+		if !isRegionValid(regionName) {
+			return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", regionName)
+		}
 	}
 
 	ec2, err := awsServices.Compute(regionName, endpoint)

@@ -231,13 +231,13 @@ func TestNewAWSCloud(t *testing.T) {
 			true, "", "", "",
 		},
 		{
-			"Config specifies valid zone, calulate region",
+			"Config specifies valid zone, calculate region",
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
 			false, "eu-west-1a", "eu-west-1", "",
 		},
 
 		{
-			"Gets zone from metadata when not in config, calulate region",
+			"Gets zone from metadata when not in config, calculate region",
 			strings.NewReader("[global]\n"),
 			NewFakeAWSServices(),
 			false, "us-east-1a", "us-east-1", "",
