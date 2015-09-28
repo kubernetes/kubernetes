@@ -318,9 +318,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret":                     nil,
 		},
 		"../examples/phabricator": {
-			"authenticator-controller": &api.ReplicationController{},
-			"phabricator-controller":   &api.ReplicationController{},
-			"phabricator-service":      &api.Service{},
+			"phabricator-controller": &api.ReplicationController{},
+			"phabricator-service":    &api.Service{},
 		},
 		"../examples/redis": {
 			"redis-controller":          &api.ReplicationController{},
