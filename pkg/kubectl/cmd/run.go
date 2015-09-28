@@ -42,7 +42,7 @@ $ kubectl run nginx --image=nginx
 $ kubectl run hazelcast --image=hazelcast --port=5701
 
 # Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
-$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=local" --env="POD_NAMESPACE=default"
+$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
 # Start a replicated instance of nginx.
 $ kubectl run nginx --image=nginx --replicas=5
