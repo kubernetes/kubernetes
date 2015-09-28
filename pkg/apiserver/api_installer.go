@@ -90,7 +90,8 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []api.APIRe
 func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
-	ws.Doc("API at " + a.prefix + " version " + a.group.Version)
+	// a.prefix contains "prefix/group/version"
+	ws.Doc("API at " + a.prefix)
 	// TODO: change to restful.MIME_JSON when we set content type in client
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
