@@ -16,16 +16,28 @@ limitations under the License.
 
 package rkt
 
+import "github.com/golang/glog"
+
 // ImageManager manages and garbage collects the container images for rkt.
 type ImageManager struct {
-	runtime *runtime
+	runtime *Runtime
 }
 
-func NewImageManager(r *runtime) *ImageManager {
+func NewImageManager(r *Runtime) *ImageManager {
 	return &ImageManager{runtime: r}
 }
 
-// GarbageCollect collects the images. It is not implemented by rkt yet.
+// GarbageCollect collects the images.
+// TODO(yifan): Enforce ImageGCPolicy.
 func (im *ImageManager) GarbageCollect() error {
+	if _, err := im.runtime.runCommand("image", "gc"); err != nil {
+		glog.Errorf("rkt: Failed to gc image: %v", err)
+		return err
+	}
+	return nil
+}
+
+// Start is a no-op for rkt as we don't need to mark unused images in kubelet.
+func (im *ImageManager) Start() error {
 	return nil
 }
