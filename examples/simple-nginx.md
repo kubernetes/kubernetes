@@ -59,10 +59,10 @@ You can also see the replication controller that was created:
 kubectl get rc
 ```
 
-To stop the two replicated containers, stop the replication controller:
+To delete the two replicated containers, delete the replication controller:
 
 ```bash
-kubectl stop rc my-nginx
+kubectl delete rc my-nginx
 ```
 
 ### Exposing your pods to the internet.
