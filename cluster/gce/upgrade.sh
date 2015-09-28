@@ -173,7 +173,7 @@ function upgrade-nodes() {
 #   KUBELET_KEY_BASE64
 function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
-  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed s/"\."/-/g)
+  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
 
   detect-minion-names
 
