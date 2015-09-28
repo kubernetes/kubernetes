@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	expapi "k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -591,8 +592,8 @@ func (m *Master) init(c *Config) {
 		}
 		expAPIVersions := []api.GroupVersion{
 			{
-				GroupVersion: g.Group + "/" + expVersion.Version,
-				Version:      expVersion.Version,
+				GroupVersion: expVersion.Version,
+				Version:      apiutil.GetVersion(expVersion.Version),
 			},
 		}
 		storageVersion, found := c.StorageVersions[g.Group]
@@ -602,7 +603,7 @@ func (m *Master) init(c *Config) {
 		group := api.APIGroup{
 			Name:             g.Group,
 			Versions:         expAPIVersions,
-			PreferredVersion: api.GroupVersion{GroupVersion: g.Group + "/" + storageVersion, Version: storageVersion},
+			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
 		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
 		allGroups = append(allGroups, group)
