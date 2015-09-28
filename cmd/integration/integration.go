@@ -231,7 +231,8 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
-		10*time.Second /* SyncFrequency */)
+		10*time.Second, /* SyncFrequency */
+		40 /* MaxPods */)
 
 	kubeletapp.RunKubelet(kcfg, nil)
 	// Kubelet (machine)
@@ -261,7 +262,8 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
-		10*time.Second /* SyncFrequency */)
+		10*time.Second, /* SyncFrequency */
+		40 /* MaxPods */)
 
 	kubeletapp.RunKubelet(kcfg, nil)
 	return apiServer.URL, configFilePath
