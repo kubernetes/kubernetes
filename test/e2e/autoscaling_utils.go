@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -100,11 +101,13 @@ func newResourceConsumer(name string, replicas, initCPU, initMemory, consumption
 
 // ConsumeCPU consumes given number of CPU
 func (rc *ResourceConsumer) ConsumeCPU(millicores int) {
+	Logf("RC %s: consume %v millicores in total", rc.name, millicores)
 	rc.cpu <- millicores
 }
 
 // ConsumeMem consumes given number of Mem
 func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
+	Logf("RC %s: consume %v MB in total", rc.name, megabytes)
 	rc.mem <- megabytes
 }
 
@@ -116,11 +119,13 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	for {
 		select {
 		case millicores := <-rc.cpu:
+			Logf("RC %s: consume %v millicores in total", rc.name, millicores)
 			if rc.requestSizeInMillicores != 0 {
 				count = millicores / rc.requestSizeInMillicores
 			}
 			rest = millicores - count*rc.requestSizeInMillicores
 		case <-time.After(sleepTime):
+			Logf("RC %s: sending %v requests to consume %v millicores each and 1 request to consume %v millicores", rc.name, count, rc.requestSizeInMillicores, rest)
 			if count > 0 {
 				rc.sendConsumeCPURequests(count, rc.requestSizeInMillicores, rc.consumptionTimeInSeconds)
 			}
@@ -142,11 +147,13 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	for {
 		select {
 		case megabytes := <-rc.mem:
+			Logf("RC %s: consume %v MB in total", rc.name, megabytes)
 			if rc.requestSizeInMegabytes != 0 {
 				count = megabytes / rc.requestSizeInMegabytes
 			}
 			rest = megabytes - count*rc.requestSizeInMegabytes
 		case <-time.After(sleepTime):
+			Logf("RC %s: sending %v requests to consume %v MB each and 1 request to consume %v MB", rc.name, count, rc.requestSizeInMegabytes, rest)
 			if count > 0 {
 				rc.sendConsumeMemRequests(count, rc.requestSizeInMegabytes, rc.consumptionTimeInSeconds)
 			}
@@ -225,6 +232,7 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
 }
 
 func (rc *ResourceConsumer) CleanUp() {
+	By(fmt.Sprintf("Removing consuming RC %s", rc.name))
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
 	// Wait some time to ensure all child goroutines are finished.
@@ -234,6 +242,7 @@ func (rc *ResourceConsumer) CleanUp() {
 }
 
 func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, replicas int, cpuLimitMillis, memLimitMb int64) {
+	By(fmt.Sprintf("Running consuming RC %s with %v replicas", name, replicas))
 	_, err := c.Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
