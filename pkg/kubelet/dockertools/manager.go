@@ -133,7 +133,7 @@ type DockerManager struct {
 	execHandler ExecHandler
 
 	// Used to set OOM scores of processes.
-	oomAdjuster *oom.OomAdjuster
+	oomAdjuster *oom.OOMAdjuster
 
 	// Get information from /proc mount.
 	procFs procfs.ProcFsInterface
@@ -157,7 +157,7 @@ func NewDockerManager(
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
 	execHandler ExecHandler,
-	oomAdjuster *oom.OomAdjuster,
+	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFsInterface,
 	cpuCFSQuota bool) *DockerManager {
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
@@ -1498,15 +1498,15 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// whole pod will die.
 	var oomScoreAdj int
 	if container.Name == PodInfraContainerName {
-		oomScoreAdj = qos.PodInfraOomAdj
+		oomScoreAdj = qos.PodInfraOOMAdj
 	} else {
-		oomScoreAdj = qos.GetContainerOomScoreAdjust(container, dm.machineInfo.MemoryCapacity)
+		oomScoreAdj = qos.GetContainerOOMScoreAdjust(container, dm.machineInfo.MemoryCapacity)
 	}
 	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
 	if err != nil {
 		return "", err
 	}
-	if err = dm.oomAdjuster.ApplyOomScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
+	if err = dm.oomAdjuster.ApplyOOMScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
 		return "", err
 	}
 
