@@ -1366,6 +1366,9 @@ type NodeSpec struct {
 
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty"`
+
+	// SELinuxEnabled indicates whether SELinux is enabled on this node
+	SELinuxEnabled bool `json:"selinuxEnabled,omitempty"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.

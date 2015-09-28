@@ -1132,6 +1132,7 @@ func convert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conv
 	out.ExternalID = in.ExternalID
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
+	out.SELinuxEnabled = in.SELinuxEnabled
 	return nil
 }
 
@@ -3567,6 +3568,7 @@ func convert_v1_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *api.NodeSpec, s conv
 	out.ExternalID = in.ExternalID
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
+	out.SELinuxEnabled = in.SELinuxEnabled
 	return nil
 }
 

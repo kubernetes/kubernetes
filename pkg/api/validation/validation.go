@@ -1394,6 +1394,11 @@ func ValidateNode(node *api.Node) errs.ValidationErrorList {
 	}
 
 	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
+
+	if capabilities.Get().EnableSELinuxIntegration && !node.Spec.SELinuxEnabled {
+		allErrs = append(allErrs, fmt.Errorf("SELinux required by cluster but not enabled on this node integration %v enabled %v", capabilities.Get().EnableSELinuxIntegration, node.Spec.SELinuxEnabled))
+	}
+
 	return allErrs
 }
 

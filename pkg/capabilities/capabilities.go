@@ -64,10 +64,9 @@ func Initialize(c Capabilities) {
 }
 
 // Setup the capability set.  It wraps Initialize for improving usibility.
-func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64, enableSELinuxIntegration bool) {
+func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64) {
 	Initialize(Capabilities{
 		AllowPrivileged:                        allowPrivileged,
-		EnableSELinuxIntegration:               enableSELinuxIntegration,
 		PrivilegedSources:                      privilegedSources,
 		PerConnectionBandwidthLimitBytesPerSec: perConnectionBytesPerSec,
 	})

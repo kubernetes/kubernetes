@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -829,6 +828,9 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	} else {
 		node.Spec.ExternalID = kl.hostname
 	}
+
+	node.Spec.SELinuxEnabled = kl.selinuxEnabled()
+
 	if err := kl.setNodeStatus(node); err != nil {
 		return nil, err
 	}
@@ -2347,13 +2349,10 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	// Check whether network is configured properly
 	networkConfigured := kl.doneNetworkConfigure()
 
-	selinuxRequired := capabilities.Get().EnableSELinuxIntegration
-	selinuxOK := (selinuxRequired && kl.selinuxEnabled()) || !selinuxRequired
-
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && networkConfigured && selinuxOK {
+	if containerRuntimeUp && networkConfigured {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -2369,9 +2368,6 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		if !networkConfigured {
 			messages = append(reasons, "network not configured correctly")
-		}
-		if !selinuxOK {
-			messages = append(reasons, "SELinux integration is enabled in the cluster but SELinux is not enabled on this node.")
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,

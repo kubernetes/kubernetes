@@ -1719,6 +1719,9 @@ type NodeSpec struct {
 	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"`
 	Unschedulable bool `json:"unschedulable,omitempty"`
+
+	// SELinuxEnabled indicates whether SELinux is enabled on this node
+	SELinuxEnabled bool `json:"selinuxEnabled,omitempty"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
