@@ -167,15 +167,10 @@ function create-master-instance {
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
 
-# TODO(zmerlynn): Make $1 required.
-# TODO(zmerlynn): Document required vars (for this and call chain).
-# $1 version
+# $1: template name (required)
 function create-node-instance-template {
-  local suffix=""
-  if [[ -n ${1:-} ]]; then
-    suffix="-${1}"
-  fi
-  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags}" \
+  local template_name="$1"
+  create-node-template "$template_name" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
 }
