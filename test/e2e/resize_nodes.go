@@ -173,11 +173,11 @@ func rcByName(name string, replicas int, image string, labels map[string]string)
 	})
 }
 
-func rcByNamePort(name string, replicas int, image string, port int, labels map[string]string) *api.ReplicationController {
+func rcByNamePort(name string, replicas int, image string, port int, protocol api.Protocol, labels map[string]string) *api.ReplicationController {
 	return rcByNameContainer(name, replicas, image, labels, api.Container{
 		Name:  name,
 		Image: image,
-		Ports: []api.ContainerPort{{ContainerPort: port}},
+		Ports: []api.ContainerPort{{ContainerPort: port, Protocol: protocol}},
 	})
 }
 
@@ -215,7 +215,7 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 func newRCByName(c *client.Client, ns, name string, replicas int) (*api.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
 	return c.ReplicationControllers(ns).Create(rcByNamePort(
-		name, replicas, serveHostnameImage, 9376, map[string]string{}))
+		name, replicas, serveHostnameImage, 9376, api.ProtocolTCP, map[string]string{}))
 }
 
 func resizeRC(c *client.Client, ns, name string, replicas int) error {

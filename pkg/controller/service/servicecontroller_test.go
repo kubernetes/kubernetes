@@ -65,8 +65,8 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Type: api.ServiceTypeLoadBalancer,
 				},
 			},
-			expectErr:           true,
-			expectCreateAttempt: false,
+			expectErr:           false,
+			expectCreateAttempt: true,
 		},
 		{
 			service: &api.Service{
