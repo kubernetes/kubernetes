@@ -114,6 +114,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, experimentalMode bool) {
 			strings.Join([]string{"list", "daemonsets", ""}, "-"),
 			strings.Join([]string{"list", "deployments", ""}, "-"),
 			strings.Join([]string{"list", "jobs", ""}, "-"),
+			strings.Join([]string{"list", "ingress", ""}, "-"),
 		)
 	}
 
