@@ -42,3 +42,7 @@ func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
 func newContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface, dockerDaemonContainer, systemContainer, kubeletContainer string) (containerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }
+
+func validateSystemRequirements(mountUtil mount.Interface) error {
+	return nil
+}

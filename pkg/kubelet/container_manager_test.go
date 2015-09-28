@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
 
@@ -19,19 +17,33 @@ limitations under the License.
 package kubelet
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"fmt"
 
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-func TestCgroupMountValidationSuccess(t *testing.T) {
-	assert.Nil(t, validateSystemRequirements(fakeContainerMgrMountInt()))
+type fakeMountInterface struct {
+	mountPoints []mount.MountPoint
 }
 
-func TestCgroupMountValidationMemoryMissing(t *testing.T) {
-	mountInt := &fakeMountInterface{
+func (mi *fakeMountInterface) Mount(source string, target string, fstype string, options []string) error {
+	return fmt.Errorf("unsupported")
+}
+
+func (mi *fakeMountInterface) Unmount(target string) error {
+	return fmt.Errorf("unsupported")
+}
+
+func (mi *fakeMountInterface) List() ([]mount.MountPoint, error) {
+	return mi.mountPoints, nil
+}
+
+func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
+	return false, fmt.Errorf("unsupported")
+}
+
+func fakeContainerMgrMountInt() mount.Interface {
+	return &fakeMountInterface{
 		[]mount.MountPoint{
 			{
 				Device: "cgroup",
@@ -48,30 +60,11 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 				Type:   "cgroup",
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
-		},
-	}
-	assert.Error(t, validateSystemRequirements(mountInt))
-}
-
-func TestCgroupMountValidationMultipleSubsytem(t *testing.T) {
-	mountInt := &fakeMountInterface{
-		[]mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
-				Opts:   []string{"rw", "relatime", "cpuset", "memory"},
-			},
-			{
-				Device: "cgroup",
-				Type:   "cgroup",
-				Opts:   []string{"rw", "relatime", "cpu"},
-			},
-			{
-				Device: "cgroup",
-				Type:   "cgroup",
-				Opts:   []string{"rw", "relatime", "cpuacct"},
+				Opts:   []string{"rw", "relatime", "memory"},
 			},
 		},
 	}
-	assert.Nil(t, validateSystemRequirements(mountInt))
 }
