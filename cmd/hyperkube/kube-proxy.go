@@ -19,9 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"os"
-
 	kubeproxy "k8s.io/kubernetes/cmd/kube-proxy/app"
 )
 
@@ -39,13 +36,13 @@ func NewKubeProxy() *Server {
 	}
 
 	config.AddFlags(hks.Flags())
-	s, err := kubeproxy.NewProxyServerDefault(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
 
 	hks.Run = func(_ *Server, args []string) error {
+		s, err := kubeproxy.NewProxyServerDefault(config)
+		if err != nil {
+			return err
+		}
+
 		return s.Run(args)
 	}
 
