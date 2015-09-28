@@ -283,8 +283,8 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 		}
 
 		// Also apply oom-score-adj to processes
-		oomAdjuster := oom.NewOomAdjuster()
-		if err := oomAdjuster.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
+		oomAdjuster := oom.NewOOMAdjuster()
+		if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
 			errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
 		}
 	}

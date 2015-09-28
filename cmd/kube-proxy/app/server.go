@@ -72,7 +72,7 @@ type ProxyServer struct {
 	EndpointsConfig  *proxyconfig.EndpointsConfig
 	EndpointsHandler proxyconfig.EndpointsConfigHandler
 	IptInterface     utiliptables.Interface
-	OomAdjuster      *oom.OomAdjuster
+	OOMAdjuster      *oom.OOMAdjuster
 	Proxier          proxy.ProxyProvider
 	Recorder         record.EventRecorder
 	ServiceConfig    *proxyconfig.ServiceConfig
@@ -114,7 +114,7 @@ func NewProxyConfig() *ProxyServerConfig {
 		BindAddress:        net.ParseIP("0.0.0.0"),
 		HealthzPort:        10249,
 		HealthzBindAddress: net.ParseIP("127.0.0.1"),
-		OOMScoreAdj:        qos.KubeProxyOomScoreAdj,
+		OOMScoreAdj:        qos.KubeProxyOOMScoreAdj,
 		ResourceContainer:  "/kube-proxy",
 		SyncPeriod:         5 * time.Second,
 	}
@@ -126,7 +126,7 @@ func NewProxyServer(
 	endpointsConfig *proxyconfig.EndpointsConfig,
 	endpointsHandler proxyconfig.EndpointsConfigHandler,
 	iptInterface utiliptables.Interface,
-	oomAdjuster *oom.OomAdjuster,
+	oomAdjuster *oom.OOMAdjuster,
 	proxier proxy.ProxyProvider,
 	recorder record.EventRecorder,
 	serviceConfig *proxyconfig.ServiceConfig,
@@ -137,7 +137,7 @@ func NewProxyServer(
 		EndpointsConfig:  endpointsConfig,
 		EndpointsHandler: endpointsHandler,
 		IptInterface:     iptInterface,
-		OomAdjuster:      oomAdjuster,
+		OOMAdjuster:      oomAdjuster,
 		Proxier:          proxier,
 		Recorder:         recorder,
 		ServiceConfig:    serviceConfig,
@@ -162,10 +162,10 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	}
 
 	// TODO(vmarmol): Use container config for this.
-	var oomAdjuster *oom.OomAdjuster
+	var oomAdjuster *oom.OOMAdjuster
 	if config.OOMScoreAdj != 0 {
-		oomAdjuster := oom.NewOomAdjuster()
-		if err := oomAdjuster.ApplyOomScoreAdj(0, config.OOMScoreAdj); err != nil {
+		oomAdjuster := oom.NewOOMAdjuster()
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, config.OOMScoreAdj); err != nil {
 			glog.V(2).Info(err)
 		}
 	}
