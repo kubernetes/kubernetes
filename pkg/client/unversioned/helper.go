@@ -179,13 +179,13 @@ func MatchesServerVersion(client *Client, c *Config) error {
 
 // NegotiateVersion queries the server's supported api versions to find
 // a version that both client and server support.
-// - If no version is provided, try registered client versions in order of
-//   preference.
-// - If version is provided, but not default config (explicitly requested via
-//   commandline flag), and is unsupported by the server, print a warning to
-//   stderr and try client's registered versions in order of preference.
-// - If version is config default, and the server does not support it,
-//   return an error.
+// - If no version is provided, try the version specified in the Config c. If that
+//   fails, try registered client versions in order of preference.
+// - If version is provided, but not the on in Config c, and is unsupported by
+//   the server, print a warning to stderr and try client's registered versions
+//   in order of preference.
+// - If version is provided and equals the one specified in the Config c, and
+//   the server does not support it, return an error.
 func NegotiateVersion(client *Client, c *Config, group string, version string, clientRegisteredGroupVersions []string) (string, error) {
 	var err error
 	if client == nil {
@@ -211,7 +211,7 @@ func NegotiateVersion(client *Client, c *Config, group string, version string, c
 	// It's expected to be "" if the group is not specified in the Config.
 	var configVersion string
 	if len(c.GroupVersion) == 0 {
-		// there is no preference
+		// "" means there is no preference
 		configVersion = ""
 	} else if apiutil.GetGroup(c.GroupVersion) == group {
 		configVersion = apiutil.GetVersion(c.GroupVersion)

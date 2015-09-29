@@ -45,7 +45,7 @@ var (
 type ClientConfig interface {
 	// RawConfig returns the merged result of all overrides
 	RawConfig() (clientcmdapi.Config, error)
-	// ClientConfig returns a complete client config
+	// ClientConfig returns a client config that can be used to initialize a RESTClient
 	ClientConfig(group string) (*client.Config, error)
 	// Namespace returns the namespace resulting from the merged
 	// result of all overrides and a boolean indicating if it was
