@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 type fakeRoundTripper struct {
@@ -89,7 +89,7 @@ func TestValidate(t *testing.T) {
 			t.Errorf("expected empty string, got %s", status)
 		}
 		if status != test.expectedStatus {
-			t.Errorf("expected %s, got %s", test.expectedStatus.String(), status.String())
+			t.Errorf("expected %s, got %s", test.expectedStatus, status)
 		}
 	}
 }

@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 # Kubernetes Developer Guide
 
 The developer guide is for anyone wanting to either write code which directly accesses the
-kubernetes API, or to contribute directly to the kubernetes project.
+Kubernetes API, or to contribute directly to the Kubernetes project.
 It assumes some familiarity with concepts in the [User Guide](../user-guide/README.md) and the [Cluster Admin
 Guide](../admin/README.md).
 
@@ -50,6 +50,8 @@ Guide](../admin/README.md).
 * **Faster PR reviews** ([faster_reviews.md](faster_reviews.md)): How to get faster PR reviews.
 
 * **Getting Recent Builds** ([getting-builds.md](getting-builds.md)): How to get recent builds including the latest builds that pass CI.
+
+* **Automated Tools** ([automation.md](automation.md)): Descriptions of the automation that is running on our github repository.
 
 
 ## Setting up your dev environment, coding, and debugging

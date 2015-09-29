@@ -645,6 +645,15 @@ function drawCharts(machineInfo, containerInfo) {
                 });
 	}
 
+	// Custom Metrics
+	if (containerInfo.spec.has_custom_metrics) {
+		steps.push(function() {
+        		getCustomMetrics(window.cadvisor.rootDir, window.cadvisor.containerName, function(metricsInfo) {
+                		drawCustomMetrics("custom-metrics-chart", containerInfo, metricsInfo)
+		        });
+		});
+	}
+
 	stepExecute(steps);
 }
 
@@ -696,10 +705,142 @@ function refreshStats() {
 			}
 			if (containerInfo.spec.has_network) {
 				startNetwork("network-selection", containerInfo);
+			}	
+			if (containerInfo.spec.has_custom_metrics) {
+				startCustomMetrics("custom-metrics-chart", containerInfo);
 			}
 		}
 			drawCharts(machineInfo, containerInfo);
 	});
+}
+
+function addAllLabels(containerInfo, metricsInfo) {
+        if (metricsInfo.length == 0) {
+                return;
+        }
+        var metricSpec = containerInfo.spec.custom_metrics;
+        for (var containerName in metricsInfo) {
+                var container = metricsInfo[containerName];
+                for (i=0; i<metricSpec.length; i++) {
+                        metricName = metricSpec[i].name;
+                        metricLabelVal = container[metricName];
+                        firstLabel = true;
+                        for (var label in metricLabelVal) {
+                                if (label == "") {
+                                        $('#button-'+metricName).hide();
+                                }
+
+                                $("#"+metricName+"_labels").append($("<li>")
+                                        .attr("role", "presentation")
+                                        .append($("<a>")
+                                        .attr("role", "menuitem")
+                                        .click(setLabel.bind(null, metricName, label))
+                                        .text(label)));
+                                        if (firstLabel) {
+                                                firstLabel = false;
+                                                setLabel(metricName, label);
+                                        }
+                        }
+                }
+        }
+}
+
+function getMetricIndex(metricName) {
+	for (i = 0; i<window.cadvisor.metricLabelPair.length; ++i) {
+		if (window.cadvisor.metricLabelPair[i][0] == metricName)
+			return i; 
+	}
+	return -1;	
+}
+
+function setLabel(metric, label) {
+	$("#"+metric+"-selection-text")
+        	.empty()
+                .append($("<span>").text("Label: "))
+                .append($("<b>").text(label))
+
+	index = getMetricIndex(metric);
+	if (index == -1) {
+		window.cadvisor.metricLabelPair.push([metric, label]);
+	} else {
+		window.cadvisor.metricLabelPair[index][1] = label;
+	}
+        
+        refreshStats();
+}
+
+function getSelectedLabel(metricName) {
+	index = getMetricIndex(metricName);
+	if (index == -1)
+		return "";
+ 	return window.cadvisor.metricLabelPair[index][1];
+}
+
+function startCustomMetrics(elementId, containerInfo) {
+	var metricSpec = containerInfo.spec.custom_metrics;
+	var metricStats = containerInfo.stats.custom_metrics;
+	var el=$("<div>");
+
+	if (metricSpec.length < window.cadvisor.maxCustomMetrics)
+		window.cadvisor.maxCustomMetrics = metricSpec.length
+	for (i = 0; i<window.cadvisor.maxCustomMetrics; i++) {
+		metricName = metricSpec[i].name;
+        	var divText = "<div class='dropdown'> <button class='btn btn-default dropdown-toggle' type='button' id='button-"+metricName;
+		divText += "' data-toggle='dropdown' aria-haspopup='true' aria-expanded='false'>";
+		divText += "<span id='"+metricName+"-selection-text'></span> <span class='caret'></span> </button>";
+        	divText += "<ul id='"+metricName+"_labels' class='dropdown-menu' role='menu' aria-labelledby='button-"+metricName+ "'> </ul> </div>";
+		divText += "<div id='"+elementId+"-"+metricName+"'> </div>";
+		el.append($(divText));
+	}
+	el.append($("</div>"));
+	
+	$("#"+elementId).append(el);
+}
+
+function getCustomMetrics(rootDir, containerName, callback) {
+        $.getJSON(rootDir + "api/v2.0/appmetrics/" + containerName)
+        .done(function(data) {
+                callback(data);
+        })
+        .fail(function(jqhxr, textStatus, error) {
+	        callback([]);
+        });
+}
+
+function drawCustomMetrics(elementId, containerInfo, metricsInfo) {
+	if(metricsInfo.length == 0) {
+		return;
+	}
+        var metricSpec = containerInfo.spec.custom_metrics;
+	for (var containerName in metricsInfo) {
+		var container = metricsInfo[containerName];
+		for (i=0; i<window.cadvisor.maxCustomMetrics; i++) {
+			metricName = metricSpec[i].name;
+			metricUnits = metricSpec[i].units;
+			var titles = ["Time", metricName];
+			metricLabelVal = container[metricName];
+			if (window.cadvisor.firstCustomCollection) {
+				window.cadvisor.firstCustomCollection = false;
+				addAllLabels(containerInfo, metricsInfo);				
+			}
+			var data = [];
+			selectedLabel = getSelectedLabel(metricName);
+			metricVal = metricLabelVal[selectedLabel];
+			for (var index in metricVal) {
+        	        	metric = metricVal[index];
+                	        var elements = [];
+                        	for (var attribute in metric) {
+                                	value = metric[attribute];
+                                        elements.push(value);
+                                }
+                    	       	if (elements.length<2) {
+                        		elements.push(0);
+                                }
+                                data.push(elements);
+                        }
+			drawLineChart(titles, data, elementId+"-"+metricName, metricUnits);
+		}
+	}
 }
 
 // Executed when the page finishes loading.
@@ -714,6 +855,10 @@ function startPage(containerName, hasCpu, hasMemory, rootDir, isRoot) {
 	window.cadvisor.firstRun = true;
 	window.cadvisor.rootDir = rootDir;
 	window.cadvisor.containerName = containerName;
+
+	window.cadvisor.firstCustomCollection = true;
+	window.cadvisor.metricLabelPair = [];	
+	window.cadvisor.maxCustomMetrics = 10;
 
 	// Draw process information at start and refresh every 60s.
 	getProcessInfo(rootDir, containerName, function(processInfo) {

@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
-	latestschedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/latest"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
@@ -43,8 +43,8 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-	factory := NewConfigFactory(client)
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	factory := NewConfigFactory(client, nil)
 	factory.Create()
 }
 
@@ -61,8 +61,8 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-	factory := NewConfigFactory(client)
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	factory := NewConfigFactory(client, nil)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -103,8 +103,8 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-	factory := NewConfigFactory(client)
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	factory := NewConfigFactory(client, nil)
 
 	configData = []byte(`{}`)
 	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
@@ -123,37 +123,39 @@ func PredicateTwo(pod *api.Pod, existingPods []*api.Pod, node string) (bool, err
 	return true, nil
 }
 
-func PriorityOne(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PriorityOne(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	return []algorithm.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	return []algorithm.HostPriority{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
+	grace := int64(30)
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 		},
 	}
 	handler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
+		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()
 
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle(testapi.ResourcePath("pods", "bar", "foo"), &handler)
+	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()}), nil)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
-		perPodBackoff:   map[string]*backoffEntry{},
+		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &fakeClock{},
 		defaultDuration: 1 * time.Millisecond,
 		maxDuration:     1 * time.Second,
@@ -170,7 +172,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, testapi.ResourcePath("pods", "bar", "foo"), "GET", nil)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -178,7 +180,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 }
 
-func TestMinionEnumerator(t *testing.T) {
+func TestNodeEnumerator(t *testing.T) {
 	testList := &api.NodeList{
 		Items: []api.Node{
 			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
@@ -233,68 +235,74 @@ func TestBind(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.ResourcePath("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
+		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 
 func TestBackoff(t *testing.T) {
 	clock := fakeClock{}
 	backoff := podBackoff{
-		perPodBackoff:   map[string]*backoffEntry{},
+		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &clock,
 		defaultDuration: 1 * time.Second,
 		maxDuration:     60 * time.Second,
 	}
 
 	tests := []struct {
-		podID            string
+		podID            types.NamespacedName
 		expectedDuration time.Duration
 		advanceClock     time.Duration
 	}{
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 1 * time.Second,
 		},
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 2 * time.Second,
 		},
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 4 * time.Second,
 		},
 		{
-			podID:            "bar",
+			podID:            types.NamespacedName{Namespace: "default", Name: "bar"},
 			expectedDuration: 1 * time.Second,
 			advanceClock:     120 * time.Second,
 		},
 		// 'foo' should have been gc'd here.
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 1 * time.Second,
 		},
 	}
 
 	for _, test := range tests {
-		duration := backoff.getBackoff(test.podID)
+		duration := backoff.getEntry(test.podID).getBackoff(backoff.maxDuration)
 		if duration != test.expectedDuration {
 			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
 		}
 		clock.t = clock.t.Add(test.advanceClock)
 		backoff.gc()
 	}
-
-	backoff.perPodBackoff["foo"].backoff = 60 * time.Second
-	duration := backoff.getBackoff("foo")
+	fooID := types.NamespacedName{Namespace: "default", Name: "foo"}
+	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
+	duration := backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
 	if duration != 60*time.Second {
 		t.Errorf("expected: 60, got %s", duration.String())
+	}
+	// Verify that we split on namespaces correctly, same name, different namespace
+	fooID.Namespace = "other"
+	duration = backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
+	if duration != 1*time.Second {
+		t.Errorf("expected: 1, got %s", duration.String())
 	}
 }

@@ -18,22 +18,24 @@ package config
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
 	ch := make(chan interface{})
-	NewSourceURL("http://localhost:49575/_not_found_", "localhost", time.Millisecond, ch)
+	NewSourceURL("http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		t.Errorf("Expected no update, Got %#v", got)
@@ -43,7 +45,7 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := sourceURL{"http://localhost:49575/_not_found_", "other", ch, nil}
+	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0}
 	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
@@ -57,16 +59,16 @@ func TestExtractInvalidPods(t *testing.T) {
 	}{
 		{
 			desc: "No version",
-			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: ""}},
+			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: ""}},
 		},
 		{
 			desc: "Invalid version",
-			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: "v1betta2"}},
+			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: "v1betta2"}},
 		},
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -75,7 +77,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -84,7 +86,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -93,7 +95,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -112,7 +114,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, "localhost", ch, nil}
+		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0}
 		if err := c.extractFromURL(); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
@@ -122,6 +124,7 @@ func TestExtractInvalidPods(t *testing.T) {
 func TestExtractPodsFromHTTP(t *testing.T) {
 	hostname := "different-value"
 
+	grace := int64(30)
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
@@ -130,7 +133,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Single pod",
 			pods: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
@@ -155,9 +158,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, "mynamespace"),
 					},
 					Spec: api.PodSpec{
-						NodeName:      hostname,
-						RestartPolicy: api.RestartPolicyAlways,
-						DNSPolicy:     api.DNSClusterFirst,
+						NodeName:                      hostname,
+						RestartPolicy:                 api.RestartPolicyAlways,
+						DNSPolicy:                     api.DNSClusterFirst,
+						TerminationGracePeriodSeconds: &grace,
+
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
@@ -170,7 +175,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Multiple pods",
 			pods: &api.PodList{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "PodList",
 					APIVersion: "",
 				},
@@ -208,9 +213,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						NodeName:      hostname,
-						RestartPolicy: api.RestartPolicyAlways,
-						DNSPolicy:     api.DNSClusterFirst,
+						NodeName:                      hostname,
+						RestartPolicy:                 api.RestartPolicyAlways,
+						DNSPolicy:                     api.DNSClusterFirst,
+						TerminationGracePeriodSeconds: &grace,
+
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
@@ -228,9 +235,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						NodeName:      hostname,
-						RestartPolicy: api.RestartPolicyAlways,
-						DNSPolicy:     api.DNSClusterFirst,
+						NodeName:                      hostname,
+						RestartPolicy:                 api.RestartPolicyAlways,
+						DNSPolicy:                     api.DNSClusterFirst,
+						TerminationGracePeriodSeconds: &grace,
+
 						Containers: []api.Container{{
 							Name:  "2",
 							Image: "bar",
@@ -244,11 +253,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	for _, testCase := range testCases {
 		var versionedPods runtime.Object
-		err := testapi.Converter().Convert(&testCase.pods, &versionedPods)
+		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods)
 		if err != nil {
-			t.Fatalf("error in versioning the pods: %s", testCase.desc, err)
+			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
-		data, err := testapi.Codec().Encode(versionedPods)
+		data, err := testapi.Default.Codec().Encode(versionedPods)
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
@@ -259,7 +268,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, hostname, ch, nil}
+		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
@@ -274,5 +283,49 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errors.NewAggregate(errs))
 			}
 		}
+	}
+}
+
+func TestURLWithHeader(t *testing.T) {
+	pod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: testapi.Default.Version(),
+			Kind:       "Pod",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			UID:       "111",
+			Namespace: "mynamespace",
+		},
+		Spec: api.PodSpec{
+			NodeName:   "localhost",
+			Containers: []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
+		},
+	}
+	data, err := json.Marshal(pod)
+	if err != nil {
+		t.Fatalf("Unexpected json marshalling error: %v", err)
+	}
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(data),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	ch := make(chan interface{}, 1)
+	header := make(http.Header)
+	header.Set("Metadata-Flavor", "Google")
+	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0}
+	if err := c.extractFromURL(); err != nil {
+		t.Fatalf("Unexpected error extracting from URL: %v", err)
+	}
+	update := (<-ch).(kubelet.PodUpdate)
+
+	headerVal := fakeHandler.RequestReceived.Header["Metadata-Flavor"]
+	if len(headerVal) != 1 || headerVal[0] != "Google" {
+		t.Errorf("Header missing expected entry %v. Got %v", header, fakeHandler.RequestReceived.Header)
+	}
+	if len(update.Pods) != 1 {
+		t.Errorf("Received wrong number of pods, expected one: %v", update.Pods)
 	}
 }

@@ -18,10 +18,6 @@ Forward one or more local ports to a pod.
 
 .SH OPTIONS
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for port\-forward
-
-.PP
 \fB\-p\fP, \fB\-\-pod\fP=""
     Pod name
 
@@ -116,10 +112,6 @@ Forward one or more local ports to a pod.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -130,17 +122,17 @@ Forward one or more local ports to a pod.
 
 .nf
 
-// listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
-$ kubectl port\-forward \-p mypod 5000 6000
+# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
+$ kubectl port\-forward mypod 5000 6000
 
-// listens on port 8888 locally, forwarding to 5000 in the pod
-$ kubectl port\-forward \-p mypod 8888:5000
+# Listen on port 8888 locally, forwarding to 5000 in the pod
+$ kubectl port\-forward mypod 8888:5000
 
-// listens on a random port locally, forwarding to 5000 in the pod
-$ kubectl port\-forward \-p mypod :5000
+# Listen on a random port locally, forwarding to 5000 in the pod
+$ kubectl port\-forward mypod :5000
 
-// listens on a random port locally, forwarding to 5000 in the pod
-$ kubectl port\-forward \-p mypod 0:5000
+# Listen on a random port locally, forwarding to 5000 in the pod
+$ kubectl port\-forward  mypod 0:5000
 
 .fi
 .RE

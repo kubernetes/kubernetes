@@ -173,16 +173,24 @@ func (sws SwaggerService) getDeclarations(req *restful.Request, resp *restful.Re
 		} else {
 			host = hostvalues[0]
 		}
-		(&decl).BasePath = fmt.Sprintf("http://%s", host)
+		// inspect Referer for the scheme (http vs https)
+		scheme := "http"
+		if referer := req.Request.Header["Referer"]; len(referer) > 0 {
+			if strings.HasPrefix(referer[0], "https") {
+				scheme = "https"
+			}
+		}
+		(&decl).BasePath = fmt.Sprintf("%s://%s", scheme, host)
 	}
 	resp.WriteAsJson(decl)
 }
 
+// composeDeclaration uses all routes and parameters to create a ApiDeclaration
 func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix string) ApiDeclaration {
 	decl := ApiDeclaration{
 		SwaggerVersion: swaggerVersion,
 		BasePath:       sws.config.WebServicesUrl,
-		ResourcePath:   ws.RootPath(),
+		ResourcePath:   pathPrefix,
 		Models:         ModelList{},
 		ApiVersion:     ws.Version()}
 

@@ -33,6 +33,7 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
+	"github.com/google/cadvisor/utils/machine"
 	"golang.org/x/exp/inotify"
 )
 
@@ -60,9 +61,11 @@ type rawContainerHandler struct {
 
 	fsInfo         fs.FsInfo
 	externalMounts []mount
+
+	rootFs string
 }
 
-func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *InotifyWatcher) (container.ContainerHandler, error) {
+func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *InotifyWatcher, rootFs string) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
 	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
 	for key, val := range cgroupSubsystems.MountPoints {
@@ -107,6 +110,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		hasNetwork:         hasNetwork,
 		externalMounts:     externalMounts,
 		watcher:            watcher,
+		rootFs:             rootFs,
 	}, nil
 }
 
@@ -210,13 +214,33 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 		}
 	}
 
-	// Memory.
-	memoryRoot, ok := self.cgroupPaths["memory"]
-	if ok {
-		if utils.FileExists(memoryRoot) {
+	// Memory
+	if self.name == "/" {
+		// Get memory and swap limits of the running machine
+		memLimit, err := machine.GetMachineMemoryCapacity()
+		if err != nil {
+			glog.Warningf("failed to obtain memory limit for machine container")
+			spec.HasMemory = false
+		} else {
+			spec.Memory.Limit = uint64(memLimit)
+			// Spec is marked to have memory only if the memory limit is set
 			spec.HasMemory = true
-			spec.Memory.Limit = readInt64(memoryRoot, "memory.limit_in_bytes")
-			spec.Memory.SwapLimit = readInt64(memoryRoot, "memory.memsw.limit_in_bytes")
+		}
+
+		swapLimit, err := machine.GetMachineSwapCapacity()
+		if err != nil {
+			glog.Warningf("failed to obtain swap limit for machine container")
+		} else {
+			spec.Memory.SwapLimit = uint64(swapLimit)
+		}
+	} else {
+		memoryRoot, ok := self.cgroupPaths["memory"]
+		if ok {
+			if utils.FileExists(memoryRoot) {
+				spec.HasMemory = true
+				spec.Memory.Limit = readInt64(memoryRoot, "memory.limit_in_bytes")
+				spec.Memory.SwapLimit = readInt64(memoryRoot, "memory.memsw.limit_in_bytes")
+			}
 		}
 	}
 
@@ -305,15 +329,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	nd, err := self.GetRootNetworkDevices()
-	if err != nil {
-		return new(info.ContainerStats), err
-	}
-	networkInterfaces := make([]string, len(nd))
-	for i := range nd {
-		networkInterfaces[i] = nd[i].Name
-	}
-	stats, err := libcontainer.GetStats(self.cgroupManager, networkInterfaces)
+	stats, err := libcontainer.GetStats(self.cgroupManager, self.rootFs, os.Getpid())
 	if err != nil {
 		return stats, err
 	}
@@ -333,6 +349,10 @@ func (self *rawContainerHandler) GetCgroupPath(resource string) (string, error) 
 		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, self.name)
 	}
 	return path, nil
+}
+
+func (self *rawContainerHandler) GetContainerLabels() map[string]string {
+	return map[string]string{}
 }
 
 // Lists all directories under "path" and outputs the results as children of "parent".

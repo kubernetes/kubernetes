@@ -19,7 +19,7 @@ package watch
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // FullChannelBehavior controls how the Broadcaster reacts if a watcher's watch
@@ -41,8 +41,9 @@ const incomingQueueLength = 25
 type Broadcaster struct {
 	lock sync.Mutex
 
-	watchers    map[int64]*broadcasterWatcher
-	nextWatcher int64
+	watchers     map[int64]*broadcasterWatcher
+	nextWatcher  int64
+	distributing sync.WaitGroup
 
 	incoming chan Event
 
@@ -58,7 +59,7 @@ type Broadcaster struct {
 }
 
 // NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
-// It is guaranteed that events will be distibuted in the order in which they ocur,
+// It is guaranteed that events will be distributed in the order in which they occur,
 // but the order in which a single event is distributed among all of the watchers is unspecified.
 func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
@@ -67,6 +68,7 @@ func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *B
 		watchQueueLength:    queueLength,
 		fullChannelBehavior: fullChannelBehavior,
 	}
+	m.distributing.Add(1)
 	go m.loop()
 	return m
 }
@@ -91,7 +93,7 @@ func (m *Broadcaster) Watch() Interface {
 
 // WatchWithPrefix adds a new watcher to the list and returns an Interface for it. It sends
 // queuedEvents down the new watch before beginning to send ordinary events from Broadcaster.
-// The returned watch will have a queue length that is at least large enough to accomodate
+// The returned watch will have a queue length that is at least large enough to accommodate
 // all of the items in queuedEvents.
 func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
 	m.lock.Lock()
@@ -146,12 +148,17 @@ func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 }
 
 // Shutdown disconnects all watchers (but any queued events will still be distributed).
-// You must not call Action after calling Shutdown.
+// You must not call Action or Watch* after calling Shutdown. This call blocks
+// until all events have been distributed through the outbound channels. Note
+// that since they can be buffered, this means that the watchers might not
+// have received the data yet as it can remain sitting in the buffered
+// channel.
 func (m *Broadcaster) Shutdown() {
 	close(m.incoming)
+	m.distributing.Wait()
 }
 
-// loop recieves from m.incoming and distributes to all watchers.
+// loop receives from m.incoming and distributes to all watchers.
 func (m *Broadcaster) loop() {
 	// Deliberately not catching crashes here. Yes, bring down the process if there's a
 	// bug in watch.Broadcaster.
@@ -163,6 +170,7 @@ func (m *Broadcaster) loop() {
 		m.distribute(event)
 	}
 	m.closeAll()
+	m.distributing.Done()
 }
 
 // distribute sends event to all watchers. Blocking.

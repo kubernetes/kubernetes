@@ -74,8 +74,8 @@ $kube_provider_boxes = {
   },
   :vmware_desktop => {
     'fedora' => {
-      :box_name => 'kube-fedora20',
-      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-20-i386_chef-provisionerless.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-21_chef-provisionerless.box'
     }
   }
 }

@@ -25,8 +25,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// Uses _ instead of - to better align with glog flags.
-var logFlushFreq = pflag.Duration("log_flush_frequency", 5*time.Second, "Maximum number of seconds between log flushes")
+var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 
 // TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
 func init() {
@@ -47,7 +46,7 @@ func InitLogs() {
 	log.SetOutput(GlogWriter{})
 	log.SetFlags(0)
 	// The default glog flush interval is 30 seconds, which is frighteningly long.
-	go Forever(glog.Flush, *logFlushFreq)
+	go Until(glog.Flush, *logFlushFreq, NeverStop)
 }
 
 // FlushLogs flushes logs immediately.

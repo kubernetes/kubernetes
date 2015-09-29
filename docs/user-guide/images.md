@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 Each container in a pod has its own image.  Currently, the only type of image supported is a [Docker Image](https://docs.docker.com/userguide/dockerimages/).
 
-You create your Docker image and push it to a registry before referring to it in a kubernetes pod.
+You create your Docker image and push it to a registry before referring to it in a Kubernetes pod.
 
 The `image` property of a container supports the same syntax as the `docker` command does, including private registries and tags.
 
@@ -55,9 +55,9 @@ The `image` property of a container supports the same syntax as the `docker` com
 
 ## Updating Images
 
-The default pull policy is `PullIfNotPresent` which causes the Kubelet to not
+The default pull policy is `IfNotPresent` which causes the Kubelet to not
 pull an image if it already exists. If you would like to always force a pull
-you must set a pull image policy of `PullAlways` or specify a `:latest` tag on
+you must set a pull image policy of `Always` or specify a `:latest` tag on
 your image.
 
 ## Using a Private Registry
@@ -68,7 +68,7 @@ Credentials can be provided in several ways:
     - Per-cluster
     - automatically configured on Google Compute Engine or Google Container Engine
     - all pods can read the project's private registry
-  - Configuring Nodes to Authenticate to a Private Registry 
+  - Configuring Nodes to Authenticate to a Private Registry
     - all pods can read any configured private registries
     - requires node configuration by cluster administrator
   - Pre-pulling Images
@@ -77,7 +77,7 @@ Credentials can be provided in several ways:
   - Specifying ImagePullSecrets on a Pod
     - only pods which provide own keys can access the private registry
 Each option is described in more detail below.
-  
+
 
 ### Using Google Container Registry
 
@@ -88,7 +88,7 @@ use the full image name (e.g. gcr.io/my_project/image:tag).
 
 All pods in a cluster will have read access to images in this registry.
 
-The kubelet kubelet will authenticate to GCR using the instance's
+The kubelet will authenticate to GCR using the instance's
 Google service account.  The service account on the instance
 will have a `https://www.googleapis.com/auth/devstorage.read_only`,
 so it can pull from the project's GCR, but not push.
@@ -101,7 +101,7 @@ with credentials for Google Container Registry.  You cannot use this approach.
 **Note:** this approach is suitable if you can control node configuration.  It
 will not work reliably on GCE, and any other cloud provider that does automatic
 node replacement.
- 
+
 Docker stores keys for private registries in the `$HOME/.dockercfg` file.  If you put this
 in the `$HOME` of `root` on a kubelet, then docker will use it.
 
@@ -109,7 +109,7 @@ Here are the recommended steps to configuring your nodes to use a private regist
 example, run these on your desktop/laptop:
    1. run `docker login [server]` for each set of credentials you want to use.
    1. view `$HOME/.dockercfg` in an editor to ensure it contains just the credentials you want to use.
-   1. get a list of your nodes 
+   1. get a list of your nodes
       - for example: `nodes=$(kubectl get nodes -o template --template='{{range.items}}{{.metadata.name}} {{end}}')`
    1. copy your local `.dockercfg` to the home directory of root on each node.
       - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg; done`
@@ -126,8 +126,8 @@ spec:
   containers:
     - name: uses-private-image
       image: $PRIVATE_IMAGE_NAME
+      imagePullPolicy: Always
       command: [ "echo", "SUCCESS" ]
-  imagePullPolicy: Always
 EOF
 $ kubectl create -f /tmp/private-image-test-1.yaml
 pods/private-image-test-1
@@ -218,7 +218,7 @@ secrets/myregistrykey
 $
 ```
 
-If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid. 
+If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid.
 If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
 the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file.
 
@@ -267,7 +267,7 @@ common use cases and suggested solutions.
      - may be hosted on the [Docker Hub](https://hub.docker.com/account/signup/), or elsewhere.
      - manually configure .dockercfg on each node as described above
    - Or, run an internal private registry behind your firewall with open read access.
-     - no kubernetes configuration required
+     - no Kubernetes configuration required
    - Or, when on GCE/GKE, use the project's Google Container Registry.
      - will work better with cluster autoscaling than manual node configuration
    - Or, on a cluster where changing the node configuration is inconvenient, use `imagePullSecrets`.

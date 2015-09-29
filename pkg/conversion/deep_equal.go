@@ -17,7 +17,7 @@ limitations under the License.
 package conversion
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/forked/reflect"
+	"k8s.io/kubernetes/third_party/forked/reflect"
 )
 
 // The code for this type must be located in third_party, since it forks from

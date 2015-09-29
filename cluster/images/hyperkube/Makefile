@@ -1,6 +1,6 @@
 # build the hyperkube image.
 
-VERSION=v0.18.2
+VERSION=v1.0.1
 
 all:
 	cp ../../saltbase/salt/helpers/safe_format_and_mount .

@@ -15,7 +15,6 @@
 # limitations under the License.
 
 from mock import patch
-from path import path
 from path import Path
 import pytest
 import subprocess
@@ -38,7 +37,7 @@ def test_run():
     assert output
     assert 'kubernetes_installer.py' in output
 
-    invalid_directory = path('/not/a/real/directory')
+    invalid_directory = Path('/not/a/real/directory')
     assert not invalid_directory.exists()
     invalid_command = 'ls {0}'.format(invalid_directory)
     with pytest.raises(subprocess.CalledProcessError) as error:
@@ -67,13 +66,13 @@ class TestKubernetesInstaller():
         assert 'kubelet' in ki.aliases
         assert ki.arch == 'i386'
         assert ki.version == '3.0.1'
-        assert ki.output_dir == path('/tmp/does_not_exist')
+        assert ki.output_dir == Path('/tmp/does_not_exist')
 
     @patch('kubernetes_installer.run')
     @patch('kubernetes_installer.subprocess.call')
     def test_build(self, cmock, rmock):
         """ Test the build method with master and non-master branches. """
-        directory = path('/tmp/kubernetes_installer_test/build')
+        directory = Path('/tmp/kubernetes_installer_test/build')
         ki = self.makeone('amd64', 'v99.00.11', directory)
         assert not directory.exists(), 'The %s directory exists!' % directory
         # Call the build method with "master" branch.
@@ -94,7 +93,7 @@ class TestKubernetesInstaller():
 
     def test_install(self):
         """ Test the install method that it creates the correct links. """
-        directory = path('/tmp/kubernetes_installer_test/install')
+        directory = Path('/tmp/kubernetes_installer_test/install')
         ki = self.makeone('ppc64le', '1.2.3', directory)
         assert not directory.exists(), 'The %s directory exits!' % directory
         directory.makedirs_p()

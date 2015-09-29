@@ -20,6 +20,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestPoller(t *testing.T) {
@@ -34,7 +36,7 @@ DRAIN:
 				break DRAIN
 			}
 			count++
-		case <-time.After(time.Second):
+		case <-time.After(util.ForeverTestTimeout):
 			t.Errorf("unexpected timeout after poll")
 		}
 	}
@@ -91,9 +93,10 @@ func TestPollForever(t *testing.T) {
 			}
 			return false, nil
 		})
-		if err := Poll(time.Microsecond, 0, f); err != nil {
+		if err := PollInfinite(time.Microsecond, f); err != nil {
 			t.Fatalf("unexpected error %v", err)
 		}
+
 		close(ch)
 		complete <- struct{}{}
 	}()
@@ -108,7 +111,7 @@ func TestPollForever(t *testing.T) {
 			if !open {
 				t.Fatalf("did not expect channel to be closed")
 			}
-		case <-time.After(time.Second):
+		case <-time.After(util.ForeverTestTimeout):
 			t.Fatalf("channel did not return at least once within the poll interval")
 		}
 	}

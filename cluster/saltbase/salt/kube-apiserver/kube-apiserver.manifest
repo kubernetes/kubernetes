@@ -9,10 +9,10 @@
 {% set cloud_config_volume = "" -%}
 
 {% if grains.cloud is defined -%}
-  {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
+  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
-    {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
+    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
     {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
   {% endif -%}
@@ -35,7 +35,7 @@
 
 {% set cluster_name = "" -%}
 {% if pillar['instance_prefix'] is defined -%}
-  {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
+  {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
 {% endif -%}
 
 {% set bind_address = "" -%}
@@ -43,24 +43,24 @@
   {% set bind_address = "--bind-address=" + grains.publicAddressOverride -%}
 {% endif -%}
 
-{% set etcd_servers = "--etcd_servers=http://127.0.0.1:4001" -%}
+{% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
 
 {% set service_cluster_ip_range = "" -%}
 {% if pillar['service_cluster_ip_range'] is defined -%}
   {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
 {% endif -%}
 
-{% set cert_file = "--tls_cert_file=/srv/kubernetes/server.cert" -%}
-{% set key_file = "--tls_private_key_file=/srv/kubernetes/server.key" -%}
+{% set cert_file = "--tls-cert-file=/srv/kubernetes/server.cert" -%}
+{% set key_file = "--tls-private-key-file=/srv/kubernetes/server.key" -%}
 {% set client_ca_file = "" -%}
 
 {% set secure_port = "6443" -%}
 {% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]    %}
   {% set secure_port = "443" -%}
-  {% set client_ca_file = "--client_ca_file=/srv/kubernetes/ca.crt" -%}
+  {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
-{% set token_auth_file = "--token_auth_file=/dev/null" -%}
+{% set token_auth_file = "--token-auth-file=/dev/null" -%}
 {% set basic_auth_file = "" -%}
 
 {% set min_request_timeout = "" -%}
@@ -70,31 +70,39 @@
 
 {% if grains.cloud is defined -%}
 {% if grains.cloud in [ 'aws', 'gce', 'vagrant' ] -%}
-    {% set token_auth_file = "--token_auth_file=/srv/kubernetes/known_tokens.csv" -%}
+    {% set token_auth_file = "--token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
 {% endif -%}
 {% endif -%}
 
 {% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant']  %}
-  {% set basic_auth_file = "--basic_auth_file=/srv/kubernetes/basic_auth.csv" -%}
+  {% set basic_auth_file = "--basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
 {% endif -%}
 
 {% set admission_control = "" -%}
 {% if pillar['admission_control'] is defined -%}
- {% set admission_control = "--admission_control=" + pillar['admission_control'] -%}
+ {% set admission_control = "--admission-control=" + pillar['admission_control'] -%}
 {% endif -%}
 
 {% set runtime_config = "" -%}
 {% if grains.runtime_config is defined -%}
- {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
+ {% set runtime_config = "--runtime-config=" + grains.runtime_config -%}
 {% endif -%}
 
 {% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
-{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
+{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
+
+# test_args has to be kept at the end, so they'll overwrite any prior configuration
+{% if pillar['apiserver_test_args'] is defined -%}
+{% set params = params + " " + pillar['apiserver_test_args'] -%}
+{% endif -%}
 
 {
 "apiVersion": "v1",
 "kind": "Pod",
-"metadata": {"name":"kube-apiserver"},
+"metadata": {
+  "name":"kube-apiserver",
+  "namespace": "kube-system"
+},
 "spec":{
 "hostNetwork": true,
 "containers":[
@@ -109,12 +117,13 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-apiserver {{params}} --allow_privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
+                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
     "livenessProbe": {
       "httpGet": {
-        "path": "/healthz",
-        "port": 8080
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
       },
       "initialDelaySeconds": 15,
       "timeoutSeconds": 15

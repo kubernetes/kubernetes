@@ -60,7 +60,7 @@ Documentation for other releases can be found at
 ### Accessing for the first time with kubectl
 
 When accessing the Kubernetes API for the first time, we suggest using the
-kubernetes CLI, `kubectl`.
+Kubernetes CLI, `kubectl`.
 
 To access a cluster, you need to know the location of the cluster and have credentials
 to access it.  Typically, this is automatically set-up when you work through
@@ -148,9 +148,9 @@ with future high-availability support.
 
 There are [client libraries](../devel/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
-[Go](../../pkg/client/)
+[Go](http://releases.k8s.io/HEAD/pkg/client/)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
-as the kubectl CLI does to locate and authenticate to the apiserver.  
+as the kubectl CLI does to locate and authenticate to the apiserver.
 
 See documentation for other libraries for how they authenticate.
 
@@ -172,7 +172,7 @@ at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
 From within a pod the recommended ways to connect to API are:
   - run a kubectl proxy as one of the containers in the pod, or as a background
     process within a container.  This proxies the
-    kubernetes API to the localhost interface of the pod, so that other processes
+    Kubernetes API to the localhost interface of the pod, so that other processes
     in any container of the pod can access it.  See this [example of using kubectl proxy
     in a pod](../../examples/kubectl-container/).
   - use the Go client library, and create a client using the `client.NewInCluster()` factory.
@@ -183,7 +183,7 @@ In each case, the credentials of the pod are used to communicate securely with t
 ## Accessing services running on the cluster
 
 The previous section was about connecting the Kubernetes API server.  This section is about
-connecting to other services running on Kubernetes cluster.  In kubernetes, the
+connecting to other services running on Kubernetes cluster.  In Kubernetes, the
 [nodes](../admin/node.md), [pods](pods.md) and [services](services.md) all have
 their own IPs.  In many cases, the node IPs, pod IPs, and some service IPs on a cluster will not be
 routable, so they will not be reachable from a machine outside the cluster,
@@ -241,7 +241,7 @@ at `https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticse
 
 #### Manually constructing apiserver proxy URLs
 
-As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
+As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:
 `http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
 <!--- TODO: update this part of doc because it doesn't seem to be valid. What
 about namespaces? 'proxy' verb? -->
@@ -280,10 +280,10 @@ The redirect capabilities have been deprecated and removed.  Please use a proxy 
 
 ## So Many Proxies
 
-There are several different proxies you may encounter when using kubernetes:
+There are several different proxies you may encounter when using Kubernetes:
   1. The [kubectl proxy](#directly-accessing-the-rest-api):
     - runs on a user's desktop or in a pod
-    - proxies from a localhost address to the kubernetes apiserver
+    - proxies from a localhost address to the Kubernetes apiserver
     - client to proxy uses HTTP
     - proxy to apiserver uses HTTPS
     - locates apiserver
@@ -297,7 +297,7 @@ There are several different proxies you may encounter when using kubernetes:
     - can be used to reach a Node, Pod, or Service
     - does load balancing when used to reach a Service
   1. The [kube proxy](services.md#ips-and-vips):
-    - runs on each node 
+    - runs on each node
     - proxies UDP and TCP
     - does not understand HTTP
     - provides load balancing
@@ -308,7 +308,7 @@ There are several different proxies you may encounter when using kubernetes:
     - acts as load balancer if there are several apiservers.
   1. Cloud Load Balancers on external services:
     - are provided by some cloud providers (e.g. AWS ELB, Google Cloud Load Balancer)
-    - are created automatically when the kubernetes service has type `LoadBalancer`
+    - are created automatically when the Kubernetes service has type `LoadBalancer`
     - use UDP/TCP only
     - implementation varies by cloud provider.
 

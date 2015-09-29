@@ -19,9 +19,9 @@
     - group: root
     - mode: 755
 
-# The default here is that this file is blank.  If this is the case, the kubelet
-# won't be able to parse it as JSON and will try to use the kubernetes_auth file
-# instead.  You'll see a single error line in the kubelet start up file
+# The default here is that this file is blank. If this is the case, the kubelet
+# won't be able to parse it as JSON and it will not be able to publish events
+# to the apiserver. You'll see a single error line in the kubelet start up file
 # about this.
 /var/lib/kubelet/kubeconfig:
   file.managed:
@@ -31,19 +31,6 @@
     - mode: 400
     - makedirs: true
 
-#
-# --- This file is DEPRECATED ---
-# The default here is that this file is blank.  If this is the case, the kubelet
-# won't be able to parse it as JSON and it'll not be able to publish events to
-# the apiserver.  You'll see a single error line in the kubelet start up file
-# about this.
-/var/lib/kubelet/kubernetes_auth:
-  file.managed:
-    - source: salt://kubelet/kubernetes_auth
-    - user: root
-    - group: root
-    - mode: 400
-    - makedirs: true
 
 {% if pillar.get('is_systemd') %}
 
@@ -64,7 +51,7 @@ fix-service-kubelet:
       - file: /usr/local/bin/kubelet
       - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
       - file: {{ environment_file }}
-      - file: /var/lib/kubelet/kubernetes_auth
+      - file: /var/lib/kubelet/kubeconfig
 
 {% else %}
 
@@ -91,4 +78,4 @@ kubelet:
       - file: /usr/lib/systemd/system/kubelet.service
 {% endif %}
       - file: {{ environment_file }}
-      - file: /var/lib/kubelet/kubernetes_auth
+      - file: /var/lib/kubelet/kubeconfig

@@ -44,7 +44,8 @@ type Scheme struct {
 	// deep copy behavior.
 	cloner *Cloner
 
-	// Indent will cause the JSON output from Encode to be indented, iff it is true.
+	// Indent will cause the JSON output from Encode to be indented,
+	// if and only if it is true.
 	Indent bool
 
 	// InternalVersion is the default internal version. It is recommended that

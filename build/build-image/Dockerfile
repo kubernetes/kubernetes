@@ -44,7 +44,7 @@ RUN mkdir -p /usr/local/src/etcd &&\
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+WORKDIR /go/src/k8s.io/kubernetes
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs
@@ -54,4 +54,4 @@ ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
 # Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes
+ADD kube-source.tar.gz /go/src/k8s.io/kubernetes

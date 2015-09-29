@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/conversion"
 )
 
 func addConversionFuncs() {
@@ -29,8 +29,10 @@ func addConversionFuncs() {
 	err := api.Scheme.AddConversionFuncs(
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
+		convert_api_ServiceSpec_To_v1_ServiceSpec,
 		convert_v1_PodSpec_To_api_PodSpec,
 		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
+		convert_v1_ServiceSpec_To_api_ServiceSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -43,10 +45,13 @@ func addConversionFuncs() {
 			switch label {
 			case "metadata.name",
 				"metadata.namespace",
+				"metadata.labels",
+				"metadata.annotations",
 				"status.phase",
+				"status.podIP",
 				"spec.nodeName":
 				return label, value, nil
-				// This is for backwards compatability with old v1 clients which send spec.host
+				// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
 				return "spec.nodeName", value, nil
 			default:
@@ -279,6 +284,8 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	out.DeprecatedServiceAccount = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -346,6 +353,8 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 	}
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -355,6 +364,31 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		}
 	} else {
 		out.ImagePullSecrets = nil
+	}
+	return nil
+}
+
+func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
+	if err := autoconvert_api_ServiceSpec_To_v1_ServiceSpec(in, out, s); err != nil {
+		return err
+	}
+	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
+	for _, ip := range in.ExternalIPs {
+		out.DeprecatedPublicIPs = append(out.DeprecatedPublicIPs, ip)
+	}
+	return nil
+}
+
+func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
+	if err := autoconvert_v1_ServiceSpec_To_api_ServiceSpec(in, out, s); err != nil {
+		return err
+	}
+	// Prefer the legacy deprecatedPublicIPs field, if provided.
+	if len(in.DeprecatedPublicIPs) > 0 {
+		out.ExternalIPs = nil
+		for _, ip := range in.DeprecatedPublicIPs {
+			out.ExternalIPs = append(out.ExternalIPs, ip)
+		}
 	}
 	return nil
 }

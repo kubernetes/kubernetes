@@ -2,15 +2,15 @@
   "swaggerVersion": "1.2",
   "apis": [
    {
-    "path": "/api/v1beta3",
-    "description": "API at /api/v1beta3 version v1beta3"
-   },
-   {
     "path": "/api/v1",
     "description": "API at /api/v1 version v1"
    },
    {
     "path": "/api",
+    "description": "get available API versions"
+   },
+   {
+    "path": "/apis",
     "description": "get available API versions"
    },
    {

@@ -59,7 +59,7 @@ func TestSplitPort(t *testing.T) {
 			t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
 		}
 		if e, a := item.valid, valid; e != a {
-			t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
+			t.Errorf("%q: Wanted %t, got %t", item.in, e, a)
 		}
 	}
 }

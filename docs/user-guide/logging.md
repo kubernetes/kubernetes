@@ -43,18 +43,23 @@ The logs of a running container may be fetched using the command `kubectl logs`.
 this pod specification [counter-pod.yaml](../../examples/blog-logging/counter-pod.yaml), which has a container which writes out some text to standard
 output every second. (You can find different pod specifications [here](logging-demo/).)
 
+<!-- BEGIN MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
+
 ```yaml
- apiVersion: v1
- kind: Pod
- metadata:
-   name: counter
- spec:
-   containers:
-   - name: count
-     image: ubuntu:14.04
-     args: [bash, -c, 
-            'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
+apiVersion: v1
+kind: Pod
+metadata:
+  name: counter
+spec:
+  containers:
+  - name: count
+    image: ubuntu:14.04
+    args: [bash, -c, 
+           'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 ```
+
+[Download example](../../examples/blog-logging/counter-pod.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
 
 we can run the pod:
 
@@ -111,11 +116,11 @@ describes how to ingest cluster level logs into Elasticsearch and view them usin
 ## Ingesting Application Log Files
 
 Cluster level logging only collects the standard output and standard error output of the applications
-running in containers. The guide [Collecting log files within containers with Fluentd](../../contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
+running in containers. The guide [Collecting log files within containers with Fluentd](http://releases.k8s.io/release-1.0/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
 
 ## Known issues
 
-Kubernetes does log rotation for kubernetes components and docker containers. The command `kubectl logs` currently only read the latest logs, not all historical ones.
+Kubernetes does log rotation for Kubernetes components and docker containers. The command `kubectl logs` currently only read the latest logs, not all historical ones.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -120,7 +120,7 @@ func TestReplaceCallsPush(t *testing.T) {
 
 	m := []interface{}{mkObj("a", 1)}
 
-	u.Replace(m)
+	u.Replace(m, "0")
 	if callcount != 1 {
 		t.Errorf("Expected 1 calls, got %d", callcount)
 	}

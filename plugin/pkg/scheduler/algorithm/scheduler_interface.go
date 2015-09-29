@@ -17,11 +17,11 @@ limitations under the License.
 package algorithm
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Scheduler is an interface implemented by things that know how to schedule pods
 // onto machines.
 type ScheduleAlgorithm interface {
-	Schedule(*api.Pod, MinionLister) (selectedMachine string, err error)
+	Schedule(*api.Pod, NodeLister) (selectedMachine string, err error)
 }

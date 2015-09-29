@@ -45,6 +45,9 @@ type CreateOpts struct {
 	// Required. Human-readable name for the VIP. Does not have to be unique.
 	Name string
 
+	// Required for admins. Indicates the owner of the VIP.
+	TenantID string
+
 	// Optional. Describes the security group.
 	Description string
 }
@@ -62,6 +65,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 
 	type secgroup struct {
 		Name        string `json:"name"`
+		TenantID    string `json:"tenant_id,omitempty"`
 		Description string `json:"description,omitempty"`
 	}
 
@@ -71,6 +75,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 
 	reqBody := request{SecGroup: secgroup{
 		Name:        opts.Name,
+		TenantID:    opts.TenantID,
 		Description: opts.Description,
 	}}
 
@@ -90,4 +95,37 @@ func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
 	_, res.Err = c.Delete(resourceURL(c, id), nil)
 	return res
+}
+
+// IDFromName is a convenience function that returns a security group's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	securityGroupCount := 0
+	securityGroupID := ""
+	if name == "" {
+		return "", fmt.Errorf("A security group name must be provided.")
+	}
+	pager := List(client, ListOpts{})
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		securityGroupList, err := ExtractGroups(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range securityGroupList {
+			if s.Name == name {
+				securityGroupCount++
+				securityGroupID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch securityGroupCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find security group: %s", name)
+	case 1:
+		return securityGroupID, nil
+	default:
+		return "", fmt.Errorf("Found %d security groups matching %s", securityGroupCount, name)
+	}
 }

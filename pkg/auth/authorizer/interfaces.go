@@ -17,14 +17,14 @@ limitations under the License.
 package authorizer
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // Attributes is an interface used by an Authorizer to get information about a request
 // that is used to make an authorization decision.
 type Attributes interface {
 	// The user string which the request was authenticated as, or empty if
-	// no authentication occured and the request was allowed to proceed.
+	// no authentication occurred and the request was allowed to proceed.
 	GetUserName() string
 
 	// The list of group names the authenticated user is a member of. Can be

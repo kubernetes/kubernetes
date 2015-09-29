@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl config view \- displays Merged kubeconfig settings or a specified kubeconfig file.
+kubectl config view \- Displays merged kubeconfig settings or a specified kubeconfig file.
 
 
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ kubectl config view \- displays Merged kubeconfig settings or a specified kubeco
 
 .SH DESCRIPTION
 .PP
-displays Merged kubeconfig settings or a specified kubeconfig file.
+Displays merged kubeconfig settings or a specified kubeconfig file.
 
 .PP
 You can use \-\-output=template \-\-template=TEMPLATE to extract specific values.
@@ -23,10 +23,6 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 .PP
 \fB\-\-flatten\fP=false
     flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for view
 
 .PP
 \fB\-\-merge\fP=true
@@ -42,7 +38,9 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide.
+    Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -53,9 +51,17 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
     display raw byte data
 
 .PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
+\fB\-\-sort\-by\fP=""
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
+
+.PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -148,10 +154,6 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -161,11 +163,11 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 .RS
 
 .nf
-// Show Merged kubeconfig settings.
+# Show Merged kubeconfig settings.
 $ kubectl config view
 
-// Get the password for the e2e user
-$ kubectl config view \-o template \-\-template='\{\{range .users\}\}\{\{ if eq .name "e2e" \}\}\{\{ index .user.password \}\}\{\{end\}\}\{\{end\}\}'
+# Get the password for the e2e user
+$ kubectl config view \-o template \-\-template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'
 
 .fi
 .RE

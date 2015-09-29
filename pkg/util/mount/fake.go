@@ -62,11 +62,11 @@ func (f *FakeMounter) List() ([]MountPoint, error) {
 	return f.MountPoints, nil
 }
 
-func (f *FakeMounter) IsMountPoint(file string) (bool, error) {
+func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	for _, mp := range f.MountPoints {
 		if mp.Path == file {
-			return true, nil
+			return false, nil
 		}
 	}
-	return false, nil
+	return true, nil
 }

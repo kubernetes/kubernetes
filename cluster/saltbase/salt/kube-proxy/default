@@ -25,4 +25,11 @@
   {% endif -%}
 
 {% endif -%}
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{kubeconfig}} {{pillar['log_level']}}"
+
+{% set test_args = "" -%}
+{% if pillar['kubeproxy_test_args'] is defined -%}
+  {% set test_args=pillar['kubeproxy_test_args'] %}
+{% endif -%}
+
+# test_args has to be kept at the end, so they'll overwrite any prior configuration
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{kubeconfig}} {{pillar['log_level']}} {{test_args}}"

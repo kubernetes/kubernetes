@@ -22,6 +22,7 @@ It has these top-level messages:
 	OtherMessage
 	MyMessage
 	Ext
+	DefaultsMessage
 	MyMessageSet
 	Empty
 	MessageList
@@ -33,14 +34,18 @@ It has these top-level messages:
 	GroupOld
 	GroupNew
 	FloatingPoint
+	MessageWithMap
+	Communique
 */
 package testdata
 
 import proto "github.com/gogo/protobuf/proto"
+import fmt "fmt"
 import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
 
 type FOO int32
@@ -180,6 +185,42 @@ func (x *MyMessage_Color) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type DefaultsMessage_DefaultsEnum int32
+
+const (
+	DefaultsMessage_ZERO DefaultsMessage_DefaultsEnum = 0
+	DefaultsMessage_ONE  DefaultsMessage_DefaultsEnum = 1
+	DefaultsMessage_TWO  DefaultsMessage_DefaultsEnum = 2
+)
+
+var DefaultsMessage_DefaultsEnum_name = map[int32]string{
+	0: "ZERO",
+	1: "ONE",
+	2: "TWO",
+}
+var DefaultsMessage_DefaultsEnum_value = map[string]int32{
+	"ZERO": 0,
+	"ONE":  1,
+	"TWO":  2,
+}
+
+func (x DefaultsMessage_DefaultsEnum) Enum() *DefaultsMessage_DefaultsEnum {
+	p := new(DefaultsMessage_DefaultsEnum)
+	*p = x
+	return p
+}
+func (x DefaultsMessage_DefaultsEnum) String() string {
+	return proto.EnumName(DefaultsMessage_DefaultsEnum_name, int32(x))
+}
+func (x *DefaultsMessage_DefaultsEnum) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(DefaultsMessage_DefaultsEnum_value, data, "DefaultsMessage_DefaultsEnum")
+	if err != nil {
+		return err
+	}
+	*x = DefaultsMessage_DefaultsEnum(value)
+	return nil
+}
+
 type Defaults_Color int32
 
 const (
@@ -263,8 +304,8 @@ func (m *GoEnum) GetFoo() FOO {
 }
 
 type GoTestField struct {
-	Label            *string `protobuf:"bytes,1,req" json:"Label,omitempty"`
-	Type             *string `protobuf:"bytes,2,req" json:"Type,omitempty"`
+	Label            *string `protobuf:"bytes,1,req,name=Label" json:"Label,omitempty"`
+	Type             *string `protobuf:"bytes,2,req,name=Type" json:"Type,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -288,13 +329,13 @@ func (m *GoTestField) GetType() string {
 
 type GoTest struct {
 	// Some typical parameters
-	Kind  *GoTest_KIND `protobuf:"varint,1,req,enum=testdata.GoTest_KIND" json:"Kind,omitempty"`
-	Table *string      `protobuf:"bytes,2,opt" json:"Table,omitempty"`
-	Param *int32       `protobuf:"varint,3,opt" json:"Param,omitempty"`
+	Kind  *GoTest_KIND `protobuf:"varint,1,req,name=Kind,enum=testdata.GoTest_KIND" json:"Kind,omitempty"`
+	Table *string      `protobuf:"bytes,2,opt,name=Table" json:"Table,omitempty"`
+	Param *int32       `protobuf:"varint,3,opt,name=Param" json:"Param,omitempty"`
 	// Required, repeated and optional foreign fields.
-	RequiredField *GoTestField   `protobuf:"bytes,4,req" json:"RequiredField,omitempty"`
-	RepeatedField []*GoTestField `protobuf:"bytes,5,rep" json:"RepeatedField,omitempty"`
-	OptionalField *GoTestField   `protobuf:"bytes,6,opt" json:"OptionalField,omitempty"`
+	RequiredField *GoTestField   `protobuf:"bytes,4,req,name=RequiredField" json:"RequiredField,omitempty"`
+	RepeatedField []*GoTestField `protobuf:"bytes,5,rep,name=RepeatedField" json:"RepeatedField,omitempty"`
+	OptionalField *GoTestField   `protobuf:"bytes,6,opt,name=OptionalField" json:"OptionalField,omitempty"`
 	// Required fields of all basic types
 	F_BoolRequired    *bool    `protobuf:"varint,10,req,name=F_Bool_required" json:"F_Bool_required,omitempty"`
 	F_Int32Required   *int32   `protobuf:"varint,11,req,name=F_Int32_required" json:"F_Int32_required,omitempty"`
@@ -895,7 +936,7 @@ func (m *GoTest) GetOptionalgroup() *GoTest_OptionalGroup {
 
 // Required, repeated, and optional groups.
 type GoTest_RequiredGroup struct {
-	RequiredField    *string `protobuf:"bytes,71,req" json:"RequiredField,omitempty"`
+	RequiredField    *string `protobuf:"bytes,71,req,name=RequiredField" json:"RequiredField,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -911,7 +952,7 @@ func (m *GoTest_RequiredGroup) GetRequiredField() string {
 }
 
 type GoTest_RepeatedGroup struct {
-	RequiredField    *string `protobuf:"bytes,81,req" json:"RequiredField,omitempty"`
+	RequiredField    *string `protobuf:"bytes,81,req,name=RequiredField" json:"RequiredField,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -927,7 +968,7 @@ func (m *GoTest_RepeatedGroup) GetRequiredField() string {
 }
 
 type GoTest_OptionalGroup struct {
-	RequiredField    *string `protobuf:"bytes,91,req" json:"RequiredField,omitempty"`
+	RequiredField    *string `protobuf:"bytes,91,req,name=RequiredField" json:"RequiredField,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -1401,6 +1442,29 @@ var E_Ext_Number = &proto.ExtensionDesc{
 	Tag:           "varint,105,opt,name=number",
 }
 
+type DefaultsMessage struct {
+	XXX_extensions   map[int32]proto.Extension `json:"-"`
+	XXX_unrecognized []byte                    `json:"-"`
+}
+
+func (m *DefaultsMessage) Reset()         { *m = DefaultsMessage{} }
+func (m *DefaultsMessage) String() string { return proto.CompactTextString(m) }
+func (*DefaultsMessage) ProtoMessage()    {}
+
+var extRange_DefaultsMessage = []proto.ExtensionRange{
+	{100, 536870911},
+}
+
+func (*DefaultsMessage) ExtensionRangeArray() []proto.ExtensionRange {
+	return extRange_DefaultsMessage
+}
+func (m *DefaultsMessage) ExtensionMap() map[int32]proto.Extension {
+	if m.XXX_extensions == nil {
+		m.XXX_extensions = make(map[int32]proto.Extension)
+	}
+	return m.XXX_extensions
+}
+
 type MyMessageSet struct {
 	XXX_extensions   map[int32]proto.Extension `json:"-"`
 	XXX_unrecognized []byte                    `json:"-"`
@@ -1450,7 +1514,7 @@ func (m *Empty) String() string { return proto.CompactTextString(m) }
 func (*Empty) ProtoMessage()    {}
 
 type MessageList struct {
-	Message          []*MessageList_Message `protobuf:"group,1,rep" json:"message,omitempty"`
+	Message          []*MessageList_Message `protobuf:"group,1,rep,name=Message" json:"message,omitempty"`
 	XXX_unrecognized []byte                 `json:"-"`
 }
 
@@ -1516,24 +1580,24 @@ func (m *Strings) GetBytesField() []byte {
 type Defaults struct {
 	// Default-valued fields of all basic types.
 	// Same as GoTest, but copied here to make testing easier.
-	F_Bool    *bool           `protobuf:"varint,1,opt,def=1" json:"F_Bool,omitempty"`
-	F_Int32   *int32          `protobuf:"varint,2,opt,def=32" json:"F_Int32,omitempty"`
-	F_Int64   *int64          `protobuf:"varint,3,opt,def=64" json:"F_Int64,omitempty"`
-	F_Fixed32 *uint32         `protobuf:"fixed32,4,opt,def=320" json:"F_Fixed32,omitempty"`
-	F_Fixed64 *uint64         `protobuf:"fixed64,5,opt,def=640" json:"F_Fixed64,omitempty"`
-	F_Uint32  *uint32         `protobuf:"varint,6,opt,def=3200" json:"F_Uint32,omitempty"`
-	F_Uint64  *uint64         `protobuf:"varint,7,opt,def=6400" json:"F_Uint64,omitempty"`
-	F_Float   *float32        `protobuf:"fixed32,8,opt,def=314159" json:"F_Float,omitempty"`
-	F_Double  *float64        `protobuf:"fixed64,9,opt,def=271828" json:"F_Double,omitempty"`
-	F_String  *string         `protobuf:"bytes,10,opt,def=hello, \"world!\"\n" json:"F_String,omitempty"`
-	F_Bytes   []byte          `protobuf:"bytes,11,opt,def=Bignose" json:"F_Bytes,omitempty"`
-	F_Sint32  *int32          `protobuf:"zigzag32,12,opt,def=-32" json:"F_Sint32,omitempty"`
-	F_Sint64  *int64          `protobuf:"zigzag64,13,opt,def=-64" json:"F_Sint64,omitempty"`
-	F_Enum    *Defaults_Color `protobuf:"varint,14,opt,enum=testdata.Defaults_Color,def=1" json:"F_Enum,omitempty"`
+	F_Bool    *bool           `protobuf:"varint,1,opt,name=F_Bool,def=1" json:"F_Bool,omitempty"`
+	F_Int32   *int32          `protobuf:"varint,2,opt,name=F_Int32,def=32" json:"F_Int32,omitempty"`
+	F_Int64   *int64          `protobuf:"varint,3,opt,name=F_Int64,def=64" json:"F_Int64,omitempty"`
+	F_Fixed32 *uint32         `protobuf:"fixed32,4,opt,name=F_Fixed32,def=320" json:"F_Fixed32,omitempty"`
+	F_Fixed64 *uint64         `protobuf:"fixed64,5,opt,name=F_Fixed64,def=640" json:"F_Fixed64,omitempty"`
+	F_Uint32  *uint32         `protobuf:"varint,6,opt,name=F_Uint32,def=3200" json:"F_Uint32,omitempty"`
+	F_Uint64  *uint64         `protobuf:"varint,7,opt,name=F_Uint64,def=6400" json:"F_Uint64,omitempty"`
+	F_Float   *float32        `protobuf:"fixed32,8,opt,name=F_Float,def=314159" json:"F_Float,omitempty"`
+	F_Double  *float64        `protobuf:"fixed64,9,opt,name=F_Double,def=271828" json:"F_Double,omitempty"`
+	F_String  *string         `protobuf:"bytes,10,opt,name=F_String,def=hello, \"world!\"\n" json:"F_String,omitempty"`
+	F_Bytes   []byte          `protobuf:"bytes,11,opt,name=F_Bytes,def=Bignose" json:"F_Bytes,omitempty"`
+	F_Sint32  *int32          `protobuf:"zigzag32,12,opt,name=F_Sint32,def=-32" json:"F_Sint32,omitempty"`
+	F_Sint64  *int64          `protobuf:"zigzag64,13,opt,name=F_Sint64,def=-64" json:"F_Sint64,omitempty"`
+	F_Enum    *Defaults_Color `protobuf:"varint,14,opt,name=F_Enum,enum=testdata.Defaults_Color,def=1" json:"F_Enum,omitempty"`
 	// More fields with crazy defaults.
-	F_Pinf *float32 `protobuf:"fixed32,15,opt,def=inf" json:"F_Pinf,omitempty"`
-	F_Ninf *float32 `protobuf:"fixed32,16,opt,def=-inf" json:"F_Ninf,omitempty"`
-	F_Nan  *float32 `protobuf:"fixed32,17,opt,def=nan" json:"F_Nan,omitempty"`
+	F_Pinf *float32 `protobuf:"fixed32,15,opt,name=F_Pinf,def=inf" json:"F_Pinf,omitempty"`
+	F_Ninf *float32 `protobuf:"fixed32,16,opt,name=F_Ninf,def=-inf" json:"F_Ninf,omitempty"`
+	F_Nan  *float32 `protobuf:"fixed32,17,opt,name=F_Nan,def=nan" json:"F_Nan,omitempty"`
 	// Sub-message.
 	Sub *SubDefaults `protobuf:"bytes,18,opt,name=sub" json:"sub,omitempty"`
 	// Redundant but explicit defaults.
@@ -1798,7 +1862,7 @@ func (m *MoreRepeated) GetFixeds() []uint32 {
 }
 
 type GroupOld struct {
-	G                *GroupOld_G `protobuf:"group,101,opt" json:"g,omitempty"`
+	G                *GroupOld_G `protobuf:"group,101,opt,name=G" json:"g,omitempty"`
 	XXX_unrecognized []byte      `json:"-"`
 }
 
@@ -1830,7 +1894,7 @@ func (m *GroupOld_G) GetX() int32 {
 }
 
 type GroupNew struct {
-	G                *GroupNew_G `protobuf:"group,101,opt" json:"g,omitempty"`
+	G                *GroupNew_G `protobuf:"group,101,opt,name=G" json:"g,omitempty"`
 	XXX_unrecognized []byte      `json:"-"`
 }
 
@@ -1885,12 +1949,507 @@ func (m *FloatingPoint) GetF() float64 {
 	return 0
 }
 
+type MessageWithMap struct {
+	NameMapping      map[int32]string         `protobuf:"bytes,1,rep,name=name_mapping" json:"name_mapping,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MsgMapping       map[int64]*FloatingPoint `protobuf:"bytes,2,rep,name=msg_mapping" json:"msg_mapping,omitempty" protobuf_key:"zigzag64,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ByteMapping      map[bool][]byte          `protobuf:"bytes,3,rep,name=byte_mapping" json:"byte_mapping,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	StrToStr         map[string]string        `protobuf:"bytes,4,rep,name=str_to_str" json:"str_to_str,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	XXX_unrecognized []byte                   `json:"-"`
+}
+
+func (m *MessageWithMap) Reset()         { *m = MessageWithMap{} }
+func (m *MessageWithMap) String() string { return proto.CompactTextString(m) }
+func (*MessageWithMap) ProtoMessage()    {}
+
+func (m *MessageWithMap) GetNameMapping() map[int32]string {
+	if m != nil {
+		return m.NameMapping
+	}
+	return nil
+}
+
+func (m *MessageWithMap) GetMsgMapping() map[int64]*FloatingPoint {
+	if m != nil {
+		return m.MsgMapping
+	}
+	return nil
+}
+
+func (m *MessageWithMap) GetByteMapping() map[bool][]byte {
+	if m != nil {
+		return m.ByteMapping
+	}
+	return nil
+}
+
+func (m *MessageWithMap) GetStrToStr() map[string]string {
+	if m != nil {
+		return m.StrToStr
+	}
+	return nil
+}
+
+type Communique struct {
+	MakeMeCry *bool `protobuf:"varint,1,opt,name=make_me_cry" json:"make_me_cry,omitempty"`
+	// This is a oneof, called "union".
+	//
+	// Types that are valid to be assigned to Union:
+	//	*Communique_Number
+	//	*Communique_Name
+	//	*Communique_Data
+	//	*Communique_TempC
+	//	*Communique_Col
+	//	*Communique_Msg
+	Union            isCommunique_Union `protobuf_oneof:"union"`
+	XXX_unrecognized []byte             `json:"-"`
+}
+
+func (m *Communique) Reset()         { *m = Communique{} }
+func (m *Communique) String() string { return proto.CompactTextString(m) }
+func (*Communique) ProtoMessage()    {}
+
+type isCommunique_Union interface {
+	isCommunique_Union()
+}
+
+type Communique_Number struct {
+	Number int32 `protobuf:"varint,5,opt,name=number,oneof"`
+}
+type Communique_Name struct {
+	Name string `protobuf:"bytes,6,opt,name=name,oneof"`
+}
+type Communique_Data struct {
+	Data []byte `protobuf:"bytes,7,opt,name=data,oneof"`
+}
+type Communique_TempC struct {
+	TempC float64 `protobuf:"fixed64,8,opt,name=temp_c,oneof"`
+}
+type Communique_Col struct {
+	Col MyMessage_Color `protobuf:"varint,9,opt,name=col,enum=testdata.MyMessage_Color,oneof"`
+}
+type Communique_Msg struct {
+	Msg *Strings `protobuf:"bytes,10,opt,name=msg,oneof"`
+}
+
+func (*Communique_Number) isCommunique_Union() {}
+func (*Communique_Name) isCommunique_Union()   {}
+func (*Communique_Data) isCommunique_Union()   {}
+func (*Communique_TempC) isCommunique_Union()  {}
+func (*Communique_Col) isCommunique_Union()    {}
+func (*Communique_Msg) isCommunique_Union()    {}
+
+func (m *Communique) GetUnion() isCommunique_Union {
+	if m != nil {
+		return m.Union
+	}
+	return nil
+}
+
+func (m *Communique) GetMakeMeCry() bool {
+	if m != nil && m.MakeMeCry != nil {
+		return *m.MakeMeCry
+	}
+	return false
+}
+
+func (m *Communique) GetNumber() int32 {
+	if x, ok := m.GetUnion().(*Communique_Number); ok {
+		return x.Number
+	}
+	return 0
+}
+
+func (m *Communique) GetName() string {
+	if x, ok := m.GetUnion().(*Communique_Name); ok {
+		return x.Name
+	}
+	return ""
+}
+
+func (m *Communique) GetData() []byte {
+	if x, ok := m.GetUnion().(*Communique_Data); ok {
+		return x.Data
+	}
+	return nil
+}
+
+func (m *Communique) GetTempC() float64 {
+	if x, ok := m.GetUnion().(*Communique_TempC); ok {
+		return x.TempC
+	}
+	return 0
+}
+
+func (m *Communique) GetCol() MyMessage_Color {
+	if x, ok := m.GetUnion().(*Communique_Col); ok {
+		return x.Col
+	}
+	return MyMessage_RED
+}
+
+func (m *Communique) GetMsg() *Strings {
+	if x, ok := m.GetUnion().(*Communique_Msg); ok {
+		return x.Msg
+	}
+	return nil
+}
+
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*Communique) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), []interface{}) {
+	return _Communique_OneofMarshaler, _Communique_OneofUnmarshaler, []interface{}{
+		(*Communique_Number)(nil),
+		(*Communique_Name)(nil),
+		(*Communique_Data)(nil),
+		(*Communique_TempC)(nil),
+		(*Communique_Col)(nil),
+		(*Communique_Msg)(nil),
+	}
+}
+
+func _Communique_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*Communique)
+	// union
+	switch x := m.Union.(type) {
+	case *Communique_Number:
+		_ = b.EncodeVarint(5<<3 | proto.WireVarint)
+		_ = b.EncodeVarint(uint64(x.Number))
+	case *Communique_Name:
+		_ = b.EncodeVarint(6<<3 | proto.WireBytes)
+		_ = b.EncodeStringBytes(x.Name)
+	case *Communique_Data:
+		_ = b.EncodeVarint(7<<3 | proto.WireBytes)
+		_ = b.EncodeRawBytes(x.Data)
+	case *Communique_TempC:
+		_ = b.EncodeVarint(8<<3 | proto.WireFixed64)
+		_ = b.EncodeFixed64(math.Float64bits(x.TempC))
+	case *Communique_Col:
+		_ = b.EncodeVarint(9<<3 | proto.WireVarint)
+		_ = b.EncodeVarint(uint64(x.Col))
+	case *Communique_Msg:
+		_ = b.EncodeVarint(10<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Msg); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("Communique.Union has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _Communique_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*Communique)
+	switch tag {
+	case 5: // union.number
+		if wire != proto.WireVarint {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeVarint()
+		m.Union = &Communique_Number{int32(x)}
+		return true, err
+	case 6: // union.name
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeStringBytes()
+		m.Union = &Communique_Name{x}
+		return true, err
+	case 7: // union.data
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeRawBytes(true)
+		m.Union = &Communique_Data{x}
+		return true, err
+	case 8: // union.temp_c
+		if wire != proto.WireFixed64 {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeFixed64()
+		m.Union = &Communique_TempC{math.Float64frombits(x)}
+		return true, err
+	case 9: // union.col
+		if wire != proto.WireVarint {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeVarint()
+		m.Union = &Communique_Col{MyMessage_Color(x)}
+		return true, err
+	case 10: // union.msg
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Strings)
+		err := b.DecodeMessage(msg)
+		m.Union = &Communique_Msg{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
 var E_Greeting = &proto.ExtensionDesc{
 	ExtendedType:  (*MyMessage)(nil),
 	ExtensionType: ([]string)(nil),
 	Field:         106,
 	Name:          "testdata.greeting",
 	Tag:           "bytes,106,rep,name=greeting",
+}
+
+var E_NoDefaultDouble = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*float64)(nil),
+	Field:         101,
+	Name:          "testdata.no_default_double",
+	Tag:           "fixed64,101,opt,name=no_default_double",
+}
+
+var E_NoDefaultFloat = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*float32)(nil),
+	Field:         102,
+	Name:          "testdata.no_default_float",
+	Tag:           "fixed32,102,opt,name=no_default_float",
+}
+
+var E_NoDefaultInt32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int32)(nil),
+	Field:         103,
+	Name:          "testdata.no_default_int32",
+	Tag:           "varint,103,opt,name=no_default_int32",
+}
+
+var E_NoDefaultInt64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int64)(nil),
+	Field:         104,
+	Name:          "testdata.no_default_int64",
+	Tag:           "varint,104,opt,name=no_default_int64",
+}
+
+var E_NoDefaultUint32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint32)(nil),
+	Field:         105,
+	Name:          "testdata.no_default_uint32",
+	Tag:           "varint,105,opt,name=no_default_uint32",
+}
+
+var E_NoDefaultUint64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint64)(nil),
+	Field:         106,
+	Name:          "testdata.no_default_uint64",
+	Tag:           "varint,106,opt,name=no_default_uint64",
+}
+
+var E_NoDefaultSint32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int32)(nil),
+	Field:         107,
+	Name:          "testdata.no_default_sint32",
+	Tag:           "zigzag32,107,opt,name=no_default_sint32",
+}
+
+var E_NoDefaultSint64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int64)(nil),
+	Field:         108,
+	Name:          "testdata.no_default_sint64",
+	Tag:           "zigzag64,108,opt,name=no_default_sint64",
+}
+
+var E_NoDefaultFixed32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint32)(nil),
+	Field:         109,
+	Name:          "testdata.no_default_fixed32",
+	Tag:           "fixed32,109,opt,name=no_default_fixed32",
+}
+
+var E_NoDefaultFixed64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint64)(nil),
+	Field:         110,
+	Name:          "testdata.no_default_fixed64",
+	Tag:           "fixed64,110,opt,name=no_default_fixed64",
+}
+
+var E_NoDefaultSfixed32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int32)(nil),
+	Field:         111,
+	Name:          "testdata.no_default_sfixed32",
+	Tag:           "fixed32,111,opt,name=no_default_sfixed32",
+}
+
+var E_NoDefaultSfixed64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int64)(nil),
+	Field:         112,
+	Name:          "testdata.no_default_sfixed64",
+	Tag:           "fixed64,112,opt,name=no_default_sfixed64",
+}
+
+var E_NoDefaultBool = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*bool)(nil),
+	Field:         113,
+	Name:          "testdata.no_default_bool",
+	Tag:           "varint,113,opt,name=no_default_bool",
+}
+
+var E_NoDefaultString = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*string)(nil),
+	Field:         114,
+	Name:          "testdata.no_default_string",
+	Tag:           "bytes,114,opt,name=no_default_string",
+}
+
+var E_NoDefaultBytes = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: ([]byte)(nil),
+	Field:         115,
+	Name:          "testdata.no_default_bytes",
+	Tag:           "bytes,115,opt,name=no_default_bytes",
+}
+
+var E_NoDefaultEnum = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*DefaultsMessage_DefaultsEnum)(nil),
+	Field:         116,
+	Name:          "testdata.no_default_enum",
+	Tag:           "varint,116,opt,name=no_default_enum,enum=testdata.DefaultsMessage_DefaultsEnum",
+}
+
+var E_DefaultDouble = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*float64)(nil),
+	Field:         201,
+	Name:          "testdata.default_double",
+	Tag:           "fixed64,201,opt,name=default_double,def=3.1415",
+}
+
+var E_DefaultFloat = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*float32)(nil),
+	Field:         202,
+	Name:          "testdata.default_float",
+	Tag:           "fixed32,202,opt,name=default_float,def=3.14",
+}
+
+var E_DefaultInt32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int32)(nil),
+	Field:         203,
+	Name:          "testdata.default_int32",
+	Tag:           "varint,203,opt,name=default_int32,def=42",
+}
+
+var E_DefaultInt64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int64)(nil),
+	Field:         204,
+	Name:          "testdata.default_int64",
+	Tag:           "varint,204,opt,name=default_int64,def=43",
+}
+
+var E_DefaultUint32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint32)(nil),
+	Field:         205,
+	Name:          "testdata.default_uint32",
+	Tag:           "varint,205,opt,name=default_uint32,def=44",
+}
+
+var E_DefaultUint64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint64)(nil),
+	Field:         206,
+	Name:          "testdata.default_uint64",
+	Tag:           "varint,206,opt,name=default_uint64,def=45",
+}
+
+var E_DefaultSint32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int32)(nil),
+	Field:         207,
+	Name:          "testdata.default_sint32",
+	Tag:           "zigzag32,207,opt,name=default_sint32,def=46",
+}
+
+var E_DefaultSint64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int64)(nil),
+	Field:         208,
+	Name:          "testdata.default_sint64",
+	Tag:           "zigzag64,208,opt,name=default_sint64,def=47",
+}
+
+var E_DefaultFixed32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint32)(nil),
+	Field:         209,
+	Name:          "testdata.default_fixed32",
+	Tag:           "fixed32,209,opt,name=default_fixed32,def=48",
+}
+
+var E_DefaultFixed64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*uint64)(nil),
+	Field:         210,
+	Name:          "testdata.default_fixed64",
+	Tag:           "fixed64,210,opt,name=default_fixed64,def=49",
+}
+
+var E_DefaultSfixed32 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int32)(nil),
+	Field:         211,
+	Name:          "testdata.default_sfixed32",
+	Tag:           "fixed32,211,opt,name=default_sfixed32,def=50",
+}
+
+var E_DefaultSfixed64 = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*int64)(nil),
+	Field:         212,
+	Name:          "testdata.default_sfixed64",
+	Tag:           "fixed64,212,opt,name=default_sfixed64,def=51",
+}
+
+var E_DefaultBool = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*bool)(nil),
+	Field:         213,
+	Name:          "testdata.default_bool",
+	Tag:           "varint,213,opt,name=default_bool,def=1",
+}
+
+var E_DefaultString = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*string)(nil),
+	Field:         214,
+	Name:          "testdata.default_string",
+	Tag:           "bytes,214,opt,name=default_string,def=Hello, string",
+}
+
+var E_DefaultBytes = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: ([]byte)(nil),
+	Field:         215,
+	Name:          "testdata.default_bytes",
+	Tag:           "bytes,215,opt,name=default_bytes,def=Hello, bytes",
+}
+
+var E_DefaultEnum = &proto.ExtensionDesc{
+	ExtendedType:  (*DefaultsMessage)(nil),
+	ExtensionType: (*DefaultsMessage_DefaultsEnum)(nil),
+	Field:         216,
+	Name:          "testdata.default_enum",
+	Tag:           "varint,216,opt,name=default_enum,enum=testdata.DefaultsMessage_DefaultsEnum,def=1",
 }
 
 var E_X201 = &proto.ExtensionDesc{
@@ -2297,12 +2856,45 @@ func init() {
 	proto.RegisterEnum("testdata.FOO", FOO_name, FOO_value)
 	proto.RegisterEnum("testdata.GoTest_KIND", GoTest_KIND_name, GoTest_KIND_value)
 	proto.RegisterEnum("testdata.MyMessage_Color", MyMessage_Color_name, MyMessage_Color_value)
+	proto.RegisterEnum("testdata.DefaultsMessage_DefaultsEnum", DefaultsMessage_DefaultsEnum_name, DefaultsMessage_DefaultsEnum_value)
 	proto.RegisterEnum("testdata.Defaults_Color", Defaults_Color_name, Defaults_Color_value)
 	proto.RegisterEnum("testdata.RepeatedEnum_Color", RepeatedEnum_Color_name, RepeatedEnum_Color_value)
 	proto.RegisterExtension(E_Ext_More)
 	proto.RegisterExtension(E_Ext_Text)
 	proto.RegisterExtension(E_Ext_Number)
 	proto.RegisterExtension(E_Greeting)
+	proto.RegisterExtension(E_NoDefaultDouble)
+	proto.RegisterExtension(E_NoDefaultFloat)
+	proto.RegisterExtension(E_NoDefaultInt32)
+	proto.RegisterExtension(E_NoDefaultInt64)
+	proto.RegisterExtension(E_NoDefaultUint32)
+	proto.RegisterExtension(E_NoDefaultUint64)
+	proto.RegisterExtension(E_NoDefaultSint32)
+	proto.RegisterExtension(E_NoDefaultSint64)
+	proto.RegisterExtension(E_NoDefaultFixed32)
+	proto.RegisterExtension(E_NoDefaultFixed64)
+	proto.RegisterExtension(E_NoDefaultSfixed32)
+	proto.RegisterExtension(E_NoDefaultSfixed64)
+	proto.RegisterExtension(E_NoDefaultBool)
+	proto.RegisterExtension(E_NoDefaultString)
+	proto.RegisterExtension(E_NoDefaultBytes)
+	proto.RegisterExtension(E_NoDefaultEnum)
+	proto.RegisterExtension(E_DefaultDouble)
+	proto.RegisterExtension(E_DefaultFloat)
+	proto.RegisterExtension(E_DefaultInt32)
+	proto.RegisterExtension(E_DefaultInt64)
+	proto.RegisterExtension(E_DefaultUint32)
+	proto.RegisterExtension(E_DefaultUint64)
+	proto.RegisterExtension(E_DefaultSint32)
+	proto.RegisterExtension(E_DefaultSint64)
+	proto.RegisterExtension(E_DefaultFixed32)
+	proto.RegisterExtension(E_DefaultFixed64)
+	proto.RegisterExtension(E_DefaultSfixed32)
+	proto.RegisterExtension(E_DefaultSfixed64)
+	proto.RegisterExtension(E_DefaultBool)
+	proto.RegisterExtension(E_DefaultString)
+	proto.RegisterExtension(E_DefaultBytes)
+	proto.RegisterExtension(E_DefaultEnum)
 	proto.RegisterExtension(E_X201)
 	proto.RegisterExtension(E_X202)
 	proto.RegisterExtension(E_X203)

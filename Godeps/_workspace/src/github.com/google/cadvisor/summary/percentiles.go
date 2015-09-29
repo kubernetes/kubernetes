@@ -28,20 +28,23 @@ const secondsToMilliSeconds = 1000
 const milliSecondsToNanoSeconds = 1000000
 const secondsToNanoSeconds = secondsToMilliSeconds * milliSecondsToNanoSeconds
 
-type uint64Slice []uint64
+type Uint64Slice []uint64
 
-func (a uint64Slice) Len() int           { return len(a) }
-func (a uint64Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a uint64Slice) Less(i, j int) bool { return a[i] < a[j] }
+func (a Uint64Slice) Len() int           { return len(a) }
+func (a Uint64Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a Uint64Slice) Less(i, j int) bool { return a[i] < a[j] }
 
-// Get 90th percentile of the provided samples. Round to integer.
-func (self uint64Slice) Get90Percentile() uint64 {
+// Get percentile of the provided samples. Round to integer.
+func (self Uint64Slice) GetPercentile(d float64) uint64 {
+	if d < 0.0 || d > 1.0 {
+		return 0
+	}
 	count := self.Len()
 	if count == 0 {
 		return 0
 	}
 	sort.Sort(self)
-	n := float64(0.9 * (float64(count) + 1))
+	n := float64(d * (float64(count) + 1))
 	idx, frac := math.Modf(n)
 	index := int(idx)
 	percentile := float64(self[index-1])
@@ -71,7 +74,7 @@ func (self *mean) Add(value uint64) {
 
 type resource struct {
 	// list of samples being tracked.
-	samples uint64Slice
+	samples Uint64Slice
 	// average from existing samples.
 	mean mean
 	// maximum value seen so far in the added samples.
@@ -94,27 +97,31 @@ func (self *resource) Add(p info.Percentiles) {
 // Add a single sample. Internally, we convert it to a fake percentile sample.
 func (self *resource) AddSample(val uint64) {
 	sample := info.Percentiles{
-		Present: true,
-		Mean:    val,
-		Max:     val,
-		Ninety:  val,
+		Present:    true,
+		Mean:       val,
+		Max:        val,
+		Fifty:      val,
+		Ninety:     val,
+		NinetyFive: val,
 	}
 	self.Add(sample)
 }
 
 // Get max, average, and 90p from existing samples.
-func (self *resource) GetPercentile() info.Percentiles {
+func (self *resource) GetAllPercentiles() info.Percentiles {
 	p := info.Percentiles{}
 	p.Mean = uint64(self.mean.Mean)
 	p.Max = self.max
-	p.Ninety = self.samples.Get90Percentile()
+	p.Fifty = self.samples.GetPercentile(0.5)
+	p.Ninety = self.samples.GetPercentile(0.9)
+	p.NinetyFive = self.samples.GetPercentile(0.95)
 	p.Present = true
 	return p
 }
 
 func NewResource(size int) *resource {
 	return &resource{
-		samples: make(uint64Slice, 0, size),
+		samples: make(Uint64Slice, 0, size),
 		mean:    mean{count: 0, Mean: 0},
 	}
 }
@@ -128,8 +135,8 @@ func GetDerivedPercentiles(stats []*info.Usage) info.Usage {
 		memory.Add(stat.Memory)
 	}
 	usage := info.Usage{}
-	usage.Cpu = cpu.GetPercentile()
-	usage.Memory = memory.GetPercentile()
+	usage.Cpu = cpu.GetAllPercentiles()
+	usage.Memory = memory.GetAllPercentiles()
 	return usage
 }
 
@@ -183,7 +190,7 @@ func GetMinutePercentiles(stats []*secondSample) info.Usage {
 	percent := getPercentComplete(stats)
 	return info.Usage{
 		PercentComplete: percent,
-		Cpu:             cpu.GetPercentile(),
-		Memory:          memory.GetPercentile(),
+		Cpu:             cpu.GetAllPercentiles(),
+		Memory:          memory.GetAllPercentiles(),
 	}
 }

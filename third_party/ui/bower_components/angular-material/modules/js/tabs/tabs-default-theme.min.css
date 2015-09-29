@@ -1,6 +1,0 @@
-/*!
- * Angular Material Design
- * https://github.com/angular/material
- * @license MIT
- * v0.7.0-rc3
- */md-tabs.md-THEME_NAME-theme .md-header{background-color:'{{primary-color}}'}md-tabs.md-THEME_NAME-theme.md-accent .md-header{background-color:'{{accent-color}}'}md-tabs.md-THEME_NAME-theme.md-accent md-tab:not([disabled]){color:'{{accent-100}}'}md-tabs.md-THEME_NAME-theme.md-accent md-tab:not([disabled]).active{color:'{{accent-contrast}}'}md-tabs.md-THEME_NAME-theme.md-warn .md-header{background-color:'{{warn-color}}'}md-tabs.md-THEME_NAME-theme.md-warn md-tab:not([disabled]){color:'{{warn-100}}'}md-tabs.md-THEME_NAME-theme.md-warn md-tab:not([disabled]).active{color:'{{warn-contrast}}'}md-tabs.md-THEME_NAME-theme md-tabs-ink-bar{color:'{{primary-contrast}}';background:0 0}md-tabs.md-THEME_NAME-theme md-tab{color:'{{primary-100}}'}md-tabs.md-THEME_NAME-theme md-tab.active{color:'{{primary-contrast}}'}md-tabs.md-THEME_NAME-theme md-tab[disabled]{color:'{{foreground-4}}'}md-tabs.md-THEME_NAME-theme md-tab:focus{color:'{{primary-contrast}}';background-color:'{{primary-contrast-0.1}}'}md-tabs.md-THEME_NAME-theme md-tab .md-ripple-container{color:'{{primary-contrast}}'}

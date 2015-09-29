@@ -18,15 +18,15 @@ package util
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
-	"io"
-	"os"
-	"strings"
 )
 
 type testSSHServer struct {

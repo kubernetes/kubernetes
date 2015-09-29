@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func init() {
@@ -270,76 +270,81 @@ func TestEventf(t *testing.T) {
 		},
 	}
 
+	logCalled := make(chan struct{})
+	createEvent := make(chan *api.Event)
+	updateEvent := make(chan *api.Event)
+	testEvents := testEventSink{
+		OnCreate: func(event *api.Event) (*api.Event, error) {
+			createEvent <- event
+			return event, nil
+		},
+		OnUpdate: func(event *api.Event) (*api.Event, error) {
+			updateEvent <- event
+			return event, nil
+		},
+	}
+	eventBroadcaster := NewBroadcaster()
+	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
 	for _, item := range table {
-		called := make(chan struct{})
-		testEvents := testEventSink{
-			OnCreate: func(event *api.Event) (*api.Event, error) {
-				returnEvent, _ := validateEvent(event, item.expect, t)
-				if item.expectUpdate {
-					t.Errorf("Expected event update(), got event create()")
-				}
-				called <- struct{}{}
-				return returnEvent, nil
-			},
-			OnUpdate: func(event *api.Event) (*api.Event, error) {
-				returnEvent, _ := validateEvent(event, item.expect, t)
-				if !item.expectUpdate {
-					t.Errorf("Expected event create(), got event update()")
-				}
-				called <- struct{}{}
-				return returnEvent, nil
-			},
-		}
-		eventBroadcaster := NewBroadcaster()
-		sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			called <- struct{}{}
+			logCalled <- struct{}{}
 		})
-		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
-		<-called
-		<-called
-		sinkWatcher.Stop()
+		<-logCalled
+
+		// validate event
+		if item.expectUpdate {
+			actualEvent := <-updateEvent
+			validateEvent(actualEvent, item.expect, t)
+		} else {
+			actualEvent := <-createEvent
+			validateEvent(actualEvent, item.expect, t)
+		}
 		logWatcher1.Stop()
 		logWatcher2.Stop()
 	}
+	sinkWatcher.Stop()
 }
 
 func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.T) (*api.Event, error) {
+	recvEvent := *actualEvent
 	expectCompression := expectedEvent.Count > 1
+	t.Logf("expectedEvent.Count is %d\n", expectedEvent.Count)
 	// Just check that the timestamp was set.
-	if actualEvent.FirstTimestamp.IsZero() || actualEvent.LastTimestamp.IsZero() {
-		t.Errorf("timestamp wasn't set: %#v", *actualEvent)
+	if recvEvent.FirstTimestamp.IsZero() || recvEvent.LastTimestamp.IsZero() {
+		t.Errorf("timestamp wasn't set: %#v", recvEvent)
 	}
-	if actualEvent.FirstTimestamp.Equal(actualEvent.LastTimestamp) {
+	actualFirstTimestamp := recvEvent.FirstTimestamp
+	actualLastTimestamp := recvEvent.LastTimestamp
+	if actualFirstTimestamp.Equal(actualLastTimestamp) {
 		if expectCompression {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurance of the event, but were different. Actual Event: %#v", actualEvent.FirstTimestamp, actualEvent.LastTimestamp, *actualEvent)
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, recvEvent)
 		}
 	} else {
-		if !expectCompression {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", actualEvent.FirstTimestamp, actualEvent.LastTimestamp, *actualEvent)
+		if expectedEvent.Count == 1 {
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, recvEvent)
 		}
 	}
-	actualFirstTimestamp := actualEvent.FirstTimestamp
-	actualLastTimestamp := actualEvent.LastTimestamp
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
-	actualEvent.FirstTimestamp = expectedEvent.FirstTimestamp
-	actualEvent.LastTimestamp = expectedEvent.LastTimestamp
+	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
+	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
 	// Check that name has the right prefix.
-	if n, en := actualEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
+	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
 		t.Errorf("Name '%v' does not contain prefix '%v'", n, en)
 	}
-	actualEvent.Name = expectedEvent.Name
-	if e, a := expectedEvent, actualEvent; !reflect.DeepEqual(e, a) {
+	recvEvent.Name = expectedEvent.Name
+	if e, a := expectedEvent, &recvEvent; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectGoPrintDiff(e, a))
 	}
-	actualEvent.FirstTimestamp = actualFirstTimestamp
-	actualEvent.LastTimestamp = actualLastTimestamp
+	recvEvent.FirstTimestamp = actualFirstTimestamp
+	recvEvent.LastTimestamp = actualLastTimestamp
 	return actualEvent, nil
 }
 
@@ -523,42 +528,323 @@ func TestEventfNoNamespace(t *testing.T) {
 		},
 	}
 
+	logCalled := make(chan struct{})
+	createEvent := make(chan *api.Event)
+	updateEvent := make(chan *api.Event)
+	testEvents := testEventSink{
+		OnCreate: func(event *api.Event) (*api.Event, error) {
+			createEvent <- event
+			return event, nil
+		},
+		OnUpdate: func(event *api.Event) (*api.Event, error) {
+			updateEvent <- event
+			return event, nil
+		},
+	}
+	eventBroadcaster := NewBroadcaster()
+	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+
 	for _, item := range table {
-		called := make(chan struct{})
-		testEvents := testEventSink{
-			OnCreate: func(event *api.Event) (*api.Event, error) {
-				returnEvent, _ := validateEvent(event, item.expect, t)
-				if item.expectUpdate {
-					t.Errorf("Expected event update(), got event create()")
-				}
-				called <- struct{}{}
-				return returnEvent, nil
-			},
-			OnUpdate: func(event *api.Event) (*api.Event, error) {
-				returnEvent, _ := validateEvent(event, item.expect, t)
-				if !item.expectUpdate {
-					t.Errorf("Expected event create(), got event update()")
-				}
-				called <- struct{}{}
-				return returnEvent, nil
-			},
-		}
-		eventBroadcaster := NewBroadcaster()
-		sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			called <- struct{}{}
+			logCalled <- struct{}{}
 		})
-		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
-		<-called
-		<-called
-		sinkWatcher.Stop()
+		<-logCalled
+
+		// validate event
+		if item.expectUpdate {
+			actualEvent := <-updateEvent
+			validateEvent(actualEvent, item.expect, t)
+		} else {
+			actualEvent := <-createEvent
+			validateEvent(actualEvent, item.expect, t)
+		}
+
 		logWatcher1.Stop()
 		logWatcher2.Stop()
 	}
+	sinkWatcher.Stop()
+}
+
+func TestMultiSinkCache(t *testing.T) {
+	testPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			SelfLink:  "/api/version/pods/foo",
+			Name:      "foo",
+			Namespace: "baz",
+			UID:       "bar",
+		},
+	}
+	testPod2 := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			SelfLink:  "/api/version/pods/foo",
+			Name:      "foo",
+			Namespace: "baz",
+			UID:       "differentUid",
+		},
+	}
+	testRef, err := api.GetPartialReference(testPod, "spec.containers[2]")
+	testRef2, err := api.GetPartialReference(testPod2, "spec.containers[3]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := []struct {
+		obj          runtime.Object
+		reason       string
+		messageFmt   string
+		elements     []interface{}
+		expect       *api.Event
+		expectLog    string
+		expectUpdate bool
+	}{
+		{
+			obj:        testRef,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "version",
+					FieldPath:  "spec.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testPod,
+			reason:     "Killed",
+			messageFmt: "some other verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "version",
+				},
+				Reason:  "Killed",
+				Message: "some other verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:""}): reason: 'Killed' some other verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testRef,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "version",
+					FieldPath:  "spec.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   2,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectUpdate: true,
+		},
+		{
+			obj:        testRef2,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "differentUid",
+					APIVersion: "version",
+					FieldPath:  "spec.containers[3]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[3]"}): reason: 'Started' some verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testRef,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "version",
+					FieldPath:  "spec.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   3,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectUpdate: true,
+		},
+		{
+			obj:        testRef2,
+			reason:     "Stopped",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "differentUid",
+					APIVersion: "version",
+					FieldPath:  "spec.containers[3]",
+				},
+				Reason:  "Stopped",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testRef2,
+			reason:     "Stopped",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "differentUid",
+					APIVersion: "version",
+					FieldPath:  "spec.containers[3]",
+				},
+				Reason:  "Stopped",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   2,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
+			expectUpdate: true,
+		},
+	}
+
+	createEvent := make(chan *api.Event)
+	updateEvent := make(chan *api.Event)
+	testEvents := testEventSink{
+		OnCreate: func(event *api.Event) (*api.Event, error) {
+			createEvent <- event
+			return event, nil
+		},
+		OnUpdate: func(event *api.Event) (*api.Event, error) {
+			updateEvent <- event
+			return event, nil
+		},
+	}
+
+	createEvent2 := make(chan *api.Event)
+	updateEvent2 := make(chan *api.Event)
+	testEvents2 := testEventSink{
+		OnCreate: func(event *api.Event) (*api.Event, error) {
+			createEvent2 <- event
+			return event, nil
+		},
+		OnUpdate: func(event *api.Event) (*api.Event, error) {
+			updateEvent2 <- event
+			return event, nil
+		},
+	}
+
+	eventBroadcaster := NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+
+	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+	for _, item := range table {
+		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
+
+		// validate event
+		if item.expectUpdate {
+			actualEvent := <-updateEvent
+			validateEvent(actualEvent, item.expect, t)
+		} else {
+			actualEvent := <-createEvent
+			validateEvent(actualEvent, item.expect, t)
+		}
+	}
+
+	// Another StartRecordingToSink call should start to record events with new clean cache.
+	sinkWatcher2 := eventBroadcaster.StartRecordingToSink(&testEvents2)
+	for _, item := range table {
+		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
+
+		// validate event
+		if item.expectUpdate {
+			actualEvent := <-updateEvent2
+			validateEvent(actualEvent, item.expect, t)
+		} else {
+			actualEvent := <-createEvent2
+			validateEvent(actualEvent, item.expect, t)
+		}
+	}
+
+	sinkWatcher.Stop()
+	sinkWatcher2.Stop()
 }

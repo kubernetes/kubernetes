@@ -2,10 +2,6 @@
 
 package flavors
 
-import (
-	os "github.com/rackspace/gophercloud/openstack/compute/v2/flavors"
-)
-
 // ListOutput is a sample response of a flavor List request.
 const ListOutput = `
 {
@@ -103,7 +99,7 @@ const GetOutput = `
 
 // Performance1Flavor is the expected result of parsing GetOutput, or the first element of
 // ListOutput.
-var Performance1Flavor = os.Flavor{
+var Performance1Flavor = Flavor{
 	ID:         "performance1-1",
 	Disk:       20,
 	RAM:        1024,
@@ -111,10 +107,16 @@ var Performance1Flavor = os.Flavor{
 	RxTxFactor: 200.0,
 	Swap:       0,
 	VCPUs:      1,
+	ExtraSpecs: ExtraSpecs{
+		NumDataDisks: 0,
+		Class:        "performance1",
+		DiskIOIndex:  0,
+		PolicyClass:  "performance_flavor",
+	},
 }
 
 // Performance2Flavor is the second result expected from parsing ListOutput.
-var Performance2Flavor = os.Flavor{
+var Performance2Flavor = Flavor{
 	ID:         "performance1-2",
 	Disk:       40,
 	RAM:        2048,
@@ -122,8 +124,14 @@ var Performance2Flavor = os.Flavor{
 	RxTxFactor: 400.0,
 	Swap:       0,
 	VCPUs:      2,
+	ExtraSpecs: ExtraSpecs{
+		NumDataDisks: 0,
+		Class:        "performance1",
+		DiskIOIndex:  0,
+		PolicyClass:  "performance_flavor",
+	},
 }
 
 // ExpectedFlavorSlice is the slice of Flavor structs that are expected to be parsed from
 // ListOutput.
-var ExpectedFlavorSlice = []os.Flavor{Performance1Flavor, Performance2Flavor}
+var ExpectedFlavorSlice = []Flavor{Performance1Flavor, Performance2Flavor}

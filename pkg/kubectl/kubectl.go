@@ -18,27 +18,16 @@ limitations under the License.
 package kubectl
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
 
 type NamespaceInfo struct {
 	Namespace string
-}
-
-// TODO Move to labels package.
-func formatLabels(labelMap map[string]string) string {
-	l := labels.Set(labelMap).String()
-	if l == "" {
-		l = "<none>"
-	}
-	return l
 }
 
 func listOfImages(spec *api.PodSpec) []string {
@@ -90,10 +79,6 @@ type ShortcutExpander struct {
 func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	resource = expandResourceShortcut(resource)
 	defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(resource)
-	// TODO: remove this once v1beta1 and v1beta2 are deprecated
-	if err == nil && kind == "Minion" {
-		err = fmt.Errorf("Alias minion(s) is deprecated. Use node(s) instead")
-	}
 	return defaultVersion, kind, err
 }
 
@@ -106,16 +91,17 @@ func expandResourceShortcut(resource string) string {
 		"cs":     "componentstatuses",
 		"ev":     "events",
 		"ep":     "endpoints",
-		"limits": "limitRanges",
+		"hpa":    "horizontalpodautoscalers",
+		"limits": "limitranges",
 		"no":     "nodes",
+		"ns":     "namespaces",
 		"po":     "pods",
-		"pv":     "persistentVolumes",
-		"pvc":    "persistentVolumeClaims",
-		"quota":  "resourceQuotas",
+		"pv":     "persistentvolumes",
+		"pvc":    "persistentvolumeclaims",
+		"quota":  "resourcequotas",
 		"rc":     "replicationcontrollers",
-		// DEPRECATED: will be removed before 1.0
-		"se":  "services",
-		"svc": "services",
+		"ds":     "daemonsets",
+		"svc":    "services",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded

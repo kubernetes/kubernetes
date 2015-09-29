@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	kubelet "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
+	kubelet "k8s.io/kubernetes/cmd/kubelet/app"
 )
 
 // NewKubelet creates a new hyperkube Server object that includes the
@@ -32,8 +32,8 @@ func NewKubelet() *Server {
 		queries Docker to see what is currently running.  It synchronizes the
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
-		Run: func(_ *Server, args []string) error {
-			return s.Run(args)
+		Run: func(_ *Server, _ []string) error {
+			return s.Run(nil)
 		},
 	}
 	s.AddFlags(hks.Flags())

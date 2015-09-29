@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -19,17 +18,11 @@ import (
 )
 
 var (
-	startPort = 10000 + rand.Intn(30000)
-	globalWG  = new(sync.WaitGroup)
+	globalWG = new(sync.WaitGroup)
 )
 
 func noopHandler(*upid.UPID, proto.Message) {
 	globalWG.Done()
-}
-
-func getNewPort() int {
-	startPort++
-	return startPort
 }
 
 func shuffleMessages(queue *[]proto.Message) {
@@ -136,39 +129,25 @@ func runTestServer(b *testing.B, wg *sync.WaitGroup) *httptest.Server {
 }
 
 func TestMessengerFailToInstall(t *testing.T) {
-	m := NewHttp(&upid.UPID{ID: "mesos"})
+	m := NewHttp(upid.UPID{ID: "mesos"})
 	handler := func(from *upid.UPID, pbMsg proto.Message) {}
 	assert.NotNil(t, m)
 	assert.NoError(t, m.Install(handler, &testmessage.SmallMessage{}))
 	assert.Error(t, m.Install(handler, &testmessage.SmallMessage{}))
 }
 
-func TestMessengerFailToStart(t *testing.T) {
-	port := strconv.Itoa(getNewPort())
-	m1 := NewHttp(&upid.UPID{ID: "mesos", Host: "localhost", Port: port})
-	m2 := NewHttp(&upid.UPID{ID: "mesos", Host: "localhost", Port: port})
-	assert.NoError(t, m1.Start())
-	assert.Error(t, m2.Start())
-}
-
 func TestMessengerFailToSend(t *testing.T) {
-	upid, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-	m := NewHttp(upid)
+	m := NewHttp(upid.UPID{ID: "foo", Host: "localhost"})
 	assert.NoError(t, m.Start())
-	assert.Error(t, m.Send(context.TODO(), upid, &testmessage.SmallMessage{}))
+	self := m.UPID()
+	assert.Error(t, m.Send(context.TODO(), &self, &testmessage.SmallMessage{}))
 }
 
 func TestMessenger(t *testing.T) {
 	messages := generateMixedMessages(1000)
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-	upid2, err := upid.Parse(fmt.Sprintf("mesos2@localhost:%d", getNewPort()))
-	assert.NoError(t, err)
-
-	m1 := NewHttp(upid1)
-	m2 := NewHttp(upid2)
+	m1 := NewHttp(upid.UPID{ID: "mesos1", Host: "localhost"})
+	m2 := NewHttp(upid.UPID{ID: "mesos2", Host: "localhost"})
 
 	done := make(chan struct{})
 	counts := make([]int, 4)
@@ -177,10 +156,11 @@ func TestMessenger(t *testing.T) {
 
 	assert.NoError(t, m1.Start())
 	assert.NoError(t, m2.Start())
+	upid2 := m2.UPID()
 
 	go func() {
 		for _, msg := range messages {
-			assert.NoError(t, m1.Send(context.TODO(), upid2, msg))
+			assert.NoError(t, m1.Send(context.TODO(), &upid2, msg))
 		}
 	}()
 
@@ -204,20 +184,20 @@ func BenchmarkMessengerSendSmallMessage(b *testing.B) {
 	srv := runTestServer(b, wg)
 	defer srv.Close()
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
 	upid2, err := upid.Parse(fmt.Sprintf("testserver@%s", srv.Listener.Addr().String()))
-
 	assert.NoError(b, err)
 
-	m1 := NewHttp(upid1)
+	m1 := NewHttp(upid.UPID{ID: "mesos1", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m1.Send(context.TODO(), upid2, messages[i%1000])
 	}
 	wg.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendMediumMessage(b *testing.B) {
@@ -228,19 +208,20 @@ func BenchmarkMessengerSendMediumMessage(b *testing.B) {
 	srv := runTestServer(b, wg)
 	defer srv.Close()
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
 	upid2, err := upid.Parse(fmt.Sprintf("testserver@%s", srv.Listener.Addr().String()))
 	assert.NoError(b, err)
 
-	m1 := NewHttp(upid1)
+	m1 := NewHttp(upid.UPID{ID: "mesos1", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m1.Send(context.TODO(), upid2, messages[i%1000])
 	}
 	wg.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendBigMessage(b *testing.B) {
@@ -251,19 +232,20 @@ func BenchmarkMessengerSendBigMessage(b *testing.B) {
 	srv := runTestServer(b, wg)
 	defer srv.Close()
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
 	upid2, err := upid.Parse(fmt.Sprintf("testserver@%s", srv.Listener.Addr().String()))
 	assert.NoError(b, err)
 
-	m1 := NewHttp(upid1)
+	m1 := NewHttp(upid.UPID{ID: "mesos1", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m1.Send(context.TODO(), upid2, messages[i%1000])
 	}
 	wg.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendLargeMessage(b *testing.B) {
@@ -274,19 +256,20 @@ func BenchmarkMessengerSendLargeMessage(b *testing.B) {
 	srv := runTestServer(b, wg)
 	defer srv.Close()
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
 	upid2, err := upid.Parse(fmt.Sprintf("testserver@%s", srv.Listener.Addr().String()))
 	assert.NoError(b, err)
 
-	m1 := NewHttp(upid1)
+	m1 := NewHttp(upid.UPID{ID: "mesos1", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m1.Send(context.TODO(), upid2, messages[i%1000])
 	}
 	wg.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendMixedMessage(b *testing.B) {
@@ -297,19 +280,20 @@ func BenchmarkMessengerSendMixedMessage(b *testing.B) {
 	srv := runTestServer(b, wg)
 	defer srv.Close()
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
 	upid2, err := upid.Parse(fmt.Sprintf("testserver@%s", srv.Listener.Addr().String()))
 	assert.NoError(b, err)
 
-	m1 := NewHttp(upid1)
+	m1 := NewHttp(upid.UPID{ID: "mesos1", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m1.Send(context.TODO(), upid2, messages[i%1000])
 	}
 	wg.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendRecvSmallMessage(b *testing.B) {
@@ -317,23 +301,25 @@ func BenchmarkMessengerSendRecvSmallMessage(b *testing.B) {
 
 	messages := generateSmallMessages(1000)
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-	upid2, err := upid.Parse(fmt.Sprintf("mesos2@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-
-	m1 := NewHttp(upid1)
-	m2 := NewHttp(upid2)
+	m1 := NewHttp(upid.UPID{ID: "foo1", Host: "localhost"})
+	m2 := NewHttp(upid.UPID{ID: "foo2", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
+
 	assert.NoError(b, m2.Start())
+	defer m2.Stop()
+
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.SmallMessage{}))
 
-	time.Sleep(time.Second) // Avoid race on upid.
+	upid2 := m2.UPID()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m1.Send(context.TODO(), upid2, messages[i%1000])
+		m1.Send(context.TODO(), &upid2, messages[i%1000])
 	}
 	globalWG.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendRecvMediumMessage(b *testing.B) {
@@ -341,23 +327,25 @@ func BenchmarkMessengerSendRecvMediumMessage(b *testing.B) {
 
 	messages := generateMediumMessages(1000)
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-	upid2, err := upid.Parse(fmt.Sprintf("mesos2@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-
-	m1 := NewHttp(upid1)
-	m2 := NewHttp(upid2)
+	m1 := NewHttp(upid.UPID{ID: "foo1", Host: "localhost"})
+	m2 := NewHttp(upid.UPID{ID: "foo2", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
+
 	assert.NoError(b, m2.Start())
+	defer m2.Stop()
+
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.MediumMessage{}))
 
-	time.Sleep(time.Second) // Avoid race on upid.
+	upid2 := m2.UPID()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m1.Send(context.TODO(), upid2, messages[i%1000])
+		m1.Send(context.TODO(), &upid2, messages[i%1000])
 	}
 	globalWG.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendRecvBigMessage(b *testing.B) {
@@ -365,72 +353,78 @@ func BenchmarkMessengerSendRecvBigMessage(b *testing.B) {
 
 	messages := generateBigMessages(1000)
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-	upid2, err := upid.Parse(fmt.Sprintf("mesos2@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-
-	m1 := NewHttp(upid1)
-	m2 := NewHttp(upid2)
+	m1 := NewHttp(upid.UPID{ID: "foo1", Host: "localhost"})
+	m2 := NewHttp(upid.UPID{ID: "foo2", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
+
 	assert.NoError(b, m2.Start())
+	defer m2.Stop()
+
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.BigMessage{}))
 
-	time.Sleep(time.Second) // Avoid race on upid.
+	upid2 := m2.UPID()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m1.Send(context.TODO(), upid2, messages[i%1000])
+		m1.Send(context.TODO(), &upid2, messages[i%1000])
 	}
 	globalWG.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendRecvLargeMessage(b *testing.B) {
 	globalWG.Add(b.N)
 	messages := generateLargeMessages(1000)
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-	upid2, err := upid.Parse(fmt.Sprintf("mesos2@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-
-	m1 := NewHttp(upid1)
-	m2 := NewHttp(upid2)
+	m1 := NewHttp(upid.UPID{ID: "foo1", Host: "localhost"})
+	m2 := NewHttp(upid.UPID{ID: "foo2", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
+
 	assert.NoError(b, m2.Start())
+	defer m2.Stop()
+
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.LargeMessage{}))
 
-	time.Sleep(time.Second) // Avoid race on upid.
+	upid2 := m2.UPID()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m1.Send(context.TODO(), upid2, messages[i%1000])
+		m1.Send(context.TODO(), &upid2, messages[i%1000])
 	}
 	globalWG.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func BenchmarkMessengerSendRecvMixedMessage(b *testing.B) {
 	globalWG.Add(b.N)
 	messages := generateMixedMessages(1000)
 
-	upid1, err := upid.Parse(fmt.Sprintf("mesos1@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-	upid2, err := upid.Parse(fmt.Sprintf("mesos2@localhost:%d", getNewPort()))
-	assert.NoError(b, err)
-
-	m1 := NewHttp(upid1)
-	m2 := NewHttp(upid2)
+	m1 := NewHttp(upid.UPID{ID: "foo1", Host: "localhost"})
+	m2 := NewHttp(upid.UPID{ID: "foo2", Host: "localhost"})
 	assert.NoError(b, m1.Start())
+	defer m1.Stop()
+
 	assert.NoError(b, m2.Start())
+	defer m2.Stop()
+
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.SmallMessage{}))
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.MediumMessage{}))
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.BigMessage{}))
 	assert.NoError(b, m2.Install(noopHandler, &testmessage.LargeMessage{}))
 
-	time.Sleep(time.Second) // Avoid race on upid.
+	upid2 := m2.UPID()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m1.Send(context.TODO(), upid2, messages[i%1000])
+		m1.Send(context.TODO(), &upid2, messages[i%1000])
 	}
 	globalWG.Wait()
+	b.StopTimer()
+	time.Sleep(2 * time.Second) // allow time for connection cleanup
 }
 
 func TestUPIDBindingAddress(t *testing.T) {

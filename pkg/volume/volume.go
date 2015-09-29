@@ -18,6 +18,7 @@ package volume
 
 import (
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/api"
 	"os"
 	"path"
 )
@@ -41,6 +42,9 @@ type Builder interface {
 	// directory path, which may or may not exist yet.  This may be called
 	// more than once, so implementations must be idempotent.
 	SetUpAt(dir string) error
+	// IsReadOnly is a flag that gives the builder's ReadOnly attribute.
+	// All persistent volumes have a private readOnly flag in their builders.
+	IsReadOnly() bool
 }
 
 // Cleaner interface provides methods to cleanup/unmount the volumes.
@@ -60,6 +64,20 @@ type Recycler interface {
 	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
 	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
 	Recycle() error
+}
+
+// Create adds a new resource in the storage provider and creates a PersistentVolume for the new resource.
+// Calls to Create should block until complete.
+type Creater interface {
+	Create() (*api.PersistentVolume, error)
+}
+
+// Delete removes the resource from the underlying storage provider.  Calls to this method should block until
+// the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
+// A nil return indicates success.
+type Deleter interface {
+	Volume
+	Delete() error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {

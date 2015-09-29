@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
+	watchjson "k8s.io/kubernetes/pkg/watch/json"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"

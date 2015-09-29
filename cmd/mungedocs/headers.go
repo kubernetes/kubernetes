@@ -19,53 +19,56 @@ package main
 import (
 	"fmt"
 	"regexp"
-	"strings"
 )
 
 var headerRegex = regexp.MustCompile(`^(#+)\s*(.*)$`)
-var whitespaceRegex = regexp.MustCompile(`^\s*$`)
 
-func fixHeaderLines(fileBytes []byte) []byte {
-	lines := splitLines(fileBytes)
-	out := []string{}
-	for i := range lines {
-		matches := headerRegex.FindStringSubmatch(lines[i])
-		if matches == nil {
-			out = append(out, lines[i])
-			continue
-		}
-		if i > 0 && !whitespaceRegex.Match([]byte(out[len(out)-1])) {
-			out = append(out, "")
-		}
-		out = append(out, fmt.Sprintf("%s %s", matches[1], matches[2]))
-		if i+1 < len(lines) && !whitespaceRegex.Match([]byte(lines[i+1])) {
-			out = append(out, "")
+func fixHeaderLine(mlines mungeLines, newlines mungeLines, linenum int) mungeLines {
+	var out mungeLines
+
+	mline := mlines[linenum]
+	line := mlines[linenum].data
+
+	matches := headerRegex.FindStringSubmatch(line)
+	if matches == nil {
+		out = append(out, mline)
+		return out
+	}
+
+	// There must be a blank line before the # (unless first line in file)
+	if linenum != 0 {
+		newlen := len(newlines)
+		if newlines[newlen-1].data != "" {
+			out = append(out, blankMungeLine)
 		}
 	}
-	final := strings.Join(out, "\n")
-	// Preserve the end of the file.
-	if len(fileBytes) > 0 && fileBytes[len(fileBytes)-1] == '\n' {
-		final += "\n"
+
+	// There must be a space AFTER the ##'s
+	newline := fmt.Sprintf("%s %s", matches[1], matches[2])
+	newmline := newMungeLine(newline)
+	out = append(out, newmline)
+
+	// The next line needs to be a blank line (unless last line in file)
+	if len(mlines) > linenum+1 && mlines[linenum+1].data != "" {
+		out = append(out, blankMungeLine)
 	}
-	return []byte(final)
+	return out
 }
 
 // Header lines need whitespace around them and after the #s.
-func checkHeaderLines(filePath string, fileBytes []byte) ([]byte, error) {
-	fbs := splitByPreformatted(fileBytes)
-	fbs = append([]fileBlock{{false, []byte{}}}, fbs...)
-	fbs = append(fbs, fileBlock{false, []byte{}})
-
-	for i := range fbs {
-		block := &fbs[i]
-		if block.preformatted {
+func updateHeaderLines(filePath string, mlines mungeLines) (mungeLines, error) {
+	var out mungeLines
+	for i, mline := range mlines {
+		if mline.preformatted {
+			out = append(out, mline)
 			continue
 		}
-		block.data = fixHeaderLines(block.data)
+		if !mline.header {
+			out = append(out, mline)
+			continue
+		}
+		newLines := fixHeaderLine(mlines, out, i)
+		out = append(out, newLines...)
 	}
-	output := []byte{}
-	for _, block := range fbs {
-		output = append(output, block.data...)
-	}
-	return output, nil
+	return out, nil
 }

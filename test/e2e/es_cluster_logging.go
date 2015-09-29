@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -269,7 +269,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		}
 
 		// Ask Elasticsearch to return all the log lines that were tagged with the underscore
-		// verison of the name. Ask for twice as many log lines as we expect to check for
+		// version of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
 		body, err = f.Client.Get().
 			Namespace(api.NamespaceSystem).

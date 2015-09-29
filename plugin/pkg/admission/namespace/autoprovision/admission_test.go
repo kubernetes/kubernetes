@@ -19,11 +19,12 @@ package autoprovision
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // TestAdmission verifies a namespace is created on create requests for namespace managed resources
@@ -45,10 +46,11 @@ func TestAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
-	if len(mockClient.Actions) != 1 {
+	actions := mockClient.Actions()
+	if len(actions) != 1 {
 		t.Errorf("Expected a create-namespace request")
 	}
-	if mockClient.Actions[0].Action != "create-namespace" {
+	if !actions[0].Matches("create", "namespaces") {
 		t.Errorf("Expected a create-namespace request to be made via the client")
 	}
 }
@@ -76,7 +78,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
-	if len(mockClient.Actions) != 0 {
+	if len(mockClient.Actions()) != 0 {
 		t.Errorf("No client request should have been made")
 	}
 }
@@ -97,7 +99,7 @@ func TestIgnoreAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
-	if len(mockClient.Actions) != 0 {
+	if len(mockClient.Actions()) != 0 {
 		t.Errorf("No client request should have been made")
 	}
 }
@@ -105,9 +107,11 @@ func TestIgnoreAdmission(t *testing.T) {
 // TestAdmissionNamespaceExistsUnknownToHandler
 func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	namespace := "test"
-	mockClient := &testclient.Fake{
-		Err: errors.NewAlreadyExists("namespaces", namespace),
-	}
+	mockClient := &testclient.Fake{}
+	mockClient.AddReactor("create", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.NewAlreadyExists("namespaces", namespace)
+	})
+
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	handler := &provision{
 		client: mockClient,

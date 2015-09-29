@@ -60,6 +60,8 @@ It provides a step by step walk through of adding Kubernetes to a Mesos cluster 
 **NOTE:** There are [known issues with the current implementation][7] and support for centralized logging and monitoring is not yet available.
 Please [file an issue against the kubernetes-mesos project][8] if you have problems completing the steps below.
 
+Further information is available in the Kubernetes on Mesos [contrib directory][13].
+
 ### Prerequisites
 
 * Understanding of [Apache Mesos][6]
@@ -83,7 +85,7 @@ ssh jclouds@${ip_address_of_master_node}
 Build Kubernetes-Mesos.
 
 ```bash
-git clone https://github.com/GoogleCloudPlatform/kubernetes
+git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 export KUBERNETES_CONTRIB=mesos
 make
@@ -97,12 +99,17 @@ export KUBERNETES_MASTER_IP=$(hostname -i)
 export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 ```
 
+Note that KUBERNETES_MASTER is used as the api endpoint. If you have existing `~/.kube/config` and point to another endpoint, you need to add option `--server=${KUBERNETES_MASTER}` to kubectl in later steps.
+
 ### Deploy etcd
 
 Start etcd and verify that it is running:
 
 ```bash
-sudo docker run -d --hostname $(uname -n) --name etcd -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12
+sudo docker run -d --hostname $(uname -n) --name etcd \
+  -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12 \
+  --listen-client-urls http://0.0.0.0:4001 \
+  --advertise-client-urls http://${KUBERNETES_MASTER_IP}:4001
 ```
 
 ```console
@@ -127,7 +134,7 @@ Update your PATH to more easily run the Kubernetes-Mesos binaries:
 export PATH="$(pwd)/_output/local/go/bin:$PATH"
 ```
 
-Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
+Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos-master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
 In order to let Kubernetes survive Mesos master changes, the ZooKeeper URL is recommended for production environments.
 
 ```bash
@@ -153,6 +160,7 @@ $ km apiserver \
   --port=8888 \
   --cloud-provider=mesos \
   --cloud-config=mesos-cloud.conf \
+  --secure-port=0 \
   --v=1 >apiserver.log 2>&1 &
 
 $ km controller-manager \
@@ -202,7 +210,7 @@ kubernetes       component=apiserver,provider=kubernetes   <none>     10.10.10.1
 ```
 
 Lastly, look for Kubernetes in the Mesos web GUI by pointing your browser to
-`http://<mesos_master_ip:port>`. Make sure you have an active VPN connection.
+`http://<mesos-master-ip:port>`. Make sure you have an active VPN connection.
 Go to the Frameworks tab, and look for an active framework named "Kubernetes".
 
 ## Spin up a pod
@@ -344,6 +352,8 @@ Address 1: 10.10.10.1
 
 Try out some of the standard [Kubernetes examples][9].
 
+Read about Kubernetes on Mesos' architecture in the [contrib directory][13].
+
 **NOTE:** Some examples require Kubernetes DNS to be installed on the cluster.
 Future work will add instructions to this guide to enable support for Kubernetes DNS.
 
@@ -355,12 +365,13 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [4]: ../../cluster/addons/dns/README.md
 [5]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/
 [6]: http://mesos.apache.org/
-[7]: https://github.com/mesosphere/kubernetes-mesos/blob/master/docs/issues.md
+[7]: ../../contrib/mesos/docs/issues.md
 [8]: https://github.com/mesosphere/kubernetes-mesos/issues
 [9]: ../../examples/
 [10]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/#vpn-setup
 [11]: ../../cluster/addons/dns/skydns-rc.yaml.in
 [12]: ../../cluster/addons/dns/skydns-svc.yaml.in
+[13]: ../../contrib/mesos/README.md
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -26,7 +26,7 @@ import (
 func ExpectValue(t *testing.T, atomicValue *AtomicValue, expectedValue interface{}) {
 	actualValue := atomicValue.Load()
 	if actualValue != expectedValue {
-		t.Error("Expected to find %v, found %v", expectedValue, actualValue)
+		t.Errorf("Expected to find %v, found %v", expectedValue, actualValue)
 	}
 	ch := make(chan interface{})
 	go func() {
@@ -35,10 +35,10 @@ func ExpectValue(t *testing.T, atomicValue *AtomicValue, expectedValue interface
 	select {
 	case actualValue = <-ch:
 		if actualValue != expectedValue {
-			t.Error("Expected to find %v, found %v", expectedValue, actualValue)
+			t.Errorf("Expected to find %v, found %v", expectedValue, actualValue)
 			return
 		}
-	case <-time.After(time.Second * 5):
+	case <-time.After(ForeverTestTimeout):
 		t.Error("Value could not be read")
 		return
 	}

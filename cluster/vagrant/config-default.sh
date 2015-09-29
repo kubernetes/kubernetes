@@ -21,14 +21,17 @@ NUM_MINIONS=${NUM_MINIONS-"1"}
 export NUM_MINIONS
 
 # The IP of the master
-export MASTER_IP="10.245.1.2"
-export KUBE_MASTER_IP="10.245.1.2"
+export MASTER_IP=${MASTER_IP-"10.245.1.2"}
+export KUBE_MASTER_IP=${MASTER_IP}
 
 export INSTANCE_PREFIX="kubernetes"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
+# Should the master serve as a node
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
+
 # Map out the IPs, names and container subnets of each minion
-export MINION_IP_BASE="10.245.1."
+export MINION_IP_BASE=${MINION_IP_BASE-"10.245.1."}
 MINION_CONTAINER_SUBNET_BASE="10.246"
 MASTER_CONTAINER_NETMASK="255.255.255.0"
 MASTER_CONTAINER_ADDR="${MINION_CONTAINER_SUBNET_BASE}.0.1"
@@ -50,7 +53,7 @@ MASTER_USER=vagrant
 MASTER_PASSWD=vagrant
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
@@ -71,13 +74,19 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # TODO Enable selinux when Fedora 21 repositories get an updated docker package
 #   see https://bugzilla.redhat.com/show_bug.cgi?id=1216151
 #EXTRA_DOCKER_OPTS="-b=cbr0 --selinux-enabled --insecure-registry 10.0.0.0/8"
-EXTRA_DOCKER_OPTS="-b=cbr0 --insecure-registry 10.0.0.0/8"
+EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+
+# Flag to tell the kubelet to enable CFS quota support
+ENABLE_CPU_CFS_QUOTA="${KUBE_ENABLE_CPU_CFS_QUOTA:-true}"
 
 # Optional: Install cluster DNS.
-ENABLE_CLUSTER_DNS=true
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.247.0.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
+
+# Optional: Install Kubernetes UI
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""

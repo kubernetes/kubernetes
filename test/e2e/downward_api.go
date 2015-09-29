@@ -19,35 +19,14 @@ package e2e
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Downward API", func() {
-	var c *client.Client
-	var ns string
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("downward-api", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		// Clean up the namespace if a non-default one was used
-		if ns != api.NamespaceDefault {
-			By("Cleaning up the namespace")
-			err := c.Namespaces().Delete(ns)
-			expectNoError(err)
-		}
-	})
+	framework := NewFramework("downward-api")
 
 	It("should provide pod name and namespace as env vars", func() {
 		podName := "downward-api-" + string(util.NewUUID())
@@ -88,9 +67,9 @@ var _ = Describe("Downward API", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("downward api env vars", c, pod, 0, []string{
+		framework.TestContainerOutput("downward api env vars", pod, 0, []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
-			fmt.Sprintf("POD_NAMESPACE=%v", ns),
-		}, ns)
+			fmt.Sprintf("POD_NAMESPACE=%v", framework.Namespace.Name),
+		})
 	})
 })

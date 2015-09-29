@@ -22,8 +22,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func GetHostname(hostnameOverride string) string {

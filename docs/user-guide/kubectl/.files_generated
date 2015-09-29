@@ -1,5 +1,7 @@
 kubectl.md
+kubectl_annotate.md
 kubectl_api-versions.md
+kubectl_attach.md
 kubectl_cluster-info.md
 kubectl_config.md
 kubectl_config_set-cluster.md
@@ -12,6 +14,7 @@ kubectl_config_view.md
 kubectl_create.md
 kubectl_delete.md
 kubectl_describe.md
+kubectl_edit.md
 kubectl_exec.md
 kubectl_expose.md
 kubectl_get.md

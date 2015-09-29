@@ -90,7 +90,7 @@ In addition to the local disk storage provided by `emptyDir`, Kubernetes support
 
 ## Distributing credentials
 
-Many applications need credentials, such as passwords, OAuth tokens, and TLS keys, to authenticate with other applications, databases, and services. Storing these credentials in container images or environment variables is less than ideal, since the credentials can then be copied by anyone with access to the image, pod/container specification, host file system, or host Docker daemon. 
+Many applications need credentials, such as passwords, OAuth tokens, and TLS keys, to authenticate with other applications, databases, and services. Storing these credentials in container images or environment variables is less than ideal, since the credentials can then be copied by anyone with access to the image, pod/container specification, host file system, or host Docker daemon.
 
 Kubernetes provides a mechanism, called [*secrets*](secrets.md), that facilitates delivery of sensitive credentials to applications. A `Secret` is a simple resource containing a map of data. For instance, a simple secret with a username and password might look as follows:
 
@@ -206,7 +206,7 @@ spec:
 
 [Pods](pods.md) support running multiple containers co-located together. They can be used to host vertically integrated application stacks, but their primary motivation is to support auxiliary helper programs that assist the primary application. Typical examples are data pullers, data pushers, and proxies.
 
-Such containers typically need to communicate with one another, often through the file system. This can be achieved by mounting the same volume into both containers. An example of this pattern would be a web server with a [program that polls a git repository](../../contrib/git-sync/) for new updates:
+Such containers typically need to communicate with one another, often through the file system. This can be achieved by mounting the same volume into both containers. An example of this pattern would be a web server with a [program that polls a git repository](http://releases.k8s.io/HEAD/contrib/git-sync/) for new updates:
 
 ```yaml
 apiVersion: v1
@@ -245,9 +245,9 @@ More examples can be found in our [blog article](http://blog.kubernetes.io/2015/
 
 ## Resource management
 
-Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications. 
+Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications.
 
-If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](limitrange/) for the default [Namespace](namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
+If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](../admin/limitrange/) for the default [Namespace](namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
 
 ```yaml
 apiVersion: v1
@@ -272,9 +272,14 @@ spec:
             cpu: 500m
             # memory units are bytes
             memory: 64Mi
+		  requests:
+			# cpu units are cores
+		    cpu: 500m
+			# memory units are bytes
+			memory: 64Mi
 ```
 
-The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability.
+The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability. By specifying request, pod is guaranteed to be able to use that much of resource when needed. See [Resource QoS](../proposals/resource-qos.md) for the difference between resource limits and requests.
 
 If you’re not sure how much resources to request, you can first launch the application without specifying resources, and use [resource usage monitoring](monitoring.md) to determine appropriate values.
 
@@ -317,8 +322,9 @@ For more details (e.g., how to specify command-based probes), see the [example i
 ## Lifecycle hooks and termination notice
 
 Of course, nodes and applications may fail at any time, but many applications benefit from clean shutdown, such as to complete in-flight requests, when the termination of the application is deliberate. To support such cases, Kubernetes supports two kinds of notifications:
-Kubernetes will send SIGTERM to applications, which can be handled in order to effect graceful termination. SIGKILL is sent 10 seconds later if the application does not terminate sooner.
-Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM. 
+
+* Kubernetes will send SIGTERM to applications, which can be handled in order to effect graceful termination. SIGKILL is sent a configurable number of seconds later if the application does not terminate sooner (defaults to 30 seconds, controlled by `spec.terminationGracePeriodSeconds`).
+* Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM.
 
 The specification of a pre-stop hook is similar to that of probes, but without the timing-related parameters. For example:
 
@@ -371,9 +377,9 @@ The message is recorded along with the other state of the last (i.e., most recen
 $ kubectl create -f ./pod.yaml
 pods/pod-w-message
 $ sleep 70
-$ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
+$ kubectl get pods/pod-w-message -o go-template="{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
 Sleep expired
-$ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
+$ kubectl get pods/pod-w-message -o go-template="{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
 0
 ```
 

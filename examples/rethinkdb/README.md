@@ -45,27 +45,27 @@ Quick start
 
 **Step 1**
 
-Rethinkdb will discover peer using endpoints provided by kubernetes service,
+Rethinkdb will discover its peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
-```shell
+```sh
 $kubectl create -f examples/rethinkdb/driver-service.yaml
 ```
 
 check out:
 
-```shell
+```sh
 $kubectl get services
-NAME               LABELS        SELECTOR       IP(S)         PORT(S)
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+rethinkdb-driver  10.0.27.114      <none>            28015/TCP     db=rethinkdb           10m
 [...]
-rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 ```
 
 **Step 2**
 
-start fist server in cluster
+start the first server in the cluster
 
-```shell
+```sh
 $kubectl create -f examples/rethinkdb/rc.yaml
 ```
 
@@ -73,7 +73,7 @@ Actually, you can start servers as many as you want at one time, just modify the
 
 check out again:
 
-```shell
+```sh
 $kubectl get pods
 NAME                                                  READY     REASON    RESTARTS   AGE
 [...]
@@ -88,10 +88,10 @@ rethinkdb-rc-r4tb0                                    1/1       Running   0     
 Scale
 -----
 
-You can scale up you cluster using `kubectl scale`, and new pod will join to exsits cluster automatically, for example
+You can scale up your cluster using `kubectl scale`. The new pod will join to the existing cluster automatically, for example
 
 
-```shell
+```sh
 $kubectl scale rc rethinkdb-rc --replicas=3
 scaled
 
@@ -108,33 +108,32 @@ Admin
 
 You need a separate pod (labeled as role:admin) to access Web Admin UI
 
-```shell
+```sh
 kubectl create -f examples/rethinkdb/admin-pod.yaml
 kubectl create -f examples/rethinkdb/admin-service.yaml
 ```
 
 find the service
 
-```shell
-$kubectl get se
-NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
+```console
+$kubectl get services
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                  AGE
 [...]
-rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080/TCP
-                                                           104.197.19.120
-rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
+rethinkdb-admin   10.0.131.19      104.197.19.120    8080/TCP      db=rethinkdb,role=admin   10m
+rethinkdb-driver  10.0.27.114      <none>            28015/TCP     db=rethinkdb              20m
 ```
 
-We request for an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
+We request an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
 
 ```
 type: LoadBalancer
 ```
 
-The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case. 
+The external load balancer allows us to access the service from outside the firewall via an external IP, 104.197.19.120 in this case.
 
 Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
 
-```
+```console
 $ gcloud compute firewall-rules create rethinkdb --allow=tcp:8080
 ```
 

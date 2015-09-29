@@ -17,10 +17,12 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"reflect"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestTTLExpirationBasic(t *testing.T) {
@@ -29,7 +31,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 	ttlStore := NewFakeExpirationStore(
 		testStoreKeyFunc, deleteChan,
 		&FakeExpirationPolicy{
-			NeverExpire: util.NewStringSet(),
+			NeverExpire: sets.NewString(),
 			RetrieveKeyFunc: func(obj interface{}) (string, error) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
@@ -53,7 +55,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 		if delKey != key {
 			t.Errorf("Unexpected delete for key %s", key)
 		}
-	case <-time.After(time.Millisecond * 100):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Unexpected timeout waiting on delete")
 	}
 	close(deleteChan)
@@ -65,14 +67,14 @@ func TestTTLList(t *testing.T) {
 		{id: "foo1", val: "bar1"},
 		{id: "foo2", val: "bar2"},
 	}
-	expireKeys := util.NewStringSet(testObjs[0].id, testObjs[2].id)
+	expireKeys := sets.NewString(testObjs[0].id, testObjs[2].id)
 	deleteChan := make(chan string)
 	defer close(deleteChan)
 
 	ttlStore := NewFakeExpirationStore(
 		testStoreKeyFunc, deleteChan,
 		&FakeExpirationPolicy{
-			NeverExpire: util.NewStringSet(testObjs[1].id),
+			NeverExpire: sets.NewString(testObjs[1].id),
 			RetrieveKeyFunc: func(obj interface{}) (string, error) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
@@ -98,7 +100,7 @@ func TestTTLList(t *testing.T) {
 				t.Errorf("Unexpected delete for key %s", delKey)
 			}
 			expireKeys.Delete(delKey)
-		case <-time.After(time.Millisecond * 100):
+		case <-time.After(util.ForeverTestTimeout):
 			t.Errorf("Unexpected timeout waiting on delete")
 			return
 		}
@@ -111,14 +113,14 @@ func TestTTLPolicy(t *testing.T) {
 	exactlyOnTTL := fakeTime.Add(-ttl)
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
-	policy := TTLPolicy{ttl, &util.FakeClock{fakeTime}}
+	policy := TTLPolicy{ttl, &util.FakeClock{Time: fakeTime}}
 	fakeTimestampedEntry := &timestampedEntry{obj: struct{}{}, timestamp: exactlyOnTTL}
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL cache should not expire entries exactly on ttl")
 	}
 	fakeTimestampedEntry.timestamp = fakeTime
 	if policy.IsExpired(fakeTimestampedEntry) {
-		t.Errorf("TTL Cache should not expire entires before ttl")
+		t.Errorf("TTL Cache should not expire entries before ttl")
 	}
 	fakeTimestampedEntry.timestamp = expiredTime
 	if !policy.IsExpired(fakeTimestampedEntry) {

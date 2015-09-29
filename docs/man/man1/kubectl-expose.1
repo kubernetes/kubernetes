@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl expose \- Take a replicated application and expose it as Kubernetes Service
+kubectl expose \- Take a replication controller, service or pod and expose it as a new Kubernetes Service
 
 
 .SH SYNOPSIS
@@ -13,10 +13,10 @@ kubectl expose \- Take a replicated application and expose it as Kubernetes Serv
 
 .SH DESCRIPTION
 .PP
-Take a replicated application and expose it as Kubernetes Service.
+Take a replication controller, service or pod and expose it as a new Kubernetes Service.
 
 .PP
-Looks up a replication controller or service by name and uses the selector for that resource as the
+Looks up a replication controller, service or pod by name and uses the selector for that resource as the
 selector for a new Service on the specified port. If no labels are specified, the new service will
 re\-use the labels from the resource it exposes.
 
@@ -35,16 +35,24 @@ re\-use the labels from the resource it exposes.
     If true, only print the object that would be sent, without creating it.
 
 .PP
+\fB\-\-external\-ip\fP=""
+    External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.
+
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to expose a service
+
+.PP
 \fB\-\-generator\fP="service/v2"
     The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for expose
-
-.PP
 \fB\-l\fP, \fB\-\-labels\fP=""
     Labels to apply to the service created by this call.
+
+.PP
+\fB\-\-load\-balancer\-ip\fP=""
+    IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud\-provider specific).
 
 .PP
 \fB\-\-name\fP=""
@@ -56,7 +64,9 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide.
+    Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -75,12 +85,20 @@ re\-use the labels from the resource it exposes.
     The network protocol for the service to be created. Default is 'tcp'.
 
 .PP
-\fB\-\-public\-ip\fP=""
-    Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
-
-.PP
 \fB\-\-selector\fP=""
     A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
+
+.PP
+\fB\-\-session\-affinity\fP=""
+    If non\-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'
+
+.PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
+\fB\-\-sort\-by\fP=""
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
 \fB\-\-target\-port\fP=""
@@ -88,12 +106,12 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
 .PP
 \fB\-\-type\fP=""
-    Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless \-\-create\-external\-load\-balancer is specified.
+    Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -186,10 +204,6 @@ re\-use the labels from the resource it exposes.
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -199,13 +213,19 @@ re\-use the labels from the resource it exposes.
 .RS
 
 .nf
-// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx \-\-port=80 \-\-target\-port=8000
 
-// Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx\-https"
+# Create a service for a replication controller identified by type and name specified in "nginx\-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
+$ kubectl expose \-f nginx\-controller.yaml \-\-port=80 \-\-target\-port=8000
+
+# Create a service for a pod valid\-pod, which serves on port 444 with the name "frontend"
+$ kubectl expose pod valid\-pod \-\-port=444 \-\-name=frontend
+
+# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx\-https"
 $ kubectl expose service nginx \-\-port=443 \-\-target\-port=8443 \-\-name=nginx\-https
 
-// Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video\-stream'.
+# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video\-stream'.
 $ kubectl expose rc streamer \-\-port=4100 \-\-protocol=udp \-\-name=video\-stream
 
 .fi

@@ -23,29 +23,55 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type TestStruct struct {
+	val int
+}
+
+func TestIsZero(t *testing.T) {
+	tests := []struct {
+		val        interface{}
+		expectZero bool
+	}{
+		{"", true},
+		{nil, true},
+		{0, true},
+		{TestStruct{}, true},
+		{"foo", false},
+		{1, false},
+		{TestStruct{val: 2}, false},
+	}
+
+	for _, test := range tests {
+		output := IsZero(test.val)
+		if output != test.expectZero {
+			t.Errorf("expected: %v, saw %v", test.expectZero, output)
+		}
+	}
+}
+
 func TestValidateParams(t *testing.T) {
 	tests := []struct {
 		paramSpec []GeneratorParam
-		params    map[string]string
+		params    map[string]interface{}
 		valid     bool
 	}{
 		{
 			paramSpec: []GeneratorParam{},
-			params:    map[string]string{},
+			params:    map[string]interface{}{},
 			valid:     true,
 		},
 		{
 			paramSpec: []GeneratorParam{
 				{Name: "foo"},
 			},
-			params: map[string]string{},
+			params: map[string]interface{}{},
 			valid:  true,
 		},
 		{
 			paramSpec: []GeneratorParam{
 				{Name: "foo", Required: true},
 			},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"foo": "bar",
 			},
 			valid: true,
@@ -54,7 +80,7 @@ func TestValidateParams(t *testing.T) {
 			paramSpec: []GeneratorParam{
 				{Name: "foo", Required: true},
 			},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"baz": "blah",
 				"foo": "bar",
 			},
@@ -65,7 +91,7 @@ func TestValidateParams(t *testing.T) {
 				{Name: "foo", Required: true},
 				{Name: "baz", Required: true},
 			},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"baz": "blah",
 				"foo": "bar",
 			},
@@ -76,7 +102,7 @@ func TestValidateParams(t *testing.T) {
 				{Name: "foo", Required: true},
 				{Name: "baz", Required: true},
 			},
-			params: map[string]string{
+			params: map[string]interface{}{
 				"foo": "bar",
 			},
 			valid: false,
@@ -103,7 +129,7 @@ func TestMakeParams(t *testing.T) {
 		{Name: "foo", Required: true},
 		{Name: "baz", Required: true},
 	}
-	expected := map[string]string{
+	expected := map[string]interface{}{
 		"foo": "bar",
 		"baz": "blah",
 	}

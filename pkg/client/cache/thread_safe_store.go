@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // ThreadSafeStore is an interface that allows concurrent access to a storage backend.
@@ -41,8 +41,10 @@ type ThreadSafeStore interface {
 	Get(key string) (item interface{}, exists bool)
 	List() []interface{}
 	ListKeys() []string
-	Replace(map[string]interface{})
+	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
+	ListIndexFuncValues(name string) []string
+	ByIndex(indexName, indexKey string) ([]interface{}, error)
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -110,7 +112,7 @@ func (c *threadSafeMap) ListKeys() []string {
 	return list
 }
 
-func (c *threadSafeMap) Replace(items map[string]interface{}) {
+func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items = items
@@ -133,17 +135,56 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
 	}
 
-	indexKey, err := indexFunc(obj)
+	indexKeys, err := indexFunc(obj)
 	if err != nil {
 		return nil, err
 	}
 	index := c.indices[indexName]
+
+	// need to de-dupe the return list.  Since multiple keys are allowed, this can happen.
+	returnKeySet := sets.String{}
+	for _, indexKey := range indexKeys {
+		set := index[indexKey]
+		for _, key := range set.List() {
+			returnKeySet.Insert(key)
+		}
+	}
+
+	list := make([]interface{}, 0, returnKeySet.Len())
+	for absoluteKey := range returnKeySet {
+		list = append(list, c.items[absoluteKey])
+	}
+	return list, nil
+}
+
+// ByIndex returns a list of items that match an exact value on the index function
+func (c *threadSafeMap) ByIndex(indexName, indexKey string) ([]interface{}, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	indexFunc := c.indexers[indexName]
+	if indexFunc == nil {
+		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	index := c.indices[indexName]
+
 	set := index[indexKey]
 	list := make([]interface{}, 0, set.Len())
 	for _, key := range set.List() {
 		list = append(list, c.items[key])
 	}
+
 	return list, nil
+}
+
+func (c *threadSafeMap) ListIndexFuncValues(indexName string) []string {
+	index := c.indices[indexName]
+	names := make([]string, 0, len(index))
+	for key := range index {
+		names = append(names, key)
+	}
+	return names
 }
 
 // updateIndices modifies the objects location in the managed indexes, if this is an update, you must provide an oldObj
@@ -154,7 +195,7 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 		c.deleteFromIndices(oldObj, key)
 	}
 	for name, indexFunc := range c.indexers {
-		indexValue, err := indexFunc(newObj)
+		indexValues, err := indexFunc(newObj)
 		if err != nil {
 			return err
 		}
@@ -163,12 +204,15 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 			index = Index{}
 			c.indices[name] = index
 		}
-		set := index[indexValue]
-		if set == nil {
-			set = util.StringSet{}
-			index[indexValue] = set
+
+		for _, indexValue := range indexValues {
+			set := index[indexValue]
+			if set == nil {
+				set = sets.String{}
+				index[indexValue] = set
+			}
+			set.Insert(key)
 		}
-		set.Insert(key)
 	}
 	return nil
 }
@@ -177,15 +221,18 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 // it is intended to be called from a function that already has a lock on the cache
 func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 	for name, indexFunc := range c.indexers {
-		indexValue, err := indexFunc(obj)
+		indexValues, err := indexFunc(obj)
 		if err != nil {
 			return err
 		}
+
 		index := c.indices[name]
-		if index != nil {
-			set := index[indexValue]
-			if set != nil {
-				set.Delete(key)
+		for _, indexValue := range indexValues {
+			if index != nil {
+				set := index[indexValue]
+				if set != nil {
+					set.Delete(key)
+				}
 			}
 		}
 	}

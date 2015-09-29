@@ -23,25 +23,29 @@ import (
 
 const Nanosecond = 1000000000
 
-func Test90Percentile(t *testing.T) {
+func assertPercentile(t *testing.T, s Uint64Slice, f float64, want uint64) {
+	if got := s.GetPercentile(f); got != want {
+		t.Errorf("GetPercentile(%f) is %d, should be %d.", f, got, want)
+	}
+}
+
+func TestPercentile(t *testing.T) {
 	N := 100
-	stats := make(uint64Slice, 0, N)
+	s := make(Uint64Slice, 0, N)
 	for i := N; i > 0; i-- {
-		stats = append(stats, uint64(i))
+		s = append(s, uint64(i))
 	}
-	p := stats.Get90Percentile()
-	if p != 90 {
-		t.Errorf("90th percentile is %d, should be 90.", p)
-	}
-	// 90p should be between 94 and 95. Promoted to 95.
+	assertPercentile(t, s, 0.2, 20)
+	assertPercentile(t, s, 0.7, 70)
+	assertPercentile(t, s, 0.9, 90)
 	N = 105
 	for i := 101; i <= N; i++ {
-		stats = append(stats, uint64(i))
+		s = append(s, uint64(i))
 	}
-	p = stats.Get90Percentile()
-	if p != 95 {
-		t.Errorf("90th percentile is %d, should be 95.", p)
-	}
+	// 90p should be between 94 and 95. Promoted to 95.
+	assertPercentile(t, s, 0.2, 21)
+	assertPercentile(t, s, 0.7, 74)
+	assertPercentile(t, s, 0.9, 95)
 }
 
 func TestMean(t *testing.T) {
@@ -74,19 +78,23 @@ func TestAggregates(t *testing.T) {
 	usage := GetMinutePercentiles(stats)
 	// Cpu mean, max, and 90p should all be 1000 ms/s.
 	cpuExpected := info.Percentiles{
-		Present: true,
-		Mean:    1000,
-		Max:     1000,
-		Ninety:  1000,
+		Present:    true,
+		Mean:       1000,
+		Max:        1000,
+		Fifty:      1000,
+		Ninety:     1000,
+		NinetyFive: 1000,
 	}
 	if usage.Cpu != cpuExpected {
 		t.Errorf("cpu stats are %+v. Expected %+v", usage.Cpu, cpuExpected)
 	}
 	memExpected := info.Percentiles{
-		Present: true,
-		Mean:    50 * 1024,
-		Max:     99 * 1024,
-		Ninety:  90 * 1024,
+		Present:    true,
+		Mean:       50 * 1024,
+		Max:        99 * 1024,
+		Fifty:      50 * 1024,
+		Ninety:     90 * 1024,
+		NinetyFive: 95 * 1024,
 	}
 	if usage.Memory != memExpected {
 		t.Errorf("memory stats are mean %+v. Expected %+v", usage.Memory, memExpected)
@@ -119,19 +127,23 @@ func TestSamplesCloseInTimeIgnored(t *testing.T) {
 	usage := GetMinutePercentiles(stats)
 	// Cpu mean, max, and 90p should all be 1000 ms/s. All high-value samples are discarded.
 	cpuExpected := info.Percentiles{
-		Present: true,
-		Mean:    1000,
-		Max:     1000,
-		Ninety:  1000,
+		Present:    true,
+		Mean:       1000,
+		Max:        1000,
+		Fifty:      1000,
+		Ninety:     1000,
+		NinetyFive: 1000,
 	}
 	if usage.Cpu != cpuExpected {
 		t.Errorf("cpu stats are %+v. Expected %+v", usage.Cpu, cpuExpected)
 	}
 	memExpected := info.Percentiles{
-		Present: true,
-		Mean:    50 * 1024,
-		Max:     99 * 1024,
-		Ninety:  90 * 1024,
+		Present:    true,
+		Mean:       50 * 1024,
+		Max:        99 * 1024,
+		Fifty:      50 * 1024,
+		Ninety:     90 * 1024,
+		NinetyFive: 95 * 1024,
 	}
 	if usage.Memory != memExpected {
 		t.Errorf("memory stats are mean %+v. Expected %+v", usage.Memory, memExpected)
@@ -146,35 +158,43 @@ func TestDerivedStats(t *testing.T) {
 		s := &info.Usage{
 			PercentComplete: 100,
 			Cpu: info.Percentiles{
-				Present: true,
-				Mean:    i * Nanosecond,
-				Max:     i * Nanosecond,
-				Ninety:  i * Nanosecond,
+				Present:    true,
+				Mean:       i * Nanosecond,
+				Max:        i * Nanosecond,
+				Fifty:      i * Nanosecond,
+				Ninety:     i * Nanosecond,
+				NinetyFive: i * Nanosecond,
 			},
 			Memory: info.Percentiles{
-				Present: true,
-				Mean:    i * 1024,
-				Max:     i * 1024,
-				Ninety:  i * 1024,
+				Present:    true,
+				Mean:       i * 1024,
+				Max:        i * 1024,
+				Fifty:      i * 1024,
+				Ninety:     i * 1024,
+				NinetyFive: i * 1024,
 			},
 		}
 		stats = append(stats, s)
 	}
 	usage := GetDerivedPercentiles(stats)
 	cpuExpected := info.Percentiles{
-		Present: true,
-		Mean:    50 * Nanosecond,
-		Max:     99 * Nanosecond,
-		Ninety:  90 * Nanosecond,
+		Present:    true,
+		Mean:       50 * Nanosecond,
+		Max:        99 * Nanosecond,
+		Fifty:      50 * Nanosecond,
+		Ninety:     90 * Nanosecond,
+		NinetyFive: 95 * Nanosecond,
 	}
 	if usage.Cpu != cpuExpected {
 		t.Errorf("cpu stats are %+v. Expected %+v", usage.Cpu, cpuExpected)
 	}
 	memExpected := info.Percentiles{
-		Present: true,
-		Mean:    50 * 1024,
-		Max:     99 * 1024,
-		Ninety:  90 * 1024,
+		Present:    true,
+		Mean:       50 * 1024,
+		Max:        99 * 1024,
+		Fifty:      50 * 1024,
+		Ninety:     90 * 1024,
+		NinetyFive: 95 * 1024,
 	}
 	if usage.Memory != memExpected {
 		t.Errorf("memory stats are mean %+v. Expected %+v", usage.Memory, memExpected)

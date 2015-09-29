@@ -55,14 +55,14 @@ While Kubernetes today is not primarily a multi-tenant system, the long term evo
 
 We define "user" as a unique identity accessing the Kubernetes API server, which may be a human or an automated process.  Human users fall into the following categories:
 
-1. k8s admin - administers a kubernetes cluster and has access to the underlying components of the system
+1. k8s admin - administers a Kubernetes cluster and has access to the underlying components of the system
 2. k8s project administrator - administrates the security of a small subset of the cluster
-3. k8s developer - launches pods on a kubernetes cluster and consumes cluster resources
+3. k8s developer - launches pods on a Kubernetes cluster and consumes cluster resources
 
 Automated process users fall into the following categories:
 
 1. k8s container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources independent of the human users attached to a project
-2. k8s infrastructure user - the user that kubernetes infrastructure components use to perform cluster functions with clearly defined roles
+2. k8s infrastructure user - the user that Kubernetes infrastructure components use to perform cluster functions with clearly defined roles
 
 
 ### Description of roles
@@ -127,11 +127,11 @@ A pod runs in a *security context* under a *service account* that is defined by 
 ### Related design discussion
 
 * [Authorization and authentication](access.md)
-* [Secret distribution via files](https://github.com/GoogleCloudPlatform/kubernetes/pull/2030)
+* [Secret distribution via files](http://pr.k8s.io/2030)
 * [Docker secrets](https://github.com/docker/docker/pull/6697)
 * [Docker vault](https://github.com/docker/docker/issues/10310)
 * [Service Accounts:](service_accounts.md)
-* [Secret volumes](https://github.com/GoogleCloudPlatform/kubernetes/pull/4126)
+* [Secret volumes](http://pr.k8s.io/4126)
 
 ## Specific Design Points
 

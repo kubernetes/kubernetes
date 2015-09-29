@@ -16,7 +16,7 @@
 
 import json
 import sys
-# This script helps parse out the private IP addreses from the
+# This script helps parse out the private IP addresses from the
 # `juju run` command's JSON object, see cluster/juju/util.sh
 
 if len(sys.argv) > 1:

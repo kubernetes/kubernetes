@@ -56,7 +56,7 @@ Source is freely available at:
 
 ### Simple Single Pod Hazelcast Node
 
-In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes. 
+In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
 
 In this case, we shall not run a single Hazelcast pod, because the discovery mechanism now relies on a service definition.
 
@@ -67,19 +67,24 @@ In Kubernetes a _[Service](../../docs/user-guide/services.md)_ describes a set o
 
 Here is the service description:
 
+<!-- BEGIN MUNGE: EXAMPLE hazelcast-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
-metadata: 
-  labels: 
+metadata:
+  labels:
     name: hazelcast
   name: hazelcast
 spec: 
   ports:
     - port: 5701
-  selector: 
+  selector:
     name: hazelcast
 ```
+
+[Download example](hazelcast-service.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE hazelcast-service.yaml -->
 
 The important thing to note here is the `selector`. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is `name: hazelcast`.  If you look at the Replication Controller specification below, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
@@ -96,6 +101,8 @@ The real power of Kubernetes and Hazelcast lies in easily building a replicated,
 In Kubernetes a _[Replication Controller](../../docs/user-guide/replication-controller.md)_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Hazelcast Pod.
+
+<!-- BEGIN MUNGE: EXAMPLE hazelcast-controller.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -131,7 +138,10 @@ spec:
               name: hazelcast
 ```
 
-There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
+[Download example](hazelcast-controller.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE hazelcast-controller.yaml -->
+
+There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingly.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
 
 You may also note that we tell Kubernetes that the container exposes the `hazelcast` port.  Finally, we tell the cluster manager that we need 1 cpu core.
 

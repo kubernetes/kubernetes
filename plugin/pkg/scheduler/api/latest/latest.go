@@ -17,7 +17,7 @@ limitations under the License.
 package latest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/v1"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api/v1"
 )
 
 // Version is the string that represents the current external default version.

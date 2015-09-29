@@ -23,10 +23,6 @@ Specifying a name that already exists will merge new fields on top of existing v
     cluster for the context entry in kubeconfig
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for set\-context
-
-.PP
 \fB\-\-namespace\fP=""
     namespace for the context entry in kubeconfig
 
@@ -113,10 +109,6 @@ Specifying a name that already exists will merge new fields on top of existing v
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -126,7 +118,7 @@ Specifying a name that already exists will merge new fields on top of existing v
 .RS
 
 .nf
-// Set the user field on the gce context entry without touching other values
+# Set the user field on the gce context entry without touching other values
 $ kubectl config set\-context gce \-\-user=cluster\-admin
 
 .fi

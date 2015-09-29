@@ -39,9 +39,9 @@ The Salt scripts are shared across multiple hosting providers, so it's important
 
 ## Salt cluster setup
 
-The **salt-master** service runs on the kubernetes-master node [(except on the default GCE setup)](#standalone-salt-configuration-on-gce).
+The **salt-master** service runs on the kubernetes-master [(except on the default GCE setup)](#standalone-salt-configuration-on-gce).
 
-The **salt-minion** service runs on the kubernetes-master node and each kubernetes-minion node in the cluster.
+The **salt-minion** service runs on the kubernetes-master and each kubernetes-node in the cluster.
 
 Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file [(except on GCE)](#standalone-salt-configuration-on-gce).
 
@@ -50,7 +50,7 @@ Each salt-minion service is configured to interact with the **salt-master** serv
 master: kubernetes-master
 ```
 
-The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-minion with all the required capabilities needed to run Kubernetes.
+The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-node with all the required capabilities needed to run Kubernetes.
 
 If you are running the Vagrant based environment, the **salt-api** service is running on the kubernetes-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.
 
@@ -95,21 +95,21 @@ Key | Value
 ------------- | -------------
 `api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
 `cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
-`cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*, *aws*, *vagrant*
+`cloud` | (Optional) Which IaaS platform is used to host Kubernetes, *gce*, *azure*, *aws*, *vagrant*
 `etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
 `hostnamef` | (Optional) The full host name of the machine, i.e. uname -n
 `node_ip` | (Optional) The IP address to use to address this node
-`hostname_override` | (Optional) Mapped to the kubelet hostname_override
+`hostname_override` | (Optional) Mapped to the kubelet hostname-override
 `network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
 `networkInterfaceName` | (Optional) Networking interface to use to bind addresses, default value *eth0*
 `publicAddressOverride` | (Optional) The IP address the kube-apiserver should use to bind against for external read-only access
-`roles` | (Required) 1. `kubernetes-master` means this machine is the master in the kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
+`roles` | (Required) 1. `kubernetes-master` means this machine is the master in the Kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-node.  Depending on the role, the Salt scripts will provision different resources on the machine.
 
 These keys may be leveraged by the Salt sls files to branch behavior.
 
 In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, it's important to sometimes distinguish behavior based on operating system using if branches like the following.
 
-```
+```jinja
 {% if grains['os_family'] == 'RedHat' %}
 // something specific to a RedHat environment (Centos, Fedora, RHEL) where you may use yum, systemd, etc.
 {% else %}
@@ -129,7 +129,7 @@ We should define a grains.conf key that captures more specifically what network 
 
 ## Further reading
 
-The [cluster/saltbase](../../cluster/saltbase/) tree has more details on the current SaltStack configuration.
+The [cluster/saltbase](http://releases.k8s.io/HEAD/cluster/saltbase/) tree has more details on the current SaltStack configuration.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

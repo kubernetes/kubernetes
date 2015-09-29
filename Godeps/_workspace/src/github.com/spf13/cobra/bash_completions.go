@@ -13,17 +13,25 @@ import (
 const (
 	BashCompFilenameExt     = "cobra_annotation_bash_completion_filename_extentions"
 	BashCompOneRequiredFlag = "cobra_annotation_bash_completion_one_required_flag"
+	BashCompSubdirsInDir    = "cobra_annotation_bash_completion_subdirs_in_dir"
 )
 
 func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, `#!/bin/bash
-
 
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
         echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
     fi
+}
+
+# Homebrew on Macs have version 1.3 of bash-completion which doesn't include
+# _init_completion. This is a very minimal version of that function.
+__my_init_completion()
+{
+    COMPREPLY=()
+    _get_comp_words_by_ref cur prev words cword
 }
 
 __index_of_word()
@@ -98,6 +106,12 @@ __handle_filename_extension_flag()
 {
     local ext="$1"
     _filedir "@(${ext})"
+}
+
+__handle_subdirs_in_dir_flag()
+{
+    local dir="$1"
+    pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1
 }
 
 __handle_flag()
@@ -181,7 +195,11 @@ func postscript(out *bytes.Buffer, name string) {
 	fmt.Fprintf(out, "__start_%s()\n", name)
 	fmt.Fprintf(out, `{
     local cur prev words cword
-    _init_completion -s || return
+    if declare -F _init_completions >/dev/null 2>&1; then
+        _init_completion -s || return
+    else
+        __my_init_completion || return
+    fi
 
     local c=0
     local flags=()
@@ -205,7 +223,7 @@ func postscript(out *bytes.Buffer, name string) {
 func writeCommands(cmd *Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
-		if len(c.Deprecated) > 0 {
+		if len(c.Deprecated) > 0 || c == cmd.helpCommand {
 			continue
 		}
 		fmt.Fprintf(out, "    commands+=(%q)\n", c.Name())
@@ -219,9 +237,23 @@ func writeFlagHandler(name string, annotations map[string][]string, out *bytes.B
 		case BashCompFilenameExt:
 			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
 
-			ext := strings.Join(value, "|")
-			ext = "__handle_filename_extension_flag " + ext
-			fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			if len(value) > 0 {
+				ext := "__handle_filename_extension_flag " + strings.Join(value, "|")
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			} else {
+				ext := "_filedir"
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			}
+		case BashCompSubdirsInDir:
+			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
+
+			if len(value) == 1 {
+				ext := "__handle_subdirs_in_dir_flag " + value[0]
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			} else {
+				ext := "_filedir -d"
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			}
 		}
 	}
 }
@@ -271,7 +303,7 @@ func writeRequiredFlag(cmd *Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    must_have_one_flag=()\n")
 	flags := cmd.NonInheritedFlags()
 	flags.VisitAll(func(flag *pflag.Flag) {
-		for key, _ := range flag.Annotations {
+		for key := range flag.Annotations {
 			switch key {
 			case BashCompOneRequiredFlag:
 				format := "    must_have_one_flag+=(\"--%s"
@@ -300,7 +332,7 @@ func writeRequiredNoun(cmd *Command, out *bytes.Buffer) {
 
 func gen(cmd *Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
-		if len(c.Deprecated) > 0 {
+		if len(c.Deprecated) > 0 || c == cmd.helpCommand {
 			continue
 		}
 		gen(c, out)
@@ -343,15 +375,24 @@ func (cmd *Command) GenBashCompletionFile(filename string) error {
 	return nil
 }
 
-func (cmd *Command) MarkFlagRequired(name string) {
-	flag := cmd.Flags().Lookup(name)
-	if flag == nil {
-		return
-	}
-	if flag.Annotations == nil {
-		flag.Annotations = make(map[string][]string)
-	}
-	annotation := make([]string, 1)
-	annotation[0] = "true"
-	flag.Annotations[BashCompOneRequiredFlag] = annotation
+// MarkFlagRequired adds the BashCompOneRequiredFlag annotation to the named flag, if it exists.
+func (cmd *Command) MarkFlagRequired(name string) error {
+	return MarkFlagRequired(cmd.Flags(), name)
+}
+
+// MarkFlagRequired adds the BashCompOneRequiredFlag annotation to the named flag in the flag set, if it exists.
+func MarkFlagRequired(flags *pflag.FlagSet, name string) error {
+	return flags.SetAnnotation(name, BashCompOneRequiredFlag, []string{"true"})
+}
+
+// MarkFlagFilename adds the BashCompFilenameExt annotation to the named flag, if it exists.
+// Generated bash autocompletion will select filenames for the flag, limiting to named extensions if provided.
+func (cmd *Command) MarkFlagFilename(name string, extensions ...string) error {
+	return MarkFlagFilename(cmd.Flags(), name, extensions...)
+}
+
+// MarkFlagFilename adds the BashCompFilenameExt annotation to the named flag in the flag set, if it exists.
+// Generated bash autocompletion will select filenames for the flag, limiting to named extensions if provided.
+func MarkFlagFilename(flags *pflag.FlagSet, name string, extensions ...string) error {
+	return flags.SetAnnotation(name, BashCompFilenameExt, extensions)
 }

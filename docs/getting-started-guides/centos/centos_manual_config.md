@@ -46,9 +46,9 @@ You need two machines with CentOS installed on them.
 
 This is a getting started guide for CentOS.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE node working.  Multiple nodes requires a functional [networking configuration](../../admin/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE node working.  Multiple nodes requires a functional [networking configuration](../../admin/networking.md) done outside of kubernetes.  Although the additional Kubernetes configuration requirements should be obvious.
 
-The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, centos-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, centos-minion will be the node and run kubelet, proxy, cadvisor and docker.
+The Kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, centos-master, will be the Kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, centos-minion will be the node and run kubelet, proxy, cadvisor and docker.
 
 **System Information:**
 
@@ -60,7 +60,7 @@ centos-minion = 192.168.121.65
 ```
 
 **Prepare the hosts:**
-    
+
 * Create virt7-testing repo on all hosts - centos-{master,minion} with following information.
 
 ```
@@ -70,7 +70,7 @@ baseurl=http://cbs.centos.org/repos/virt7-testing/x86_64/os/
 gpgcheck=0
 ```
 
-* Install kubernetes on all hosts - centos-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
+* Install Kubernetes on all hosts - centos-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
 
 ```sh
 yum -y install --enablerepo=virt7-testing kubernetes
@@ -104,7 +104,7 @@ echo "192.168.121.9	centos-master
 
 ```sh
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://centos-master:4001"
+KUBE_ETCD_SERVERS="--etcd-servers=http://centos-master:4001"
 
 # logging to stderr means we get it in the systemd journal
 KUBE_LOGTOSTDERR="--logtostderr=true"
@@ -113,7 +113,7 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 KUBE_LOG_LEVEL="--v=0"
 
 # Should this cluster be allowed to run privileged docker containers
-KUBE_ALLOW_PRIV="--allow_privileged=false"
+KUBE_ALLOW_PRIV="--allow-privileged=false"
 ```
 
 * Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers
@@ -123,7 +123,7 @@ systemctl disable iptables-services firewalld
 systemctl stop iptables-services firewalld
 ```
 
-**Configure the kubernetes services on the master.**
+**Configure the Kubernetes services on the master.**
 
 * Edit /etc/kubernetes/apiserver to appear as such:
 
@@ -138,7 +138,7 @@ KUBE_API_PORT="--port=8080"
 KUBE_MASTER="--master=http://centos-master:8080"
 
 # Port kubelets listen on
-KUBELET_PORT="--kubelet_port=10250"
+KUBELET_PORT="--kubelet-port=10250"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
@@ -157,7 +157,7 @@ for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do
 done
 ```
 
-**Configure the kubernetes services on the node.**
+**Configure the Kubernetes services on the node.**
 
 ***We need to configure the kubelet and start the kubelet and proxy***
 
@@ -171,11 +171,14 @@ KUBELET_ADDRESS="--address=0.0.0.0"
 KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-KUBELET_HOSTNAME="--hostname_override=centos-minion"
+KUBELET_HOSTNAME="--hostname-override=centos-minion"
+
+# Location of the api-server
+KUBELET_API_SERVER="--api-servers=http://centos-master:8080"
 
 # Add your own!
 KUBELET_ARGS=""
-```       
+```
 
 * Start the appropriate services on node (centos-minion).
 

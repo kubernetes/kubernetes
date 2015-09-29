@@ -20,7 +20,7 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 #Args below can be overriden when calling from cmd line.
 #Just send all the args in order.
 #for dev/test you can use:
-#kubectl=$GOPATH/src/github.com/GoogleCloudPlatform/kubernetes/cluster/kubectl.sh"
+#kubectl=$GOPATH/src/github.com/kubernetes/kubernetes/cluster/kubectl.sh"
 kubectl="kubectl"
 VERSION="r.2.8.19"
 _SECONDS=1000          # number of seconds to measure throughput.
@@ -227,7 +227,7 @@ $kubectl create -f fe-s.json --namespace=$NS
 $kubectl create -f bps-load-gen-rc.json --namespace=$NS
 }
 
-#This script assumes the cloud provider is able to create a load balancer. If this not the case, you may want to check out other ways to make the frontend service accessible from outside (https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services)
+#This script assumes the cloud provider is able to create a load balancer. If this not the case, you may want to check out other ways to make the frontend service accessible from outside (https://github.com/kubernetes/kubernetes/blob/master/docs/services.md#external-services)
 function getIP {
   echo "Waiting up to 1 min for a public IP to be assigned by the cloud provider..."
   for i in `seq 1 20`;

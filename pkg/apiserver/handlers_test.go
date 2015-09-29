@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -26,11 +27,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeRL bool
@@ -51,11 +51,11 @@ func expectHTTP(url string, code int, t *testing.T) {
 }
 
 func getPath(resource, namespace, name string) string {
-	return testapi.ResourcePath(resource, namespace, name)
+	return testapi.Default.ResourcePath(resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
 }
 
 func TestMaxInFlight(t *testing.T) {
@@ -110,21 +110,6 @@ func TestMaxInFlight(t *testing.T) {
 	expectHTTP(server.URL, http.StatusOK, t)
 }
 
-func TestRateLimit(t *testing.T) {
-	for _, allow := range []bool{true, false} {
-		rl := fakeRL(allow)
-		server := httptest.NewServer(RateLimit(rl, http.HandlerFunc(
-			func(w http.ResponseWriter, req *http.Request) {
-				if !allow {
-					t.Errorf("Unexpected call")
-				}
-			},
-		)))
-		defer server.Close()
-		http.Get(server.URL)
-	}
-}
-
 func TestReadOnly(t *testing.T) {
 	server := httptest.NewServer(ReadOnly(http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
@@ -140,6 +125,62 @@ func TestReadOnly(t *testing.T) {
 			t.Fatalf("Couldn't make request: %v", err)
 		}
 		http.DefaultClient.Do(req)
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	sendResponse := make(chan struct{}, 1)
+	writeErrors := make(chan error, 1)
+	timeout := make(chan time.Time, 1)
+	resp := "test response"
+	timeoutResp := "test timeout"
+
+	ts := httptest.NewServer(TimeoutHandler(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			<-sendResponse
+			_, err := w.Write([]byte(resp))
+			writeErrors <- err
+		}),
+		func(*http.Request) (<-chan time.Time, string) {
+			return timeout, timeoutResp
+		}))
+	defer ts.Close()
+
+	// No timeouts
+	sendResponse <- struct{}{}
+	res, err := http.Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusOK)
+	}
+	body, _ := ioutil.ReadAll(res.Body)
+	if string(body) != resp {
+		t.Errorf("got body %q; expected %q", string(body), resp)
+	}
+	if err := <-writeErrors; err != nil {
+		t.Errorf("got unexpected Write error on first request: %v", err)
+	}
+
+	// Times out
+	timeout <- time.Time{}
+	res, err = http.Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	body, _ = ioutil.ReadAll(res.Body)
+	if string(body) != timeoutResp {
+		t.Errorf("got body %q; expected %q", string(body), timeoutResp)
+	}
+
+	// Now try to send a response
+	sendResponse <- struct{}{}
+	if err := <-writeErrors; err != http.ErrHandlerTimeout {
+		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
 	}
 }
 
@@ -174,22 +215,26 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// fully-qualified paths
-		{"GET", getPath("pods", "other", ""), "list", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "other", "foo"), "get", testapi.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", getPath("pods", "", ""), "list", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"POST", getPath("pods", "", ""), "create", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "", "foo"), "get", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("redirect", "pods", "", ""), "redirect", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("watch", "pods", "other", ""), "watch", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "other", ""), "list", testapi.Default.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "other", "foo"), "get", testapi.Default.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", getPath("pods", "", ""), "list", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"POST", getPath("pods", "", ""), "create", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "", "foo"), "get", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithPrefix("redirect", "pods", "", ""), "redirect", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithPrefix("watch", "pods", "other", ""), "watch", testapi.Default.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
 		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
+
+		// verb identification
+		{"PATCH", "/namespaces/other/pods/foo", "patch", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"DELETE", "/namespaces/other/pods/foo", "delete", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 	}
 
-	apiRequestInfoResolver := &APIRequestInfoResolver{util.NewStringSet("api"), latest.RESTMapper}
+	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), testapi.Default.RESTMapper()}
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)

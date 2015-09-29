@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 type testLW struct {
@@ -48,18 +49,18 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
-	go r.listAndWatch(util.NeverStop)
+	go r.ListAndWatch(util.NeverStop)
 	fw.Error(pod)
 	select {
 	case _, ok := <-fw.ResultChan():
 		if ok {
 			t.Errorf("Watch channel left open after cancellation")
 		}
-	case <-time.After(100 * time.Millisecond):
-		t.Errorf("the cancellation is at least 99 milliseconds late")
+	case <-time.After(util.ForeverTestTimeout):
+		t.Errorf("the cancellation is at least %s late", util.ForeverTestTimeout.String())
 		break
 	}
 }
@@ -74,7 +75,7 @@ func TestRunUntil(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	r.RunUntil(stopCh)
@@ -87,8 +88,8 @@ func TestRunUntil(t *testing.T) {
 		if ok {
 			t.Errorf("Watch channel left open after stopping the watch")
 		}
-	case <-time.After(100 * time.Millisecond):
-		t.Errorf("the cancellation is at least 99 milliseconds late")
+	case <-time.After(util.ForeverTestTimeout):
+		t.Errorf("the cancellation is at least %s late", util.ForeverTestTimeout.String())
 		break
 	}
 }
@@ -97,7 +98,7 @@ func TestReflector_resyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &api.Pod{}, s, time.Millisecond)
 	a, _ := g.resyncChan()
-	b := time.After(100 * time.Millisecond)
+	b := time.After(util.ForeverTestTimeout)
 	select {
 	case <-a:
 		t.Logf("got timeout as expected")
@@ -214,7 +215,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	}
 }
 
-func TestReflector_listAndWatch(t *testing.T) {
+func TestReflector_ListAndWatch(t *testing.T) {
 	createdFakes := make(chan *watch.FakeWatcher)
 
 	// The ListFunc says that it's at revision 1. Therefore, we expect our WatchFunc
@@ -234,12 +235,12 @@ func TestReflector_listAndWatch(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
 	r := NewReflector(lw, &api.Pod{}, s, 0)
-	go r.listAndWatch(util.NeverStop)
+	go r.ListAndWatch(util.NeverStop)
 
 	ids := []string{"foo", "bar", "baz", "qux", "zoo"}
 	var fw *watch.FakeWatcher
@@ -272,12 +273,12 @@ func TestReflector_listAndWatch(t *testing.T) {
 	}
 }
 
-func TestReflector_listAndWatchWithErrors(t *testing.T) {
+func TestReflector_ListAndWatchWithErrors(t *testing.T) {
 	mkPod := func(id string, rv string) *api.Pod {
 		return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv string, pods ...*api.Pod) *api.PodList {
-		list := &api.PodList{ListMeta: api.ListMeta{ResourceVersion: rv}}
+		list := &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: rv}}
 		for _, pod := range pods {
 			list.Items = append(list.Items, *pod)
 		}
@@ -356,6 +357,6 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 			},
 		}
 		r := NewReflector(lw, &api.Pod{}, s, 0)
-		r.listAndWatch(util.NeverStop)
+		r.ListAndWatch(util.NeverStop)
 	}
 }

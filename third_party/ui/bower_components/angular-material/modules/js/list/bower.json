@@ -1,7 +1,0 @@
-{
-  "name": "angular-material-list",
-  "version": "0.7.0-rc3",
-  "dependencies": {
-    "angular-material-core": "0.7.0-rc3"
-  }
-}

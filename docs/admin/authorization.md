@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 
 In Kubernetes, authorization happens as a separate step from authentication.
-See the [authentication documentation](authentication.md) for an 
+See the [authentication documentation](authentication.md) for an
 overview of authentication.
 
 Authorization applies to all HTTP accesses on the main (secure) apiserver port.
@@ -45,9 +45,9 @@ the request, (such as user, resource, and namespace) with access
 policies.  An API call must be allowed by some policy in order to proceed.
 
 The following implementations are available, and are selected by flag:
-  - `--authorization_mode=AlwaysDeny`
-  - `--authorization_mode=AlwaysAllow`
-  - `--authorization_mode=ABAC`
+  - `--authorization-mode=AlwaysDeny`
+  - `--authorization-mode=AlwaysAllow`
+  - `--authorization-mode=ABAC`
 
 `AlwaysDeny` blocks all requests (used in tests).
 `AlwaysAllow` allows all requests; use if you don't need authorization.
@@ -57,11 +57,12 @@ The following implementations are available, and are selected by flag:
 
 ### Request Attributes
 
-A request has 4 attributes that can be considered for authorization:
+A request has 5 attributes that can be considered for authorization:
   - user (the user-string which a user was authenticated as).
-  - whether the request is readonly (GETs are readonly)
-  - what resource is being accessed 
-    - applies only to the API endpoints, such as 
+  - group (the list of group names the authenticated user is a member of).
+  - whether the request is readonly (GETs are readonly).
+  - what resource is being accessed.
+    - applies only to the API endpoints, such as
         `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
   - the namespace of the object being access, or the empty string if the
@@ -72,13 +73,14 @@ to assist in policy management.
 
 ### Policy File Format
 
-For mode `ABAC`, also specify `--authorization_policy_file=SOME_FILENAME`.
+For mode `ABAC`, also specify `--authorization-policy-file=SOME_FILENAME`.
 
 The file format is [one JSON object per line](http://jsonlines.org/).  There should be no enclosing list or map, just
 one map per line.
 
 Each line is a "policy object".  A policy object is a map with the following properties:
-  - `user`, type string; the user-string from `--token_auth_file`
+  - `user`, type string; the user-string from `--token-auth-file`. If you specify `user`, it must match the username of the authenticated user.
+  - `group`, type string; if you specify `group`, it must match one of the groups of the authenticated user.
   - `readonly`, type boolean, when true, means that the policy only applies to GET
       operations.
   - `resource`, type string; a resource from an URL, such as `pods`.
@@ -95,7 +97,7 @@ interface.
 A request has attributes which correspond to the properties of a policy object.
 
 When a request is received, the attributes are determined.  Unknown attributes
-are set to the zero value of its type (e.g. empty string, 0, false). 
+are set to the zero value of its type (e.g. empty string, 0, false).
 
 An unset property will match any value of the corresponding
 attribute.  An unset attribute will match any value of the corresponding property.
@@ -111,9 +113,31 @@ To permit an action Policy with an unset namespace applies regardless of namespa
  1. Alice can do anything: `{"user":"alice"}`
  2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
- 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
+ 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "namespace": "projectCaribou"}`
 
-[Complete file example](../../pkg/auth/authorizer/abac/example_policy_file.jsonl)
+[Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
+
+### A quick note on service accounts
+
+A service account automatically generates a user. The user's name is generated according to the naming convention:
+
+```
+system:serviceaccount:<namespace>:<serviceaccountname>
+```
+
+Creating a new namespace also causes a new service account to be created, of this form:*
+
+```
+system:serviceaccount:<namespace>:default
+```
+
+For example, if you wanted to grant the default service account in the kube-system full privilege to the API, you would add this line to your policy file:
+
+```json
+{"user":"system:serviceaccount:kube-system:default"}
+```
+
+The apiserver will need to be restarted to pickup the new policy lines.
 
 ## Plugin Development
 
@@ -129,7 +153,7 @@ type Authorizer interface {
 to determine whether or not to allow each API action.
 
 An authorization plugin is a module that implements this interface.
-Authorization plugin code goes in `pkg/auth/authorization/$MODULENAME`.
+Authorization plugin code goes in `pkg/auth/authorizer/$MODULENAME`.
 
 An authorization module can be completely implemented in go, or can call out
 to a remote authorization service.  Authorization modules can implement

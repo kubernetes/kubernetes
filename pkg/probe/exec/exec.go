@@ -17,8 +17,8 @@ limitations under the License.
 package exec
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/util/exec"
 
 	"github.com/golang/glog"
 )

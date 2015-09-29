@@ -19,8 +19,8 @@ package scdeny
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // ensures the SecurityContext is denied if it defines anything more than Caps or Privileged

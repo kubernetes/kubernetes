@@ -37,6 +37,9 @@ type OperationManager interface {
 	// Attempts to send msg to the channel associated with ID.
 	// Returns an error if no associated channel exists.
 	Send(id string, msg interface{}) error
+
+	// Returns true if an entry with the specified ID already exists.
+	Exists(id string) bool
 }
 
 // Returns a new instance of a channel manager.
@@ -89,4 +92,12 @@ func (cm *operationManager) Send(id string, msg interface{}) error {
 	}
 	cm.chanMap[id] <- msg
 	return nil
+}
+
+// Returns true if an entry with the specified ID already exists.
+func (cm *operationManager) Exists(id string) (exists bool) {
+	cm.RLock()
+	defer cm.RUnlock()
+	_, exists = cm.chanMap[id]
+	return
 }

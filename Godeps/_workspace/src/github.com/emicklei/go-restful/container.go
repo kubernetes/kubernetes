@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/emicklei/go-restful/log"
 )
@@ -18,6 +19,7 @@ import (
 // Container holds a collection of WebServices and a http.ServeMux to dispatch http requests.
 // The requests are further dispatched to routes of WebServices using a RouteSelector
 type Container struct {
+	webServicesLock        sync.RWMutex
 	webServices            []*WebService
 	ServeMux               *http.ServeMux
 	isRegisteredOnRoot     bool
@@ -83,6 +85,8 @@ func (c *Container) EnableContentEncoding(enabled bool) {
 
 // Add a WebService to the Container. It will detect duplicate root paths and panic in that case.
 func (c *Container) Add(service *WebService) *Container {
+	c.webServicesLock.Lock()
+	defer c.webServicesLock.Unlock()
 	// If registered on root then no additional specific mapping is needed
 	if !c.isRegisteredOnRoot {
 		pattern := c.fixedPrefixPath(service.RootPath())
@@ -122,6 +126,19 @@ func (c *Container) Add(service *WebService) *Container {
 	return c
 }
 
+func (c *Container) Remove(ws *WebService) error {
+	c.webServicesLock.Lock()
+	defer c.webServicesLock.Unlock()
+	newServices := []*WebService{}
+	for ix := range c.webServices {
+		if c.webServices[ix].rootPath != ws.rootPath {
+			newServices = append(newServices, c.webServices[ix])
+		}
+	}
+	c.webServices = newServices
+	return nil
+}
+
 // logStackOnRecover is the default RecoverHandleFunction and is called
 // when DoNotRecover is false and the recoverHandleFunc is not set for the container.
 // Default implementation logs the stacktrace and writes the stacktrace on the response.
@@ -150,11 +167,20 @@ func writeServiceError(err ServiceError, req *Request, resp *Response) {
 
 // Dispatch the incoming Http Request to a matching WebService.
 func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
+	writer := httpWriter
+
+	// CompressingResponseWriter should be closed after all operations are done
+	defer func() {
+		if compressWriter, ok := writer.(*CompressingResponseWriter); ok {
+			compressWriter.Close()
+		}
+	}()
+
 	// Instal panic recovery unless told otherwise
 	if !c.doNotRecover { // catch all for 500 response
 		defer func() {
 			if r := recover(); r != nil {
-				c.recoverHandleFunc(r, httpWriter)
+				c.recoverHandleFunc(r, writer)
 				return
 			}
 		}()
@@ -168,7 +194,6 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 
 	// Detect if compression is needed
 	// assume without compression, test for override
-	writer := httpWriter
 	if c.contentEncodingEnabled {
 		doCompress, encoding := wantsCompressedResponse(httpRequest)
 		if doCompress {
@@ -179,15 +204,19 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 				httpWriter.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			defer func() {
-				writer.(*CompressingResponseWriter).Close()
-			}()
 		}
 	}
 	// Find best match Route ; err is non nil if no match was found
-	webService, route, err := c.router.SelectRoute(
-		c.webServices,
-		httpRequest)
+	var webService *WebService
+	var route *Route
+	var err error
+	func() {
+		c.webServicesLock.RLock()
+		defer c.webServicesLock.RUnlock()
+		webService, route, err = c.router.SelectRoute(
+			c.webServices,
+			httpRequest)
+	}()
 	if err != nil {
 		// a non-200 response has already been written
 		// run container filters anyway ; they should not touch the response...
@@ -267,7 +296,13 @@ func (c *Container) Filter(filter FilterFunction) {
 
 // RegisteredWebServices returns the collections of added WebServices
 func (c Container) RegisteredWebServices() []*WebService {
-	return c.webServices
+	c.webServicesLock.RLock()
+	defer c.webServicesLock.RUnlock()
+	result := make([]*WebService, len(c.webServices))
+	for ix := range c.webServices {
+		result[ix] = c.webServices[ix]
+	}
+	return result
 }
 
 // computeAllowedMethods returns a list of HTTP methods that are valid for a Request

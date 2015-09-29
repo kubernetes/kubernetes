@@ -20,6 +20,10 @@ package mount
 
 type NsenterMounter struct{}
 
+func NewNsenterMounter() *NsenterMounter {
+	return &NsenterMounter{}
+}
+
 var _ = Interface(&NsenterMounter{})
 
 func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
@@ -34,6 +38,6 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
-	return false, nil
+func (*NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	return true, nil
 }

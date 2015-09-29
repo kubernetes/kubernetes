@@ -1,6 +1,0 @@
----
-- name: Generic | Install Docker
-  action: "{{ ansible_pkg_mgr }}"
-  args:
-    name: docker
-    state: latest

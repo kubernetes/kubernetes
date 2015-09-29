@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/probe"
 
 	"github.com/golang/glog"
 )

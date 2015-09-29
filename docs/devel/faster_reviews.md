@@ -53,15 +53,24 @@ later, just as soon as they have more free time (ha!).
 
 Let's talk about how to avoid this.
 
+## 0. Familiarize yourself with project conventions
+
+* [Development guide](development.md)
+* [Coding conventions](coding-conventions.md)
+* [API conventions](api-conventions.md)
+* [Kubectl conventions](kubectl-conventions.md)
+
 ## 1. Don't build a cathedral in one PR
 
 Are you sure FeatureX is something the Kubernetes team wants or will accept, or
 that it is implemented to fit with other changes in flight?  Are you willing to
 bet a few days or weeks of work on it?  If you have any doubt at all about the
-usefulness of your feature or the design - make a proposal doc or a sketch PR
-or both.  Write or code up just enough to express the idea and the design and
-why you made those choices, then get feedback on this.  Now, when we ask you to
-change a bunch of facets of the design, you don't have to re-write it all.
+usefulness of your feature or the design - make a proposal doc (in docs/proposals;
+for example [the QoS proposal](http://prs.k8s.io/11713)) or a sketch PR (e.g., just
+the API or Go interface) or both.  Write or code up just enough to express the idea
+and the design and why you made those choices, then get feedback on this. Be clear
+about what type of feedback you are asking for. Now, if we ask you to change a
+bunch of facets of the design, you won't have to re-write it all.
 
 ## 2. Smaller diffs are exponentially better
 
@@ -154,7 +163,20 @@ commit and re-push.  Your reviewer can then look at that commit on its own - so
 much faster to review than starting over.
 
 We might still ask you to clean up your commits at the very end, for the sake
-of a more readable history.
+of a more readable history, but don't do this until asked, typically at the point
+where the PR would otherwise be tagged LGTM.
+
+General squashing guidelines:
+
+* Sausage => squash
+
+  When there are several commits to fix bugs in the original commit(s), address reviewer feedback, etc. Really we only want to see the end state and commit message for the whole PR.
+
+* Layers => don't squash
+
+  When there are independent changes layered upon each other to achieve a single goal. For instance, writing a code munger could be one commit, applying it could be another, and adding a precommit check could be a third. One could argue they should be separate PRs, but there's really no way to test/review the munger without seeing it applied, and there needs to be a precommit check to ensure the munged output doesn't immediately get out of date.
+
+A commit, as much as possible, should be a single logical change. Each commit should always have a good title line (<70 characters) and include an additional description paragraph describing in more detail the change intended. Do not link pull requests by `#` in a commit description, because GitHub creates lots of spam. Instead, reference other PRs via the PR your commit is in.
 
 ## 8. KISS, YAGNI, MVP, etc
 
@@ -186,6 +208,9 @@ things you can do that might help kick a stalled process along:
 
    * Ping the assignee by email (many of us have email addresses that are well
      published or are the same as our GitHub handle @google.com or @redhat.com).
+
+   * Ping the [team](https://github.com/orgs/kubernetes/teams) (via @team-name)
+     that works in the area you're submitting code.
 
 If you think you have fixed all the issues in a round of review, and you haven't
 heard back, you should ping the reviewer (assignee) on the comment stream with a

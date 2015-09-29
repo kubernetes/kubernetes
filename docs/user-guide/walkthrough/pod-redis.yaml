@@ -10,5 +10,5 @@ spec:
     - name: redis-persistent-storage
       mountPath: /data/redis
   volumes:
-    - name: redis-persistent-storage
-      emptyDir: {}
+  - name: redis-persistent-storage
+    emptyDir: {}

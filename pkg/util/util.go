@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -41,16 +41,29 @@ import (
 // For testing, bypass HandleCrash.
 var ReallyCrash bool
 
+// For any test of the style:
+//   ...
+//   <- time.After(timeout):
+//      t.Errorf("Timed out")
+// The value for timeout should effectively be "forever." Obviously we don't want our tests to truly lock up forever, but 30s
+// is long enough that it is effectively forever for the things that can slow down a run on a heavily contended machine
+// (GC, seeks, etc), but not so long as to make a developer ctrl-c a test run if they do happen to break that test.
+var ForeverTestTimeout = time.Second * 30
+
 // PanicHandlers is a list of functions which will be invoked when a panic happens.
 var PanicHandlers = []func(interface{}){logPanic}
 
 // HandleCrash simply catches a crash and logs an error. Meant to be called via defer.
-func HandleCrash() {
+// Additional context-specific handlers can be provided, and will be called in case of panic
+func HandleCrash(additionalHandlers ...func(interface{})) {
 	if ReallyCrash {
 		return
 	}
 	if r := recover(); r != nil {
 		for _, fn := range PanicHandlers {
+			fn(r)
+		}
+		for _, fn := range additionalHandlers {
 			fn(r)
 		}
 	}
@@ -88,18 +101,18 @@ func logError(err error) {
 	glog.ErrorDepth(2, err)
 }
 
-// Forever loops forever running f every period.  Catches any panics, and keeps going.
-// Deprecated. Please use Until and pass NeverStop as the stopCh.
-func Forever(f func(), period time.Duration) {
-	Until(f, period, nil)
-}
-
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
 
+// Forever is syntactic sugar on top of Until
+func Forever(f func(), period time.Duration) {
+	Until(f, period, NeverStop)
+}
+
 // Until loops until stop channel is closed, running f every period.
 // Catches any panics, and keeps going. f may not be invoked if
-// stop channel is already closed.
+// stop channel is already closed. Pass NeverStop to Until if you
+// don't want it stop.
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 	for {
 		select {
@@ -174,6 +187,9 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 }
 
 func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
+	if intstr == nil {
+		return
+	}
 	if c.RandBool() {
 		intstr.Kind = IntstrInt
 		c.Fuzz(&intstr.IntVal)
@@ -183,6 +199,25 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 		intstr.IntVal = 0
 		c.Fuzz(&intstr.StrVal)
 	}
+}
+
+func GetIntOrPercentValue(intStr *IntOrString) (int, bool, error) {
+	switch intStr.Kind {
+	case IntstrInt:
+		return intStr.IntVal, false, nil
+	case IntstrString:
+		s := strings.Replace(intStr.StrVal, "%", "", -1)
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, false, fmt.Errorf("invalid value %q: %v", intStr.StrVal, err)
+		}
+		return v, true, nil
+	}
+	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
+}
+
+func GetValueFromPercent(percent int, value int) int {
+	return int(math.Ceil(float64(percent) * (float64(value)) / 100))
 }
 
 // Takes a list of strings and compiles them into a list of regular expressions
@@ -210,34 +245,6 @@ func UsingSystemdInitSystem() bool {
 	}
 
 	return false
-}
-
-// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
-func ApplyOomScoreAdj(pid int, value int) error {
-	if value < -1000 || value > 1000 {
-		return fmt.Errorf("invalid value(%d) specified for oom_score_adj. Values must be within the range [-1000, 1000]", value)
-	}
-	if pid < 0 {
-		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
-	}
-
-	var pidStr string
-	if pid == 0 {
-		pidStr = "self"
-	} else {
-		pidStr = strconv.Itoa(pid)
-	}
-
-	oom_value, err := ioutil.ReadFile(path.Join("/proc", pidStr, "oom_score_adj"))
-	if err != nil {
-		return fmt.Errorf("failed to read oom_score_adj: %v", err)
-	} else if string(oom_value) != strconv.Itoa(value) {
-		if err := ioutil.WriteFile(path.Join("/proc", pidStr, "oom_score_adj"), []byte(strconv.Itoa(value)), 0700); err != nil {
-			return fmt.Errorf("failed to set oom_score_adj to %d: %v", value, err)
-		}
-	}
-
-	return nil
 }
 
 // Tests whether all pointer fields in a struct are nil.  This is useful when,
@@ -350,7 +357,7 @@ func isInterfaceUp(intf *net.Interface) bool {
 }
 
 //getFinalIP method receives all the IP addrs of a Interface
-//and returns a nil if the address is Loopback , Ipv6  or nil.
+//and returns a nil if the address is Loopback, Ipv6, link-local or nil.
 //It returns a valid IPv4 if an Ipv4 address is found in the array.
 func getFinalIP(addrs []net.Addr) (net.IP, error) {
 	if len(addrs) > 0 {
@@ -363,11 +370,11 @@ func getFinalIP(addrs []net.Addr) (net.IP, error) {
 			//Only IPv4
 			//TODO : add IPv6 support
 			if ip.To4() != nil {
-				if !ip.IsLoopback() {
+				if !ip.IsLoopback() && !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
 					glog.V(4).Infof("IP found %v", ip)
 					return ip, nil
 				} else {
-					glog.V(4).Infof("Loopback found %v", ip)
+					glog.V(4).Infof("Loopback/link-local found %v", ip)
 				}
 			} else {
 				glog.V(4).Infof("%v is not a valid IPv4 address", ip)
@@ -428,7 +435,9 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 					if addrIP, _, err := net.ParseCIDR(addr.String()); err == nil {
 						if addrIP.To4() != nil {
 							ip = addrIP.To4()
-							break
+							if !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
+								break
+							}
 						}
 					}
 				}
@@ -538,4 +547,36 @@ func FileExists(filename string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// borrowed from ioutil.ReadDir
+// ReadDir reads the directory named by dirname and returns
+// a list of directory entries, minus those with lstat errors
+func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
+	if dirname == "" {
+		dirname = "."
+	}
+
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	names, err := f.Readdirnames(-1)
+	list := make([]os.FileInfo, 0, len(names))
+	errs := make([]error, 0, len(names))
+	for _, filename := range names {
+		fip, lerr := os.Lstat(dirname + "/" + filename)
+		if os.IsNotExist(lerr) {
+			// File disappeared between readdir + stat.
+			// Just treat it as if it didn't exist.
+			continue
+		}
+
+		list = append(list, fip)
+		errs = append(errs, lerr)
+	}
+
+	return list, errs, nil
 }

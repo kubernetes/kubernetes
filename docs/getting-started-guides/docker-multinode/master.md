@@ -44,7 +44,7 @@ There are two main phases to installing the master:
 
 _Note_:
 There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
-Please install Docker 1.6.2 or wait for Docker 1.7.1.
+Please install Docker 1.6.2 or Docker 1.7.1.
 
 ### Setup Docker-Bootstrap
 
@@ -160,22 +160,24 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
 ```
+
+> Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
 
 ### Also run the service proxy
 
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
-Download the kubectl binary
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.21.2/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v0.21.2/bin/linux/amd64/kubectl))
+Download the kubectl binary and make it available by editing your PATH ENV.
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
 
 List the nodes
 
@@ -191,12 +193,12 @@ NAME        LABELS                             STATUS
 ```
 
 If the status of the node is `NotReady` or `Unknown` please check that all of the containers you created are successfully running.
-If all else fails, ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers).
+If all else fails, ask questions on [Slack](../../troubleshooting.md#slack).
 
 
 ### Next steps
 
-Move on to [adding one or more workers](worker.md)
+Move on to [adding one or more workers](worker.md) or [deploy a dns](deployDNS.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

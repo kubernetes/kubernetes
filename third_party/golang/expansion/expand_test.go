@@ -3,7 +3,7 @@ package expansion
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestMapReference(t *testing.T) {

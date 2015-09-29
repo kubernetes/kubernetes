@@ -52,7 +52,7 @@ Documentation for other releases can be found at
 
 In addition to the imperative-style commands, such as `kubectl run` and `kubectl expose`, described [elsewhere](quick-start.md), Kubernetes supports declarative configuration. Often times, configuration files are preferable to imperative commands, since they can be checked into version control and changes to the files can be code reviewed, which is especially important for more complex configurations, producing a more robust, reliable and archival system.
 
-In the declarative style, all configuration is stored in YAML or JSON configuration files, using Kubernetes's API resource schemas as the configuration schemas. `kubectl` can create, update, delete, and get API resources. The `apiVersion` (currently “v1”), resource `kind`, and resource `name` are used by `kubectl` to construct the appropriate API path to invoke for the specified operation. 
+In the declarative style, all configuration is stored in YAML or JSON configuration files using Kubernetes's API resource schemas as the configuration schemas. `kubectl` can create, update, delete, and get API resources. The `apiVersion` (currently “v1”), resource `kind`, and resource `name` are used by `kubectl` to construct the appropriate API path to invoke for the specified operation.
 
 ## Launching a container using a configuration file
 
@@ -73,7 +73,7 @@ spec:  # specification of the pod’s contents
 
 The value of `metadata.name`, `hello-world`, will be the name of the pod resource created, and must be unique within the cluster, whereas `containers[0].name` is just a nickname for the container within that pod. `image` is the name of the Docker image, which Kubernetes expects to be able to pull from a registry, the [Docker Hub](https://registry.hub.docker.com/) by default.
 
-`restartPolicy: Never` indicates that we just want to run the container once and then terminate the pod. 
+`restartPolicy: Never` indicates that we just want to run the container once and then terminate the pod.
 
 The [`command`](containers.md#containers-and-commands) overrides the Docker container’s `Entrypoint`. Command arguments (corresponding to Docker’s `Cmd`) may be specified using `args`, as follows:
 
@@ -103,15 +103,18 @@ Let’s say you specified `entrypoint` instead of `command`. You’d see output 
 
 ```console
 I0709 06:33:05.600829   14160 schema.go:126] unknown field: entrypoint
-I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
+I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see http://issue.k8s.io/6842
 pods/hello-world
 ```
 
 `kubectl create --validate` currently warns about problems it detects, but creates the resource anyway, unless a required field is absent or a field value is invalid. Unknown API fields are ignored, so be careful. This pod was created, but with no `command`, which is an optional field, since the image may specify an `Entrypoint`.
+View the [Pod API
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_pod)
+to see the list of valid fields.
 
 ## Environment variables and variable expansion
 
-Kubernetes [does not automatically run commands in a shell](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ#use-of-environment-variables-on-the-command-line) (not all images contain shells). If you would like to run your command in a shell, such as to expand environment variables (specified using `env`), you could do the following:
+Kubernetes [does not automatically run commands in a shell](https://github.com/kubernetes/kubernetes/wiki/User-FAQ#use-of-environment-variables-on-the-command-line) (not all images contain shells). If you would like to run your command in a shell, such as to expand environment variables (specified using `env`), you could do the following:
 
 ```yaml
 apiVersion: v1
@@ -139,7 +142,7 @@ However, a shell isn’t necessary just to expand environment variables. Kuberne
 
 ## Viewing pod status
 
-You can see the pod you created (actually all of your cluster's pods) using the `get` command. 
+You can see the pod you created (actually all of your cluster's pods) using the `get` command.
 
 If you’re quick, it will look as follows:
 
@@ -151,7 +154,7 @@ hello-world   0/1       Pending   0          0s
 
 Initially, a newly created pod is unscheduled -- no node has been selected to run it. Scheduling happens after creation, but is fast, so you normally shouldn’t see pods in an unscheduled state unless there’s a problem.
 
-After the pod has been scheduled, the image may need to be pulled to the node on which it was scheduled, if it hadn’t be pulled already. After a few seconds, you should see the container running:
+After the pod has been scheduled, the image may need to be pulled to the node on which it was scheduled, if it hadn’t been pulled already. After a few seconds, you should see the container running:
 
 ```console
 $ kubectl get pods
@@ -196,7 +199,7 @@ $ kubectl delete pods/hello-world
 pods/hello-world
 ```
 
-Terminated pods aren’t currently automatically deleted, so that you can observe their final status, so be sure to clean up your dead pods. 
+Terminated pods aren’t currently automatically deleted, so that you can observe their final status, so be sure to clean up your dead pods.
 
 On the other hand, containers and their logs are eventually deleted automatically in order to free up disk space on the nodes.
 

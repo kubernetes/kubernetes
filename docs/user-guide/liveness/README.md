@@ -69,7 +69,7 @@ The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
       timeoutSeconds: 1
 ```
 
-The Kubelet sends a HTTP request to the specified path and port to perform the health check. If you take a look at image/server.go, you will see the server starts to respond with an error code 500 after 10 seconds, so the check fails.
+The Kubelet sends an HTTP request to the specified path and port to perform the health check. If you take a look at image/server.go, you will see the server starts to respond with an error code 500 after 10 seconds, so the check fails. The Kubelet sends the probe to the container's ip address by default which could be specified with `host` as part of httpGet probe. If the container listens on `127.0.0.1`, `host` should be specified as `127.0.0.1`. In general, if the container listens on its ip address or on all interfaces (0.0.0.0), there is no need to specify the `host` as part of the httpGet probe.
 
 This [guide](../walkthrough/k8s201.md#health-checking) has more information on health checks.
 
@@ -96,7 +96,6 @@ Check the status half a minute later, you will see the container restart count b
 
 ```console
 $ kubectl get pods
-mwielgus@mwielgusd:~/test/k2/kubernetes/examples/liveness$ kubectl get pods
 NAME                                           READY     STATUS       RESTARTS   AGE
 [...]
 liveness-exec                                  1/1       Running      1          36s

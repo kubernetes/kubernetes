@@ -978,3 +978,134 @@ func TestEmbeddedStructPull204(t *testing.T) {
  }
 `)
 }
+
+type AddressWithMethod struct {
+	Country  string `json:"country,omitempty"`
+	PostCode int    `json:"postcode,omitempty"`
+}
+
+func (AddressWithMethod) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":         "Address doc",
+		"country":  "Country doc",
+		"postcode": "PostCode doc",
+	}
+}
+
+func TestDocInMethodSwaggerDoc(t *testing.T) {
+	expected := `{
+		  "swagger.AddressWithMethod": {
+		   "id": "swagger.AddressWithMethod",
+		   "description": "Address doc",
+		   "properties": {
+		    "country": {
+		     "type": "string",
+		     "description": "Country doc"
+		    },
+		    "postcode": {
+		     "type": "integer",
+		     "format": "int32",
+		     "description": "PostCode doc"
+		    }
+		   }
+		  }
+		 }`
+	testJsonFromStruct(t, AddressWithMethod{}, expected)
+}
+
+type RefDesc struct {
+	f1 *int64 `description:"desc"`
+}
+
+func TestPtrDescription(t *testing.T) {
+	b := RefDesc{}
+	expected := `{
+   "swagger.RefDesc": {
+    "id": "swagger.RefDesc",
+    "required": [
+     "f1"
+    ],
+    "properties": {
+     "f1": {
+      "type": "integer",
+      "format": "int64",
+			"description": "desc"
+     }
+    }
+   }
+  }`
+	testJsonFromStruct(t, b, expected)
+}
+
+type A struct {
+	B  `json:",inline"`
+	C1 `json:"metadata,omitempty"`
+}
+
+type B struct {
+	SB string
+}
+
+type C1 struct {
+	SC string
+}
+
+func (A) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":         "A struct",
+		"B":        "B field", // We should not get anything from this
+		"metadata": "C1 field",
+	}
+}
+
+func (B) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":   "B struct",
+		"SB": "SB field",
+	}
+}
+
+func (C1) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":   "C1 struct",
+		"SC": "SC field",
+	}
+}
+
+func TestNestedStructDescription(t *testing.T) {
+	expected := `
+{
+  "swagger.A": {
+   "id": "swagger.A",
+   "description": "A struct",
+   "required": [
+    "SB"
+   ],
+   "properties": {
+    "SB": {
+     "type": "string",
+     "description": "SB field"
+    },
+    "metadata": {
+     "$ref": "swagger.C1",
+     "description": "C1 field"
+    }
+   }
+  },
+  "swagger.C1": {
+   "id": "swagger.C1",
+   "description": "C1 struct",
+   "required": [
+    "SC"
+   ],
+   "properties": {
+    "SC": {
+     "type": "string",
+     "description": "SC field"
+    }
+   }
+  }
+ }
+`
+	testJsonFromStruct(t, A{}, expected)
+}

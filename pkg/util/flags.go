@@ -16,10 +16,13 @@ limitations under the License.
 
 package util
 
-import "strings"
+import (
+	goflag "flag"
+	"strings"
 
-import "github.com/spf13/pflag"
-import "github.com/golang/glog"
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
+)
 
 // WordSepNormalizeFunc changes all flags that contain "_" separators
 func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -43,6 +46,6 @@ func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedNam
 // InitFlags normalizes and parses the command line flags
 func InitFlags() {
 	pflag.CommandLine.SetNormalizeFunc(WordSepNormalizeFunc)
-	AddAllFlagsToPFlags()
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	pflag.Parse()
 }

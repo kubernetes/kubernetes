@@ -122,7 +122,7 @@ func TestFIFO_addUpdate(t *testing.T) {
 func TestFIFO_addReplace(t *testing.T) {
 	f := NewHistorical(nil)
 	f.Add(&testObj{"foo", 10})
-	f.Replace([]interface{}{&testObj{"foo", 15}})
+	f.Replace([]interface{}{&testObj{"foo", 15}}, "0")
 	got := make(chan *testObj, 2)
 	go func() {
 		for {

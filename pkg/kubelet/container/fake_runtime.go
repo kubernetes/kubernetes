@@ -23,8 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // FakeRuntime is a fake container runtime for testing.
@@ -32,7 +33,6 @@ type FakeRuntime struct {
 	sync.Mutex
 	CalledFunctions   []string
 	PodList           []*Pod
-	ContainerList     []*Container
 	ImageList         []Image
 	PodStatus         api.PodStatus
 	StartedPods       []string
@@ -87,7 +87,6 @@ func (f *FakeRuntime) ClearCalls() {
 
 	f.CalledFunctions = []string{}
 	f.PodList = []*Pod{}
-	f.ContainerList = []*Container{}
 	f.PodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
@@ -151,7 +150,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secret) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secret, backOff *util.Backoff) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -163,13 +162,13 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secr
 	return f.Err
 }
 
-func (f *FakeRuntime) KillPod(pod Pod) error {
+func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "KillPod")
-	f.KilledPods = append(f.KilledPods, string(pod.ID))
-	for _, c := range pod.Containers {
+	f.KilledPods = append(f.KilledPods, string(runningPod.ID))
+	for _, c := range runningPod.Containers {
 		f.KilledContainers = append(f.KilledContainers, c.Name)
 	}
 	return f.Err
@@ -218,19 +217,19 @@ func (f *FakeRuntime) GetPodStatus(*api.Pod) (*api.PodStatus, error) {
 	return &status, f.Err
 }
 
-func (f *FakeRuntime) GetContainers(all bool) ([]*Container, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetContainers")
-	return f.ContainerList, f.Err
-}
-
 func (f *FakeRuntime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ExecInContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) AttachContainer(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "AttachContainer")
 	return f.Err
 }
 
@@ -242,7 +241,7 @@ func (f *FakeRuntime) RunInContainer(containerID string, cmd []string) ([]byte, 
 	return []byte{}, f.Err
 }
 
-func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	f.Lock()
 	defer f.Unlock()
 

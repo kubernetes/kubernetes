@@ -25,10 +25,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-controller-manager/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
 )

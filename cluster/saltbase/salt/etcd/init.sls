@@ -1,3 +1,9 @@
+# Early configurations of Kubernetes ran etcd on the host and as part of a migration step, we began to delete the host etcd
+# It's possible though that the host has configured a separate etcd to configure other services like Flannel
+# In that case, we do not want Salt to remove or stop the host service
+# Note: its imperative that the host installed etcd not conflict with the Kubernetes managed etcd
+{% if grains['keep_host_etcd'] is not defined %}
+
 delete_etc_etcd_dir:
   file.absent:
     - name: /etc/etcd
@@ -5,20 +11,6 @@ delete_etc_etcd_dir:
 delete_etcd_conf:
   file.absent:
     - name: /etc/etcd/etcd.conf
-
-touch /var/log/etcd.log:
-  cmd.run:
-    - creates: /var/log/etcd.log
-
-/var/etcd:
-  file.directory:
-    - user: root
-    - group: root
-    - dir_mode: 700
-    - recurse:
-      - user
-      - group
-      - mode
 
 delete_etcd_default:
   file.absent:
@@ -34,6 +26,28 @@ delete_etcd_initd:
   file.absent:
     - name: /etc/init.d/etcd
 
+#stop legacy etcd_service
+stop_etcd-service:
+  service.dead:
+    - name: etcd
+    - enable: None
+
+{% endif %}
+
+touch /var/log/etcd.log:
+  cmd.run:
+    - creates: /var/log/etcd.log
+
+/var/etcd:
+  file.directory:
+    - user: root
+    - group: root
+    - dir_mode: 700
+    - recurse:
+      - user
+      - group
+      - mode
+
 /etc/kubernetes/manifests/etcd.manifest:
   file.managed:
     - source: salt://etcd/etcd.manifest
@@ -43,9 +57,3 @@ delete_etcd_initd:
     - mode: 644
     - makedirs: true
     - dir_mode: 755
-
-#stop legacy etcd_service 
-stop_etcd-service:
-  service.dead:
-    - name: etcd
-    - enable: None

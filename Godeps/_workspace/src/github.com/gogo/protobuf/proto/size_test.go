@@ -33,10 +33,12 @@ package proto_test
 
 import (
 	"log"
+	"strings"
 	"testing"
 
-	pb "./testdata"
 	. "github.com/gogo/protobuf/proto"
+	proto3pb "github.com/gogo/protobuf/proto/proto3_proto"
+	pb "github.com/gogo/protobuf/proto/testdata"
 )
 
 var messageWithExtension1 = &pb.MyMessage{Count: Int32(7)}
@@ -102,6 +104,31 @@ var SizeTests = []struct {
 	{"unrecognized", &pb.MoreRepeated{XXX_unrecognized: []byte{13<<3 | 0, 4}}},
 	{"extension (unencoded)", messageWithExtension1},
 	{"extension (encoded)", messageWithExtension3},
+	// proto3 message
+	{"proto3 empty", &proto3pb.Message{}},
+	{"proto3 bool", &proto3pb.Message{TrueScotsman: true}},
+	{"proto3 int64", &proto3pb.Message{ResultCount: 1}},
+	{"proto3 uint32", &proto3pb.Message{HeightInCm: 123}},
+	{"proto3 float", &proto3pb.Message{Score: 12.6}},
+	{"proto3 string", &proto3pb.Message{Name: "Snezana"}},
+	{"proto3 bytes", &proto3pb.Message{Data: []byte("wowsa")}},
+	{"proto3 bytes, empty", &proto3pb.Message{Data: []byte{}}},
+	{"proto3 enum", &proto3pb.Message{Hilarity: proto3pb.Message_PUNS}},
+	{"proto3 map field with empty bytes", &proto3pb.MessageWithMap{ByteMapping: map[bool][]byte{false: {}}}},
+
+	{"map field", &pb.MessageWithMap{NameMapping: map[int32]string{1: "Rob", 7: "Andrew"}}},
+	{"map field with message", &pb.MessageWithMap{MsgMapping: map[int64]*pb.FloatingPoint{0x7001: {F: Float64(2.0)}}}},
+	{"map field with bytes", &pb.MessageWithMap{ByteMapping: map[bool][]byte{true: []byte("this time for sure")}}},
+	{"map field with empty bytes", &pb.MessageWithMap{ByteMapping: map[bool][]byte{true: {}}}},
+
+	{"map field with big entry", &pb.MessageWithMap{NameMapping: map[int32]string{8: strings.Repeat("x", 125)}}},
+	{"map field with big key and val", &pb.MessageWithMap{StrToStr: map[string]string{strings.Repeat("x", 70): strings.Repeat("y", 70)}}},
+	{"map field with big numeric key", &pb.MessageWithMap{NameMapping: map[int32]string{0xf00d: "om nom nom"}}},
+
+	{"oneof not set", &pb.Communique{}},
+	{"oneof zero int32", &pb.Communique{Union: &pb.Communique_Number{Number: 0}}},
+	{"oneof int32", &pb.Communique{Union: &pb.Communique_Number{Number: 3}}},
+	{"oneof string", &pb.Communique{Union: &pb.Communique_Name{Name: "Rhythmic Fman"}}},
 }
 
 func TestSize(t *testing.T) {

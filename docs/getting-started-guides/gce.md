@@ -38,7 +38,7 @@ Getting started on Google Compute Engine
 - [Before you start](#before-you-start)
 - [Prerequisites](#prerequisites)
 - [Starting a cluster](#starting-a-cluster)
-- [Installing the kubernetes command line tools on your workstation](#installing-the-kubernetes-command-line-tools-on-your-workstation)
+- [Installing the Kubernetes command line tools on your workstation](#installing-the-kubernetes-command-line-tools-on-your-workstation)
 - [Getting started with your cluster](#getting-started-with-your-cluster)
     - [Inspect your cluster](#inspect-your-cluster)
     - [Run some examples](#run-some-examples)
@@ -86,11 +86,11 @@ wget -q -O - https://get.k8s.io | bash
 
 Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
 
-By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
+By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.md), while `heapster` provides [monitoring](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/README.md) services.
 
 The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
 
-Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
+Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/kubernetes/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
 ```bash
 cd kubernetes
@@ -100,7 +100,7 @@ cluster/kube-up.sh
 If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
-[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on [Slack](../troubleshooting.md#slack).
 
 The next few steps will show you:
 
@@ -109,7 +109,7 @@ The next few steps will show you:
 1. how to delete the cluster
 1. how to start clusters with non-default options (like larger clusters)
 
-### Installing the kubernetes command line tools on your workstation
+### Installing the Kubernetes command line tools on your workstation
 
 The cluster startup script will leave you with a running cluster and a `kubernetes` directory on your workstation.
 The next step is to make sure the `kubectl` tool is in your path.
@@ -132,6 +132,24 @@ However the gcloud bundled kubectl version may be older than the one downloaded 
 get.k8s.io install script. We recommend you use the downloaded binary to avoid
 potential issues with client/server version skew.
 
+#### Enabling bash completion of the Kubernetes command line tools
+
+You may find it useful to enable `kubectl` bash completion:
+
+```
+$ source ./contrib/completions/bash/kubectl
+```
+
+**Note**: This will last for the duration of your bash session. If you want to make this permanent you need to add this line in your bash profile.
+
+Alternatively, on most linux distributions you can also move the completions file to your bash_completions.d like this:
+
+```
+$ cp ./contrib/completions/bash/kubectl /etc/bash_completion.d/
+```
+
+but then you have to update it when you update kubectl.
+
 ### Getting started with your cluster
 
 #### Inspect your cluster
@@ -145,15 +163,11 @@ $ kubectl get --all-namespaces services
 should show a set of [services](../user-guide/services.md) that look something like this:
 
 ```console
-NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
-default       kubernetes            component=apiserver,provider=kubernetes                                          <none>                  10.0.0.1    443/TCP
-kube-system   kube-dns              k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS   k8s-app=kube-dns        10.0.0.10   53/UDP
-                                                                                                                                                         53/TCP
-kube-system   kube-ui               k8s-app=kube-ui,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeUI     k8s-app=kube-ui         10.0.59.25     80/TCP
-kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernetes.io/name=Grafana                    k8s-app=influxGrafana   10.0.41.246    80/TCP
-kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
-kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
-                                                                                                                                                            8086/TCP
+NAMESPACE     NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+default       kubernetes            10.0.0.1         <none>            443/TCP       <none>                 1d
+kube-system   kube-dns              10.0.0.2         <none>            53/TCP,53/UDP k8s-app=kube-dns       1d
+kube-system   kube-ui               10.0.0.3         <none>            80/TCP        k8s-app=kube-ui        1d
+...
 ```
 
 Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.

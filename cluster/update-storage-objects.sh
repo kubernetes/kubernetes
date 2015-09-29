@@ -19,7 +19,7 @@
 # they are written using the latest API version.
 #
 # Steps to use this script to upgrade the cluster to a new version:
-# https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
+# https://github.com/kubernetes/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
 
 set -o errexit
 set -o nounset
@@ -32,7 +32,7 @@ KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 
 # List of resources to be updated.
 # TODO: Get this list of resources from server once
-# https://github.com/GoogleCloudPlatform/kubernetes/issues/2057 is fixed.
+# http://issue.k8s.io/2057 is fixed.
 declare -a resources=(
     "endpoints"
     "events"
@@ -49,7 +49,7 @@ declare -a resources=(
 )
 
 # Find all the namespaces.
-namespaces=( $("${KUBECTL}" get namespaces -o template -t "{{range.items}}{{.metadata.name}} {{end}}"))
+namespaces=( $("${KUBECTL}" get namespaces -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
 if [ -z "${namespaces:-}" ]
 then
   echo "Unexpected: No namespace found. Nothing to do."
@@ -59,7 +59,7 @@ for resource in "${resources[@]}"
 do
   for namespace in "${namespaces[@]}"
   do
-    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o template -t "{{range.items}}{{.metadata.name}} {{end}}"))
+    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
     # Nothing to do if there is no instance of that resource.
     if [[ -z "${instances:-}" ]]
     then
@@ -84,7 +84,7 @@ do
           echo "Looks like ${instance} got deleted. Ignoring it"
           continue
         fi
-        output=$("${KUBECTL}" update -f "${filename}" --namespace="${namespace}") || true
+        output=$("${KUBECTL}" replace -f "${filename}" --namespace="${namespace}") || true
         rm "${filename}"
         if [ -n "${output:-}" ]
         then

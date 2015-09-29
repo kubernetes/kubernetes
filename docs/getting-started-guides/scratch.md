@@ -71,11 +71,12 @@ steps that existing cluster setup scripts are making.
     - [Using Configuration Management](#using-configuration-management)
   - [Bootstrapping the Cluster](#bootstrapping-the-cluster)
     - [etcd](#etcd)
-    - [Apiserver](#apiserver)
+    - [Apiserver, Controller Manager, and Scheduler](#apiserver-controller-manager-and-scheduler)
       - [Apiserver pod template](#apiserver-pod-template)
-      - [Starting Apiserver](#starting-apiserver)
-    - [Scheduler](#scheduler)
-    - [Controller Manager](#controller-manager)
+        - [Cloud Providers](#cloud-providers)
+      - [Scheduler pod template](#scheduler-pod-template)
+      - [Controller Manager Template](#controller-manager-template)
+      - [Starting and Verifying Apiserver, Scheduler, and Controller Manager](#starting-and-verifying-apiserver-scheduler-and-controller-manager)
     - [Logging](#logging)
     - [Monitoring](#monitoring)
     - [DNS](#dns)
@@ -91,13 +92,14 @@ steps that existing cluster setup scripts are making.
 
 ## Designing and Preparing
 
-### Learning 
+### Learning
 
   1. You should be familiar with using Kubernetes already.  We suggest you set
     up a temporary cluster by following one of the other Getting Started Guides.
     This will help you become familiar with the CLI ([kubectl](../user-guide/kubectl/kubectl.md)) and concepts ([pods](../user-guide/pods.md), [services](../user-guide/services.md), etc.) first.
   1. You should have `kubectl` installed on your desktop.  This will happen as a side
-    effect of completing one of the other Getting Started Guides.
+    effect of completing one of the other Getting Started Guides.  If not, follow the instructions
+    [here](../user-guide/prereqs.md).
 
 ### Cloud Provider
 
@@ -106,7 +108,7 @@ an interface for managing TCP Load Balancers, Nodes (Instances) and Networking R
 The interface is defined in `pkg/cloudprovider/cloud.go`.  It is possible to
 create a custom cluster without implementing a cloud provider (for example if using
 bare-metal), and not all parts of the interface need to be implemented, depending
-on how flags are set on various components. 
+on how flags are set on various components.
 
 ### Nodes
 
@@ -136,7 +138,7 @@ accomplished in two ways:
   - Harder to setup from scratch.
   - Google Compute Engine ([GCE](gce.md)) and [AWS](aws.md) guides use this approach.
   - Need to make the Pod IPs routable by programming routers, switches, etc.
-  - Can be configured external to kubernetes, or can implement in the "Routes" interface of a Cloud Provider module.
+  - Can be configured external to Kubernetes, or can implement in the "Routes" interface of a Cloud Provider module.
   - Generally highest performance.
 - Create an Overlay network
   - Easier to setup
@@ -210,7 +212,7 @@ A Kubernetes binary release includes all the Kubernetes binaries as well as the 
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
 [Developer Documentation](../devel/README.md).  Only using a binary release is covered in this guide.
 
-Download the [latest binary release](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest) and unzip it.
+Download the [latest binary release](https://github.com/kubernetes/kubernetes/releases/latest) and unzip it.
 Then locate `./kubernetes/server/kubernetes-server-linux-amd64.tar.gz` and unzip *that*.
 Then, within the second set of unzipped files, locate `./kubernetes/server/bin`, which contains
 all the necessary binaries.
@@ -218,37 +220,37 @@ all the necessary binaries.
 #### Selecting Images
 
 You will run docker, kubelet, and kube-proxy outside of a container, the same way you would run any system daemon, so
-you just need the bare binaries.  For etcd, kube-apiserver, kube-controller-manager, and kube-scheduler, 
+you just need the bare binaries.  For etcd, kube-apiserver, kube-controller-manager, and kube-scheduler,
 we recommend that you run these as containers, so you need an image to be built.
 
 You have several choices for Kubernetes images:
 - Use images hosted on Google Container Registry (GCR):
-  - e.g `gcr.io/google_containers/kube-apiserver:$TAG`, where `TAG` is the latest
-    release tag, which can be found on the [latest releases page](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest). 
+  - e.g `gcr.io/google_containers/hyperkube:$TAG`, where `TAG` is the latest
+    release tag, which can be found on the [latest releases page](https://github.com/kubernetes/kubernetes/releases/latest).
   - Ensure $TAG is the same tag as the release tag you are using for kubelet and kube-proxy.
+  - The [hyperkube](../../cmd/hyperkube/) binary is an all in one binary
+    - `hyperkube kubelet ...` runs the kublet, `hyperkube apiserver ...` runs an apiserver, etc.
 - Build your own images.
   - Useful if you are using a private registry.
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
     can be converted into docker images using a command like
     `docker load -i kube-apiserver.tar`
-  - You can verify if the image is loaded successfully with the right reposity and tag using
+  - You can verify if the image is loaded successfully with the right repository and tag using
     command like `docker images`
 
 For etcd, you can:
 - Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
-- Use images hosted on [Docker Hub](https://registry.hub.docker.com/u/coreos/etcd/) or [quay.io](https://registry.hub.docker.com/u/coreos/etcd/)
+- Use images hosted on [Docker Hub](https://hub.docker.com/search/?q=etcd) or [Quay.io](https://quay.io/repository/coreos/etcd), such as `quay.io/coreos/etcd:v2.2.0`
 - Use etcd binary included in your OS distro.
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
 
-We recommend that you use the etcd version which is provided in the kubernetes binary distribution.   The kubernetes binaries in the release
+We recommend that you use the etcd version which is provided in the Kubernetes binary distribution.   The Kubernetes binaries in the release
 were tested extensively with this version of etcd and not with any other version.
 The recommended version number can also be found as the value of `ETCD_VERSION` in `kubernetes/cluster/images/etcd/Makefile`.
 
 The remainder of the document assumes that the image identifiers have been chosen and stored in corresponding env vars.  Examples (replace with latest tags and appropriate registry):
-  - `APISERVER_IMAGE=gcr.io/google_containers/kube-apiserver:$TAG`
-  - `SCHEDULER_IMAGE=gcr.io/google_containers/kube-scheduler:$TAG`
-  - `CNTRLMNGR_IMAGE=gcr.io/google_containers/kube-controller-manager:$TAG`
+  - `HYPERKUBE_IMAGE==gcr.io/google_containers/hyperkube:$TAG`
   - `ETCD_IMAGE=gcr.io/google_containers/etcd:$ETCD_VERSION`
 
 ### Security Models
@@ -257,7 +259,7 @@ There are two main options for security:
 - Access the apiserver using HTTP.
   - Use a firewall for security.
   - This is easier to setup.
-- Access the apiserver using HTTPS  
+- Access the apiserver using HTTPS
   - Use https with certs, and credentials for user.
   - This is the recommended approach.
   - Configuring certs can be tricky.
@@ -292,7 +294,7 @@ You will end up with the following files (we will use these variables later on)
 #### Preparing Credentials
 
 The admin user (and any users) need:
-  - a token or a password to identify them. 
+  - a token or a password to identify them.
   - tokens are just long alphanumeric strings, e.g. 32 chars.  See
     - `TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)`
 
@@ -311,12 +313,12 @@ The kubeconfig file for the administrator can be created as follows:
       - `kubectl config set-cluster $CLUSTER_NAME --server=http://$MASTER_IP --insecure-skip-tls-verify=true`
     - Otherwise, do this to set the apiserver ip, client certs, and user credentials.
       - `kubectl config set-cluster $CLUSTER_NAME --certificate-authority=$CA_CERT --embed-certs=true --server=https://$MASTER_IP`
-      - `kubectl config set-credentials $CLUSTER_NAME --client-certificate=$CLI_CERT --client-key=$CLI_KEY --embed-certs=true --token=$TOKEN`
+      - `kubectl config set-credentials $USER --client-certificate=$CLI_CERT --client-key=$CLI_KEY --embed-certs=true --token=$TOKEN`
     - Set your cluster as the default cluster to use:
-      - `kubectl config set-context $CLUSTER_NAME --cluster=$CLUSTER_NAME --user=admin`
-      - `kubectl config use-context $CONTEXT  --cluster=$CONTEXT`
+      - `kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NAME --user=$USER`
+      - `kubectl config use-context $CONTEXT_NAME`
 
-Next, make a kubeconfig file for the kubelets and kube-proxy.  There are a couple of options for how 
+Next, make a kubeconfig file for the kubelets and kube-proxy.  There are a couple of options for how
 many distinct files to make:
   1. Use the same credential as the admin
     - This is simplest to setup.
@@ -353,7 +355,7 @@ guide assume that there are kubeconfigs in `/var/lib/kube-proxy/kubeconfig` and
 
 ## Configuring and Installing Base Software on Nodes
 
-This section discusses how to configure machines to be kubernetes nodes. 
+This section discusses how to configure machines to be Kubernetes nodes.
 
 You should run three daemons on every node:
   - docker or rkt
@@ -390,10 +392,10 @@ so that kube-proxy can manage iptables instead of docker.
     - if you have setup PodIPs to be routable, then you want this false, otherwise, docker will
       rewrite the PodIP source-address to a NodeIP.
     - some environments (e.g. GCE) still need you to masquerade out-bound traffic when it leaves the cloud environment. This is very environment specific.
-    - if you are using an overlay network, consult those instructions.  
+    - if you are using an overlay network, consult those instructions.
   - `--mtu=`
     - may be required when using Flannel, because of the extra packet size due to udp encapsulation
-  - `--insecure-registry $CLUSTER_SUBNET` 
+  - `--insecure-registry $CLUSTER_SUBNET`
     - to connect to a private registry, if you set one up, without using SSL.
 
 You may want to increase the number of open files for docker:
@@ -410,7 +412,7 @@ installation, by following examples given in the Docker documentation.
 The minimum version required is [v0.5.6](https://github.com/coreos/rkt/releases/tag/v0.5.6).
 
 [systemd](http://www.freedesktop.org/wiki/Software/systemd/) is required on your node to run rkt.  The
-minimum version required to match rkt v0.5.6 is 
+minimum version required to match rkt v0.5.6 is
 [systemd 215](http://lists.freedesktop.org/archives/systemd-devel/2014-July/020903.html).
 
 [rkt metadata service](https://github.com/coreos/rkt/blob/master/Documentation/networking.md) is also required
@@ -418,7 +420,7 @@ for rkt networking support.  You can start rkt metadata service by using command
 `sudo systemd-run rkt metadata-service`
 
 Then you need to configure your kubelet with flag:
-  - `--container_runtime=rkt`
+  - `--container-runtime=rkt`
 
 ### kubelet
 
@@ -430,19 +432,19 @@ Arguments to consider:
     - `--kubeconfig=/var/lib/kubelet/kubeconfig`
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
-  - `--config=/etc/kubernetes/manifests` -%}
+  - `--config=/etc/kubernetes/manifests`
   - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](#starting-addons).)
   - `--cluster-domain=` to the dns domain prefix to use for cluster DNS addresses.
   - `--docker-root=`
   - `--root-dir=`
   - `--configure-cbr0=` (described above)
-  - `--register-node` (described in [Node](../admin/node.md) documentation.
+  - `--register-node` (described in [Node](../admin/node.md) documentation.)
 
 ### kube-proxy
 
 All nodes should run kube-proxy.  (Running kube-proxy on a "master" node is not
 strictly required, but being consistent is easier.)   Obtain a binary as described for
-kubelet. 
+kubelet.
 
 Arguments to consider:
   - If following the HTTPS security approach:
@@ -454,7 +456,7 @@ Arguments to consider:
 ### Networking
 
 Each node needs to be allocated its own CIDR range for pod networking.
-Call this `NODE_X_POD_CIDR`. 
+Call this `NODE_X_POD_CIDR`.
 
 A bridge called `cbr0` needs to be created on each node.  The bridge is explained
 further in the [networking documentation](../admin/networking.md).  The bridge itself
@@ -496,7 +498,7 @@ NOTE: This is environment specific.  Some environments will not need
 any masquerading at all.  Others, such as GCE, will not allow pod IPs to send
 traffic to the internet, but have no problem with them inside your GCE Project.
 
-### Other 
+### Other
 
 - Enable auto-upgrades for your OS package manager, if desired.
 - Configure log rotation for all node components (e.g. using [logrotate](http://linux.die.net/man/8/logrotate)).
@@ -523,52 +525,33 @@ all configured and managed *by Kubernetes*:
 
 ### etcd
 
-You will need to run one or more instances of etcd.  
+You will need to run one or more instances of etcd.
   - Recommended approach: run one etcd instance, with its log written to a directory backed
     by durable storage (RAID, GCE PD)
   - Alternative: run 3 or 5 etcd instances.
-    - Log can be written to non-durable storage because storage is replicated. 
+    - Log can be written to non-durable storage because storage is replicated.
     - run a single apiserver which connects to one of the etc nodes.
  See [cluster-troubleshooting](../admin/cluster-troubleshooting.md) for more discussion on factors affecting cluster
 availability.
 
 To run an etcd instance:
+
 1. copy `cluster/saltbase/salt/etcd/etcd.manifest`
 1. make any modifications needed
 1. start the pod by putting it into the kubelet manifest directory
 
-### Apiserver
+### Apiserver, Controller Manager, and Scheduler
 
-To run the apiserver:
-1. select the correct flags for your cluster
-1. write a pod spec for the apiserver using the provided template
-1. start the pod by putting it into the kubelet manifest directory
+The apiserver, controller manager, and scheduler will each run as a pod on the master node.
 
-Here are some apiserver flags you may need to set:
-  - `--cloud-provider=`
-  - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostPath.
-  - `--address=${MASTER_IP}`.  
-   - or `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
-  - `--cluster-name=$CLUSTER_NAME`
-  - `--service-cluster-ip-range=$SERVICE_CLUSTER_IP_RANGE`
-  - `--etcd-servers=http://127.0.0.1:4001`
-  - `--tls-cert-file=/srv/kubernetes/server.cert` -%}
-  - `--tls-private-key-file=/srv/kubernetes/server.key` -%}
-  - `--admission-control=$RECOMMENDED_LIST`
-    - See [admission controllers](../admin/admission-controllers.md) for recommended arguments.
-  - `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
- 
-If you are following the firewall-only security approach, then use these arguments:
-  - `--token-auth-file=/dev/null`
-  - `--insecure-bind-address=$MASTER_IP`
-  - `--advertise-address=$MASTER_IP`
+For each of these components, the steps to start them running are similar:
 
-If you are using the HTTPS approach, then set:
-  - `--client-ca-file=/srv/kubernetes/ca.crt`
-  - `--token-auth-file=/srv/kubernetes/known_tokens.csv`
-  - `--basic-auth-file=/srv/kubernetes/basic_auth.csv`
-
-*TODO* document proxy-ssh setup.
+1. Start with a provided template for a pod.
+1. Set the `HYPERKUBE_IMAGE` to the values chosen in [Selecting Images](#selecting-images).
+1. Determine which flags are needed for your cluster, using the advice below each template.
+1. Set the flags to be individual strings in the command array (e.g. $ARGN below)
+1. Start the pod by putting the completed template into the kubelet manifest directory.
+1. Verify that the pod is started.
 
 #### Apiserver pod template
 
@@ -584,11 +567,14 @@ If you are using the HTTPS approach, then set:
     "containers": [
       {
         "name": "kube-apiserver",
-        "image": "${APISERVER_IMAGE}",
+        "image": "${HYPERKUBE_IMAGE}",
         "command": [
-          "/bin/sh",
-          "-c",
-          "/usr/local/bin/kube-apiserver $ARGS"
+          "/hyperkube",
+          "apiserver",
+          "$ARG1",
+          "$ARG2",
+          ...
+          "$ARGN"
         ],
         "ports": [
           {
@@ -642,49 +628,61 @@ If you are using the HTTPS approach, then set:
 }
 ```
 
-The `/etc/ssl` mount allows the apiserver to find the SSL root certs so it can
-authenticate external services, such as a cloud provider.
+Here are some apiserver flags you may need to set:
 
-The `/srv/kubernetes` mount allows the apiserver to read certs and credentials stored on the
-node disk.
+- `--cloud-provider=` see [cloud providers](#cloud-providers)
+- `--cloud-config=` see [cloud providers](#cloud-providers)
+- `--address=${MASTER_IP}` *or* `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
+- `--cluster-name=$CLUSTER_NAME`
+- `--service-cluster-ip-range=$SERVICE_CLUSTER_IP_RANGE`
+- `--etcd-servers=http://127.0.0.1:4001`
+- `--tls-cert-file=/srv/kubernetes/server.cert`
+- `--tls-private-key-file=/srv/kubernetes/server.key`
+- `--admission-control=$RECOMMENDED_LIST`
+  - See [admission controllers](../admin/admission-controllers.md) for recommended arguments.
+- `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
 
-Optionally, you may want to mount `/var/log` as well and redirect output there.
+If you are following the firewall-only security approach, then use these arguments:
 
-#### Starting Apiserver
+- `--token-auth-file=/dev/null`
+- `--insecure-bind-address=$MASTER_IP`
+- `--advertise-address=$MASTER_IP`
 
-Place the completed pod template into the kubelet config dir
-(whatever `--config=` argument of kubelet is set to, typically
-`/etc/kubernetes/manifests`).
+If you are using the HTTPS approach, then set:
+- `--client-ca-file=/srv/kubernetes/ca.crt`
+- `--token-auth-file=/srv/kubernetes/known_tokens.csv`
+- `--basic-auth-file=/srv/kubernetes/basic_auth.csv`
 
-Next, verify that kubelet has started a container for the apiserver:
+This pod mounts several node file system directories using the  `hostPath` volumes.  Their purposes are:
+- The `/etc/ssl` mount allows the apiserver to find the SSL root certs so it can
+  authenticate external services, such as a cloud provider.
+  - This is not required if you do not use a cloud provider (e.g. bare-metal).
+- The `/srv/kubernetes` mount allows the apiserver to read certs and credentials stored on the
+  node disk.  These could instead be stored on a persistent disk, such as a GCE PD, or baked into the image.
+- Optionally, you may want to mount `/var/log` as well and redirect output there (not shown in template).
+  - Do this if you prefer your logs to be accessible from the root filesystem with tools like journalctl.
 
-```console
-$ sudo docker ps | grep apiserver:
-5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
+*TODO* document proxy-ssh setup.
 
-```
+##### Cloud Providers
 
-Then try to connect to the apiserver:
+Apiserver supports several cloud providers.
 
-```console
+- options for `--cloud-provider` flag are `aws`, `gce`, `mesos`, `openshift`, `ovirt`, `rackspace`, `vagrant`, or unset.
+- unset used for e.g. bare metal setups.
+- support for new IaaS is added by contributing code [here](../../pkg/cloudprovider/providers/)
 
-$ echo $(curl -s http://localhost:8080/healthz)
-ok
-$ curl -s http://localhost:8080/api
-{
-  "versions": [
-    "v1beta3",
-    "v1"
-  ]
-}
+Some cloud providers require a config file. If so, you need to put config file into apiserver image or mount through hostPath.
 
-```
+- `--cloud-config=` set if cloud provider requires a config file.
+- Used by `aws`, `gce`, `mesos`, `openshift`, `ovirt` and `rackspace`.
+- You must put config file into apiserver image or mount through hostPath.
+- Cloud config file syntax is [Gcfg](https://code.google.com/p/gcfg/).
+- AWS format defined by type [AWSCloudConfig](../../pkg/cloudprovider/providers/aws/aws.go)
+- There is a similar type in the corresponding file for other cloud providers.
+- GCE example: search for `gce.conf` in [this file](../../cluster/gce/configure-vm.sh)
 
-If you have selected the `--register-node=true` option for kubelets, they will now being self-registering with the apiserver.
-You should soon be able to see all your nodes by running the `kubect get nodes` command.
-Otherwise, you will need to manually create node objects.
-
-### Scheduler
+#### Scheduler pod template
 
 Complete this template for the scheduler pod:
 
@@ -701,14 +699,18 @@ Complete this template for the scheduler pod:
     "containers": [
       {
         "name": "kube-scheduler",
-        "image": "$SCHEDULER_IMAGE",
+        "image": "$HYBERKUBE_IMAGE",
         "command": [
-          "/bin/sh",
-          "-c",
-          "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080"
+          "/hyperkube",
+          "scheduler",
+          "--master=127.0.0.1:8080",
+          "$SCHEDULER_FLAG1",
+          ...
+          "$SCHEDULER_FLAGN"
         ],
         "livenessProbe": {
           "httpGet": {
+            "host" : "127.0.0.1",
             "path": "/healthz",
             "port": 10251
           },
@@ -722,26 +724,11 @@ Complete this template for the scheduler pod:
 
 ```
 
+Typically, no additional flags are required for the scheduler.
+
 Optionally, you may want to mount `/var/log` as well and redirect output there.
 
-Start as described for apiserver.
-
-### Controller Manager
-
-To run the controller manager:
-  - select the correct flags for your cluster
-  - write a pod spec for the controller manager using the provided template
-  - start the controller manager pod
-
-Flags to consider using with controller manager.
- - `--cluster-name=$CLUSTER_NAME`
- - `--cluster-cidr=`
-   - *TODO*: explain this flag.
- - `--allocate-node-cidrs=`
-   - *TODO*: explain when you want controller to do this and when you wanna do it another way.
- - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
- - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../user-guide/service-accounts.md) feature.  
- - `--master=127.0.0.1:8080`
+#### Controller Manager Template
 
 Template for controller manager pod:
 
@@ -758,11 +745,13 @@ Template for controller manager pod:
     "containers": [
       {
         "name": "kube-controller-manager",
-        "image": "$CNTRLMNGR_IMAGE",
+        "image": "$HYPERKUBE_IMAGE",
         "command": [
-          "/bin/sh",
-          "-c",
-          "/usr/local/bin/kube-controller-manager $ARGS"
+          "/hyperkube",
+          "controller-manager",
+          "$CNTRLMNGR_FLAG1",
+          ...
+          "$CNTRLMNGR_FLAGN"
         ],
         "volumeMounts": [
           {
@@ -778,6 +767,7 @@ Template for controller manager pod:
         ],
         "livenessProbe": {
           "httpGet": {
+            "host": "127.0.0.1",
             "path": "/healthz",
             "port": 10252
           },
@@ -805,6 +795,46 @@ Template for controller manager pod:
 
 ```
 
+Flags to consider using with controller manager:
+ - `--cluster-name=$CLUSTER_NAME`
+ - `--cluster-cidr=`
+   - *TODO*: explain this flag.
+ - `--allocate-node-cidrs=`
+   - *TODO*: explain when you want controller to do this and when you want to do it another way.
+ - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
+ - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by the [service account](../user-guide/service-accounts.md) feature.
+ - `--master=127.0.0.1:8080`
+
+#### Starting and Verifying Apiserver, Scheduler, and Controller Manager
+
+Place each completed pod template into the kubelet config dir
+(whatever `--config=` argument of kubelet is set to, typically
+`/etc/kubernetes/manifests`).  The order does not matter: scheduler and
+controller manager will retry reaching the apiserver until it is up.
+
+Use `ps` or `docker ps` to verify that each process has started.  For example, verify that kubelet has started a container for the apiserver like this:
+
+```console
+$ sudo docker ps | grep apiserver:
+5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
+```
+
+Then try to connect to the apiserver:
+
+```console
+$ echo $(curl -s http://localhost:8080/healthz)
+ok
+$ curl -s http://localhost:8080/api
+{
+  "versions": [
+    "v1"
+  ]
+}
+```
+
+If you have selected the `--register-node=true` option for kubelets, they will now begin self-registering with the apiserver.
+You should soon be able to see all your nodes by running the `kubect get nodes` command.
+Otherwise, you will need to manually create node objects.
 
 ### Logging
 
@@ -835,7 +865,7 @@ At this point you should be able to run through one of the basic examples, such 
 
 ### Running the Conformance Test
 
-You may want to try to run the [Conformance test](../../hack/conformance-test.sh).  Any failures may give a hint as to areas that need more attention.
+You may want to try to run the [Conformance test](http://releases.k8s.io/HEAD/hack/conformance-test.sh).  Any failures may give a hint as to areas that need more attention.
 
 ### Networking
 
@@ -845,7 +875,7 @@ pinging or SSH-ing from one node to another.
 ### Getting Help
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
-[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on [Slack](../troubleshooting.md#slack).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

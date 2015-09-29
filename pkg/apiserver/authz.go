@@ -18,9 +18,11 @@ package apiserver
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/authorizer/union"
 )
 
 // Attributes implements authorizer.Attributes interface.
@@ -63,21 +65,46 @@ const (
 // Keep this list in sync with constant list above.
 var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}
 
-// NewAuthorizerFromAuthorizationConfig returns the right sort of authorizer.Authorizer
-// based on the authorizationMode xor an error.  authorizationMode should be one of AuthorizationModeChoices.
-func NewAuthorizerFromAuthorizationConfig(authorizationMode string, authorizationPolicyFile string) (authorizer.Authorizer, error) {
-	if authorizationPolicyFile != "" && authorizationMode != "ABAC" {
-		return nil, errors.New("Cannot specify --authorization_policy_file without mode ABAC")
+// NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
+// based on the authorizationMode or an error.  authorizationMode should be a comma separated values
+// of AuthorizationModeChoices.
+func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, authorizationPolicyFile string) (authorizer.Authorizer, error) {
+
+	if len(authorizationModes) == 0 {
+		return nil, errors.New("Atleast one authorization mode should be passed")
 	}
-	// Keep cases in sync with constant list above.
-	switch authorizationMode {
-	case ModeAlwaysAllow:
-		return NewAlwaysAllowAuthorizer(), nil
-	case ModeAlwaysDeny:
-		return NewAlwaysDenyAuthorizer(), nil
-	case ModeABAC:
-		return abac.NewFromFile(authorizationPolicyFile)
-	default:
-		return nil, errors.New("Unknown authorization mode")
+
+	var authorizers []authorizer.Authorizer
+	authorizerMap := make(map[string]bool)
+
+	for _, authorizationMode := range authorizationModes {
+		if authorizerMap[authorizationMode] {
+			return nil, fmt.Errorf("Authorization mode %s specified more than once", authorizationMode)
+		}
+		// Keep cases in sync with constant list above.
+		switch authorizationMode {
+		case ModeAlwaysAllow:
+			authorizers = append(authorizers, NewAlwaysAllowAuthorizer())
+		case ModeAlwaysDeny:
+			authorizers = append(authorizers, NewAlwaysDenyAuthorizer())
+		case ModeABAC:
+			if authorizationPolicyFile == "" {
+				return nil, errors.New("ABAC's authorization policy file not passed")
+			}
+			abacAuthorizer, err := abac.NewFromFile(authorizationPolicyFile)
+			if err != nil {
+				return nil, err
+			}
+			authorizers = append(authorizers, abacAuthorizer)
+		default:
+			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
+		}
+		authorizerMap[authorizationMode] = true
 	}
+
+	if !authorizerMap[ModeABAC] && authorizationPolicyFile != "" {
+		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
+	}
+
+	return union.New(authorizers...), nil
 }

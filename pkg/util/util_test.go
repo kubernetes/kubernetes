@@ -379,6 +379,12 @@ docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0
 `
 
+// Based on DigitalOcean COREOS
+const gatewayfirstLinkLocal = `Iface   Destination     Gateway         Flags   RefCnt  Use     Metric  Mask            MTU     Window  IRTT                                                       
+eth0    00000000        0120372D        0001    0       0       0       00000000        0       0       0                                                                               
+eth0    00000000        00000000        0001    0       0       2048    00000000        0       0       0                                                                            
+`
+
 func TestGetRoutes(t *testing.T) {
 	testCases := []struct {
 		tcase    string
@@ -499,6 +505,19 @@ func (_ validNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return ifat, nil
 }
 
+type validNetworkInterfaceWithLinkLocal struct {
+}
+
+func (_ validNetworkInterfaceWithLinkLocal) InterfaceByName(intfName string) (*net.Interface, error) {
+	c := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: net.FlagUp}
+	return &c, nil
+}
+func (_ validNetworkInterfaceWithLinkLocal) Addrs(intf *net.Interface) ([]net.Addr, error) {
+	var ifat []net.Addr
+	ifat = []net.Addr{addrStruct{val: "169.254.162.166/16"}, addrStruct{val: "45.55.47.146/19"}}
+	return ifat, nil
+}
+
 type validNetworkInterfacewithIpv6Only struct {
 }
 
@@ -577,6 +596,7 @@ func TestChooseHostInterfaceFromRoute(t *testing.T) {
 		{"valid_routemiddle", strings.NewReader(gatewaymiddle), validNetworkInterface{}, net.ParseIP("10.254.71.145")},
 		{"valid_routemiddle_ipv6", strings.NewReader(gatewaymiddle), validNetworkInterfacewithIpv6Only{}, nil},
 		{"no internet connection", strings.NewReader(noInternetConnection), validNetworkInterface{}, nil},
+		{"no non-link-local ip", strings.NewReader(gatewayfirstLinkLocal), validNetworkInterfaceWithLinkLocal{}, net.ParseIP("45.55.47.146")},
 		{"no route", strings.NewReader(nothing), validNetworkInterface{}, nil},
 		{"no route file", nil, validNetworkInterface{}, nil},
 		{"no interfaces", nil, noNetworkInterface{}, nil},

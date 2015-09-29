@@ -56,7 +56,7 @@ for a number of reasons:
   - Auditing considerations for humans and service accounts may differ.
   - A config bundle for a complex system may include definition of various service
     accounts for components of that system.  Because service accounts can be created
-    ad-hoc and have namespaced names, such config is portable. 
+    ad-hoc and have namespaced names, such config is portable.
 
 ## Service account automation
 
@@ -84,7 +84,7 @@ TokenController runs as part of controller-manager. It acts asynchronously. It:
 - observes serviceAccount creation and creates a corresponding Secret to allow API access.
 - observes serviceAccount deletion and deletes all corresponding ServiceAccountToken Secrets
 - observes secret addition, and ensures the referenced ServiceAccount exists, and adds a token to the secret if needed
-- observes secret deleteion and removes a reference from the corresponding ServiceAccount if needed
+- observes secret deletion and removes a reference from the corresponding ServiceAccount if needed
 
 #### To create additional API tokens
 
@@ -96,14 +96,15 @@ account, and the controller will update it with a generated token:
 ```json
 secret.json:
 {
-	"kind": "Secret",
-	"metadata": {
-		"name": "mysecretname",
-		"annotations": {
-			"kubernetes.io/service-account.name": "myserviceaccount"
-		}
-	}
-	"type": "kubernetes.io/service-account-token"
+    "kind": "Secret",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "mysecretname",
+        "annotations": {
+            "kubernetes.io/service-account.name": "myserviceaccount"
+        }
+    },
+    "type": "kubernetes.io/service-account-token"
 }
 ```
 
@@ -117,6 +118,11 @@ kubectl describe secret mysecretname
 ```sh
 kubectl delete secret mysecretname
 ```
+
+### Service Account Controller
+
+Service Account Controller manages ServiceAccount inside namespaces, and ensures
+a ServiceAccount named "default" exists in every active namespace.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

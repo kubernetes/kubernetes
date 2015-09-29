@@ -16,40 +16,36 @@ limitations under the License.
 
 package main
 
-import "bytes"
+import "fmt"
 
 // Blocks of ``` need to have blank lines on both sides or they don't look
 // right in HTML.
-func checkPreformatted(filePath string, fileBytes []byte) ([]byte, error) {
-	f := splitByPreformatted(fileBytes)
-	f = append(fileBlocks{{false, []byte{}}}, f...)
-	f = append(f, fileBlock{false, []byte{}})
-
-	output := []byte(nil)
-	for i := 1; i < len(f)-1; i++ {
-		prev := &f[i-1]
-		block := &f[i]
-		next := &f[i+1]
-		if !block.preformatted {
-			continue
-		}
-		neededSuffix := []byte("\n\n")
-		for !bytes.HasSuffix(prev.data, neededSuffix) {
-			prev.data = append(prev.data, '\n')
-		}
-		for !bytes.HasSuffix(block.data, neededSuffix) {
-			block.data = append(block.data, '\n')
-			if bytes.HasPrefix(next.data, []byte("\n")) {
-				// don't change the number of newlines unless needed.
-				next.data = next.data[1:]
-				if len(next.data) == 0 {
-					f = append(f[:i+1], f[i+2:]...)
-				}
+func updatePreformatted(filePath string, mlines mungeLines) (mungeLines, error) {
+	var out mungeLines
+	inpreformat := false
+	for i, mline := range mlines {
+		if !inpreformat && mline.preformatted {
+			if i == 0 || out[len(out)-1].data != "" {
+				out = append(out, blankMungeLine)
 			}
+			// start of a preformat block
+			inpreformat = true
+		}
+		out = append(out, mline)
+		if inpreformat && !mline.preformatted {
+			if i >= len(mlines)-2 || mlines[i+1].data != "" {
+				out = append(out, blankMungeLine)
+			}
+			inpreformat = false
 		}
 	}
-	for _, block := range f {
-		output = append(output, block.data...)
+	return out, nil
+}
+
+// If the file ends on a preformatted line, there must have been an imbalance.
+func checkPreformatBalance(filePath string, mlines mungeLines) (mungeLines, error) {
+	if len(mlines) > 0 && mlines[len(mlines)-1].preformatted {
+		return nil, fmt.Errorf("file ends in preformatted block")
 	}
-	return output, nil
+	return mlines, nil
 }

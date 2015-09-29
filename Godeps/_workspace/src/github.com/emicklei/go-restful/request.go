@@ -6,6 +6,8 @@ package restful
 
 import (
 	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
 	"encoding/xml"
 	"io"
@@ -82,15 +84,17 @@ func (r *Request) HeaderParameter(name string) string {
 // ReadEntity checks the Accept header and reads the content into the entityPointer
 // May be called multiple times in the request-response flow
 func (r *Request) ReadEntity(entityPointer interface{}) (err error) {
+	defer r.Request.Body.Close()
 	contentType := r.Request.Header.Get(HEADER_ContentType)
+	contentEncoding := r.Request.Header.Get(HEADER_ContentEncoding)
 	if doCacheReadEntityBytes {
-		return r.cachingReadEntity(contentType, entityPointer)
+		return r.cachingReadEntity(contentType, contentEncoding, entityPointer)
 	}
 	// unmarshall directly from request Body
-	return r.decodeEntity(r.Request.Body, contentType, entityPointer)
+	return r.decodeEntity(r.Request.Body, contentType, contentEncoding, entityPointer)
 }
 
-func (r *Request) cachingReadEntity(contentType string, entityPointer interface{}) (err error) {
+func (r *Request) cachingReadEntity(contentType string, contentEncoding string, entityPointer interface{}) (err error) {
 	var buffer []byte
 	if r.bodyContent != nil {
 		buffer = *r.bodyContent
@@ -101,22 +105,38 @@ func (r *Request) cachingReadEntity(contentType string, entityPointer interface{
 		}
 		r.bodyContent = &buffer
 	}
-	return r.decodeEntity(bytes.NewReader(buffer), contentType, entityPointer)
+	return r.decodeEntity(bytes.NewReader(buffer), contentType, contentEncoding, entityPointer)
 }
 
-func (r *Request) decodeEntity(reader io.Reader, contentType string, entityPointer interface{}) (err error) {
-	if strings.Contains(contentType, MIME_XML) {
-		return xml.NewDecoder(reader).Decode(entityPointer)
+func (r *Request) decodeEntity(reader io.Reader, contentType string, contentEncoding string, entityPointer interface{}) (err error) {
+	entityReader := reader
+
+	// check if the request body needs decompression
+	if ENCODING_GZIP == contentEncoding {
+		gzipReader := GzipReaderPool.Get().(*gzip.Reader)
+		gzipReader.Reset(reader)
+		entityReader = gzipReader
+	} else if ENCODING_DEFLATE == contentEncoding {
+		zlibReader, err := zlib.NewReader(reader)
+		if err != nil {
+			return err
+		}
+		entityReader = zlibReader
 	}
+
+	// decode JSON
 	if strings.Contains(contentType, MIME_JSON) || MIME_JSON == defaultRequestContentType {
-		decoder := json.NewDecoder(reader)
+		decoder := json.NewDecoder(entityReader)
 		decoder.UseNumber()
 		return decoder.Decode(entityPointer)
 	}
-	if MIME_XML == defaultRequestContentType {
-		return xml.NewDecoder(reader).Decode(entityPointer)
+
+	// decode XML
+	if strings.Contains(contentType, MIME_XML) || MIME_XML == defaultRequestContentType {
+		return xml.NewDecoder(entityReader).Decode(entityPointer)
 	}
-	return NewError(400, "Unable to unmarshal content of type:"+contentType)
+
+	return NewError(http.StatusBadRequest, "Unable to unmarshal content of type:"+contentType)
 }
 
 // SetAttribute adds or replaces the attribute with the given value.

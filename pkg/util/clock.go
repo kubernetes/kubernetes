@@ -54,3 +54,8 @@ func (f *FakeClock) Now() time.Time {
 func (f *FakeClock) Since(ts time.Time) time.Duration {
 	return f.Time.Sub(ts)
 }
+
+// Move clock by Duration
+func (f *FakeClock) Step(d time.Duration) {
+	f.Time = f.Time.Add(d)
+}

@@ -14,12 +14,6 @@ type Connector interface {
 	Get(string) ([]byte, *zk.Stat, error)
 }
 
-// interface for handling watcher event when zk.EventNodeChildrenChanged.
-type ChildWatcher func(*Client, string)
-
-// interface for handling errors (session and watch related).
-type ErrorHandler func(*Client, error)
-
 //Factory is an adapter to trap the creation of zk.Conn instances
 //since the official zk API does not expose an interface for zk.Conn.
 type Factory interface {

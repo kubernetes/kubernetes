@@ -82,6 +82,10 @@ func TestKubectlDashF(t *testing.T) {
 			"Foo\n```\nkubectl -blah create -f/foobar\n```\nBar",
 			true,
 		},
+		{
+			"Foo\n```\nkubectl -blah create -f~/foobar\n```\nBar",
+			true,
+		},
 		// Real checks
 		{
 			"Foo\n```\nkubectl -blah create -f mungedocs.go\n```\nBar",
@@ -126,9 +130,9 @@ func TestKubectlDashF(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		*rootDir = ""
-		*repoRoot = ""
-		_, err := checkKubectlFileTargets("filename.md", []byte(c.in))
+		repoRoot = ""
+		in := getMungeLines(c.in)
+		_, err := updateKubectlFileTargets("filename.md", in)
 		if err != nil && c.ok {
 			t.Errorf("case[%d]: expected success, got %v", i, err)
 		}

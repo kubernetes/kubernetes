@@ -19,18 +19,17 @@ package etcd
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/tools"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+	return NewREST(etcdStorage), fakeClient
 }
 
 func validNewPodTemplate(name string) *api.PodTemplate {
@@ -61,9 +60,8 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 }
 
 func TestCreate(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	pod := validNewPodTemplate("foo")
 	pod.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -77,30 +75,55 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	key, err := storage.KeyFunc(test.TestContext(), "foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	key = etcdtest.AddPrefix(key)
-
-	fakeEtcdClient.ExpectNotFoundGet(key)
-	fakeEtcdClient.ChangeIndex = 2
-	pod := validNewPodTemplate("foo")
-	existing := validNewPodTemplate("exists")
-	existing.Namespace = test.TestNamespace()
-	obj, err := storage.Create(test.TestContext(), existing)
-	if err != nil {
-		t.Fatalf("unable to create object: %v", err)
-	}
-	older := obj.(*api.PodTemplate)
-	older.ResourceVersion = "1"
-
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
-		pod,
-		existing,
-		older,
+		//valid
+		validNewPodTemplate("foo"),
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.PodTemplate)
+			object.Template.Spec.NodeSelector = map[string]string{"a": "b"}
+			return object
+		},
+	)
+}
+
+func TestDelete(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ReturnDeletedObject()
+	test.TestDelete(validNewPodTemplate("foo"))
+}
+
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewPodTemplate("foo"))
+}
+
+func TestList(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewPodTemplate("foo"))
+}
+
+func TestWatch(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestWatch(
+		validNewPodTemplate("foo"),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{},
+		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
 	)
 }

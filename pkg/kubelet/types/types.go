@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage

@@ -62,7 +62,7 @@ and flags that are only available to that command.
 In the example above 'port' is the flag.
 
 Flag functionality is provided by the [pflag
-libary](https://github.com/ogier/pflag), a fork of the flag standard library
+library](https://github.com/ogier/pflag), a fork of the flag standard library
 which maintains the same interface while adding posix compliance.
 
 ## Usage
@@ -421,6 +421,10 @@ func main() {
 ## Generating markdown formatted documentation for your command
 
 Cobra can generate a markdown formatted document based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Markdown Docs](md_docs.md)
+
+## Generating man pages for your command
+
+Cobra can generate a man page based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Man Docs](man_docs.md)
 
 ## Generating bash completions for your command
 

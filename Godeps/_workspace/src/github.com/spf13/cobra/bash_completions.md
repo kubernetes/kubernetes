@@ -118,7 +118,7 @@ and you'll get something like
 -c            --container=  -p            --pod=  
 ```
 
-# Specify valid filename extentions for flags that take a filename
+# Specify valid filename extensions for flags that take a filename
 
 In this example we use --filename= and expect to get a json or yaml file as the argument. To make this easier we annotate the --filename flag with valid filename extensions.
 

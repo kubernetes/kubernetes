@@ -32,10 +32,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-UTILS=${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh
-if [ -f ${UTILS} ]; then
-    source "${UTILS}"
-fi
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.

@@ -15,11 +15,29 @@
 # limitations under the License.
 
 # Cleans up resources from the example, assumed to be run from Kubernetes repo root
-
+echo
+echo
 export OPENSHIFT_EXAMPLE=$(pwd)/examples/openshift-origin
 export OPENSHIFT_CONFIG=${OPENSHIFT_EXAMPLE}/config
-rm -fr ${OPENSHIFT_CONFIG}
-cluster/kubectl.sh delete secrets openshift-config
-cluster/kubectl.sh stop rc openshift
-cluster/kubectl.sh delete rc openshift
-cluster/kubectl.sh delete services openshift
+
+echo "===> Removing the OpenShift namespace:"
+kubectl delete namespace openshift-origin
+echo
+
+echo "===> Removing local files:"
+rm -rf ${OPENSHIFT_CONFIG}
+rm ${OPENSHIFT_EXAMPLE}/openshift-startup.log
+rm ${OPENSHIFT_EXAMPLE}/secret.json
+touch ${OPENSHIFT_EXAMPLE}/secret.json
+echo
+
+echo "===> Restoring changed YAML specifcations:"
+if [ -f "${OPENSHIFT_EXAMPLE}/etcd-controller.yaml.bak" ]; then
+	rm ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml
+	mv -v ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml.bak ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml
+else
+	echo "No changed specifications found."
+fi
+echo
+
+echo Done.

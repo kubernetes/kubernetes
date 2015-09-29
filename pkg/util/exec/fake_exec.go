@@ -24,6 +24,7 @@ import (
 type FakeExec struct {
 	CommandScript []FakeCommandAction
 	CommandCalls  int
+	LookPathFunc  func(string) (string, error)
 }
 
 type FakeCommandAction func(cmd string, args ...string) Cmd
@@ -35,6 +36,10 @@ func (fake *FakeExec) Command(cmd string, args ...string) Cmd {
 	i := fake.CommandCalls
 	fake.CommandCalls++
 	return fake.CommandScript[i](cmd, args...)
+}
+
+func (fake *FakeExec) LookPath(file string) (string, error) {
+	return fake.LookPathFunc(file)
 }
 
 // A simple scripted Cmd type.

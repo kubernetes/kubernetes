@@ -21,10 +21,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
 )
@@ -35,8 +35,8 @@ func init() {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewProxyServer()
-	s.AddFlags(pflag.CommandLine)
+	config := app.NewProxyConfig()
+	config.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
 	util.InitLogs()
@@ -44,7 +44,13 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+	s, err := app.NewProxyServerDefault(config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
+	if err = s.Run(pflag.CommandLine.Args()); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

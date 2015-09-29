@@ -24,12 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/empty_dir"
 )
 
 func newTestHost(t *testing.T) volume.VolumeHost {
@@ -51,7 +50,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -78,7 +77,7 @@ func testSetUp(plug volume.VolumePlugin, builder volume.Builder, t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	g := builder.(*gitRepo)
+	g := builder.(*gitRepoVolumeBuilder)
 	g.exec = &fake
 
 	err := g.SetUp()
@@ -120,7 +119,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, mount.New())
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -142,7 +141,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), mount.New())
+	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -157,35 +156,5 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
-	}
-}
-
-func TestPluginLegacy(t *testing.T) {
-	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
-
-	plug, err := plugMgr.FindPluginByName("git")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
-	if plug.Name() != "git" {
-		t.Errorf("Wrong name: %s", plug.Name())
-	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
-		t.Errorf("Expected false")
-	}
-
-	spec := &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, nil); err == nil {
-		t.Errorf("Expected failiure")
-	}
-
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), nil)
-	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
-	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
 	}
 }

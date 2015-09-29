@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"

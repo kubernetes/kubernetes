@@ -23,12 +23,12 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type ViewOptions struct {
@@ -40,13 +40,13 @@ type ViewOptions struct {
 }
 
 const (
-	view_long = `displays Merged kubeconfig settings or a specified kubeconfig file.
+	view_long = `Displays merged kubeconfig settings or a specified kubeconfig file.
 
 You can use --output=template --template=TEMPLATE to extract specific values.`
-	view_example = `// Show Merged kubeconfig settings.
+	view_example = `# Show Merged kubeconfig settings.
 $ kubectl config view
 
-// Get the password for the e2e user
+# Get the password for the e2e user
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
 
@@ -55,7 +55,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "displays Merged kubeconfig settings or a specified kubeconfig file.",
+		Short:   "Displays merged kubeconfig settings or a specified kubeconfig file.",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {

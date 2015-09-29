@@ -19,14 +19,10 @@ config modifies kubeconfig files using subcommands like "kubectl config set curr
 The loading order follows these rules:
     1. If the \-\-kubeconfig flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.
     2. If $KUBECONFIG environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged together.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
-    3. Otherwise, $\{HOME\}/.kube/config is used and no merging takes place.
+    3. Otherwise, ${HOME}/.kube/config is used and no merging takes place.
 
 
 .SH OPTIONS
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for config
-
 .PP
 \fB\-\-kubeconfig\fP=""
     use a particular kubeconfig file
@@ -116,10 +112,6 @@ The loading order follows these rules:
 .PP
 \fB\-\-v\fP=0
     log level for V logs
-
-.PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
 
 .PP
 \fB\-\-vmodule\fP=

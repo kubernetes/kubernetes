@@ -31,10 +31,6 @@ Specifying a name that already exists will merge new fields on top of existing v
     embed\-certs for the cluster entry in kubeconfig
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for set\-cluster
-
-.PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
     insecure\-skip\-tls\-verify for the cluster entry in kubeconfig
 
@@ -117,10 +113,6 @@ Specifying a name that already exists will merge new fields on top of existing v
     log level for V logs
 
 .PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
-
-.PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
@@ -130,13 +122,13 @@ Specifying a name that already exists will merge new fields on top of existing v
 .RS
 
 .nf
-// Set only the server field on the e2e cluster entry without touching other values.
+# Set only the server field on the e2e cluster entry without touching other values.
 $ kubectl config set\-cluster e2e \-\-server=https://1.2.3.4
 
-// Embed certificate authority data for the e2e cluster entry
+# Embed certificate authority data for the e2e cluster entry
 $ kubectl config set\-cluster e2e \-\-certificate\-authority=\~/.kube/e2e/kubernetes.ca.crt
 
-// Disable cert checking for the dev cluster entry
+# Disable cert checking for the dev cluster entry
 $ kubectl config set\-cluster e2e \-\-insecure\-skip\-tls\-verify=true
 
 .fi

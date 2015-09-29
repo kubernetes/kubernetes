@@ -19,32 +19,9 @@ package v1_test
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api"
+	versioned "k8s.io/kubernetes/pkg/api/v1"
 )
-
-func TestNodeConversion(t *testing.T) {
-	obj, err := versioned.Codec.Decode([]byte(`{"kind":"Minion","apiVersion":"v1"}`))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok := obj.(*api.Node); !ok {
-		t.Errorf("unexpected type: %#v", obj)
-	}
-
-	obj, err = versioned.Codec.Decode([]byte(`{"kind":"MinionList","apiVersion":"v1"}`))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok := obj.(*api.NodeList); !ok {
-		t.Errorf("unexpected type: %#v", obj)
-	}
-
-	obj = &api.Node{}
-	if err := versioned.Codec.DecodeInto([]byte(`{"kind":"Minion","apiVersion":"v1"}`), obj); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
 
 // TestPodSpecConversion tests that ServiceAccount is an alias for
 // ServiceAccountName.

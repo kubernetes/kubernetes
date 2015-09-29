@@ -1,6 +1,0 @@
-/*!
- * Angular Material Design
- * https://github.com/angular/material
- * @license MIT
- * v0.7.0-rc3
- */.md-sticky-clone{z-index:1;top:0;left:0;right:0;position:absolute!important;-webkit-transform:translate3d(-9999px,-9999px,0);transform:translate3d(-9999px,-9999px,0)}.md-sticky-clone[sticky-state=active]{-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0)}.md-sticky-clone[sticky-state=active]:not(.md-sticky-no-effect):after{-webkit-animation:subheaderStickyHoverIn .3s ease-out both;animation:subheaderStickyHoverIn .3s ease-out both}

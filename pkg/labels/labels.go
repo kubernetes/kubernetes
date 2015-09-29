@@ -60,3 +60,12 @@ func (ls Set) Get(label string) string {
 func (ls Set) AsSelector() Selector {
 	return SelectorFromSet(ls)
 }
+
+// FormatLables convert label map into plain string
+func FormatLabels(labelMap map[string]string) string {
+	l := Set(labelMap).String()
+	if l == "" {
+		l = "<none>"
+	}
+	return l
+}

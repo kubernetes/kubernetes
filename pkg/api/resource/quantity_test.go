@@ -77,6 +77,26 @@ func TestQuantityCanocicalizeZero(t *testing.T) {
 	}
 }
 
+func TestQuantityCmp(t *testing.T) {
+	table := []struct {
+		x      string
+		y      string
+		expect int
+	}{
+		{"0", "0", 0},
+		{"100m", "50m", 1},
+		{"50m", "100m", -1},
+		{"10000T", "100Gi", 1},
+	}
+	for _, testCase := range table {
+		q1 := MustParse(testCase.x)
+		q2 := MustParse(testCase.y)
+		if result := q1.Cmp(q2); result != testCase.expect {
+			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
+		}
+	}
+}
+
 func TestQuantityParse(t *testing.T) {
 	table := []struct {
 		input  string
@@ -488,7 +508,7 @@ func TestUninitializedNoCrash(t *testing.T) {
 	q.Value()
 	q.MilliValue()
 	q.Copy()
-	q.String()
+	_ = q.String()
 	q.MarshalJSON()
 }
 

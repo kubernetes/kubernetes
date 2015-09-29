@@ -80,7 +80,7 @@ function test_etcd {
 
 function k8petstore {
      ### run K8petstore .  Should work perfectly IFF flannel and so on is setup properly.
-    wget https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/release-0.17/examples/k8petstore/k8petstore.sh
+    wget https://raw.githubusercontent.com/kubernetes/kubernetes/release-0.17/examples/k8petstore/k8petstore.sh
      chmod 777 k8petstore.sh
     ./k8petstore.sh
 }
@@ -90,7 +90,7 @@ function write_api_server_config {
     mkdir -p -m 777 /srv/kubernetes/
 
     ### We will move files back and forth between the /srv/kube.. directory.
-    ### That is how we modulate leader.  Each node will continously either
+    ### That is how we modulate leader.  Each node will continuously either
     ### ensure that the manifests are in this dir, or else, are in the kubelet manifest dir.
     cp /vagrant/kube-scheduler.manifest /vagrant/kube-controller-manager.manifest /srv/kubernetes
 

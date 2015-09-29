@@ -204,6 +204,7 @@ func TestCreateWithOptionalFields(t *testing.T) {
 		`)
 
 		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `{}`)
 	})
 
 	iTrue := true

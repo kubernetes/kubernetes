@@ -20,11 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/proc"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesos/mesos-go/mesosutil"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 )
 
 func TestInMemoryRegistry_RegisterGetUnregister(t *testing.T) {
@@ -297,6 +297,7 @@ func TestInMemoryRegistry_TaskLifeCycle(t *testing.T) {
 func TestInMemoryRegistry_NotFinished(t *testing.T) {
 	// all these behave the same
 	notFinishedStates := []mesos.TaskState{
+		mesos.TaskState_TASK_ERROR,
 		mesos.TaskState_TASK_FAILED,
 		mesos.TaskState_TASK_KILLED,
 		mesos.TaskState_TASK_LOST,

@@ -6,18 +6,18 @@ coreos:
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount etcd.service
+        After=opt-kubernetes.mount etcd2.service
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-apiserver
         Description=Kubernetes API Server
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount etcd.service
+        Requires=opt-kubernetes.mount etcd2.service
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-apiserver \
         --address=0.0.0.0 \
         --port=8080 \
-        --etcd_servers=http://127.0.0.1:4001 \
-        --kubelet_port=10250 \
+        --etcd-servers=http://127.0.0.1:2379 \
+        --kubelet-port=10250 \
         --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}
         Restart=always
         RestartSec=2

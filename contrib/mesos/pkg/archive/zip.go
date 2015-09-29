@@ -70,24 +70,24 @@ func ZipWalker(zw *zip.Writer) filepath.WalkFunc {
 
 // Create a zip of all files in a directory recursively, return a byte array and
 // the number of files archived.
-func ZipDir(path string) ([]byte, int, error) {
+func ZipDir(path string) ([]byte, []string, error) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	zipWalker := ZipWalker(zw)
-	numberManifests := 0
+	paths := []string{}
 	err := filepath.Walk(path, filepath.WalkFunc(func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
-			numberManifests++
+			paths = append(paths, path)
 		}
 		return zipWalker(path, info, err)
 	}))
 
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	} else if err = zw.Close(); err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
-	return buf.Bytes(), numberManifests, nil
+	return buf.Bytes(), paths, nil
 }
 
 // UnzipDir unzips all files from a given zip byte array into a given directory.

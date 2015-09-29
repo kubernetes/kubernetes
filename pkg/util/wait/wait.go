@@ -43,12 +43,16 @@ type ConditionFunc func() (done bool, err error)
 // Poll tries a condition func until it returns true, an error, or the timeout
 // is reached. condition will always be invoked at least once but some intervals
 // may be missed if the condition takes too long or the time window is too short.
-// If you pass maxTimes = 0, Poll will loop until condition returns true or an
-// error.
+// If you want to Poll something forever, see PollInfinite.
 // Poll always waits the interval before the first check of the condition.
 // TODO: create a separate PollImmediate function that does not wait.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 	return WaitFor(poller(interval, timeout), condition)
+}
+
+// PollInfinite polls forever.
+func PollInfinite(interval time.Duration, condition ConditionFunc) error {
+	return WaitFor(poller(interval, 0), condition)
 }
 
 // WaitFunc creates a channel that receives an item every time a test
@@ -81,7 +85,7 @@ func WaitFor(wait WaitFunc, c ConditionFunc) error {
 // poller returns a WaitFunc that will send to the channel every
 // interval until timeout has elapsed and then close the channel.
 // Over very short intervals you may receive no ticks before
-// the channel is closed closed.  If maxTimes is 0, the channel
+// the channel is closed.  If timeout is 0, the channel
 // will never be closed.
 func poller(interval, timeout time.Duration) WaitFunc {
 	return WaitFunc(func() <-chan struct{} {

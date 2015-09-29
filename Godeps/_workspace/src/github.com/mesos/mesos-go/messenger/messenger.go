@@ -19,12 +19,11 @@
 package messenger
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"reflect"
 	"strconv"
-	"time"
+	"sync"
 
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
@@ -36,20 +35,7 @@ import (
 
 const (
 	defaultQueueSize = 1024
-	preparePeriod    = time.Second * 1
 )
-
-var (
-	sendRoutines   int
-	encodeRoutines int
-	decodeRoutines int
-)
-
-func init() {
-	flag.IntVar(&sendRoutines, "send-routines", 1, "Number of network sending routines")
-	flag.IntVar(&encodeRoutines, "encode-routines", 1, "Number of encoding routines")
-	flag.IntVar(&decodeRoutines, "decode-routines", 1, "Number of decoding routines")
-}
 
 // MessageHandler is the callback of the message. When the callback
 // is invoked, the sender's upid and the message is passed to the callback.
@@ -62,24 +48,25 @@ type Messenger interface {
 	Route(ctx context.Context, from *upid.UPID, msg proto.Message) error
 	Start() error
 	Stop() error
-	UPID() *upid.UPID
+	UPID() upid.UPID
 }
 
 // MesosMessenger is an implementation of the Messenger interface.
 type MesosMessenger struct {
-	upid              *upid.UPID
+	upid              upid.UPID
 	encodingQueue     chan *Message
 	sendingQueue      chan *Message
 	installedMessages map[string]reflect.Type
 	installedHandlers map[string]MessageHandler
 	stop              chan struct{}
+	stopOnce          sync.Once
 	tr                Transporter
 }
 
 // ForHostname creates a new default messenger (HTTP), using UPIDBindingAddress to
 // determine the binding-address used for both the UPID.Host and Transport binding address.
-func ForHostname(proc *process.Process, hostname string, bindingAddress net.IP, port uint16) (Messenger, error) {
-	upid := &upid.UPID{
+func ForHostname(proc *process.Process, hostname string, bindingAddress net.IP, port uint16, publishedAddress net.IP) (Messenger, error) {
+	upid := upid.UPID{
 		ID:   proc.Label(),
 		Port: strconv.Itoa(int(port)),
 	}
@@ -87,7 +74,21 @@ func ForHostname(proc *process.Process, hostname string, bindingAddress net.IP, 
 	if err != nil {
 		return nil, err
 	}
-	upid.Host = host
+
+	var publishedHost string
+	if publishedAddress != nil {
+		publishedHost, err = UPIDBindingAddress(hostname, publishedAddress)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if publishedHost != "" {
+		upid.Host = publishedHost
+	} else {
+		upid.Host = host
+	}
+
 	return NewHttpWithBindingAddress(upid, bindingAddress), nil
 }
 
@@ -135,17 +136,16 @@ func UPIDBindingAddress(hostname string, bindingAddress net.IP) (string, error) 
 }
 
 // NewMesosMessenger creates a new mesos messenger.
-func NewHttp(upid *upid.UPID) *MesosMessenger {
+func NewHttp(upid upid.UPID) *MesosMessenger {
 	return NewHttpWithBindingAddress(upid, nil)
 }
 
-func NewHttpWithBindingAddress(upid *upid.UPID, address net.IP) *MesosMessenger {
+func NewHttpWithBindingAddress(upid upid.UPID, address net.IP) *MesosMessenger {
 	return New(upid, NewHTTPTransporter(upid, address))
 }
 
-func New(upid *upid.UPID, t Transporter) *MesosMessenger {
+func New(upid upid.UPID, t Transporter) *MesosMessenger {
 	return &MesosMessenger{
-		upid:              upid,
 		encodingQueue:     make(chan *Message, defaultQueueSize),
 		sendingQueue:      make(chan *Message, defaultQueueSize),
 		installedMessages: make(map[string]reflect.Type),
@@ -180,7 +180,7 @@ func (m *MesosMessenger) Install(handler MessageHandler, msg proto.Message) erro
 func (m *MesosMessenger) Send(ctx context.Context, upid *upid.UPID, msg proto.Message) error {
 	if upid == nil {
 		panic("cannot sent a message to a nil pid")
-	} else if upid.Equal(m.upid) {
+	} else if *upid == m.upid {
 		return fmt.Errorf("Send the message to self")
 	}
 	name := getMessageName(msg)
@@ -198,11 +198,15 @@ func (m *MesosMessenger) Send(ctx context.Context, upid *upid.UPID, msg proto.Me
 // 1) routing internal error to callback handlers
 // 2) testing components without starting remote servers.
 func (m *MesosMessenger) Route(ctx context.Context, upid *upid.UPID, msg proto.Message) error {
-	// if destination is not self, send to outbound.
-	if !upid.Equal(m.upid) {
+	if upid == nil {
+		panic("cannot route a message to a nil pid")
+	} else if *upid != m.upid {
+		// if destination is not self, send to outbound.
 		return m.Send(ctx, upid, msg)
 	}
 
+	// TODO(jdef) this has an unfortunate performance impact for self-messaging. implement
+	// something more reasonable here.
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return err
@@ -211,30 +215,29 @@ func (m *MesosMessenger) Route(ctx context.Context, upid *upid.UPID, msg proto.M
 	return m.tr.Inject(ctx, &Message{upid, name, msg, data})
 }
 
-// Start starts the messenger.
+// Start starts the messenger; expects to be called once and only once.
 func (m *MesosMessenger) Start() error {
 
 	m.stop = make(chan struct{})
-	errChan := m.tr.Start()
 
-	select {
-	case err := <-errChan:
-		log.Errorf("failed to start messenger: %v", err)
-		return err
-	case <-time.After(preparePeriod): // continue
+	pid, errChan := m.tr.Start()
+	if pid == (upid.UPID{}) {
+		err := <-errChan
+		return fmt.Errorf("failed to start messenger: %v", err)
 	}
 
-	m.upid = m.tr.UPID()
+	// the pid that we're actually bound as
+	m.upid = pid
 
-	for i := 0; i < sendRoutines; i++ {
-		go m.sendLoop()
-	}
-	for i := 0; i < encodeRoutines; i++ {
-		go m.encodeLoop()
-	}
-	for i := 0; i < decodeRoutines; i++ {
-		go m.decodeLoop()
-	}
+	go m.sendLoop()
+	go m.encodeLoop()
+	go m.decodeLoop()
+
+	// wait for a listener error or a stop signal; either way stop the messenger
+
+	// TODO(jdef) a better implementation would attempt to re-listen; need to coordinate
+	// access to m.upid in that case. probably better off with a state machine instead of
+	// what we have now.
 	go func() {
 		select {
 		case err := <-errChan:
@@ -242,7 +245,11 @@ func (m *MesosMessenger) Start() error {
 				//TODO(jdef) should the driver abort in this case? probably
 				//since this messenger will never attempt to re-establish the
 				//transport
-				log.Error(err)
+				log.Errorln("transport stopped unexpectedly:", err.Error())
+			}
+			err = m.Stop()
+			if err != nil && err != errTerminal {
+				log.Errorln("failed to stop messenger cleanly: ", err.Error())
 			}
 		case <-m.stop:
 		}
@@ -251,18 +258,27 @@ func (m *MesosMessenger) Start() error {
 }
 
 // Stop stops the messenger and clean up all the goroutines.
-func (m *MesosMessenger) Stop() error {
-	//TODO(jdef) don't hardcode the graceful flag here
-	if err := m.tr.Stop(true); err != nil {
-		log.Errorf("Failed to stop the transporter: %v\n", err)
-		return err
-	}
-	close(m.stop)
-	return nil
+func (m *MesosMessenger) Stop() (err error) {
+	m.stopOnce.Do(func() {
+		select {
+		case <-m.stop:
+		default:
+			defer close(m.stop)
+		}
+
+		log.Info("stopping messenger..")
+
+		//TODO(jdef) don't hardcode the graceful flag here
+		if err2 := m.tr.Stop(true); err2 != nil && err2 != errTerminal {
+			log.Warningf("failed to stop the transporter: %v\n", err2)
+			err = err2
+		}
+	})
+	return
 }
 
 // UPID returns the upid of the messenger.
-func (m *MesosMessenger) UPID() *upid.UPID {
+func (m *MesosMessenger) UPID() upid.UPID {
 	return m.upid
 }
 
@@ -303,7 +319,8 @@ func (m *MesosMessenger) reportError(err error) {
 	defer cancel()
 
 	c := make(chan error, 1)
-	go func() { c <- m.Route(ctx, m.UPID(), &mesos.FrameworkErrorMessage{Message: proto.String(err.Error())}) }()
+	pid := m.upid
+	go func() { c <- m.Route(ctx, &pid, &mesos.FrameworkErrorMessage{Message: proto.String(err.Error())}) }()
 	select {
 	case <-ctx.Done():
 		<-c // wait for Route to return

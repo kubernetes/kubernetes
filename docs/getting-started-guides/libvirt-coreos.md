@@ -36,6 +36,7 @@ Getting started with libvirt CoreOS
 **Table of Contents**
 
 - [Highlights](#highlights)
+- [Warnings about `libvirt-coreos` use case](#warnings-about-libvirt-coreos-use-case)
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
 - [Interacting with your Kubernetes cluster with the `kube-*` scripts.](#interacting-with-your-kubernetes-cluster-with-the-kube--scripts)
@@ -51,6 +52,30 @@ Getting started with libvirt CoreOS
 * Super-fast cluster boot-up (few seconds instead of several minutes for vagrant)
 * Reduced disk usage thanks to [COW](https://en.wikibooks.org/wiki/QEMU/Images#Copy_on_write)
 * Reduced memory footprint thanks to [KSM](https://www.kernel.org/doc/Documentation/vm/ksm.txt)
+
+### Warnings about `libvirt-coreos` use case
+
+The primary goal of the `libvirt-coreos` cluster provider is to deploy a multi-node Kubernetes cluster on local VMs as fast as possible and to be as light as possible in term of resources used.
+
+In order to achieve that goal, its deployment is very different from the “standard production deployment” method used on other providers. This was done on purpose in order to implement some optimizations made possible by the fact that we know that all VMs will be running on the same physical machine.
+
+The `libvirt-coreos` cluster provider doesn’t aim at being production look-alike.
+
+Another difference is that no security is enforced on `libvirt-coreos` at all. For example,
+
+* Kube API server is reachable via a clear-text connection (no SSL);
+* Kube API server requires no credentials;
+* etcd access is not protected;
+* Kubernetes secrets are not protected as securely as they are on production environments;
+* etc.
+
+So, an k8s application developer should not validate its interaction with Kubernetes on `libvirt-coreos` because he might technically succeed in doing things that are prohibited on a production environment like:
+
+* un-authenticated access to Kube API server;
+* Access to Kubernetes private data structures inside etcd;
+* etc.
+
+On the other hand, `libvirt-coreos` might be useful for people investigating low level implementation of Kubernetes because debugging techniques like sniffing the network traffic or introspecting the etcd content are easier on `libvirt-coreos` than on a production deployment.
 
 ### Prerequisites
 
@@ -103,7 +128,7 @@ $ usermod -a -G libvirtd $USER
 
 #### ² Qemu will run with a specific user. It must have access to the VMs drives
 
-All the disk drive resources needed by the VM (CoreOS disk image, kubernetes binaries, cloud-init files, etc.) are put inside `./cluster/libvirt-coreos/libvirt_storage_pool`.
+All the disk drive resources needed by the VM (CoreOS disk image, Kubernetes binaries, cloud-init files, etc.) are put inside `./cluster/libvirt-coreos/libvirt_storage_pool`.
 
 As we’re using the `qemu:///system` instance of libvirt, qemu will run with a specific `user:group` distinct from your user. It is configured in `/etc/libvirt/qemu.conf`. That qemu user must have access to that libvirt storage pool.
 
@@ -128,7 +153,7 @@ setfacl -m g:kvm:--x ~
 
 ### Setup
 
-By default, the libvirt-coreos setup will create a single kubernetes master and 3 kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
+By default, the libvirt-coreos setup will create a single Kubernetes master and 3 Kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
 
 To start your local cluster, open a shell and run:
 
@@ -143,7 +168,7 @@ The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster 
 
 The `NUM_MINIONS` environment variable may be set to specify the number of nodes to start. If it is not set, the number of nodes defaults to 3.
 
-The `KUBE_PUSH` environment variable may be set to specify which kubernetes binaries must be deployed on the cluster. Its possible values are:
+The `KUBE_PUSH` environment variable may be set to specify which Kubernetes binaries must be deployed on the cluster. Its possible values are:
 
 * `release` (default if `KUBE_PUSH` is not set) will deploy the binaries of `_output/release-tars/kubernetes-server-….tar.gz`. This is built with `make release` or `make release-skip-tests`.
 * `local` will deploy the binaries of `_output/local/go/bin`. These are built with `make`.
@@ -160,7 +185,7 @@ $ virsh -c qemu:///system list
  18    kubernetes_minion-03           running
  ```
 
-You can check that the kubernetes cluster is working with:
+You can check that the Kubernetes cluster is working with:
 
 ```console
 $ kubectl get nodes

@@ -19,7 +19,7 @@ limitations under the License.
 package main
 
 import (
-	scheduler "github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
+	scheduler "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
 // NewScheduler creates a new hyperkube Server object that includes the

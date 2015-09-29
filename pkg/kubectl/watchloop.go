@@ -20,7 +20,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // WatchLoop loops, passing events in w to fn.

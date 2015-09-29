@@ -13,20 +13,21 @@ apt-get install -q -y \
     python-pip \
     wget
 
-pip install path.py
+pip install -r $CHARM_DIR/python_requirements.txt
 
 # Create the necessary kubernetes group.
-groupadd kubernetes
-useradd -d /var/lib/kubernetes \
-    -g kubernetes \
-    -s /sbin/nologin \
-    --system \
-    kubernetes
+groupadd --force kubernetes
+
+if grep -q "^kubernetes:" /etc/passwd; then
+    echo "The kubernetes user already exists!"
+else
+    # Create the user when kubernetes does not exist.
+    useradd -d /var/lib/kubernetes \
+        -g kubernetes \
+        -s /sbin/nologin \
+        --system \
+        kubernetes
+fi
 
 install -d -m 0744 -o kubernetes -g kubernetes /var/lib/kubernetes
 install -d -m 0744 -o kubernetes -g kubernetes /etc/kubernetes/manifests
-
-# wait for the world, depends on where we installed it from distro
-#sudo service docker.io stop
-# or upstream archive
-#sudo service docker stop

@@ -22,17 +22,18 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
@@ -249,7 +250,7 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 		return "", err
 	}
 
-	references := util.NewStringSet()
+	references := sets.NewString()
 	for _, secret := range serviceAccount.Secrets {
 		references.Insert(secret.Name)
 	}
@@ -273,27 +274,17 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAcco
 	tokens := []*api.Secret{}
 	for _, obj := range index {
 		token := obj.(*api.Secret)
-		if token.Type != api.SecretTypeServiceAccountToken {
-			continue
+
+		if serviceaccount.IsServiceAccountToken(token, serviceAccount) {
+			tokens = append(tokens, token)
 		}
-		name := token.Annotations[api.ServiceAccountNameKey]
-		uid := token.Annotations[api.ServiceAccountUIDKey]
-		if name != serviceAccount.Name {
-			// Name must match
-			continue
-		}
-		if len(uid) > 0 && uid != string(serviceAccount.UID) {
-			// If UID is set, it must match
-			continue
-		}
-		tokens = append(tokens, token)
 	}
 	return tokens, nil
 }
 
 func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
-	mountableSecrets := util.NewStringSet()
+	mountableSecrets := sets.NewString()
 	for _, s := range serviceAccount.Secrets {
 		mountableSecrets.Insert(s.Name)
 	}
@@ -309,7 +300,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 	}
 
 	// limit pull secret references as well
-	pullSecrets := util.NewStringSet()
+	pullSecrets := sets.NewString()
 	for _, s := range serviceAccount.ImagePullSecrets {
 		pullSecrets.Insert(s.Name)
 	}
@@ -340,7 +331,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 	// Find the volume and volume name for the ServiceAccountTokenSecret if it already exists
 	tokenVolumeName := ""
 	hasTokenVolume := false
-	allVolumeNames := util.NewStringSet()
+	allVolumeNames := sets.NewString()
 	for _, volume := range pod.Spec.Volumes {
 		allVolumeNames.Insert(volume.Name)
 		if volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken {

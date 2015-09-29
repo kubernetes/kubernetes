@@ -22,8 +22,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 func TestSelectContainer(t *testing.T) {
@@ -150,18 +151,10 @@ func TestSelectContainer(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-
 	tests := []struct {
 		name, version, podPath, logPath, container string
 		pod                                        *api.Pod
 	}{
-		{
-			name:    "v1beta3 - pod log",
-			version: "v1beta3",
-			podPath: "/api/v1beta3/namespaces/test/pods/foo",
-			logPath: "/api/v1beta3/namespaces/test/pods/foo/log",
-			pod:     testPod(),
-		},
 		{
 			name:    "v1 - pod log",
 			version: "v1",
@@ -173,9 +166,9 @@ func TestLog(t *testing.T) {
 	for _, test := range tests {
 		logContent := "test log content"
 		f, tf, codec := NewAPIFactory()
-		tf.Client = &client.FakeRESTClient{
+		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
 					body := objBody(codec, test.pod)

@@ -25,9 +25,9 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
 )
@@ -43,7 +43,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+	if err := s.Run(nil); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

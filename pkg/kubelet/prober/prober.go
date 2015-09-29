@@ -24,15 +24,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	execprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/exec"
-	httprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/http"
-	tcprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/tcp"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/probe"
+	execprobe "k8s.io/kubernetes/pkg/probe/exec"
+	httprobe "k8s.io/kubernetes/pkg/probe/http"
+	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
 
 	"github.com/golang/glog"
 )
@@ -122,13 +122,13 @@ func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container ap
 		if err != nil {
 			glog.V(1).Infof("Liveness probe for %q errored: %v", ctrName, err)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Liveness probe errored: %v", err)
+				pb.recorder.Eventf(ref, "Unhealthy", "Liveness probe errored: %v", err)
 			}
 			return probe.Unknown, err
 		} else { // live != probe.Success
 			glog.V(1).Infof("Liveness probe for %q failed (%v): %s", ctrName, live, output)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Liveness probe failed: %s", output)
+				pb.recorder.Eventf(ref, "Unhealthy", "Liveness probe failed: %s", output)
 			}
 			return live, nil
 		}
@@ -162,13 +162,13 @@ func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container a
 		if err != nil {
 			glog.V(1).Infof("readiness probe for %q errored: %v", ctrName, err)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Readiness probe errored: %v", err)
+				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe errored: %v", err)
 			}
 			return
 		} else { // ready != probe.Success
 			glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Readiness probe failed: %s", output)
+				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe failed: %s", output)
 			}
 			return
 		}
@@ -255,7 +255,7 @@ func extractPort(param util.IntOrString, container api.Container) (int, error) {
 func findPortByName(container api.Container, portName string) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
-			return port.HostPort, nil
+			return port.ContainerPort, nil
 		}
 	}
 	return 0, fmt.Errorf("port %s not found", portName)

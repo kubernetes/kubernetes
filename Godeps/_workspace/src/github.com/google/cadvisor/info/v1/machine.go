@@ -112,6 +112,22 @@ type NetInfo struct {
 	Mtu int64 `json:"mtu"`
 }
 
+type CloudProvider string
+
+const (
+	GCE            CloudProvider = "GCE"
+	AWS                          = "AWS"
+	Baremetal                    = "Baremetal"
+	UnkownProvider               = "Unknown"
+)
+
+type InstanceType string
+
+const (
+	NoInstance      InstanceType = "None"
+	UnknownInstance              = "Unknown"
+)
+
 type MachineInfo struct {
 	// The number of cores in this machine.
 	NumCores int `json:"num_cores"`
@@ -143,6 +159,12 @@ type MachineInfo struct {
 	// Machine Topology
 	// Describes cpu/memory layout and hierarchy.
 	Topology []Node `json:"topology"`
+
+	// Cloud provider the machine belongs to.
+	CloudProvider CloudProvider `json:"cloud_provider"`
+
+	// Type of cloud instance (e.g. GCE standard) the machine is.
+	InstanceType InstanceType `json:"instance_type"`
 }
 
 type VersionInfo struct {

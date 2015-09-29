@@ -6,7 +6,7 @@
     - mode: 755
 
 # Used to restart kube-master-addons service each time salt is run
-# Actually, it doens't work (the service is not restarted),
+# Actually, it does not work (the service is not restarted),
 # but master-addon service always terminates after it does it job,
 # so it is (usually) not running and it will be started when
 # salt is run.

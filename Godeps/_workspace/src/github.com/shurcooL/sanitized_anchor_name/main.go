@@ -5,7 +5,7 @@
 //
 // At this time, it does not try to ensure that generated anchor names
 // are unique, that responsibility falls on the caller.
-package sanitized_anchor_name // import "github.com/shurcooL/sanitized_anchor_name"
+package sanitized_anchor_name
 
 import "unicode"
 

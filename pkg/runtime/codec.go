@@ -17,7 +17,9 @@ limitations under the License.
 package runtime
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
+	"io"
+
+	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 // CodecFor returns a Codec that invokes Encode with the provided version.
@@ -77,3 +79,14 @@ type codecWrapper struct {
 func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
 	return c.EncodeToVersion(obj, c.version)
 }
+
+func (c *codecWrapper) EncodeToStream(obj Object, stream io.Writer) error {
+	return c.EncodeToVersionStream(obj, c.version, stream)
+}
+
+// TODO: Make this behaviour default when we move everyone away from
+// the unversioned types.
+//
+// func (c *codecWrapper) Decode(data []byte) (Object, error) {
+// 	return c.DecodeToVersion(data, c.version)
+// }

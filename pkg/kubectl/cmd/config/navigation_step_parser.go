@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"strings"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type navigationSteps struct {
@@ -50,12 +50,12 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			// store them as a single step.  In order to do that, we need to determine what set of tokens is a legal step AFTER the name of the map key
 			// This set of reflective code pulls the type of the map values, uses that type to look up the set of legal tags.  Those legal tags are used to
 			// walk the list of remaining parts until we find a match to a legal tag or the end of the string.  That name is used to burn all the used parts.
-			mapValueType := currType.Elem()
+			mapValueType := currType.Elem().Elem()
 			mapValueOptions, err := getPotentialTypeValues(mapValueType)
 			if err != nil {
 				return nil, err
 			}
-			nextPart := findNameStep(individualParts[currPartIndex:], util.KeySet(reflect.ValueOf(mapValueOptions)))
+			nextPart := findNameStep(individualParts[currPartIndex:], sets.KeySet(reflect.ValueOf(mapValueOptions)))
 
 			steps = append(steps, navigationStep{nextPart, mapValueType})
 			currPartIndex += len(strings.Split(nextPart, "."))
@@ -103,7 +103,7 @@ func (s *navigationSteps) moreStepsRemaining() bool {
 
 // findNameStep takes the list of parts and a set of valid tags that can be used after the name.  It then walks the list of parts
 // until it find a valid "next" tag or until it reaches the end of the parts and then builds the name back up out of the individual parts
-func findNameStep(parts []string, typeOptions util.StringSet) string {
+func findNameStep(parts []string, typeOptions sets.String) string {
 	if len(parts) == 0 {
 		return ""
 	}
@@ -120,6 +120,10 @@ func findNameStep(parts []string, typeOptions util.StringSet) string {
 
 // getPotentialTypeValues takes a type and looks up the tags used to represent its fields when serialized.
 func getPotentialTypeValues(typeValue reflect.Type) (map[string]reflect.Type, error) {
+	if typeValue.Kind() == reflect.Ptr {
+		typeValue = typeValue.Elem()
+	}
+
 	if typeValue.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("%v is not of type struct", typeValue)
 	}
@@ -137,7 +141,7 @@ func getPotentialTypeValues(typeValue reflect.Type) (map[string]reflect.Type, er
 	return ret, nil
 }
 
-func findKnownValue(parts []string, valueOptions util.StringSet) int {
+func findKnownValue(parts []string, valueOptions sets.String) int {
 	for i := range parts {
 		if valueOptions.Has(parts[i]) {
 			return i

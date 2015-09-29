@@ -83,7 +83,7 @@ func DefaultStacktracePred(status int) bool {
 //
 // defer NewLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
 //
-// (Only the call to Log() is defered, so you can set everything up in one line!)
+// (Only the call to Log() is deferred, so you can set everything up in one line!)
 //
 // Note that this *changes* your writer, to route response writing actions
 // through the logger.

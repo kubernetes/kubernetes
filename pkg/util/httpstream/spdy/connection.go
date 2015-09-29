@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/docker/spdystream"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 // connection maintains state about a spdystream.Connection and its associated
@@ -78,7 +78,7 @@ const createStreamResponseTimeout = 30 * time.Second
 func (c *connection) Close() error {
 	c.streamLock.Lock()
 	for _, s := range c.streams {
-		s.Reset()
+		s.Close()
 	}
 	c.streams = make([]httpstream.Stream, 0)
 	c.streamLock.Unlock()

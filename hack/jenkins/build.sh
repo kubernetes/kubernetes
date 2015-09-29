@@ -31,8 +31,10 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
-export KUBE_RELEASE_RUN_TESTS=n
 export KUBE_SKIP_CONFIRMATIONS=y
+
+: ${KUBE_RELEASE_RUN_TESTS:="n"}
+export KUBE_RELEASE_RUN_TESTS
 
 # Clean stuff out. Assume the last build left the tree in an odd
 # state.

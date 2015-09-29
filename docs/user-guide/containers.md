@@ -48,7 +48,7 @@ we can use:
 Docker images have metadata associated with them that is used to store information about the image.
 The image author may use this to define defaults for the command and arguments to run a container
 when the user does not supply values.  Docker calls the fields for commands and arguments
-`Entrypoint` and `Cmd` respectively.  The full details for this feature are too complicated to 
+`Entrypoint` and `Cmd` respectively.  The full details for this feature are too complicated to
 describe here, mostly due to the fact that the docker API allows users to specify both of these
 fields as either a string array or a string and there are subtle differences in how those cases are
 handled.  We encourage the curious to check out [docker's documentation]() for this feature.
@@ -69,10 +69,10 @@ Here are examples for these rules in table format
 
 | Image `Entrypoint` |    Image `Cmd`   | Container `Command` |  Container `Args`  |    Command Run   |
 |--------------------|------------------|---------------------|--------------------|------------------|
-|     `[/ep-1]`      |   `[foo bar]`    |   &lt;not set&gt;   |   &lt;not set&gt;  | `[ep-1 foo bar]` | 
-|     `[/ep-1]`      |   `[foo bar]`    |      `[/ep-2]`      |   &lt;not set&gt;  |     `[ep-2]`     | 
-|     `[/ep-1]`      |   `[foo bar]`    |   &lt;not set&gt;   |     `[zoo boo]`    | `[ep-1 zoo boo]` | 
-|     `[/ep-1]`      |   `[foo bar]`    |      `[/ep-2]`      |     `[zoo boo]`    | `[ep-2 zoo boo]` | 
+|     `[/ep-1]`      |   `[foo bar]`    |   &lt;not set&gt;   |   &lt;not set&gt;  | `[ep-1 foo bar]` |
+|     `[/ep-1]`      |   `[foo bar]`    |      `[/ep-2]`      |   &lt;not set&gt;  |     `[ep-2]`     |
+|     `[/ep-1]`      |   `[foo bar]`    |   &lt;not set&gt;   |     `[zoo boo]`    | `[ep-1 zoo boo]` |
+|     `[/ep-1]`      |   `[foo bar]`    |      `[/ep-2]`      |     `[zoo boo]`    | `[ep-2 zoo boo]` |
 
 
 ## Capabilities

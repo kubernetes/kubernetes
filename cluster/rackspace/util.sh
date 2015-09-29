@@ -51,20 +51,6 @@ verify-prereqs() {
   fi
 }
 
-# Ensure that we have a password created for validating to the master.  Will
-# read from kubeconfig current-context if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-get-password() {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python2.7 -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
 rax-ssh-key() {
   if [ ! -f $HOME/.ssh/${SSH_KEY_NAME} ]; then
     echo "cluster/rackspace/util.sh: Generating SSH KEY ${HOME}/.ssh/${SSH_KEY_NAME}"
@@ -301,7 +287,7 @@ kube-up() {
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
-  get-password
+  gen-kube-basicauth
   python2.7 $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
@@ -322,6 +308,7 @@ kube-up() {
   # TODO look for a better way to get the known_tokens to the master. This is needed over file injection since the files were too large on a 4 node cluster.
   $(scp -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} ${KUBE_TEMP}/known_tokens.csv core@${KUBE_MASTER_IP}:/home/core/known_tokens.csv)
   $(sleep 2)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo /usr/bin/mkdir -p /var/lib/kube-apiserver)
   $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo mv /home/core/known_tokens.csv /var/lib/kube-apiserver/known_tokens.csv)
   $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo chown root.root /var/lib/kube-apiserver/known_tokens.csv)
   $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo systemctl restart kube-apiserver)
@@ -364,13 +351,15 @@ kube-up() {
 
   detect-minions
 
+  # ensures KUBECONFIG is set
+  get-kubeconfig-basicauth
   echo "All minions may not be online yet, this is okay."
   echo
   echo "Kubernetes cluster is running.  The master is running at:"
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
   echo
   echo "Security note: The server above uses a self signed certificate.  This is"
   echo "    subject to \"Man in the middle\" type attacks."

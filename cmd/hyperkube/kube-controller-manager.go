@@ -19,7 +19,7 @@ limitations under the License.
 package main
 
 import (
-	controllermgr "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-controller-manager/app"
+	controllermgr "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 )
 
 // NewKubeControllerManager creates a new hyperkube Server object that includes the

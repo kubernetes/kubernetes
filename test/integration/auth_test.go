@@ -36,26 +36,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
-	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/user"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
+	"k8s.io/kubernetes/test/integration/framework"
 )
-
-var nodeResourceName string
-
-func init() {
-	nodeResourceName = "nodes"
-}
 
 const (
 	AliceToken   string = "abc123" // username: alice.  Present in token file.
@@ -71,22 +65,22 @@ func getTestTokenAuth() authenticator.Request {
 }
 
 func path(resource, namespace, name string) string {
-	return testapi.ResourcePath(resource, namespace, name)
+	return testapi.Default.ResourcePath(resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
 }
 
 func timeoutPath(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.ResourcePath(resource, namespace, name))
+	return addTimeoutFlag(testapi.Default.ResourcePath(resource, namespace, name))
 }
 
 // Bodies for requests used in subsequent tests.
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "v1",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -104,7 +98,7 @@ var aPod string = `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -137,7 +131,7 @@ var aRC string = `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "v1",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -161,7 +155,7 @@ var aService string = `
 var aNode string = `
 {
   "kind": "Node",
-  "apiVersion": "v1",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -173,7 +167,7 @@ var aNode string = `
 var aEvent string = `
 {
   "kind": "Event",
-  "apiVersion": "v1",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -189,7 +183,7 @@ var aEvent string = `
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "v1",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -199,10 +193,20 @@ var aBinding string = `
 }
 `
 
-var aEndpoints string = `
+var emptyEndpoints string = `
 {
   "kind": "Endpoints",
   "apiVersion": "v1",
+  "metadata": {
+    "name": "a"%s
+  }
+}
+`
+
+var aEndpoints string = `
+{
+  "kind": "Endpoints",
+  "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -227,8 +231,8 @@ var aEndpoints string = `
 var deleteNow string = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "v1",
-  "gracePeriodSeconds": null%s
+  "apiVersion": "` + testapi.Default.Version() + `",
+  "gracePeriodSeconds": 0%s
 }
 `
 
@@ -243,6 +247,7 @@ var code405 = map[int]bool{405: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
 var code500 = map[int]bool{500: true}
+var code503 = map[int]bool{503: true}
 
 // To ensure that a POST completes before a dependent GET, set a timeout.
 func addTimeoutFlag(URLString string) string {
@@ -299,8 +304,14 @@ func getTestRequests() []struct {
 		{"GET", path("services", "", ""), "", code200},
 		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
 		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
+		// Create an endpoint for the service (this is done automatically by endpoint controller
+		// whenever a service is created, but this test does not run that controller)
+		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), emptyEndpoints, code201},
+		// Should return service unavailable when endpoint.subset is empty.
+		{"GET", pathWithPrefix("proxy", "services", api.NamespaceDefault, "a") + "/", "", code503},
 		{"PUT", timeoutPath("services", api.NamespaceDefault, "a"), aService, code200},
 		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
+		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
 		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
 
 		// Normal methods on replicationControllers
@@ -319,12 +330,12 @@ func getTestRequests() []struct {
 		{"GET", path("endpoints", api.NamespaceDefault, "a"), "", code200},
 		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
 
-		// Normal methods on minions
-		{"GET", path(nodeResourceName, "", ""), "", code200},
-		{"POST", timeoutPath(nodeResourceName, "", ""), aNode, code201},
-		{"PUT", timeoutPath(nodeResourceName, "", "a"), aNode, code200},
-		{"GET", path(nodeResourceName, "", "a"), "", code200},
-		{"DELETE", timeoutPath(nodeResourceName, "", "a"), "", code200},
+		// Normal methods on nodes
+		{"GET", path("nodes", "", ""), "", code200},
+		{"POST", timeoutPath("nodes", "", ""), aNode, code201},
+		{"PUT", timeoutPath("nodes", "", "a"), aNode, code200},
+		{"GET", path("nodes", "", "a"), "", code200},
+		{"DELETE", timeoutPath("nodes", "", "a"), "", code200},
 
 		// Normal methods on events
 		{"GET", path("events", "", ""), "", code200},
@@ -350,10 +361,10 @@ func getTestRequests() []struct {
 		{"DELETE", timeoutPath("foo", api.NamespaceDefault, ""), "", code404},
 
 		// Special verbs on nodes
-		{"GET", pathWithPrefix("proxy", nodeResourceName, api.NamespaceDefault, "a"), "", code404},
-		{"GET", pathWithPrefix("redirect", nodeResourceName, api.NamespaceDefault, "a"), "", code404},
+		{"GET", pathWithPrefix("proxy", "nodes", api.NamespaceDefault, "a"), "", code404},
+		{"GET", pathWithPrefix("redirect", "nodes", api.NamespaceDefault, "a"), "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
-		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
+		// TODO: figure out how to create a node so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
 		{"GET", "/", "", code200},
@@ -375,7 +386,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -386,17 +397,16 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -492,7 +502,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -504,17 +514,16 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authorizer:       apiserver.NewAlwaysDenyAuthorizer(),
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -561,7 +570,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -573,18 +582,17 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       allowAliceAuthorizer{},
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -650,7 +658,7 @@ func TestBobIsForbidden(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -662,18 +670,17 @@ func TestBobIsForbidden(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       allowAliceAuthorizer{},
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -713,7 +720,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -725,18 +732,17 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       allowAliceAuthorizer{},
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport
@@ -792,7 +798,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -807,18 +813,17 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       a,
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -909,7 +914,7 @@ func TestKindAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -924,18 +929,17 @@ func TestKindAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       a,
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1014,7 +1018,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1028,18 +1032,17 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       a,
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
 	transport := http.DefaultTransport

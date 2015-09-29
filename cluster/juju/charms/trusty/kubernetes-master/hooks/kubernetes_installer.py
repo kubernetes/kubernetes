@@ -17,7 +17,7 @@
 import os
 import shlex
 import subprocess
-from path import path
+from path import Path
 
 
 def run(command, shell=False):
@@ -46,7 +46,7 @@ class KubernetesInstaller():
                         'kubelet': 'kubelet'}
         self.arch = arch
         self.version = version
-        self.output_dir = path(output_dir)
+        self.output_dir = Path(output_dir)
 
     def build(self, branch):
         """ Build kubernetes from a github repository using the Makefile. """
@@ -88,7 +88,7 @@ class KubernetesInstaller():
         print(make_what)
         rc = subprocess.call(shlex.split(make_what), env=go_env)
 
-    def install(self, install_dir=path('/usr/local/bin')):
+    def install(self, install_dir=Path('/usr/local/bin')):
         """ Install kubernetes binary files from the output directory. """
 
         if not install_dir.isdir():

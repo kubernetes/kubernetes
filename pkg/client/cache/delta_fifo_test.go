@@ -97,7 +97,7 @@ func TestDeltaFIFO_compressorWorks(t *testing.T) {
 	)
 	f.Add(mkFifoObj("foo", 10))
 	f.Update(mkFifoObj("foo", 12))
-	f.Replace([]interface{}{mkFifoObj("foo", 20)})
+	f.Replace([]interface{}{mkFifoObj("foo", 20)}, "0")
 	f.Delete(mkFifoObj("foo", 15))
 	f.Delete(mkFifoObj("foo", 18)) // flush the last one out
 	expect := []DeltaType{Added, Updated, Sync, Deleted}
@@ -165,7 +165,7 @@ func TestDeltaFIFO_enqueueing(t *testing.T) {
 func TestDeltaFIFO_addReplace(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
 	f.Add(mkFifoObj("foo", 10))
-	f.Replace([]interface{}{mkFifoObj("foo", 15)})
+	f.Replace([]interface{}{mkFifoObj("foo", 15)}, "0")
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
@@ -197,7 +197,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 		}),
 	)
 	f.Delete(mkFifoObj("baz", 10))
-	f.Replace([]interface{}{mkFifoObj("foo", 5)})
+	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
 
 	expectedList := []Deltas{
 		{{Deleted, mkFifoObj("baz", 10)}},

@@ -54,7 +54,7 @@ particular, they may be self-merged by the release branch owner without fanfare,
 in the case the release branch owner knows the cherry pick was already
 requested - this should not be the norm, but it may happen.
 
-[Contributor License Agreements](../../CONTRIBUTING.md) is considered implicit
+[Contributor License Agreements](http://releases.k8s.io/HEAD/CONTRIBUTING.md) is considered implicit
 for all code within cherry-pick pull requests, ***unless there is a large
 conflict***.
 
@@ -62,7 +62,7 @@ conflict***.
 
 Now that we've structured cherry picks as PRs, searching for all cherry-picks
 against a release is a GitHub query: For example,
-[this query is all of the v0.21.x cherry-picks](https://github.com/GoogleCloudPlatform/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Apr+%22automated+cherry+pick%22+base%3Arelease-0.21)
+[this query is all of the v0.21.x cherry-picks](https://github.com/kubernetes/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Apr+%22automated+cherry+pick%22+base%3Arelease-0.21)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

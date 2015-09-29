@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Master is used to announce the current elected master.
@@ -37,7 +38,7 @@ type Master string
 func (Master) IsAnAPIObject() {}
 
 // NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd.
-func NewEtcdMasterElector(h tools.EtcdGetSet) MasterElector {
+func NewEtcdMasterElector(h tools.EtcdClient) MasterElector {
 	return &etcdMasterElector{etcd: h}
 }
 
@@ -45,7 +46,7 @@ type empty struct{}
 
 // internal implementation struct
 type etcdMasterElector struct {
-	etcd   tools.EtcdGetSet
+	etcd   tools.EtcdClient
 	done   chan empty
 	events chan watch.Event
 }
@@ -54,7 +55,7 @@ type etcdMasterElector struct {
 func (e *etcdMasterElector) Elect(path, id string) watch.Interface {
 	e.done = make(chan empty)
 	e.events = make(chan watch.Event)
-	go util.Forever(func() { e.run(path, id) }, time.Second*5)
+	go util.Until(func() { e.run(path, id) }, time.Second*5, util.NeverStop)
 	return e
 }
 
@@ -90,10 +91,10 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 	// We don't handle the TTL delete w/o a write case here, it's handled in the next loop
 	// iteration.
 	_, err := e.etcd.CompareAndSwap(path, id, ttl, "", res.Node.ModifiedIndex)
-	if err != nil && !tools.IsEtcdTestFailed(err) {
+	if err != nil && !etcdstorage.IsEtcdTestFailed(err) {
 		return "", err
 	}
-	if err != nil && tools.IsEtcdTestFailed(err) {
+	if err != nil && etcdstorage.IsEtcdTestFailed(err) {
 		return "", nil
 	}
 	return id, nil
@@ -105,11 +106,11 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 // returns "", err if an error occurred
 func (e *etcdMasterElector) becomeMaster(path, id string, ttl uint64) (string, error) {
 	_, err := e.etcd.Create(path, id, ttl)
-	if err != nil && !tools.IsEtcdNodeExist(err) {
+	if err != nil && !etcdstorage.IsEtcdNodeExist(err) {
 		// unexpected error
 		return "", err
 	}
-	if err != nil && tools.IsEtcdNodeExist(err) {
+	if err != nil && etcdstorage.IsEtcdNodeExist(err) {
 		return "", nil
 	}
 	return id, nil
@@ -124,12 +125,12 @@ func (e *etcdMasterElector) handleMaster(path, id string, ttl uint64) (string, e
 	res, err := e.etcd.Get(path, false, false)
 
 	// Unexpected error, bail out
-	if err != nil && !tools.IsEtcdNotFound(err) {
+	if err != nil && !etcdstorage.IsEtcdNotFound(err) {
 		return "", err
 	}
 
 	// There is no master, try to become the master.
-	if err != nil && tools.IsEtcdNotFound(err) {
+	if err != nil && etcdstorage.IsEtcdNotFound(err) {
 		return e.becomeMaster(path, id, ttl)
 	}
 

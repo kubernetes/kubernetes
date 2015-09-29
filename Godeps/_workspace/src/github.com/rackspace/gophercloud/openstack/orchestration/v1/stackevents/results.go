@@ -57,7 +57,7 @@ func (r FindResult) Extract() ([]Event, error) {
 	for i, eventRaw := range events {
 		event := eventRaw.(map[string]interface{})
 		if date, ok := event["event_time"]; ok && date != nil {
-			t, err := time.Parse(time.RFC3339, date.(string))
+			t, err := time.Parse(gophercloud.STACK_TIME_FMT, date.(string))
 			if err != nil {
 				return nil, err
 			}
@@ -121,7 +121,7 @@ func ExtractEvents(page pagination.Page) ([]Event, error) {
 	for i, eventRaw := range events {
 		event := eventRaw.(map[string]interface{})
 		if date, ok := event["event_time"]; ok && date != nil {
-			t, err := time.Parse(time.RFC3339, date.(string))
+			t, err := time.Parse(gophercloud.STACK_TIME_FMT, date.(string))
 			if err != nil {
 				return nil, err
 			}
@@ -161,7 +161,7 @@ func (r GetResult) Extract() (*Event, error) {
 	event := r.Body.(map[string]interface{})["event"].(map[string]interface{})
 
 	if date, ok := event["event_time"]; ok && date != nil {
-		t, err := time.Parse(time.RFC3339, date.(string))
+		t, err := time.Parse(gophercloud.STACK_TIME_FMT, date.(string))
 		if err != nil {
 			return nil, err
 		}

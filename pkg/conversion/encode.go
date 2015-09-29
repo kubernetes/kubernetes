@@ -17,8 +17,11 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"path"
 )
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
@@ -50,27 +53,49 @@ import (
 // config files.
 //
 func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []byte, err error) {
+	buff := &bytes.Buffer{}
+	if err := s.EncodeToVersionStream(obj, destVersion, buff); err != nil {
+		return nil, err
+	}
+	return buff.Bytes(), nil
+}
+
+func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stream io.Writer) error {
 	obj = maybeCopy(obj)
 	v, _ := EnforcePtr(obj) // maybeCopy guarantees a pointer
+
+	// Don't encode an object defined in the unversioned package, unless if the
+	// destVersion is v1, encode it to v1 for backward compatibility.
+	pkg := path.Base(v.Type().PkgPath())
+	if pkg == "unversioned" && destVersion != "v1" {
+		// TODO: convert this to streaming too
+		data, err := s.encodeUnversionedObject(obj)
+		if err != nil {
+			return err
+		}
+		_, err = stream.Write(data)
+		return err
+	}
+
 	if _, registered := s.typeToVersion[v.Type()]; !registered {
-		return nil, fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
+		return fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
 	}
 
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Perform a conversion if necessary.
 	if objVersion != destVersion {
 		objOut, err := s.NewObject(destVersion, objKind)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		flags, meta := s.generateConvertMeta(objVersion, destVersion, obj)
 		err = s.converter.Convert(obj, objOut, flags, meta)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		obj = objOut
 	}
@@ -78,27 +103,45 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	// ensure the output object name comes from the destination type
 	_, objKind, err = s.ObjectVersionAndKind(obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Version and Kind should be set on the wire.
 	err = s.SetVersionAndKind(destVersion, objKind, obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// To add metadata, do some simple surgery on the JSON.
-	data, err = json.Marshal(obj)
-	if err != nil {
-		return nil, err
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(obj); err != nil {
+		return err
 	}
 
 	// Version and Kind should be blank in memory. Reset them, since it's
 	// possible that we modified a user object and not a copy above.
 	err = s.SetVersionAndKind("", "", obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	return nil
+}
+
+func (s *Scheme) encodeUnversionedObject(obj interface{}) (data []byte, err error) {
+	_, objKind, err := s.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.SetVersionAndKind("", objKind, obj); err != nil {
+		return nil, err
+	}
+	data, err = json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// Version and Kind should be blank in memory. Reset them, since it's
+	// possible that we modified a user object and not a copy above.
+	err = s.SetVersionAndKind("", "", obj)
 	return data, nil
 }

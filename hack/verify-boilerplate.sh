@@ -19,35 +19,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-boiler="${KUBE_ROOT}/hooks/boilerplate.py"
+boiler="${KUBE_ROOT}/hack/boilerplate/boilerplate.py"
 
-cd ${KUBE_ROOT}
-
-find_files() {
-  local ext=$1
-  find . -not \( \
-      \( \
-        -wholename './output' \
-        -o -wholename './_output' \
-        -o -wholename './release' \
-        -o -wholename './target' \
-        -o -wholename './.git' \
-        -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
-      \) -prune \
-    \) -name "*.${ext}"
-}
-
-files_need_boilerplate=()
-
-files=($(find_files "go"))
-files_need_boilerplate+=($(${boiler} "go" "${files[@]}"))
-
-files=($(find_files "sh"))
-files_need_boilerplate+=($(${boiler} "sh" "${files[@]}"))
-
-files=($(find_files "py"))
-files_need_boilerplate+=($(${boiler} "py" "${files[@]}"))
+files_need_boilerplate=($(${boiler} "$@"))
 
 if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
   for file in "${files_need_boilerplate[@]}"; do

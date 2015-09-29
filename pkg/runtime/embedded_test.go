@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type EmbeddedTest struct {
@@ -153,7 +153,7 @@ func TestEmbeddedObject(t *testing.T) {
 	outer := &EmbeddedTest{
 		ID: "outer",
 		Object: runtime.EmbeddedObject{
-			&EmbeddedTest{
+			Object: &EmbeddedTest{
 				ID: "inner",
 			},
 		},
@@ -212,7 +212,7 @@ func TestDeepCopyOfEmbeddedObject(t *testing.T) {
 	original := &EmbeddedTest{
 		ID: "outer",
 		Object: runtime.EmbeddedObject{
-			&EmbeddedTest{
+			Object: &EmbeddedTest{
 				ID: "inner",
 			},
 		},

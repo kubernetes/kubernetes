@@ -221,6 +221,16 @@ const containersHtmlTemplate = `
           </div>
         </div>
 	{{end}}
+	{{if .CustomMetricsAvailable}}
+	<div class="panel panel-primary">
+	  <div class="panel-heading">
+	    <h3 class="panel-title">Application Metrics</h3>
+	  </div>
+	  <div class="panel-body">
+	    <div id="custom-metrics-chart"></div>
+	  </div>
+	</div>
+	{{end}}
       </div>
       {{end}}
     </div>

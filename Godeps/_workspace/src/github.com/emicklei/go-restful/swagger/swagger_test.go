@@ -6,6 +6,24 @@ import (
 	"github.com/emicklei/go-restful"
 )
 
+// go test -v -test.run TestThatMultiplePathsOnRootAreHandled ...swagger
+func TestThatMultiplePathsOnRootAreHandled(t *testing.T) {
+	ws1 := new(restful.WebService)
+	ws1.Route(ws1.GET("/_ping").To(dummy))
+	ws1.Route(ws1.GET("/version").To(dummy))
+
+	cfg := Config{
+		WebServicesUrl: "http://here.com",
+		ApiPath:        "/apipath",
+		WebServices:    []*restful.WebService{ws1},
+	}
+	sws := newSwaggerService(cfg)
+	decl := sws.composeDeclaration(ws1, "/")
+	if got, want := len(decl.Apis), 2; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
+}
+
 // go test -v -test.run TestServiceToApi ...swagger
 func TestServiceToApi(t *testing.T) {
 	ws := new(restful.WebService)

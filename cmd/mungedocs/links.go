@@ -29,20 +29,20 @@ var (
 	// Finds markdown links of the form [foo](bar "alt-text").
 	linkRE = regexp.MustCompile(`\[([^]]*)\]\(([^)]*)\)`)
 	// Splits the link target into link target and alt-text.
-	altTextRE = regexp.MustCompile(`(.*)( ".*")`)
+	altTextRE = regexp.MustCompile(`([^)]*)( ".*")`)
 )
 
-// checkLinks assumes fileBytes has links in markdown syntax, and verifies that
-// any relative links actually point to files that exist.
-func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
-	dir := path.Dir(filePath)
-	errors := []string{}
-
-	output := replaceNonPreformattedRegexp(fileBytes, linkRE, func(in []byte) (out []byte) {
-		match := linkRE.FindSubmatch(in)
-		// match[0] is the entire expression; [1] is the visible text and [2] is the link text.
-		visibleText := string(match[1])
-		linkText := string(match[2])
+func processLink(in string, filePath string) (string, error) {
+	var err error
+	out := linkRE.ReplaceAllStringFunc(in, func(in string) string {
+		match := linkRE.FindStringSubmatch(in)
+		if match == nil {
+			err = fmt.Errorf("Detected this line had a link, but unable to parse, %v", in)
+			return ""
+		}
+		// match[0] is the entire expression;
+		visibleText := match[1]
+		linkText := match[2]
 		altText := ""
 		if parts := altTextRE.FindStringSubmatch(linkText); parts != nil {
 			linkText = parts[1]
@@ -54,13 +54,10 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 		linkText = strings.Trim(linkText, "\n")
 		linkText = strings.Trim(linkText, " ")
 
-		u, err := url.Parse(linkText)
-		if err != nil {
-			errors = append(
-				errors,
-				fmt.Sprintf("link %q is unparsable: %v", linkText, err),
-			)
-			return in
+		u, terr := url.Parse(linkText)
+		if terr != nil {
+			err = fmt.Errorf("link %q is unparsable: %v", linkText, terr)
+			return ""
 		}
 
 		if u.Host != "" && u.Host != "github.com" {
@@ -72,10 +69,8 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 		if u.Path != "" && !strings.HasPrefix(linkText, "TODO:") {
 			newPath, targetExists := checkPath(filePath, path.Clean(u.Path))
 			if !targetExists {
-				errors = append(
-					errors,
-					fmt.Sprintf("%q: target not found", linkText),
-				)
+				err = fmt.Errorf("%q: target not found", linkText)
+				return ""
 			}
 			u.Path = newPath
 			if strings.HasPrefix(u.Path, "/") {
@@ -89,11 +84,16 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 			// Make the visible text show the absolute path if it's
 			// not nested in or beneath the current directory.
 			if strings.HasPrefix(u.Path, "..") {
-				suggestedVisibleText = makeRepoRelative(path.Join(dir, u.Path))
+				dir := path.Dir(filePath)
+				suggestedVisibleText, err = makeRepoRelative(path.Join(dir, u.Path), filePath)
+				if err != nil {
+					return ""
+				}
 			} else {
 				suggestedVisibleText = u.Path
 			}
-			if unescaped, err := url.QueryUnescape(u.String()); err != nil {
+			var unescaped string
+			if unescaped, err = url.QueryUnescape(u.String()); err != nil {
 				// Remove %28 type stuff, be nice to humans.
 				// And don't fight with the toc generator.
 				linkText = unescaped
@@ -107,18 +107,37 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 			visibleText = suggestedVisibleText
 		}
 
-		return []byte(fmt.Sprintf("[%s](%s)", visibleText, linkText+altText))
+		return fmt.Sprintf("[%s](%s)", visibleText, linkText+altText)
 	})
+	if out == "" {
+		return in, err
+	}
+	return out, nil
+}
+
+// updateLinks assumes lines has links in markdown syntax, and verifies that
+// any relative links actually point to files that exist.
+func updateLinks(filePath string, mlines mungeLines) (mungeLines, error) {
+	var out mungeLines
+	errors := []string{}
+
+	for _, mline := range mlines {
+		if mline.preformatted || !mline.link {
+			out = append(out, mline)
+			continue
+		}
+		line, err := processLink(mline.data, filePath)
+		if err != nil {
+			errors = append(errors, err.Error())
+		}
+		ml := newMungeLine(line)
+		out = append(out, ml)
+	}
 	err := error(nil)
 	if len(errors) != 0 {
 		err = fmt.Errorf("%s", strings.Join(errors, "\n"))
 	}
-	return output, err
-}
-
-func makeRepoRelative(filePath string) string {
-	realRoot := path.Join(*rootDir, *repoRoot) + "/"
-	return strings.TrimPrefix(filePath, realRoot)
+	return out, err
 }
 
 // We have to append together before path.Clean will be able to tell that stuff
@@ -138,8 +157,8 @@ func cleanPath(dirPath, linkPath string) string {
 func checkPath(filePath, linkPath string) (newPath string, ok bool) {
 	dir := path.Dir(filePath)
 	absFilePrefixes := []string{
-		"/GoogleCloudPlatform/kubernetes/blob/master/",
-		"/GoogleCloudPlatform/kubernetes/tree/master/",
+		"/kubernetes/kubernetes/blob/master/",
+		"/kubernetes/kubernetes/tree/master/",
 	}
 	for _, prefix := range absFilePrefixes {
 		if strings.HasPrefix(linkPath, prefix) {

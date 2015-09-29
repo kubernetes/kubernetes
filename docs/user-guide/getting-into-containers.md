@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-﻿#Getting into containers: kubectl exec
+
+# Getting into containers: kubectl exec
+
 Developers can use `kubectl exec` to run commands in a container. This guide demonstrates two use cases.
 
 ## Using kubectl exec to check the environment variables of a container
@@ -53,7 +55,7 @@ NAME                 READY     REASON       RESTARTS   AGE
 redis-master-ft9ex   1/1       Running      0          12s
 ```
 
-then we can check the environment variables of the pod, 
+then we can check the environment variables of the pod,
 
 ```console
 $ kubectl exec redis-master-ft9ex env

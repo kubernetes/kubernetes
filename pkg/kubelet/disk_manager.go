@@ -21,12 +21,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 // Manages policy for diskspace management for disks holding docker images and root fs.
+
+// mb is used to easily convert an int to an mb
+const mb = 1024 * 1024
 
 // Implementation is thread-safe.
 type diskSpaceManager interface {
@@ -106,8 +109,6 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 	if fsInfo.Available < 0 {
 		return true, fmt.Errorf("wrong available space for %q: %+v", fsType, fsInfo)
 	}
-
-	const mb = int64(1024 * 1024)
 
 	if fsInfo.Available < int64(threshold)*mb {
 		glog.Infof("Running out of space on disk for %q: available %d MB, threshold %d MB", fsType, fsInfo.Available/mb, threshold)

@@ -2,7 +2,7 @@
 # The ordering of salt states for service docker, kubelet and
 # master-addon below is very important to avoid the race between
 # salt restart docker or kubelet and kubelet start master components.
-# Please see https://github.com/GoogleCloudPlatform/kubernetes/issues/10122#issuecomment-114566063
+# Please see http://issue.k8s.io/10122#issuecomment-114566063
 # for detail explanation on this very issue.
 /etc/kubernetes/manifests/kube-scheduler.manifest:
   file.managed:

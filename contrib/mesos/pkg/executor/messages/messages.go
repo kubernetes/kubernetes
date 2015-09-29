@@ -26,7 +26,10 @@ const (
 	ExecutorShutdown         = "executor-shutdown"
 	LaunchTaskFailed         = "launch-task-failed"
 	TaskKilled               = "task-killed"
+	TaskLost                 = "task-lost"
 	UnmarshalTaskDataFailure = "unmarshal-task-data-failure"
 	TaskLostAck              = "task-lost-ack" // executor acknowledgement of forwarded TASK_LOST framework message
 	Kamikaze                 = "kamikaze"
+	WrongSlaveFailure        = "pod-for-wrong-slave-failure"
+	AnnotationUpdateFailure  = "annotation-update-failure"
 )

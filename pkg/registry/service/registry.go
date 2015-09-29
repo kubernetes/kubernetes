@@ -17,20 +17,73 @@ limitations under the License.
 package service
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices(ctx api.Context) (*api.ServiceList, error)
+	ListServices(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ServiceList, error)
 	CreateService(ctx api.Context, svc *api.Service) (*api.Service, error)
 	GetService(ctx api.Context, name string) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
 	UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error)
 	WatchServices(ctx api.Context, labels labels.Selector, fields fields.Selector, resourceVersion string) (watch.Interface, error)
+}
+
+// storage puts strong typing around storage calls
+type storage struct {
+	rest.StandardStorage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s rest.StandardStorage) Registry {
+	return &storage{s}
+}
+
+func (s *storage) ListServices(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ServiceList, error) {
+	obj, err := s.List(ctx, label, field)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ServiceList), nil
+}
+
+func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+	obj, err := s.Create(ctx, svc)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Service), nil
+}
+
+func (s *storage) GetService(ctx api.Context, name string) (*api.Service, error) {
+	obj, err := s.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Service), nil
+}
+
+func (s *storage) DeleteService(ctx api.Context, name string) error {
+	_, err := s.Delete(ctx, name, nil)
+	return err
+}
+
+func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+	obj, _, err := s.Update(ctx, svc)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Service), nil
+}
+
+func (s *storage) WatchServices(ctx api.Context, labels labels.Selector, fields fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return s.Watch(ctx, labels, fields, resourceVersion)
 }
 
 // TODO: Move to a general location (as other components may need allocation in future; it's not service specific)
@@ -40,6 +93,6 @@ type RangeRegistry interface {
 	// or an error if the allocation could not be retrieved.
 	Get() (*api.RangeAllocation, error)
 	// CreateOrUpdate should create or update the provide allocation, unless a conflict
-	// has occured since the item was last created.
+	// has occurred since the item was last created.
 	CreateOrUpdate(*api.RangeAllocation) error
 }

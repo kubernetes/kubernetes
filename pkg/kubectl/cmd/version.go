@@ -21,8 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -39,8 +39,8 @@ func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+	kubectl.GetClientVersion(out)
 	if cmdutil.GetFlagBool(cmd, "client") {
-		kubectl.GetClientVersion(out)
 		return nil
 	}
 
@@ -49,6 +49,6 @@ func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	kubectl.GetVersion(out, client)
+	kubectl.GetServerVersion(out, client)
 	return nil
 }

@@ -38,7 +38,7 @@ services on top of both. Accessing the frontend pod will return
 environment information about itself, and a backend pod that it has
 accessed through the service. The goal is to illuminate the
 environment metadata available to running containers inside the
-Kubernetes cluster. The documentation for the kubernetes environment
+Kubernetes cluster. The documentation for the Kubernetes environment
 is [here](../../../docs/user-guide/container-environment.md).
 
 ![Diagram](diagram.png)
@@ -81,7 +81,7 @@ Pod Name: show-rc-xxu6i
 Pod Namespace: default
 USER_VAR: important information
 
-Kubenertes environment variables
+Kubernetes environment variables
 BACKEND_SRV_SERVICE_HOST = 10.147.252.185
 BACKEND_SRV_SERVICE_PORT = 5000
 KUBERNETES_RO_SERVICE_HOST = 10.147.240.1
@@ -99,10 +99,10 @@ Backend Namespace: default
 ```
 
 First the frontend pod's information is printed. The pod name and
-[namespace](../../../docs/design/namespaces.md) are retreived from the
+[namespace](../../../docs/design/namespaces.md) are retrieved from the
 [Downward API](../../../docs/user-guide/downward-api.md). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
-definition](show-rc.yaml). Then, the dynamic kubernetes environment
+definition](show-rc.yaml). Then, the dynamic Kubernetes environment
 variables are scanned and printed. These are used to find the backend
 service, named `backend-srv`. Finally, the frontend pod queries the
 backend service and prints the information returned. Again the backend

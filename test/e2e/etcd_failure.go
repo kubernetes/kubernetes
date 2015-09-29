@@ -19,10 +19,10 @@ package e2e
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -34,7 +34,11 @@ var _ = Describe("Etcd failure", func() {
 	framework := Framework{BaseName: "etcd-failure"}
 
 	BeforeEach(func() {
-		// These tests requires SSH, so the provider check should be identical to those tests.
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
 		skipped = true
 		SkipUnlessProviderIs("gce")
 		skipped = false
@@ -80,7 +84,7 @@ func etcdFailTest(framework Framework, failCommand, fixCommand string) {
 
 	checkExistingRCRecovers(framework)
 
-	ServeImageOrFail(framework.Client, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+	ServeImageOrFail(&framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.
@@ -134,7 +138,7 @@ func checkExistingRCRecovers(f Framework) {
 		pods, err := podClient.List(rcSelector, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {
-			if api.IsPodReady(&pod) {
+			if pod.DeletionTimestamp == nil && api.IsPodReady(&pod) {
 				return true, nil
 			}
 		}

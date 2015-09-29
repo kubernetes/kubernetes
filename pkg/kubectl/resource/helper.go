@@ -17,12 +17,11 @@ limitations under the License.
 package resource
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Helper provides methods for retrieving or mutating a RESTful
@@ -71,14 +70,13 @@ func (m *Helper) List(namespace, apiVersion string, selector labels.Selector) (r
 		Get()
 }
 
-func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector, fieldSelector fields.Selector) (watch.Interface, error) {
+func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Prefix("watch").
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Param("resourceVersion", resourceVersion).
 		LabelsSelectorParam(labelSelector).
-		FieldsSelectorParam(fieldSelector).
 		Watch()
 }
 

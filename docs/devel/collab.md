@@ -61,7 +61,7 @@ Maintainers will do merges of appropriately reviewed-and-approved changes during
 
 There may be discussion an even approvals granted outside of the above hours, but merges will generally be deferred.
 
-If a PR is considered complex or controversial, the merge of that PR should be delayed to give all interested parties in all timezones the opportunity to provide feedback.  Concretely, this means that such PRs should be held for 24 
+If a PR is considered complex or controversial, the merge of that PR should be delayed to give all interested parties in all timezones the opportunity to provide feedback.  Concretely, this means that such PRs should be held for 24
 hours before merging.  Of course "complex" and "controversial" are left to the judgment of the people involved, but we trust that part of being a committer is the judgment required to evaluate such things honestly, and not be
 motivated by your desire (or your cube-mate's desire) to get their code merged.  Also see "Holds" below, any reviewer can issue a "hold" to indicate that the PR is in fact complicated or complex and deserves further review.
 

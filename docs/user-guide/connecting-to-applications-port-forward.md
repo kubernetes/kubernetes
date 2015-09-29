@@ -64,7 +64,7 @@ $ kubectl get pods redis-master -t='{{(index (index .spec.containers 0).ports 0)
 then we forward the port 6379 on the local workstation to the port 6379 of pod redis-master,
 
 ```console
-$ kubectl port-forward -p redis-master 6379:6379
+$ kubectl port-forward redis-master 6379:6379
 I0710 14:43:38.274550    3655 portforward.go:225] Forwarding from 127.0.0.1:6379 -> 6379
 I0710 14:43:38.274797    3655 portforward.go:225] Forwarding from [::1]:6379 -> 6379
 ```

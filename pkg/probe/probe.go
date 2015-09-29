@@ -16,22 +16,10 @@ limitations under the License.
 
 package probe
 
-type Result int
+type Result string
 
-// Status values must be one of these constants.
 const (
-	Success Result = iota
-	Failure
-	Unknown
+	Success Result = "success"
+	Failure Result = "failure"
+	Unknown Result = "unknown"
 )
-
-func (s Result) String() string {
-	switch s {
-	case Success:
-		return "success"
-	case Failure:
-		return "failure"
-	default:
-		return "unknown"
-	}
-}

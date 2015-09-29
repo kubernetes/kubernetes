@@ -17,39 +17,38 @@ limitations under the License.
 package service
 
 import (
-	"bufio"
-	"fmt"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/redirfd"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
-	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	log "github.com/golang/glog"
-	"github.com/kardianos/osext"
 	bindings "github.com/mesos/mesos-go/executor"
+	"k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
+	"k8s.io/kubernetes/contrib/mesos/pkg/redirfd"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/util"
+	utilio "k8s.io/kubernetes/pkg/util/io"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/oom"
 
 	"github.com/spf13/pflag"
 )
@@ -62,11 +61,6 @@ const (
 
 type KubeletExecutorServer struct {
 	*app.KubeletServer
-	RunProxy       bool
-	ProxyLogV      int
-	ProxyExec      string
-	ProxyLogfile   string
-	ProxyBindall   bool
 	SuicideTimeout time.Duration
 	ShutdownFD     int
 	ShutdownFIFO   string
@@ -75,9 +69,6 @@ type KubeletExecutorServer struct {
 func NewKubeletExecutorServer() *KubeletExecutorServer {
 	k := &KubeletExecutorServer{
 		KubeletServer:  app.NewKubeletServer(),
-		RunProxy:       true,
-		ProxyExec:      "./kube-proxy",
-		ProxyLogfile:   "./proxy-log",
 		SuicideTimeout: config.DefaultSuicideTimeout,
 	}
 	if pwd, err := os.Getwd(); err != nil {
@@ -85,42 +76,17 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 	} else {
 		k.RootDirectory = pwd // mesos sandbox dir
 	}
-	k.Address = util.IP(net.ParseIP(defaultBindingAddress()))
+	k.Address = net.ParseIP(defaultBindingAddress())
 	k.ShutdownFD = -1 // indicates unspecified FD
+
 	return k
 }
 
-func NewHyperKubeletExecutorServer() *KubeletExecutorServer {
-	s := NewKubeletExecutorServer()
-
-	// cache this for later use
-	binary, err := osext.Executable()
-	if err != nil {
-		log.Fatalf("failed to determine currently running executable: %v", err)
-	}
-
-	s.ProxyExec = binary
-	return s
-}
-
-func (s *KubeletExecutorServer) addCoreFlags(fs *pflag.FlagSet) {
+func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	s.KubeletServer.AddFlags(fs)
-	fs.BoolVar(&s.RunProxy, "run-proxy", s.RunProxy, "Maintain a running kube-proxy instance as a child proc of this kubelet-executor.")
-	fs.IntVar(&s.ProxyLogV, "proxy-logv", s.ProxyLogV, "Log verbosity of the child kube-proxy.")
-	fs.StringVar(&s.ProxyLogfile, "proxy-logfile", s.ProxyLogfile, "Path to the kube-proxy log file.")
-	fs.BoolVar(&s.ProxyBindall, "proxy-bindall", s.ProxyBindall, "When true will cause kube-proxy to bind to 0.0.0.0.")
 	fs.DurationVar(&s.SuicideTimeout, "suicide-timeout", s.SuicideTimeout, "Self-terminate after this period of inactivity. Zero disables suicide watch.")
 	fs.IntVar(&s.ShutdownFD, "shutdown-fd", s.ShutdownFD, "File descriptor used to signal shutdown to external watchers, requires shutdown-fifo flag")
 	fs.StringVar(&s.ShutdownFIFO, "shutdown-fifo", s.ShutdownFIFO, "FIFO used to signal shutdown to external watchers, requires shutdown-fd flag")
-}
-
-func (s *KubeletExecutorServer) AddStandaloneFlags(fs *pflag.FlagSet) {
-	s.addCoreFlags(fs)
-	fs.StringVar(&s.ProxyExec, "proxy-exec", s.ProxyExec, "Path to the kube-proxy executable.")
-}
-
-func (s *KubeletExecutorServer) AddHyperkubeFlags(fs *pflag.FlagSet) {
-	s.addCoreFlags(fs)
 }
 
 // returns a Closer that should be closed to signal impending shutdown, but only if ShutdownFD
@@ -139,10 +105,17 @@ func (s *KubeletExecutorServer) syncExternalShutdownWatcher() (io.Closer, error)
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOomAdjuster()
+	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		log.Info(err)
 	}
 
+	// empty string for the docker and system containers (= cgroup paths). This
+	// stops the kubelet taking any control over other system processes.
+	s.SystemContainer = ""
+	s.DockerDaemonContainer = ""
+
+	// create apiserver client
 	var apiclient *client.Client
 	clientConfig, err := s.CreateAPIServerClientConfig()
 	if err == nil {
@@ -162,7 +135,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		return err
 	}
 
-	cadvisorInterface, err := cadvisor.New(s.CadvisorPort)
+	cAdvisorInterface, err := cadvisor.New(s.CAdvisorPort)
 	if err != nil {
 		return err
 	}
@@ -198,11 +171,13 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		mounter = &mount.NsenterMounter{}
 	}
 
+	var writer utilio.Writer = &utilio.StdWriter{}
 	var dockerExecHandler dockertools.ExecHandler
 	switch s.DockerExecHandlerName {
 	case "native":
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	case "nsenter":
+		writer = &utilio.NsenterWriter{}
 		dockerExecHandler = &dockertools.NsenterExecHandler{}
 	default:
 		log.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
@@ -233,14 +208,14 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		Runonce:                        s.RunOnce,
 		Port:                           s.Port,
 		ReadOnlyPort:                   s.ReadOnlyPort,
-		CadvisorInterface:              cadvisorInterface,
+		CAdvisorInterface:              cAdvisorInterface,
 		EnableServer:                   s.EnableServer,
 		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
 		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
 		KubeClient:                     apiclient,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  app.ProbeVolumePlugins(),
-		NetworkPlugins:                 app.ProbeNetworkPlugins(),
+		NetworkPlugins:                 app.ProbeNetworkPlugins(s.NetworkPluginDir),
 		NetworkPluginName:              s.NetworkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		TLSOptions:                     tlsOptions,
@@ -257,6 +232,10 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		ConfigureCBR0:             s.ConfigureCBR0,
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
+		ResolverConfig:            s.ResolverConfig,
+		CPUCFSQuota:               s.CPUCFSQuota,
+		Writer:                    writer,
+		MaxOpenFiles:              s.MaxOpenFiles,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
@@ -270,12 +249,12 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	if s.HealthzPort > 0 {
 		healthz.DefaultHealthz()
-		go util.Forever(func() {
+		go util.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
 			if err != nil {
 				log.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second)
+		}, 5*time.Second, util.NeverStop)
 	}
 
 	// block until executor is shut down or commits shutdown
@@ -316,7 +295,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		MaxContainers:      kc.MaxContainerCount,
 	}
 
-	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates, kc.Recorder)
+	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kc.Recorder)
 	updates := pc.Channel(MESOS_CFG_SOURCE)
 
 	klet, err := kubelet.NewMainKubelet(
@@ -329,6 +308,8 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
+		kc.EventRecordQPS,
+		kc.EventBurst,
 		gcPolicy,
 		pc.SeenAllSources,
 		kc.RegisterNode,
@@ -341,7 +322,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.NetworkPluginName,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
-		kc.CadvisorInterface,
+		kc.CAdvisorInterface,
 		kc.ImageGCPolicy,
 		kc.DiskSpacePolicy,
 		kc.Cloud,
@@ -350,13 +331,21 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.OSInterface,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
+		kc.RktPath,
+		kc.RktStage1Image,
 		kc.Mounter,
+		kc.Writer,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
 		kc.PodCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler,
+		kc.ResolverConfig,
+		kc.CPUCFSQuota,
+		&api.NodeDaemonEndpoints{
+			KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
+		},
 	)
 	if err != nil {
 		return nil, nil, err
@@ -386,6 +375,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 			return klet.GetRuntime().GetPodStatus(pod)
 		},
 		StaticPodsConfigPath: staticPodsConfigPath,
+		PodLW:                cache.NewListWatchFromClient(kc.KubeClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, kc.NodeName)),
 	})
 
 	go exec.InitializeStaticPodsSource(func() {
@@ -397,11 +387,6 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 
 	k := &kubeletExecutor{
 		Kubelet:         klet,
-		runProxy:        ks.RunProxy,
-		proxyLogV:       ks.ProxyLogV,
-		proxyExec:       ks.ProxyExec,
-		proxyLogfile:    ks.ProxyLogfile,
-		proxyBindall:    ks.ProxyBindall,
 		address:         ks.Address,
 		dockerClient:    kc.DockerClient,
 		hks:             hks,
@@ -413,7 +398,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	dconfig := bindings.DriverConfig{
 		Executor:         exec,
 		HostnameOverride: ks.HostnameOverride,
-		BindingAddress:   net.IP(ks.Address),
+		BindingAddress:   ks.Address,
 	}
 	if driver, err := bindings.NewMesosExecutorDriver(dconfig); err != nil {
 		log.Fatalf("failed to create executor driver: %v", err)
@@ -436,12 +421,7 @@ type kubeletExecutor struct {
 	*kubelet.Kubelet
 	initialize      sync.Once
 	driver          bindings.ExecutorDriver
-	runProxy        bool
-	proxyLogV       int
-	proxyExec       string
-	proxyLogfile    string
-	proxyBindall    bool
-	address         util.IP
+	address         net.IP
 	dockerClient    dockertools.DockerInterface
 	hks             hyperkube.Interface
 	kubeletFinished chan struct{}   // closed once kubelet.Run() returns
@@ -453,9 +433,6 @@ func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions 
 	// this func could be called many times, depending how often the HTTP server crashes,
 	// so only execute certain initialization procs once
 	kl.initialize.Do(func() {
-		if kl.runProxy {
-			go runtime.Until(kl.runProxyService, 5*time.Second, kl.executorDone)
-		}
 		go func() {
 			if _, err := kl.driver.Run(); err != nil {
 				log.Fatalf("executor driver failed: %v", err)
@@ -465,103 +442,6 @@ func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions 
 	})
 	log.Infof("Starting kubelet server...")
 	kubelet.ListenAndServeKubeletServer(kl, address, port, tlsOptions, enableDebuggingHandlers)
-}
-
-// this function blocks as long as the proxy service is running; intended to be
-// executed asynchronously.
-func (kl *kubeletExecutor) runProxyService() {
-
-	log.Infof("Starting proxy process...")
-
-	const KM_PROXY = "proxy" //TODO(jdef) constant should be shared with km package
-	args := []string{}
-
-	if kl.hks.FindServer(KM_PROXY) {
-		args = append(args, KM_PROXY)
-		log.V(1).Infof("attempting to using km proxy service")
-	} else if _, err := os.Stat(kl.proxyExec); os.IsNotExist(err) {
-		log.Errorf("failed to locate proxy executable at '%v' and km not present: %v", kl.proxyExec, err)
-		return
-	}
-
-	bindAddress := "0.0.0.0"
-	if !kl.proxyBindall {
-		bindAddress = kl.address.String()
-	}
-	args = append(args,
-		fmt.Sprintf("--bind-address=%s", bindAddress),
-		fmt.Sprintf("--v=%d", kl.proxyLogV),
-		"--logtostderr=true",
-	)
-
-	// add client.Config args here. proxy still calls client.BindClientConfigFlags
-	appendStringArg := func(name, value string) {
-		if value != "" {
-			args = append(args, fmt.Sprintf("--%s=%s", name, value))
-		}
-	}
-	appendStringArg("master", kl.clientConfig.Host)
-	/* TODO(jdef) move these flags to a config file pointed to by --kubeconfig
-	appendStringArg("api-version", kl.clientConfig.Version)
-	appendStringArg("client-certificate", kl.clientConfig.CertFile)
-	appendStringArg("client-key", kl.clientConfig.KeyFile)
-	appendStringArg("certificate-authority", kl.clientConfig.CAFile)
-	args = append(args, fmt.Sprintf("--insecure-skip-tls-verify=%t", kl.clientConfig.Insecure))
-	*/
-
-	log.Infof("Spawning process executable %s with args '%+v'", kl.proxyExec, args)
-
-	cmd := exec.Command(kl.proxyExec, args...)
-	if _, err := cmd.StdoutPipe(); err != nil {
-		log.Fatal(err)
-	}
-
-	proxylogs, err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//TODO(jdef) append instead of truncate? what if the disk is full?
-	logfile, err := os.Create(kl.proxyLogfile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logfile.Close()
-
-	ch := make(chan struct{})
-	go func() {
-		defer func() {
-			select {
-			case <-ch:
-				log.Infof("killing proxy process..")
-				if err = cmd.Process.Kill(); err != nil {
-					log.Errorf("failed to kill proxy process: %v", err)
-				}
-			default:
-			}
-		}()
-
-		writer := bufio.NewWriter(logfile)
-		defer writer.Flush()
-
-		<-ch
-		written, err := io.Copy(writer, proxylogs)
-		if err != nil {
-			log.Errorf("error writing data to proxy log: %v", err)
-		}
-
-		log.Infof("wrote %d bytes to proxy log", written)
-	}()
-
-	// if the proxy fails to start then we exit the executor, otherwise
-	// wait for the proxy process to end (and release resources after).
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-	}
-	close(ch)
-	if err := cmd.Wait(); err != nil {
-		log.Error(err)
-	}
 }
 
 // runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
@@ -609,8 +489,6 @@ func (kl *kubeletExecutor) Run(updates <-chan kubelet.PodUpdate) {
 	util.Until(func() { kl.Kubelet.Run(pipe) }, 0, kl.executorDone)
 
 	//TODO(jdef) revisit this if/when executor failover lands
-	err := kl.SyncPods([]*api.Pod{}, nil, nil, time.Now())
-	if err != nil {
-		log.Errorf("failed to cleanly remove all pods and associated state: %v", err)
-	}
+	// Force kubelet to delete all pods.
+	kl.HandlePodDeletions(kl.GetPods())
 }

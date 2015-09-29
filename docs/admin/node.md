@@ -46,9 +46,10 @@ Documentation for other releases can be found at
     - [Node Info](#node-info)
   - [Node Management](#node-management)
     - [Node Controller](#node-controller)
-    - [Self-Registration of nodes](#self-registration-of-nodes)
+    - [Self-Registration of Nodes](#self-registration-of-nodes)
       - [Manual Node Administration](#manual-node-administration)
     - [Node capacity](#node-capacity)
+  - [API Object](#api-object)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -124,7 +125,7 @@ number of pods that can be scheduled onto the node.
 
 ### Node Info
 
-General information about the node, for instance kernel version, kubernetes version
+General information about the node, for instance kernel version, Kubernetes version
 (kubelet version, kube-proxy version), docker version (if used), OS name.
 The information is gathered by Kubelet from the node.
 
@@ -177,7 +178,7 @@ join a node to a Kubernetes cluster, you as an admin need to make sure proper se
 running in the node. In the future, we plan to automatically provision some node
 services.
 
-### Self-Registration of nodes
+### Self-Registration of Nodes
 
 When kubelet flag `--register-node` is true (the default), the kubelet will attempt to
 register itself with the API server.  This is the preferred pattern, used by most distros.
@@ -213,6 +214,10 @@ unschedulable, run this command:
 kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 ```
 
+Note that pods which are created by a daemonSet controller bypass the Kubernetes scheduler,
+and do not respect the unschedulable attribute on a node.   The assumption is that daemons belong on
+the machine even if it is being drained of applications in preparation for a reboot.
+
 ### Node capacity
 
 The capacity of the node (number of cpus and amount of memory) is part of the node resource.
@@ -220,10 +225,10 @@ Normally, nodes register themselves and report their capacity when creating the 
 you are doing [manual node administration](#manual-node-administration), then you need to set node
 capacity when adding a node.
 
-The kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
-checks that the sum of the limits of containers on the node is no greater than than the node capacity.  It
+The Kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
+checks that the sum of the limits of containers on the node is no greater than the node capacity.  It
 includes all containers started by kubelet, but not containers started directly by docker, nor
-processes not in containers.  
+processes not in containers.
 
 If you want to explicitly reserve resources for non-Pod processes, you can create a placeholder
 pod.  Use the following template:
@@ -246,6 +251,13 @@ spec:
 Set the `cpu` and `memory` values to the amount of resources you want to reserve.
 Place the file in the manifest directory (`--config=DIR` flag of kubelet).  Do this
 on each kubelet where you want to reserve resources.
+
+
+## API Object
+
+Node is a top-level resource in the kubernetes REST API. More details about the
+API object can be found at: [Node API
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

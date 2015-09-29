@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 
 	"speter.net/go/exp/math/dec/inf"
 )
@@ -54,8 +54,8 @@ func TestSemantic(t *testing.T) {
 		{resource.Quantity{}, resource.MustParse("0"), true},
 		{resource.Quantity{}, resource.MustParse("1m"), false},
 		{
-			resource.Quantity{inf.NewDec(5, 0), resource.BinarySI},
-			resource.Quantity{inf.NewDec(5, 0), resource.DecimalSI},
+			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.BinarySI},
+			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.DecimalSI},
 			true,
 		},
 		{resource.MustParse("2m"), resource.MustParse("1m"), false},
@@ -138,7 +138,40 @@ func TestAddToNodeAddresses(t *testing.T) {
 	for i, tc := range testCases {
 		AddToNodeAddresses(&tc.existing, tc.toAdd...)
 		if !Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Error("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
+			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
 		}
+	}
+}
+
+func TestGetAccessModesFromString(t *testing.T) {
+	modes := GetAccessModesFromString("ROX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+
+	modes = GetAccessModesFromString("ROX,RWX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+	if !containsAccessMode(modes, ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadWriteMany, modes)
+	}
+
+	modes = GetAccessModesFromString("RWO,ROX,RWX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+	if !containsAccessMode(modes, ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadWriteMany, modes)
+	}
+}
+
+func TestRemoveDuplicateAccessModes(t *testing.T) {
+	modes := []PersistentVolumeAccessMode{
+		ReadWriteOnce, ReadOnlyMany, ReadOnlyMany, ReadOnlyMany,
+	}
+	modes = removeDuplicateAccessModes(modes)
+	if len(modes) != 2 {
+		t.Errorf("Expected 2 distinct modes in set but found %v", len(modes))
 	}
 }

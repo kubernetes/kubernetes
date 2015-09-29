@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 const HeaderSpdy31 = "SPDY/3.1"

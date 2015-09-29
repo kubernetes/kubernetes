@@ -19,7 +19,7 @@ package container
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // GenerateContainerRef returns an *api.ObjectReference which references the given container

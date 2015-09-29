@@ -17,83 +17,140 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 )
-
-// Splits a document up into a slice of lines.
-func splitLines(document []byte) []string {
-	lines := strings.Split(string(document), "\n")
-	// Skip trailing empty string from Split-ing
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return lines
-}
 
 // Replaces the text between matching "beginMark" and "endMark" within the
 // document represented by "lines" with "insertThis".
 //
 // Delimiters should occupy own line.
 // Returns copy of document with modifications.
-func updateMacroBlock(lines []string, beginMark, endMark, insertThis string) ([]byte, error) {
-	var buffer bytes.Buffer
+func updateMacroBlock(mlines mungeLines, token string, insertThis mungeLines) (mungeLines, error) {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
+	var out mungeLines
 	betweenBeginAndEnd := false
-	for _, line := range lines {
-		trimmedLine := strings.Trim(line, " \n")
-		if trimmedLine == beginMark {
+	for _, mline := range mlines {
+		if mline.preformatted && !betweenBeginAndEnd {
+			out = append(out, mline)
+			continue
+		}
+		line := mline.data
+		if mline.beginTag && line == beginMark {
 			if betweenBeginAndEnd {
 				return nil, fmt.Errorf("found second begin mark while updating macro blocks")
 			}
 			betweenBeginAndEnd = true
-			buffer.WriteString(line)
-			buffer.WriteString("\n")
-		} else if trimmedLine == endMark {
+			out = append(out, mline)
+		} else if mline.endTag && line == endMark {
 			if !betweenBeginAndEnd {
-				return nil, fmt.Errorf("found end mark without being mark while updating macro blocks")
+				return nil, fmt.Errorf("found end mark without begin mark while updating macro blocks")
 			}
-			buffer.WriteString(insertThis)
-			// Extra newline avoids github markdown bug where comment ends up on same line as last bullet.
-			buffer.WriteString("\n")
-			buffer.WriteString(line)
-			buffer.WriteString("\n")
 			betweenBeginAndEnd = false
+			out = append(out, insertThis...)
+			out = append(out, mline)
 		} else {
 			if !betweenBeginAndEnd {
-				buffer.WriteString(line)
-				buffer.WriteString("\n")
+				out = append(out, mline)
 			}
 		}
 	}
 	if betweenBeginAndEnd {
 		return nil, fmt.Errorf("never found closing end mark while updating macro blocks")
 	}
-	return buffer.Bytes(), nil
+	return out, nil
 }
 
 // Tests that a document, represented as a slice of lines, has a line.  Ignores
 // leading and trailing space.
-func hasLine(lines []string, needle string) bool {
-	for _, line := range lines {
-		trimmedLine := strings.Trim(line, " \n")
-		if trimmedLine == needle {
+func hasLine(lines mungeLines, needle string) bool {
+	for _, mline := range lines {
+		haystack := strings.TrimSpace(mline.data)
+		if haystack == needle {
 			return true
 		}
 	}
 	return false
 }
 
+func removeMacroBlock(token string, mlines mungeLines) (mungeLines, error) {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
+	var out mungeLines
+	betweenBeginAndEnd := false
+	for _, mline := range mlines {
+		if mline.preformatted {
+			out = append(out, mline)
+			continue
+		}
+		line := mline.data
+		if mline.beginTag && line == beginMark {
+			if betweenBeginAndEnd {
+				return nil, fmt.Errorf("found second begin mark while updating macro blocks")
+			}
+			betweenBeginAndEnd = true
+		} else if mline.endTag && line == endMark {
+			if !betweenBeginAndEnd {
+				return nil, fmt.Errorf("found end mark without begin mark while updating macro blocks")
+			}
+			betweenBeginAndEnd = false
+		} else {
+			if !betweenBeginAndEnd {
+				out = append(out, mline)
+			}
+		}
+	}
+	if betweenBeginAndEnd {
+		return nil, fmt.Errorf("never found closing end mark while updating macro blocks")
+	}
+	return out, nil
+}
+
+// Add a macro block to the beginning of a set of lines
+func prependMacroBlock(token string, mlines mungeLines) mungeLines {
+	beginLine := newMungeLine(beginMungeTag(token))
+	endLine := newMungeLine(endMungeTag(token))
+	out := mungeLines{beginLine, endLine}
+	if len(mlines) > 0 && mlines[0].data != "" {
+		out = append(out, blankMungeLine)
+	}
+	return append(out, mlines...)
+}
+
+// Add a macro block to the end of a set of lines
+func appendMacroBlock(mlines mungeLines, token string) mungeLines {
+	beginLine := newMungeLine(beginMungeTag(token))
+	endLine := newMungeLine(endMungeTag(token))
+	out := mlines
+	if len(mlines) > 0 && mlines[len(mlines)-1].data != "" {
+		out = append(out, blankMungeLine)
+	}
+	return append(out, beginLine, endLine)
+}
+
 // Tests that a document, represented as a slice of lines, has a macro block.
-func hasMacroBlock(lines []string, begin string, end string) bool {
+func hasMacroBlock(lines mungeLines, token string) bool {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
+
 	foundBegin := false
-	for _, line := range lines {
-		trimmedLine := strings.Trim(line, " \n")
+	for _, mline := range lines {
+		if mline.preformatted {
+			continue
+		}
+		if !mline.beginTag && !mline.endTag {
+			continue
+		}
+		line := mline.data
 		switch {
-		case !foundBegin && trimmedLine == begin:
+		case !foundBegin && line == beginMark:
 			foundBegin = true
-		case foundBegin && trimmedLine == end:
+		case foundBegin && line == endMark:
 			return true
 		}
 	}
@@ -112,72 +169,123 @@ func endMungeTag(desc string) string {
 	return fmt.Sprintf("<!-- END MUNGE: %s -->", desc)
 }
 
-// Calls 'replace' for all sections of the document not in ``` / ``` blocks. So
-// that you don't have false positives inside those blocks.
-func replaceNonPreformatted(input []byte, replace func([]byte) []byte) []byte {
-	f := splitByPreformatted(input)
-	output := []byte(nil)
-	for _, block := range f {
-		if block.preformatted {
-			output = append(output, block.data...)
-		} else {
-			output = append(output, replace(block.data)...)
+type mungeLine struct {
+	data         string
+	preformatted bool
+	header       bool
+	link         bool
+	beginTag     bool
+	endTag       bool
+}
+
+type mungeLines []mungeLine
+
+func (m1 mungeLines) Equal(m2 mungeLines) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+	for i := range m1 {
+		if m1[i].data != m2[i].data {
+			return false
 		}
 	}
-	return output
+	return true
 }
 
-type fileBlock struct {
-	preformatted bool
-	data         []byte
+func (mlines mungeLines) String() string {
+	slice := []string{}
+	for _, mline := range mlines {
+		slice = append(slice, mline.data)
+	}
+	s := strings.Join(slice, "\n")
+	// We need to tack on an extra newline at the end of the file
+	return s + "\n"
 }
 
-type fileBlocks []fileBlock
+func (mlines mungeLines) Bytes() []byte {
+	return []byte(mlines.String())
+}
 
 var (
 	// Finds all preformatted block start/stops.
 	preformatRE    = regexp.MustCompile("^\\s*```")
 	notPreformatRE = regexp.MustCompile("^\\s*```.*```")
+	// Is this line a header?
+	mlHeaderRE = regexp.MustCompile(`^#`)
+	// Is there a link on this line?
+	mlLinkRE   = regexp.MustCompile(`\[[^]]*\]\([^)]*\)`)
+	beginTagRE = regexp.MustCompile(`<!-- BEGIN MUNGE:`)
+	endTagRE   = regexp.MustCompile(`<!-- END MUNGE:`)
+
+	blankMungeLine = newMungeLine("")
 )
 
-func splitByPreformatted(input []byte) fileBlocks {
-	f := fileBlocks{}
+// Does not set 'preformatted'
+func newMungeLine(line string) mungeLine {
+	return mungeLine{
+		data:     line,
+		header:   mlHeaderRE.MatchString(line),
+		link:     mlLinkRE.MatchString(line),
+		beginTag: beginTagRE.MatchString(line),
+		endTag:   endTagRE.MatchString(line),
+	}
+}
 
-	cur := []byte(nil)
+func trimRightSpace(in string) string {
+	return strings.TrimRightFunc(in, unicode.IsSpace)
+}
+
+// Splits a document up into a slice of lines.
+func splitLines(document string) []string {
+	lines := strings.Split(document, "\n")
+	// Skip trailing empty string from Split-ing
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
+}
+
+func getMungeLines(in string) mungeLines {
+	var out mungeLines
 	preformatted := false
-	// SplitAfter keeps the newline, so you don't have to worry about
-	// omitting it on the last line or anything. Also, the documentation
-	// claims it's unicode safe.
-	for _, line := range bytes.SplitAfter(input, []byte("\n")) {
+
+	lines := splitLines(in)
+	// We indicate if any given line is inside a preformatted block or
+	// outside a preformatted block
+	for _, line := range lines {
 		if !preformatted {
-			if preformatRE.Match(line) && !notPreformatRE.Match(line) {
-				if len(cur) > 0 {
-					f = append(f, fileBlock{false, cur})
-				}
-				cur = []byte{}
+			if preformatRE.MatchString(line) && !notPreformatRE.MatchString(line) {
 				preformatted = true
 			}
-			cur = append(cur, line...)
 		} else {
-			cur = append(cur, line...)
-			if preformatRE.Match(line) {
-				if len(cur) > 0 {
-					f = append(f, fileBlock{true, cur})
-				}
-				cur = []byte{}
+			if preformatRE.MatchString(line) {
 				preformatted = false
 			}
 		}
+		ml := newMungeLine(line)
+		ml.preformatted = preformatted
+		out = append(out, ml)
 	}
-	if len(cur) > 0 {
-		f = append(f, fileBlock{preformatted, cur})
-	}
-	return f
+	return out
 }
 
-// As above, but further uses exp to parse the non-preformatted sections.
-func replaceNonPreformattedRegexp(input []byte, exp *regexp.Regexp, replace func([]byte) []byte) []byte {
-	return replaceNonPreformatted(input, func(in []byte) []byte {
-		return exp.ReplaceAllFunc(in, replace)
-	})
+// filePath is the file we are looking for
+// inFile is the file where we found the link. So if we are processing
+//    /path/to/repoRoot/docs/admin/README.md and are looking for
+//    ../../file.json we can find that location.
+// In many cases filePath and processingFile may be the same
+func makeRepoRelative(filePath string, processingFile string) (string, error) {
+	if filePath, err := filepath.Rel(repoRoot, filePath); err == nil {
+		return filePath, nil
+	}
+	cwd := path.Dir(processingFile)
+	return filepath.Rel(repoRoot, path.Join(cwd, filePath))
+}
+
+func makeFileRelative(filePath string, processingFile string) (string, error) {
+	cwd := path.Dir(processingFile)
+	if filePath, err := filepath.Rel(cwd, filePath); err == nil {
+		return filePath, nil
+	}
+	return filepath.Rel(cwd, path.Join(cwd, filePath))
 }

@@ -40,7 +40,7 @@ This documents the process for making release notes for a release.
 Find the most-recent PR that was merged with the previous .0 release.  Remember this as $LASTPR.
 _TODO_: Figure out a way to record this somewhere to save the next release engineer time.
 
-Find the most-recent PR that was merged with the current .0 release.  Remeber this as $CURRENTPR.
+Find the most-recent PR that was merged with the current .0 release.  Remember this as $CURRENTPR.
 
 ### 2) Run the release-notes tool
 
@@ -66,7 +66,7 @@ With the final markdown all set, cut and paste it to the top of `CHANGELOG.md`
 
 ### 5) Update the Release page
 
-   * Switch to the [releases](https://github.com/GoogleCloudPlatform/kubernetes/releases) page.
+   * Switch to the [releases](https://github.com/kubernetes/kubernetes/releases) page.
    * Open up the release you are working on.
    * Cut and paste the final markdown from above into the release notes
    * Press Save.

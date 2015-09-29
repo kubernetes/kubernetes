@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Identifiers and Names in Kubernetes
 
-A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/kubernetes/issues/199).
+A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](http://issue.k8s.io/199).
 
 
 ## Definitions

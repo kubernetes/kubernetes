@@ -21,12 +21,13 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -51,9 +52,10 @@ type EventRecorder interface {
 	// Event constructs an event from the given information and puts it in the queue for sending.
 	// 'object' is the object this event is about. Event will make a reference-- or you may also
 	// pass a reference to the object directly.
-	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it will
-	// be used to automate handling of events, so imagine people writing switch statements to
-	// handle them. You want to make that easy.
+	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it
+	// should be in UpperCamelCase format (starting with a capital letter). "reason" will be used
+	// to automate handling of events, so imagine people writing switch statements to handle them.
+	// You want to make that easy.
 	// 'message' is intended to be human readable.
 	//
 	// The resulting event will be created in the same namespace as the reference object.
@@ -63,21 +65,21 @@ type EventRecorder interface {
 	Eventf(object runtime.Object, reason, messageFmt string, args ...interface{})
 
 	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
-	PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{})
+	PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{})
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
 type EventBroadcaster interface {
-	// StartEventWatcher starts sending events recieved from this EventBroadcaster to the given
+	// StartEventWatcher starts sending events received from this EventBroadcaster to the given
 	// event handler function. The return value can be ignored or used to stop recording, if
 	// desired.
 	StartEventWatcher(eventHandler func(*api.Event)) watch.Interface
 
-	// StartRecordingToSink starts sending events recieved from this EventBroadcaster to the given
+	// StartRecordingToSink starts sending events received from this EventBroadcaster to the given
 	// sink. The return value can be ignored or used to stop recording, if desired.
 	StartRecordingToSink(sink EventSink) watch.Interface
 
-	// StartLogging starts sending events recieved from this EventBroadcaster to the given logging
+	// StartLogging starts sending events received from this EventBroadcaster to the given logging
 	// function. The return value can be ignored or used to stop recording, if desired.
 	StartLogging(logf func(format string, args ...interface{})) watch.Interface
 
@@ -95,13 +97,14 @@ type eventBroadcasterImpl struct {
 	*watch.Broadcaster
 }
 
-// StartRecordingToSink starts sending events recieved from the specified eventBroadcaster to the given sink.
+// StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // The return value can be ignored or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
 func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
+	var eventCache *historyCache = NewEventCache()
 	return eventBroadcaster.StartEventWatcher(
 		func(event *api.Event) {
 			// Make a copy before modification, because there could be multiple listeners.
@@ -109,7 +112,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 			eventCopy := *event
 			event = &eventCopy
 
-			previousEvent := getEvent(event)
+			previousEvent := eventCache.getEvent(event)
 			updateExistingEvent := previousEvent.Count > 0
 			if updateExistingEvent {
 				event.Count = previousEvent.Count + 1
@@ -120,7 +123,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 
 			tries := 0
 			for {
-				if recordEvent(sink, event, updateExistingEvent) {
+				if recordEvent(sink, event, updateExistingEvent, eventCache) {
 					break
 				}
 				tries++
@@ -154,7 +157,7 @@ func isKeyNotFoundError(err error) bool {
 // was successfully recorded or discarded, false if it should be retried.
 // If updateExistingEvent is false, it creates a new event, otherwise it updates
 // existing event.
-func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) bool {
+func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool, eventCache *historyCache) bool {
 	var newEvent *api.Event
 	var err error
 	if updateExistingEvent {
@@ -167,7 +170,7 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 		newEvent, err = sink.Create(event)
 	}
 	if err == nil {
-		addOrUpdateEvent(newEvent)
+		eventCache.addOrUpdateEvent(newEvent)
 		return true
 	}
 
@@ -195,7 +198,7 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 	return false
 }
 
-// StartLogging starts sending events recieved from this EventBroadcaster to the given logging function.
+// StartLogging starts sending events received from this EventBroadcaster to the given logging function.
 // The return value can be ignored or used to stop recording, if desired.
 func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
 	return eventBroadcaster.StartEventWatcher(
@@ -204,7 +207,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format stri
 		})
 }
 
-// StartEventWatcher starts sending events recieved from this EventBroadcaster to the given event handler function.
+// StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value can be ignored or used to stop recording, if desired.
 func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*api.Event)) watch.Interface {
 	watcher := eventBroadcaster.Watch()
@@ -237,7 +240,7 @@ type recorderImpl struct {
 	*watch.Broadcaster
 }
 
-func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp util.Time, reason, message string) {
+func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
@@ -251,19 +254,19 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp uti
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, reason, message string) {
-	recorder.generateEvent(object, util.Now(), reason, message)
+	recorder.generateEvent(object, unversioned.Now(), reason, message)
 }
 
 func (recorder *recorderImpl) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
 	recorder.Event(object, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
+func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
 	recorder.generateEvent(object, timestamp, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 func makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
-	t := util.Now()
+	t := unversioned.Now()
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = api.NamespaceDefault
