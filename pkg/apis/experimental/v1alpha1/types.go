@@ -120,7 +120,7 @@ type HorizontalPodAutoscaler struct {
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
 
 	// Status represents the current information about the autoscaler.
-	Status *HorizontalPodAutoscalerStatus `json:"status,omitempty"`
+	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscalerList is a list of HorizontalPodAutoscalers.

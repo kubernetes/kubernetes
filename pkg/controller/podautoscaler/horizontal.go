@@ -109,7 +109,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		// Going down only if the usageRatio dropped significantly below the target
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas && usageRatio < (1-tolerance) &&
-			(hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+			(hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
@@ -117,7 +117,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		// Going up only if the usage ratio increased significantly above the target
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas && usageRatio > (1+tolerance) &&
-			(hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+			(hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
@@ -135,12 +135,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		desiredReplicas = currentReplicas
 	}
 
-	status := experimental.HorizontalPodAutoscalerStatus{
+	hpa.Status = experimental.HorizontalPodAutoscalerStatus{
 		CurrentReplicas:    currentReplicas,
 		DesiredReplicas:    desiredReplicas,
 		CurrentConsumption: currentConsumption,
 	}
-	hpa.Status = &status
 	if rescale {
 		now := unversioned.NewTime(now)
 		hpa.Status.LastScaleTimestamp = &now
