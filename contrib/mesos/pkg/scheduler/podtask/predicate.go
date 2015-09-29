@@ -20,6 +20,7 @@ import (
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -31,25 +32,25 @@ var DefaultPredicate = RequireAllPredicate([]FitPredicate{
 }).Fit
 
 // FitPredicate implementations determine if the given task "fits" into offered Mesos resources.
-// Neither the task or offer should be modified.
-type FitPredicate func(*T, *mesos.Offer) bool
+// Neither the task or offer should be modified. Note that the node can be nil.
+type FitPredicate func(*T, *mesos.Offer, *api.Node) bool
 
 type RequireAllPredicate []FitPredicate
 
-func (f RequireAllPredicate) Fit(t *T, offer *mesos.Offer) bool {
+func (f RequireAllPredicate) Fit(t *T, offer *mesos.Offer, n *api.Node) bool {
 	for _, p := range f {
-		if !p(t, offer) {
+		if !p(t, offer, n) {
 			return false
 		}
 	}
 	return true
 }
 
-func ValidationPredicate(t *T, offer *mesos.Offer) bool {
+func ValidationPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 	return t != nil && offer != nil
 }
 
-func NodeSelectorPredicate(t *T, offer *mesos.Offer) bool {
+func NodeSelectorPredicate(t *T, offer *mesos.Offer, n *api.Node) bool {
 	// if the user has specified a target host, make sure this offer is for that host
 	if t.Pod.Spec.NodeName != "" && offer.GetHostname() != t.Pod.Spec.NodeName {
 		return false
@@ -57,21 +58,18 @@ func NodeSelectorPredicate(t *T, offer *mesos.Offer) bool {
 
 	// check the NodeSelector
 	if len(t.Pod.Spec.NodeSelector) > 0 {
-		slaveLabels := map[string]string{}
-		for _, a := range offer.Attributes {
-			if a.GetType() == mesos.Value_TEXT {
-				slaveLabels[a.GetName()] = a.GetText().GetValue()
-			}
+		if n.Labels == nil {
+			return false
 		}
 		selector := labels.SelectorFromSet(t.Pod.Spec.NodeSelector)
-		if !selector.Matches(labels.Set(slaveLabels)) {
+		if !selector.Matches(labels.Set(n.Labels)) {
 			return false
 		}
 	}
 	return true
 }
 
-func PortsPredicate(t *T, offer *mesos.Offer) bool {
+func PortsPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 	// check ports
 	if _, err := t.mapper.Generate(t, offer); err != nil {
 		log.V(3).Info(err)
@@ -80,7 +78,7 @@ func PortsPredicate(t *T, offer *mesos.Offer) bool {
 	return true
 }
 
-func PodFitsResourcesPredicate(t *T, offer *mesos.Offer) bool {
+func PodFitsResourcesPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 	// find offered cpu and mem
 	var (
 		offeredCpus mresource.CPUShares

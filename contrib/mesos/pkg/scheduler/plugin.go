@@ -543,7 +543,11 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 				defer k.api.Unlock()
 				switch task, state := k.api.tasks().Get(task.ID); state {
 				case podtask.StatePending:
-					return !task.Has(podtask.Launched) && k.api.algorithm().FitPredicate()(task, offer)
+					// Assess fitness of pod with the current offer. The scheduler normally
+					// "backs off" when it can't find an offer that matches up with a pod.
+					// The backoff period for a pod can terminate sooner if an offer becomes
+					// available that matches up.
+					return !task.Has(podtask.Launched) && k.api.algorithm().FitPredicate()(task, offer, nil)
 				default:
 					// no point in continuing to check for matching offers
 					return true
