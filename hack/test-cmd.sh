@@ -702,6 +702,18 @@ __EOF__
   # Post-condition: the error message has "invalid resource" string
   kube::test::if_has_string "${output_message}" 'invalid resource'
 
+  ### Try to generate a service with invalid name (exceeding maximum valid size)
+  # Pre-condition: use --name flag
+  output_message=$(! kubectl expose -f hack/testdata/pod-with-large-name.yaml --name=invalid-large-service-name --port=8081 2>&1 "${kube_flags[@]}")
+  # Post-condition: should fail due to invalid name
+  kube::test::if_has_string "${output_message}" 'metadata.name: invalid value'
+  # Pre-condition: default run without --name flag; should succeed by truncating the inherited name
+  output_message=$(kubectl expose -f hack/testdata/pod-with-large-name.yaml --port=8081 2>&1 "${kube_flags[@]}")
+  # Post-condition: inherited name from pod has been truncated
+  kube::test::if_has_string "${output_message}" '\"kubernetes-serve-hostnam\" exposed'
+  # Clean-up
+  kubectl delete svc kubernetes-serve-hostnam "${kube_flags[@]}"
+
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
