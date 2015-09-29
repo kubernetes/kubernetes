@@ -410,7 +410,6 @@ var _ = Describe("SchedulerPredicates", func() {
 		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
 		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
 		expectNoError(err)
-
 		node, err := c.Nodes().Get(nodeName)
 		expectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
