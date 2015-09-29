@@ -104,13 +104,14 @@ GCE_DEFAULT_SKIP_TESTS=(
     )
 
 # Tests which cannot be run on GKE, e.g. because they require
-# master ssh access.
+# master ssh access or experimental api.
 GKE_REQUIRED_SKIP_TESTS=(
     "Nodes"
     "Etcd\sFailure"
     "MasterCerts"
     "Shell"
     "Daemon\sset"
+    "Deployment"
     )
 
 # The following tests are known to be flaky, and are thus run only in their own
