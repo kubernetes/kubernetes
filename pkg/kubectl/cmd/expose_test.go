@@ -136,7 +136,7 @@ func TestRunExposeService(t *testing.T) {
 			status:   200,
 		},
 		{
-			name: "expose-external-service",
+			name: "expose-service",
 			args: []string{"service", "baz"},
 			ns:   "test",
 			calls: map[string]string{
@@ -168,7 +168,7 @@ func TestRunExposeService(t *testing.T) {
 			status:   200,
 		},
 		{
-			name: "expose-external-affinity-service",
+			name: "expose-affinity-service",
 			args: []string{"service", "baz"},
 			ns:   "test",
 			calls: map[string]string{
@@ -226,9 +226,38 @@ func TestRunExposeService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromInt(90),
 						},
 					},
+					Selector: map[string]string{"svc": "fromexternal"},
 				},
 			},
 			expected: "service \"frombaz\" exposed",
+			status:   200,
+		},
+		{
+			name: "truncate-name",
+			args: []string{"pod", "a-name-that-is-toooo-big-for-a-service"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/pods/a-name-that-is-toooo-big-for-a-service",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+			},
+			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod", "generator": "service/v2"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "a-name-that-is-toooo-big", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Protocol:   api.ProtocolTCP,
+							Port:       90,
+							TargetPort: util.NewIntOrStringFromInt(90),
+						},
+					},
+					Selector: map[string]string{"svc": "frompod"},
+				},
+			},
+			expected: "service \"a-name-that-is-toooo-big\" exposed",
 			status:   200,
 		},
 	}
