@@ -71,7 +71,7 @@ func (e *etcdMasterElector) run(path, id string) {
 				Object: Master(m),
 			}
 		case e := <-errors:
-			glog.Errorf("error in election: %v", e)
+			glog.Errorf("Error in election: %v", e)
 		}
 	}
 }
