@@ -67,6 +67,8 @@ echo "Starting to download all kubernetes godeps. This takes a while"
 preload-dep "github.com/prometheus" "client_golang" "692492e54b553a81013254cc1fba4b6dd76fad30"
 
 "${GODEP}" restore
+#FIXME HACK! workaround for https://github.com/kubernetes/kubernetes/issues/14677
+"${GODEP}" restore
 echo "Download finished"
 
 # copy the contents of your kube directory into the nice clean place
