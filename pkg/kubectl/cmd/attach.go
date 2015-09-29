@@ -160,12 +160,6 @@ func (p *AttachOptions) Run() error {
 		return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
 	}
 
-	containerName := p.ContainerName
-	if len(containerName) == 0 {
-		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-		containerName = pod.Spec.Containers[0].Name
-	}
-
 	// TODO: refactor with terminal helpers from the edit utility once that is merged
 	var stdin io.Reader
 	tty := p.TTY
@@ -218,4 +212,14 @@ func (p *AttachOptions) Run() error {
 	}, api.Scheme)
 
 	return p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
+}
+
+// GetContainerName returns the name of the container to attach to, with a fallback.
+func (p *AttachOptions) GetContainerName(pod *api.Pod) string {
+	if len(p.ContainerName) > 0 {
+		return p.ContainerName
+	}
+
+	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
+	return pod.Spec.Containers[0].Name
 }

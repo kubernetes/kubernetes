@@ -305,12 +305,16 @@ func handleAttachPod(c *client.Client, pod *api.Pod, opts *AttachOptions) error 
 		return err
 	}
 	if status == api.PodSucceeded || status == api.PodFailed {
-		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: pod.Spec.Containers[0].Name}, opts.Out)
+		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: opts.GetContainerName(pod)}, opts.Out)
 	}
 	opts.Client = c
 	opts.PodName = pod.Name
 	opts.Namespace = pod.Namespace
-	return opts.Run()
+	if err := opts.Run(); err != nil {
+		fmt.Fprintf(opts.Out, "Error attaching, falling back to logs: %v\n", err)
+		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: opts.GetContainerName(pod)}, opts.Out)
+	}
+	return nil
 }
 
 func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, error) {
