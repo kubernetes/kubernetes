@@ -22,12 +22,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 func objBody(object interface{}) io.ReadCloser {
@@ -119,22 +119,22 @@ func TestNegotiateVersion(t *testing.T) {
 			expectErr:       false,
 		},
 	}
-	codec := testapi.Default.Codec()
 
 	for _, test := range tests {
-		fakeClient := &fake.RESTClient{
-			Codec: codec,
-			Resp: &http.Response{
-				StatusCode: 200,
-				Body:       objBody(&api.APIVersions{Versions: test.serverVersions}),
-			},
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 200, Body: objBody(&api.APIVersions{Versions: test.serverVersions})}, nil
-			}),
-		}
-		c := unversioned.NewOrDie(test.config)
-		c.Client = fakeClient.Client
-		response, err := unversioned.NegotiateVersion(c, test.config, test.group, test.version, test.clientVersions)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var output []byte
+			var err error
+			output, err = json.Marshal(api.APIVersions{Versions: test.serverVersions})
+			if err != nil {
+				t.Errorf("unexpected encoding error: %v", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		}))
+		test.config.Host = server.URL
+		response, err := unversioned.NegotiateVersion(test.config, test.group, test.version, test.clientVersions)
 		if err == nil && test.expectErr {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

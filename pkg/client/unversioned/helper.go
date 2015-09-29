@@ -17,6 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -186,19 +187,17 @@ func MatchesServerVersion(client *Client, c *Config) error {
 //   in order of preference.
 // - If version is provided and equals the one specified in the Config c, and
 //   the server does not support it, return an error.
-func NegotiateVersion(client *Client, c *Config, group string, version string, clientRegisteredGroupVersions []string) (string, error) {
-	var err error
-	if client == nil {
-		client, err = New(c)
-		if err != nil {
-			return "", err
-		}
-	}
+func NegotiateVersion(c *Config, group string, version string, clientRegisteredGroupVersions []string) (string, error) {
 	clientGroupVersions := sets.String{}
 	for _, v := range clientRegisteredGroupVersions {
 		clientGroupVersions.Insert(v)
 	}
-	apiVersions, err := client.ServerAPIVersions()
+
+	client, err := UnversionedRESTClientFor(c)
+	if err != nil {
+		return "", err
+	}
+	apiVersions, err := ServerAPIVersions(client)
 	if err != nil {
 		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
@@ -400,6 +399,60 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	return client, nil
 }
 
+// UnversionedRESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
+// object, just like what RESTCLinetForDoes, but ignores the GroupVersion, Codec, and Prefix field.
+func UnversionedRESTClientFor(c *Config) (*RESTClient, error) {
+	// TODO: have a better config copy method
+	config := *c
+	config.GroupVersion = ""
+	config.Codec = nil
+	config.Prefix = ""
+	baseURL, err := defaultServerUrlFor(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	client := NewRESTClient(baseURL, config.GroupVersion, config.Codec, config.QPS, config.Burst)
+
+	transport, err := TransportFor(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	if transport != http.DefaultTransport {
+		client.Client = &http.Client{Transport: transport}
+	}
+	return client, nil
+}
+
+// ServerAPIVersions returns the GroupVersions supported by the API server of the RESTClient
+func ServerAPIVersions(c *RESTClient) (groupVersions []string, err error) {
+	// Get the groupVersions exposed at /api
+	body, err := c.Get().UnversionedPath("api").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var v api.APIVersions
+	err = json.Unmarshal(body, &v)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	groupVersions = append(groupVersions, v.Versions...)
+	// Get the groupVersions exposed at /apis
+	body, err = c.Get().UnversionedPath("apis").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var apiGroupList api.APIGroupList
+	err = json.Unmarshal(body, &apiGroupList)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+
+	return groupVersions, nil
+}
+
 var (
 	// tlsTransports stores reusable round trippers with custom TLSClientConfig options
 	tlsTransports = map[string]*http.Transport{}
@@ -530,9 +583,6 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	if version == "" {
-		return nil, fmt.Errorf("version must be set")
 	}
 	base := host
 	hostURL, err := url.Parse(base)

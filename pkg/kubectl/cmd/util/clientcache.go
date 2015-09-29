@@ -63,7 +63,7 @@ func (c *ClientCache) ClientConfigForVersion(group, version string) (*client.Con
 	}
 	// TODO: have a better config copy method
 	config := *c.defaultConfig[group]
-	negotiatedGroupVersion, err := client.NegotiateVersion(c.defaultClient, &config, group, version, registered.RegisteredVersions)
+	negotiatedGroupVersion, err := client.NegotiateVersion(&config, group, version, registered.RegisteredVersions)
 	if err != nil {
 		return nil, err
 	}
