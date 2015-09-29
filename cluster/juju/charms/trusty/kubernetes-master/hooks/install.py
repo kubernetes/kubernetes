@@ -85,7 +85,7 @@ def clone_repository():
 def install_packages():
     """
     Install required packages to build the k8s source, and syndicate between
-    minion nodes. In addition, fetch pip to handle python dependencies
+    node nodes. In addition, fetch pip to handle python dependencies
     """
     hookenv.log('Installing Debian packages')
     # Create the list of packages to install.

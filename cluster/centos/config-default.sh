@@ -19,16 +19,16 @@
 export MASTER=${MASTER:-"centos@172.10.0.11"}
 export MASTER_IP=${MASTER#*@}
 
-# Define all your minion nodes,
+# Define all your node nodes,
 # And separated with blank space like <user_1@ip_1> <user_2@ip_2> <user_3@ip_3>.
 # The user should have sudo privilege
-export MINIONS=${MINIONS:-"centos@172.10.0.12 centos@172.10.0.13"}
+export NODES=${NODES:-"centos@172.10.0.12 centos@172.10.0.13"}
 # If it practically impossible to set an array as an environment variable
 # from a script, so assume variable is a string then convert it to an array
-export MINIONS_ARRAY=($MINIONS)
+export NODES_ARRAY=($NODES)
 
 # Number of nodes in your cluster.
-export NUM_MINIONS=${NUM_MINIONS:-2}
+export NUM_NODES=${NUM_NODES:-2}
 
 # By default, the cluster will use the etcd installed on master.
 export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:4001"}
@@ -48,5 +48,5 @@ export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,ServiceA
 export DOCKER_OPTS=${DOCKER_OPTS:-""} 
 
 
-# Timeouts for process checking on master and minion
+# Timeouts for process checking on master and node
 export PROCESS_CHECK_TIMEOUT=${PROCESS_CHECK_TIMEOUT:-180} # seconds.

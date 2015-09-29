@@ -17,14 +17,14 @@
 
 # A library of common helper functions for Ubuntus & Debians.
 
-function detect-minion-image() {
-  if [[ -z "${KUBE_MINION_IMAGE=-}" ]]; then
+function detect-node-image() {
+  if [[ -z "${KUBE_NODE_IMAGE=-}" ]]; then
     detect-image
-    KUBE_MINION_IMAGE=$AWS_IMAGE
+    KUBE_NODE_IMAGE=$AWS_IMAGE
   fi
 }
 
-function generate-minion-user-data {
+function generate-node-user-data {
   # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
   echo "#! /bin/bash"
   echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
@@ -35,12 +35,12 @@ function generate-minion-user-data {
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
 }
 
-function check-minion() {
-  local minion_ip=$1
+function check-node() {
+  local node_ip=$1
 
-  local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@$minion_ip sudo docker ps -a 2>/dev/null)
+  local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@$node_ip sudo docker ps -a 2>/dev/null)
   if [[ -z "${output}" ]]; then
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@$minion_ip sudo service docker start > $LOG 2>&1
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@$node_ip sudo service docker start > $LOG 2>&1
     echo "not working yet"
   else
     echo "working"

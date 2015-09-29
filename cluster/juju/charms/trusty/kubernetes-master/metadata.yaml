@@ -12,7 +12,7 @@ tags:
 provides:
   client-api:
     interface: kubernetes-client
-  minions-api:
+  nodes-api:
     interface: kubernetes-api
 requires:
   etcd:

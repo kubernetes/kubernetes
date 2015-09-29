@@ -28,8 +28,8 @@ The controlling unit in a Kubernetes cluster is called the master.  It is the
 main management contact point providing many management services for the worker
 nodes.
 
-### Kubernetes minion
-The servers that perform the work are known as minions.  Minions must be able to
+### Kubernetes node
+The servers that perform the work are known as nodes.  Nodes must be able to
 communicate with the master and run the workloads that are assigned to them.
 
 
@@ -77,7 +77,7 @@ The command above does few things for you:
   deployment environment (machine 0).
 - Deploys the Juju GUI to your environment onto the bootstrap node.
 - Provisions 4 machines, and deploys the Kubernetes services on top of
-  them (Kubernetes-master, two Kubernetes minions using flannel, and etcd).
+  them (Kubernetes-master, two Kubernetes nodes using flannel, and etcd).
 - Orchestrates the relations among the services, and exits.
 
 Now you should have a running Kubernetes. Run `juju status

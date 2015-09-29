@@ -33,7 +33,7 @@ coreos:
         EnvironmentFile=/etc/kube-env
         ExecStart=/run/setup-hostname-override.sh
 
-    - name: kubernetes-install-minion.service
+    - name: kubernetes-install-node.service
       command: start
       content: |
         [Unit]
@@ -54,8 +54,8 @@ coreos:
       content: |
         [Unit]
         Description=Run Kubelet service
-        Requires=kubernetes-install-minion.service
-        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-node.service
+        After=kubernetes-install-node.service
         Requires=hostname-override.service
         After=hostname-override.service
 
@@ -82,8 +82,8 @@ coreos:
       content: |
         [Unit]
         Description=Start Kube-proxy service as Daemon
-        Requires=kubernetes-install-minion.service
-        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-node.service
+        After=kubernetes-install-node.service
         Requires=kubernetes-install-rkt.service
         After=kubernetes-install-rkt.service
         [Service]

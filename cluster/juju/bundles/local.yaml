@@ -48,6 +48,6 @@ kubernetes-local:
       - "kubernetes:etcd"
     - - "etcd:client"
       - "kubernetes-master:etcd"
-    - - "kubernetes-master:minions-api"
+    - - "kubernetes-master:nodes-api"
       - "kubernetes:api"
   series: trusty

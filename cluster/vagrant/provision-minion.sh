@@ -70,7 +70,7 @@ EOF
 
 # Set the host name explicitly
 # See: https://github.com/mitchellh/vagrant/issues/2430
-hostnamectl set-hostname ${MINION_NAME}
+hostnamectl set-hostname ${NODE_NAME}
 
 if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
   # Workaround to vagrant inability to guess interface naming sequence
@@ -94,20 +94,20 @@ if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
   echo "Adding $MASTER_NAME to hosts file"
   echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 fi
-echo "$MINION_IP $MINION_NAME" >> /etc/hosts
+echo "$NODE_IP $NODE_NAME" >> /etc/hosts
 
-# Setup hosts file to support ping by hostname to each minion in the cluster
-for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-  minion=${MINION_NAMES[$i]}
-  ip=${MINION_IPS[$i]}
-  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
-    echo "Adding $minion to hosts file"
-    echo "$ip $minion" >> /etc/hosts
+# Setup hosts file to support ping by hostname to each node in the cluster
+for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+  node=${NODE_NAMES[$i]}
+  ip=${NODE_IPS[$i]}
+  if [ ! "$(cat /etc/hosts | grep $node)" ]; then
+    echo "Adding $node to hosts file"
+    echo "$ip $node" >> /etc/hosts
   fi
 done
 
 # Configure network
-provision-network-minion
+provision-network-node
 
 # Placeholder for any other manifests that may be per-node.
 mkdir -p /etc/kubernetes/manifests
@@ -145,13 +145,13 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   cloud: vagrant
   network_mode: openvswitch
-  node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  node_ip: '$(echo "$NODE_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: '$(echo "$NETWORK_IF_NAME" | sed -e "s/'/''/g")'
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
-  hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  hostname_override: '$(echo "$NODE_IP" | sed -e "s/'/''/g")'
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 
