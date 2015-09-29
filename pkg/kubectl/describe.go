@@ -1260,7 +1260,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 			hpa.Spec.Target.Resource)
 		fmt.Fprintf(out, "Current resource consumption:\t")
 
-		if hpa.Status != nil && hpa.Status.CurrentConsumption != nil {
+		if hpa.Status.CurrentConsumption != nil {
 			fmt.Fprintf(out, "%s %s\n",
 				hpa.Status.CurrentConsumption.Quantity.String(),
 				hpa.Status.CurrentConsumption.Resource)
