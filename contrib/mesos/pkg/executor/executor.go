@@ -168,6 +168,9 @@ func New(config Config) *KubernetesExecutor {
 	}
 
 	// watch pods from the given pod ListWatch
+	if config.PodLW == nil {
+		log.Fatal("cannot create executor with nil PodLW")
+	}
 	_, k.podController = framework.NewInformer(config.PodLW, &api.Pod{}, podRelistPeriod, &framework.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*api.Pod)
