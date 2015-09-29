@@ -1,33 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/development.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -35,7 +7,7 @@ Documentation for other releases can be found at
 
 # Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/v1.1.0/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -347,7 +319,7 @@ The conformance test runs a subset of the e2e-tests against a manually-created c
 require support for up/push/down and other operations.  To run a conformance test, you need to know the
 IP of the master for your cluster and the authorization arguments to use.  The conformance test is
 intended to run against a cluster at a specific binary release of Kubernetes.
-See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
+See [conformance-test.sh](http://releases.k8s.io/v1.1.0/hack/conformance-test.sh).
 
 ## Testing out flaky tests
 
@@ -358,6 +330,13 @@ See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
 ```sh
 hack/update-generated-docs.sh
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+  <!-- TAG IS_VERSIONED -->
+  <!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

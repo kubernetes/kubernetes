@@ -1,33 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/admin/cluster-components.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -97,17 +69,17 @@ selects a node for them to run on.
 Addons are pods and services that implement cluster features. They don't run on
 the master VM, but currently the default setup scripts that make the API calls
 to create these pods and services does run on the master VM. See:
-[kube-master-addons](http://releases.k8s.io/HEAD/cluster/saltbase/salt/kube-master-addons/kube-master-addons.sh)
+[kube-master-addons](http://releases.k8s.io/v1.1.0/cluster/saltbase/salt/kube-master-addons/kube-master-addons.sh)
 
 Addon objects are created in the "kube-system" namespace.
 
 Example addons are:
-* [DNS](http://releases.k8s.io/HEAD/cluster/addons/dns/) provides cluster local DNS.
-* [kube-ui](http://releases.k8s.io/HEAD/cluster/addons/kube-ui/) provides a graphical UI for the
+* [DNS](http://releases.k8s.io/v1.1.0/cluster/addons/dns/) provides cluster local DNS.
+* [kube-ui](http://releases.k8s.io/v1.1.0/cluster/addons/kube-ui/) provides a graphical UI for the
   cluster.
-* [fluentd-elasticsearch](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/) provides
-  log storage. Also see the [gcp version](http://releases.k8s.io/HEAD/cluster/addons/fluentd-gcp/).
-* [cluster-monitoring](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/) provides
+* [fluentd-elasticsearch](http://releases.k8s.io/v1.1.0/cluster/addons/fluentd-elasticsearch/) provides
+  log storage. Also see the [gcp version](http://releases.k8s.io/v1.1.0/cluster/addons/fluentd-gcp/).
+* [cluster-monitoring](http://releases.k8s.io/v1.1.0/cluster/addons/cluster-monitoring/) provides
   monitoring for the cluster.
 
 ## Node components
@@ -145,6 +117,13 @@ network rules on the host and performing connection forwarding.
 
 `monit` is a lightweight process babysitting system for keeping kubelet and docker
 running.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+  <!-- TAG IS_VERSIONED -->
+  <!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
