@@ -139,7 +139,7 @@ type Config struct {
 	ExitFunc             func(int)
 	PodStatusFunc        func(KubeletInterface, *api.Pod) (*api.PodStatus, error)
 	StaticPodsConfigPath string
-	PodLW                cache.ListerWatcher
+	PodLW                cache.ListerWatcher // mandatory, otherwise initialiation will panic
 	LaunchGracePeriod    time.Duration
 }
 
@@ -172,6 +172,10 @@ func New(config Config) *KubernetesExecutor {
 	}
 
 	// watch pods from the given pod ListWatch
+	if config.PodLW == nil {
+		// fail early to make debugging easier
+		panic("cannot create executor with nil PodLW")
+	}
 	_, k.podController = framework.NewInformer(config.PodLW, &api.Pod{}, podRelistPeriod, &framework.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*api.Pod)

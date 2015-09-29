@@ -57,12 +57,7 @@ import (
 // after Register is called.
 func TestExecutorRegister(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	updates := make(chan interface{}, 1024)
-	executor := New(Config{
-		Docker:     dockertools.ConnectToDockerOrDie("fake://"),
-		Updates:    updates,
-		SourceName: "executor_test",
-	})
+	executor, updates := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
@@ -95,7 +90,7 @@ func TestExecutorRegister(t *testing.T) {
 // connected after a call to Disconnected has occurred.
 func TestExecutorDisconnect(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
@@ -110,7 +105,7 @@ func TestExecutorDisconnect(t *testing.T) {
 // after a connection problem happens, followed by a call to Reregistered.
 func TestExecutorReregister(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
@@ -166,6 +161,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 				Phase: api.PodRunning,
 			}, nil
 		},
+		PodLW: &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 
@@ -330,6 +326,7 @@ func TestExecutorStaticPods(t *testing.T) {
 			}, nil
 		},
 		StaticPodsConfigPath: staticPodsConfigPath,
+		PodLW:                &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 	hostname := "h1"
@@ -417,6 +414,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 			close(kubeletFinished)
 		},
 		KubeletFinished: kubeletFinished,
+		PodLW:           &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 
@@ -579,6 +577,7 @@ func TestExecutorShutdown(t *testing.T) {
 		ExitFunc: func(_ int) {
 			atomic.AddInt32(&exitCalled, 1)
 		},
+		PodLW: &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 
@@ -608,7 +607,7 @@ func TestExecutorShutdown(t *testing.T) {
 
 func TestExecutorsendFrameworkMessage(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
