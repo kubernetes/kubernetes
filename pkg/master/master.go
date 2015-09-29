@@ -955,7 +955,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 // experimental returns the resources and codec for the experimental api
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
-	controllerStorage := expcontrolleretcd.NewStorage(c.ExpDatabaseStorage)
+	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
 	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
