@@ -6,7 +6,7 @@
 
 package main
 
-// Download http://encoding.spec.whatwg.org/encodings.json and use it to
+// Download https://encoding.spec.whatwg.org/encodings.json and use it to
 // generate table.go.
 
 import (
@@ -27,7 +27,7 @@ type group struct {
 	Heading   string
 }
 
-const specURL = "http://encoding.spec.whatwg.org/encodings.json"
+const specURL = "https://encoding.spec.whatwg.org/encodings.json"
 
 func main() {
 	resp, err := http.Get(specURL)
