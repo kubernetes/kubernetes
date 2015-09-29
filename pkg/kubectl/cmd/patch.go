@@ -19,9 +19,11 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -66,6 +68,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
+	cmd.Flags().Int("max-retries", 3, "The number of times to retry the patch if a resource update conflict occurs.")
 	cmd.MarkFlagRequired("patch")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 
@@ -114,9 +117,24 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, []byte(patch))
-	if err != nil {
-		return err
+	retries := 0
+	wait := time.Second
+	maxRetries := cmdutil.GetFlagInt(cmd, "max-retries")
+	for {
+		_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, []byte(patch))
+		if err != nil {
+			if !errors.IsConflict(err) {
+				return err
+			}
+			retries++
+			if retries >= maxRetries {
+				return fmt.Errorf("unable to patch after %d retries (%v)", retries, err)
+			}
+			time.Sleep(wait)
+			wait *= 2
+			continue
+		}
+		break
 	}
 	cmdutil.PrintSuccess(mapper, shortOutput, out, "", name, "patched")
 	return nil
