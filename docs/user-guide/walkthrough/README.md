@@ -169,8 +169,8 @@ spec:
 <!-- END MUNGE: EXAMPLE pod-redis.yaml -->
 
 Notes:
-- The volume mount name is a reference to a specific empty dir volume.
-- The volume mount path is the path to mount the empty dir volume within the container.
+- The `volumeMounts` `name` is a reference to a specific  `volumes` `name`.
+- The `volumeMounts` `mountPath` is the path to mount the volume within the container.
 
 ##### Volume Types
 
