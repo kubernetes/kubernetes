@@ -123,7 +123,7 @@ func (f *ConfigFactory) Create() (*scheduler.Config, error) {
 
 // Creates a scheduler from the name of a registered algorithm provider.
 func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
-	glog.V(2).Infof("creating scheduler from algorithm provider '%v'", providerName)
+	glog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 
 // Creates a scheduler from the configuration file
 func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
-	glog.V(2).Infof("creating scheduler from configuration: %v", policy)
+	glog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
 	if err := validation.ValidatePolicy(policy); err != nil {
