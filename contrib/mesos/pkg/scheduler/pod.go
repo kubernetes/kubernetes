@@ -78,8 +78,3 @@ func (p *Pod) String() string {
 	}
 	return fmt.Sprintf("{pod:%v, deadline:%v, delay:%v}", p.Pod.Name, displayDeadline, p.GetDelay())
 }
-
-func (p *Pod) InGracefulTermination() bool {
-	return p.Pod.DeletionTimestamp != nil &&
-		p.Pod.DeletionGracePeriodSeconds != nil && *p.Pod.DeletionGracePeriodSeconds > 0
-}
