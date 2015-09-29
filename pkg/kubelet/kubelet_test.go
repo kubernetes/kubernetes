@@ -1755,44 +1755,30 @@ func getNotReadyStatus(cName string) api.ContainerStatus {
 		Ready: false,
 	}
 }
-func getReadyCondition(status api.ConditionStatus, transitionTime unversioned.Time, reason, message string) []api.PodCondition {
+func getReadyCondition(status api.ConditionStatus, reason, message string) []api.PodCondition {
 	return []api.PodCondition{{
-		Type:   api.PodReady,
-		Status: status,
+		Type:    api.PodReady,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
 	}}
 }
 
 func TestGetPodReadyCondition(t *testing.T) {
-	transitionTime := unversioned.Now()
 	tests := []struct {
 		spec              *api.PodSpec
 		containerStatuses []api.ContainerStatus
-		existingStatus    *api.PodStatus
 		expected          []api.PodCondition
-		clearTimestamp    bool
 	}{
 		{
 			spec:              nil,
 			containerStatuses: nil,
-			existingStatus:    nil,
-			expected:          getReadyCondition(api.ConditionFalse, transitionTime, "UnknownContainerStatuses", ""),
-			clearTimestamp:    true,
-		},
-		{
-			spec:              nil,
-			containerStatuses: nil,
-			existingStatus: &api.PodStatus{
-				Conditions: getReadyCondition(api.ConditionFalse, transitionTime, "", ""),
-			},
-			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "UnknownContainerStatuses", ""),
-			clearTimestamp: false,
+			expected:          getReadyCondition(api.ConditionFalse, "UnknownContainerStatuses", ""),
 		},
 		{
 			spec:              &api.PodSpec{},
 			containerStatuses: []api.ContainerStatus{},
-			existingStatus:    nil,
-			expected:          getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
-			clearTimestamp:    true,
+			expected:          getReadyCondition(api.ConditionTrue, "", ""),
 		},
 		{
 			spec: &api.PodSpec{
@@ -1801,22 +1787,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 				},
 			},
 			containerStatuses: []api.ContainerStatus{},
-			existingStatus:    nil,
-			expected:          getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unknown status: [1234]"),
-			clearTimestamp:    true,
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-			},
-			existingStatus: nil,
-			expected:       getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
-			clearTimestamp: true,
+			expected:          getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unknown status: [1234]"),
 		},
 		{
 			spec: &api.PodSpec{
@@ -1829,9 +1800,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 				getReadyStatus("1234"),
 				getReadyStatus("5678"),
 			},
-			existingStatus: nil,
-			expected:       getReadyCondition(api.ConditionTrue, transitionTime, "", ""),
-			clearTimestamp: true,
+			expected: getReadyCondition(api.ConditionTrue, "", ""),
 		},
 		{
 			spec: &api.PodSpec{
@@ -1843,9 +1812,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 			containerStatuses: []api.ContainerStatus{
 				getReadyStatus("1234"),
 			},
-			existingStatus: nil,
-			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unknown status: [5678]"),
-			clearTimestamp: true,
+			expected: getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unknown status: [5678]"),
 		},
 		{
 			spec: &api.PodSpec{
@@ -1858,18 +1825,12 @@ func TestGetPodReadyCondition(t *testing.T) {
 				getReadyStatus("1234"),
 				getNotReadyStatus("5678"),
 			},
-			expected:       getReadyCondition(api.ConditionFalse, transitionTime, "ContainersNotReady", "containers with unready status: [5678]"),
-			clearTimestamp: true,
+			expected: getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unready status: [5678]"),
 		},
 	}
 
 	for i, test := range tests {
-		condition := getPodReadyCondition(test.spec, test.containerStatuses, test.existingStatus)
-		if test.clearTimestamp {
-			condition[0].LastTransitionTime = transitionTime
-			test.expected[0].LastTransitionTime = transitionTime
-		}
-		condition[0].LastProbeTime = unversioned.Time{}
+		condition := getPodReadyCondition(test.spec, test.containerStatuses)
 		if !reflect.DeepEqual(condition, test.expected) {
 			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
 		}

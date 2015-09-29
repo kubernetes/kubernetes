@@ -80,9 +80,9 @@ func IsPodReadyConditionTrue(status PodStatus) bool {
 // Extracts the pod ready condition from the given status and returns that.
 // Returns nil if the condition is not present.
 func GetPodReadyCondition(status PodStatus) *PodCondition {
-	for _, c := range status.Conditions {
+	for i, c := range status.Conditions {
 		if c.Type == PodReady {
-			return &c
+			return &status.Conditions[i]
 		}
 	}
 	return nil
