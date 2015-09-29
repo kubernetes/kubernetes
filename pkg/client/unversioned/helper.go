@@ -188,24 +188,6 @@ func MatchesServerVersion(client *Client, c *Config) error {
 // - If version is provided and equals the one specified in the Config c, and
 //   the server does not support it, return an error.
 func NegotiateVersion(c *Config, group string, version string, clientRegisteredGroupVersions []string) (string, error) {
-	clientGroupVersions := sets.String{}
-	for _, v := range clientRegisteredGroupVersions {
-		clientGroupVersions.Insert(v)
-	}
-
-	client, err := UnversionedRESTClientFor(c)
-	if err != nil {
-		return "", err
-	}
-	apiVersions, err := ServerAPIVersions(client)
-	if err != nil {
-		return "", fmt.Errorf("couldn't read version from server: %v", err)
-	}
-	serverGroupVersions := sets.String{}
-	for _, v := range apiVersions {
-		serverGroupVersions.Insert(v)
-	}
-
 	// configVersion is the version specified for this group in the Config.
 	// It's expected to be "" if the group is not specified in the Config.
 	var configVersion string
@@ -222,19 +204,41 @@ func NegotiateVersion(c *Config, group string, version string, clientRegisteredG
 		version = configVersion
 	}
 
+	clientGroupVersions := sets.String{}
+	for _, v := range clientRegisteredGroupVersions {
+		if apiutil.GetGroup(v) == group {
+			clientGroupVersions.Insert(v)
+		}
+	}
+
+	client, err := UnversionedRESTClientFor(c)
+	if err != nil {
+		return "", err
+	}
+	apiVersions, err := ServerAPIVersions(client)
+	if err != nil {
+		return "", fmt.Errorf("couldn't read version from server: %v", err)
+	}
+	serverGroupVersions := sets.String{}
+	for _, v := range apiVersions {
+		if apiutil.GetGroup(v) == group {
+			serverGroupVersions.Insert(v)
+		}
+	}
+
 	// If version explicitly requested verify that both client and server support it.
 	// If server does not support warn, but try to negotiate a lower version.
 	if len(version) != 0 {
 		groupVersion := apiutil.GetGroupVersion(group, version)
 		if !clientGroupVersions.Has(groupVersion) {
-			return "", fmt.Errorf("Client does not support API version '%s'. Client supported API versions: %v", groupVersion, clientGroupVersions)
+			return "", fmt.Errorf("Client does not support API version '%s'. Client-supported API versions for group %s: %v", groupVersion, group, clientGroupVersions)
 		}
 		if serverGroupVersions.Has(groupVersion) {
 			return groupVersion, nil
 		}
 		// If we are using an explicit config version the server does not support, fail.
 		if version == configVersion && version != "" {
-			return "", fmt.Errorf("Server does not support API version '%s'.", version)
+			return "", fmt.Errorf("Server does not support API version '%s'. Server-suppported API versions for group %s: %v .", groupVersion, group, serverGroupVersions)
 		}
 	}
 
