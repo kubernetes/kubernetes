@@ -96,7 +96,16 @@ function trap-add {
 function validate-cluster() {
   # by default call the generic validate-cluster.sh script, customizable by
   # any cluster provider if this does not fit.
+  set +e
   "${KUBE_ROOT}/cluster/validate-cluster.sh"
+  if [[ "$?" -ne "0" ]]; then
+    troubleshoot-master
+    for minion in ${MINIONS}; do
+      troubleshoot-minion ${minion}
+    done
+    exit 1
+  fi
+  set -e
 }
 
 # Instantiate a kubernetes cluster
@@ -105,11 +114,6 @@ function kube-up() {
 
   for minion in ${MINIONS}; do
     provision-minion ${minion}
-  done
-
-  verify-master
-  for minion in ${MINIONS}; do
-    verify-minion ${minion}
   done
 
   detect-master
@@ -132,58 +136,42 @@ function kube-down() {
   done
 }
 
-
-function verify-master() {
-  # verify master has all required daemons
-  printf "[INFO] Validating master ${MASTER}"
+function troubleshoot-master() {
+  # Troubleshooting on master if all required daemons are active.
+  echo "[INFO] Troubleshooting on master ${MASTER}"
   local -a required_daemon=("kube-apiserver" "kube-controller-manager" "kube-scheduler")
-  local validated="1"
-  local try_count=0
-  until [[ "$validated" == "0" ]]; do
-    validated="0"
-    local daemon
-    for daemon in "${required_daemon[@]}"; do
-      local rc=0
-      kube-ssh "${MASTER}" "sudo pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
-      if [[ "${rc}" -ne "0" ]]; then
-        printf "."
-        validated="1"
-        ((try_count=try_count+2))
-        if [[ ${try_count} -gt ${PROCESS_CHECK_TIMEOUT} ]]; then
-          printf "\nWarning: Process \"${daemon}\" failed to run on ${MASTER}, please check.\n"
-          exit 1
-        fi
-        sleep 2
-      fi
-    done
+  local daemon
+  local daemon_status
+  printf "%-24s %-10s \n" "PROCESS" "STATUS"
+  for daemon in "${required_daemon[@]}"; do
+    local rc=0
+    kube-ssh "${MASTER}" "sudo systemctl is-active ${daemon}" >/dev/null 2>&1 || rc="$?"
+    if [[ "${rc}" -ne "0" ]]; then
+      daemon_status="inactive"
+    else
+      daemon_status="active"
+    fi
+    printf "%-24s %s\n" ${daemon} ${daemon_status}
   done
   printf "\n"
-
 }
 
-function verify-minion() {
-  # verify minion has all required daemons
-  printf "[INFO] Validating minion ${1}"
-  local -a required_daemon=("kube-proxy" "kubelet" "docker")
-  local validated="1"
-  local try_count=0
-  until [[ "$validated" == "0" ]]; do
-    validated="0"
-    local daemon
-    for daemon in "${required_daemon[@]}"; do
-      local rc=0
-      kube-ssh "${1}" "sudo pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
-      if [[ "${rc}" -ne "0" ]]; then
-        printf "."
-        validated="1"
-        ((try_count=try_count+2))
-        if [[ ${try_count} -gt ${PROCESS_CHECK_TIMEOUT} ]] ; then
-          printf "\nWarning: Process \"${daemon}\" failed to run on ${1}, please check.\n"
-          exit 1
-        fi
-        sleep 2
-      fi
-    done
+function troubleshoot-minion() {
+  # Troubleshooting on minion if all required daemons are active.
+  echo "[INFO] Troubleshooting on minion ${1}"
+  local -a required_daemon=("kube-proxy" "kubelet" "docker" "flannel")
+  local daemon
+  local daemon_status
+  printf "%-24s %-10s \n" "PROCESS" "STATUS"
+  for daemon in "${required_daemon[@]}"; do
+    local rc=0
+    kube-ssh "${1}" "sudo systemctl is-active ${daemon}" >/dev/null 2>&1 || rc="$?"
+    if [[ "${rc}" -ne "0" ]]; then
+      daemon_status="inactive"
+    else
+      daemon_status="active"
+    fi
+    printf "%-24s %s\n" ${daemon} ${daemon_status}
   done
   printf "\n"
 }
