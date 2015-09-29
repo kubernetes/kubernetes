@@ -175,10 +175,10 @@ func TestTryOrdering(t *testing.T) {
 		order = append(order, value.Value)
 		return true, 0
 	})
-	if !reflect.DeepEqual(order, []string{"first", "third", "second"}) {
+	if !reflect.DeepEqual(order, []string{"first", "third"}) {
 		t.Fatalf("order was wrong: %v", order)
 	}
-	if count != 4 {
+	if count != 3 {
 		t.Fatalf("unexpected iterations: %d", count)
 	}
 }

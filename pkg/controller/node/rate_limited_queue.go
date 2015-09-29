@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -163,16 +164,14 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.CanAccept() {
+			glog.V(10).Info("Try rate limitted...")
 			// Try again later
 			break
 		}
 
 		now := now()
 		if now.Before(val.ProcessAt) {
-			q.queue.Replace(val)
-			val, ok = q.queue.Head()
-			// we do not sleep here because other values may be added at the front of the queue
-			continue
+			break
 		}
 
 		if ok, wait := fn(val); !ok {
