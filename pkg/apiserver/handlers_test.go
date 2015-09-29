@@ -66,9 +66,16 @@ func TestMaxInFlight(t *testing.T) {
 
 	re := regexp.MustCompile("[.*\\/watch][^\\/proxy.*]")
 
+	// Calls verifies that the server is actually blocked up before running the rest of the test
+	calls := &sync.WaitGroup{}
+	calls.Add(Iterations * 3)
+
 	server := httptest.NewServer(MaxInFlightLimit(sem, re, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "dontwait") {
 			return
+		}
+		if calls != nil {
+			calls.Done()
 		}
 		block.Wait()
 	})))
@@ -81,6 +88,7 @@ func TestMaxInFlight(t *testing.T) {
 			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
 		}()
 	}
+
 	for i := 0; i < Iterations; i++ {
 		// These should hang waiting on block...
 		go func() {
@@ -95,15 +103,17 @@ func TestMaxInFlight(t *testing.T) {
 			expectHTTP(server.URL, http.StatusOK, t)
 		}()
 	}
-	// There's really no more elegant way to do this.  I could use a WaitGroup, but even then
-	// it'd still be racy.
-	time.Sleep(1 * time.Second)
-	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
+	calls.Wait()
+	calls = nil
 
 	// Do this multiple times to show that it rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
 		expectHTTP(server.URL, errors.StatusTooManyRequests, t)
 	}
+
+	// Validate that non-accounted URLs still work
+	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
+
 	block.Done()
 
 	// Show that we recover from being blocked up.
