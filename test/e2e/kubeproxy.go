@@ -67,7 +67,10 @@ var _ = Describe("KubeProxy", func() {
 	config := &KubeProxyTestConfig{
 		f: f,
 	}
+
 	It("should test kube-proxy", func() {
+		SkipUnlessProviderIs(providersWithSSH...)
+
 		By("cleaning up any pre-existing namespaces used by this test")
 		config.cleanup()
 
@@ -163,7 +166,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 }
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
-	node1_IP := strings.TrimSuffix(config.nodes[0], ":22")
+	node1_IP := config.nodes[0]
 	tries := epCount*epCount + 5 // + 10 if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
@@ -187,7 +190,7 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	By("Test disabled. dialing(http) node --> 127.0.0.1:nodeHttpPort")
 	//config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
 
-	node2_IP := strings.TrimSuffix(config.nodes[1], ":22")
+	node2_IP := config.nodes[1]
 	By("dialing(udp) node1 --> node2:nodeUdpPort")
 	config.dialFromNode("udp", node2_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1 --> node2:nodeHttpPort")
@@ -248,7 +251,7 @@ func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targe
 }
 
 func (config *KubeProxyTestConfig) ssh(cmd string) string {
-	stdout, _, code, err := SSH(cmd, config.nodes[0], testContext.Provider)
+	stdout, _, code, err := SSH(cmd, config.nodes[0]+":22", testContext.Provider)
 	Expect(err).NotTo(HaveOccurred(), "error while SSH-ing to node: %v (code %v)", err, code)
 	Expect(code).Should(BeZero(), "command exited with non-zero code %v. cmd:%s", code, cmd)
 	return stdout
@@ -420,10 +423,10 @@ func (config *KubeProxyTestConfig) setup() {
 	By("Getting ssh-able hosts")
 	hosts, err := NodeSSHHosts(config.f.Client)
 	Expect(err).NotTo(HaveOccurred())
-	if len(hosts) == 0 {
-		Failf("No ssh-able nodes")
+	config.nodes = make([]string, 0, len(hosts))
+	for _, h := range hosts {
+		config.nodes = append(config.nodes, strings.TrimSuffix(h, ":22"))
 	}
-	config.nodes = hosts
 
 	if enableLoadBalancerTest {
 		By("Creating the LoadBalancer Service on top of the pods in kubernetes")
