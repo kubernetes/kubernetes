@@ -208,11 +208,11 @@ this example).
 Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
 watches the Kubernetes master for the addition and removal of `Service`
 and `Endpoints` objects. For each `Service` it opens a port (randomly chosen)
-on the local node.  Any connections made to that port will be proxied to one of
-the corresponding backend `Pods`.  Which backend to use is decided based on the
+on the local node.  Any connections to `service`  port will be proxied to one of
+the corresponding backend `Pods`.  Which backend `Pod`  to use is decided based on the
 `SessionAffinity` of the `Service`.  Lastly, it installs iptables rules which
-capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` and
-redirects that traffic to the previously described port.
+capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` then
+redirects that traffic to the backend `Pod` (`Endpoints`).
 
 The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
