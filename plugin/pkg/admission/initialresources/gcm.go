@@ -23,9 +23,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 
-	gcm "github.com/google/google-api-go-client/cloudmonitoring/v2beta2"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	gcm "google.golang.org/api/cloudmonitoring/v2beta2"
 	gce "google.golang.org/cloud/compute/metadata"
 )
 
