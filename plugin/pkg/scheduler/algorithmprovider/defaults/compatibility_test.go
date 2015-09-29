@@ -69,11 +69,16 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		// Do not change this JSON after 1.1 is tagged. A failure indicates backwards compatibility with 1.1 was broken.
 		"1.1": {
 			JSON: `{
-		  "priorities": [
+		  "predicates": [
+		    {"name": "PodFitsHostPorts"}
+		  ],"priorities": [
 		    {"name": "SelectorSpreadPriority",   "weight": 2}
 		  ]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "PodFitsHostPorts"},
+				},
 				Priorities: []schedulerapi.PriorityPolicy{
 					{Name: "SelectorSpreadPriority", Weight: 2},
 				},

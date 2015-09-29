@@ -356,7 +356,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 	return affinitySelector.Matches(labels.Set(node.Labels)), nil
 }
 
-func PodFitsPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func PodFitsHostPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	existingPorts := getUsedPorts(existingPods...)
 	wantPorts := getUsedPorts(pod)
 	for wport := range wantPorts {
