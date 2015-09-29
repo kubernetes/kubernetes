@@ -17,6 +17,7 @@ limitations under the License.
 package replicationcontroller
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
@@ -38,26 +39,26 @@ import (
 )
 
 const (
-	// We'll attempt to recompute the required replicas of all replication controllers
-	// that have fulfilled their expectations at least this often. This recomputation
-	// happens based on contents in local pod storage.
+// We'll attempt to recompute the required replicas of all replication controllers
+// that have fulfilled their expectations at least this often. This recomputation
+// happens based on contents in local pod storage.
 	FullControllerResyncPeriod = 30 * time.Second
 
-	// If a watch misdelivers info about a pod, it'll take at least this long
-	// to rectify the number of replicas. Note that dropped deletes are only
-	// rectified after the expectation times out because we don't know the
-	// final resting state of the pod.
+// If a watch misdelivers info about a pod, it'll take at least this long
+// to rectify the number of replicas. Note that dropped deletes are only
+// rectified after the expectation times out because we don't know the
+// final resting state of the pod.
 	PodRelistPeriod = 5 * time.Minute
 
-	// Realistic value of the burstReplica field for the replication manager based off
-	// performance requirements for kubernetes 1.0.
+// Realistic value of the burstReplica field for the replication manager based off
+// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
 
-	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
-	// avoid a hot loop, we'll wait this long between checks.
+// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
+// avoid a hot loop, we'll wait this long between checks.
 	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 
-	// The number of times we retry updating a replication controller's status.
+// The number of times we retry updating a replication controller's status.
 	statusUpdateRetries = 1
 )
 
@@ -89,6 +90,8 @@ type ReplicationManager struct {
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
+
+	selectorMap map[string]*api.ReplicationController
 
 	// Controllers that need to be synced
 	queue *workqueue.Type
@@ -123,7 +126,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 		&api.ReplicationController{},
 		FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc: rm.enqueueController,
+			AddFunc: rm.filterEnqueueController,
 			UpdateFunc: func(old, cur interface{}) {
 				// You might imagine that we only really need to enqueue the
 				// controller when Spec changes, but it is safer to sync any
@@ -142,12 +145,20 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 				if oldRC.Status.Replicas != curRC.Status.Replicas {
 					glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
 				}
-				rm.enqueueController(cur)
+				rm.filterEnqueueController(cur)
 			},
 			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
 			// way of achieving this is by performing a `stop` operation on the controller.
-			DeleteFunc: rm.enqueueController,
+			DeleteFunc: func(obj interface{}) {
+				key, err := NamespaceSelectorKeyFunc(obj)
+				if err != nil {
+					glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+					return
+				}
+				delete(rm.selectorMap, key)
+				rm.enqueueController(obj)
+			},
 		},
 	)
 
@@ -172,6 +183,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 		},
 	)
 
+	rm.selectorMap = map[string]*api.ReplicationController{}
 	rm.syncHandler = rm.syncReplicationController
 	rm.podStoreSynced = rm.podController.HasSynced
 	return rm
@@ -199,7 +211,6 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // getPodController returns the controller managing the given pod.
-// TODO: Surface that we are ignoring multiple controllers for a single pod.
 func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
 	controllers, err := rm.rcStore.GetPodControllers(pod)
 	if err != nil {
@@ -212,6 +223,13 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 	// pod: [(k1:v1), (k2:v2)] will wake both rc1 and rc2, and we will sync rc1.
 	// pod: [(k2:v2)] will wake rc2 which creates a new replica.
 	sort.Sort(overlappingControllers(controllers))
+	// Surface that we are ignoring multiple controllers for a single pod
+	for i, _ := range controllers {
+		if i == 0 {
+			continue
+		}
+		rm.reportConflict(&controllers[i], &controllers[0])
+	}
 	return &controllers[0]
 }
 
@@ -315,6 +333,61 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
 	rm.queue.Add(key)
+}
+
+// Handle overlapping controllers when we periodically relist all controllers.
+// Eveb if user enable admission comtrol "ReplicationControllerExists" to disallow
+// overlapping controllers creation, there are still chances to create overlapping
+// controllers if there are serveral
+func (rm *ReplicationManager) filterEnqueueController(obj interface{}) {
+	key, err := NamespaceSelectorKeyFunc(obj)
+	if err != nil {
+		glog.Errorf("Couldn't get namespace-selector key for object %+v: %v", obj, err)
+		return
+	}
+	newrc := obj.(*api.ReplicationController)
+	if oldrc, exists :=  rm.selectorMap[key]; exists && newrc.Name != oldrc.Name {
+		if newrc.CreationTimestamp.Before(oldrc.CreationTimestamp) || newrc.CreationTimestamp.Equal(oldrc.CreationTimestamp) && newrc.Name < oldrc.Name {
+			rm.selectorMap[key] = newrc
+			oldrc, newrc = newrc, oldrc
+		}
+		rm.reportConflict(newrc, oldrc)
+	} else {
+		if newrc.Status.Phase == api.ReplicationControllerConflicting {
+			newrc.Status.Phase = api.ReplicationControllerRunning
+			newrc.Status.Reason = ""
+			newrc.Status.Message = ""
+			rm.tryUpdateStatus(newrc)
+		}
+		rm.selectorMap[key] = newrc
+		rm.enqueueController(obj)
+	}
+}
+
+func(rm *ReplicationManager) reportConflict (newrc *api.ReplicationController, oldrc *api.ReplicationController) {
+	conflictInfo := fmt.Sprintf("Can not be started due to conflict with: %s", oldrc.Name)
+	if newrc.Status.Phase == api.ReplicationControllerConflicting && newrc.Status.Message == conflictInfo {
+		return
+	}
+
+	newrc.Status.Phase = api.ReplicationControllerConflicting
+	newrc.Status.Reason = "conflict"
+	newrc.Status.Message = conflictInfo
+
+	rm.tryUpdateStatus(newrc)
+}
+
+func(rm *ReplicationManager) tryUpdateStatus (controller *api.ReplicationController) {
+	var updateErr error
+	for i := 0; i < statusUpdateRetries; i++ {
+		_, updateErr = rm.kubeClient.ReplicationControllers(controller.Namespace).Update(controller)
+		if updateErr == nil {
+			break
+		}
+	}
+	if updateErr != nil {
+		glog.Errorf("could not update status for controller %+V: %v", controller, updateErr)
+	}
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.

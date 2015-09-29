@@ -17,9 +17,13 @@ limitations under the License.
 package replicationcontroller
 
 import (
+	"fmt"
+	"encoding/json"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/meta"
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
@@ -28,7 +32,7 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
 	if controller.Status.Replicas == numReplicas &&
-		controller.Generation == controller.Status.ObservedGeneration {
+	controller.Generation == controller.Status.ObservedGeneration {
 		return nil
 	}
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
@@ -54,6 +58,30 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 			return getErr
 		}
 	}
+}
+
+// NamespaceSelectorKeyFunc is a convenient KeyFunc which make for replicationcontroller
+// based on its namespace and selector, used to filter out overlapping controllers.
+// The key uses the format <namespace>/string(<selector>) unless <namespace> is empty, then
+// it's just <name>.
+func NamespaceSelectorKeyFunc(obj interface{}) (string, error) {
+	if key, ok := obj.(string); ok {
+		return string(key), nil
+	}
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("object has no meta: %v", err)
+	}
+
+	replicationController := obj.(*api.ReplicationController)
+	selector := replicationController.Spec.Selector
+
+	selectorjson, _ := json.Marshal(selector)
+	selectorstr := string(selectorjson)
+	if len(meta.Namespace()) > 0 {
+		return meta.Namespace() + "/" + selectorstr, nil
+	}
+	return selectorstr, nil
 }
 
 // OverlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.
