@@ -531,6 +531,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 				// LastProbeTime is the last time we heard from kubelet.
 				readyCondition.LastHeartbeatTime = lastReadyCondition.LastHeartbeatTime
 				readyCondition.LastTransitionTime = nc.now()
+				nc.recordNodeEvent(node.Name, "NodeLost", fmt.Sprintf("Node %v is out of touch", node.Name))
 			}
 		}
 		if !api.Semantic.DeepEqual(nc.getCondition(&node.Status, api.NodeReady), lastReadyCondition) {
