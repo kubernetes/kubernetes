@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -1562,6 +1563,55 @@ func DeleteRC(c *client.Client, ns, name string) error {
 func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
 	return wait.Poll(poll, 2*time.Minute, func() (bool, error) {
 		if pods, err := c.Pods(rc.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
+// Waits for the deployment to reach desired state.
+// Returns an error if minAvailable or maxCreated is broken at any times.
+func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated int) error {
+	return wait.Poll(poll, 2*time.Minute, func() (bool, error) {
+
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		oldRCs, err := deploymentUtil.GetOldRCs(*deployment, c)
+		if err != nil {
+			return false, err
+		}
+		newRC, err := deploymentUtil.GetNewRC(*deployment, c)
+		if err != nil {
+			return false, err
+		}
+		if newRC == nil {
+			// New RC hasnt been created yet.
+			return false, nil
+		}
+		allRCs := append(oldRCs, newRC)
+		totalCreated := deploymentUtil.GetReplicaCountForRCs(allRCs)
+		totalAvailable, err := deploymentUtil.GetAvailablePodsForRCs(c, allRCs)
+		if err != nil {
+			return false, err
+		}
+		if totalCreated > maxCreated {
+			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
+		}
+		if totalAvailable < minAvailable {
+			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
+		}
+
+		if deployment.Status.Replicas == desiredUpdatedReplicas &&
+			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
+			// Verify RCs.
+			if deploymentUtil.GetReplicaCountForRCs(oldRCs) != 0 {
+				return false, fmt.Errorf("old RCs are not fully scaled down")
+			}
+			if deploymentUtil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
+				return false, fmt.Errorf("new RCs is not fully scaled up")
+			}
 			return true, nil
 		}
 		return false, nil
