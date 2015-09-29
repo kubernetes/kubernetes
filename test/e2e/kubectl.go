@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -211,25 +212,30 @@ var _ = Describe("Kubectl client", func() {
 			}
 
 			// Get the kube/config
+			// TODO: Can it be RepoRoot with jenkins e2e?
 			testWorkspace := os.Getenv("WORKSPACE")
 			if testWorkspace == "" {
-				// Not running in jenkins, assume "HOME"
-				testWorkspace = os.Getenv("HOME")
+				// Not running in jenkins, assume RepoRoot
+				testWorkspace = testContext.RepoRoot // os.Getenv("HOME")
 			}
 
-			testKubectlPath := testContext.KubectlPath
-			// If no path is given then default to Jenkins e2e expected path
-			if testKubectlPath == "" || testKubectlPath == "kubectl" {
-				testKubectlPath = filepath.Join(testWorkspace, "kubernetes", "platforms", "linux", "amd64", "kubectl")
+			// Build the static kubectl
+			By("Building a static kubectl for upload")
+			kubectlContainerPath := path.Join(testWorkspace, "/examples/kubectl-container/")
+			staticKubectlBuild := exec.Command("make", "-C", kubectlContainerPath)
+			if out, err := staticKubectlBuild.Output(); err != nil {
+				Failf("Unable to create static kubectl. Error=%s, Output=%s", err, out)
 			}
-			// Get the kubeconfig path
+			// Verify the static kubectl path
+			testStaticKubectlPath := path.Join(kubectlContainerPath, "kubectl")
+			_, err := os.Stat(testStaticKubectlPath)
+			if err != nil {
+				Failf("static kubectl path could not be accessed. Error=%s", err)
+			}
+
+			// Verify the kubeconfig path
 			kubeConfigFilePath := testContext.KubeConfig
-			if kubeConfigFilePath == "" {
-				// Fall back to the jenkins e2e location
-				kubeConfigFilePath = filepath.Join(testWorkspace, ".kube", "config")
-			}
-
-			_, err := os.Stat(kubeConfigFilePath)
+			_, err = os.Stat(kubeConfigFilePath)
 			if err != nil {
 				Failf("kube config path could not be accessed. Error=%s", err)
 			}
@@ -252,7 +258,6 @@ var _ = Describe("Kubectl client", func() {
 			if err != nil {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
-
 			resp, err := c.Post().
 				Prefix("proxy").
 				Namespace(ns).
@@ -272,7 +277,7 @@ var _ = Describe("Kubectl client", func() {
 			kubecConfigRemotePath := uploadConfigOutput.Output
 
 			// Upload
-			pipeReader, postBodyWriter, err := newStreamingUpload(testContext.KubectlPath)
+			pipeReader, postBodyWriter, err := newStreamingUpload(testStaticKubectlPath)
 			if err != nil {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
