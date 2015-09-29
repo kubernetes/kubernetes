@@ -157,6 +157,7 @@ ir-influxdb-host
 ir-namespace-only
 ir-password
 ir-user
+ir-hawkular
 jenkins-host
 jenkins-jobs
 k8s-build-output
