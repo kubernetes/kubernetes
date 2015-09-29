@@ -137,7 +137,7 @@ func TestCodec(t *testing.T) {
 }
 
 func TestCreater(t *testing.T) {
-	creater := NewObjectCreator("creater version", api.Scheme)
+	creater := NewObjectCreator("creater group", "creater version", api.Scheme)
 	tests := []struct {
 		name        string
 		version     string
@@ -147,7 +147,7 @@ func TestCreater(t *testing.T) {
 	}{
 		{
 			name:        "valid ThirdPartyResourceData creation",
-			version:     "creater version",
+			version:     "creater group/creater version",
 			kind:        "ThirdPartyResourceData",
 			expectedObj: &experimental.ThirdPartyResourceData{},
 			expectErr:   false,
