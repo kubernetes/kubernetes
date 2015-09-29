@@ -115,7 +115,7 @@ func NewCMServer() *CMServer {
 		NamespaceSyncPeriod:               5 * time.Minute,
 		PVClaimBinderSyncPeriod:           10 * time.Second,
 		HorizontalPodAutoscalerSyncPeriod: 30 * time.Second,
-		DeploymentControllerSyncPeriod:    1 * time.Minute,
+		DeploymentControllerSyncPeriod:    30 * time.Second,
 		RegisterRetryCount:                10,
 		PodEvictionTimeout:                5 * time.Minute,
 		ClusterName:                       "kubernetes",
