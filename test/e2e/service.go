@@ -238,7 +238,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to up and down services", func() {
 		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		SkipUnlessProviderIs(providersWithSSH...)
 		ns := namespaces[0]
 		numPods, servicePort := 3, 80
 
