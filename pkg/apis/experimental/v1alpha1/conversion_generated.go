@@ -2309,13 +2309,8 @@ func autoconvert_experimental_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodA
 	if err := convert_experimental_HorizontalPodAutoscalerSpec_To_v1alpha1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if in.Status != nil {
-		out.Status = new(HorizontalPodAutoscalerStatus)
-		if err := convert_experimental_HorizontalPodAutoscalerStatus_To_v1alpha1_HorizontalPodAutoscalerStatus(in.Status, out.Status, s); err != nil {
-			return err
-		}
-	} else {
-		out.Status = nil
+	if err := convert_experimental_HorizontalPodAutoscalerStatus_To_v1alpha1_HorizontalPodAutoscalerStatus(&in.Status, &out.Status, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -3115,13 +3110,8 @@ func autoconvert_v1alpha1_HorizontalPodAutoscaler_To_experimental_HorizontalPodA
 	if err := convert_v1alpha1_HorizontalPodAutoscalerSpec_To_experimental_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if in.Status != nil {
-		out.Status = new(experimental.HorizontalPodAutoscalerStatus)
-		if err := convert_v1alpha1_HorizontalPodAutoscalerStatus_To_experimental_HorizontalPodAutoscalerStatus(in.Status, out.Status, s); err != nil {
-			return err
-		}
-	} else {
-		out.Status = nil
+	if err := convert_v1alpha1_HorizontalPodAutoscalerStatus_To_experimental_HorizontalPodAutoscalerStatus(&in.Status, &out.Status, s); err != nil {
+		return err
 	}
 	return nil
 }
