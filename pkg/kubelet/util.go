@@ -77,6 +77,7 @@ func canRunPod(pod *api.Pod) error {
 			}
 		}
 	}
+
 	return nil
 }
 

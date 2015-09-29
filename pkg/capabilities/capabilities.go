@@ -31,6 +31,10 @@ type Capabilities struct {
 
 	// PerConnectionBandwidthLimitBytesPerSec limits the throughput of each connection (currently only used for proxy, exec, attach)
 	PerConnectionBandwidthLimitBytesPerSec int64
+
+	// EnableSELinuxIntegration controls whether SELinux
+	// integration is expected from Kubernetes
+	EnableSELinuxIntegration bool
 }
 
 // PrivilegedSources defines the pod sources allowed to make privileged requests for certain types

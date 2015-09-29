@@ -1403,6 +1403,11 @@ func ValidateNode(node *api.Node) errs.ValidationErrorList {
 	}
 
 	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
+
+	if capabilities.Get().EnableSELinuxIntegration && !node.Spec.SELinuxEnabled {
+		allErrs = append(allErrs, fmt.Errorf("SELinux required by cluster but not enabled on this node integration %v enabled %v", capabilities.Get().EnableSELinuxIntegration, node.Spec.SELinuxEnabled))
+	}
+
 	return allErrs
 }
 
@@ -1932,6 +1937,10 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 		if *sc.RunAsUser < 0 {
 			allErrs = append(allErrs, errs.NewFieldInvalid("runAsUser", *sc.RunAsUser, "runAsUser cannot be negative"))
 		}
+	}
+
+	if sc.SELinuxOptions != nil && !capabilities.Get().EnableSELinuxIntegration {
+		allErrs = append(allErrs, errs.NewFieldForbidden("seLinuxOptions", "Cannot specify seLinuxOptions if SELinux integration is not enabled"))
 	}
 	return allErrs
 }

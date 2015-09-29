@@ -11807,6 +11807,10 @@
      "unschedulable": {
       "type": "boolean",
       "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"`"
+     },
+     "selinuxEnabled": {
+      "type": "boolean",
+      "description": "SELinuxEnabled indicates whether SELinux is enabled on this node"
      }
     }
    },

@@ -675,11 +675,12 @@ func (NodeList) SwaggerDoc() map[string]string {
 }
 
 var map_NodeSpec = map[string]string{
-	"":              "NodeSpec describes the attributes that a node is created with.",
-	"podCIDR":       "PodCIDR represents the pod IP range assigned to the node.",
-	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
-	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
-	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"`",
+	"":               "NodeSpec describes the attributes that a node is created with.",
+	"podCIDR":        "PodCIDR represents the pod IP range assigned to the node.",
+	"externalID":     "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
+	"providerID":     "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
+	"unschedulable":  "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"`",
+	"selinuxEnabled": "SELinuxEnabled indicates whether SELinux is enabled on this node",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {

@@ -976,6 +976,7 @@ func deepCopy_api_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) err
 	out.ExternalID = in.ExternalID
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
+	out.SELinuxEnabled = in.SELinuxEnabled
 	return nil
 }
 

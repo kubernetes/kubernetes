@@ -832,6 +832,9 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	} else {
 		node.Spec.ExternalID = kl.hostname
 	}
+
+	node.Spec.SELinuxEnabled = kl.selinuxEnabled()
+
 	if err := kl.setNodeStatus(node); err != nil {
 		return nil, err
 	}

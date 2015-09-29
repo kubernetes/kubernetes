@@ -33,3 +33,7 @@ func (kl *Kubelet) getRootDirContext() (string, error) {
 	// Get the SELinux context of the rootDir.
 	return selinux.Getfilecon(kl.getRootDir())
 }
+
+func (kl *Kubelet) selinuxEnabled() bool {
+	return selinux.SelinuxEnabled()
+}
