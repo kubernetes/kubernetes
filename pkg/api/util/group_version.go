@@ -37,3 +37,12 @@ func GetGroup(groupVersion string) string {
 	}
 	return s[0]
 }
+
+// GetGroupVersion returns the "group/version". It returns "version" is if group
+// is empty. It returns "group/" if version is empty.
+func GetGroupVersion(group, version string) string {
+	if len(group) == 0 {
+		return version
+	}
+	return group + "/" + version
+}
