@@ -56,13 +56,6 @@ func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
 		os.Exit(1)
 	}
 
-	var expAPIVersions []string
-	expAPIVersions, err = client.Experimental().ServerAPIVersions()
-
 	fmt.Fprintf(w, "Available Server Api Versions: %#v\n", apiVersions)
-	if err == nil {
-		fmt.Fprintf(w, "Available Server Experimental Api Versions: %#v\n", expAPIVersions)
-	}
-
 	return nil
 }

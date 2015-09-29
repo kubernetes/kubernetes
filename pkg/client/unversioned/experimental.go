@@ -59,9 +59,8 @@ func (c *ExperimentalClient) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
-// ServerAPIVersions retrieves and parses the list of experimental API versions the
-// server supports.
-// TODO: ServerAPIVersions should be a function of the high-level client.
+// TODO: User should either use client.Client.ServerAPIVersions, or use the one
+// defined in pkg/client/unversioned/helper.go.
 func (c *ExperimentalClient) ServerAPIVersions() ([]string, error) {
 	return []string{}, nil
 }

@@ -156,7 +156,8 @@ func extractGroupVersions(l *api.APIGroupList) []string {
 }
 
 // ServerAPIVersions retrieves and parses the list of API versions the server supports.
-// TODO: caesarxuchao ServerAPIVersions() should be a function of RESTClient.
+// If one doesn't have a client.Client, one should use ServerAPIVersions defined in
+// pkg/client/unversioned/helper.go.
 func (c *Client) ServerAPIVersions() (groupVersions []string, err error) {
 	// Get the groupVersions exposed at /api
 	body, err := c.Get().UnversionedPath("").Do().Raw()

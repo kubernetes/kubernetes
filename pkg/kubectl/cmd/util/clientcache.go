@@ -35,16 +35,21 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 // ClientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
 // is invoked only once
 type ClientCache struct {
-	loader  clientcmd.ClientConfig
+	loader clientcmd.ClientConfig
+	// clients is a map between group/version and clients. Note that version is
+	// allowed to be empty.
 	clients map[string]*client.RESTClient
+	// configs is a map between group/version and configs. Note that version is
+	// allowed to be empty.
 	configs map[string]*client.Config
-	//defaultConfig is a map between group and their default config.
+	// defaultConfig is a map between group and their default config.
 	defaultConfig map[string]*client.Config
 	defaultClient *client.Client
 	matchVersion  bool
 }
 
-// ClientConfigForVersion returns the correct config for a server
+// ClientConfigForVersion returns the correct config for a server. Version is
+// allowed to be empty.
 func (c *ClientCache) ClientConfigForVersion(group, version string) (*client.Config, error) {
 	if _, found := c.defaultConfig[group]; !found {
 		config, err := c.loader.ClientConfig(group)
@@ -99,9 +104,12 @@ func (c *ClientCache) RESTClientForVersion(groupVersion string) (*client.RESTCli
 // Currently this function only accepts one groupVersion. It will
 // try to initialize or reuse the RESTClient of the group in the groupVersion
 // for the specified version. For RESTClients of other groups, it will initialize
-// or reuse the one of the negotiated version. An error is returned if any
-// it is not possible to return such a Client.
-// TODO: We will deprecate this function and return typed RESTClient like experimental
+// or reuse the one of the negotiated version. An error is returned if it is not
+// possible to return such a Client.
+// TODO: We will deprecate this function. We will add a bunch of functions that
+// return typed RESTClient, like ExperimentalClient. Users of ClientForVersion
+// should either convert to use a versioned client.Client, e.g., pkg/client/v1/,
+// or use the functions that return typed RESTClient.
 func (c *ClientCache) ClientForVersion(groupVersion string) (*client.Client, error) {
 	// TODO: The following could be a for loop when we have a MetaClient
 	// initialize the RESTClient

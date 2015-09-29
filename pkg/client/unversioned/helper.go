@@ -429,7 +429,7 @@ func UnversionedRESTClientFor(c *Config) (*RESTClient, error) {
 	return client, nil
 }
 
-// ServerAPIVersions returns the GroupVersions supported by the API server of the RESTClient
+// ServerAPIVersions returns the GroupVersions supported by the API server of the RESTClient.
 func ServerAPIVersions(c *RESTClient) (groupVersions []string, err error) {
 	// Get the groupVersions exposed at /api
 	body, err := c.Get().UnversionedPath("api").Do().Raw()

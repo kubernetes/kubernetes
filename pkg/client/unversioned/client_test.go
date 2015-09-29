@@ -270,7 +270,7 @@ func TestGetServerVersion(t *testing.T) {
 	}
 }
 
-func TestGetServerAPIVersions(t *testing.T) {
+func TestClientGetServerAPIVersions(t *testing.T) {
 	expect := []string{"v1", "v2", "v3"}
 	APIVersions := api.APIVersions{Versions: expect}
 	expect = append(expect, "group1/v1", "group1/v2", "group2/v1", "group2/v2")

@@ -38,6 +38,8 @@ func GetGroup(groupVersion string) string {
 	return s[0]
 }
 
+// GetGroupVersion returns the "group/version". It removes the leading "/" if
+// group is empty.
 func GetGroupVersion(group, version string) string {
 	return strings.TrimLeft(group+"/"+version, "/")
 }

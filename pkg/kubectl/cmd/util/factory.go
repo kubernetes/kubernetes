@@ -135,11 +135,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return clients.ClientConfigForVersion(group, "")
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			client, err := clients.RESTClientForVersion(mapping.APIVersion)
+			restClient, err := clients.RESTClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			return client, nil
+			return restClient, nil
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
 			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
