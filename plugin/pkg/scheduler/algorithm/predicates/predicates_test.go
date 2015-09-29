@@ -244,7 +244,7 @@ func newPod(host string, hostPorts ...int) *api.Pod {
 	}
 }
 
-func TestPodFitsPorts(t *testing.T) {
+func TestPodFitsHostPorts(t *testing.T) {
 	tests := []struct {
 		pod          *api.Pod
 		existingPods []*api.Pod
@@ -291,7 +291,7 @@ func TestPodFitsPorts(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fits, err := PodFitsPorts(test.pod, test.existingPods, "machine")
+		fits, err := PodFitsHostPorts(test.pod, test.existingPods, "machine")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
