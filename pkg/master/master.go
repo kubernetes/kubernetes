@@ -933,8 +933,6 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	fmt.Println("CHAO: apiRoot:", apiRoot, "Group:", group, "Version:", version)
-
 	return &apiserver.APIGroupVersion{
 		Root: apiRoot,
 
