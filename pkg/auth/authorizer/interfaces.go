@@ -32,6 +32,10 @@ type Attributes interface {
 	// authentication occurred.
 	GetGroups() []string
 
+	// GetVerb returns the kube verb associated with API requests (this includes get, list, watch, create, update, patch, delete, and proxy),
+	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
+	GetVerb() string
+
 	// When IsReadOnly() == true, the request has no side effects, other than
 	// caching, logging, and other incidentals.
 	IsReadOnly() bool
@@ -62,7 +66,7 @@ func (f AuthorizerFunc) Authorize(a Attributes) error {
 // AttributesRecord implements Attributes interface.
 type AttributesRecord struct {
 	User      user.Info
-	ReadOnly  bool
+	Verb      string
 	Namespace string
 	APIGroup  string
 	Resource  string
@@ -76,8 +80,12 @@ func (a AttributesRecord) GetGroups() []string {
 	return a.User.GetGroups()
 }
 
+func (a AttributesRecord) GetVerb() string {
+	return a.Verb
+}
+
 func (a AttributesRecord) IsReadOnly() bool {
-	return a.ReadOnly
+	return a.Verb == "get" || a.Verb == "list" || a.Verb == "watch"
 }
 
 func (a AttributesRecord) GetNamespace() string {
