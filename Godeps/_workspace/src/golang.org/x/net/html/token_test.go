@@ -392,7 +392,7 @@ var tokenTests = []tokenTest{
 		"½",
 	},
 	// Attribute tests:
-	// http://dev.w3.org/html5/spec/Overview.html#attributes-0
+	// http://dev.w3.org/html5/pf-summary/Overview.html#attributes
 	{
 		"Empty attribute",
 		`<input disabled FOO>`,
