@@ -90,6 +90,7 @@ const (
 	// How wide to print pod names, by default. Useful for aligning printing to
 	// quickly scan through output.
 	podPrintWidth = 55
+	endpointRegisterTimeout  = time.Minute
 )
 
 type CloudConfig struct {
@@ -408,22 +409,22 @@ func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName s
 }
 
 func waitForPodCondition(c *client.Client, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
-	Logf("Waiting up to %[1]v for pod %-[2]*[3]s status to be %[4]s", timeout, podPrintWidth, podName, desc)
+	Logf("Waiting up to %[1]v for pod %[2]s status to be %[3]s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
 			// Aligning this text makes it much more readable
-			Logf("Get pod %-[1]*[2]s in namespace '%[3]s' failed, ignoring for %[4]v. Error: %[5]v",
-				podPrintWidth, podName, ns, poll, err)
+			Logf("Get pod %[1]s in namespace '%[2]s' failed, ignoring for %[3]v. Error: %[4]v",
+				podName, ns, poll, err)
 			continue
 		}
 		done, err := condition(pod)
 		if done {
 			return err
 		}
-		Logf("Waiting for pod %-[1]*[2]s in namespace '%[3]s' status to be '%[4]s'"+
-			"(found phase: %[5]q, readiness: %[6]t) (%[7]v elapsed)",
-			podPrintWidth, podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
+		Logf("Waiting for pod %[1]s in namespace '%[2]s' status to be '%[3]s'"+
+			"(found phase: %[4]q, readiness: %[5]t) (%[6]v elapsed)",
+			podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
 }
@@ -1172,7 +1173,6 @@ func Diff(oldPods []*api.Pod, curPods []*api.Pod) PodDiff {
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
 func RunRC(config RCConfig) error {
-
 	// Don't force tests to fail if they don't care about containers restarting.
 	var maxContainerFailures int
 	if config.MaxContainerFailures == nil {
@@ -1183,7 +1183,7 @@ func RunRC(config RCConfig) error {
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 
-	By(fmt.Sprintf("%v Creating replication controller %s", time.Now(), config.Name))
+	By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: config.Name,
@@ -1250,7 +1250,7 @@ func RunRC(config RCConfig) error {
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
-	Logf("%v Created replication controller with name: %v, namespace: %v, replica count: %v", time.Now(), rc.Name, config.Namespace, rc.Spec.Replicas)
+	Logf("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
 	podStore := newPodStore(config.Client, config.Namespace, label, fields.Everything())
 	defer podStore.Stop()
 
@@ -1427,7 +1427,7 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
-	By(fmt.Sprintf("%v Scaling replication controller %s in namespace %s to %d", time.Now(), name, ns, size))
+	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
 	scaler, err := kubectl.ScalerFor("ReplicationController", c)
 	if err != nil {
 		return err
@@ -1497,7 +1497,7 @@ func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (p
 
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
-	By(fmt.Sprintf("%v Deleting replication controller %s in namespace %s", time.Now(), name, ns))
+	By(fmt.Sprintf("deleting replication controller %s in namespace %s", name, ns))
 	rc, err := c.ReplicationControllers(ns).Get(name)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
@@ -1793,7 +1793,7 @@ func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeo
 	// support only Go >= 1.4.
 	for _, podName := range podNames {
 		if !<-result {
-			Logf("Pod %-[1]*[2]s failed to be %[3]s.", podPrintWidth, podName, desc)
+			Logf("Pod %[1]s failed to be %[2]s.", podName, desc)
 			success = false
 		}
 	}
