@@ -260,14 +260,16 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 	})
 	expectNoError(err)
 	config := RCConfig{
-		Client:    c,
-		Image:     image,
-		Name:      name,
-		Namespace: ns,
-		Timeout:   timeoutRC,
-		Replicas:  replicas,
-		CpuLimit:  cpuLimitMillis,
-		MemLimit:  memLimitMb * 1024 * 1024, // MemLimit is in bytes
+		Client:     c,
+		Image:      image,
+		Name:       name,
+		Namespace:  ns,
+		Timeout:    timeoutRC,
+		Replicas:   replicas,
+		CpuRequest: cpuLimitMillis,
+		CpuLimit:   cpuLimitMillis,
+		MemRequest: memLimitMb * 1024 * 1024, // MemLimit is in bytes
+		MemLimit:   memLimitMb * 1024 * 1024,
 	}
 	expectNoError(RunRC(config))
 	// Make sure endpoints are propagated.
