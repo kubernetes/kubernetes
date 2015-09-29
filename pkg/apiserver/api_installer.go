@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -90,11 +91,11 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []api.APIRe
 func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
-	ws.Doc("API at " + a.prefix + " version " + a.group.Version)
+	ws.Doc("API at " + a.prefix + " version " + apiutil.GetGroupVersion(a.group.Group, a.group.Version))
 	// TODO: change to restful.MIME_JSON when we set content type in client
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
-	ws.ApiVersion(a.group.Version)
+	ws.ApiVersion(apiutil.GetGroupVersion(a.group.Group, a.group.Version))
 
 	return ws
 }
@@ -105,7 +106,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	serverVersion := a.group.ServerVersion
 	if len(serverVersion) == 0 {
-		serverVersion = a.group.Version
+		serverVersion = apiutil.GetGroupVersion(a.group.Group, a.group.Version)
 	}
 
 	var resource, subresource string
@@ -125,13 +126,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
-	versionedPtr, err := a.group.Creater.New(a.group.Version, kind)
+	versionedPtr, err := a.group.Creater.New(apiutil.GetGroupVersion(a.group.Group, a.group.Version), kind)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
+	mapping, err := a.group.Mapper.RESTMapping(kind, apiutil.GetGroupVersion(a.group.Group, a.group.Version))
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
+		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, apiutil.GetGroupVersion(a.group.Group, a.group.Version))
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +181,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isLister {
 		list := lister.NewList()
 		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
+		versionedListPtr, err := a.group.Creater.New(apiutil.GetGroupVersion(a.group.Group, a.group.Version), listKind)
 		if err != nil {
 			return nil, err
 		}
@@ -378,7 +379,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:          a.group.Creater,
 		Convertor:        a.group.Convertor,
 		Codec:            mapping.Codec,
-		APIVersion:       a.group.Version,
+		APIVersion:       apiutil.GetGroupVersion(a.group.Group, a.group.Version),
 		ServerAPIVersion: serverVersion,
 		Resource:         resource,
 		Subresource:      subresource,

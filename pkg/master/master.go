@@ -594,23 +594,23 @@ func (m *Master) init(c *Config) {
 		}
 		expAPIVersions := []api.GroupVersion{
 			{
-				GroupVersion: expVersion.Version,
-				Version:      apiutil.GetVersion(expVersion.Version),
+				GroupVersion: apiutil.GetGroupVersion(expVersion.Group, expVersion.Version),
+				Version:      expVersion.Version,
 			},
 		}
-		storageVersion, found := c.StorageVersions[g.Group]
+		storageGroupVersion, found := c.StorageVersions[g.Group]
 		if !found {
 			glog.Fatalf("Couldn't find storage version of group %v", g.Group)
 		}
 		group := api.APIGroup{
 			Name:             g.Group,
 			Versions:         expAPIVersions,
-			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
+			PreferredVersion: api.GroupVersion{GroupVersion: storageGroupVersion, Version: apiutil.GetVersion(storageGroupVersion)},
 		}
 		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
 		allGroups = append(allGroups, group)
 		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{apiutil.GetGroupVersion(expVersion.Group, expVersion.Version)})
 	}
 
 	// This should be done after all groups are registered
@@ -944,6 +944,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
 		Linker:        latest.GroupOrDie("experimental").SelfLinker,
 		Storage:       storage,
+		Group:         group,
 		Version:       version,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
@@ -1000,7 +1001,8 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Codec:         expMeta.Codec,
 		Linker:        expMeta.SelfLinker,
 		Storage:       storage,
-		Version:       expMeta.GroupVersion,
+		Group:         expMeta.Group,
+		Version:       expMeta.Version,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Admit:   m.admissionControl,
