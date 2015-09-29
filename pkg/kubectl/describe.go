@@ -1435,6 +1435,10 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			}
 			fmt.Fprintf(out, "NewReplicationController:\t%s\n", printReplicationControllersByLabels(newRCs))
 		}
+		events, err := dd.Events(namespace).Search(d)
+		if err == nil && events != nil {
+			DescribeEvents(events, out)
+		}
 		return nil
 	})
 }
