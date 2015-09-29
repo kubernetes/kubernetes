@@ -1270,6 +1270,7 @@ func RunRC(config RCConfig) error {
 		terminating := 0
 
 		running := 0
+		runningButNotReady := 0
 		waiting := 0
 		pending := 0
 		unknown := 0
@@ -1286,7 +1287,19 @@ func RunRC(config RCConfig) error {
 			}
 			created = append(created, p)
 			if p.Status.Phase == api.PodRunning {
-				running++
+				ready := false
+				for _, c := range p.Status.Conditions {
+					if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+						ready = true
+						break
+					}
+				}
+				if ready {
+					// Only count a pod is running when it is also ready.
+					running++
+				} else {
+					runningButNotReady++
+				}
 				for _, v := range FailedContainers(p) {
 					failedContainers = failedContainers + v.restarts
 					containerRestartNodes.Insert(p.Spec.NodeName)
@@ -1308,13 +1321,13 @@ func RunRC(config RCConfig) error {
 			*config.CreatedPods = pods
 		}
 
-		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown ",
-			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown)
+		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
+			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown, runningButNotReady)
 
 		promPushRunningPending(running, pending)
 
 		if config.PodStatusFile != nil {
-			fmt.Fprintf(config.PodStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown\n", time.Now(), running, pending, waiting, inactive, unknown)
+			fmt.Fprintf(config.PodStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown, %d, runningButNotReady\n", time.Now(), running, pending, waiting, inactive, unknown, runningButNotReady)
 		}
 
 		if failedContainers > maxContainerFailures {
