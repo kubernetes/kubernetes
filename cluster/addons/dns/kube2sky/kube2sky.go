@@ -336,7 +336,7 @@ func (ks *kube2sky) generateSRVRecord(subdomain, portSegment, recordName, cName 
 
 func (ks *kube2sky) addDNS(subdomain string, service *kapi.Service) error {
 	if len(service.Spec.Ports) == 0 {
-		glog.Fatalf("unexpected service with no ports: %v", service)
+		glog.Fatalf("Unexpected service with no ports: %v", service)
 	}
 	// if ClusterIP is not set, a DNS entry should not be created
 	if !kapi.IsServiceIPSet(service) {
