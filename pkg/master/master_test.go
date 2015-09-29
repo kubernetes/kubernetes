@@ -293,7 +293,8 @@ func TestExpapi(t *testing.T) {
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").GroupVersion)
+	assert.Equal(expAPIGroup.Group, latest.GroupOrDie("experimental").Group)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
@@ -681,7 +682,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		},
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
-			APIVersion: version,
+			APIVersion: "company.com/" + version,
 		},
 		SomeField:  "test field",
 		OtherField: 10,

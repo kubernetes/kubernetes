@@ -927,16 +927,18 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := makeThirdPartyPath(group)
+	apiRoot := makeThirdPartyPath("")
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
+	fmt.Println("CHAO: apiRoot:", apiRoot, "Group:", group, "Version:", version)
+
 	return &apiserver.APIGroupVersion{
 		Root: apiRoot,
 
-		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
+		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
