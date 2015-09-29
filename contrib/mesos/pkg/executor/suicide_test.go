@@ -67,7 +67,7 @@ func (t *suicideTracker) makeJumper(_ jumper) jumper {
 func TestSuicide_zeroTimeout(t *testing.T) {
 	defer glog.Flush()
 
-	k := New(Config{})
+	k, _ := NewTestKubernetesExecutor()
 	tracker := &suicideTracker{suicideWatcher: k.suicideWatch}
 	k.suicideWatch = tracker
 
@@ -92,9 +92,8 @@ func TestSuicide_zeroTimeout(t *testing.T) {
 func TestSuicide_WithTasks(t *testing.T) {
 	defer glog.Flush()
 
-	k := New(Config{
-		SuicideTimeout: 50 * time.Millisecond,
-	})
+	k, _ := NewTestKubernetesExecutor()
+	k.suicideTimeout = 50 * time.Millisecond
 
 	jumps := uint32(0)
 	tracker := &suicideTracker{suicideWatcher: k.suicideWatch, jumps: &jumps}
