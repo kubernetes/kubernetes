@@ -457,7 +457,10 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	//   - if 'LastProbeTime' have gone back in time its probably an error, currently we ignore it,
 	//   - currently only correct Ready State transition outside of Node Controller is marking it ready by Kubelet, we don't check
 	//     if that's the case, but it does not seem necessary.
-	savedCondition := nc.getCondition(&savedNodeStatus.status, api.NodeReady)
+	var savedCondition *api.NodeCondition
+	if found {
+		savedCondition = nc.getCondition(&savedNodeStatus.status, api.NodeReady)
+	}
 	observedCondition := nc.getCondition(&node.Status, api.NodeReady)
 	if !found {
 		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
