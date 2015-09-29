@@ -21,6 +21,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -44,22 +45,25 @@ func New(client client.Interface) *DeploymentController {
 
 func (d *DeploymentController) Run(syncPeriod time.Duration) {
 	go util.Until(func() {
-		if err := d.reconcileDeployments(); err != nil {
+		errs := d.reconcileDeployments()
+		for _, err := range errs {
+			glog.Errorf("Failed to reconcile: %v", err)
 		}
 	}, syncPeriod, util.NeverStop)
 }
 
-func (d *DeploymentController) reconcileDeployments() error {
+func (d *DeploymentController) reconcileDeployments() []error {
 	list, err := d.expClient.Deployments(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
-		return fmt.Errorf("error listing deployments: %v", err)
+		return []error{fmt.Errorf("error listing deployments: %v", err)}
 	}
+	errs := []error{}
 	for _, deployment := range list.Items {
 		if err := d.reconcileDeployment(&deployment); err != nil {
-			return fmt.Errorf("error in reconciling deployment: %v", err)
+			errs = append(errs, fmt.Errorf("error in reconciling deployment %s: %v", deployment.Name, err))
 		}
 	}
-	return nil
+	return errs
 }
 
 func (d *DeploymentController) reconcileDeployment(deployment *experimental.Deployment) error {
@@ -69,7 +73,7 @@ func (d *DeploymentController) reconcileDeployment(deployment *experimental.Depl
 	case experimental.RollingUpdateDeploymentStrategyType:
 		return d.reconcileRollingUpdateDeployment(*deployment)
 	}
-	return fmt.Errorf("Unexpected deployment strategy type: %s", deployment.Spec.Strategy.Type)
+	return fmt.Errorf("unexpected deployment strategy type: %s", deployment.Spec.Strategy.Type)
 }
 
 func (d *DeploymentController) reconcileRecreateDeployment(deployment experimental.Deployment) error {
@@ -176,7 +180,7 @@ func (d *DeploymentController) scaleUp(allRCs []*api.ReplicationController, newR
 	}
 	maxSurge, isPercent, err := util.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxSurge)
 	if err != nil {
-		return false, fmt.Errorf("Invalid value for MaxSurge: %v", err)
+		return false, fmt.Errorf("invalid value for MaxSurge: %v", err)
 	}
 	if isPercent {
 		maxSurge = util.GetValueFromPercent(maxSurge, deployment.Spec.Replicas)
@@ -208,7 +212,7 @@ func (d *DeploymentController) scaleDown(allRCs []*api.ReplicationController, ol
 	}
 	maxUnavailable, isPercent, err := util.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable)
 	if err != nil {
-		return false, fmt.Errorf("Invalid value for MaxUnavailable: %v", err)
+		return false, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
 	if isPercent {
 		maxUnavailable = util.GetValueFromPercent(maxUnavailable, deployment.Spec.Replicas)
