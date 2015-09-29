@@ -285,7 +285,7 @@ func validatePredicateOrDie(predicate schedulerapi.PredicatePolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			glog.Fatalf("Exactly 1 predicate argument is required")
+			glog.Fatalf("Exactly 1 predicate argument is required, numArgs: %v", numArgs)
 		}
 	}
 }
