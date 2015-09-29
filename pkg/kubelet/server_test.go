@@ -19,6 +19,7 @@ package kubelet
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -35,12 +36,15 @@ import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeKubelet struct {
@@ -131,15 +135,38 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return fk.streamingConnectionIdleTimeoutFunc()
 }
 
+type fakeAuth struct {
+	authenticateFunc func(*http.Request) (user.Info, bool, error)
+	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
+	authorizeFunc    func(authorizer.Attributes) (err error)
+}
+
+func (f *fakeAuth) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	return f.authenticateFunc(req)
+}
+func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
+	return f.attributesFunc(u, req)
+}
+func (f *fakeAuth) Authorize(a authorizer.Attributes) (err error) {
+	return f.authorizeFunc(a)
+}
+
 type serverTestFramework struct {
 	serverUnderTest *Server
 	fakeKubelet     *fakeKubelet
+	fakeAuth        *fakeAuth
 	testHTTPServer  *httptest.Server
 }
 
 func newServerTest() *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
+		containerVersionFunc: func() (kubecontainer.Version, error) {
+			return dockertools.NewVersion("1.15")
+		},
+		hostnameFunc: func() string {
+			return "127.0.0.1"
+		},
 		podByNameFunc: func(namespace, name string) (*api.Pod, bool) {
 			return &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -149,7 +176,18 @@ func newServerTest() *serverTestFramework {
 			}, true
 		},
 	}
-	server := NewServer(fw.fakeKubelet, true)
+	fw.fakeAuth = &fakeAuth{
+		authenticateFunc: func(req *http.Request) (user.Info, bool, error) {
+			return &user.DefaultInfo{Name: "test"}, true, nil
+		},
+		attributesFunc: func(u user.Info, req *http.Request) authorizer.Attributes {
+			return &authorizer.AttributesRecord{User: u}
+		},
+		authorizeFunc: func(a authorizer.Attributes) (err error) {
+			return nil
+		},
+	}
+	server := NewServer(fw.fakeKubelet, fw.fakeAuth, true)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -499,6 +537,178 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	defer resp.Body.Close()
 	if resp.StatusCode != expectedErrorCode {
 		t.Errorf("expected status code %d, got %d", expectedErrorCode, resp.StatusCode)
+	}
+}
+
+type authTestCase struct {
+	Method string
+	Path   string
+}
+
+func TestAuthFilters(t *testing.T) {
+	fw := newServerTest()
+
+	testcases := []authTestCase{}
+
+	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
+	// Ideally, these would move to registered web services and this list would get shorter
+	expectedPaths := []string{"/healthz", "/stats/", "/metrics"}
+	paths := sets.NewString(fw.serverUnderTest.restfulCont.RegisteredHandlePaths()...)
+	for _, expectedPath := range expectedPaths {
+		if !paths.Has(expectedPath) {
+			t.Errorf("Expected registered handle path %s was missing", expectedPath)
+		}
+	}
+
+	// Test all the non-web-service handlers
+	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
+		testcases = append(testcases, authTestCase{"GET", path})
+		testcases = append(testcases, authTestCase{"POST", path})
+		// Test subpaths for directory handlers
+		if strings.HasSuffix(path, "/") {
+			testcases = append(testcases, authTestCase{"GET", path + "foo"})
+			testcases = append(testcases, authTestCase{"POST", path + "foo"})
+		}
+	}
+
+	// Test all the generated web-service paths
+	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
+		for _, r := range ws.Routes() {
+			testcases = append(testcases, authTestCase{r.Method, r.Path})
+		}
+	}
+
+	for _, tc := range testcases {
+		var (
+			expectedUser       = &user.DefaultInfo{Name: "test"}
+			expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+			calledAuthenticate = false
+			calledAuthorize    = false
+			calledAttributes   = false
+		)
+
+		fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+			calledAuthenticate = true
+			return expectedUser, true, nil
+		}
+		fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+			calledAttributes = true
+			if u != expectedUser {
+				t.Fatalf("%s: expected user %v, got %v", tc.Path, expectedUser, u)
+			}
+			return expectedAttributes
+		}
+		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+			calledAuthorize = true
+			if a != expectedAttributes {
+				t.Fatalf("%s: expected attributes %v, got %v", tc.Path, expectedAttributes, a)
+			}
+			return errors.New("Forbidden")
+		}
+
+		req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.Path, err)
+			continue
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.Path, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("%s: unexpected status code %d", tc.Path, resp.StatusCode)
+			continue
+		}
+
+		if !calledAuthenticate {
+			t.Errorf("%s: Authenticate was not called", tc.Path)
+			continue
+		}
+		if !calledAttributes {
+			t.Errorf("%s: Attributes were not called", tc.Path)
+			continue
+		}
+		if !calledAuthorize {
+			t.Errorf("%s: Authorize was not called", tc.Path)
+			continue
+		}
+	}
+}
+
+func TestAuthenticationFailure(t *testing.T) {
+	var (
+		expectedUser       = &user.DefaultInfo{Name: "test"}
+		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+		calledAuthenticate = false
+		calledAuthorize    = false
+		calledAttributes   = false
+	)
+
+	fw := newServerTest()
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+		calledAuthenticate = true
+		return nil, false, nil
+	}
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+		calledAttributes = true
+		return expectedAttributes
+	}
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+		calledAuthorize = true
+		return errors.New("not allowed")
+	}
+
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusUnauthorized)
+
+	if !calledAuthenticate {
+		t.Fatalf("Authenticate was not called")
+	}
+	if calledAttributes {
+		t.Fatalf("Attributes was called unexpectedly")
+	}
+	if calledAuthorize {
+		t.Fatalf("Authorize was called unexpectedly")
+	}
+}
+
+func TestAuthorizationSuccess(t *testing.T) {
+	var (
+		expectedUser       = &user.DefaultInfo{Name: "test"}
+		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+		calledAuthenticate = false
+		calledAuthorize    = false
+		calledAttributes   = false
+	)
+
+	fw := newServerTest()
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+		calledAuthenticate = true
+		return expectedUser, true, nil
+	}
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+		calledAttributes = true
+		return expectedAttributes
+	}
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+		calledAuthorize = true
+		return nil
+	}
+
+	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
+
+	if !calledAuthenticate {
+		t.Fatalf("Authenticate was not called")
+	}
+	if !calledAttributes {
+		t.Fatalf("Attributes were not called")
+	}
+	if !calledAuthorize {
+		t.Fatalf("Authorize was not called")
 	}
 }
 
