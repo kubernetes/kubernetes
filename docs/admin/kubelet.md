@@ -104,7 +104,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --pod-cidr="": The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.
       --pod-infra-container-image="": The image whose network/ipc namespaces containers in each pod will use.
       --port=0: The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
-      --read-only-port=0: The read-only port for the Kubelet to serve on (set to 0 to disable)
+      --read-only-port=0: The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)
       --really-crash-for-testing=false: If true, when panics occur crash. Intended for testing.
       --register-node=false: Register the node with the apiserver (defaults to true if --api-server is set)
       --registry-burst=0: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0
