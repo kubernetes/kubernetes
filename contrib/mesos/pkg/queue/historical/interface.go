@@ -14,5 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package queue provides several queue implementations
-package queue
+package historical
+
+import (
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+)
+
+type Entry interface {
+	Copyable
+	Value() UniqueCopyable
+	// types is a logically OR'd combination of EventType, e.g. ADD_EVENT|UPDATE_EVENT
+	Is(types queue.EventType) bool
+}
+
+type Copyable interface {
+	// return an independent copy (deep clone) of the current object
+	Copy() Copyable
+}
+
+type UniqueCopyable interface {
+	Copyable
+	queue.UniqueID
+}

@@ -468,6 +468,10 @@
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
 		{
+			"ImportPath": "github.com/pivotal-golang/clock",
+			"Rev": "240d07df7a54b9fa7dc6adb66f3730bad8a77dfa"
+		},
+		{
 			"ImportPath": "github.com/prometheus/client_golang/extraction",
 			"Comment": "0.4.0-1-g692492e",
 			"Rev": "692492e54b553a81013254cc1fba4b6dd76fad30"

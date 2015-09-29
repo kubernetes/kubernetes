@@ -40,7 +40,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
-	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/delay"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
@@ -706,7 +706,7 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 
 	// preconditions
 	qr := newQueuer(nil)
-	qr.podQueue.Add(pod, queue.ReplaceExisting)
+	qr.podQueue.Add(pod, delay.ReplaceExisting)
 	assert.Equal(1, len(qr.podQueue.List()))
 	_, found := qr.podQueue.Get("default/foo")
 	assert.True(found)
@@ -749,7 +749,7 @@ func TestDeleteOne_Running(t *testing.T) {
 
 	// preconditions
 	qr := newQueuer(nil)
-	qr.podQueue.Add(pod, queue.ReplaceExisting)
+	qr.podQueue.Add(pod, delay.ReplaceExisting)
 	assert.Equal(1, len(qr.podQueue.List()))
 	_, found := qr.podQueue.Get("default/foo")
 	assert.True(found)

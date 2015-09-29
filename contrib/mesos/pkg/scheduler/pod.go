@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/delay"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue/historical"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -28,13 +29,13 @@ import (
 // wrapper for the k8s pod type so that we can define additional methods on a "pod"
 type Pod struct {
 	*api.Pod
-	deadline *time.Time
-	delay    *time.Duration
-	notify   queue.BreakChan
+	eventTime *time.Time
+	delay     *time.Duration
+	notify    delay.BreakChan
 }
 
 // implements Copyable
-func (p *Pod) Copy() queue.Copyable {
+func (p *Pod) Copy() historical.Copyable {
 	if p == nil {
 		return nil
 	}
@@ -43,7 +44,7 @@ func (p *Pod) Copy() queue.Copyable {
 	return &Pod{Pod: &pod}
 }
 
-// implements Unique
+// implements queue.UniqueID
 func (p *Pod) GetUID() string {
 	if id, err := cache.MetaNamespaceKeyFunc(p.Pod); err != nil {
 		panic(fmt.Sprintf("failed to determine pod id for '%+v'", p.Pod))
@@ -52,14 +53,15 @@ func (p *Pod) GetUID() string {
 	}
 }
 
-// implements Deadlined
-func (dp *Pod) Deadline() (time.Time, bool) {
-	if dp.deadline != nil {
-		return *(dp.deadline), true
+// implements queue/delay.Scheduled
+func (dp *Pod) EventTime() (time.Time, bool) {
+	if dp.eventTime != nil {
+		return *(dp.eventTime), true
 	}
 	return time.Time{}, false
 }
 
+// implements queue/delay.Delayed
 func (dp *Pod) GetDelay() time.Duration {
 	if dp.delay != nil {
 		return *(dp.delay)
@@ -67,14 +69,15 @@ func (dp *Pod) GetDelay() time.Duration {
 	return 0
 }
 
-func (p *Pod) Breaker() queue.BreakChan {
+// implements queue/delay.Breakout
+func (p *Pod) Breaker() delay.BreakChan {
 	return p.notify
 }
 
 func (p *Pod) String() string {
 	displayDeadline := "<none>"
-	if deadline, ok := p.Deadline(); ok {
-		displayDeadline = deadline.String()
+	if eventTime, ok := p.EventTime(); ok {
+		displayDeadline = eventTime.String()
 	}
-	return fmt.Sprintf("{pod:%v, deadline:%v, delay:%v}", p.Pod.Name, displayDeadline, p.GetDelay())
+	return fmt.Sprintf("{pod:%v, eventTime:%v, delay:%v}", p.Pod.Name, displayDeadline, p.GetDelay())
 }

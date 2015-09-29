@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package queue provides several queue implementations
-package queue
+// Package delay provides delay queue implementations.
+// Delay queues are priority queues with time-based dequeuing.
+package delay
