@@ -65,9 +65,11 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
 	storageVersions := make(map[string]string)
-	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
+	storageDestinations := NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix()))
+	storageDestinations.AddAPIGroup("experimental", etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix()))
+	config.StorageDestinations = storageDestinations
 	storageVersions[""] = testapi.Default.Version()
-	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
 	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
