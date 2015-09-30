@@ -84,9 +84,8 @@ const (
 	// be "ready" before the test starts, so this is small.
 	nodeReadyInitialTimeout = 20 * time.Second
 
-	// How long pods have to be "ready" when a test begins. They should already
-	// be "ready" before the test starts, so this is small.
-	podReadyBeforeTimeout = 20 * time.Second
+	// How long pods have to be "ready" when a test begins.
+	podReadyBeforeTimeout = 2 * time.Minute
 
 	podRespondingTimeout     = 2 * time.Minute
 	serviceRespondingTimeout = 2 * time.Minute
