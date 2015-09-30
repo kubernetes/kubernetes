@@ -390,6 +390,8 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -397,7 +399,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -506,6 +508,8 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -514,7 +518,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -574,6 +578,8 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -582,7 +588,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -662,6 +668,8 @@ func TestBobIsForbidden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -670,7 +678,7 @@ func TestBobIsForbidden(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -724,6 +732,8 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -732,7 +742,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -809,6 +819,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	trackingAuthorizer := &trackingAuthorizer{}
 
@@ -819,7 +831,7 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -890,6 +902,8 @@ func TestNamespaceAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	a := newAuthorizerWithContents(t, `{"namespace": "foo"}
 `)
@@ -901,7 +915,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -1006,6 +1020,8 @@ func TestKindAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
@@ -1017,7 +1033,7 @@ func TestKindAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -1110,6 +1126,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	a := newAuthorizerWithContents(t, `{"readonly": true}`)
 
@@ -1120,7 +1138,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,

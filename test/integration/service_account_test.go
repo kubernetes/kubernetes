@@ -345,6 +345,8 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	// Listener
 	var m *master.Master
@@ -411,16 +413,16 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 
 	// Create a master and install handlers into mux.
 	m = master.New(&master.Config{
-		DatabaseStorage:   etcdStorage,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     authenticator,
-		Authorizer:        authorizer,
-		AdmissionControl:  serviceAccountAdmission,
-		StorageVersions:   map[string]string{"": testapi.Default.Version()},
+		StorageDestinations: storageDestinations,
+		KubeletClient:       client.FakeKubeletClient{},
+		EnableLogsSupport:   false,
+		EnableUISupport:     false,
+		EnableIndex:         true,
+		APIPrefix:           "/api",
+		Authenticator:       authenticator,
+		Authorizer:          authorizer,
+		AdmissionControl:    serviceAccountAdmission,
+		StorageVersions:     map[string]string{"": testapi.Default.Version()},
 	})
 
 	// Start the service account and service account token controllers

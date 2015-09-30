@@ -51,6 +51,8 @@ func TestSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -59,7 +61,7 @@ func TestSecrets(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
