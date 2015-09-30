@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 	gpath "path"
-	"reflect"
 	"strings"
 	"time"
 
@@ -497,7 +496,11 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 			if err := json.Unmarshal(currentPatch, &diff2); err != nil {
 				return nil, err
 			}
-			if hasConflicts(diff1, diff2) {
+			hasConflicts, err := strategicpatch.HasConflicts(diff1, diff2)
+			if err != nil {
+				return nil, err
+			}
+			if hasConflicts {
 				return updateObject, updateErr
 			}
 
@@ -514,45 +517,6 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 
 		return updateObject, updateErr
 	})
-}
-
-// hasConflicts returns true if the left and right JSON interface objects overlap with
-// different values in any key.  The code will panic if an unrecognized type is passed
-// (anything not returned by a JSON decode).  All keys are required to be strings.
-func hasConflicts(left, right interface{}) bool {
-	switch typedLeft := left.(type) {
-	case map[string]interface{}:
-		switch typedRight := right.(type) {
-		case map[string]interface{}:
-			for key, leftValue := range typedLeft {
-				if rightValue, ok := typedRight[key]; ok && hasConflicts(leftValue, rightValue) {
-					return true
-				}
-			}
-			return false
-		default:
-			return true
-		}
-	case []interface{}:
-		switch typedRight := right.(type) {
-		case []interface{}:
-			if len(typedLeft) != len(typedRight) {
-				return true
-			}
-			for i := range typedLeft {
-				if hasConflicts(typedLeft[i], typedRight[i]) {
-					return true
-				}
-			}
-			return false
-		default:
-			return true
-		}
-	case string, float64, bool, int, int64, nil:
-		return !reflect.DeepEqual(left, right)
-	default:
-		panic(fmt.Sprintf("unknown type: %v", reflect.TypeOf(left)))
-	}
 }
 
 // UpdateResource returns a function that will handle a resource update

@@ -19,11 +19,11 @@ package jsonmerge
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
@@ -161,9 +161,14 @@ func (d *Delta) Apply(latest []byte) ([]byte, error) {
 	}
 
 	glog.V(6).Infof("Testing for conflict between:\n%s\n%s", string(d.edit), string(changes))
-	if hasConflicts(diff1, diff2) {
+	hasConflicts, err := strategicpatch.HasConflicts(diff1, diff2)
+	if err != nil {
+		return nil, err
+	}
+	if hasConflicts {
 		return nil, ErrConflict
 	}
+
 	return jsonpatch.MergePatch(base, d.edit)
 }
 
@@ -182,45 +187,6 @@ func IsPreconditionFailed(err error) bool {
 
 var ErrPreconditionFailed = fmt.Errorf("a precondition failed")
 var ErrConflict = fmt.Errorf("changes are in conflict")
-
-// hasConflicts returns true if the left and right JSON interface objects overlap with
-// different values in any key.  The code will panic if an unrecognized type is passed
-// (anything not returned by a JSON decode).  All keys are required to be strings.
-func hasConflicts(left, right interface{}) bool {
-	switch typedLeft := left.(type) {
-	case map[string]interface{}:
-		switch typedRight := right.(type) {
-		case map[string]interface{}:
-			for key, leftValue := range typedLeft {
-				if rightValue, ok := typedRight[key]; ok && hasConflicts(leftValue, rightValue) {
-					return true
-				}
-			}
-			return false
-		default:
-			return true
-		}
-	case []interface{}:
-		switch typedRight := right.(type) {
-		case []interface{}:
-			if len(typedLeft) != len(typedRight) {
-				return true
-			}
-			for i := range typedLeft {
-				if hasConflicts(typedLeft[i], typedRight[i]) {
-					return true
-				}
-			}
-			return false
-		default:
-			return true
-		}
-	case string, float64, bool, int, int64, nil:
-		return !reflect.DeepEqual(left, right)
-	default:
-		panic(fmt.Sprintf("unknown type: %v", reflect.TypeOf(left)))
-	}
-}
 
 func (d *Delta) Edit() []byte {
 	return d.edit
