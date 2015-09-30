@@ -541,6 +541,17 @@ case ${JOB_NAME} in
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     ;;
+
+  kubernetes-kubemark)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark"}
+    : ${E2E_NETWORK:="kubernetes-kubemark"}
+    : ${PROJECT:="k8s-jenkins-kubemark"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    : ${NUM_MINIONS:="10"}
+    ;;
 esac
 
 # AWS variables
@@ -737,6 +748,18 @@ if [[ "${E2E_TEST,,}" == "true" ]]; then
         echo "${githash}" > ${WORKSPACE}/githash.txt
         gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
     fi
+fi
+
+### Start Kubemark ###
+if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
+  ./test/kubemark/start-kubemark.sh
+  ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
+  if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
+        echo "publish githash to ci/latest-green.txt: ${githash}"
+        echo "${githash}" > ${WORKSPACE}/githash.txt
+        gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
+  fi
+  ./test/kubemark/stop-kubemark.sh
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
