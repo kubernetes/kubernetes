@@ -192,6 +192,7 @@ node-startup-grace-period
 node-status-update-frequency
 node-sync-period
 no-headers
+no-suggestions
 num-nodes
 oidc-ca-file
 oidc-client-id
