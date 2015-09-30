@@ -1,4 +1,4 @@
-package aws
+package request
 
 // A Handlers provides a collection of request handlers for various
 // stages of handling requests.
@@ -15,8 +15,8 @@ type Handlers struct {
 	AfterRetry       HandlerList
 }
 
-// copy returns of this handler's lists.
-func (h *Handlers) copy() Handlers {
+// Copy returns of this handler's lists.
+func (h *Handlers) Copy() Handlers {
 	return Handlers{
 		Validate:         h.Validate.copy(),
 		Build:            h.Build.copy(),
@@ -47,19 +47,25 @@ func (h *Handlers) Clear() {
 
 // A HandlerList manages zero or more handlers in a list.
 type HandlerList struct {
-	list []func(*Request)
+	list []NamedHandler
+}
+
+// A NamedHandler is a struct that contains a name and function callback.
+type NamedHandler struct {
+	Name string
+	Fn   func(*Request)
 }
 
 // copy creates a copy of the handler list.
 func (l *HandlerList) copy() HandlerList {
 	var n HandlerList
-	n.list = append([]func(*Request){}, l.list...)
+	n.list = append([]NamedHandler{}, l.list...)
 	return n
 }
 
 // Clear clears the handler list.
 func (l *HandlerList) Clear() {
-	l.list = []func(*Request){}
+	l.list = []NamedHandler{}
 }
 
 // Len returns the number of handlers in the list.
@@ -67,19 +73,40 @@ func (l *HandlerList) Len() int {
 	return len(l.list)
 }
 
-// PushBack pushes handlers f to the back of the handler list.
-func (l *HandlerList) PushBack(f ...func(*Request)) {
-	l.list = append(l.list, f...)
+// PushBack pushes handler f to the back of the handler list.
+func (l *HandlerList) PushBack(f func(*Request)) {
+	l.list = append(l.list, NamedHandler{"__anonymous", f})
 }
 
-// PushFront pushes handlers f to the front of the handler list.
-func (l *HandlerList) PushFront(f ...func(*Request)) {
-	l.list = append(f, l.list...)
+// PushFront pushes handler f to the front of the handler list.
+func (l *HandlerList) PushFront(f func(*Request)) {
+	l.list = append([]NamedHandler{{"__anonymous", f}}, l.list...)
+}
+
+// PushBackNamed pushes named handler f to the back of the handler list.
+func (l *HandlerList) PushBackNamed(n NamedHandler) {
+	l.list = append(l.list, n)
+}
+
+// PushFrontNamed pushes named handler f to the front of the handler list.
+func (l *HandlerList) PushFrontNamed(n NamedHandler) {
+	l.list = append([]NamedHandler{n}, l.list...)
+}
+
+// Remove removes a NamedHandler n
+func (l *HandlerList) Remove(n NamedHandler) {
+	newlist := []NamedHandler{}
+	for _, m := range l.list {
+		if m.Name != n.Name {
+			newlist = append(newlist, m)
+		}
+	}
+	l.list = newlist
 }
 
 // Run executes all handlers in the list with a given request object.
 func (l *HandlerList) Run(r *Request) {
 	for _, f := range l.list {
-		f(r)
+		f.Fn(r)
 	}
 }

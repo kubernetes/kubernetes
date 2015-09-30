@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/internal/apierr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +39,7 @@ func TestCredentialsGet(t *testing.T) {
 }
 
 func TestCredentialsGetWithError(t *testing.T) {
-	c := NewCredentials(&stubProvider{err: apierr.New("provider error", "", nil), expired: true})
+	c := NewCredentials(&stubProvider{err: awserr.New("provider error", "", nil), expired: true})
 
 	_, err := c.Get()
 	assert.Equal(t, "provider error", err.(awserr.Error).Code(), "Expected provider error")
