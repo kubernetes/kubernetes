@@ -57,7 +57,7 @@ func (t *suicideTracker) Next(d time.Duration, driver bindings.ExecutorDriver, f
 
 func (t *suicideTracker) makeJumper(_ jumper) jumper {
 	return jumper(func(driver bindings.ExecutorDriver, cancel <-chan struct{}) {
-		glog.Warningln("jumping?!")
+		glog.Warningln("Jumping?!")
 		if t.jumps != nil {
 			atomic.AddUint32(t.jumps, 1)
 		}
@@ -103,7 +103,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 	k.tasks["foo"] = &kuberTask{} // prevent suicide attempts from succeeding
 
 	// call reset with a nil timer
-	glog.Infoln("resetting suicide watch with 1 task")
+	glog.Infoln("Resetting suicide watch with 1 task")
 	select {
 	case <-k.resetSuicideWatch(nil):
 		tracker = k.suicideWatch.(*suicideTracker)
@@ -125,7 +125,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 	suicideStart := time.Now()
 
 	// reset the suicide watch, which should actually start a timer now
-	glog.Infoln("resetting suicide watch with 0 tasks")
+	glog.Infoln("Resetting suicide watch with 0 tasks")
 	select {
 	case <-k.resetSuicideWatch(nil):
 		tracker = k.suicideWatch.(*suicideTracker)
@@ -147,7 +147,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 	k.lock.Unlock()
 
 	// reset the suicide watch, which should stop the existing timer
-	glog.Infoln("resetting suicide watch with 1 task")
+	glog.Infoln("Resetting suicide watch with 1 task")
 	select {
 	case <-k.resetSuicideWatch(nil):
 		tracker = k.suicideWatch.(*suicideTracker)
@@ -169,7 +169,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 	k.lock.Unlock()
 
 	// reset the suicide watch, which should reset a stopped timer
-	glog.Infoln("resetting suicide watch with 0 tasks")
+	glog.Infoln("Resetting suicide watch with 0 tasks")
 	select {
 	case <-k.resetSuicideWatch(nil):
 		tracker = k.suicideWatch.(*suicideTracker)
@@ -192,6 +192,6 @@ func TestSuicide_WithTasks(t *testing.T) {
 	if j := atomic.LoadUint32(&jumps); j != 1 {
 		t.Fatalf("expected 1 jumps instead of %d since stop was called", j)
 	} else {
-		glog.Infoln("jumps verified") // glog so we get a timestamp
+		glog.Infoln("Jumps verified") // glog so we get a timestamp
 	}
 }

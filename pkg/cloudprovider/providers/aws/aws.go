@@ -683,7 +683,7 @@ func isAlive(instance *ec2.Instance) bool {
 	case "pending", "running":
 		return true
 	default:
-		glog.Errorf("unknown EC2 instance state: %s", stateName)
+		glog.Errorf("Unknown EC2 instance state: %s", stateName)
 		return false
 	}
 }
@@ -724,13 +724,13 @@ func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
 		if orEmpty(instance.State.Name) == "pending" {
-			glog.V(2).Infof("skipping EC2 instance (pending): %s", *instance.InstanceId)
+			glog.V(2).Infof("Skipping EC2 instance (pending): %s", *instance.InstanceId)
 			continue
 		}
 
 		privateDNSName := orEmpty(instance.PrivateDnsName)
 		if privateDNSName == "" {
-			glog.V(2).Infof("skipping EC2 instance (no PrivateDNSName): %s",
+			glog.V(2).Infof("Skipping EC2 instance (no PrivateDNSName): %s",
 				orEmpty(instance.InstanceId))
 			continue
 		}
@@ -1514,7 +1514,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 				}
 			}
 			if !ignore {
-				glog.Error("error creating security group: ", err)
+				glog.Error("Error creating security group: ", err)
 				return "", err
 			}
 			time.Sleep(1 * time.Second)
@@ -1617,7 +1617,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 		subnets, err := s.ec2.DescribeSubnets(request)
 		if err != nil {
-			glog.Error("error describing subnets: ", err)
+			glog.Error("Error describing subnets: ", err)
 			return nil, err
 		}
 
@@ -1625,7 +1625,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		for _, subnet := range subnets {
 			subnetIDs = append(subnetIDs, orEmpty(subnet.SubnetId))
 			if !strings.HasPrefix(orEmpty(subnet.AvailabilityZone), region) {
-				glog.Error("found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
+				glog.Error("Found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
 				return nil, fmt.Errorf("invalid AZ for region")
 			}
 			//		zones = append(zones, subnet.AvailabilityZone)
@@ -1639,7 +1639,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		sgDescription := "Security group for Kubernetes ELB " + name
 		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, orEmpty(vpc.VpcId))
 		if err != nil {
-			glog.Error("error creating load balancer security group: ", err)
+			glog.Error("Error creating load balancer security group: ", err)
 			return nil, err
 		}
 
@@ -1814,7 +1814,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 	for _, instance := range allInstances {
 		securityGroupId := findSecurityGroupForInstance(instance)
 		if isNilOrEmpty(securityGroupId) {
-			glog.Warning("ignoring instance without security group: ", orEmpty(instance.InstanceId))
+			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
 			continue
 		}
 
@@ -1824,7 +1824,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 	// Compare to actual groups
 	for _, actualGroup := range actualGroups {
 		if isNilOrEmpty(actualGroup.GroupId) {
-			glog.Warning("ignoring group without ID: ", actualGroup)
+			glog.Warning("Ignoring group without ID: ", actualGroup)
 			continue
 		}
 
@@ -1899,7 +1899,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 		// De-authorize the load balancer security group from the instances security group
 		err = s.updateInstanceSecurityGroupsForLoadBalancer(lb, nil)
 		if err != nil {
-			glog.Error("error deregistering load balancer from instance security groups: ", err)
+			glog.Error("Error deregistering load balancer from instance security groups: ", err)
 			return err
 		}
 	}
@@ -1912,7 +1912,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 		_, err = s.elb.DeleteLoadBalancer(request)
 		if err != nil {
 			// TODO: Check if error was because load balancer was concurrently deleted
-			glog.Error("error deleting load balancer: ", err)
+			glog.Error("Error deleting load balancer: ", err)
 			return err
 		}
 	}
