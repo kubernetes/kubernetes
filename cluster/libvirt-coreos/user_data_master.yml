@@ -14,8 +14,8 @@ coreos:
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-apiserver \
-        --address=0.0.0.0 \
-        --port=8080 \
+        --insecure-bind-address=0.0.0.0 \
+        --insecure-port=8080 \
         --etcd-servers=http://127.0.0.1:2379 \
         --kubelet-port=10250 \
         --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}
