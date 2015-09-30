@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type fakeRL bool
@@ -64,59 +66,119 @@ func TestMaxInFlight(t *testing.T) {
 	block.Add(1)
 	sem := make(chan bool, Iterations)
 
-	re := regexp.MustCompile("[.*\\/watch][^\\/proxy.*]")
+	requestsThatShouldBeWaiting := sets.String{}
 
-	// Calls verifies that the server is actually blocked up before running the rest of the test
-	calls := &sync.WaitGroup{}
-	calls.Add(Iterations * 3)
+	requestsWaitingOnBlockLock := &sync.Mutex{} // used to force consistency between threads
+	requestsWaitingOnBlock := sets.String{}
+
+	re := regexp.MustCompile("[.*\\/watch.*][^\\/proxy.*]")
 
 	server := httptest.NewServer(MaxInFlightLimit(sem, re, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "dontwait") {
+			t.Logf("Not blocking %s", r.URL.String())
 			return
 		}
-		if calls != nil {
-			calls.Done()
-		}
+
+		requestsWaitingOnBlockLock.Lock()
+		requestsWaitingOnBlock.Insert(r.URL.String())
+		requestsWaitingOnBlockLock.Unlock()
+
+		t.Logf("Blocking %s", r.URL.String())
 		block.Wait()
+		t.Logf("Released %s", r.URL.String())
+
+		requestsWaitingOnBlockLock.Lock()
+		requestsWaitingOnBlock.Delete(r.URL.String())
+		requestsWaitingOnBlockLock.Unlock()
 	})))
 	defer server.Close()
 
-	// These should hang, but not affect accounting.
+	// These should hang, but doesn't care about inflights
 	for i := 0; i < Iterations; i++ {
+		url := fmt.Sprintf("/foo/bar/watch/%d", i)
 		// These should hang waiting on block...
 		go func() {
-			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
+			expectHTTP(server.URL+url, http.StatusOK, t)
 		}()
+
+		requestsThatShouldBeWaiting.Insert(url)
+	}
+	// These should hang, but doesn't care about inflights
+	for i := 0; i < Iterations; i++ {
+		url := fmt.Sprintf("/proxy/foo/bar/%d", i)
+		// These should hang waiting on block...
+		go func() {
+			expectHTTP(server.URL+url, http.StatusOK, t)
+		}()
+
+		requestsThatShouldBeWaiting.Insert(url)
 	}
 
-	for i := 0; i < Iterations; i++ {
-		// These should hang waiting on block...
-		go func() {
-			expectHTTP(server.URL+"/proxy/foo/bar", http.StatusOK, t)
-		}()
+	// wait until we see the expected blockers
+	err := wait.Poll(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+		requestsWaitingOnBlockLock.Lock()
+		defer requestsWaitingOnBlockLock.Unlock()
+		if !reflect.DeepEqual(requestsWaitingOnBlock.List(), requestsThatShouldBeWaiting.List()) {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("did not get expected waiters: %v, got %v", requestsThatShouldBeWaiting.List(), requestsWaitingOnBlock.List())
 	}
+
+	// // doesn't block does care about inflights
 	expectHTTP(server.URL+"/dontwait", http.StatusOK, t)
 
 	for i := 0; i < Iterations; i++ {
-		// These should hang waiting on block...
+		// These should hang waiting on block and affect the accounting.  This fills our waiting queue
 		go func() {
 			expectHTTP(server.URL, http.StatusOK, t)
 		}()
+
+		requestsThatShouldBeWaiting.Insert("/")
 	}
-	calls.Wait()
-	calls = nil
+
+	// wait until we see the expected blockers
+	err = wait.Poll(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+		requestsWaitingOnBlockLock.Lock()
+		defer requestsWaitingOnBlockLock.Unlock()
+		if !reflect.DeepEqual(requestsWaitingOnBlock.List(), requestsThatShouldBeWaiting.List()) {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("did not get expected waiters: %v, got %v", requestsThatShouldBeWaiting.List(), requestsWaitingOnBlock.List())
+	}
+
+	// this doesn't block and doesn't care about inflights
+	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
 
 	// Do this multiple times to show that it rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
+		// this cares about accounting, but the max inflights have been reached, so it should immediately fail
 		expectHTTP(server.URL, errors.StatusTooManyRequests, t)
 	}
-
-	// Validate that non-accounted URLs still work
-	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
-
 	block.Done()
 
-	// Show that we recover from being blocked up.
+	// wait for all requests to clear
+	err = wait.Poll(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+		requestsWaitingOnBlockLock.Lock()
+		defer requestsWaitingOnBlockLock.Unlock()
+		if len(requestsWaitingOnBlock) != 0 {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("did not clean  waiters: %v", requestsWaitingOnBlock.List())
+	}
+
+	// // Show that we recover from being blocked up.
 	expectHTTP(server.URL, http.StatusOK, t)
 }
 
