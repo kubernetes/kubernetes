@@ -15,6 +15,7 @@ kubectl-delete.1
 kubectl-describe.1
 kubectl-edit.1
 kubectl-exec.1
+kubectl-explain.1
 kubectl-expose.1
 kubectl-get.1
 kubectl-label.1
