@@ -1665,7 +1665,7 @@ func TestPatch(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
-	request.Header.Set("Content-Type", "application/merge-patch+json")
+	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 	_, err = client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

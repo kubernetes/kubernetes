@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	gpath "path"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -736,6 +737,10 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 }
 
 func getPatchedJS(contentType string, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
+	// Remove "; charset=" if included in header.
+	if idx := strings.Index(contentType, ";"); idx > 0 {
+		contentType = contentType[:idx]
+	}
 	patchType := api.PatchType(contentType)
 	switch patchType {
 	case api.JSONPatchType:
