@@ -145,6 +145,12 @@ func (c *ClientCache) ClientForVersion(groupVersion string) (*client.Client, err
 	experimentalClient, ok := c.clients[apiutil.GetGroupVersion("experimental", experimentalVersion)]
 	if !ok {
 		config, err := c.ClientConfigForVersion("experimental", experimentalVersion)
+		if err != nil && len(experimentalVersion) == 0 {
+			// This is a hack. This is to work around when "experimental" is not supported by the server,
+			// and the caller doesn't specifically want a ExperiementalClient. But this also hides other
+			// types of error.
+			return &client.Client{RESTClient: legacyClient, ExperimentalClient: nil}, nil
+		}
 		if err != nil {
 			return nil, err
 		}
