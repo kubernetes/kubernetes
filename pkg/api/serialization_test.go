@@ -17,8 +17,6 @@ limitations under the License.
 package api_test
 
 import (
-	"encoding/json"
-
 	"math/rand"
 	"reflect"
 	"testing"
@@ -35,6 +33,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/experimental"
 	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
 
+	json "github.com/pquerna/ffjson/ffjson"
 	flag "github.com/spf13/pflag"
 )
 
@@ -73,6 +72,8 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 
+	// The ffjson library mucks with the data as it parses it, so we need to regenerate.
+	data, _ = codec.Encode(item)
 	obj3 := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
 	err = codec.DecodeInto(data, obj3)
 	if err != nil {
@@ -207,7 +208,8 @@ func BenchmarkEncode(b *testing.B) {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	for i := 0; i < b.N; i++ {
-		testapi.Default.Codec().Encode(&pod)
+		data, _ := testapi.Default.Codec().Encode(&pod)
+		json.Pool(data)
 	}
 }
 
@@ -217,7 +219,8 @@ func BenchmarkEncodeJSON(b *testing.B) {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	for i := 0; i < b.N; i++ {
-		json.Marshal(&pod)
+		data, _ := json.Marshal(&pod)
+		json.Pool(data)
 	}
 }
 

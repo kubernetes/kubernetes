@@ -17,10 +17,11 @@ limitations under the License.
 package conversion
 
 import (
-	"encoding/json"
 	"fmt"
 	"path"
 	"reflect"
+
+	json "github.com/pquerna/ffjson/ffjson"
 )
 
 // MetaFactory is used to store and retrieve the version and kind

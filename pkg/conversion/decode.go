@@ -17,9 +17,10 @@ limitations under the License.
 package conversion
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	json "github.com/pquerna/ffjson/ffjson"
 )
 
 func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version, kind string, err error) {
