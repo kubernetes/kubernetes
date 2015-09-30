@@ -133,7 +133,7 @@ func ExampleInformer() {
 		time.Millisecond*100,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				source.Delete(obj.(runtime.Object))
+				source.DeleteDropWatch(obj.(runtime.Object))
 			},
 			DeleteFunc: func(obj interface{}) {
 				key, err := framework.DeletionHandlingMetaNamespaceKeyFunc(obj)
@@ -327,7 +327,7 @@ func TestUpdate(t *testing.T) {
 				if !allowedTransitions[pair{from, to}] {
 					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
 				}
-				source.Delete(n)
+				source.DeleteDropWatch(n)
 			},
 			DeleteFunc: func(obj interface{}) {
 				testDoneWG.Done()
@@ -384,7 +384,7 @@ func TestUpdate(t *testing.T) {
 			go func(name string, f func(string)) {
 				defer wg.Done()
 				f(name)
-			}(fmt.Sprintf("%v-%v", i, j), f)
+			}(fmt.Sprintf("%d-%d", i, j), f)
 		}
 	}
 	wg.Wait()
