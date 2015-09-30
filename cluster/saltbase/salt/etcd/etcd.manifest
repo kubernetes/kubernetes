@@ -19,7 +19,7 @@
     "command": [
               "/bin/sh",
               "-c",
-              "/usr/local/bin/etcd --addr 127.0.0.1:4001 --bind-addr 127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd.log 2>&1"
+              "/usr/local/bin/etcd --advertise-client-urls http://127.0.0.1:4001 --listen-client-urls http://127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd.log 2>&1"
             ],
     "livenessProbe": {
       "httpGet": {
