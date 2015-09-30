@@ -103,7 +103,7 @@ func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 		panic(err) // this is test code only
 	}
 
-	resourceVersion := len(f.changes)
+	resourceVersion := len(f.changes) + 1
 	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
 	f.changes = append(f.changes, e)
 	key := f.key(objMeta)
@@ -127,7 +127,7 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 	for _, obj := range f.items {
 		// Must make a copy to allow clients to modify the object.
 		// Otherwise, if they make a change and write it back, they
-		// will inadvertently change the our canonical copy (in
+		// will inadvertently change our canonical copy (in
 		// addition to racing with other clients).
 		objCopy, err := api.Scheme.DeepCopy(obj)
 		if err != nil {
@@ -157,7 +157,6 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 	if err != nil {
 		return nil, err
 	}
-	rc++ // Don't re-send them a change they already have.
 	if rc < len(f.changes) {
 		changes := []watch.Event{}
 		for _, c := range f.changes[rc:] {
@@ -177,4 +176,12 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 		return nil, errors.New("resource version in the future not supported by this fake")
 	}
 	return f.broadcaster.Watch(), nil
+}
+
+// Shutdown closes the underlying broadcaster, waiting for events to be
+// delivered. It's an error to call any method after calling shutdown. This is
+// enforced by Shutdown() leaving f locked.
+func (f *FakeControllerSource) Shutdown() {
+	f.lock.Lock() // Purposely no unlock.
+	f.broadcaster.Shutdown()
 }
