@@ -100,7 +100,7 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     public List<InetAddress> getSeeds() {
         List<InetAddress> list = new ArrayList<InetAddress>();
-        String host = "https://kubernetes.default.svc.cluster.local";
+        String host = getEnvOrDefault("KUBERNETES_API_HOST","https://kubernetes.default.svc.cluster.local");
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
         String podNamespace = getEnvOrDefault("POD_NAMESPACE", "default");
         String path = String.format("/api/v1/namespaces/%s/endpoints/", podNamespace);
