@@ -77,7 +77,7 @@ write_files:
 
 coreos:
   etcd:
-    name: kubernetes-minion-INDEX
+    name: kubernetes-node-INDEX
     discovery: https://discovery.etcd.io/DISCOVERY_ID
     addr: $private_ipv4:4001
     peer-addr: $private_ipv4:7001
