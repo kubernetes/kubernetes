@@ -78,7 +78,7 @@ type ServiceController struct {
 }
 
 // New returns a new service controller to keep cloud provider service resources
-// (like external load balancers) in sync with the registry.
+// (like load balancers) in sync with the registry.
 func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -98,12 +98,12 @@ func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName
 }
 
 // Run starts a background goroutine that watches for changes to services that
-// have (or had) externalLoadBalancers=true and ensures that they have external
+// have (or had) LoadBalancers=true and ensures that they have
 // load balancers created and deleted appropriately.
 // serviceSyncPeriod controls how often we check the cluster's services to
-// ensure that the correct external load balancers exist.
+// ensure that the correct load balancers exist.
 // nodeSyncPeriod controls how often we check the cluster's nodes to determine
-// if external load balancers need to be updated to point to a new set.
+// if load balancers need to be updated to point to a new set.
 //
 // It's an error to call Run() more than once for a given ServiceController
 // object.
@@ -152,17 +152,17 @@ func (s *ServiceController) init() error {
 
 	balancer, ok := s.cloud.TCPLoadBalancer()
 	if !ok {
-		return fmt.Errorf("the cloud provider does not support external TCP load balancers.")
+		return fmt.Errorf("the cloud provider does not support TCP load balancers.")
 	}
 	s.balancer = balancer
 
 	zones, ok := s.cloud.Zones()
 	if !ok {
-		return fmt.Errorf("the cloud provider does not support zone enumeration, which is required for creating external load balancers.")
+		return fmt.Errorf("the cloud provider does not support zone enumeration, which is required for creating load balancers.")
 	}
 	zone, err := zones.GetZone()
 	if err != nil {
-		return fmt.Errorf("failed to get zone from cloud provider, will not be able to create external load balancers: %v", err)
+		return fmt.Errorf("failed to get zone from cloud provider, will not be able to create load balancers: %v", err)
 	}
 	s.zone = zone
 	return nil
@@ -284,10 +284,10 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 	// Save the state so we can avoid a write if it doesn't change
 	previousState := api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 
-	if !wantsExternalLoadBalancer(service) {
+	if !wantsLoadBalancer(service) {
 		needDelete := true
 		if appliedState != nil {
-			if !wantsExternalLoadBalancer(appliedState) {
+			if !wantsLoadBalancer(appliedState) {
 				needDelete = false
 			}
 		} else {
@@ -361,7 +361,7 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 			glog.Infof("Not persisting update to service that has been changed since we received it: %v", err)
 			return nil
 		}
-		glog.Warningf("Failed to persist updated LoadBalancerStatus to service %s after creating its external load balancer: %v",
+		glog.Warningf("Failed to persist updated LoadBalancerStatus to service %s after creating its load balancer: %v",
 			service.Name, err)
 		time.Sleep(clientRetryInterval)
 	}
@@ -454,10 +454,10 @@ func (s *serviceCache) delete(serviceName string) {
 }
 
 func needsUpdate(oldService *api.Service, newService *api.Service) bool {
-	if !wantsExternalLoadBalancer(oldService) && !wantsExternalLoadBalancer(newService) {
+	if !wantsLoadBalancer(oldService) && !wantsLoadBalancer(newService) {
 		return false
 	}
-	if wantsExternalLoadBalancer(oldService) != wantsExternalLoadBalancer(newService) {
+	if wantsLoadBalancer(oldService) != wantsLoadBalancer(newService) {
 		return true
 	}
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
@@ -488,7 +488,7 @@ func getPortsForLB(service *api.Service) ([]*api.ServicePort, error) {
 		// it's supported.
 		sp := &service.Spec.Ports[i]
 		if sp.Protocol != api.ProtocolTCP {
-			return nil, fmt.Errorf("external load balancers for non TCP services are not currently supported.")
+			return nil, fmt.Errorf("load balancers for non TCP services are not currently supported.")
 		}
 		ports = append(ports, sp)
 	}
@@ -588,7 +588,7 @@ func hostsFromNodeList(list *api.NodeList) []string {
 	return result
 }
 
-// nodeSyncLoop handles updating the hosts pointed to by all external load
+// nodeSyncLoop handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
 func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	var prevHosts []string
@@ -617,14 +617,14 @@ func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 		servicesToUpdate = s.cache.allServices()
 		numServices := len(servicesToUpdate)
 		servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
-		glog.Infof("Successfully updated %d out of %d external load balancers to direct traffic to the updated set of nodes",
+		glog.Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
 			numServices-len(servicesToUpdate), numServices)
 
 		prevHosts = newHosts
 	}
 }
 
-// updateLoadBalancerHosts updates all existing external load balancers so that
+// updateLoadBalancerHosts updates all existing load balancers so that
 // they will match the list of hosts provided.
 // Returns the list of services that couldn't be updated.
 func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, hosts []string) (servicesToRetry []*cachedService) {
@@ -648,10 +648,10 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, h
 	return servicesToRetry
 }
 
-// Updates the external load balancer of a service, assuming we hold the mutex
+// Updates the load balancer of a service, assuming we hold the mutex
 // associated with the service.
 func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, hosts []string) error {
-	if !wantsExternalLoadBalancer(service) {
+	if !wantsLoadBalancer(service) {
 		return nil
 	}
 
@@ -674,7 +674,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 	return err
 }
 
-func wantsExternalLoadBalancer(service *api.Service) bool {
+func wantsLoadBalancer(service *api.Service) bool {
 	return service.Spec.Type == api.ServiceTypeLoadBalancer
 }
 
