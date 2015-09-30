@@ -17,10 +17,35 @@ limitations under the License.
 package framework
 
 import (
+	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/watch"
 )
+
+// ensure the watch delivers the requested and only the requested items.
+func consume(t *testing.T, w watch.Interface, rvs []string, done *sync.WaitGroup) {
+	defer done.Done()
+	for _, rv := range rvs {
+		got, ok := <-w.ResultChan()
+		if !ok {
+			t.Errorf("%#v: unexpected channel close, wanted %v", rvs, rv)
+			return
+		}
+		gotRV := got.Object.(*api.Pod).ObjectMeta.ResourceVersion
+		if e, a := rv, gotRV; e != a {
+			t.Errorf("wanted %v, got %v", e, a)
+		} else {
+			t.Logf("Got %v as expected", gotRV)
+		}
+	}
+	// We should not get anything else.
+	got, open := <-w.ResultChan()
+	if open {
+		t.Errorf("%#v: unwanted object %#v", rvs, got)
+	}
+}
 
 func TestRCNumber(t *testing.T) {
 	pod := func(name string) *api.Pod {
@@ -31,6 +56,9 @@ func TestRCNumber(t *testing.T) {
 		}
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+
 	source := NewFakeControllerSource()
 	source.Add(pod("foo"))
 	source.Modify(pod("foo"))
@@ -40,9 +68,27 @@ func TestRCNumber(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer w.Stop()
-	got := <-w.ResultChan()
-	if e, a := "2", got.Object.(*api.Pod).ObjectMeta.ResourceVersion; e != a {
+	go consume(t, w, []string{"2", "3"}, wg)
+
+	list, err := source.List()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if e, a := "3", list.(*api.List).ResourceVersion; e != a {
 		t.Errorf("wanted %v, got %v", e, a)
 	}
+
+	w2, err := source.Watch("2")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	go consume(t, w2, []string{"3"}, wg)
+
+	w3, err := source.Watch("3")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	go consume(t, w3, []string{}, wg)
+	source.Shutdown()
+	wg.Wait()
 }
