@@ -47,8 +47,8 @@ var allowedUsage = resourceUsagePerContainer{
 	},
 	"/kube-proxy": &containerResourceUsage{
 		CPUUsageInCores:         0.025,
-		MemoryUsageInBytes:      12000000,
-		MemoryWorkingSetInBytes: 12000000,
+		MemoryUsageInBytes:      100000000,
+		MemoryWorkingSetInBytes: 100000000,
 	},
 	"/system": &containerResourceUsage{
 		CPUUsageInCores:         0.03,
