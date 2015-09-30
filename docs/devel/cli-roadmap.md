@@ -35,8 +35,8 @@ Documentation for other releases can be found at
 
 See github issues with the following labels:
 * [area/app-config-deployment](https://github.com/kubernetes/kubernetes/labels/area/app-config-deployment)
-* [component/CLI](https://github.com/kubernetes/kubernetes/labels/component/CLI)
-* [component/client](https://github.com/kubernetes/kubernetes/labels/component/client)
+* [component/kubectl](https://github.com/kubernetes/kubernetes/labels/component/kubectl)
+* [component/clientlib](https://github.com/kubernetes/kubernetes/labels/component/clientlib)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
