@@ -51,6 +51,8 @@ type Command struct {
 	BashCompletionFunction string
 	// Is this command deprecated and should print this string when used?
 	Deprecated string
+	// Is this command hidden and should NOT show up in the list of available commands?
+	Hidden bool
 	// Full set of flags
 	flags *flag.FlagSet
 	// Set of flags childrens of this command will inherit
@@ -104,6 +106,11 @@ type Command struct {
 	helpCommand   *Command                 // The help command
 	// The global normalization function that we can use on every pFlag set and children commands
 	globNormFunc func(f *flag.FlagSet, name string) flag.NormalizedName
+
+	// Disable the suggestions based on Levenshtein distance that go along with 'unknown command' messages
+	DisableSuggestions bool
+	// If displaying suggestions, allows to set the minimum levenshtein distance to display, must be > 0
+	SuggestionsMinimumDistance int
 }
 
 // os.Args[1:] by default, if desired, can be overridden
@@ -184,6 +191,9 @@ func (c *Command) UsageFunc() (f func(*Command) error) {
 	} else {
 		return func(c *Command) error {
 			err := tmpl(c.Out(), c.UsageTemplate(), c)
+			if err != nil {
+				fmt.Print(err)
+			}
 			return err
 		}
 	}
@@ -246,8 +256,7 @@ func (c *Command) UsageTemplate() string {
 	if c.HasParent() {
 		return c.parent.UsageTemplate()
 	} else {
-		return `{{ $cmd := . }}
-Usage: {{if .Runnable}}
+		return `Usage:{{if .Runnable}}
   {{.UseLine}}{{if .HasFlags}} [flags]{{end}}{{end}}{{if .HasSubCommands}}
   {{ .CommandPath}} [command]{{end}}{{if gt .Aliases 0}}
 
@@ -256,22 +265,22 @@ Aliases:
 {{end}}{{if .HasExample}}
 
 Examples:
-{{ .Example }}{{end}}{{ if .HasNonHelpSubCommands}}
+{{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
 
-Available Commands: {{range .Commands}}{{if (not .IsHelpCommand)}}
+Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasLocalFlags}}
 
 Flags:
-{{.LocalFlags.FlagUsages}}{{end}}{{ if .HasInheritedFlags}}
+{{.LocalFlags.FlagUsages | trimRightSpace}}{{end}}{{ if .HasInheritedFlags}}
 
 Global Flags:
-{{.InheritedFlags.FlagUsages}}{{end}}{{if .HasHelpSubCommands}}
+{{.InheritedFlags.FlagUsages | trimRightSpace}}{{end}}{{if .HasHelpSubCommands}}
 
-Additional help topics: {{range .Commands}}{{if .IsHelpCommand}}
+Additional help topics:{{range .Commands}}{{if .IsHelpCommand}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasSubCommands }}
 
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-{{end}}`
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 	}
 }
 
@@ -283,9 +292,9 @@ func (c *Command) HelpTemplate() string {
 	if c.HasParent() {
 		return c.parent.HelpTemplate()
 	} else {
-		return `{{with or .Long .Short }}{{. | trim}}{{end}}
-{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`
+		return `{{with or .Long .Short }}{{. | trim}}
+
+{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 	}
 }
 
@@ -417,9 +426,31 @@ func (c *Command) Find(args []string) (*Command, []string, error) {
 	if !commandFound.HasSubCommands() {
 		return commandFound, a, nil
 	}
+
 	// root command with subcommands, do subcommand checking
 	if commandFound == c && len(argsWOflags) > 0 {
-		return commandFound, a, fmt.Errorf("unknown command %q for %q", argsWOflags[0], commandFound.CommandPath())
+		suggestions := ""
+		if !c.DisableSuggestions {
+			if c.SuggestionsMinimumDistance <= 0 {
+				c.SuggestionsMinimumDistance = 2
+			}
+			similar := []string{}
+			for _, cmd := range c.commands {
+				if cmd.IsAvailableCommand() {
+					levenshtein := ld(argsWOflags[0], cmd.Name(), true)
+					if levenshtein <= c.SuggestionsMinimumDistance {
+						similar = append(similar, cmd.Name())
+					}
+				}
+			}
+			if len(similar) > 0 {
+				suggestions += "\n\nDid you mean this?\n"
+				for _, s := range similar {
+					suggestions += fmt.Sprintf("\t%v\n", s)
+				}
+			}
+		}
+		return commandFound, a, fmt.Errorf("unknown command %q for %q%s", argsWOflags[0], commandFound.CommandPath(), suggestions)
 	}
 
 	return commandFound, a, nil
@@ -437,6 +468,10 @@ func (c *Command) Root() *Command {
 	}
 
 	return findRoot(c)
+}
+
+func (c *Command) ArgsLenAtDash() int {
+	return c.Flags().ArgsLenAtDash()
 }
 
 func (c *Command) execute(a []string) (err error) {
@@ -850,42 +885,75 @@ func (c *Command) HasSubCommands() bool {
 	return len(c.commands) > 0
 }
 
-func (c *Command) IsHelpCommand() bool {
-	if c.Runnable() {
+// IsAvailableCommand determines if a command is available as a non-help command
+// (this includes all non deprecated/hidden commands)
+func (c *Command) IsAvailableCommand() bool {
+	if len(c.Deprecated) != 0 || c.Hidden {
 		return false
 	}
+
+	if c.HasParent() && c.Parent().helpCommand == c {
+		return false
+	}
+
+	if c.Runnable() || c.HasAvailableSubCommands() {
+		return true
+	}
+
+	return false
+}
+
+// IsHelpCommand determines if a command is a 'help' command; a help command is
+// determined by the fact that it is NOT runnable/hidden/deprecated, and has no
+// sub commands that are runnable/hidden/deprecated
+func (c *Command) IsHelpCommand() bool {
+
+	// if a command is runnable, deprecated, or hidden it is not a 'help' command
+	if c.Runnable() || len(c.Deprecated) != 0 || c.Hidden {
+		return false
+	}
+
+	// if any non-help sub commands are found, the command is not a 'help' command
 	for _, sub := range c.commands {
-		if len(sub.Deprecated) != 0 {
-			continue
-		}
 		if !sub.IsHelpCommand() {
 			return false
 		}
 	}
+
+	// the command either has no sub commands, or no non-help sub commands
 	return true
 }
 
+// HasHelpSubCommands determines if a command has any avilable 'help' sub commands
+// that need to be shown in the usage/help default template under 'additional help
+// topics'
 func (c *Command) HasHelpSubCommands() bool {
+
+	// return true on the first found available 'help' sub command
 	for _, sub := range c.commands {
-		if len(sub.Deprecated) != 0 {
-			continue
-		}
 		if sub.IsHelpCommand() {
 			return true
 		}
 	}
+
+	// the command either has no sub commands, or no available 'help' sub commands
 	return false
 }
 
-func (c *Command) HasNonHelpSubCommands() bool {
+// HasAvailableSubCommands determines if a command has available sub commands that
+// need to be shown in the usage/help default template under 'available commands'
+func (c *Command) HasAvailableSubCommands() bool {
+
+	// return true on the first found available (non deprecated/help/hidden)
+	// sub command
 	for _, sub := range c.commands {
-		if len(sub.Deprecated) != 0 {
-			continue
-		}
-		if !sub.IsHelpCommand() {
+		if sub.IsAvailableCommand() {
 			return true
 		}
 	}
+
+	// the command either has no sub comamnds, or no available (non deprecated/help/hidden)
+	// sub commands
 	return false
 }
 
