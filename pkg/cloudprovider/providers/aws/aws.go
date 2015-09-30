@@ -683,7 +683,7 @@ func isAlive(instance *ec2.Instance) bool {
 	case "pending", "running":
 		return true
 	default:
-		glog.Errorf("unknown EC2 instance state: %s", stateName)
+		glog.Errorf("Unknown EC2 instance state: %s", stateName)
 		return false
 	}
 }
@@ -724,13 +724,13 @@ func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
 		if orEmpty(instance.State.Name) == "pending" {
-			glog.V(2).Infof("skipping EC2 instance (pending): %s", *instance.InstanceId)
+			glog.V(2).Infof("Skipping EC2 instance (pending): %s", *instance.InstanceId)
 			continue
 		}
 
 		privateDNSName := orEmpty(instance.PrivateDnsName)
 		if privateDNSName == "" {
-			glog.V(2).Infof("skipping EC2 instance (no PrivateDNSName): %s",
+			glog.V(2).Infof("Skipping EC2 instance (no PrivateDNSName): %s",
 				orEmpty(instance.InstanceId))
 			continue
 		}
