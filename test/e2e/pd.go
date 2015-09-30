@@ -84,7 +84,7 @@ var _ = Describe("Pod Disks", func() {
 			podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
 			detachPD(host1Name, diskName)
-			deletePD(diskName)
+			deletePDWithRetry(diskName)
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -144,7 +144,7 @@ var _ = Describe("Pod Disks", func() {
 
 			detachPD(host0Name, diskName)
 			detachPD(host1Name, diskName)
-			deletePD(diskName)
+			deletePDWithRetry(diskName)
 		}()
 
 		By("submitting rwPod to ensure PD is formatted")
@@ -194,7 +194,7 @@ var _ = Describe("Pod Disks", func() {
 			// Teardown should do nothing unless test failed.
 			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
-			deletePD(diskName)
+			deletePDWithRetry(diskName)
 		}()
 
 		fileAndContentToVerify := make(map[string]string)
@@ -251,8 +251,8 @@ var _ = Describe("Pod Disks", func() {
 			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, disk1Name)
 			detachPD(host0Name, disk2Name)
-			deletePD(disk1Name)
-			deletePD(disk2Name)
+			deletePDWithRetry(disk1Name)
+			deletePDWithRetry(disk2Name)
 		}()
 
 		containerName := "mycontainer"
@@ -351,7 +351,13 @@ func deletePD(pdName string) error {
 		cmd := exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "disks", "delete", "--zone="+zone, pdName)
 		data, err := cmd.CombinedOutput()
 		if err != nil {
-			Logf("Error deleting PD: %s (%v)", string(data), err)
+			dataStr := string(data)
+			if strings.Contains(dataStr, "was not found") {
+				Logf("PD deletion implicitly succeeded because PD %q does not exist.", pdName)
+				return nil
+			}
+
+			Logf("Error deleting PD: %s (%v)", dataStr, err)
 		}
 		return err
 	} else {
