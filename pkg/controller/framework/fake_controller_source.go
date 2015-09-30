@@ -37,7 +37,7 @@ func NewFakeControllerSource() *FakeControllerSource {
 
 // FakeControllerSource implements listing/watching for testing.
 type FakeControllerSource struct {
-	sync.RWMutex
+	lock        sync.RWMutex
 	items       map[nnu]runtime.Object
 	changes     []watch.Event // one change per resourceVersion
 	broadcaster *watch.Broadcaster
@@ -95,8 +95,8 @@ func (f *FakeControllerSource) key(meta *api.ObjectMeta) nnu {
 // Change records the given event (setting the object's resource version) and
 // sends a watch event with the specified probability.
 func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
-	f.Lock()
-	defer f.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 
 	objMeta, err := api.ObjectMetaFor(e.Object)
 	if err != nil {
@@ -121,8 +121,8 @@ func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 
 // List returns a list object, with its resource version set.
 func (f *FakeControllerSource) List() (runtime.Object, error) {
-	f.RLock()
-	defer f.RUnlock()
+	f.lock.RLock()
+	defer f.lock.RUnlock()
 	list := make([]runtime.Object, 0, len(f.items))
 	for _, obj := range f.items {
 		// Must make a copy to allow clients to modify the object.
@@ -151,8 +151,8 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 // Watch returns a watch, which will be pre-populated with all changes
 // after resourceVersion.
 func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, error) {
-	f.RLock()
-	defer f.RUnlock()
+	f.lock.RLock()
+	defer f.lock.RUnlock()
 	rc, err := strconv.Atoi(resourceVersion)
 	if err != nil {
 		return nil, err
