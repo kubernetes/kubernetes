@@ -50,6 +50,9 @@ var (
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
+	argEtcdCert            = flag.String("etcd-cert", "", "Etcd client cert file")
+	argEtcdKey             = flag.String("etcd-key", "", "Etcd client cert key")
+	argEtcdCA              = flag.String("etcd-ca", "", "Etcd CA")
 	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
 	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
@@ -450,6 +453,27 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 	return client, nil
 }
 
+func newEtcdTLSClient(etcdServer, etcdCert, etcdKey, etcdCA string) (*etcd.Client, error) {
+	// loop until we have > 0 machines && machines[0] != ""
+	var client *etcd.Client
+	poll, timeout := 1*time.Second, 10*time.Second
+	if err := wait.Poll(poll, timeout, func() (bool, error) {
+		var err error
+		if client, err = etcd.NewTLSClient([]string{etcdServer}, etcdCert, etcdKey, etcdCA); err != nil {
+			return false, err
+		}
+		client.SyncCluster()
+		machines := client.GetCluster()
+		if len(machines) == 0 || len(machines[0]) == 0 {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, fmt.Errorf("Timed out after %s waiting for at least 1 synchronized etcd server in the cluster. Error: %v", timeout, err)
+	}
+	return client, nil
+}
+
 func expandKubeMasterURL() (string, error) {
 	parsedURL, err := url.Parse(os.ExpandEnv(*argKubeMasterURL))
 	if err != nil {
@@ -571,8 +595,15 @@ func main() {
 		domain:              domain,
 		etcdMutationTimeout: *argEtcdMutationTimeout,
 	}
-	if ks.etcdClient, err = newEtcdClient(*argEtcdServer); err != nil {
-		glog.Fatalf("Failed to create etcd client - %v", err)
+	if len(*argEtcdCert) == 0 && len(*argEtcdKey) == 0 && len(*argEtcdCA) == 0 {
+		if ks.etcdClient, err = newEtcdClient(*argEtcdServer); err != nil {
+			glog.Fatalf("Failed to create etcd client - %v", err)
+		}
+	} else {
+		// at least one tls option was passed - use tls client
+		if ks.etcdClient, err = newEtcdTLSClient(*argEtcdServer, *argEtcdCert, *argEtcdKey, *argEtcdCA); err != nil {
+			glog.Fatalf("Failed to create tls enabled etcd client - %v", err)
+		}
 	}
 
 	kubeClient, err := newKubeClient()
