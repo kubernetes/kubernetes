@@ -45,8 +45,9 @@ const (
 	gitRepoPluginName = "kubernetes.io/git-repo"
 )
 
-func (plugin *gitRepoPlugin) Init(host volume.VolumeHost) {
+func (plugin *gitRepoPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *gitRepoPlugin) Name() string {

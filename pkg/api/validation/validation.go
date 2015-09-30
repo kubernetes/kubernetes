@@ -484,6 +484,10 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateFCVolumeSource(source.FC, fldPath.Child("fc"))...)
 		}
 	}
+	if source.FlexVolume != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("FlexVolume"))...)
+	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
@@ -697,6 +701,17 @@ func validateCephFSVolumeSource(cephfs *api.CephFSVolumeSource, fldPath *field.P
 	return allErrs
 }
 
+func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(fv.Driver) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+	}
+	if len(fv.FSType) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
+	}
+	return allErrs
+}
+
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
@@ -816,6 +831,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			numVolumes++
 			allErrs = append(allErrs, validateFCVolumeSource(pv.Spec.FC, specPath.Child("fc"))...)
 		}
+	}
+	if pv.Spec.FlexVolume != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateFlexVolumeSource(pv.Spec.FlexVolume, specPath.Child("flexVolume"))...)
 	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume type"))

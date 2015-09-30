@@ -61,8 +61,9 @@ type flocker struct {
 	plugin      *flockerPlugin
 }
 
-func (p *flockerPlugin) Init(host volume.VolumeHost) {
+func (p *flockerPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
+	return nil
 }
 
 func (p flockerPlugin) Name() string {

@@ -2971,6 +2971,68 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_v1_flexvolumesource">v1.FlexVolumeSource</h3>
+<div class="paragraph">
+<p>FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">driver</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Driver is the name of the driver to use for this volume.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs"</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">options</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Extra command options if any.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1beta1_jobcondition">v1beta1.JobCondition</h3>
 <div class="paragraph">
 <p>JobCondition describes current state of a job.</p>
@@ -3274,6 +3336,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md">http://releases.k8s.io/HEAD/examples/rbd/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_rbdvolumesource">v1.RBDVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">flexVolume</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_flexvolumesource">v1.FlexVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4292,7 +4361,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-12-17 23:51:47 UTC
+Last updated 2015-12-18 08:02:33 UTC
 </div>
 </div>
 </body>

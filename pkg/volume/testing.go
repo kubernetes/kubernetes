@@ -129,8 +129,9 @@ var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 
-func (plugin *FakeVolumePlugin) Init(host VolumeHost) {
+func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
 	plugin.Host = host
+	return nil
 }
 
 func (plugin *FakeVolumePlugin) Name() string {

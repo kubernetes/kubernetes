@@ -73,8 +73,9 @@ const (
 	hostPathPluginName = "kubernetes.io/host-path"
 )
 
-func (plugin *hostPathPlugin) Init(host volume.VolumeHost) {
+func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *hostPathPlugin) Name() string {

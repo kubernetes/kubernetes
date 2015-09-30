@@ -243,6 +243,10 @@ type VolumeSource struct {
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
+	// FlexVolume represents a generic volume resource that is
+	// provisioned/attached using a exec based plugin. This is an
+	// alpha feature and may change in future.
+	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
@@ -311,6 +315,10 @@ type PersistentVolumeSource struct {
 	FC *FCVolumeSource `json:"fc,omitempty"`
 	// Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running
 	Flocker *FlockerVolumeSource `json:"flocker,omitempty"`
+	// FlexVolume represents a generic volume resource that is
+	// provisioned/attached using a exec based plugin. This is an
+	// alpha feature and may change in future.
+	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -648,6 +656,24 @@ type GCEPersistentDiskVolumeSource struct {
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// FlexVolume represents a generic volume resource that is
+// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+type FlexVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	Driver string `json:"driver"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	FSType string `json:"fsType,omitempty"`
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+	// Optional: Extra command options if any.
+	Options map[string]string `json:"options,omitempty"`
 }
 
 // Represents a Persistent Disk resource in AWS.

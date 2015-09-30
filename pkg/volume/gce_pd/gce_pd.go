@@ -50,8 +50,9 @@ const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 )
 
-func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) {
+func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *gcePersistentDiskPlugin) Name() string {

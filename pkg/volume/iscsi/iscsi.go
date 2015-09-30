@@ -46,8 +46,9 @@ const (
 	iscsiPluginName = "kubernetes.io/iscsi"
 )
 
-func (plugin *iscsiPlugin) Init(host volume.VolumeHost) {
+func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *iscsiPlugin) Name() string {
