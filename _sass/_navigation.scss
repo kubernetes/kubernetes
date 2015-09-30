@@ -91,7 +91,23 @@ ul, ul ul {
     font-weight: normal;
 	margin-left:.6em;
 }
-#gcse-wrapper {
-  z-index: 1;
+
+#gcse-searchbox {
+  background-color: #fff;
+  padding: 13px;
   position: fixed;
+  z-index: 1;
+}
+
+/* Restore gcse default styles. */
+/* TODO: Don't overwrite root styles. This should not be necessary. */
+.gcse-wrapper * {
+  -webkit-box-sizing: content-box;
+  box-sizing: content-box;
+}
+.gcse-wrapper .gsc-cursor-page.gsc-cursor-current-page {
+  color: #fff !important;
+}
+.gcse-wrapper b {
+  font-weight: bold;
 }

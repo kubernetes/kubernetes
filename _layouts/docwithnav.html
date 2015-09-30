@@ -1,8 +1,12 @@
 {% include dochead.html %}
 <!-- Search box for Google Custom Search Engine -->
-<div id="gcse-wrapper">
-	<gcse:search></gcse:search>
+<div class="gcse-wrapper" id="gcse-searchbox">
+	<gcse:searchbox></gcse:searchbox>
 </div>
+<div class="gcse-wrapper">
+  <gcse:searchresults></gcse:searchresults>
+</div>
+
 <!-- Navigation menu -->
 <div id="wrapper">
 	{% include nav_v1.0.html %}
