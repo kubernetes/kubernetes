@@ -53,7 +53,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 #   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
 #   NamespaceLifecycle, NamespaceAutoProvision,
 #   AlwaysAdmit, ServiceAccount, ResourceQuota
-#KUBE_ADMISSION_CONTROL="--admission-control=\"${ADMISSION_CONTROL}\""
+KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
 
 # --client-ca-file="": If set, any request presenting a client certificate signed
 # by one of the authorities in the client-ca-file is authenticated with an identity
@@ -78,6 +78,7 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
                         \${MINION_PORT}              \\
                         \${KUBE_ALLOW_PRIV}          \\
                         \${KUBE_SERVICE_ADDRESSES}   \\
+                        \${KUBE_ADMISSION_CONTROL}   \\
                         \${KUBE_API_CLIENT_CA_FILE}  \\
                         \${KUBE_API_TLS_CERT_FILE}   \\
                         \${KUBE_API_TLS_PRIVATE_KEY_FILE}"
