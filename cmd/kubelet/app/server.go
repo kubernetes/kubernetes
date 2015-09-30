@@ -381,6 +381,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		NetworkPluginName:         s.NetworkPluginName,
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
+		OOMAdjuster:               oom.NewOOMAdjuster(),
 		OSInterface:               kubecontainer.RealOS{},
 		PodCIDR:                   s.PodCIDR,
 		PodInfraContainerImage:    s.PodInfraContainerImage,
@@ -449,7 +450,7 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 	glog.V(2).Infof("Using root directory: %v", s.RootDirectory)
 
 	// TODO(vmarmol): Do this through container config.
-	oomAdjuster := oom.NewOOMAdjuster()
+	oomAdjuster := kcfg.OOMAdjuster
 	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Warning(err)
 	}
@@ -639,6 +640,7 @@ func SimpleKubelet(client *client.Client,
 		MinimumGCAge:              minimumGCAge,
 		Mounter:                   mount.New(),
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
+		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
 		OSInterface:               osInterface,
 		PodInfraContainerImage:    dockertools.PodInfraContainerImage,
 		Port:              port,
@@ -819,6 +821,7 @@ type KubeletConfig struct {
 	NetworkPlugins                 []network.NetworkPlugin
 	NodeName                       string
 	NodeStatusUpdateFrequency      time.Duration
+	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
 	PodInfraContainerImage         string
@@ -910,7 +913,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
 		kc.CPUCFSQuota,
-		daemonEndpoints)
+		daemonEndpoints,
+		kc.OOMAdjuster)
 
 	if err != nil {
 		return nil, nil, err
