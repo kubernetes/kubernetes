@@ -121,9 +121,9 @@ copy_dev_tarballs() {
 }
 
 prep_known_tokens() {
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    generate_kubelet_tokens ${MINION_NAMES[i]}
-    cat ${KUBE_TEMP}/${MINION_NAMES[i]}_tokens.csv >> ${KUBE_TEMP}/known_tokens.csv
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    generate_kubelet_tokens ${NODE_NAMES[i]}
+    cat ${KUBE_TEMP}/${NODE_NAMES[i]}_tokens.csv >> ${KUBE_TEMP}/known_tokens.csv
   done
 
     # Generate tokens for other "service accounts".  Append to known_tokens.
@@ -175,14 +175,14 @@ ${MASTER_NAME}"
   $MASTER_BOOT_CMD
 }
 
-rax-boot-minions() {
+rax-boot-nodes() {
 
-  cp $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml \
-  ${KUBE_TEMP}/minion-cloud-config.yaml
+  cp $(dirname $0)/rackspace/cloud-config/node-cloud-config.yaml \
+  ${KUBE_TEMP}/node-cloud-config.yaml
 
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
 
-    get_tokens_from_csv ${MINION_NAMES[i]}
+    get_tokens_from_csv ${NODE_NAMES[i]}
 
     sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
         -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
@@ -196,22 +196,22 @@ rax-boot-minions() {
         -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \
         -e "s|KUBE_PROXY_TOKEN|${KUBE_PROXY_TOKEN}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
-    $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
+    $(dirname $0)/rackspace/cloud-config/node-cloud-config.yaml > $KUBE_TEMP/node-cloud-config-$(($i + 1)).yaml
 
 
-    MINION_BOOT_CMD="nova boot \
+    NODE_BOOT_CMD="nova boot \
 --key-name ${SSH_KEY_NAME} \
---flavor ${KUBE_MINION_FLAVOR} \
+--flavor ${KUBE_NODE_FLAVOR} \
 --image ${KUBE_IMAGE} \
---meta ${MINION_TAG} \
---user-data ${KUBE_TEMP}/minion-cloud-config-$(( i +1 )).yaml \
+--meta ${NODE_TAG} \
+--user-data ${KUBE_TEMP}/node-cloud-config-$(( i +1 )).yaml \
 --config-drive true \
 --nic net-id=${NETWORK_UUID} \
-${MINION_NAMES[$i]}"
+${NODE_NAMES[$i]}"
 
-    echo "cluster/rackspace/util.sh: Booting ${MINION_NAMES[$i]} with following command:"
-    echo -e "\t$MINION_BOOT_CMD"
-    $MINION_BOOT_CMD
+    echo "cluster/rackspace/util.sh: Booting ${NODE_NAMES[$i]} with following command:"
+    echo -e "\t$NODE_BOOT_CMD"
+    $NODE_BOOT_CMD
   done
 }
 
@@ -229,16 +229,16 @@ rax-nova-network() {
   fi
 }
 
-detect-minions() {
-  KUBE_MINION_IP_ADDRESSES=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    local minion_ip=$(nova show --minimal ${MINION_NAMES[$i]} \
+detect-nodes() {
+  KUBE_NODE_IP_ADDRESSES=()
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
       | grep accessIPv4 | awk '{print $4}')
-    echo "cluster/rackspace/util.sh: Found ${MINION_NAMES[$i]} at ${minion_ip}"
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    echo "cluster/rackspace/util.sh: Found ${NODE_NAMES[$i]} at ${node_ip}"
+    KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
   done
-  if [ -z "$KUBE_MINION_IP_ADDRESSES" ]; then
-    echo "cluster/rackspace/util.sh: Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
+  if [ -z "$KUBE_NODE_IP_ADDRESSES" ]; then
+    echo "cluster/rackspace/util.sh: Could not detect Kubernetes node nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
 
@@ -283,7 +283,7 @@ kube-up() {
   # developer up.
   find-object-url
 
-  # Create a temp directory to hold scripts that will be uploaded to master/minions
+  # Create a temp directory to hold scripts that will be uploaded to master/nodes
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
@@ -301,7 +301,7 @@ kube-up() {
   prep_known_tokens
 
   rax-boot-master
-  rax-boot-minions
+  rax-boot-nodes
 
   detect-master
 
@@ -349,11 +349,11 @@ kube-up() {
   # Don't bail on errors, we want to be able to print some info.
   set +e
 
-  detect-minions
+  detect-nodes
 
   # ensures KUBECONFIG is set
   get-kubeconfig-basicauth
-  echo "All minions may not be online yet, this is okay."
+  echo "All nodes may not be online yet, this is okay."
   echo
   echo "Kubernetes cluster is running.  The master is running at:"
   echo
