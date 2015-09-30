@@ -41,8 +41,7 @@ readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 # KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
 readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel}/
 readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
-readonly KUBE_GCS_LATEST_FILE=${KUBE_GCS_LATEST_FILE:-}
-readonly KUBE_GCS_LATEST_CONTENTS=${KUBE_GCS_LATEST_CONTENTS:-}
+readonly KUBE_GCS_PUBLISH_VERSION=${KUBE_GCS_PUBLISH_VERSION:-}
 readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
@@ -337,6 +336,28 @@ function kube::build::destroy_container() {
   "${DOCKER[@]}" kill "$1" >/dev/null 2>&1 || true
   "${DOCKER[@]}" wait "$1" >/dev/null 2>&1 || true
   "${DOCKER[@]}" rm -f -v "$1" >/dev/null 2>&1 || true
+}
+
+# Validate a release version
+#
+# Globals:
+#   None
+# Arguments:
+#   version
+# Returns:
+#   If version is a valid release version
+# Sets:
+#  BASH_REMATCH, so you can do something like:
+#    local -r version_major="${BASH_REMATCH[1]}"
+#    local -r version_minor="${BASH_REMATCH[2]}"
+#    local -r version_patch="${BASH_REMATCH[3]}"
+function kube::release::parse_and_validate_release_version() {
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  local -r version="${1-}"
+  [[ "${version}" =~ ${version_regex} ]] || {
+    kube::log::error "Invalid release version: '${version}'"
+    return 1
+  }
 }
 
 
@@ -975,14 +996,15 @@ function kube::release::gcs::copy_release_artifacts() {
     kube::log::error "${gcs_destination} not empty."
     [[ ${KUBE_GCS_DELETE_EXISTING} =~ ^[yY]$ ]] || {
       read -p "Delete everything under ${gcs_destination}? [y/n] " -r || {
-        echo "EOF on prompt.  Skipping upload"
+        kube::log::status "EOF on prompt.  Skipping upload"
         return
       }
       [[ $REPLY =~ ^[yY]$ ]] || {
-        echo "Skipping upload"
+        kube::log::status "Skipping upload"
         return
       }
     }
+    kube::log::status "Deleting everything under ${gcs_destination}"
     gsutil -q -m rm -f -R "${gcs_destination}" || return 1
   fi
 
@@ -1006,68 +1028,169 @@ function kube::release::gcs::copy_release_artifacts() {
   gsutil ls -lhr "${gcs_destination}" || return 1
 }
 
-function kube::release::gcs::publish_latest() {
-  local latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
-
-  mkdir -p "${RELEASE_STAGE}/upload" || return 1
-  echo ${KUBE_GCS_LATEST_CONTENTS} > "${RELEASE_STAGE}/upload/latest" || return 1
-
-  gsutil -m cp "${RELEASE_STAGE}/upload/latest" "${latest_file_dst}" || return 1
-
-  if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
-    gsutil acl ch -R -g all:R "${latest_file_dst}" >/dev/null 2>&1 || return 1
-  fi
-
-  kube::log::status "gsutil cat ${latest_file_dst}:"
-  gsutil cat ${latest_file_dst} || return 1
+# Publish a new ci version, (latest,) but only if the release files actually
+# exist on GCS.
+#
+# Globals:
+#   See callees
+# Arguments:
+#   None
+# Returns:
+#   Success
+function kube::release::gcs::publish_ci() {
+  kube::release::gcs::verify_release_files || return 1
+  kube::release::gcs::publish 'ci/latest.txt' || return 1
 }
 
-# Publish a new latest.txt, but only if the release we're dealing with
-# is newer than the contents in GCS.
-function kube::release::gcs::publish_latest_official() {
-  local -r new_version=${KUBE_GCS_LATEST_CONTENTS}
-  local -r latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+# Publish a new official version, (latest or stable,) but only if the release
+# files actually exist on GCS and the release we're dealing with is newer than
+# the contents in GCS.
+#
+# Globals:
+#   KUBE_GCS_PUBLISH_VERSION
+#   See callees
+# Arguments:
+#   release_kind: either 'latest' or 'stable'
+# Returns:
+#   Success
+function kube::release::gcs::publish_official() {
+  local -r release_kind="${1-}"
 
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-  [[ ${new_version} =~ ${version_regex} ]] || {
-    kube::log::error "publish_latest_official passed bogus value: '${new_version}'"
+  kube::release::gcs::verify_release_files || return 1
+
+  kube::release::parse_and_validate_release_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
+
+  local publish_files
+  if [[ "${release_kind}" == 'latest' ]]; then
+    publish_files=(release/latest.txt release/latest-${version_major}.txt release/latest-${version_major}.${version_minor}.txt)
+  elif [[ "${release_kind}" == 'stable' ]]; then
+    publish_files=(release/stable.txt release/stable-${version_major}.txt release/stable-${version_major}.${version_minor}.txt)
+  else
+    kube::log::error "Wrong release_kind: must be 'latest' or 'stable'."
     return 1
-  }
+  fi
+
+  for publish_file in ${publish_files[*]}; do
+    # If there's a version that's above the one we're trying to release, don't
+    # do anything, and just try the next one.
+    kube::release::gcs::verify_release_gt "${publish_file}" || continue
+    kube::release::gcs::publish "${publish_file}" || return 1
+  done
+}
+
+# Verify that the release files we expect actually exist.
+#
+# Globals:
+#   KUBE_GCS_RELEASE_BUCKET
+#   KUBE_GCS_RELEASE_PREFIX
+# Arguments:
+#   None
+# Returns:
+#   If release files exist
+function kube::release::gcs::verify_release_files() {
+  local -r release_dir="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_RELEASE_PREFIX}"
+  if ! gsutil ls "${release_dir}" >/dev/null 2>&1 ; then
+    kube::log::error "Release files don't exist at '${release_dir}'"
+    return 1
+  fi
+}
+
+# Check if the new version is greater than the version currently published on
+# GCS.
+#
+# Globals:
+#   KUBE_GCS_PUBLISH_VERSION
+#   KUBE_GCS_RELEASE_BUCKET
+# Arguments:
+#   publish_file: the GCS location to look in
+# Returns:
+#   If new version is greater than the GCS version
+function kube::release::gcs::verify_release_gt() {
+  local -r publish_file="${1-}"
+  local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
+  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  kube::release::parse_and_validate_release_version "${new_version}" || return 1
 
   local -r version_major="${BASH_REMATCH[1]}"
   local -r version_minor="${BASH_REMATCH[2]}"
   local -r version_patch="${BASH_REMATCH[3]}"
 
   local gcs_version
-  gcs_version=$(gsutil cat "${latest_file_dst}")
+  if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
+    kube::release::parse_and_validate_release_version "${gcs_version}" || {
+      kube::log::error "${publish_file_dst} contains invalid release version, can't compare: '${gcs_version}'"
+      return 1
+    }
 
-  [[ ${gcs_version} =~ ${version_regex} ]] || {
-    kube::log::error "${latest_file_dst} contains invalid release version, can't compare: '${gcs_version}'"
-    return 1
-  }
+    local -r gcs_version_major="${BASH_REMATCH[1]}"
+    local -r gcs_version_minor="${BASH_REMATCH[2]}"
+    local -r gcs_version_patch="${BASH_REMATCH[3]}"
 
-  local -r gcs_version_major="${BASH_REMATCH[1]}"
-  local -r gcs_version_minor="${BASH_REMATCH[2]}"
-  local -r gcs_version_patch="${BASH_REMATCH[3]}"
+    local greater=true
+    if [[ "${gcs_version_major}" -gt "${version_major}" ]]; then
+      greater=false
+    elif [[ "${gcs_version_major}" -lt "${version_major}" ]]; then
+      : # fall out
+    elif [[ "${gcs_version_minor}" -gt "${version_minor}" ]]; then
+      greater=false
+    elif [[ "${gcs_version_minor}" -lt "${version_minor}" ]]; then
+      : # fall out
+    elif [[ "${gcs_version_patch}" -ge "${version_patch}" ]]; then
+      greater=false
+    fi
 
-  local greater=true
-  if [[ "${gcs_version_major}" -gt "${version_major}" ]]; then
-    greater=false
-  elif [[ "${gcs_version_major}" -lt "${version_major}" ]]; then
-    : # fall out
-  elif [[ "${gcs_version_minor}" -gt "${version_minor}" ]]; then
-    greater=false
-  elif [[ "${gcs_version_minor}" -lt "${version_minor}" ]]; then
-    : # fall out
-  elif [[ "${gcs_version_patch}" -ge "${version_patch}" ]]; then
-    greater=false
-  fi
-
-  if [[ "${greater}" != "true" ]]; then
-    kube::log::status "${gcs_version} (latest on GCS) >= ${new_version} (just uploaded), not updating ${latest_file_dst}"
+    if [[ "${greater}" != "true" ]]; then
+      kube::log::status "${new_version} (just uploaded) <= ${gcs_version} (latest on GCS), not updating ${publish_file_dst}"
+      return 1
+    else
+      kube::log::status "${new_version} (just uploaded) > ${gcs_version} (latest on GCS), updating ${publish_file_dst}"
+    fi
+  else  # gsutil cat failed; file does not exist
+    kube::log::error "Release file '${publish_file_dst}' does not exist.  Continuing."
     return 0
   fi
+}
 
-  kube::log::status "${new_version} (just uploaded) > ${gcs_version} (latest on GCS), updating ${latest_file_dst}"
-  kube::release::gcs::publish_latest || return 1
+# Publish a release to GCS: upload a version file, if KUBE_GCS_MAKE_PUBLIC,
+# make it public, and verify the result.
+#
+# Globals:
+#   KUBE_GCS_RELEASE_BUCKET
+#   RELEASE_STAGE
+#   KUBE_GCS_PUBLISH_VERSION
+#   KUBE_GCS_MAKE_PUBLIC
+# Arguments:
+#   publish_file: the GCS location to look in
+# Returns:
+#   If new version is greater than the GCS version
+function kube::release::gcs::publish() {
+  local -r publish_file="${1-}"
+  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  mkdir -p "${RELEASE_STAGE}/upload" || return 1
+  echo "${KUBE_GCS_PUBLISH_VERSION}" > "${RELEASE_STAGE}/upload/latest" || return 1
+
+  gsutil -m cp "${RELEASE_STAGE}/upload/latest" "${publish_file_dst}" || return 1
+
+  local contents
+  if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
+    gsutil acl ch -R -g all:R "${publish_file_dst}" >/dev/null 2>&1 || return 1
+    # If public, validate public link
+    local -r public_link="https://storage.googleapis.com/${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+    kube::log::status "Validating uploaded version file at ${public_link}"
+    contents="$(curl -s "${public_link}")"
+  else
+    # If not public, validate using gsutil
+    kube::log::status "Validating uploaded version file at ${publish_file_dst}"
+    contents="$(gsutil cat "${publish_file_dst}")"
+  fi
+  if [[ "${contents}" == "${KUBE_GCS_PUBLISH_VERSION}" ]]; then
+    kube::log::status "Contents as expected: ${contents}"
+  else
+    kube::log::error "Expected contents of file to be ${KUBE_GCS_PUBLISH_VERSION}, but got ${contents}"
+    return 1
+  fi
 }
