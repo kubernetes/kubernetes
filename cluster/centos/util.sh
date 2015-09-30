@@ -31,7 +31,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 
 KUBECTL_PATH=${KUBE_ROOT}/cluster/centos/binaries/kubectl
 
-# Directory to be used for master and minion provisioning.
+# Directory to be used for master and node provisioning.
 KUBE_TEMP="~/kube_temp"
 
 
@@ -43,13 +43,13 @@ function detect-master() {
   echo "KUBE_MASTER: ${MASTER}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
-function detect-minions() {
-  KUBE_MINION_IP_ADDRESSES=()
-  for minion in ${MINIONS}; do
-    KUBE_MINION_IP_ADDRESSES+=("${minion#*@}")
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+function detect-nodes() {
+  KUBE_NODE_IP_ADDRESSES=()
+  for node in ${NODES}; do
+    KUBE_NODE_IP_ADDRESSES+=("${node#*@}")
   done
-  echo "KUBE_MINION_IP_ADDRESSES: [${KUBE_MINION_IP_ADDRESSES[*]}]" 1>&2
+  echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
 
 # Verify prereqs on host machine
@@ -100,8 +100,8 @@ function validate-cluster() {
   "${KUBE_ROOT}/cluster/validate-cluster.sh"
   if [[ "$?" -ne "0" ]]; then
     troubleshoot-master
-    for minion in ${MINIONS}; do
-      troubleshoot-minion ${minion}
+    for node in ${NODES}; do
+      troubleshoot-node ${node}
     done
     exit 1
   fi
@@ -112,8 +112,8 @@ function validate-cluster() {
 function kube-up() {
   provision-master
 
-  for minion in ${MINIONS}; do
-    provision-minion ${minion}
+  for node in ${NODES}; do
+    provision-node ${node}
   done
 
   detect-master
@@ -131,8 +131,8 @@ function kube-up() {
 # Delete a kubernetes cluster
 function kube-down() {
   tear-down-master
-  for minion in ${MINIONS}; do
-    tear-down-minion ${minion}
+  for node in ${NODES}; do
+    tear-down-node ${node}
   done
 }
 
@@ -156,9 +156,9 @@ function troubleshoot-master() {
   printf "\n"
 }
 
-function troubleshoot-minion() {
-  # Troubleshooting on minion if all required daemons are active.
-  echo "[INFO] Troubleshooting on minion ${1}"
+function troubleshoot-node() {
+  # Troubleshooting on node if all required daemons are active.
+  echo "[INFO] Troubleshooting on node ${1}"
   local -a required_daemon=("kube-proxy" "kubelet" "docker" "flannel")
   local daemon
   local daemon_status
@@ -193,9 +193,9 @@ echo "[INFO] tear-down-master on ${MASTER}"
   kube-ssh "${MASTER}" "sudo rm -rf /var/lib/etcd"
 }
 
-# Clean up on minion
-function tear-down-minion() {
-echo "[INFO] tear-down-minion on $1"
+# Clean up on node
+function tear-down-node() {
+echo "[INFO] tear-down-node on $1"
   for service_name in kube-proxy kubelet docker flannel ; do
       service_file="/usr/lib/systemd/system/${service_name}.service"
       kube-ssh "$1" " \
@@ -235,30 +235,29 @@ function provision-master() {
 }
 
 
-# Provision minion
+# Provision node
 #
 # Assumed vars:
-#   $1 (minion)
+#   $1 (node)
 #   MASTER
 #   KUBE_TEMP
 #   ETCD_SERVERS
 #   FLANNEL_NET
 #   DOCKER_OPTS
-function provision-minion() {
-  echo "[INFO] Provision minion on $1"
+function provision-node() {
+  echo "[INFO] Provision node on $1"
   local master_ip=${MASTER#*@}
-  local minion=$1
-  local minion_ip=${minion#*@}
-  ensure-setup-dir ${minion}
+  local node=$1
+  local node_ip=${node#*@}
+  ensure-setup-dir ${node}
 
-  # scp -r ${SSH_OPTS} minion config-default.sh copy-files.sh util.sh "${minion_ip}:${KUBE_TEMP}" 
-  kube-scp ${minion} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
-  kube-ssh "${minion}" " \
+  kube-scp ${node} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
+  kube-ssh "${node}" " \
     sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
-    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${minion_ip}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip}; \
     sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${master_ip}"
 }
 
