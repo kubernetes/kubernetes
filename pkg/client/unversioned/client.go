@@ -222,8 +222,8 @@ func (c *Client) SwaggerSchema(version string) (*swagger.ApiDeclaration, error) 
 	}
 
 	// This check also takes care the case that kubectl is newer than the running endpoint
-	if stringDoesntExistIn(version, vers.Versions) {
-		return nil, fmt.Errorf("API version: %s is not supported by the server. Use one of: %v", version, vers.Versions)
+	if stringDoesntExistIn(version, vers) {
+		return nil, fmt.Errorf("API version: %s is not supported by the server. Use one of: %v", version, vers)
 	}
 
 	body, err := c.Get().AbsPath("/swaggerapi/api/" + version).Do().Raw()
