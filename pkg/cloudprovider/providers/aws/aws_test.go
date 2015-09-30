@@ -43,41 +43,53 @@ func TestReadAWSCloudConfig(t *testing.T) {
 
 		expectError bool
 		zone        string
+		region      string
+		endpoint    string
 	}{
 		{
 			"No config reader",
 			nil, nil,
-			true, "",
+			true, "", "", "",
 		},
 		{
 			"Empty config, no metadata",
 			strings.NewReader(""), nil,
-			true, "",
+			true, "", "", "",
 		},
 		{
 			"No zone in config, no metadata",
 			strings.NewReader("[global]\n"), nil,
-			true, "",
+			true, "", "", "",
 		},
 		{
 			"Zone in config, no metadata",
 			strings.NewReader("[global]\nzone = eu-west-1a"), nil,
-			false, "eu-west-1a",
+			false, "eu-west-1a", "", "",
 		},
 		{
 			"No zone in config, metadata does not have zone",
 			strings.NewReader("[global]\n"), NewFakeAWSServices().withAz(""),
-			true, "",
+			true, "", "", "",
 		},
 		{
 			"No zone in config, metadata has zone",
 			strings.NewReader("[global]\n"), NewFakeAWSServices(),
-			false, "us-east-1a",
+			false, "us-east-1a", "", "",
 		},
 		{
 			"Zone in config should take precedence over metadata",
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
-			false, "eu-west-1a",
+			false, "eu-west-1a", "", "",
+		},
+		{
+			"Region in config, no metadata",
+			strings.NewReader("[global]\nzone = eu-west-1a\nregion = europe"), nil,
+			false, "eu-west-1a", "europe", "",
+		},
+		{
+			"Endpoint in config, no metadata",
+			strings.NewReader("[global]\nzone = eu-west-1a\nendpoint = http://custom.endpoint.com"), nil,
+			false, "eu-west-1a", "", "http://custom.endpoint.com",
 		},
 	}
 
@@ -99,6 +111,14 @@ func TestReadAWSCloudConfig(t *testing.T) {
 			if cfg.Global.Zone != test.zone {
 				t.Errorf("Incorrect zone value (%s vs %s) for case: %s",
 					cfg.Global.Zone, test.zone, test.name)
+			}
+			if cfg.Global.Region != test.region {
+				t.Errorf("Incorrect region value (%s vs %s) for case: %s",
+					cfg.Global.Region, test.region, test.name)
+			}
+			if cfg.Global.Endpoint != test.endpoint {
+				t.Errorf("Incorrect endpoint value (%s vs %s) for case: %s",
+					cfg.Global.Endpoint, test.endpoint, test.name)
 			}
 		}
 	}
@@ -154,15 +174,15 @@ func (s *FakeAWSServices) withInstances(instances []*ec2.Instance) *FakeAWSServi
 	return s
 }
 
-func (s *FakeAWSServices) Compute(region string) (EC2, error) {
+func (s *FakeAWSServices) Compute(region string, endpoint string) (EC2, error) {
 	return s.ec2, nil
 }
 
-func (s *FakeAWSServices) LoadBalancing(region string) (ELB, error) {
+func (s *FakeAWSServices) LoadBalancing(region string, endpoint string) (ELB, error) {
 	return s.elb, nil
 }
 
-func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
+func (s *FakeAWSServices) Autoscaling(region string, endpoint string) (ASG, error) {
 	return s.asg, nil
 }
 
@@ -197,34 +217,51 @@ func TestNewAWSCloud(t *testing.T) {
 
 		expectError bool
 		zone        string
+		region      string
+		endpoint    string
 	}{
 		{
 			"No config reader",
 			nil, NewFakeAWSServices().withAz(""),
-			true, "",
+			true, "", "", "",
 		},
 		{
 			"Config specified invalid zone",
 			strings.NewReader("[global]\nzone = blahonga"), NewFakeAWSServices(),
-			true, "",
+			true, "", "", "",
 		},
 		{
-			"Config specifies valid zone",
+			"Config specifies valid zone, calculate region",
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
-			false, "eu-west-1a",
+			false, "eu-west-1a", "eu-west-1", "",
 		},
-		{
-			"Gets zone from metadata when not in config",
 
+		{
+			"Gets zone from metadata when not in config, calculate region",
 			strings.NewReader("[global]\n"),
 			NewFakeAWSServices(),
-			false, "us-east-1a",
+			false, "us-east-1a", "us-east-1", "",
 		},
 		{
 			"No zone in config or metadata",
 			strings.NewReader("[global]\n"),
 			NewFakeAWSServices().withAz(""),
-			true, "",
+			true, "", "", "",
+		},
+		{
+			"Config specifies valid zone and region. region in config takes precedence over calculated region",
+			strings.NewReader("[global]\nzone = eu-west-1a\nregion = europe"), NewFakeAWSServices(),
+			false, "eu-west-1a", "europe", "",
+		},
+		{
+			"Gets zone from metadata when not in config, region in config takes precedence over calculated region",
+			strings.NewReader("[global]\nregion = europe"), NewFakeAWSServices(),
+			false, "us-east-1a", "europe", "",
+		},
+		{
+			"Config specifies endpoint",
+			strings.NewReader("[global]\nendpoint = http://custom.us-east-1.ec2.com"), NewFakeAWSServices(),
+			false, "us-east-1a", "us-east-1", "http://custom.us-east-1.ec2.com",
 		},
 	}
 
@@ -238,9 +275,19 @@ func TestNewAWSCloud(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("Should succeed for case: %s, got %v", test.name, err)
-			} else if c.availabilityZone != test.zone {
-				t.Errorf("Incorrect zone value (%s vs %s) for case: %s",
-					c.availabilityZone, test.zone, test.name)
+			} else {
+				if c.availabilityZone != test.zone {
+					t.Errorf("Incorrect zone value (%s vs %s) for case: %s",
+						c.availabilityZone, test.zone, test.name)
+				}
+				if c.region != test.region {
+					t.Errorf("Incorrect region value (%s vs %s) for case: %s",
+						c.region, test.region, test.name)
+				}
+				if c.endpoint != test.endpoint {
+					t.Errorf("Incorrect endpoint value (%s vs %s) for case: %s",
+						c.endpoint, test.endpoint, test.name)
+				}
 			}
 		}
 	}
