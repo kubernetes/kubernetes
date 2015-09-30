@@ -24,11 +24,8 @@ update-ca-certificates
 chmod a+x /kubemark.sh
 
 tar xzf /tmp/kubemark.tar.gz
-cp kubernetes/server/bin/hyperkube /
 cp kubernetes/server/bin/kubemark /
-cp kubernetes/server/bin/kubectl /
 
 rm -rf /tmp/*
-apt-get remove -y build-essential
 apt-get clean -y
 apt-get autoremove -y
