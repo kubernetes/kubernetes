@@ -542,7 +542,7 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-kubemark)
+  kubernetes-kubemark-gce)
     : ${E2E_CLUSTER_NAME:="kubernetes-kubemark"}
     : ${E2E_NETWORK:="kubernetes-kubemark"}
     : ${PROJECT:="k8s-jenkins-kubemark"}
