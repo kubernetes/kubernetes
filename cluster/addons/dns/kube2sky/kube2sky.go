@@ -328,16 +328,29 @@ func createEndpointsLW(kubeClient *kclient.Client) *kcache.ListWatch {
 	return kcache.NewListWatchFromClient(kubeClient, "endpoints", kapi.NamespaceAll, kSelector.Everything())
 }
 
+func getPathSuffix(s *kapi.Service) string {
+	if s.Labels["domain"] != "" {
+		reversedDomain := []string{}
+		for _, v := range strings.Split(s.Labels["domain"], ".") {
+			reversedDomain = append(reversedDomain, v)
+		}
+
+		return strings.Join(reversedDomain, ".")
+	} else {
+		return s.Name
+	}
+}
+
 func (ks *kube2sky) newService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
-		name := buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, s.Name)
+		name := buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, getPathSuffix(s))
 		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
 	}
 }
 
 func (ks *kube2sky) removeService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
-		name := buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, s.Name)
+		name := buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, getPathSuffix(s))
 		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
 	}
 }
