@@ -15,7 +15,7 @@ notes on src
 ideas
 -----
  - juju provider impl
- - file provider for machines/minions
+ - file provider for machines/nodes
  - openvpn as overlay per extant salt config.
 
 cloud
@@ -42,7 +42,7 @@ change, but willing subject to suitable abstraction.
 
 Q.The zone provider api appears to return the address only of the api
 server afaics. How is that useful? afaics the better semantic would be
-an attribute on the minions to instantiate multiple templates across
+an attribute on the nodes to instantiate multiple templates across
 zones?
 A. apparently not considered, current solution for ha is multiple k8s
 per zone with external lb. pointed out this was inane.
@@ -65,9 +65,9 @@ A. not done yet, election package merged, nothing using it.
 
 Afaics design discussion doesn't take place on the list.
 
-Q. Is minion registration supported, ie. bypassing cloud provider
+Q. Is node registration supported, ie. bypassing cloud provider
 filter all instances via regex match?
-A. not done yet, pull request in review for minions in etcd (not
+A. not done yet, pull request in review for nodes in etcd (not
 found, perhaps merged)
 
 -------------

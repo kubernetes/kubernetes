@@ -67,13 +67,13 @@ if [[ ! -f "$salt_tar" ]]; then
 fi
 
 
-# Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
-for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-  minion=${MINION_NAMES[$i]}
-  ip=${MINION_IPS[$i]}
-  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
-    echo "Adding $minion to hosts file"
-    echo "$ip $minion" >> /etc/hosts
+# Setup hosts file to support ping by hostname to each node in the cluster from apiserver
+for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+  node=${NODE_NAMES[$i]}
+  ip=${NODE_IPS[$i]}
+  if [ ! "$(cat /etc/hosts | grep $node)" ]; then
+    echo "Adding $node to hosts file"
+    echo "$ip $node" >> /etc/hosts
   fi
 done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.

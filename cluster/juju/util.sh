@@ -59,8 +59,8 @@ function detect-master() {
     export KUBE_SERVER=http://${KUBE_MASTER_IP}:8080
 }
 
-function detect-minions() {
-    # Run the Juju command that gets the minion private IP addresses.
+function detect-nodes() {
+    # Run the Juju command that gets the node private IP addresses.
     local ipoutput
     ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)
     # [
@@ -69,9 +69,9 @@ function detect-minions() {
     # ]
 
     # Strip out the IP addresses
-    export KUBE_MINION_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
-    # echo "Kubernetes minions: " ${KUBE_MINION_IP_ADDRESSES[@]} 1>&2
-    export NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
+    export KUBE_NODE_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
+    # echo "Kubernetes nodes: " ${KUBE_NODE_IP_ADDRESSES[@]} 1>&2
+    export NUM_NODES=${#KUBE_NODE_IP_ADDRESSES[@]}
 }
 
 function get-password() {
@@ -97,7 +97,7 @@ function kube-up() {
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
     detect-master
-    detect-minions
+    detect-nodes
 
     local prefix=$RANDOM
     export KUBE_CERT="/tmp/${prefix}-kubecfg.crt"
@@ -152,9 +152,9 @@ function sleep-status() {
         jujustatus=$(juju status kubernetes-master --format=oneline)
     done
 
-    # sleep because we cannot get the status back of where the minions are in the deploy phase
+    # sleep because we cannot get the status back of where the nodes are in the deploy phase
     # thanks to a generic "started" state and our service not actually coming online until the
-    # minions have received the binary from the master distribution hub during relations
+    # nodes have received the binary from the master distribution hub during relations
     echo "Sleeping an additional minute to allow the cluster to settle" 1>&2
     sleep 60
 }

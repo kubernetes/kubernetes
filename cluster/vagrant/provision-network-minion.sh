@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# provision-network-minion configures flannel on the minion
-function provision-network-minion {
+# provision-network-node configures flannel on the node
+function provision-network-node {
 
-  echo "Provisioning network on minion"
+  echo "Provisioning network on node"
 
   FLANNEL_ETCD_URL="http://${MASTER_IP}:4379"
 

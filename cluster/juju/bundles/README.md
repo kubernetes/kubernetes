@@ -51,7 +51,7 @@ The command above does few things for you:
   deployment environment (machine 0).
 - Deploys the Juju GUI to your environment onto the bootstrap node.
 - Provisions 4 machines, and deploys the Kubernetes services on top of
-  them (Kubernetes-master, two Kubernetes minions using flannel, and etcd).
+  them (Kubernetes-master, two Kubernetes nodes using flannel, and etcd).
 - Orchestrates the relations among the services, and exits.
 
 Now you should have a running Kubernetes. Run `juju status
@@ -113,9 +113,9 @@ capabilities to the charms.
 The master controls the Kubernetes cluster.  It manages for the worker
 nodes and provides the primary interface for control by the user.
 
-### Kubernetes minion
+### Kubernetes node
 
-The minions are the servers that perform the work.  Minions must
+The nodes are the servers that perform the work.  Nodes must
 communicate with the master and run the workloads that are assigned to
 them.
 

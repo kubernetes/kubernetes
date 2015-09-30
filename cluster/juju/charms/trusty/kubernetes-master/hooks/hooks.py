@@ -148,7 +148,7 @@ def config_changed():
     hookenv.log('The config-changed hook completed successfully.')
 
 
-@hooks.hook('etcd-relation-changed', 'minions-api-relation-changed')
+@hooks.hook('etcd-relation-changed', 'nodes-api-relation-changed')
 def relation_changed():
     template_data = get_template_data()
 
@@ -165,7 +165,7 @@ def relation_changed():
         if render_file(n, template_data) or not host.service_running(n):
             host.service_restart(n)
 
-    # Render the file that makes the kubernetes binaries available to minions.
+    # Render the file that makes the kubernetes binaries available to nodes.
     if render_file(
             'distribution', template_data,
             'conf.tmpl', '/etc/nginx/sites-enabled/distribution') or \
@@ -178,8 +178,8 @@ def relation_changed():
             not host.service_running('nginx'):
         host.service_reload('nginx')
 
-    # Send api endpoint to minions
-    notify_minions()
+    # Send api endpoint to nodes
+    notify_nodes()
 
 
 @hooks.hook('network-relation-changed')
@@ -188,16 +188,16 @@ def network_relation_changed():
     hookenv.relation_set(relation_id, ignore_errors=True)
 
 
-def notify_minions():
-    print('Notify minions.')
+def notify_nodes():
+    print('Notify nodes.')
     config = hookenv.config()
-    for r in hookenv.relation_ids('minions-api'):
+    for r in hookenv.relation_ids('nodes-api'):
         hookenv.relation_set(
             r,
             hostname=hookenv.unit_private_ip(),
             port=8080,
             version=config['version'])
-    print('Notified minions of version ' + config['version'])
+    print('Notified nodes of version ' + config['version'])
 
 
 def basic_auth(name, id, pwd=None, file='/srv/kubernetes/basic-auth.csv'):
@@ -250,7 +250,7 @@ def get_template_data():
     template_data['etcd_servers'] = ','.join([
         'http://%s:%s' % (s[0], s[1]) for s in sorted(
             get_rel_hosts('etcd', rels, ('hostname', 'port')))])
-    template_data['minions'] = ','.join(get_rel_hosts('minions-api', rels))
+    template_data['nodes'] = ','.join(get_rel_hosts('nodes-api', rels))
     private_ip = hookenv.unit_private_ip()
     public_ip = hookenv.unit_public_ip()
     template_data['api_public_address'] = _bind_addr(public_ip)

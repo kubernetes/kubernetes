@@ -16,8 +16,8 @@
 
 ZONE=${KUBE_AWS_ZONE:-us-west-2a}
 MASTER_SIZE=${MASTER_SIZE:-t2.micro}
-MINION_SIZE=${MINION_SIZE:-t2.micro}
-NUM_MINIONS=${NUM_MINIONS:-4}
+NODE_SIZE=${NODE_SIZE:-t2.micro}
+NUM_NODES=${NUM_NODES:-4}
 
 # Optional: Set AWS_S3_BUCKET to the name of an S3 bucket to use for uploading binaries
 # (otherwise a unique bucket name will be generated for you)
@@ -33,7 +33,7 @@ INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_ID=${INSTANCE_PREFIX}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 IAM_PROFILE_MASTER="kubernetes-master"
-IAM_PROFILE_MINION="kubernetes-minion"
+IAM_PROFILE_NODE="kubernetes-node"
 
 LOG="/dev/null"
 
@@ -42,14 +42,14 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20}
 # The master root EBS volume size (typically does not need to be very large)
 MASTER_ROOT_DISK_TYPE="${MASTER_ROOT_DISK_TYPE:-gp2}"
 MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-8}
-# The minions root EBS volume size (used to house Docker images)
-MINION_ROOT_DISK_TYPE="${MINION_ROOT_DISK_TYPE:-gp2}"
-MINION_ROOT_DISK_SIZE=${MINION_ROOT_DISK_SIZE:-32}
+# The nodes root EBS volume size (used to house Docker images)
+NODE_ROOT_DISK_TYPE="${NODE_ROOT_DISK_TYPE:-gp2}"
+NODE_ROOT_DISK_SIZE=${NODE_ROOT_DISK_SIZE:-32}
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_SCOPES=""
+NODE_TAG="${INSTANCE_PREFIX}-node"
+NODE_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
@@ -89,13 +89,13 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
 
-# Optional: Enable/disable public IP assignment for minions.
+# Optional: Enable/disable public IP assignment for nodes.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
-ENABLE_MINION_PUBLIC_IP=${KUBE_ENABLE_MINION_PUBLIC_IP:-true}
+ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
-# OS options for minions
+# OS options for nodes
 KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-vivid}"
-KUBE_MINION_IMAGE="${KUBE_MINION_IMAGE:-}"
+KUBE_NODE_IMAGE="${KUBE_NODE_IMAGE:-}"
 COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"
 RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
