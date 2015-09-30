@@ -75,6 +75,8 @@ var (
 	maxConcurrency int
 
 	longTestTimeout = time.Second * 300
+
+	maxTestTimeout = time.Minute * 10
 )
 
 type fakeKubeletClient struct{}
@@ -265,6 +267,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
+
 		40 /* MaxPods */)
 
 	kubeletapp.RunKubelet(kcfg, nil)
@@ -963,7 +966,7 @@ func main() {
 
 	go func() {
 		defer util.FlushLogs()
-		time.Sleep(3 * time.Minute)
+		time.Sleep(maxTestTimeout)
 		glog.Fatalf("This test has timed out.")
 	}()
 
