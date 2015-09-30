@@ -20,6 +20,19 @@ import (
 	"strings"
 )
 
+// EscapePluginName converts a plugin name in the format
+// vendor/pluginname into a proper ondisk vendor~pluginname plugin directory
+// format.
+func EscapePluginName(in string) string {
+	return strings.Replace(in, "/", "~", -1)
+}
+
+// EscapeQualifiedPluginName converts a plugin directory name in the format
+// vendor~pluginname into a proper vendor/pluginname.
+func UnescapePluginName(in string) string {
+	return strings.Replace(in, "~", "/", -1)
+}
+
 // EscapeQualifiedNameForDisk converts a plugin name, which might contain a / into a
 // string that is safe to use on-disk.  This assumes that the input has already
 // been validates as a qualified name.  we use "~" rather than ":" here in case

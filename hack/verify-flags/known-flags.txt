@@ -337,6 +337,7 @@ upgrade-target
 use-kubernetes-cluster-service
 user-whitelist
 verify-only
+volume-plugin-dir
 watch-cache
 watch-only
 whitelist-override-label

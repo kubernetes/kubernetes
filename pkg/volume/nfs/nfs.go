@@ -58,8 +58,9 @@ const (
 	nfsPluginName = "kubernetes.io/nfs"
 )
 
-func (plugin *nfsPlugin) Init(host volume.VolumeHost) {
+func (plugin *nfsPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *nfsPlugin) Name() string {

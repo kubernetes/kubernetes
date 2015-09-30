@@ -198,6 +198,10 @@ type VolumeSource struct {
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
+	// FlexVolume represents a generic volume resource that is
+	// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
+
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 
@@ -236,6 +240,9 @@ type PersistentVolumeSource struct {
 	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
+	// FlexVolume represents a generic volume resource that is
+	// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
@@ -488,6 +495,24 @@ type FCVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// FlexVolume represents a generic volume resource that is
+// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+type FlexVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	Driver string `json:"driver"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	FSType string `json:"fsType,omitempty"`
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+	// Optional: Extra driver options if any.
+	Options map[string]string `json:"options,omitempty"`
 }
 
 // Represents a Persistent Disk resource in AWS.
