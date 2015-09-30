@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
 )
 
 func OutDir(path string) (string, error) {
@@ -38,4 +40,86 @@ func OutDir(path string) (string, error) {
 	}
 	outDir = outDir + "/"
 	return outDir, nil
+}
+
+func getOutDir(path string, args []string) (string, error) {
+	if len(args) == 1 {
+		path = args[0]
+	} else if len(args) > 1 {
+		err := fmt.Errorf("usage: COMMAND [output directory]")
+		return "", err
+	}
+
+	outDir, err := OutDir(path)
+	if err != nil {
+		return "", err
+	}
+	return outDir, nil
+}
+
+// AddGeneratedDocsCommands will add 3 new commands to a cobra command:
+// genmd, genman, genbash. The commands will be hidden from help output,
+// documentation, etc. Each command will generate their respective types of
+// documentation and will place those docs in the directory specified by
+// their first argument (or they have a fallback/default)
+func AddGeneratedDocsCommands(cmd *cobra.Command) {
+	genMD := &cobra.Command{
+		Use:    "genmd",
+		Short:  "genmd",
+		Run:    runGenMD,
+		Hidden: true,
+	}
+	cmd.AddCommand(genMD)
+
+	genMan := &cobra.Command{
+		Use:    "genman",
+		Short:  "genman",
+		Run:    runGenMan,
+		Hidden: true,
+	}
+	cmd.AddCommand(genMan)
+
+	genBash := &cobra.Command{
+		Use:    "genbash",
+		Short:  "genbash",
+		Run:    runGenBash,
+		Hidden: true,
+	}
+	cmd.AddCommand(genBash)
+}
+
+func runGenMD(cmd *cobra.Command, args []string) {
+	root := cmd.Root()
+	outDir, err := getOutDir("docs/", args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	root.GenMarkdownTree(outDir)
+}
+
+func runGenMan(cmd *cobra.Command, args []string) {
+	header := &cobra.GenManHeader{
+		Title:  "KUBERNETES",
+		Manual: "Kubernetes User Manual",
+	}
+	root := cmd.Root()
+	outDir, err := getOutDir("docs/man/man1", args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	root.GenManTree(header, outDir)
+
+}
+
+func runGenBash(cmd *cobra.Command, args []string) {
+	root := cmd.Root()
+	outDir, err := getOutDir("contrib/completions/bash/", args)
+	outFile := filepath.Join(outDir, root.Name())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	root.GenBashCompletionFile(outFile)
 }
