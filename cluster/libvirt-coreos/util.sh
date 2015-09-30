@@ -46,9 +46,9 @@ function detect-master {
   echo "KUBE_MASTER: $KUBE_MASTER"
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
-function detect-minions {
-  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+function detect-nodes {
+  KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
 
 # Verify prereqs on host machine
@@ -166,9 +166,9 @@ function wait-cluster-readiness {
 
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
-    echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
-    if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
+    nb_ready_nodes=$("${kubectl}" get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    echo "Nb ready nodes: $nb_ready_nodes / $NUM_MINIONS"
+    if [[ "$nb_ready_nodes" -eq "$NUM_MINIONS" ]]; then
         return 0
     fi
 
@@ -182,7 +182,7 @@ function wait-cluster-readiness {
 # Instantiate a kubernetes cluster
 function kube-up {
   detect-master
-  detect-minions
+  detect-nodes
   gen-kube-bearertoken
   initialize-pool keep_base_image
   initialize-network
@@ -195,11 +195,11 @@ function kube-up {
     if [[ $i -eq $NUM_MINIONS ]]; then
         etcd2_initial_cluster[$i]="${MASTER_NAME}=http://${MASTER_IP}:2380"
     else
-        etcd2_initial_cluster[$i]="${MINION_NAMES[$i]}=http://${MINION_IPS[$i]}:2380"
+        etcd2_initial_cluster[$i]="${NODE_NAMES[$i]}=http://${NODE_IPS[$i]}:2380"
     fi
   done
   etcd2_initial_cluster=$(join , "${etcd2_initial_cluster[@]}")
-  readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
+  readonly machines=$(join , "${KUBE_NODE_IP_ADDRESSES[@]}")
 
   for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
     if [[ $i -eq $NUM_MINIONS ]]; then
@@ -207,9 +207,9 @@ function kube-up {
         name=$MASTER_NAME
         public_ip=$MASTER_IP
     else
-      type=minion-$(printf "%02d" $i)
-      name=${MINION_NAMES[$i]}
-      public_ip=${MINION_IPS[$i]}
+      type=node-$(printf "%02d" $i)
+      name=${NODE_NAMES[$i]}
+      public_ip=${NODE_IPS[$i]}
     fi
     image=$name.img
     config=kubernetes_config_$type
@@ -263,7 +263,7 @@ function kube-push {
   kube-push-internal
   ssh-to-node "$MASTER_NAME" "sudo systemctl restart kube-apiserver kube-controller-manager kube-scheduler"
   for ((i=0; i < NUM_MINIONS; i++)); do
-    ssh-to-node "${MINION_NAMES[$i]}" "sudo systemctl restart kubelet kube-proxy"
+    ssh-to-node "${NODE_NAMES[$i]}" "sudo systemctl restart kubelet kube-proxy"
   done
   wait-cluster-readiness
 }
@@ -312,14 +312,14 @@ function ssh-to-node {
   local cmd="$2"
   local machine
 
-  if [[ "$node" == "$MASTER_IP" ]] || [[ "$node" =~ ^"$MINION_IP_BASE" ]]; then
+  if [[ "$node" == "$MASTER_IP" ]] || [[ "$node" =~ ^"$NODE_IP_BASE" ]]; then
       machine="$node"
   elif [[ "$node" == "$MASTER_NAME" ]]; then
       machine="$MASTER_IP"
   else
     for ((i=0; i < NUM_MINIONS; i++)); do
-        if [[ "$node" == "${MINION_NAMES[$i]}" ]]; then
-            machine="${MINION_IPS[$i]}"
+        if [[ "$node" == "${NODE_NAMES[$i]}" ]]; then
+            machine="${NODE_IPS[$i]}"
             break
         fi
     done
