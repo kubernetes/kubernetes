@@ -23,7 +23,9 @@ The following sections detail the supported record types and layout that is
 supported.  Any other layout or names or queries that happen to work are
 considered implementation details and are subject to change without warning.
 
-### A records
+### Services
+
+#### A records
 "Normal" (not headless) Services are assigned a DNS A record for a name of the
 form `my-svc.my-namespace.svc.cluster.local`.  This resolves to the cluster IP
 of the Service.
@@ -49,6 +51,13 @@ of the form `auto-generated-name.my-svc.my-namespace.svc.cluster.local`.
 Previous versions of kube-dns made names of the for
 `my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  This
 is no longer supported.
+
+### Pods
+
+#### A Records
+When enabled, pods are assigned a DNS A record in the form of `pod-ip-address.my-namespace.pod.cluster.local`.
+
+For example, a pod with ip `1.2.3.4` in the namespace `default` with a dns name of `cluster.local` would have an entry: `1-2-3-4.default.pod.cluster.local`.
 
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
@@ -126,7 +135,7 @@ Then create a pod using this file:
 kubectl create -f busybox.yaml
 ```
 
-### 2 Wait for this pod to go into the running state. 
+### 2 Wait for this pod to go into the running state.
 
 You can get its status with:
 ```
