@@ -73,7 +73,7 @@ func (c *ClientCache) ClientConfigForVersion(group, version string) (*client.Con
 		return nil, err
 	}
 	config.GroupVersion = negotiatedGroupVersion
-	if err := client.SetDefaultsForGroup(group, &config); err != nil {
+	if err := client.SetKubernetesDefaultsForGroup(group, &config); err != nil {
 		return nil, err
 	}
 	c.configs[config.GroupVersion] = &config

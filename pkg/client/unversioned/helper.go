@@ -336,9 +336,10 @@ func SetKubernetesDefaults(config *Config) error {
 	return nil
 }
 
-// SetKubernetesDefaults sets default values on the provided client config for accessing the
-// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
-func SetDefaultsForGroup(group string, config *Config) error {
+// SetKubernetesDefaultsForGroup sets default values on the provided client
+// config for accessing the Kubernetes API of the specified group. It returns an
+// error if any of the defaults are impossible or invalid.
+func SetKubernetesDefaultsForGroup(group string, config *Config) error {
 	if config.Prefix == "" {
 		if group == "" {
 			config.Prefix = "/api"
@@ -666,10 +667,11 @@ func defaultVersionFor(config *Config) string {
 	return version
 }
 
-// defaultVersionForGroup is shared between defaultServerUrlFor and RESTClientFor
+// defaultGroupVersionForGroup sets the GroupVersion field of the config. It's
+// only effective for groups compiled in the Kuberentes code base.
 func defaultGroupVersionForGroup(group string, config *Config) string {
 	groupVersion := config.GroupVersion
-	if groupVersion == "" {
+	if len(groupVersion) == 0 {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		groupVersion = latest.GroupOrDie(group).GroupVersion
