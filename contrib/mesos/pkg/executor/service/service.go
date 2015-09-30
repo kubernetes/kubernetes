@@ -105,8 +105,8 @@ func (s *KubeletExecutorServer) syncExternalShutdownWatcher() (io.Closer, error)
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	oomAdjuster := oom.NewOomAdjuster()
-	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOOMAdjuster()
+	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
 		log.Info(err)
 	}
 

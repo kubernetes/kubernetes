@@ -29,12 +29,12 @@ import (
 	"github.com/golang/glog"
 )
 
-func NewOomAdjuster() *OomAdjuster {
-	oomAdjuster := &OomAdjuster{
+func NewOOMAdjuster() *OOMAdjuster {
+	oomAdjuster := &OOMAdjuster{
 		pidLister:        getPids,
-		ApplyOomScoreAdj: applyOomScoreAdj,
+		ApplyOOMScoreAdj: applyOOMScoreAdj,
 	}
-	oomAdjuster.ApplyOomScoreAdjContainer = oomAdjuster.applyOomScoreAdjContainer
+	oomAdjuster.ApplyOOMScoreAdjContainer = oomAdjuster.applyOOMScoreAdjContainer
 	return oomAdjuster
 }
 
@@ -48,7 +48,7 @@ func getPids(cgroupName string) ([]int, error) {
 }
 
 // Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
-func applyOomScoreAdj(pid int, oomScoreAdj int) error {
+func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	if pid < 0 {
 		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
 	}
@@ -79,7 +79,7 @@ func applyOomScoreAdj(pid int, oomScoreAdj int) error {
 
 // Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
 // Keeps trying to write until the process list of the cgroup stabilizes, or until maxTries tries.
-func (oomAdjuster *OomAdjuster) applyOomScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
+func (oomAdjuster *OOMAdjuster) applyOOMScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
 	adjustedProcessSet := make(map[int]bool)
 	for i := 0; i < maxTries; i++ {
 		continueAdjusting := false
@@ -93,7 +93,7 @@ func (oomAdjuster *OomAdjuster) applyOomScoreAdjContainer(cgroupName string, oom
 			for _, pid := range pidList {
 				if !adjustedProcessSet[pid] {
 					continueAdjusting = true
-					if err = oomAdjuster.ApplyOomScoreAdj(pid, oomScoreAdj); err == nil {
+					if err = oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err == nil {
 						adjustedProcessSet[pid] = true
 					}
 				}

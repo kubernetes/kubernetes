@@ -307,7 +307,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	oomAdjuster := oom.NewOomAdjuster()
+	oomAdjuster := oom.NewOOMAdjuster()
 	procFs := procfs.NewProcFs()
 
 	// Initialize the runtime.
