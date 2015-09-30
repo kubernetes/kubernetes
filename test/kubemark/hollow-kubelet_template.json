@@ -21,7 +21,7 @@
 			"spec": {
 				"containers": [{
 					"name": "hollow-kubelet",
-					"image": "gcr.io/gmarek-kubernetes/kubemark:latest",
+					"image": "gcr.io/##project##/kubemark:latest",
 					"ports": [
 						{"containerPort": 4194},
 						{"containerPort": 10250},

@@ -59,9 +59,10 @@ gcloud compute copy-files --zone=${ZONE} \
   ${KUBE_ROOT}/test/kubemark/configure-kubectl.sh \
   hollow-cluster-master:~
 
-gcloud compute ssh --zone=${ZONE} hollow-cluster-master --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && ./start-kubemark-master.sh"
+gcloud compute ssh --zone=${ZONE} hollow-cluster-master --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh"
 
 sed "s/##masterip##/\"${MASTER_IP}\"/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 sed -i'' -e "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
+sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 kubectl create -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json
 kubectl create -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json --namespace="kubemark"
