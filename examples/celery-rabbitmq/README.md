@@ -71,7 +71,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: rabbitmq
+    component: rabbitmq
   name: rabbitmq-service
 spec:
   ports:
@@ -104,12 +104,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: rabbitmq
+    component: rabbitmq
   name: rabbitmq-controller
 spec:
   replicas: 1
-  selector:
-    component: rabbitmq
   template:
     metadata:
       labels:
@@ -145,12 +143,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: celery
+    component: celery
   name: celery-controller
 spec:
   replicas: 1
-  selector:
-    component: celery
   template:
     metadata:
       labels:
@@ -227,7 +223,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: flower
+    component: flower
   name: flower-service
 spec:
   ports:
@@ -259,12 +255,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: flower
+    component: flower
   name: flower-controller
 spec:
   replicas: 1
-  selector:
-    component: flower
   template:
     metadata:
       labels:
@@ -302,8 +296,8 @@ rabbitmq-controller-5eb2l                      1/1       Running      0         
 `kubectl get service flower-service` will help you to get the external IP addresses of the flower service.
 
 ```
-NAME             LABELS        SELECTOR                         IP(S)            PORT(S)
-flower-service   name=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
+NAME             LABELS             SELECTOR                         IP(S)            PORT(S)
+flower-service   component=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
                                                                 162.222.181.180
 ```
 
