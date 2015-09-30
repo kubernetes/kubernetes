@@ -178,7 +178,8 @@ func NewMainKubelet(
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
 	cpuCFSQuota bool,
-	daemonEndpoints *api.NodeDaemonEndpoints) (*Kubelet, error) {
+	daemonEndpoints *api.NodeDaemonEndpoints,
+	oomAdjuster *oom.OOMAdjuster) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -307,7 +308,6 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	oomAdjuster := oom.NewOOMAdjuster()
 	procFs := procfs.NewProcFs()
 
 	// Initialize the runtime.
