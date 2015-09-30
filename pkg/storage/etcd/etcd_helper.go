@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -35,10 +35,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
-func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
+func NewEtcdStorage(e etcd.Client, client tools.EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
 	return &etcdHelper{
+		etcdclient: e,
 		client:     client,
 		codec:      codec,
 		versioner:  APIObjectVersioner{},
@@ -50,9 +52,10 @@ func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string)
 
 // etcdHelper is the reference implementation of storage.Interface.
 type etcdHelper struct {
-	client tools.EtcdClient
-	codec  runtime.Codec
-	copier runtime.ObjectCopier
+	etcdclient etcd.Client
+	client     tools.EtcdClient
+	codec      runtime.Codec
+	copier     runtime.ObjectCopier
 	// optional, has to be set to perform any atomic operations
 	versioner storage.Versioner
 	// prefix for all etcd keys
@@ -73,22 +76,46 @@ func init() {
 }
 
 // Codec provides access to the underlying codec being used by the implementation.
-func (h *etcdHelper) Codec() runtime.Codec {
+func (h *etcdHelper) Codec(ctx context.Context) runtime.Codec {
 	return h.codec
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Backends() []string {
-	return h.client.GetCluster()
+func (h *etcdHelper) Backends(ctx context.Context) []string {
+
+	if h.etcdclient == nil {
+		// for testing routines
+		return nil
+	}
+
+	membersAPI := etcd.NewMembersAPI(h.etcdclient)
+	members, err := membersAPI.List(ctx)
+	if err != nil {
+		glog.Errorf("Error obtaining etcd members list: %q", err)
+		return nil
+	}
+
+	memberLength := len(members)
+	if 0 == memberLength {
+		return nil
+	}
+
+	mlist := make([]string, memberLength)
+	for idx, member := range members {
+		// under what conditions would the client urls be > 1?
+		mlist[idx] = member.ClientURLs[0]
+	}
+
+	return mlist
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Versioner() storage.Versioner {
+func (h *etcdHelper) Versioner(ctx context.Context) storage.Versioner {
 	return h.versioner
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	key = h.prefixEtcdKey(key)
 	data, err := h.codec.Encode(obj)
 	if err != nil {
@@ -101,7 +128,12 @@ func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) err
 	}
 
 	startTime := time.Now()
-	response, err := h.client.Create(key, string(data), ttl)
+	opts := etcd.SetOptions{
+		TTL:       time.Duration(ttl),
+		PrevExist: etcd.PrevNoExist,
+	}
+
+	response, err := h.client.Set(ctx, key, string(data), &opts)
 	metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	if err != nil {
 		return err
@@ -116,7 +148,7 @@ func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) err
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	var response *etcd.Response
 	data, err := h.codec.Encode(obj)
 	if err != nil {
@@ -129,7 +161,12 @@ func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error 
 		if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			create = false
 			startTime := time.Now()
-			response, err = h.client.CompareAndSwap(key, string(data), ttl, "", version)
+			opts := etcd.SetOptions{
+				PrevValue: "",
+				TTL:       time.Duration(ttl),
+				PrevIndex: version,
+			}
+			response, err = h.client.Set(ctx, key, string(data), &opts)
 			metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
 			if err != nil {
 				return err
@@ -139,7 +176,13 @@ func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error 
 	if create {
 		// Create will fail if a key already exists.
 		startTime := time.Now()
-		response, err = h.client.Create(key, string(data), ttl)
+		opts := etcd.CreateInOrderOptions{
+			TTL: time.Duration(ttl),
+		}
+		response, err = h.client.CreateInOrder(ctx, key, string(data), &opts)
+		if err != nil {
+			return err
+		}
 		metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	}
 
@@ -157,14 +200,14 @@ func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error 
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Delete(key string, out runtime.Object) error {
+func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object) error {
 	key = h.prefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
 		panic("unable to convert output object to pointer")
 	}
 
 	startTime := time.Now()
-	response, err := h.client.Delete(key, false)
+	response, err := h.client.Delete(ctx, key, nil)
 	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
 	if !IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
@@ -176,33 +219,33 @@ func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
-	go w.etcdWatch(h.client, key, resourceVersion)
+	go w.etcdWatch(ctx, h.client, key, resourceVersion)
 	return w, nil
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
-	go w.etcdWatch(h.client, key, resourceVersion)
+	go w.etcdWatch(ctx, h.client, key, resourceVersion)
 	return w, nil
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Get(key string, objPtr runtime.Object, ignoreNotFound bool) error {
+func (h *etcdHelper) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
 	key = h.prefixEtcdKey(key)
-	_, _, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	_, _, _, err := h.bodyAndExtractObj(ctx, key, objPtr, ignoreNotFound)
 	return err
 }
 
 // bodyAndExtractObj performs the normal Get path to etcd, returning the parsed node and response for additional information
 // about the response, like the current etcd index and the ttl.
-func (h *etcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
+func (h *etcdHelper) bodyAndExtractObj(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
 	startTime := time.Now()
-	response, err := h.client.Get(key, false, false)
+	response, err := h.client.Get(ctx, key, nil)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !IsEtcdNotFound(err) {
@@ -243,7 +286,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GetToList(key string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.FilterFunc, listObj runtime.Object) error {
 	trace := util.NewTrace("GetToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
@@ -252,7 +295,7 @@ func (h *etcdHelper) GetToList(key string, filter storage.FilterFunc, listObj ru
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
 	trace.Step("About to read etcd node")
-	response, err := h.client.Get(key, false, false)
+	response, err := h.client.Get(ctx, key, nil)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node read")
 	if err != nil {
@@ -270,7 +313,7 @@ func (h *etcdHelper) GetToList(key string, filter storage.FilterFunc, listObj ru
 	}
 	trace.Step("Object decoded")
 	if h.versioner != nil {
-		if err := h.versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
+		if err := h.versioner.UpdateList(listObj, response.Index); err != nil {
 			return err
 		}
 	}
@@ -321,7 +364,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (h *etcdHelper) List(ctx context.Context, key string, filter storage.FilterFunc, listObj runtime.Object) error {
 	trace := util.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
@@ -331,7 +374,7 @@ func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
 	trace.Step("About to list etcd node")
-	nodes, index, err := h.listEtcdNode(key)
+	nodes, index, err := h.listEtcdNode(ctx, key)
 	metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node listed")
 	if err != nil {
@@ -349,8 +392,12 @@ func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime
 	return nil
 }
 
-func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
-	result, err := h.client.Get(key, true, true)
+func (h *etcdHelper) listEtcdNode(ctx context.Context, key string) ([]*etcd.Node, uint64, error) {
+	opts := etcd.GetOptions{
+		Recursive: true,
+		Sort:      true,
+	}
+	result, err := h.client.Get(ctx, key, &opts)
 	if err != nil {
 		index, ok := etcdErrorIndex(err)
 		if !ok {
@@ -363,11 +410,11 @@ func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 			return nodes, index, err
 		}
 	}
-	return result.Node.Nodes, result.EtcdIndex, nil
+	return result.Node.Nodes, result.Index, nil
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.UpdateFunc) error {
+func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.UpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
@@ -376,7 +423,7 @@ func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 	key = h.prefixEtcdKey(key)
 	for {
 		obj := reflect.New(v.Type()).Interface().(runtime.Object)
-		origBody, node, res, err := h.bodyAndExtractObj(key, obj, ignoreNotFound)
+		origBody, node, res, err := h.bodyAndExtractObj(ctx, key, obj, ignoreNotFound)
 		if err != nil {
 			return err
 		}
@@ -405,7 +452,7 @@ func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 				ttl = 1
 			}
 		} else if res != nil {
-			index = res.EtcdIndex
+			index = res.Index
 		}
 
 		if newTTL != nil {
@@ -424,7 +471,11 @@ func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		// First time this key has been used, try creating new value.
 		if index == 0 {
 			startTime := time.Now()
-			response, err := h.client.Create(key, string(data), ttl)
+			opts := etcd.CreateInOrderOptions{
+				TTL: time.Duration(ttl),
+			}
+
+			response, err := h.client.CreateInOrder(ctx, key, string(data), &opts)
 			metrics.RecordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
 			if IsEtcdNodeExist(err) {
 				continue
@@ -439,7 +490,14 @@ func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 
 		startTime := time.Now()
 		// Swap origBody with data, if origBody is the latest etcd data.
-		response, err := h.client.CompareAndSwap(key, string(data), ttl, origBody, index)
+		opts := etcd.SetOptions{
+			PrevValue: origBody,
+			PrevIndex: index,
+			PrevExist: etcd.PrevExist,
+			TTL:       time.Duration(ttl),
+			Dir:       false,
+		}
+		response, err := h.client.Set(ctx, key, string(data), &opts)
 		metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
 		if IsEtcdTestFailed(err) {
 			// Try again.

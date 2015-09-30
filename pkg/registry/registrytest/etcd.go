@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
@@ -38,7 +38,7 @@ import (
 func NewEtcdStorage(t *testing.T, group string) (storage.Interface, *tools.FakeEtcdClient) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Groups[group].Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(nil, fakeClient, testapi.Groups[group].Codec(), etcdtest.PathPrefix())
 	return etcdStorage, fakeClient
 }
 
@@ -183,7 +183,7 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 		return nil, err
 	}
 	key = etcdtest.AddPrefix(key)
-	resp, err := t.fakeClient.Get(key, false, false)
+	resp, err := t.fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	_, err = t.fakeClient.Set(key, runtime.EncodeOrDie(codec, obj), 0)
+	_, err = t.fakeClient.Set(ctx, key, runtime.EncodeOrDie(codec, obj), nil)
 	return err
 }
 
@@ -281,9 +281,9 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 }
 
 func isNotFoundEtcdError(err error) bool {
-	etcdError, ok := err.(*etcd.EtcdError)
+	etcdError, ok := err.(*etcd.Error)
 	if !ok {
 		return false
 	}
-	return etcdError.ErrorCode == tools.EtcdErrorCodeNotFound
+	return etcdError.Code == tools.EtcdErrorCodeNotFound
 }

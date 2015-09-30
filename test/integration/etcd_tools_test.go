@@ -26,21 +26,25 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd"
+	etcstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 )
 
 func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	kAPI := etcd.NewKeysAPI(client)
+	etcdStorage := etcstorage.NewEtcdStorage(client, kAPI, testapi.Default.Codec(), "")
+	ctx := context.Background()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Set(ctx, key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.Get(key, false, false)
+		resp, err := kAPI.Get(ctx, key, nil)
 		if err != nil || resp.Node == nil {
 			t.Fatalf("unexpected error: %v %v", err, resp)
 		}
@@ -57,19 +61,21 @@ func TestSet(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	kAPI := etcd.NewKeysAPI(client)
+	etcdStorage := etcstorage.NewEtcdStorage(client, kAPI, testapi.Default.Codec(), "")
+	ctx := context.Background()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		coded, err := testapi.Default.Codec().Encode(&testObject)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		_, err = client.Set(key, string(coded), 0)
+		_, err = kAPI.Set(ctx, key, string(coded), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := api.ServiceAccount{}
-		if err := etcdStorage.Get(key, &result, false); err != nil {
+		if err := etcdStorage.Get(ctx, key, &result, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Propagate ResourceVersion (it is set automatically).
@@ -82,14 +88,16 @@ func TestGet(t *testing.T) {
 
 func TestWriteTTL(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	kAPI := etcd.NewKeysAPI(client)
+	etcdStorage := etcstorage.NewEtcdStorage(client, kAPI, testapi.Default.Codec(), "")
+	ctx := context.Background()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Set(ctx, key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := &api.ServiceAccount{}
-		err := etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		err := etcdStorage.GuaranteedUpdate(ctx, key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "foo" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
@@ -106,12 +114,12 @@ func TestWriteTTL(t *testing.T) {
 		if result.Name != "out" {
 			t.Errorf("unexpected response: %#v", result)
 		}
-		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL != 10 {
+		if res, err := kAPI.Get(ctx, key, nil); err != nil || res == nil || res.Node.TTL != 10 {
 			t.Fatalf("unexpected get: %v %#v", err, res)
 		}
 
 		result = &api.ServiceAccount{}
-		err = etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		err = etcdStorage.GuaranteedUpdate(ctx, key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "out" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
@@ -127,7 +135,7 @@ func TestWriteTTL(t *testing.T) {
 		if result.Name != "out2" {
 			t.Errorf("unexpected response: %#v", result)
 		}
-		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL <= 1 {
+		if res, err := kAPI.Get(ctx, key, nil); err != nil || res == nil || res.Node.TTL <= 1 {
 			t.Fatalf("unexpected get: %v %#v", err, res)
 		}
 	})
@@ -135,17 +143,19 @@ func TestWriteTTL(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	kAPI := etcd.NewKeysAPI(client)
+	etcdStorage := etcstorage.NewEtcdStorage(client, kAPI, testapi.Default.Codec(), etcdtest.PathPrefix())
+	ctx := context.Background()
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
-		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+		resp, err := kAPI.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := etcdStorage.Watch(key, 0, storage.Everything)
+		w, err := etcdStorage.Watch(ctx, key, 0, storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -172,7 +182,7 @@ func TestWatch(t *testing.T) {
 		}
 
 		// should return the previously deleted item in the watch, but with the latest index
-		resp, err = client.Delete(key, false)
+		resp, err = kAPI.Delete(ctx, key, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

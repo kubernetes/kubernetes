@@ -191,7 +191,7 @@ func TestScaleGet(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validDeployment), 0); err != nil {
+	if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validDeployment), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -211,7 +211,7 @@ func TestScaleUpdate(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validDeployment), 0); err != nil {
+	if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validDeployment), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
@@ -225,7 +225,7 @@ func TestScaleUpdate(t *testing.T) {
 	if _, _, err := storage.Scale.Update(ctx, &update); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	response, err := fakeClient.Get(key, false, false)
+	response, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

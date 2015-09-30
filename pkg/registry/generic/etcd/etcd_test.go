@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 )
 
 type testRESTStrategy struct {
@@ -71,7 +71,7 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	s := etcdstorage.NewEtcdStorage(f, testapi.Default.Codec(), etcdtest.PathPrefix())
+	s := etcdstorage.NewEtcdStorage(nil, f, testapi.Default.Codec(), etcdtest.PathPrefix())
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 	podPrefix := "/pods"
 	return f, &Etcd{
@@ -581,7 +581,7 @@ func TestEtcdDelete(t *testing.T) {
 		}
 
 		if item.expect.E != nil {
-			item.expect.E.(*etcd.EtcdError).Index = fakeClient.ChangeIndex
+			item.expect.E.(*etcd.Error).Index = fakeClient.ChangeIndex
 		}
 		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))

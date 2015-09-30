@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 type Tester struct {
@@ -936,7 +937,18 @@ func (t *Tester) testWatch(initWatchFn InitWatchFunc, injectErrFn InjectErrFunc)
 	default:
 	}
 
-	injectErrFn(nil)
+	injectErrFn(fmt.Errorf("Injected error"))
+	if errEvent, ok := <-watcher.ResultChan(); !ok {
+		t.Errorf("no error result?")
+	} else {
+		if e, a := watch.Error, errEvent.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := "Injected error", errEvent.Object.(*unversioned.Status).Message; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
 	if _, ok := <-watcher.ResultChan(); ok {
 		t.Errorf("watch channel should be closed")
 	}

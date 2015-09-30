@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	etcd "github.com/coreos/etcd/client"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
@@ -256,7 +258,7 @@ func TestResourceLocation(t *testing.T) {
 		storage, _, _, fakeClient := newStorage(t)
 		key, _ := storage.KeyFunc(ctx, tc.pod.Name)
 		key = etcdtest.AddPrefix(key)
-		if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &tc.pod), 0); err != nil {
+		if _, err := fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &tc.pod), nil); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -333,7 +335,7 @@ func TestEtcdCreate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get(key, false, false)
+	resp, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -419,7 +421,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get(key, false, false)
+	resp, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -490,7 +492,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get(key, false, false)
+	resp, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -578,14 +580,17 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), validNewPod()), 1)
+	opts := etcd.SetOptions{
+		TTL: time.Duration(1),
+	}
+	fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), validNewPod()), &opts)
 
 	podIn := validChangedPod()
 	_, _, err := storage.Update(ctx, podIn)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	response, err := fakeClient.Get(key, false, false)
+	response, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -603,7 +608,10 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{
+	opts := etcd.SetOptions{
+		TTL: time.Duration(1),
+	}
+	fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
@@ -618,7 +626,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				},
 			},
 		},
-	}), 1)
+	}), &opts)
 
 	grace := int64(30)
 	podIn := api.Pod{
@@ -650,7 +658,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	response, err := fakeClient.Get(key, false, false)
+	response, err := fakeClient.Get(ctx, key, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -684,7 +692,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			},
 		},
 	}
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &podStart), 0)
+	fakeClient.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &podStart), nil)
 
 	podIn := api.Pod{
 		ObjectMeta: api.ObjectMeta{
