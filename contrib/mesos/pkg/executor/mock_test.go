@@ -22,6 +22,8 @@ import (
 	"github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
@@ -64,16 +66,18 @@ func (m *MockExecutorDriver) SendFrameworkMessage(msg string) (mesosproto.Status
 	return args.Get(0).(mesosproto.Status), args.Error(1)
 }
 
-func NewTestKubernetesExecutor() *KubernetesExecutor {
+func NewTestKubernetesExecutor() (*KubernetesExecutor, chan kubelet.PodUpdate) {
+	updates := make(chan kubelet.PodUpdate, 1024)
 	return New(Config{
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1024),
-	})
+		Updates: updates,
+		PodLW:   &NewMockPodsListWatch(api.PodList{}).ListWatch,
+	}), updates
 }
 
 func TestExecutorNew(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 	executor.Init(mockDriver)
 
 	assert.Equal(t, executor.isDone(), false, "executor should not be in Done state on initialization")
