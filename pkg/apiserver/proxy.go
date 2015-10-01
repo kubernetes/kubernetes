@@ -286,6 +286,11 @@ func dialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 			return nil, err
 		}
 
+		// Return if we were configured to skip validation
+		if tlsConfig != nil && tlsConfig.InsecureSkipVerify {
+			return tlsConn, nil
+		}
+
 		// Verify
 		host, _, _ := net.SplitHostPort(dialAddr)
 		if err := tlsConn.VerifyHostname(host); err != nil {
