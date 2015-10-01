@@ -154,7 +154,7 @@ Deploying minion on machine 10.10.103.223
 [sudo] password to start minion: 
 ```
 
-If everything works expectedly, you will see the following message from console indicating the k8s cluster is up.
+If everything works correctly, you will see the following message from console indicating the k8s cluster is up.
 
 ```console
 Cluster validation succeeded
@@ -226,30 +226,22 @@ to eliminate OS-distro differences.
 
 Generally, what this approach does is quite simple:
 
-1. Download and copy binaries and configuration files to proper directories on every node
-2. Configure `etcd` using IPs based on input from user
-3. Create and start flannel network
+1. Download and copy binaries and configuration files to proper directories on every node.
+2. Configure `etcd` for master node using IPs based on input from user.
+3. Create and start flannel network for worker nodes.
 
-So if you encounter a problem, **check etcd configuration first**
-
-Please try:
+So if you encounter a problem, check etcd configuration of master node first.
 
 1. Check `/var/log/upstart/etcd.log` for suspicious etcd log
-2. Check `/etc/default/etcd`, as we do not have much input validation, a right config should be like:
+2. You may find following commands useful, the former one to bring down the cluster, while the latter one could start it again.
 
-	```sh
-	ETCD_OPTS="-name infra1 -initial-advertise-peer-urls <http://ip_of_this_node:2380> -listen-peer-urls <http://ip_of_this_node:2380> -initial-cluster-token etcd-cluster-1 -initial-cluster infra1=<http://ip_of_this_node:2380>,infra2=<http://ip_of_another_node:2380>,infra3=<http://ip_of_another_node:2380> -initial-cluster-state new"
-	```
+```console
+$ KUBERNETES_PROVIDER=ubuntu ./kube-down.sh
+$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh
+```
 
-3. You may find following commands useful, the former one to bring down the cluster, while
-the latter one could start it again.
-
-    ```console
-    $ KUBERNETES_PROVIDER=ubuntu ./kube-down.sh
-    $ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh
-    ```
-
-4. You can also customize your own settings in `/etc/default/{component_name}`.
+3. You can also customize your own settings in `/etc/default/{component_name}` and restart it via
+`$ sudo service {component_name} restart`.
 
 
 ## Upgrading a Cluster
@@ -263,7 +255,7 @@ $ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh [-m|-n <node id>] <version>
 ```
 
 It can be done for all components (by default), master(`-m`) or specified node(`-n`).
-Upgrading single node is currently experimental.
+Upgrading a single node is currently experimental.
 If the version is not specified, the script will try to use local binaries. You should ensure all
 the binaries are well prepared in the expected directory path cluster/ubuntu/binaries.
 
@@ -300,10 +292,10 @@ The script will not delete any resources of your cluster, it just replaces the b
 
 ### Test it out
 
-You can use `kubectl` command to check if the newly upgraded kubernetes cluster is working correctly. See
+You can use the `kubectl` command to check if the newly upgraded kubernetes cluster is working correctly. See
 also [test-it-out](ubuntu.md#test-it-out)
 
-To make sure the version of upgraded cluster is expected, you will find these commands helpful.
+To make sure the version of the upgraded cluster is what you expect, you will find these commands helpful.
 * upgrade all components or master: `$ kubectl version`. Check the *Server Version*.
 * upgrade node 10.10.102.223: `$ ssh -t vcap@10.10.102.223 'cd /opt/bin && sudo ./kubelet --version'`
 
