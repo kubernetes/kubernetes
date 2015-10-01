@@ -14,7 +14,11 @@ func main() {
 		Use:   "test",
 		Short: "my test program",
 	}
-	cmd.GenManTree("/tmp")
+	header := &cobra.GenManHeader{
+		Title: "MINE",
+		Section: "3",
+	}
+	cmd.GenManTree(header, "/tmp")
 }
 ```
 
