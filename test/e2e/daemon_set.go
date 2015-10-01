@@ -37,7 +37,9 @@ import (
 )
 
 const (
-	updateRetryPeriod    = 5 * time.Second
+	// this should not be a multiple of 5, because node status updates
+	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
+	updateRetryPeriod    = 2 * time.Second
 	updateRetryTimeout   = 30 * time.Second
 	daemonsetLabelPrefix = "daemonset-"
 	daemonsetNameLabel   = daemonsetLabelPrefix + "name"
