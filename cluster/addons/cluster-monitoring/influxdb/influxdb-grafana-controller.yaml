@@ -40,7 +40,24 @@ spec:
             limits:
               cpu: 100m
               memory: 100Mi
+          env:
+            - name: "GF_AUTH_BASIC_ENABLED"
+              value: "false"
+            - name: "GF_AUTH_ANONYMOUS_ENABLED"
+              value: "true"
+            - name: "GF_AUTH_ANONYMOUS_ORG_ROLE"
+              value: "Admin"
+            - name: "GF_SERVER_ROOT_URL"
+              value: "/api/v1/proxy/namespaces/kube-system/services/monitoring-grafana/"
+          volumeMounts:
+          - name: grafana-persistent-storage
+            mountPath: /var
+
+              
       volumes:
       - name: influxdb-persistent-storage
         emptyDir: {}
+      - name: grafana-persistent-storage
+        emptyDir: {}
+
 
