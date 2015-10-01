@@ -355,15 +355,23 @@ func NewInCluster() (*Client, error) {
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 func SetKubernetesDefaults(config *Config) error {
-	if config.Prefix == "" {
-		config.Prefix = "/api"
-	}
+	// TODO: caesarxuchao: re-enable the "if" when we have a config for each group.
+	// We need to comment it out now because the config maybe for the experimental
+	// group.
+	//if config.Prefix == "" {
+	config.Prefix = "/api"
+	//}
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if len(config.Version) == 0 {
-		config.Version = defaultVersionFor(config)
-	}
+	// TODO: caesarxuchao: re-enable the "if" when we have a config for each group.
+	// We need to comment it out now because the config maybe for the experimental
+	// group.
+	//if len(config.Version) == 0 {
+	//config.Version = defaultVersionFor(config)
+	//}
+	config.Version = latest.GroupOrDie("").GroupVersion
+
 	version := config.Version
 	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(version)
 	if err != nil {
