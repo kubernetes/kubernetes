@@ -44,6 +44,7 @@ cluster-dns
 cluster-domain
 cluster-name
 cluster-tag
+concurrent-deployment-syncs
 concurrent-endpoint-syncs
 configure-cbr0
 contain-pod-resources

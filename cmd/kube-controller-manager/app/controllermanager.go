@@ -69,6 +69,7 @@ type CMServer struct {
 	ConcurrentRCSyncs                 int
 	ConcurrentDSCSyncs                int
 	ConcurrentJobSyncs                int
+	ConcurrentDeploymentSyncs         int
 	ServiceSyncPeriod                 time.Duration
 	NodeSyncPeriod                    time.Duration
 	ResourceQuotaSyncPeriod           time.Duration
@@ -109,6 +110,7 @@ func NewCMServer() *CMServer {
 		ConcurrentRCSyncs:                 5,
 		ConcurrentDSCSyncs:                2,
 		ConcurrentJobSyncs:                5,
+		ConcurrentDeploymentSyncs:         5,
 		ServiceSyncPeriod:                 5 * time.Minute,
 		NodeSyncPeriod:                    10 * time.Second,
 		ResourceQuotaSyncPeriod:           10 * time.Second,
@@ -153,6 +155,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
+	fs.IntVar(&s.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", s.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more reponsive deployments, but more CPU (and network) load")
 	fs.DurationVar(&s.ServiceSyncPeriod, "service-sync-period", s.ServiceSyncPeriod, "The period for syncing services with their external load balancers")
 	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
@@ -291,8 +294,8 @@ func (s *CMServer) Run(_ []string) error {
 		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
 	}
 	if s.EnableDeploymentController {
-		deploymentController := deployment.New(kubeClient)
-		deploymentController.Run(s.DeploymentControllerSyncPeriod)
+		deploymentController := deployment.NewDeploymentController(kubeClient)
+		deploymentController.Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
 	}
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
