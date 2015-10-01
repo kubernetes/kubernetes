@@ -23,8 +23,7 @@ update-ca-certificates
 
 chmod a+x /kubemark.sh
 
-tar xzf /tmp/kubemark.tar.gz
-cp kubernetes/server/bin/kubemark /
+cp kubemark /
 
 rm -rf /tmp/*
 apt-get clean -y
