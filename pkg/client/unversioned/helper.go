@@ -17,6 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -173,6 +174,51 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	}
 
 	return nil
+}
+
+func extractGroupVersions(l *api.APIGroupList) []string {
+	var groupVersions []string
+	for _, g := range l.Groups {
+		for _, gv := range g.Versions {
+			groupVersions = append(groupVersions, gv.GroupVersion)
+		}
+	}
+	return groupVersions
+}
+
+// ServerAPIVersions returns the GroupVersions supported by the API server.
+// It creates a RESTClient based on the passed in config, but it doesn't rely
+// on the Version, Codec, and Prefix of the config, because it uses AbsPath and
+// takes the raw response.
+func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
+	client, err := RESTClientFor(c)
+	if err != nil {
+		return nil, err
+	}
+	// Get the groupVersions exposed at /api
+	body, err := client.Get().AbsPath("api").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var v api.APIVersions
+	err = json.Unmarshal(body, &v)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	groupVersions = append(groupVersions, v.Versions...)
+	// Get the groupVersions exposed at /apis
+	body, err = client.Get().AbsPath("apis").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var apiGroupList api.APIGroupList
+	err = json.Unmarshal(body, &apiGroupList)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+
+	return groupVersions, nil
 }
 
 // NegotiateVersion queries the server's supported api versions to find
