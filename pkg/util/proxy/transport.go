@@ -136,8 +136,11 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
 	url.Scheme = t.Scheme
 	url.Host = t.Host
 	origPath := url.Path
+	// Do not rewrite URL if the sourceURL already contains the necessary prefix.
+	if strings.HasPrefix(url.Path, t.PathPrepend) {
+		return url.String()
+	}
 	url.Path = path.Join(t.PathPrepend, url.Path)
-
 	if strings.HasSuffix(origPath, "/") {
 		// Add back the trailing slash, which was stripped by path.Join().
 		url.Path += "/"
