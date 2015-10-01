@@ -120,6 +120,37 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	}
 }
 
+func getReadyPodStatus() api.PodStatus {
+	return api.PodStatus{
+		Conditions: []api.PodCondition{
+			{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
+	}
+}
+
+func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
+	syncer := newTestManager()
+	podStatus := getReadyPodStatus()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Status: api.PodStatus{},
+	}
+	syncer.SetPodStatus(pod, podStatus)
+	verifyUpdates(t, syncer, 1)
+	status, _ := syncer.GetPodStatus(pod.UID)
+	readyCondition := api.GetPodReadyCondition(status)
+	if readyCondition.LastTransitionTime.IsZero() {
+		t.Errorf("Unexpected: last transition time not set")
+	}
+}
+
 func TestChangedStatus(t *testing.T) {
 	syncer := newTestManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
@@ -144,12 +175,72 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 	}
 }
 
+func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
+	syncer := newTestManager()
+	podStatus := getReadyPodStatus()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Status: api.PodStatus{},
+	}
+	syncer.SetPodStatus(pod, podStatus)
+	verifyUpdates(t, syncer, 1)
+	oldStatus, _ := syncer.GetPodStatus(pod.UID)
+	anotherStatus := getReadyPodStatus()
+	anotherStatus.Conditions[0].Status = api.ConditionFalse
+	syncer.SetPodStatus(pod, anotherStatus)
+	verifyUpdates(t, syncer, 1)
+	newStatus, _ := syncer.GetPodStatus(pod.UID)
+
+	oldReadyCondition := api.GetPodReadyCondition(oldStatus)
+	newReadyCondition := api.GetPodReadyCondition(newStatus)
+	if newReadyCondition.LastTransitionTime.IsZero() {
+		t.Errorf("Unexpected: last transition time not set")
+	}
+	if !oldReadyCondition.LastTransitionTime.Before(newReadyCondition.LastTransitionTime) {
+		t.Errorf("Unexpected: new transition time %s, is not after old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
+	}
+}
+
 func TestUnchangedStatus(t *testing.T) {
 	syncer := newTestManager()
 	podStatus := getRandomPodStatus()
 	syncer.SetPodStatus(testPod, podStatus)
 	syncer.SetPodStatus(testPod, podStatus)
 	verifyUpdates(t, syncer, 1)
+}
+
+func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
+	syncer := newTestManager()
+	podStatus := getReadyPodStatus()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Status: api.PodStatus{},
+	}
+	syncer.SetPodStatus(pod, podStatus)
+	verifyUpdates(t, syncer, 1)
+	oldStatus, _ := syncer.GetPodStatus(pod.UID)
+	anotherStatus := getReadyPodStatus()
+	syncer.SetPodStatus(pod, anotherStatus)
+	// No update.
+	verifyUpdates(t, syncer, 0)
+	newStatus, _ := syncer.GetPodStatus(pod.UID)
+
+	oldReadyCondition := api.GetPodReadyCondition(oldStatus)
+	newReadyCondition := api.GetPodReadyCondition(newStatus)
+	if newReadyCondition.LastTransitionTime.IsZero() {
+		t.Errorf("Unexpected: last transition time not set")
+	}
+	if !oldReadyCondition.LastTransitionTime.Equal(newReadyCondition.LastTransitionTime) {
+		t.Errorf("Unexpected: new transition time %s, is not equal to old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
+	}
 }
 
 func TestSyncBatchIgnoresNotFound(t *testing.T) {

@@ -2512,32 +2512,51 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-// Disabled LastProbeTime/LastTranitionTime for Pods to avoid constantly sending pod status
-// update to the apiserver. See http://issues.k8s.io/14273. Functional revert of a PR #12894
+func readyPodCondition(isPodReady bool, reason, message string) []api.PodCondition {
+	condition := api.PodCondition{
+		Type: api.PodReady,
+	}
+	if isPodReady {
+		condition.Status = api.ConditionTrue
+	} else {
+		condition.Status = api.ConditionFalse
+	}
+	condition.Reason = reason
+	condition.Message = message
+	return []api.PodCondition{condition}
+}
 
 // getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
-func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, existingStatus *api.PodStatus) []api.PodCondition {
-	ready := []api.PodCondition{{
-		Type:   api.PodReady,
-		Status: api.ConditionTrue,
-	}}
-	notReady := []api.PodCondition{{
-		Type:   api.PodReady,
-		Status: api.ConditionFalse,
-	}}
+func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus) []api.PodCondition {
+	// Find if all containers are ready or not.
 	if containerStatuses == nil {
-		return notReady
+		return readyPodCondition(false, "UnknownContainerStatuses", "")
 	}
+	unknownContainers := []string{}
+	unreadyContainers := []string{}
 	for _, container := range spec.Containers {
 		if containerStatus, ok := api.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
-				return notReady
+				unreadyContainers = append(unreadyContainers, container.Name)
 			}
 		} else {
-			return notReady
+			unknownContainers = append(unknownContainers, container.Name)
 		}
 	}
-	return ready
+	unreadyMessages := []string{}
+	if len(unknownContainers) > 0 {
+		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unknown status: %s", unknownContainers))
+	}
+	if len(unreadyContainers) > 0 {
+		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unready status: %s", unreadyContainers))
+	}
+	unreadyMessage := strings.Join(unreadyMessages, ", ")
+	if unreadyMessage != "" {
+		// return unready status.
+		return readyPodCondition(false, fmt.Sprint("ContainersNotReady"), unreadyMessage)
+	}
+	// return ready status.
+	return readyPodCondition(true, "", "")
 }
 
 // By passing the pod directly, this method avoids pod lookup, which requires
@@ -2603,7 +2622,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 			}
 		}
 	}
-	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, nil /* unused */)...)
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
 
 	if !kl.standaloneMode {
 		hostIP, err := kl.GetHostIP()
