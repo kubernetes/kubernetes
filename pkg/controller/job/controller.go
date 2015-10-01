@@ -97,13 +97,9 @@ func NewJobController(kubeClient client.Interface) *JobController {
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				job := cur.(*experimental.Job)
-				for _, c := range job.Status.Conditions {
-					if c.Type == experimental.JobComplete && c.Status == api.ConditionTrue {
-						return
-					}
+				if job := cur.(*experimental.Job); !isJobFinished(job) {
+					jm.enqueueController(job)
 				}
-				jm.enqueueController(cur)
 			},
 			DeleteFunc: jm.enqueueController,
 		},
@@ -447,6 +443,15 @@ func filterPods(pods []api.Pod, phase api.PodPhase) int {
 		}
 	}
 	return result
+}
+
+func isJobFinished(j *experimental.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if c.Type == experimental.JobComplete && c.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
