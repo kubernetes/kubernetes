@@ -88,3 +88,25 @@ func GetValidatedSources(sources []string) ([]string, error) {
 	}
 	return validated, nil
 }
+
+// SyncPodType classifies pod updates, eg: create, update.
+type SyncPodType int
+
+const (
+	SyncPodSync SyncPodType = iota
+	SyncPodUpdate
+	SyncPodCreate
+)
+
+func (sp SyncPodType) String() string {
+	switch sp {
+	case SyncPodCreate:
+		return "create"
+	case SyncPodUpdate:
+		return "update"
+	case SyncPodSync:
+		return "sync"
+	default:
+		return "unknown"
+	}
+}

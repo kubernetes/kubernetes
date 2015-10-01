@@ -30,7 +30,7 @@ type fakePodWorkers struct {
 	t            TestingInterface
 }
 
-func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func()) {
+func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType SyncPodType, updateComplete func()) {
 	pods, err := f.runtimeCache.GetPods()
 	if err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
