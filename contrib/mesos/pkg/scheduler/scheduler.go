@@ -397,7 +397,7 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 			} // else, we don't really care about FINISHED tasks that aren't registered
 			return
 		}
-		if hostName := k.slaveHostNames.HostName(taskStatus.GetSlaveId().GetValue()); hostName != "" {
+		if hostName := k.slaveHostNames.HostName(taskStatus.GetSlaveId().GetValue()); hostName == "" {
 			// a registered task has an update reported by a slave that we don't recognize.
 			// this should never happen! So we don't reconcile it.
 			log.Errorf("Ignore status %+v because the slave does not exist", taskStatus)
