@@ -17,11 +17,14 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
@@ -372,5 +375,61 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	}
 	if !strings.Contains(config.UserAgent, "kubernetes/") {
 		t.Errorf("no user agent set: %#v", config)
+	}
+}
+
+func TestHelperGetServerAPIVersions(t *testing.T) {
+	expect := []string{"v1", "v2", "v3"}
+	APIVersions := api.APIVersions{Versions: expect}
+	expect = append(expect, "group1/v1", "group1/v2", "group2/v1", "group2/v2")
+	APIGroupList := api.APIGroupList{
+		Groups: []api.APIGroup{
+			{
+				Versions: []api.GroupVersion{
+					{
+						GroupVersion: "group1/v1",
+					},
+					{
+						GroupVersion: "group1/v2",
+					},
+				},
+			},
+			{
+				Versions: []api.GroupVersion{
+					{
+						GroupVersion: "group2/v1",
+					},
+					{
+						GroupVersion: "group2/v2",
+					},
+				},
+			},
+		},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var output []byte
+		var err error
+		switch req.URL.Path {
+		case "/api":
+			output, err = json.Marshal(APIVersions)
+
+		case "/apis":
+			output, err = json.Marshal(APIGroupList)
+		}
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	got, err := ServerAPIVersions(&Config{Host: server.URL, Version: "invalid version", Codec: testapi.Default.Codec()})
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 }
