@@ -598,7 +598,7 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		}
 		boolValue, err := strconv.ParseBool(flagValue)
 		if err != nil {
-			glog.Fatalf("Invalid value of %s: %s", apiKey, flagValue)
+			glog.Fatalf("Invalid value of %s: %s, err: %v", apiKey, flagValue, err)
 		}
 		return boolValue
 	}
