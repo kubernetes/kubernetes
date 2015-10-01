@@ -109,7 +109,7 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
 	}
 
-	config, err := f.ClientConfig()
+	config, err := f.ClientConfig("")
 	if err != nil {
 		return err
 	}

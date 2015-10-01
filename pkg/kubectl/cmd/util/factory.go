@@ -62,7 +62,7 @@ type Factory struct {
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
-	ClientConfig func() (*client.Config, error)
+	ClientConfig func(string) (*client.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	RESTClient func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -121,31 +121,25 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		generators: generators,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			cfg, err := clientConfig.ClientConfig()
+			// TODO: caesarxuchao: this needs to be fixed when we tackle OutputVersion
+			cfg, err := clientConfig.ClientConfig("")
 			CheckErr(err)
-			cmdApiVersion := cfg.Version
+			cmdApiVersion := cfg.GroupVersion
 
 			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersion: cmdApiVersion}, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion("")
 		},
-		ClientConfig: func() (*client.Config, error) {
-			return clients.ClientConfigForVersion("")
+		ClientConfig: func(group string) (*client.Config, error) {
+			return clients.ClientConfigForVersion(group, "")
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			restClient, err := clients.RESTClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			switch group {
-			case "":
-				return client.RESTClient, nil
-			case "experimental":
-				return client.ExperimentalClient.RESTClient, nil
-			}
-			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
+			return restClient, nil
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
 			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
@@ -497,11 +491,11 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		return nil, err
 	}
 	if ok {
-		clientConfig, err := f.ClientConfig()
+		clientConfig, err := f.ClientConfig("")
 		if err != nil {
 			return nil, err
 		}
-		defaultVersion := clientConfig.Version
+		defaultVersion := clientConfig.GroupVersion
 
 		version := OutputVersion(cmd, defaultVersion)
 		if len(version) == 0 {

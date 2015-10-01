@@ -76,7 +76,7 @@ func main() {
 	util.InitFlags()
 
 	// create a client for Kubelet to communicate with API server.
-	cl := client.NewOrDie(&client.Config{Host: fmt.Sprintf("http://%v:%v", apiServer, serverPort), Version: latest.GroupOrDie("").Version})
+	cl := client.NewOrDie(&client.Config{Host: fmt.Sprintf("http://%v:%v", apiServer, serverPort), GroupVersion: latest.GroupOrDie("").GroupVersion})
 	cadvisorInterface := new(cadvisor.Fake)
 
 	testRootDir := makeTempDirOrDie("hollow-kubelet.", "")

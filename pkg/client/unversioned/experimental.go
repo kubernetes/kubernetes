@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -60,19 +59,10 @@ func (c *ExperimentalClient) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
-// ServerAPIVersions retrieves and parses the list of experimental API versions the
-// server supports.
-func (c *ExperimentalClient) ServerAPIVersions() (*api.APIVersions, error) {
-	body, err := c.Get().UnversionedPath("").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v api.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
+// TODO: User should either use client.Client.ServerAPIVersions, or use the one
+// defined in pkg/client/unversioned/helper.go.
+func (c *ExperimentalClient) ServerAPIVersions() ([]string, error) {
+	return []string{}, nil
 }
 
 func (c *ExperimentalClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
@@ -135,13 +125,13 @@ func setExperimentalDefaults(config *Config) error {
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	config.GroupVersion = g.GroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.Version)
+	versionInterfaces, err := g.InterfacesFor(config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
+			config.GroupVersion, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

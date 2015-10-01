@@ -130,7 +130,7 @@ func TestSetWithPathPrefixIntoExistingStruct(t *testing.T) {
 	test.run(t)
 
 	dc := clientcmd.NewDefaultClientConfig(expectedConfig, &clientcmd.ConfigOverrides{})
-	dcc, err := dc.ClientConfig()
+	dcc, err := dc.ClientConfig("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

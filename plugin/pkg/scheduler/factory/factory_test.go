@@ -43,7 +43,7 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 	factory := NewConfigFactory(client, nil)
 	factory.Create()
 }
@@ -61,7 +61,7 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 	factory := NewConfigFactory(client, nil)
 
 	// Pre-register some predicate and priority functions
@@ -103,7 +103,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 	factory := NewConfigFactory(client, nil)
 
 	configData = []byte(`{}`)
@@ -152,7 +152,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()}), nil)
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupAndVersion()}), nil)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
@@ -235,7 +235,7 @@ func TestBind(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {

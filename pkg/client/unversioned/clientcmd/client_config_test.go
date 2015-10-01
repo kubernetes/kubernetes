@@ -104,7 +104,7 @@ func TestCertificateData(t *testing.T) {
 
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestBasicAuthData(t *testing.T) {
 
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -150,14 +150,14 @@ func TestCreateClean(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
 	matchStringArg("", clientConfig.Prefix, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
+	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.GroupVersion, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -192,7 +192,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 
 		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
 
-		clientConfig, err := clientBuilder.ClientConfig()
+		clientConfig, err := clientBuilder.ClientConfig("")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -206,13 +206,13 @@ func TestCreateCleanDefault(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewDefaultClientConfig(*config, &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
+	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.GroupVersion, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -222,7 +222,7 @@ func TestCreateMissingContext(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{})
 
-	clientConfig, err := clientBuilder.ClientConfig()
+	clientConfig, err := clientBuilder.ClientConfig("")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

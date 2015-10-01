@@ -168,7 +168,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		DefaultNamespace: func() (string, bool, error) {
 			return t.Namespace, false, t.Err
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func(string) (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 	}, t, codec
@@ -225,7 +225,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		DefaultNamespace: func() (string, bool, error) {
 			return t.Namespace, false, t.Err
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func(string) (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 		CanBeExposed: func(kind string) error {

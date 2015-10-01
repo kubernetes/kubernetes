@@ -271,13 +271,13 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 	return &versionInfo, nil
 }
 
-func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
+func (c *Fake) ServerAPIVersions() ([]string, error) {
 	action := ActionImpl{}
 	action.Verb = "get"
 	action.Resource = "apiversions"
 
 	c.Invokes(action, nil)
-	return &api.APIVersions{Versions: registered.RegisteredVersions}, nil
+	return registered.RegisteredVersions, nil
 }
 
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {

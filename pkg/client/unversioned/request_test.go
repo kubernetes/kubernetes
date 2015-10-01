@@ -727,7 +727,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -767,7 +767,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -796,7 +796,7 @@ func BenchmarkCheckRetryClosesBody(t *testing.B) {
 	}))
 	defer testServer.Close()
 
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	r := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -824,7 +824,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Resource("bar").
 		Name("baz").
@@ -866,7 +866,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Suffix("baz").
 		Name("bar").
@@ -922,7 +922,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	wasCreated := true
 	obj, err := c.Verb("POST").
 		Prefix("foo/bar", "baz").
@@ -969,7 +969,7 @@ func TestWasCreated(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupAndVersion(), Username: "user", Password: "pass"})
 	wasCreated := false
 	obj, err := c.Verb("PUT").
 		Prefix("foo/bar", "baz").
@@ -1043,7 +1043,7 @@ func TestUnversionedPath(t *testing.T) {
 		}
 	}
 	for i, tc := range tt {
-		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, Version: "v1"})
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, GroupVersion: "v1"})
 		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
 		if r.path != tc.expectedPath {
 			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
@@ -1195,10 +1195,10 @@ func TestWatch(t *testing.T) {
 	}))
 
 	s, err := New(&Config{
-		Host:     testServer.URL,
-		Version:  testapi.Default.Version(),
-		Username: "user",
-		Password: "pass",
+		Host:         testServer.URL,
+		GroupVersion: testapi.Default.Version(),
+		Username:     "user",
+		Password:     "pass",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1245,10 +1245,10 @@ func TestStream(t *testing.T) {
 	}))
 
 	s, err := New(&Config{
-		Host:     testServer.URL,
-		Version:  testapi.Default.Version(),
-		Username: "user",
-		Password: "pass",
+		Host:         testServer.URL,
+		GroupVersion: testapi.Default.Version(),
+		Username:     "user",
+		Password:     "pass",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -79,7 +79,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		StorageVersions:       map[string]string{"": testapi.Default.Version()},
 	})
 
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()

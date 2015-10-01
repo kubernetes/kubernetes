@@ -759,8 +759,10 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status unversioned.Status
-	if err := r.codec.DecodeInto(body, &status); err == nil && status.Status != "" {
-		isStatusResponse = true
+	if r.codec != nil {
+		if err := r.codec.DecodeInto(body, &status); err == nil && status.Status != "" {
+			isStatusResponse = true
+		}
 	}
 
 	switch {

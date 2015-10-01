@@ -42,9 +42,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer s.Close()
 
 	deleteAllEtcdKeys()
-	binderClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
-	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
-	testClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	binderClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupAndVersion()})
+	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupAndVersion()})
+	testClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 
 	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
 	binder.Run()

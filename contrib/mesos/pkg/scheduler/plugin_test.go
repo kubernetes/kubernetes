@@ -460,8 +460,8 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	scheduler := New(Config{
 		Executor: executor,
 		Client: client.NewOrDie(&client.Config{
-			Host:    apiServer.server.URL,
-			Version: testapi.Default.Version(),
+			Host:         apiServer.server.URL,
+			GroupVersion: testapi.Default.GroupAndVersion(),
 		}),
 		Scheduler:  NewFCFSPodScheduler(strategy, apiServer.LookupNode),
 		Schedcfg:   *schedcfg.CreateDefaultConfig(),

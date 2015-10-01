@@ -145,7 +145,7 @@ func TestAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{Version: test.version}
+		tf.ClientConfig = &client.Config{GroupVersion: test.version}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})

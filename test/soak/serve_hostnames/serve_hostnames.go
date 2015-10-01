@@ -77,7 +77,7 @@ func main() {
 	if *gke != "" {
 		settings.CurrentContext = *gke
 	}
-	config, err := clientcmd.NewDefaultClientConfig(*settings, &clientcmd.ConfigOverrides{}).ClientConfig()
+	config, err := clientcmd.NewDefaultClientConfig(*settings, &clientcmd.ConfigOverrides{}).ClientConfig("")
 	if err != nil {
 		glog.Fatalf("Failed to construct config: %v", err)
 	}

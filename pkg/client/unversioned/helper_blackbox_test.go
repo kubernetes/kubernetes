@@ -22,12 +22,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 func objBody(object interface{}) io.ReadCloser {
@@ -40,14 +40,16 @@ func objBody(object interface{}) io.ReadCloser {
 
 func TestNegotiateVersion(t *testing.T) {
 	tests := []struct {
-		name, version, expectedVersion string
-		serverVersions                 []string
-		clientVersions                 []string
-		config                         *unversioned.Config
-		expectErr                      bool
+		name, group, version, expectedVersion string
+		serverVersions                        []string
+		clientVersions                        []string
+		config                                *unversioned.Config
+		expectErr                             bool
 	}{
 		{
+			// "default" refers to the group and version field
 			name:            "server supports client default",
+			group:           "",
 			version:         "version1",
 			config:          &unversioned.Config{},
 			serverVersions:  []string{"version1", testapi.Default.Version()},
@@ -57,6 +59,7 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "server falls back to client supported",
+			group:           "",
 			version:         testapi.Default.Version(),
 			config:          &unversioned.Config{},
 			serverVersions:  []string{"version1"},
@@ -65,9 +68,11 @@ func TestNegotiateVersion(t *testing.T) {
 			expectErr:       false,
 		},
 		{
+			// "explicit" refers to the config.GroupVersion
 			name:            "explicit version supported",
+			group:           "",
 			version:         "",
-			config:          &unversioned.Config{Version: testapi.Default.Version()},
+			config:          &unversioned.Config{GroupVersion: testapi.Default.GroupAndVersion()},
 			serverVersions:  []string{"version1", testapi.Default.Version()},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: testapi.Default.Version(),
@@ -75,30 +80,61 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "explicit version not supported",
+			group:           "",
 			version:         "",
-			config:          &unversioned.Config{Version: testapi.Default.Version()},
+			config:          &unversioned.Config{GroupVersion: testapi.Default.GroupAndVersion()},
 			serverVersions:  []string{"version1"},
 			clientVersions:  []string{"version1", testapi.Default.Version()},
 			expectedVersion: "",
 			expectErr:       true,
 		},
+		{
+			name:            "group should match the group in config.GroupVersion",
+			group:           "group1",
+			version:         "version2",
+			config:          &unversioned.Config{GroupVersion: testapi.Default.GroupAndVersion()},
+			serverVersions:  []string{"version1", "group1/version2"},
+			clientVersions:  []string{"version1", "group1/version2", testapi.Default.Version()},
+			expectedVersion: "",
+			expectErr:       true,
+		},
+		{
+			name:            "default group and version is supported",
+			group:           "group1",
+			version:         "version2",
+			config:          &unversioned.Config{},
+			serverVersions:  []string{"version1", "group1/version2"},
+			clientVersions:  []string{"version1", "group1/version2", testapi.Default.Version()},
+			expectedVersion: "group1/version2",
+			expectErr:       false,
+		},
+		{
+			name:            "server falls back to the explicit version in config",
+			group:           testapi.Experimental.Group,
+			version:         "not supported",
+			config:          &unversioned.Config{GroupVersion: testapi.Experimental.GroupAndVersion()},
+			serverVersions:  []string{"version1", testapi.Experimental.GroupAndVersion(), "version3"},
+			clientVersions:  []string{"version1", testapi.Experimental.Group + "/not supported", testapi.Experimental.GroupAndVersion(), "version3"},
+			expectedVersion: testapi.Experimental.GroupAndVersion(),
+			expectErr:       false,
+		},
 	}
-	codec := testapi.Default.Codec()
 
 	for _, test := range tests {
-		fakeClient := &fake.RESTClient{
-			Codec: codec,
-			Resp: &http.Response{
-				StatusCode: 200,
-				Body:       objBody(&api.APIVersions{Versions: test.serverVersions}),
-			},
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 200, Body: objBody(&api.APIVersions{Versions: test.serverVersions})}, nil
-			}),
-		}
-		c := unversioned.NewOrDie(test.config)
-		c.Client = fakeClient.Client
-		response, err := unversioned.NegotiateVersion(c, test.config, test.version, test.clientVersions)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var output []byte
+			var err error
+			output, err = json.Marshal(api.APIVersions{Versions: test.serverVersions})
+			if err != nil {
+				t.Errorf("unexpected encoding error: %v", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		}))
+		test.config.Host = server.URL
+		response, err := unversioned.NegotiateVersion(test.config, test.group, test.version, test.clientVersions)
 		if err == nil && test.expectErr {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

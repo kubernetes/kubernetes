@@ -145,8 +145,8 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
 		Updates: updates,
 		APIClient: client.NewOrDie(&client.Config{
-			Host:    testApiServer.server.URL,
-			Version: testapi.Default.Version(),
+			Host:         testApiServer.server.URL,
+			GroupVersion: testapi.Default.GroupAndVersion(),
 		}),
 		Kubelet: &fakeKubelet{
 			Kubelet: &kubelet.Kubelet{},
@@ -311,8 +311,8 @@ func TestExecutorStaticPods(t *testing.T) {
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
 		Updates: make(chan interface{}, 1), // allow kube-executor source to proceed past init
 		APIClient: client.NewOrDie(&client.Config{
-			Host:    testApiServer.server.URL,
-			Version: testapi.Default.Version(),
+			Host:         testApiServer.server.URL,
+			GroupVersion: testapi.Default.GroupAndVersion(),
 		}),
 		Kubelet: &kubelet.Kubelet{},
 		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
@@ -392,8 +392,8 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
 		Updates: make(chan interface{}, 1024),
 		APIClient: client.NewOrDie(&client.Config{
-			Host:    testApiServer.server.URL,
-			Version: testapi.Default.Version(),
+			Host:         testApiServer.server.URL,
+			GroupVersion: testapi.Default.GroupAndVersion(),
 		}),
 		Kubelet: &fakeKubelet{
 			Kubelet: &kubelet.Kubelet{},

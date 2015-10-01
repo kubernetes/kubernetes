@@ -818,7 +818,7 @@ func loadConfig() (*client.Config, error) {
 			fmt.Printf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
 			c.CurrentContext = testContext.KubeContext
 		}
-		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: testContext.Host}}).ClientConfig()
+		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: testContext.Host}}).ClientConfig("")
 	default:
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}

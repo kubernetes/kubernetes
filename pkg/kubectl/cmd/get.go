@@ -195,11 +195,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	if generic {
-		clientConfig, err := f.ClientConfig()
+		// TODO: we will fix the OutputVersion in another PR.
+		clientConfig, err := f.ClientConfig("")
 		if err != nil {
 			return err
 		}
-		defaultVersion := clientConfig.Version
+		defaultVersion := clientConfig.GroupVersion
 
 		singular := false
 		r := b.Flatten().Do()

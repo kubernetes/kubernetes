@@ -73,21 +73,21 @@ func (config DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, erro
 }
 
 // ClientConfig implements ClientConfig
-func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error) {
+func (config DeferredLoadingClientConfig) ClientConfig(group string) (*client.Config, error) {
 	mergedClientConfig, err := config.createClientConfig()
 	if err != nil {
 		return nil, err
 	}
-	mergedConfig, err := mergedClientConfig.ClientConfig()
+	mergedConfig, err := mergedClientConfig.ClientConfig(group)
 	if err != nil {
 		return nil, err
 	}
 	// Are we running in a cluster and were no other configs found? If so, use the in-cluster-config.
 	icc := inClusterClientConfig{}
-	defaultConfig, err := DefaultClientConfig.ClientConfig()
+	defaultConfig, err := DefaultClientConfig.ClientConfig(group)
 	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
 		glog.V(2).Info("No kubeconfig could be created, falling back to service account.")
-		return icc.ClientConfig()
+		return icc.ClientConfig(group)
 	}
 
 	return mergedConfig, nil

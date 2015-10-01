@@ -479,8 +479,8 @@ func newKubeClient() (*kclient.Client, error) {
 	if masterURL != "" && *argKubecfgFile == "" {
 		// Only --kube_master_url was provided.
 		config = &kclient.Config{
-			Host:    masterURL,
-			Version: "v1",
+			Host:         masterURL,
+			GroupVersion: "v1",
 		}
 	} else {
 		// We either have:
@@ -492,13 +492,13 @@ func newKubeClient() (*kclient.Client, error) {
 		overrides := &kclientcmd.ConfigOverrides{}
 		overrides.ClusterInfo.Server = masterURL                                     // might be "", but that is OK
 		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile} // might be "", but that is OK
-		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
+		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(""); err != nil {
 			return nil, err
 		}
 	}
 
 	glog.Infof("Using %s for kubernetes master", config.Host)
-	glog.Infof("Using kubernetes API %s", config.Version)
+	glog.Infof("Using kubernetes API %s", config.GroupVersion)
 	return kclient.New(config)
 }
 

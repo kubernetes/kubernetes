@@ -525,7 +525,7 @@ func (s *KubeletServer) authPathClientConfig(useDefaults bool) (*client.Config, 
 func (s *KubeletServer) kubeconfigClientConfig() (*client.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig("")
 }
 
 // createClientConfig creates a client configuration from the command line

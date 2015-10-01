@@ -17,11 +17,14 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
@@ -215,7 +218,7 @@ func TestTLSTransportCache(t *testing.T) {
 		"empty":          {Insecure: true},
 		"host":           {Insecure: true, Host: "foo"},
 		"prefix":         {Insecure: true, Prefix: "foo"},
-		"version":        {Insecure: true, Version: "foo"},
+		"version":        {Insecure: true, GroupVersion: "foo"},
 		"codec":          {Insecure: true, Codec: testapi.Default.Codec()},
 		"basic":          {Insecure: true, Username: "bob", Password: "password"},
 		"bearer":         {Insecure: true, BearerToken: "token"},
@@ -329,17 +332,17 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		{
 			Config{},
 			Config{
-				Prefix:  "/api",
-				Version: testapi.Default.Version(),
-				Codec:   testapi.Default.Codec(),
-				QPS:     5,
-				Burst:   10,
+				Prefix:       "/api",
+				GroupVersion: testapi.Default.Version(),
+				Codec:        testapi.Default.Codec(),
+				QPS:          5,
+				Burst:        10,
 			},
 			false,
 		},
 		{
 			Config{
-				Version: "not_an_api",
+				GroupVersion: "not_an_api",
 			},
 			Config{},
 			true,
@@ -372,5 +375,65 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	}
 	if !strings.Contains(config.UserAgent, "kubernetes/") {
 		t.Errorf("no user agent set: %#v", config)
+	}
+}
+
+func TestGetServerAPIVersions(t *testing.T) {
+	expect := []string{"v1", "v2", "v3"}
+	APIVersions := api.APIVersions{Versions: expect}
+	expect = append(expect, "group1/v1", "group1/v2", "group2/v1", "group2/v2")
+	APIGroupList := api.APIGroupList{
+		Groups: []api.APIGroup{
+			{
+				Versions: []api.GroupVersion{
+					{
+						GroupVersion: "group1/v1",
+					},
+					{
+						GroupVersion: "group1/v2",
+					},
+				},
+			},
+			{
+				Versions: []api.GroupVersion{
+					{
+						GroupVersion: "group2/v1",
+					},
+					{
+						GroupVersion: "group2/v2",
+					},
+				},
+			},
+		},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var output []byte
+		var err error
+		switch req.URL.Path {
+		case "/api":
+			output, err = json.Marshal(APIVersions)
+
+		case "/apis":
+			output, err = json.Marshal(APIGroupList)
+		}
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client, err := UnversionedRESTClientFor(&Config{Host: server.URL})
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+	got, err := ServerAPIVersions(client)
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 }

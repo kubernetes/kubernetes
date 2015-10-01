@@ -130,11 +130,11 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Default.GroupAndVersion()})
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupAndVersion()})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	cl.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Experimental.GroupAndVersion()})
+	cl.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Experimental.GroupAndVersion()})
 
 	storageVersions := make(map[string]string)
 	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
@@ -485,13 +485,13 @@ func runAPIVersionsTest(c *client.Client) {
 		glog.Fatalf("failed to get api versions: %v", err)
 	}
 	// Verify that the server supports the API version used by the client.
-	for _, version := range v.Versions {
+	for _, version := range v {
 		if version == clientVersion {
 			glog.Infof("Version test passed")
 			return
 		}
 	}
-	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v.Versions, clientVersion)
+	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v, clientVersion)
 }
 
 func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
@@ -981,10 +981,10 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Default.GroupAndVersion()})
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, GroupVersion: testapi.Default.GroupAndVersion()})
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	kubeClient.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServerURL, Version: testapi.Experimental.GroupAndVersion()})
+	kubeClient.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServerURL, GroupVersion: testapi.Experimental.GroupAndVersion()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

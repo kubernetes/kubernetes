@@ -27,6 +27,7 @@ import (
 
 // List of registered API versions.
 // The list is in the order of most preferred to the least.
+// TODO: we should rename it to RegisteredGroupVersions in another PR.
 var RegisteredVersions []string
 
 func init() {
