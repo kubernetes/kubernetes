@@ -21,10 +21,12 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 // PatchOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -84,6 +86,10 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if len(patch) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify -p to patch")
 	}
+	patchBytes, err := yaml.ToJSON([]byte(patch))
+	if err != nil {
+		return fmt.Errorf("unable to parse %q: %v", patch, err)
+	}
 
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
@@ -114,7 +120,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, []byte(patch))
+	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
 	if err != nil {
 		return err
 	}
