@@ -191,12 +191,29 @@ func extractGroupVersions(l *api.APIGroupList) []string {
 // on the Version, Codec, and Prefix of the config, because it uses AbsPath and
 // takes the raw response.
 func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
-	client, err := RESTClientFor(c)
+	transport, err := TransportFor(c)
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{Transport: transport}
+
+	configCopy := *c
+	configCopy.Version = ""
+	configCopy.Prefix = ""
+	baseURL, err := defaultServerUrlFor(c)
 	if err != nil {
 		return nil, err
 	}
 	// Get the groupVersions exposed at /api
-	body, err := client.Get().AbsPath("api").Do().Raw()
+	req, err := http.NewRequest("GET", baseURL.String()+"/api", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +224,15 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	}
 	groupVersions = append(groupVersions, v.Versions...)
 	// Get the groupVersions exposed at /apis
-	body, err = client.Get().AbsPath("apis").Do().Raw()
+	req, err = http.NewRequest("GET", baseURL.String()+"/apis", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -518,9 +543,6 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	if version == "" {
-		return nil, fmt.Errorf("version must be set")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
