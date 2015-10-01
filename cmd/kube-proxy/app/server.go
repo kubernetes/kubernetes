@@ -220,7 +220,6 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 
 	if useIptablesProxy {
 		glog.V(2).Info("Using iptables Proxier.")
-		execer := exec.New()
 		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.SyncPeriod, config.MasqueradeAll)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
