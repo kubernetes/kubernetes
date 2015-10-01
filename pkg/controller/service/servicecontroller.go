@@ -670,7 +670,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 		return nil
 	}
 
-	s.eventRecorder.Eventf(service, "LoadBalancerUpdateFailed", "Error updating load balancer with new hosts: %v", err)
+	s.eventRecorder.Eventf(service, "LoadBalancerUpdateFailed", "Error updating load balancer with new hosts %v: %v", hosts, err)
 	return err
 }
 
