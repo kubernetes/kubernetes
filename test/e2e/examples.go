@@ -63,7 +63,7 @@ var _ = Describe("Examples e2e", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
+		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})
@@ -458,7 +458,7 @@ var _ = Describe("Examples e2e", func() {
 				var err error
 				namespaces[i], err = createTestingNS(fmt.Sprintf("dnsexample%d", i), c)
 				if namespaces[i] != nil {
-					defer deleteNS(c, namespaces[i].Name)
+					defer deleteNS(c, namespaces[i].Name, 5*time.Minute /* namespace deletion timeout */)
 				}
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -562,22 +562,26 @@ func prepareResourceWithReplacedString(inputFile, old, new string) string {
 }
 
 func forEachPod(c *client.Client, ns, selectorKey, selectorValue string, fn func(api.Pod)) {
-	var pods *api.PodList
-	var err error
+	pods := []*api.Pod{}
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
-		pods, err = c.Pods(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything())
+		podList, err := c.Pods(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
-		if len(pods.Items) > 0 {
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == api.PodPending || pod.Status.Phase == api.PodRunning {
+				pods = append(pods, &pod)
+			}
+		}
+		if len(pods) > 0 {
 			break
 		}
 	}
-	if pods == nil || len(pods.Items) == 0 {
+	if pods == nil || len(pods) == 0 {
 		Failf("No pods found")
 	}
-	for _, pod := range pods.Items {
-		err = waitForPodRunningInNamespace(c, pod.Name, ns)
+	for _, pod := range pods {
+		err := waitForPodRunningInNamespace(c, pod.Name, ns)
 		Expect(err).NotTo(HaveOccurred())
-		fn(pod)
+		fn(*pod)
 	}
 }
 

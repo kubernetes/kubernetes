@@ -226,7 +226,7 @@ func resizeRC(c *client.Client, ns, name string, replicas int) error {
 }
 
 func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList, error) {
-	timeout := time.Minute
+	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
@@ -402,7 +402,7 @@ var _ = Describe("Nodes", func() {
 			Failf("Not all nodes are ready: %v", err)
 		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := deleteNS(c, ns); err != nil {
+		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
 		}
 		if err := checkTestingNSDeletedExcept(c, ""); err != nil {

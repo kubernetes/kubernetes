@@ -317,6 +317,11 @@ EOF
 enable_horizontal_pod_autoscaler: '$(echo "$ENABLE_HORIZONTAL_POD_AUTOSCALER" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${ENABLE_DEPLOYMENTS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_deployments: '$(echo "$ENABLE_DEPLOYMENTS" | sed -e "s/'/''/g")'
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes

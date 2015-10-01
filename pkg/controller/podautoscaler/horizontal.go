@@ -34,9 +34,6 @@ import (
 )
 
 const (
-	heapsterNamespace = "kube-system"
-	heapsterService   = "monitoring-heapster"
-
 	// Usage shoud exceed the tolerance before we start downscale or upscale the pods.
 	// TODO: make it a flag or HPA spec element.
 	tolerance = 0.1
@@ -48,8 +45,8 @@ type HorizontalController struct {
 	eventRecorder record.EventRecorder
 }
 
-var downscaleForbiddenWindow, _ = time.ParseDuration("20m")
-var upscaleForbiddenWindow, _ = time.ParseDuration("3m")
+var downscaleForbiddenWindow = 5 * time.Minute
+var upscaleForbiddenWindow = 3 * time.Minute
 
 func NewHorizontalController(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalController {
 	broadcaster := record.NewBroadcaster()

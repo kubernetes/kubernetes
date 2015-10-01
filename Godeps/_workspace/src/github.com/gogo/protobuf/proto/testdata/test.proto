@@ -277,6 +277,51 @@ extend MyMessage {
   repeated string greeting = 106;
 }
 
+message DefaultsMessage {
+  enum DefaultsEnum {
+    ZERO = 0;
+    ONE = 1;
+    TWO = 2;
+  };
+  extensions 100 to max;
+}
+
+extend DefaultsMessage {
+  optional double no_default_double = 101;
+  optional float no_default_float = 102;
+  optional int32 no_default_int32 = 103;
+  optional int64 no_default_int64 = 104;
+  optional uint32 no_default_uint32 = 105;
+  optional uint64 no_default_uint64 = 106;
+  optional sint32 no_default_sint32 = 107;
+  optional sint64 no_default_sint64 = 108;
+  optional fixed32 no_default_fixed32 = 109;
+  optional fixed64 no_default_fixed64 = 110;
+  optional sfixed32 no_default_sfixed32 = 111;
+  optional sfixed64 no_default_sfixed64 = 112;
+  optional bool no_default_bool = 113;
+  optional string no_default_string = 114;
+  optional bytes no_default_bytes = 115;
+  optional DefaultsMessage.DefaultsEnum no_default_enum = 116;
+
+  optional double default_double = 201 [default = 3.1415];
+  optional float default_float = 202 [default = 3.14];
+  optional int32 default_int32 = 203 [default = 42];
+  optional int64 default_int64 = 204 [default = 43];
+  optional uint32 default_uint32 = 205 [default = 44];
+  optional uint64 default_uint64 = 206 [default = 45];
+  optional sint32 default_sint32 = 207 [default = 46];
+  optional sint64 default_sint64 = 208 [default = 47];
+  optional fixed32 default_fixed32 = 209 [default = 48];
+  optional fixed64 default_fixed64 = 210 [default = 49];
+  optional sfixed32 default_sfixed32 = 211 [default = 50];
+  optional sfixed64 default_sfixed64 = 212 [default = 51];
+  optional bool default_bool = 213 [default = true];
+  optional string default_string = 214 [default = "Hello, string"];
+  optional bytes default_bytes = 215 [default = "Hello, bytes"];
+  optional DefaultsMessage.DefaultsEnum default_enum = 216 [default = ONE];
+}
+
 message MyMessageSet {
   option message_set_wire_format = true;
   extensions 100 to max;
@@ -425,4 +470,25 @@ message GroupNew {
 
 message FloatingPoint {
   required double f = 1;
+}
+
+message MessageWithMap {
+  map<int32, string> name_mapping = 1;
+  map<sint64, FloatingPoint> msg_mapping = 2;
+  map<bool, bytes> byte_mapping = 3;
+  map<string, string> str_to_str = 4;
+}
+
+message Communique {
+  optional bool make_me_cry = 1;
+
+  // This is a oneof, called "union".
+  oneof union {
+    int32 number = 5;
+    string name = 6;
+    bytes data = 7;
+    double temp_c = 8;
+    MyMessage.Color col = 9;
+    Strings msg = 10;
+  }
 }

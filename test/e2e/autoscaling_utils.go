@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -35,6 +36,8 @@ const (
 	port                            = 80
 	targetPort                      = 8080
 	timeoutRC                       = 120 * time.Second
+	startServiceTimeout             = time.Minute
+	startServiceInterval            = 5 * time.Second
 	image                           = "gcr.io/google_containers/resource_consumer:beta"
 	rcIsNil                         = "ERROR: replicationController = nil"
 )
@@ -98,26 +101,31 @@ func newResourceConsumer(name string, replicas, initCPU, initMemory, consumption
 
 // ConsumeCPU consumes given number of CPU
 func (rc *ResourceConsumer) ConsumeCPU(millicores int) {
+	Logf("RC %s: consume %v millicores in total", rc.name, millicores)
 	rc.cpu <- millicores
 }
 
 // ConsumeMem consumes given number of Mem
 func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
+	Logf("RC %s: consume %v MB in total", rc.name, megabytes)
 	rc.mem <- megabytes
 }
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
+	defer GinkgoRecover()
 	var count int
 	var rest int
 	sleepTime := time.Duration(0)
 	for {
 		select {
 		case millicores := <-rc.cpu:
+			Logf("RC %s: consume %v millicores in total", rc.name, millicores)
 			if rc.requestSizeInMillicores != 0 {
 				count = millicores / rc.requestSizeInMillicores
 			}
 			rest = millicores - count*rc.requestSizeInMillicores
 		case <-time.After(sleepTime):
+			Logf("RC %s: sending %v requests to consume %v millicores each and 1 request to consume %v millicores", rc.name, count, rc.requestSizeInMillicores, rest)
 			if count > 0 {
 				rc.sendConsumeCPURequests(count, rc.requestSizeInMillicores, rc.consumptionTimeInSeconds)
 			}
@@ -132,17 +140,20 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 }
 
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
+	defer GinkgoRecover()
 	var count int
 	var rest int
 	sleepTime := time.Duration(0)
 	for {
 		select {
 		case megabytes := <-rc.mem:
+			Logf("RC %s: consume %v MB in total", rc.name, megabytes)
 			if rc.requestSizeInMegabytes != 0 {
 				count = megabytes / rc.requestSizeInMegabytes
 			}
 			rest = megabytes - count*rc.requestSizeInMegabytes
 		case <-time.After(sleepTime):
+			Logf("RC %s: sending %v requests to consume %v MB each and 1 request to consume %v MB", rc.name, count, rc.requestSizeInMegabytes, rest)
 			if count > 0 {
 				rc.sendConsumeMemRequests(count, rc.requestSizeInMegabytes, rc.consumptionTimeInSeconds)
 			}
@@ -179,8 +190,7 @@ func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
 		Param("durationSec", strconv.Itoa(durationSec)).
-		Do().
-		Raw()
+		DoRaw()
 	expectNoError(err)
 }
 
@@ -195,8 +205,7 @@ func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec 
 		Suffix("ConsumeMem").
 		Param("megabytes", strconv.Itoa(megabytes)).
 		Param("durationSec", strconv.Itoa(durationSec)).
-		Do().
-		Raw()
+		DoRaw()
 	expectNoError(err)
 }
 
@@ -223,13 +232,17 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
 }
 
 func (rc *ResourceConsumer) CleanUp() {
+	By(fmt.Sprintf("Removing consuming RC %s", rc.name))
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
+	// Wait some time to ensure all child goroutines are finished.
+	time.Sleep(10 * time.Second)
 	expectNoError(DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
 	expectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
 }
 
 func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, replicas int, cpuLimitMillis, memLimitMb int64) {
+	By(fmt.Sprintf("Running consuming RC %s with %v replicas", name, replicas))
 	_, err := c.Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -247,14 +260,19 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 	})
 	expectNoError(err)
 	config := RCConfig{
-		Client:    c,
-		Image:     image,
-		Name:      name,
-		Namespace: ns,
-		Timeout:   timeoutRC,
-		Replicas:  replicas,
-		CpuLimit:  cpuLimitMillis,
-		MemLimit:  memLimitMb * 1024 * 1024, // MemLimit is in bytes
+		Client:     c,
+		Image:      image,
+		Name:       name,
+		Namespace:  ns,
+		Timeout:    timeoutRC,
+		Replicas:   replicas,
+		CpuRequest: cpuLimitMillis,
+		CpuLimit:   cpuLimitMillis,
+		MemRequest: memLimitMb * 1024 * 1024, // MemLimit is in bytes
+		MemLimit:   memLimitMb * 1024 * 1024,
 	}
 	expectNoError(RunRC(config))
+	// Make sure endpoints are propagated.
+	// TODO(piosz): replace sleep with endpoints watch.
+	time.Sleep(10 * time.Second)
 }

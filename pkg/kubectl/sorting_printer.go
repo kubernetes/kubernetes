@@ -130,7 +130,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		glog.Fatalf("Field %s in %v is an unsortable type: %s", r.field, iObj, iField.Kind().String())
+		glog.Fatalf("Field %s in %v is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
 	}
 	return less
 }

@@ -108,6 +108,38 @@ func TestCreate(t *testing.T) {
 	th.CheckDeepEquals(t, expected, actual)
 }
 
+func TestCreateErr(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	mockCreateErrResponse(t, lbID)
+
+	opts := CreateOpts{
+		CreateOpt{
+			Address:   "10.2.2.3",
+			Port:      80,
+			Condition: ENABLED,
+			Type:      PRIMARY,
+		},
+		CreateOpt{
+			Address:   "10.2.2.4",
+			Port:      81,
+			Condition: ENABLED,
+			Type:      SECONDARY,
+		},
+	}
+
+	page := Create(client.ServiceClient(), lbID, opts)
+
+	actual, err := page.ExtractNodes()
+	if err == nil {
+		t.Fatal("Did not receive expected error from ExtractNodes")
+	}
+	if actual != nil {
+		t.Fatalf("Received non-nil result from failed ExtractNodes: %#v", actual)
+	}
+}
+
 func TestBulkDelete(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()

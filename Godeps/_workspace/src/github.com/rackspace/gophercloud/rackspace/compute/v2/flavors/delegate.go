@@ -36,11 +36,8 @@ func ListDetail(client *gophercloud.ServiceClient, opts os.ListOptsBuilder) pagi
 }
 
 // Get returns details about a single flavor, identity by ID.
-func Get(client *gophercloud.ServiceClient, id string) os.GetResult {
-	return os.Get(client, id)
-}
-
-// ExtractFlavors interprets a page of List results as Flavors.
-func ExtractFlavors(page pagination.Page) ([]os.Flavor, error) {
-	return os.ExtractFlavors(page)
+func Get(client *gophercloud.ServiceClient, id string) GetResult {
+	var res GetResult
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
+	return res
 }

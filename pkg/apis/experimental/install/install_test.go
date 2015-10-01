@@ -58,7 +58,7 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("experimental").Version || other.Kind != "DaemonSet" {
+	if other.APIVersion != latest.GroupOrDie("experimental").GroupVersion || other.Kind != "DaemonSet" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
@@ -67,24 +67,24 @@ func TestInterfacesFor(t *testing.T) {
 	if _, err := latest.GroupOrDie("experimental").InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, version := range append([]string{latest.GroupOrDie("experimental").Version}, latest.GroupOrDie("experimental").Versions...) {
-		if vi, err := latest.GroupOrDie("experimental").InterfacesFor(version); err != nil || vi == nil {
+	for i, groupVersion := range append([]string{latest.GroupOrDie("experimental").GroupVersion}, latest.GroupOrDie("experimental").GroupVersions...) {
+		if vi, err := latest.GroupOrDie("experimental").InterfacesFor(groupVersion); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := latest.GroupOrDie("experimental").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "v1" || k != "HorizontalPodAutoscaler" {
+	if v, k, err := latest.GroupOrDie("experimental").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "experimental/v1alpha1" || k != "HorizontalPodAutoscaler" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 
-	if m, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "v1" || m.Resource != "daemonsets" {
+	if m, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "experimental/v1alpha1" || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie("experimental").Versions {
-		mapping, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("HorizontalPodAutoscaler", version)
+	for _, groupVersion := range latest.GroupOrDie("experimental").GroupVersions {
+		mapping, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("HorizontalPodAutoscaler", groupVersion)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -92,11 +92,11 @@ func TestRESTMapper(t *testing.T) {
 		if mapping.Resource != "horizontalpodautoscalers" {
 			t.Errorf("incorrect resource name: %#v", mapping)
 		}
-		if mapping.APIVersion != version {
-			t.Errorf("incorrect version: %v", mapping)
+		if mapping.APIVersion != groupVersion {
+			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("experimental").InterfacesFor(version)
+		interfaces, _ := latest.GroupOrDie("experimental").InterfacesFor(groupVersion)
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

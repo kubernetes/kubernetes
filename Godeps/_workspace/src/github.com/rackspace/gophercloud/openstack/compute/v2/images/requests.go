@@ -1,6 +1,8 @@
 package images
 
 import (
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -69,4 +71,39 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var result DeleteResult
 	_, result.Err = client.Delete(deleteURL(client, id), nil)
 	return result
+}
+
+// IDFromName is a convienience function that returns an image's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	imageCount := 0
+	imageID := ""
+	if name == "" {
+		return "", fmt.Errorf("An image name must be provided.")
+	}
+	pager := ListDetail(client, &ListOpts{
+		Name: name,
+	})
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		imageList, err := ExtractImages(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, i := range imageList {
+			if i.Name == name {
+				imageCount++
+				imageID = i.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch imageCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find image: %s", name)
+	case 1:
+		return imageID, nil
+	default:
+		return "", fmt.Errorf("Found %d images matching %s", imageCount, name)
+	}
 }

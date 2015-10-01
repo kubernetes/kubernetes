@@ -47,7 +47,7 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns); err != nil {
+		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})

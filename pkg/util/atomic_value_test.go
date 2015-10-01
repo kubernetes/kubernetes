@@ -38,7 +38,7 @@ func ExpectValue(t *testing.T, atomicValue *AtomicValue, expectedValue interface
 			t.Errorf("Expected to find %v, found %v", expectedValue, actualValue)
 			return
 		}
-	case <-time.After(time.Second * 5):
+	case <-time.After(ForeverTestTimeout):
 		t.Error("Value could not be read")
 		return
 	}

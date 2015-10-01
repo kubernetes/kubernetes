@@ -122,6 +122,34 @@ func TestUpdateDaemonSet(t *testing.T) {
 	c.Validate(t, receivedDaemonSet, err)
 }
 
+func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
+	ns := api.NamespaceDefault
+	requestDaemonSet := &experimental.DaemonSet{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+	}
+	c := &testClient{
+		Request: testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo") + "/status", Query: buildQueryValues(nil)},
+		Response: Response{
+			StatusCode: 200,
+			Body: &experimental.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
+				},
+				Spec: experimental.DaemonSetSpec{
+					Template: &api.PodTemplateSpec{},
+				},
+				Status: experimental.DaemonSetStatus{},
+			},
+		},
+	}
+	receivedDaemonSet, err := c.Setup(t).Experimental().DaemonSets(ns).UpdateStatus(requestDaemonSet)
+	c.Validate(t, receivedDaemonSet, err)
+}
+
 func TestDeleteDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{

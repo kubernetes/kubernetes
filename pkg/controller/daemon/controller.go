@@ -400,7 +400,7 @@ func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *experimental.D
 		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
 		ds.Status.CurrentNumberScheduled = currentNumberScheduled
 		ds.Status.NumberMisscheduled = numberMisscheduled
-		_, updateErr = dsClient.Update(ds)
+		_, updateErr = dsClient.UpdateStatus(ds)
 		if updateErr == nil {
 			// successful update
 			return nil

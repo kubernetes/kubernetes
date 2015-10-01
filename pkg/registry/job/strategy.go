@@ -79,6 +79,22 @@ func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fiel
 	return append(validationErrorList, updateErrorList...)
 }
 
+type jobStatusStrategy struct {
+	jobStrategy
+}
+
+var StatusStrategy = jobStatusStrategy{Strategy}
+
+func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newJob := obj.(*experimental.Job)
+	oldJob := old.(*experimental.Job)
+	newJob.Spec = oldJob.Spec
+}
+
+func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateJobUpdateStatus(obj.(*experimental.Job), old.(*experimental.Job))
+}
+
 // JobSelectableFields returns a field set that represents the object for matching purposes.
 func JobToSelectableFields(job *experimental.Job) fields.Set {
 	return fields.Set{

@@ -175,14 +175,14 @@ function test-setup() {
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-http-alt" \
+    "${CLUSTER_NAME}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-nodeports" \
+    "${CLUSTER_NAME}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
@@ -294,15 +294,12 @@ function test-teardown() {
   echo "... in gke:test-teardown()" >&2
 
   detect-project >&2
-  detect-minions >&2
-  # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-http-alt" \
+  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-http-alt" \
     --project="${PROJECT}" || true
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-nodeports" \
+  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-nodeports" \
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.

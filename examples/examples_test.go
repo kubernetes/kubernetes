@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/experimental"
+	expValidation "k8s.io/kubernetes/pkg/apis/experimental/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -99,6 +101,21 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
+	case *experimental.Deployment:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateDeployment(t)
+	case *experimental.Job:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateJob(t)
+	case *experimental.DaemonSet:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -204,6 +221,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"multi-pod":   nil,
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
+			"job":         &experimental.Job{},
+		},
+		"../docs/admin": {
+			"daemon": &experimental.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
@@ -343,6 +364,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/fibre_channel": {
 			"fc": &api.Pod{},
 		},
+		"../examples/experimental": {
+			"deployment": &experimental.Deployment{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -369,7 +393,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 				}
 				//TODO: Add validate method for &schedulerapi.Policy
 			} else {
-				if err := testapi.Default.Codec().DecodeInto(data, expectedType); err != nil {
+				codec, err := testapi.GetCodecForObject(expectedType)
+				if err != nil {
+					t.Errorf("Could not get codec for %s: %s", expectedType, err)
+				}
+				if err := codec.DecodeInto(data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}

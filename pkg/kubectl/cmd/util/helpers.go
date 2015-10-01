@@ -279,7 +279,7 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
-	cmd.Flags().String("schema-cache-dir", "/tmp/kubectl.schema", "If non-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'")
+	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {

@@ -32,6 +32,8 @@ func TestCreateOpts(t *testing.T) {
         "name": "createdserver",
         "imageRef": "asdfasdfasdf",
         "flavorRef": "performance1-1",
+	"flavorName": "",
+	"imageName": "",
         "block_device_mapping_v2":[
           {
             "uuid":"123456",

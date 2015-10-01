@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/emicklei/go-restful/swagger"
+
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -39,7 +40,7 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 	}
 
 	fakeClient := &Fake{}
-	fakeClient.AddReactor("*", "*", ObjectReaction(o, latest.GroupOrDie("").RESTMapper))
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, api.RESTMapper))
 
 	return fakeClient
 }
@@ -281,6 +282,16 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
+}
+
+// SwaggerSchema returns an empty swagger.ApiDeclaration for testing
+func (c *Fake) SwaggerSchema(version string) (*swagger.ApiDeclaration, error) {
+	action := ActionImpl{}
+	action.Verb = "get"
+	action.Resource = "/swaggerapi/api/" + version
+
+	c.Invokes(action, nil)
+	return &swagger.ApiDeclaration{}, nil
 }
 
 type FakeExperimental struct {

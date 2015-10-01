@@ -27,7 +27,7 @@ func ExampleCopy() {
 	awsutil.Copy(&f2, f1)
 
 	// Print the result
-	fmt.Println(awsutil.StringValue(f2))
+	fmt.Println(awsutil.Prettify(f2))
 
 	// Output:
 	// {
@@ -80,18 +80,26 @@ func TestCopy(t *testing.T) {
 func TestCopyIgnoreNilMembers(t *testing.T) {
 	type Foo struct {
 		A *string
+		B []string
+		C map[string]string
 	}
 
 	f := &Foo{}
 	assert.Nil(t, f.A)
+	assert.Nil(t, f.B)
+	assert.Nil(t, f.C)
 
 	var f2 Foo
 	awsutil.Copy(&f2, f)
 	assert.Nil(t, f2.A)
+	assert.Nil(t, f2.B)
+	assert.Nil(t, f2.C)
 
 	fcopy := awsutil.CopyOf(f)
 	f3 := fcopy.(*Foo)
 	assert.Nil(t, f3.A)
+	assert.Nil(t, f3.B)
+	assert.Nil(t, f3.C)
 }
 
 func TestCopyPrimitive(t *testing.T) {
@@ -183,7 +191,7 @@ func ExampleCopyOf() {
 	var f2 *Foo = v.(*Foo)
 
 	// Print the result
-	fmt.Println(awsutil.StringValue(f2))
+	fmt.Println(awsutil.Prettify(f2))
 
 	// Output:
 	// {
