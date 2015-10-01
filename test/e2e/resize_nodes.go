@@ -405,9 +405,6 @@ var _ = Describe("Nodes", func() {
 		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
 		}
-		if err := checkTestingNSDeletedExcept(c, ""); err != nil {
-			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
-		}
 	})
 
 	Describe("Resize", func() {
