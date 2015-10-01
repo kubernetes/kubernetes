@@ -29,8 +29,8 @@ kpush:
 # Rules for building the real image for deployment to gcr.io
 
 build:
-	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
+	docker build -t beta.gcr.io/google_containers/fluentd-gcp:$(TAG) .
 
 
 push:
-	gcloud docker push gcr.io/google_containers/fluentd-gcp:$(TAG)
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/fluentd-gcp:$(TAG)

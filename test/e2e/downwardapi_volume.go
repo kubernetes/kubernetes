@@ -40,7 +40,7 @@ var _ = Describe("Downward API volume", func() {
 				Containers: []api.Container{
 					{
 						Name:    "client-container",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "beta.gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c", "cat /etc/labels /etc/annotations /etc/podname"},
 						VolumeMounts: []api.VolumeMount{
 							{

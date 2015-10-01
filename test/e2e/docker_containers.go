@@ -97,7 +97,7 @@ func entrypointTestPod() *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:  testContainerName,
-					Image: "gcr.io/google_containers/eptest:0.1",
+					Image: "beta.gcr.io/google_containers/eptest:0.1",
 				},
 			},
 			RestartPolicy: api.RestartPolicyNever,

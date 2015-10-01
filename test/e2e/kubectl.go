@@ -44,8 +44,8 @@ import (
 )
 
 const (
-	nautilusImage            = "gcr.io/google_containers/update-demo:nautilus"
-	kittenImage              = "gcr.io/google_containers/update-demo:kitten"
+	nautilusImage            = "beta.gcr.io/google_containers/update-demo:nautilus"
+	kittenImage              = "beta.gcr.io/google_containers/update-demo:kitten"
 	updateDemoSelector       = "name=update-demo"
 	updateDemoContainer      = "update-demo"
 	frontendSelector         = "name=frontend"

@@ -66,7 +66,7 @@ var _ = Describe("Networking", func() {
 				Containers: []api.Container{
 					{
 						Name:    contName,
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "beta.gcr.io/google_containers/busybox",
 						Command: []string{"wget", "-s", "google.com"},
 					},
 				},
@@ -267,7 +267,7 @@ func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name, version st
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:" + version,
+						Image: "beta.gcr.io/google_containers/nettest:" + version,
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.

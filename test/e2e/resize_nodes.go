@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:1.1"
+	serveHostnameImage        = "beta.gcr.io/google_containers/serve_hostname:1.1"
 	resizeNodeReadyTimeout    = 2 * time.Minute
 	resizeNodeNotReadyTimeout = 2 * time.Minute
 )

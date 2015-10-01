@@ -142,7 +142,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "test",
-						Image: "gcr.io/google_containers/pause",
+						Image: "beta.gcr.io/google_containers/pause",
 					},
 				},
 			},
@@ -167,7 +167,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/pause",
+						Image: "beta.gcr.io/google_containers/pause",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
@@ -204,7 +204,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx:1.7.9",
+						Image: "beta.gcr.io/google_containers/nginx:1.7.9",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -312,7 +312,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx:1.7.9",
+						Image: "beta.gcr.io/google_containers/nginx:1.7.9",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -389,7 +389,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "srv",
-						Image: "gcr.io/google_containers/serve_hostname:1.1",
+						Image: "beta.gcr.io/google_containers/serve_hostname:1.1",
 						Ports: []api.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -444,7 +444,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "env3cont",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "beta.gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -473,7 +473,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "beta.gcr.io/google_containers/busybox",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -499,7 +499,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "beta.gcr.io/google_containers/busybox",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -525,7 +525,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/liveness",
+						Image:   "beta.gcr.io/google_containers/liveness",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -552,7 +552,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/liveness",
+						Image:   "beta.gcr.io/google_containers/liveness",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -579,7 +579,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "liveness",
-						Image: "gcr.io/google_containers/nettest:1.6",
+						Image: "beta.gcr.io/google_containers/nettest:1.6",
 						// These args are garbage but the image will exit if they're not there
 						// we just care about /read serving a 200, which it always does.
 						Args: []string{
@@ -631,7 +631,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx:1.7.9",
+							Image: "beta.gcr.io/google_containers/nginx:1.7.9",
 						},
 					},
 				},
@@ -703,7 +703,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx:1.7.9",
+							Image: "beta.gcr.io/google_containers/nginx:1.7.9",
 							Ports: []api.Port{{ContainerPort: 80}},
 						},
 					},

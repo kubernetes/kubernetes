@@ -46,7 +46,7 @@
                 "containers": [
                     {
                         "name": "elasticsearch-logging",
-                        "image": "gcr.io/google_containers/elasticsearch:1.0",
+                        "image": "beta.gcr.io/google_containers/elasticsearch:1.0",
                         "ports": [
                             {
                                 "name": "db",

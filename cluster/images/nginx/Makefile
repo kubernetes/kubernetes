@@ -7,8 +7,8 @@
 VERSION=v2
 
 all:
-	docker build -t gcr.io/google_containers/nginx:${VERSION} .
-	gcloud docker push gcr.io/google_containers/nginx:${VERSION}
+	docker build -t beta.gcr.io/google_containers/nginx:${VERSION} .
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/nginx:${VERSION}
 
 .PHONY: all
 

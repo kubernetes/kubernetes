@@ -175,7 +175,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 			Containers: []api.Container{
 				{
 					Name:  config.prefix + "-client",
-					Image: "gcr.io/google_containers/nginx:1.7.9",
+					Image: "beta.gcr.io/google_containers/nginx:1.7.9",
 					Ports: []api.ContainerPort{
 						{
 							Name:          "web",
@@ -254,7 +254,7 @@ var _ = Describe("Volumes", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs",
+				serverImage: "beta.gcr.io/google_containers/volume-nfs",
 				serverPorts: []int{2049},
 			}
 
@@ -291,7 +291,7 @@ var _ = Describe("Volumes", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster",
+				serverImage: "beta.gcr.io/google_containers/volume-gluster",
 				serverPorts: []int{24007, 24008, 49152},
 			}
 
@@ -371,7 +371,7 @@ var _ = Describe("Volumes", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
-				serverImage: "gcr.io/google_containers/volume-iscsi",
+				serverImage: "beta.gcr.io/google_containers/volume-iscsi",
 				serverPorts: []int{3260},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -417,7 +417,7 @@ var _ = Describe("Volumes", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
-				serverImage: "gcr.io/google_containers/volume-rbd",
+				serverImage: "beta.gcr.io/google_containers/volume-rbd",
 				serverPorts: []int{6789},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -492,7 +492,7 @@ var _ = Describe("Volumes", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
-				serverImage: "gcr.io/google_containers/volume-ceph",
+				serverImage: "beta.gcr.io/google_containers/volume-ceph",
 				serverPorts: []int{6789},
 			}
 
