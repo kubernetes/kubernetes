@@ -460,7 +460,7 @@ function prepare-push() {
   fi
 }
 
-# Update a kubernetes master with required release
+# Update a kubernetes master with expected release
 function push-master {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
@@ -502,7 +502,7 @@ function push-master {
   verify-cluster
 }
 
-# Update a kubernetes node with required release
+# Update a kubernetes node with expected release
 function push-node() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
@@ -545,7 +545,7 @@ function push-node() {
   
 }
 
-# Update a kubernetes cluster with required source
+# Update a kubernetes cluster with expected source
 function kube-push { 
   prepare-push
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
