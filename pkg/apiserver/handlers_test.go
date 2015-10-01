@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeRL bool
@@ -199,52 +198,49 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		method              string
 		url                 string
 		expectedVerb        string
+		expectedAPIPrefix   string
+		expectedAPIGroup    string
 		expectedAPIVersion  string
 		expectedNamespace   string
 		expectedResource    string
 		expectedSubresource string
-		expectedKind        string
 		expectedName        string
 		expectedParts       []string
 	}{
 
 		// resource paths
-		{"GET", "/namespaces", "list", "", "", "namespaces", "", "Namespace", "", []string{"namespaces"}},
-		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
+		{"GET", "/api/v1/namespaces", "list", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{"GET", "/api/v1/namespaces/other", "get", "api", "", "v1", "other", "namespaces", "", "other", []string{"namespaces", "other"}},
 
-		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/pods", "list", "api", "", "v1", api.NamespaceAll, "pods", "", "", []string{"pods"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// special verbs
-		{"GET", "/proxy/namespaces/other/pods/foo", "proxy", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/redirect/namespaces/other/pods/foo", "redirect", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
-
-		// fully-qualified paths
-		{"GET", getPath("pods", "other", ""), "list", testapi.Default.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "other", "foo"), "get", testapi.Default.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", getPath("pods", "", ""), "list", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"POST", getPath("pods", "", ""), "create", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "", "foo"), "get", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("redirect", "pods", "", ""), "redirect", testapi.Default.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("watch", "pods", "other", ""), "watch", testapi.Default.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/redirect/namespaces/other/pods/foo", "redirect", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/watch/pods", "watch", "api", "", "v1", api.NamespaceAll, "pods", "", "", []string{"pods"}},
+		{"GET", "/api/v1/watch/namespaces/other/pods", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// subresource identification
-		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
-		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo/status", "get", "api", "", "v1", "other", "pods", "status", "foo", []string{"pods", "foo", "status"}},
+		{"PUT", "/api/v1/namespaces/other/finalize", "update", "api", "", "v1", "other", "finalize", "", "", []string{"finalize"}},
 
 		// verb identification
-		{"PATCH", "/namespaces/other/pods/foo", "patch", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"DELETE", "/namespaces/other/pods/foo", "delete", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"PATCH", "/api/v1/namespaces/other/pods/foo", "patch", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"DELETE", "/api/v1/namespaces/other/pods/foo", "delete", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"POST", "/api/v1/namespaces/other/pods", "create", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+
+		// api group identification
+		{"POST", "/apis/experimental/v1/namespaces/other/pods", "create", "api", "experimental", "v1", "other", "pods", "", "", []string{"pods"}},
+
+		// api version identification
+		{"POST", "/apis/experimental/v1beta3/namespaces/other/pods", "create", "api", "experimental", "v1beta3", "other", "pods", "", "", []string{"pods"}},
 	}
 
-	apiRequestInfoResolver := &APIRequestInfoResolver{sets.NewString("api"), testapi.Default.RESTMapper()}
+	apiRequestInfoResolver := newTestAPIRequestInfoResolver()
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
@@ -261,9 +257,6 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		}
 		if successCase.expectedNamespace != apiRequestInfo.Namespace {
 			t.Errorf("Unexpected namespace for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedNamespace, apiRequestInfo.Namespace)
-		}
-		if successCase.expectedKind != apiRequestInfo.Kind {
-			t.Errorf("Unexpected kind for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedKind, apiRequestInfo.Kind)
 		}
 		if successCase.expectedResource != apiRequestInfo.Resource {
 			t.Errorf("Unexpected resource for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedResource, apiRequestInfo.Resource)
@@ -282,7 +275,10 @@ func TestGetAPIRequestInfo(t *testing.T) {
 	errorCases := map[string]string{
 		"no resource path":            "/",
 		"just apiversion":             "/api/version/",
+		"just prefix, group, version": "/apis/group/version/",
 		"apiversion with no resource": "/api/version/",
+		"bad prefix":                  "/badprefix/version/resource",
+		"missing api group":           "/apis/version/resource",
 	}
 	for k, v := range errorCases {
 		req, err := http.NewRequest("GET", v, nil)

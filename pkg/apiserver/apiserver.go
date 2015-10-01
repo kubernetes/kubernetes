@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -80,6 +79,10 @@ type APIGroupVersion struct {
 
 	Root    string
 	Version string
+
+	// APIRequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
+	// TODO: refactor proxy handler to use sub resources
+	APIRequestInfoResolver *APIRequestInfoResolver
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
@@ -151,12 +154,10 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
-	info := &APIRequestInfoResolver{sets.NewString(strings.TrimPrefix(g.Root, "/")), g.Mapper}
-
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
 		group:             g,
-		info:              info,
+		info:              g.APIRequestInfoResolver,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 		proxyDialerFn:     g.ProxyDialerFn,

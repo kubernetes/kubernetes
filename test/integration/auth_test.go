@@ -792,6 +792,94 @@ func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authori
 	return pl
 }
 
+type trackingAuthorizer struct {
+	requestAttributes []authorizer.Attributes
+}
+
+func (a *trackingAuthorizer) Authorize(attributes authorizer.Attributes) error {
+	a.requestAttributes = append(a.requestAttributes, attributes)
+	return nil
+}
+
+// TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly
+func TestAuthorizationAttributeDetermination(t *testing.T) {
+	framework.DeleteAllEtcdKeys()
+
+	etcdStorage, err := framework.NewEtcdStorage()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	trackingAuthorizer := &trackingAuthorizer{}
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		DatabaseStorage:       etcdStorage,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            trackingAuthorizer,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+	})
+
+	transport := http.DefaultTransport
+
+	requests := map[string]struct {
+		verb               string
+		URL                string
+		expectedAttributes authorizer.Attributes
+	}{
+		"prefix/version/resource":       {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: "", Resource: "pods"}},
+		"prefix/group/version/resource": {"GET", "/apis/experimental/v1/pods", authorizer.AttributesRecord{APIGroup: "experimental", Resource: "pods"}},
+	}
+
+	currentAuthorizationAttributesIndex := 0
+
+	for testName, r := range requests {
+		token := BobToken
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, nil)
+		if err != nil {
+			t.Logf("case %v", testName)
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			found := false
+			for i := currentAuthorizationAttributesIndex; i < len(trackingAuthorizer.requestAttributes); i++ {
+				if trackingAuthorizer.requestAttributes[i].GetAPIGroup() == r.expectedAttributes.GetAPIGroup() &&
+					trackingAuthorizer.requestAttributes[i].GetResource() == r.expectedAttributes.GetResource() {
+					found = true
+					break
+				}
+
+				t.Logf("%#v did not match %#v", r.expectedAttributes, trackingAuthorizer.requestAttributes[i].(*authorizer.AttributesRecord))
+			}
+			if !found {
+				t.Errorf("did not find %#v in %#v", r.expectedAttributes, trackingAuthorizer.requestAttributes[currentAuthorizationAttributesIndex:])
+			}
+
+			currentAuthorizationAttributesIndex = len(trackingAuthorizer.requestAttributes)
+		}()
+	}
+}
+
 // TestNamespaceAuthorization tests that authorization can be controlled
 // by namespace.
 func TestNamespaceAuthorization(t *testing.T) {
