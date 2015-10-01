@@ -320,7 +320,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	default:
 		Failf("This test is not supported for provider %s and should be disabled", testContext.Provider)
 	}
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", master)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", master)
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
@@ -346,7 +346,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 			}
 		})
 		if err != nil {
-			Failf("Failed to remove the iptable DROP rule. Manual intervention is "+
+			Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 				"required on node %s: remove rule %s, if exists", node.Name, iptablesRule)
 		}
 	}()
