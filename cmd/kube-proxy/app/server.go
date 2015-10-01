@@ -159,6 +159,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	// We ommit creation of pretty much everything if we run in cleanup mode
 	if config.CleanupAndExit {
 		return &ProxyServer{
+			Config:       config,
 			IptInterface: iptInterface,
 		}, nil
 	}
