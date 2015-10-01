@@ -255,24 +255,24 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(client *Client, c *Config, version string, clientRegisteredVersions []string) (string, error) {
+// TODO: caesarxuchao: We should call NegotiateVersion for each group. This
+// requires one config for each group. Please refer to #14592. The logic of
+// NegotiateVersion is also questionable, e.g., if the passed in version is not
+// supported, arguably an error should be returned, rather than continuing the
+// negotiation.
+func NegotiateVersion(c *Config, version string, clientRegisteredVersions []string) (string, error) {
 	var err error
-	if client == nil {
-		client, err = New(c)
-		if err != nil {
-			return "", err
-		}
-	}
 	clientVersions := sets.String{}
 	for _, v := range clientRegisteredVersions {
 		clientVersions.Insert(v)
 	}
-	apiVersions, err := client.ServerAPIVersions()
+
+	apiVersions, err := ServerAPIVersions(c)
 	if err != nil {
 		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
 	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
+	for _, v := range apiVersions {
 		serverVersions.Insert(v)
 	}
 	// If no version requested, use config version (may also be empty).
@@ -299,11 +299,9 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 		if serverVersions.Has(clientVersion) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
-			// TODO: caesarxuchao: enable the warning message when we have
-			// proper fix. Please refer to issue #14895.
-			// if len(version) != 0 {
-			// 	glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
-			// }
+			if len(version) != 0 {
+				glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
+			}
 			return clientVersion, nil
 		}
 	}
