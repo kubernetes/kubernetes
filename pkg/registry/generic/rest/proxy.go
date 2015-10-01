@@ -240,6 +240,11 @@ func (h *UpgradeAwareProxyHandler) dialURL() (net.Conn, error) {
 			}
 		}
 
+		// Return if we were configured to skip validation
+		if tlsConfig != nil && tlsConfig.InsecureSkipVerify {
+			return tlsConn, nil
+		}
+
 		// Verify
 		host, _, _ := net.SplitHostPort(dialAddr)
 		if err := tlsConn.VerifyHostname(host); err != nil {
