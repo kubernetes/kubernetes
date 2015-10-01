@@ -128,60 +128,60 @@ func TestIsMemoryGuaranteed(t *testing.T) {
 type oomTest struct {
 	container       *api.Container
 	memoryCapacity  int64
-	lowOomScoreAdj  int // The max oom_score_adj score the container should be assigned.
-	highOomScoreAdj int // The min oom_score_adj score the container should be assigned.
+	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
+	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
 }
 
-func TestGetContainerOomScoreAdjust(t *testing.T) {
+func TestGetContainerOOMScoreAdjust(t *testing.T) {
 
 	oomTests := []oomTest{
 		{
 			container:       &zeroRequestMemoryBestEffort,
 			memoryCapacity:  4000000000,
-			lowOomScoreAdj:  1000,
-			highOomScoreAdj: 1000,
+			lowOOMScoreAdj:  1000,
+			highOOMScoreAdj: 1000,
 		},
 		{
 			container:       &edgeMemoryBestEffort,
 			memoryCapacity:  8000000000,
-			lowOomScoreAdj:  1000,
-			highOomScoreAdj: 1000,
+			lowOOMScoreAdj:  1000,
+			highOOMScoreAdj: 1000,
 		},
 		{
 			container:       &noRequestMemoryBestEffort,
 			memoryCapacity:  7230457451,
-			lowOomScoreAdj:  1000,
-			highOomScoreAdj: 1000,
+			lowOOMScoreAdj:  1000,
+			highOOMScoreAdj: 1000,
 		},
 		{
 			container:       &noLimitMemoryBestEffort,
 			memoryCapacity:  4000000000,
-			lowOomScoreAdj:  1000,
-			highOomScoreAdj: 1000,
+			lowOOMScoreAdj:  1000,
+			highOOMScoreAdj: 1000,
 		},
 		{
 			container:       &memoryGuaranteed,
 			memoryCapacity:  123456789,
-			lowOomScoreAdj:  -999,
-			highOomScoreAdj: -999,
+			lowOOMScoreAdj:  -999,
+			highOOMScoreAdj: -999,
 		},
 		{
 			container:       &memoryBurstable,
 			memoryCapacity:  standardMemoryAmount,
-			lowOomScoreAdj:  495,
-			highOomScoreAdj: 505,
+			lowOOMScoreAdj:  495,
+			highOOMScoreAdj: 505,
 		},
 		{
 			container:       &memoryBurstableNoLimit,
 			memoryCapacity:  standardMemoryAmount,
-			lowOomScoreAdj:  2,
-			highOomScoreAdj: 2,
+			lowOOMScoreAdj:  2,
+			highOOMScoreAdj: 2,
 		},
 	}
 	for _, test := range oomTests {
-		oomScoreAdj := GetContainerOomScoreAdjust(test.container, test.memoryCapacity)
-		if oomScoreAdj < test.lowOomScoreAdj || oomScoreAdj > test.highOomScoreAdj {
-			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOomScoreAdj, test.highOomScoreAdj, oomScoreAdj)
+		oomScoreAdj := GetContainerOOMScoreAdjust(test.container, test.memoryCapacity)
+		if oomScoreAdj < test.lowOOMScoreAdj || oomScoreAdj > test.highOOMScoreAdj {
+			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 		}
 	}
 }

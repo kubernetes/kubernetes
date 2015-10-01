@@ -380,24 +380,32 @@ func isPrettyPrint(req *http.Request) bool {
 
 // writeJSON renders an object as JSON to the response.
 func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, pretty bool) {
+	w.Header().Set("Content-Type", "application/json")
+	// We send the status code before we encode the object, so if we error, the status code stays but there will
+	// still be an error object.  This seems ok, the alternative is to validate the object before
+	// encoding, but this really should never happen, so it's wasted compute for every API request.
+	w.WriteHeader(statusCode)
+	if pretty {
+		prettyJSON(codec, object, w)
+		return
+	}
+	err := codec.EncodeToStream(object, w)
+	if err != nil {
+		errorJSONFatal(err, codec, w)
+	}
+}
+
+func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
+	formatted := &bytes.Buffer{}
 	output, err := codec.Encode(object)
 	if err != nil {
 		errorJSONFatal(err, codec, w)
+	}
+	if err := json.Indent(formatted, output, "", "  "); err != nil {
+		errorJSONFatal(err, codec, w)
 		return
 	}
-	if pretty {
-		// PR #2243: Pretty-print JSON by default.
-		formatted := &bytes.Buffer{}
-		err = json.Indent(formatted, output, "", "  ")
-		if err != nil {
-			errorJSONFatal(err, codec, w)
-			return
-		}
-		output = formatted.Bytes()
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	w.Write(output)
+	w.Write(formatted.Bytes())
 }
 
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.

@@ -52,6 +52,7 @@ KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 ENABLE_HORIZONTAL_POD_AUTOSCALER: $(yaml-quote ${ENABLE_HORIZONTAL_POD_AUTOSCALER})
+ENABLE_DEPLOYMENTS: $(yaml-quote ${ENABLE_DEPLOYMENTS})
 RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
@@ -154,15 +155,10 @@ function create-master-instance {
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
 
-# TODO(zmerlynn): Make $1 required.
-# TODO(zmerlynn): Document required vars (for this and call chain).
-# $1 version
+# $1: template name (required)
 function create-node-instance-template {
-  local suffix=""
-  if [[ -n ${1:-} ]]; then
-    suffix="-${1}"
-  fi
-  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags}" \
+  local template_name="$1"
+  create-node-template "$template_name" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
 }

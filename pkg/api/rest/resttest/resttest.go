@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type Tester struct {
@@ -961,7 +962,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, initWatchFn InitWatchFunc, 
 				if !ok {
 					t.Errorf("watch channel should be open")
 				}
-			case <-time.After(time.Millisecond * 100):
+			case <-time.After(util.ForeverTestTimeout):
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()
@@ -982,7 +983,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, initWatchFn InitWatchFunc, 
 			select {
 			case <-watcher.ResultChan():
 				t.Errorf("unexpected result from result channel")
-			case <-time.After(time.Millisecond * 100):
+			case <-time.After(time.Millisecond * 500):
 				// expected case
 			}
 			watcher.Stop()
@@ -1009,7 +1010,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, initWatchFn InitWatchFunc, 
 				if !ok {
 					t.Errorf("watch channel should be open")
 				}
-			case <-time.After(time.Millisecond * 100):
+			case <-time.After(util.ForeverTestTimeout):
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()
@@ -1030,7 +1031,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, initWatchFn InitWatchFunc, 
 			select {
 			case <-watcher.ResultChan():
 				t.Errorf("unexpected result from result channel")
-			case <-time.After(time.Millisecond * 100):
+			case <-time.After(time.Millisecond * 500):
 				// expected case
 			}
 			watcher.Stop()

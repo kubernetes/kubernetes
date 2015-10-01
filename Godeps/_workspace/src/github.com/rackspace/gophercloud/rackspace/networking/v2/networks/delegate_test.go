@@ -203,8 +203,17 @@ func TestCreateWithOptionalFields(t *testing.T) {
 	}
 }
 		`)
-
 		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `
+{
+	"network": {
+			"name": "sample_network",
+			"admin_state_up": true,
+			"shared": true,
+			"tenant_id": "12345"
+	}
+}
+		`)
 	})
 
 	iTrue := true

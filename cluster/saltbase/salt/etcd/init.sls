@@ -38,6 +38,10 @@ touch /var/log/etcd.log:
   cmd.run:
     - creates: /var/log/etcd.log
 
+touch /var/log/etcd-events.log:
+  cmd.run:
+    - creates: /var/log/etcd-events.log
+
 /var/etcd:
   file.directory:
     - user: root
@@ -57,3 +61,21 @@ touch /var/log/etcd.log:
     - mode: 644
     - makedirs: true
     - dir_mode: 755
+    - context:
+        suffix: ""
+        port: 4001
+        server_port: 2380
+
+/etc/kubernetes/manifests/etcd-events.manifest:
+  file.managed:
+    - source: salt://etcd/etcd.manifest
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - dir_mode: 755
+    - context:
+        suffix: "-events"
+        port: 4002
+        server_port: 2381

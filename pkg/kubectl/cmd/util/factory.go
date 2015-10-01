@@ -24,6 +24,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path"
 	"strconv"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -140,7 +140,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			switch group {
-			case "api":
+			case "":
 				return client.RESTClient, nil
 			case "experimental":
 				return client.ExperimentalClient.RESTClient, nil
@@ -212,7 +212,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.Kind, kubectl.NewScalerClient(client))
+			return kubectl.ScalerFor(mapping.Kind, client)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
@@ -309,9 +309,63 @@ type schemaClient interface {
 	Get() *client.Request
 }
 
-func getSchemaAndValidate(c schemaClient, data []byte, group, version, cacheDir string) (err error) {
+func recursiveSplit(dir string) []string {
+	parent, file := path.Split(dir)
+	if len(parent) == 0 {
+		return []string{file}
+	}
+	return append(recursiveSplit(parent[:len(parent)-1]), file)
+}
+
+func substituteUserHome(dir string) (string, error) {
+	if len(dir) == 0 || dir[0] != '~' {
+		return dir, nil
+	}
+	parts := recursiveSplit(dir)
+	if len(parts[0]) == 1 {
+		parts[0] = os.Getenv("HOME")
+	} else {
+		usr, err := user.Lookup(parts[0][1:])
+		if err != nil {
+			return "", err
+		}
+		parts[0] = usr.HomeDir
+	}
+	return path.Join(parts...), nil
+}
+
+func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersion string) error {
+	if err := os.MkdirAll(path.Join(cacheDir, prefix, groupVersion), 0755); err != nil {
+		return err
+	}
+	tmpFile, err := ioutil.TempFile(cacheDir, "schema")
+	if err != nil {
+		// If we can't write, keep going.
+		if os.IsPermission(err) {
+			return nil
+		}
+		return err
+	}
+	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
+		return err
+	}
+	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
+		// If we can't write due to file existing, or permission problems, keep going.
+		if os.IsExist(err) || os.IsPermission(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string) (err error) {
 	var schemaData []byte
-	cacheFile := path.Join(cacheDir, group, version, schemaFileName)
+	fullDir, err := substituteUserHome(cacheDir)
+	if err != nil {
+		return err
+	}
+	cacheFile := path.Join(fullDir, prefix, groupVersion, schemaFileName)
 
 	if len(cacheDir) != 0 {
 		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
@@ -320,24 +374,14 @@ func getSchemaAndValidate(c schemaClient, data []byte, group, version, cacheDir 
 	}
 	if schemaData == nil {
 		schemaData, err = c.Get().
-			AbsPath("/swaggerapi", group, version).
+			AbsPath("/swaggerapi", prefix, groupVersion).
 			Do().
 			Raw()
 		if err != nil {
 			return err
 		}
 		if len(cacheDir) != 0 {
-			if err = os.MkdirAll(path.Join(cacheDir, group, version), 0755); err != nil {
-				return err
-			}
-			tmpFile, err := ioutil.TempFile(cacheDir, "schema")
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
-				return err
-			}
-			if err := os.Link(tmpFile.Name(), cacheFile); err != nil && !os.IsExist(err) {
+			if err := writeSchemaFile(schemaData, fullDir, cacheFile, prefix, groupVersion); err != nil {
 				return err
 			}
 		}
@@ -363,14 +407,10 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
 	}
 	if group == "experimental" {
-		g, err := latest.Group(group)
-		if err != nil {
-			return err
-		}
 		if c.c.ExperimentalClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
-		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/"+g.Group, version, c.cacheDir)
+		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/", version, c.cacheDir)
 	}
 	return getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 }

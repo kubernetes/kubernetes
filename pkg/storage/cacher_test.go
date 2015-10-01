@@ -75,7 +75,7 @@ func waitForUpToDateCache(cacher *storage.Cacher, resourceVersion uint64) error 
 		}
 		return result == resourceVersion, nil
 	}
-	return wait.Poll(10*time.Millisecond, 100*time.Millisecond, ready)
+	return wait.Poll(10*time.Millisecond, util.ForeverTestTimeout, ready)
 }
 
 func TestListFromMemory(t *testing.T) {
@@ -313,7 +313,7 @@ func TestWatch(t *testing.T) {
 		if obj := event.Object.(*api.Pod); event.Type != watch.Added || obj.ResourceVersion != "4" {
 			t.Errorf("unexpected event: %v", event)
 		}
-	case <-time.After(time.Millisecond * 100):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("timed out waiting for an event")
 	}
 	// Emit a new event and check if it is observed by the watcher.

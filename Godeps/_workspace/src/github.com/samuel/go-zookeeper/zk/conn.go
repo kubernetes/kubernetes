@@ -1,3 +1,4 @@
+// Package zk is a native Go client library for the ZooKeeper orchestration service.
 package zk
 
 /*
@@ -14,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -23,7 +23,16 @@ import (
 	"time"
 )
 
+// ErrNoServer indicates that an operation cannot be completed
+// because attempts to connect to all servers in the list failed.
 var ErrNoServer = errors.New("zk: could not connect to a server")
+
+// ErrInvalidPath indicates that an operation was being attempted on
+// an invalid path. (e.g. empty path)
+var ErrInvalidPath = errors.New("zk: invalid path")
+
+// DefaultLogger uses the stdlib log package for logging.
+var DefaultLogger Logger = defaultLogger{}
 
 const (
 	bufferSize      = 1536 * 1024
@@ -46,6 +55,11 @@ type watchPathType struct {
 }
 
 type Dialer func(network, address string, timeout time.Duration) (net.Conn, error)
+
+// Logger is an interface that can be implemented to provide custom log output.
+type Logger interface {
+	Printf(string, ...interface{})
+}
 
 type Conn struct {
 	lastZxid  int64
@@ -74,6 +88,8 @@ type Conn struct {
 
 	// Debug (used by unit tests)
 	reconnectDelay time.Duration
+
+	logger Logger
 }
 
 type request struct {
@@ -160,6 +176,7 @@ func ConnectWithDialer(servers []string, sessionTimeout time.Duration, dialer Di
 		watchers:        make(map[watchPathType][]chan Event),
 		passwd:          emptyPassword,
 		timeout:         int32(sessionTimeout.Nanoseconds() / 1e6),
+		logger:          DefaultLogger,
 
 		// Debug
 		reconnectDelay: 0,
@@ -182,8 +199,15 @@ func (c *Conn) Close() {
 	}
 }
 
+// States returns the current state of the connection.
 func (c *Conn) State() State {
 	return State(atomic.LoadInt32((*int32)(&c.state)))
+}
+
+// SetLogger sets the logger to be used for printing errors.
+// Logger is an interface provided by this package.
+func (c *Conn) SetLogger(l Logger) {
+	c.logger = l
 }
 
 func (c *Conn) setState(state State) {
@@ -221,7 +245,7 @@ func (c *Conn) connect() error {
 			return nil
 		}
 
-		log.Printf("Failed to connect to %s: %+v", c.servers[c.serverIndex], err)
+		c.logger.Printf("Failed to connect to %s: %+v", c.servers[c.serverIndex], err)
 	}
 }
 
@@ -267,7 +291,7 @@ func (c *Conn) loop() {
 
 		// Yeesh
 		if err != io.EOF && err != ErrSessionExpired && !strings.Contains(err.Error(), "use of closed network connection") {
-			log.Println(err)
+			c.logger.Printf(err.Error())
 		}
 
 		select {
@@ -367,7 +391,7 @@ func (c *Conn) sendSetWatches() {
 		res := &setWatchesResponse{}
 		_, err := c.request(opSetWatches, req, res, nil)
 		if err != nil {
-			log.Printf("Failed to set previous watches: %s", err.Error())
+			c.logger.Printf("Failed to set previous watches: %s", err.Error())
 		}
 	}()
 }
@@ -439,9 +463,6 @@ func (c *Conn) authenticate() error {
 		return ErrSessionExpired
 	}
 
-	if c.sessionID != r.SessionID {
-		atomic.StoreUint32(&c.xid, 0)
-	}
 	c.timeout = r.TimeOut
 	c.sessionID = r.SessionID
 	c.passwd = r.Passwd
@@ -582,7 +603,7 @@ func (c *Conn) recvLoop(conn net.Conn) error {
 		} else if res.Xid == -2 {
 			// Ping response. Ignore.
 		} else if res.Xid < 0 {
-			log.Printf("Xid < 0 (%d) but not ping or watcher event", res.Xid)
+			c.logger.Printf("Xid < 0 (%d) but not ping or watcher event", res.Xid)
 		} else {
 			if res.Zxid > 0 {
 				c.lastZxid = res.Zxid
@@ -596,7 +617,7 @@ func (c *Conn) recvLoop(conn net.Conn) error {
 			c.requestsLock.Unlock()
 
 			if !ok {
-				log.Printf("Response for unknown request with xid %d", res.Xid)
+				c.logger.Printf("Response for unknown request with xid %d", res.Xid)
 			} else {
 				if res.Err != 0 {
 					err = res.Err.toError()
@@ -694,6 +715,9 @@ func (c *Conn) GetW(path string) ([]byte, *Stat, <-chan Event, error) {
 }
 
 func (c *Conn) Set(path string, data []byte, version int32) (*Stat, error) {
+	if path == "" {
+		return nil, ErrInvalidPath
+	}
 	res := &setDataResponse{}
 	_, err := c.request(opSetData, &SetDataRequest{path, data, version}, res, nil)
 	return &res.Stat, err

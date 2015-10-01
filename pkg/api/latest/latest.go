@@ -18,6 +18,8 @@ package latest
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
@@ -32,6 +34,9 @@ var (
 	RegisterGroup = allGroups.RegisterGroup
 	// GroupOrDie is a shortcut to allGroups.GroupOrDie.
 	GroupOrDie = allGroups.GroupOrDie
+	// AllPreferredGroupVersions returns the preferred versions of all
+	// registered groups in the form of "group1/version1,group2/version2,..."
+	AllPreferredGroupVersions = allGroups.AllPreferredGroupVersions
 )
 
 // GroupMetaMap is a map between group names and their metadata.
@@ -76,6 +81,20 @@ func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
 	return groupMeta
 }
 
+// AllPreferredGroupVersions returns the preferred versions of all registered
+// groups in the form of "group1/version1,group2/version2,..."
+func (g GroupMetaMap) AllPreferredGroupVersions() string {
+	if len(g) == 0 {
+		return ""
+	}
+	var defaults []string
+	for _, groupMeta := range g {
+		defaults = append(defaults, groupMeta.GroupVersion)
+	}
+	sort.Strings(defaults)
+	return strings.Join(defaults, ",")
+}
+
 // GroupMeta stores the metadata of a group, such as the latest supported version.
 type GroupMeta struct {
 	// GroupVersion represents the current external default version of the group. It
@@ -95,6 +114,10 @@ type GroupMeta struct {
 	// Clients may choose to prefer the latter items in the list over the former
 	// items when presented with a set of versions to choose.
 	Versions []string
+
+	// GroupVersions is Group + Versions. This is to avoid string concatenation
+	// in many places.
+	GroupVersions []string
 
 	// Codec is the default codec for serializing output that should use
 	// the latest supported version.  Use this Codec when writing to

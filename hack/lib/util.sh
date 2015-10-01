@@ -242,28 +242,25 @@ kube::util::analytics-link() {
 
 # Takes a group/version and returns the path to its location on disk, sans
 # "pkg". E.g.:
-# * default behavior: experimental/v1 -> apis/experimental/v1
-# * legacy behavior: api/v1 -> api/v1
-# * Special handling for only a group: experimental -> apis/experimental
-# * Special handling for only "api" group: api -> api
-# * Very special handling for "v1": v1 -> api/v1
+# * default behavior: experimental/v1alpha1 -> apis/experimental/v1alpha1
+# * default behavior for only a group: experimental -> apis/experimental
+# * Special handling for empty group: v1 -> api/v1, unversioned -> api/unversioned
+# * Very special handling for when both group and version are "": / -> api
 kube::util::group-version-to-pkg-path() {
   local group_version="$1"
   # Special cases first.
   # TODO(lavalamp): Simplify this by moving pkg/api/v1 and splitting pkg/api,
   # moving the results to pkg/apis/api.
   case "${group_version}" in
+    # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
+    /)
+      echo "api"
+      ;;
     v1)
       echo "api/v1"
       ;;
-    api)
-      echo "api/v1"
-      ;;
-    api/*)
-      echo "${group_version}"
-      ;;
-    api/*)
-      echo "${group_version}"
+    unversioned)
+      echo "api/unversioned"
       ;;
     *)
       echo "apis/${group_version}"

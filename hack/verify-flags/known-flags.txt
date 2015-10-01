@@ -14,6 +14,7 @@ api-burst
 api-prefix
 api-rate
 api-servers
+api-server-port
 api-token
 api-version
 authorization-mode
@@ -137,6 +138,7 @@ kubelet-https
 kubelet-network-plugin
 kubelet-pod-infra-container-image
 kubelet-port
+kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
 kubelet-timeout
@@ -159,6 +161,7 @@ maximum-dead-containers-per-container
 max-log-age
 max-log-backups
 max-log-size
+max-open-files
 max-outgoing-burst
 max-outgoing-qps
 max-pods
@@ -189,6 +192,7 @@ node-startup-grace-period
 node-status-update-frequency
 node-sync-period
 no-headers
+no-suggestions
 num-nodes
 oidc-ca-file
 oidc-client-id
@@ -267,6 +271,7 @@ ssh-user
 static-pods-config
 stats-port
 storage-version
+storage-versions
 streaming-connection-idle-timeout
 suicide-timeout
 sync-frequency
@@ -291,4 +296,5 @@ www-prefix
 retry_time
 file_content_in_loop
 cpu-cfs-quota
+terminated-pod-gc-threshold
 

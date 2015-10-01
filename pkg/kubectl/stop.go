@@ -65,6 +65,8 @@ func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 		return &PodReaper{c}, nil
 	case "Service":
 		return &ServiceReaper{c}, nil
+	case "Job":
+		return &JobReaper{c, Interval, Timeout}, nil
 	}
 	return nil, &NoSuchReaperError{kind}
 }
@@ -78,6 +80,10 @@ type ReplicationControllerReaper struct {
 	pollInterval, timeout time.Duration
 }
 type DaemonSetReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+type JobReaper struct {
 	client.Interface
 	pollInterval, timeout time.Duration
 }
@@ -112,7 +118,7 @@ func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
-	scaler, err := ScalerFor("ReplicationController", NewScalerClient(*reaper))
+	scaler, err := ScalerFor("ReplicationController", *reaper)
 	if err != nil {
 		return "", err
 	}
@@ -218,6 +224,34 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	}
 
 	if err := reaper.Experimental().DaemonSets(namespace).Delete(name); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s stopped", name), nil
+}
+
+func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
+	jobs := reaper.Experimental().Jobs(namespace)
+	scaler, err := ScalerFor("Job", *reaper)
+	if err != nil {
+		return "", err
+	}
+	job, err := jobs.Get(name)
+	if err != nil {
+		return "", err
+	}
+	if timeout == 0 {
+		// we will never have more active pods than job.Spec.Parallelism
+		parallelism := *job.Spec.Parallelism
+		timeout = Timeout + time.Duration(10*parallelism)*time.Second
+	}
+
+	// TODO: handle overlapping jobs
+	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForJobs := NewRetryParams(reaper.pollInterval, timeout)
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil {
+		return "", err
+	}
+	if err := jobs.Delete(name, gracePeriod); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%s stopped", name), nil

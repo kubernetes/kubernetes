@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/experimental"
-	// Ensure that experimental/v1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/apis/experimental/v1"
+	// Ensure that experimental/v1alpha1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"

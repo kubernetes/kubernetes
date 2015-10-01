@@ -5,30 +5,24 @@
 package mesosproto
 
 import proto "github.com/gogo/protobuf/proto"
+import fmt "fmt"
 import math "math"
 
-// discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto/gogo.pb"
+// discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto"
 
-import io1 "io"
-import fmt4 "fmt"
-import github_com_gogo_protobuf_proto2 "github.com/gogo/protobuf/proto"
+import bytes "bytes"
 
-import fmt5 "fmt"
-import strings2 "strings"
-import reflect2 "reflect"
+import strings "strings"
+import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
+import sort "sort"
+import strconv "strconv"
+import reflect "reflect"
 
-import fmt6 "fmt"
-import strings3 "strings"
-import github_com_gogo_protobuf_proto3 "github.com/gogo/protobuf/proto"
-import sort1 "sort"
-import strconv1 "strconv"
-import reflect3 "reflect"
-
-import fmt7 "fmt"
-import bytes1 "bytes"
+import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
 
 type Action_Type int32
@@ -614,1547 +608,2459 @@ func init() {
 	proto.RegisterEnum("mesosproto.Metadata_Status", Metadata_Status_name, Metadata_Status_value)
 	proto.RegisterEnum("mesosproto.Record_Type", Record_Type_name, Record_Type_value)
 }
-func (m *Promise) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Promise) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Proposal = &v
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Promise)
+	if !ok {
+		return fmt.Errorf("that is not of type *Promise")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
 		}
+		return fmt.Errorf("that is type *Promise but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Promisebut is not nil && this == nil")
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
+		}
+	} else if this.Proposal != nil {
+		return fmt.Errorf("this.Proposal == nil && that.Proposal != nil")
+	} else if that1.Proposal != nil {
+		return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *Action) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Promise) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Position", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Position = &v
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Promised", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Promised = &v
-		case 3:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Performed", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Performed = &v
-		case 4:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Learned", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			b := bool(v != 0)
-			m.Learned = &b
-		case 5:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Type", wireType)
-			}
-			var v Action_Type
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (Action_Type(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Type = &v
-		case 6:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Nop", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Nop == nil {
-				m.Nop = &Action_Nop{}
-			}
-			if err := m.Nop.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		case 7:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Append", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Append == nil {
-				m.Append = &Action_Append{}
-			}
-			if err := m.Append.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		case 8:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Truncate", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Truncate == nil {
-				m.Truncate = &Action_Truncate{}
-			}
-			if err := m.Truncate.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Promise)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return false
+		}
+	} else if this.Proposal != nil {
+		return false
+	} else if that1.Proposal != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Action) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Action)
+	if !ok {
+		return fmt.Errorf("that is not of type *Action")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Action but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Actionbut is not nil && this == nil")
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return fmt.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
+		}
+	} else if this.Position != nil {
+		return fmt.Errorf("this.Position == nil && that.Position != nil")
+	} else if that1.Position != nil {
+		return fmt.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
+	}
+	if this.Promised != nil && that1.Promised != nil {
+		if *this.Promised != *that1.Promised {
+			return fmt.Errorf("Promised this(%v) Not Equal that(%v)", *this.Promised, *that1.Promised)
+		}
+	} else if this.Promised != nil {
+		return fmt.Errorf("this.Promised == nil && that.Promised != nil")
+	} else if that1.Promised != nil {
+		return fmt.Errorf("Promised this(%v) Not Equal that(%v)", this.Promised, that1.Promised)
+	}
+	if this.Performed != nil && that1.Performed != nil {
+		if *this.Performed != *that1.Performed {
+			return fmt.Errorf("Performed this(%v) Not Equal that(%v)", *this.Performed, *that1.Performed)
+		}
+	} else if this.Performed != nil {
+		return fmt.Errorf("this.Performed == nil && that.Performed != nil")
+	} else if that1.Performed != nil {
+		return fmt.Errorf("Performed this(%v) Not Equal that(%v)", this.Performed, that1.Performed)
+	}
+	if this.Learned != nil && that1.Learned != nil {
+		if *this.Learned != *that1.Learned {
+			return fmt.Errorf("Learned this(%v) Not Equal that(%v)", *this.Learned, *that1.Learned)
+		}
+	} else if this.Learned != nil {
+		return fmt.Errorf("this.Learned == nil && that.Learned != nil")
+	} else if that1.Learned != nil {
+		return fmt.Errorf("Learned this(%v) Not Equal that(%v)", this.Learned, that1.Learned)
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return fmt.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
+		}
+	} else if this.Type != nil {
+		return fmt.Errorf("this.Type == nil && that.Type != nil")
+	} else if that1.Type != nil {
+		return fmt.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
+	}
+	if !this.Nop.Equal(that1.Nop) {
+		return fmt.Errorf("Nop this(%v) Not Equal that(%v)", this.Nop, that1.Nop)
+	}
+	if !this.Append.Equal(that1.Append) {
+		return fmt.Errorf("Append this(%v) Not Equal that(%v)", this.Append, that1.Append)
+	}
+	if !this.Truncate.Equal(that1.Truncate) {
+		return fmt.Errorf("Truncate this(%v) Not Equal that(%v)", this.Truncate, that1.Truncate)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *Action_Nop) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Action) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		switch fieldNum {
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Action)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return false
+		}
+	} else if this.Position != nil {
+		return false
+	} else if that1.Position != nil {
+		return false
+	}
+	if this.Promised != nil && that1.Promised != nil {
+		if *this.Promised != *that1.Promised {
+			return false
+		}
+	} else if this.Promised != nil {
+		return false
+	} else if that1.Promised != nil {
+		return false
+	}
+	if this.Performed != nil && that1.Performed != nil {
+		if *this.Performed != *that1.Performed {
+			return false
+		}
+	} else if this.Performed != nil {
+		return false
+	} else if that1.Performed != nil {
+		return false
+	}
+	if this.Learned != nil && that1.Learned != nil {
+		if *this.Learned != *that1.Learned {
+			return false
+		}
+	} else if this.Learned != nil {
+		return false
+	} else if that1.Learned != nil {
+		return false
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return false
+		}
+	} else if this.Type != nil {
+		return false
+	} else if that1.Type != nil {
+		return false
+	}
+	if !this.Nop.Equal(that1.Nop) {
+		return false
+	}
+	if !this.Append.Equal(that1.Append) {
+		return false
+	}
+	if !this.Truncate.Equal(that1.Truncate) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Action_Nop) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Action_Nop)
+	if !ok {
+		return fmt.Errorf("that is not of type *Action_Nop")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Action_Nop but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Action_Nopbut is not nil && this == nil")
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *Action_Append) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Action_Nop) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Bytes", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				byteLen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + byteLen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.Bytes = append([]byte{}, data[index:postIndex]...)
-			index = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Cksum", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				byteLen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + byteLen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.Cksum = append([]byte{}, data[index:postIndex]...)
-			index = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Action_Nop)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Action_Append) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Action_Append)
+	if !ok {
+		return fmt.Errorf("that is not of type *Action_Append")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Action_Append but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Action_Appendbut is not nil && this == nil")
+	}
+	if !bytes.Equal(this.Bytes, that1.Bytes) {
+		return fmt.Errorf("Bytes this(%v) Not Equal that(%v)", this.Bytes, that1.Bytes)
+	}
+	if !bytes.Equal(this.Cksum, that1.Cksum) {
+		return fmt.Errorf("Cksum this(%v) Not Equal that(%v)", this.Cksum, that1.Cksum)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *Action_Truncate) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Action_Append) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field To", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.To = &v
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Action_Append)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !bytes.Equal(this.Bytes, that1.Bytes) {
+		return false
+	}
+	if !bytes.Equal(this.Cksum, that1.Cksum) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Action_Truncate) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Action_Truncate)
+	if !ok {
+		return fmt.Errorf("that is not of type *Action_Truncate")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Action_Truncate but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Action_Truncatebut is not nil && this == nil")
+	}
+	if this.To != nil && that1.To != nil {
+		if *this.To != *that1.To {
+			return fmt.Errorf("To this(%v) Not Equal that(%v)", *this.To, *that1.To)
+		}
+	} else if this.To != nil {
+		return fmt.Errorf("this.To == nil && that.To != nil")
+	} else if that1.To != nil {
+		return fmt.Errorf("To this(%v) Not Equal that(%v)", this.To, that1.To)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *Metadata) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Action_Truncate) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Status", wireType)
-			}
-			var v Metadata_Status
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (Metadata_Status(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Status = &v
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Promised", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Promised = &v
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Action_Truncate)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.To != nil && that1.To != nil {
+		if *this.To != *that1.To {
+			return false
+		}
+	} else if this.To != nil {
+		return false
+	} else if that1.To != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Metadata) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Metadata)
+	if !ok {
+		return fmt.Errorf("that is not of type *Metadata")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Metadata but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Metadatabut is not nil && this == nil")
+	}
+	if this.Status != nil && that1.Status != nil {
+		if *this.Status != *that1.Status {
+			return fmt.Errorf("Status this(%v) Not Equal that(%v)", *this.Status, *that1.Status)
+		}
+	} else if this.Status != nil {
+		return fmt.Errorf("this.Status == nil && that.Status != nil")
+	} else if that1.Status != nil {
+		return fmt.Errorf("Status this(%v) Not Equal that(%v)", this.Status, that1.Status)
+	}
+	if this.Promised != nil && that1.Promised != nil {
+		if *this.Promised != *that1.Promised {
+			return fmt.Errorf("Promised this(%v) Not Equal that(%v)", *this.Promised, *that1.Promised)
+		}
+	} else if this.Promised != nil {
+		return fmt.Errorf("this.Promised == nil && that.Promised != nil")
+	} else if that1.Promised != nil {
+		return fmt.Errorf("Promised this(%v) Not Equal that(%v)", this.Promised, that1.Promised)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *Record) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Metadata) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Type", wireType)
-			}
-			var v Record_Type
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (Record_Type(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Type = &v
-		case 2:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Promise", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Promise == nil {
-				m.Promise = &Promise{}
-			}
-			if err := m.Promise.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Action", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Action == nil {
-				m.Action = &Action{}
-			}
-			if err := m.Action.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Metadata", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Metadata == nil {
-				m.Metadata = &Metadata{}
-			}
-			if err := m.Metadata.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Metadata)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Status != nil && that1.Status != nil {
+		if *this.Status != *that1.Status {
+			return false
+		}
+	} else if this.Status != nil {
+		return false
+	} else if that1.Status != nil {
+		return false
+	}
+	if this.Promised != nil && that1.Promised != nil {
+		if *this.Promised != *that1.Promised {
+			return false
+		}
+	} else if this.Promised != nil {
+		return false
+	} else if that1.Promised != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Record) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Record)
+	if !ok {
+		return fmt.Errorf("that is not of type *Record")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Record but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Recordbut is not nil && this == nil")
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return fmt.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
+		}
+	} else if this.Type != nil {
+		return fmt.Errorf("this.Type == nil && that.Type != nil")
+	} else if that1.Type != nil {
+		return fmt.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
+	}
+	if !this.Promise.Equal(that1.Promise) {
+		return fmt.Errorf("Promise this(%v) Not Equal that(%v)", this.Promise, that1.Promise)
+	}
+	if !this.Action.Equal(that1.Action) {
+		return fmt.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
+	}
+	if !this.Metadata.Equal(that1.Metadata) {
+		return fmt.Errorf("Metadata this(%v) Not Equal that(%v)", this.Metadata, that1.Metadata)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *PromiseRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *Record) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Proposal = &v
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Position", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Position = &v
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*Record)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return false
+		}
+	} else if this.Type != nil {
+		return false
+	} else if that1.Type != nil {
+		return false
+	}
+	if !this.Promise.Equal(that1.Promise) {
+		return false
+	}
+	if !this.Action.Equal(that1.Action) {
+		return false
+	}
+	if !this.Metadata.Equal(that1.Metadata) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *PromiseRequest) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*PromiseRequest)
+	if !ok {
+		return fmt.Errorf("that is not of type *PromiseRequest")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *PromiseRequest but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *PromiseRequestbut is not nil && this == nil")
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
+		}
+	} else if this.Proposal != nil {
+		return fmt.Errorf("this.Proposal == nil && that.Proposal != nil")
+	} else if that1.Proposal != nil {
+		return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return fmt.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
+		}
+	} else if this.Position != nil {
+		return fmt.Errorf("this.Position == nil && that.Position != nil")
+	} else if that1.Position != nil {
+		return fmt.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *PromiseResponse) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *PromiseRequest) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Okay", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			b := bool(v != 0)
-			m.Okay = &b
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Proposal = &v
-		case 4:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Position", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Position = &v
-		case 3:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Action", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Action == nil {
-				m.Action = &Action{}
-			}
-			if err := m.Action.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*PromiseRequest)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return false
+		}
+	} else if this.Proposal != nil {
+		return false
+	} else if that1.Proposal != nil {
+		return false
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return false
+		}
+	} else if this.Position != nil {
+		return false
+	} else if that1.Position != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *PromiseResponse) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*PromiseResponse)
+	if !ok {
+		return fmt.Errorf("that is not of type *PromiseResponse")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *PromiseResponse but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *PromiseResponsebut is not nil && this == nil")
+	}
+	if this.Okay != nil && that1.Okay != nil {
+		if *this.Okay != *that1.Okay {
+			return fmt.Errorf("Okay this(%v) Not Equal that(%v)", *this.Okay, *that1.Okay)
+		}
+	} else if this.Okay != nil {
+		return fmt.Errorf("this.Okay == nil && that.Okay != nil")
+	} else if that1.Okay != nil {
+		return fmt.Errorf("Okay this(%v) Not Equal that(%v)", this.Okay, that1.Okay)
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
+		}
+	} else if this.Proposal != nil {
+		return fmt.Errorf("this.Proposal == nil && that.Proposal != nil")
+	} else if that1.Proposal != nil {
+		return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return fmt.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
+		}
+	} else if this.Position != nil {
+		return fmt.Errorf("this.Position == nil && that.Position != nil")
+	} else if that1.Position != nil {
+		return fmt.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
+	}
+	if !this.Action.Equal(that1.Action) {
+		return fmt.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *WriteRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *PromiseResponse) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Proposal = &v
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Position", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Position = &v
-		case 3:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Learned", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			b := bool(v != 0)
-			m.Learned = &b
-		case 4:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Type", wireType)
-			}
-			var v Action_Type
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (Action_Type(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Type = &v
-		case 5:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Nop", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Nop == nil {
-				m.Nop = &Action_Nop{}
-			}
-			if err := m.Nop.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		case 6:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Append", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Append == nil {
-				m.Append = &Action_Append{}
-			}
-			if err := m.Append.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		case 7:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Truncate", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Truncate == nil {
-				m.Truncate = &Action_Truncate{}
-			}
-			if err := m.Truncate.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*PromiseResponse)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Okay != nil && that1.Okay != nil {
+		if *this.Okay != *that1.Okay {
+			return false
+		}
+	} else if this.Okay != nil {
+		return false
+	} else if that1.Okay != nil {
+		return false
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return false
+		}
+	} else if this.Proposal != nil {
+		return false
+	} else if that1.Proposal != nil {
+		return false
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return false
+		}
+	} else if this.Position != nil {
+		return false
+	} else if that1.Position != nil {
+		return false
+	}
+	if !this.Action.Equal(that1.Action) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *WriteRequest) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*WriteRequest)
+	if !ok {
+		return fmt.Errorf("that is not of type *WriteRequest")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *WriteRequest but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *WriteRequestbut is not nil && this == nil")
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
+		}
+	} else if this.Proposal != nil {
+		return fmt.Errorf("this.Proposal == nil && that.Proposal != nil")
+	} else if that1.Proposal != nil {
+		return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return fmt.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
+		}
+	} else if this.Position != nil {
+		return fmt.Errorf("this.Position == nil && that.Position != nil")
+	} else if that1.Position != nil {
+		return fmt.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
+	}
+	if this.Learned != nil && that1.Learned != nil {
+		if *this.Learned != *that1.Learned {
+			return fmt.Errorf("Learned this(%v) Not Equal that(%v)", *this.Learned, *that1.Learned)
+		}
+	} else if this.Learned != nil {
+		return fmt.Errorf("this.Learned == nil && that.Learned != nil")
+	} else if that1.Learned != nil {
+		return fmt.Errorf("Learned this(%v) Not Equal that(%v)", this.Learned, that1.Learned)
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return fmt.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
+		}
+	} else if this.Type != nil {
+		return fmt.Errorf("this.Type == nil && that.Type != nil")
+	} else if that1.Type != nil {
+		return fmt.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
+	}
+	if !this.Nop.Equal(that1.Nop) {
+		return fmt.Errorf("Nop this(%v) Not Equal that(%v)", this.Nop, that1.Nop)
+	}
+	if !this.Append.Equal(that1.Append) {
+		return fmt.Errorf("Append this(%v) Not Equal that(%v)", this.Append, that1.Append)
+	}
+	if !this.Truncate.Equal(that1.Truncate) {
+		return fmt.Errorf("Truncate this(%v) Not Equal that(%v)", this.Truncate, that1.Truncate)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *WriteResponse) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *WriteRequest) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Okay", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			b := bool(v != 0)
-			m.Okay = &b
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Proposal = &v
-		case 3:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Position", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Position = &v
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*WriteRequest)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return false
+		}
+	} else if this.Proposal != nil {
+		return false
+	} else if that1.Proposal != nil {
+		return false
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return false
+		}
+	} else if this.Position != nil {
+		return false
+	} else if that1.Position != nil {
+		return false
+	}
+	if this.Learned != nil && that1.Learned != nil {
+		if *this.Learned != *that1.Learned {
+			return false
+		}
+	} else if this.Learned != nil {
+		return false
+	} else if that1.Learned != nil {
+		return false
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return false
+		}
+	} else if this.Type != nil {
+		return false
+	} else if that1.Type != nil {
+		return false
+	}
+	if !this.Nop.Equal(that1.Nop) {
+		return false
+	}
+	if !this.Append.Equal(that1.Append) {
+		return false
+	}
+	if !this.Truncate.Equal(that1.Truncate) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *WriteResponse) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*WriteResponse)
+	if !ok {
+		return fmt.Errorf("that is not of type *WriteResponse")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *WriteResponse but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *WriteResponsebut is not nil && this == nil")
+	}
+	if this.Okay != nil && that1.Okay != nil {
+		if *this.Okay != *that1.Okay {
+			return fmt.Errorf("Okay this(%v) Not Equal that(%v)", *this.Okay, *that1.Okay)
+		}
+	} else if this.Okay != nil {
+		return fmt.Errorf("this.Okay == nil && that.Okay != nil")
+	} else if that1.Okay != nil {
+		return fmt.Errorf("Okay this(%v) Not Equal that(%v)", this.Okay, that1.Okay)
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
+		}
+	} else if this.Proposal != nil {
+		return fmt.Errorf("this.Proposal == nil && that.Proposal != nil")
+	} else if that1.Proposal != nil {
+		return fmt.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return fmt.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
+		}
+	} else if this.Position != nil {
+		return fmt.Errorf("this.Position == nil && that.Position != nil")
+	} else if that1.Position != nil {
+		return fmt.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *LearnedMessage) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *WriteResponse) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Action", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			postIndex := index + msglen
-			if postIndex > l {
-				return io1.ErrUnexpectedEOF
-			}
-			if m.Action == nil {
-				m.Action = &Action{}
-			}
-			if err := m.Action.Unmarshal(data[index:postIndex]); err != nil {
-				return err
-			}
-			index = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*WriteResponse)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Okay != nil && that1.Okay != nil {
+		if *this.Okay != *that1.Okay {
+			return false
+		}
+	} else if this.Okay != nil {
+		return false
+	} else if that1.Okay != nil {
+		return false
+	}
+	if this.Proposal != nil && that1.Proposal != nil {
+		if *this.Proposal != *that1.Proposal {
+			return false
+		}
+	} else if this.Proposal != nil {
+		return false
+	} else if that1.Proposal != nil {
+		return false
+	}
+	if this.Position != nil && that1.Position != nil {
+		if *this.Position != *that1.Position {
+			return false
+		}
+	} else if this.Position != nil {
+		return false
+	} else if that1.Position != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *LearnedMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*LearnedMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *LearnedMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *LearnedMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *LearnedMessagebut is not nil && this == nil")
+	}
+	if !this.Action.Equal(that1.Action) {
+		return fmt.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *RecoverRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *LearnedMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		switch fieldNum {
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*LearnedMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Action.Equal(that1.Action) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RecoverRequest) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RecoverRequest)
+	if !ok {
+		return fmt.Errorf("that is not of type *RecoverRequest")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RecoverRequest but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RecoverRequestbut is not nil && this == nil")
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (m *RecoverResponse) Unmarshal(data []byte) error {
-	l := len(data)
-	index := 0
-	for index < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if index >= l {
-				return io1.ErrUnexpectedEOF
-			}
-			b := data[index]
-			index++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
+func (this *RecoverRequest) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
 		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Status", wireType)
-			}
-			var v Metadata_Status
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (Metadata_Status(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Status = &v
-		case 2:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field Begin", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Begin = &v
-		case 3:
-			if wireType != 0 {
-				return fmt4.Errorf("proto: wrong wireType = %d for field End", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if index >= l {
-					return io1.ErrUnexpectedEOF
-				}
-				b := data[index]
-				index++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.End = &v
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			index -= sizeOfWire
-			skippy, err := github_com_gogo_protobuf_proto2.Skip(data[index:])
-			if err != nil {
-				return err
-			}
-			if (index + skippy) > l {
-				return io1.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
-			index += skippy
+		return false
+	}
+
+	that1, ok := that.(*RecoverRequest)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
 		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RecoverResponse) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RecoverResponse)
+	if !ok {
+		return fmt.Errorf("that is not of type *RecoverResponse")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RecoverResponse but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RecoverResponsebut is not nil && this == nil")
+	}
+	if this.Status != nil && that1.Status != nil {
+		if *this.Status != *that1.Status {
+			return fmt.Errorf("Status this(%v) Not Equal that(%v)", *this.Status, *that1.Status)
+		}
+	} else if this.Status != nil {
+		return fmt.Errorf("this.Status == nil && that.Status != nil")
+	} else if that1.Status != nil {
+		return fmt.Errorf("Status this(%v) Not Equal that(%v)", this.Status, that1.Status)
+	}
+	if this.Begin != nil && that1.Begin != nil {
+		if *this.Begin != *that1.Begin {
+			return fmt.Errorf("Begin this(%v) Not Equal that(%v)", *this.Begin, *that1.Begin)
+		}
+	} else if this.Begin != nil {
+		return fmt.Errorf("this.Begin == nil && that.Begin != nil")
+	} else if that1.Begin != nil {
+		return fmt.Errorf("Begin this(%v) Not Equal that(%v)", this.Begin, that1.Begin)
+	}
+	if this.End != nil && that1.End != nil {
+		if *this.End != *that1.End {
+			return fmt.Errorf("End this(%v) Not Equal that(%v)", *this.End, *that1.End)
+		}
+	} else if this.End != nil {
+		return fmt.Errorf("this.End == nil && that.End != nil")
+	} else if that1.End != nil {
+		return fmt.Errorf("End this(%v) Not Equal that(%v)", this.End, that1.End)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
 	return nil
 }
-func (this *Promise) String() string {
+func (this *RecoverResponse) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RecoverResponse)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Status != nil && that1.Status != nil {
+		if *this.Status != *that1.Status {
+			return false
+		}
+	} else if this.Status != nil {
+		return false
+	} else if that1.Status != nil {
+		return false
+	}
+	if this.Begin != nil && that1.Begin != nil {
+		if *this.Begin != *that1.Begin {
+			return false
+		}
+	} else if this.Begin != nil {
+		return false
+	} else if that1.Begin != nil {
+		return false
+	}
+	if this.End != nil && that1.End != nil {
+		if *this.End != *that1.End {
+			return false
+		}
+	} else if this.End != nil {
+		return false
+	} else if that1.End != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Promise) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Promise{`,
-		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.Promise{")
+	if this.Proposal != nil {
+		s = append(s, "Proposal: "+valueToGoStringLog(this.Proposal, "uint64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *Action) String() string {
+func (this *Action) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Action{`,
-		`Position:` + valueToStringLog(this.Position) + `,`,
-		`Promised:` + valueToStringLog(this.Promised) + `,`,
-		`Performed:` + valueToStringLog(this.Performed) + `,`,
-		`Learned:` + valueToStringLog(this.Learned) + `,`,
-		`Type:` + valueToStringLog(this.Type) + `,`,
-		`Nop:` + strings2.Replace(fmt5.Sprintf("%v", this.Nop), "Action_Nop", "Action_Nop", 1) + `,`,
-		`Append:` + strings2.Replace(fmt5.Sprintf("%v", this.Append), "Action_Append", "Action_Append", 1) + `,`,
-		`Truncate:` + strings2.Replace(fmt5.Sprintf("%v", this.Truncate), "Action_Truncate", "Action_Truncate", 1) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 12)
+	s = append(s, "&mesosproto.Action{")
+	if this.Position != nil {
+		s = append(s, "Position: "+valueToGoStringLog(this.Position, "uint64")+",\n")
+	}
+	if this.Promised != nil {
+		s = append(s, "Promised: "+valueToGoStringLog(this.Promised, "uint64")+",\n")
+	}
+	if this.Performed != nil {
+		s = append(s, "Performed: "+valueToGoStringLog(this.Performed, "uint64")+",\n")
+	}
+	if this.Learned != nil {
+		s = append(s, "Learned: "+valueToGoStringLog(this.Learned, "bool")+",\n")
+	}
+	if this.Type != nil {
+		s = append(s, "Type: "+valueToGoStringLog(this.Type, "mesosproto.Action_Type")+",\n")
+	}
+	if this.Nop != nil {
+		s = append(s, "Nop: "+fmt.Sprintf("%#v", this.Nop)+",\n")
+	}
+	if this.Append != nil {
+		s = append(s, "Append: "+fmt.Sprintf("%#v", this.Append)+",\n")
+	}
+	if this.Truncate != nil {
+		s = append(s, "Truncate: "+fmt.Sprintf("%#v", this.Truncate)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *Action_Nop) String() string {
+func (this *Action_Nop) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Action_Nop{`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 4)
+	s = append(s, "&mesosproto.Action_Nop{")
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *Action_Append) String() string {
+func (this *Action_Append) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Action_Append{`,
-		`Bytes:` + valueToStringLog(this.Bytes) + `,`,
-		`Cksum:` + valueToStringLog(this.Cksum) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.Action_Append{")
+	if this.Bytes != nil {
+		s = append(s, "Bytes: "+valueToGoStringLog(this.Bytes, "byte")+",\n")
+	}
+	if this.Cksum != nil {
+		s = append(s, "Cksum: "+valueToGoStringLog(this.Cksum, "byte")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *Action_Truncate) String() string {
+func (this *Action_Truncate) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Action_Truncate{`,
-		`To:` + valueToStringLog(this.To) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.Action_Truncate{")
+	if this.To != nil {
+		s = append(s, "To: "+valueToGoStringLog(this.To, "uint64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *Metadata) String() string {
+func (this *Metadata) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Metadata{`,
-		`Status:` + valueToStringLog(this.Status) + `,`,
-		`Promised:` + valueToStringLog(this.Promised) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.Metadata{")
+	if this.Status != nil {
+		s = append(s, "Status: "+valueToGoStringLog(this.Status, "mesosproto.Metadata_Status")+",\n")
+	}
+	if this.Promised != nil {
+		s = append(s, "Promised: "+valueToGoStringLog(this.Promised, "uint64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *Record) String() string {
+func (this *Record) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&Record{`,
-		`Type:` + valueToStringLog(this.Type) + `,`,
-		`Promise:` + strings2.Replace(fmt5.Sprintf("%v", this.Promise), "Promise", "Promise", 1) + `,`,
-		`Action:` + strings2.Replace(fmt5.Sprintf("%v", this.Action), "Action", "Action", 1) + `,`,
-		`Metadata:` + strings2.Replace(fmt5.Sprintf("%v", this.Metadata), "Metadata", "Metadata", 1) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.Record{")
+	if this.Type != nil {
+		s = append(s, "Type: "+valueToGoStringLog(this.Type, "mesosproto.Record_Type")+",\n")
+	}
+	if this.Promise != nil {
+		s = append(s, "Promise: "+fmt.Sprintf("%#v", this.Promise)+",\n")
+	}
+	if this.Action != nil {
+		s = append(s, "Action: "+fmt.Sprintf("%#v", this.Action)+",\n")
+	}
+	if this.Metadata != nil {
+		s = append(s, "Metadata: "+fmt.Sprintf("%#v", this.Metadata)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *PromiseRequest) String() string {
+func (this *PromiseRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&PromiseRequest{`,
-		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
-		`Position:` + valueToStringLog(this.Position) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.PromiseRequest{")
+	if this.Proposal != nil {
+		s = append(s, "Proposal: "+valueToGoStringLog(this.Proposal, "uint64")+",\n")
+	}
+	if this.Position != nil {
+		s = append(s, "Position: "+valueToGoStringLog(this.Position, "uint64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *PromiseResponse) String() string {
+func (this *PromiseResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&PromiseResponse{`,
-		`Okay:` + valueToStringLog(this.Okay) + `,`,
-		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
-		`Position:` + valueToStringLog(this.Position) + `,`,
-		`Action:` + strings2.Replace(fmt5.Sprintf("%v", this.Action), "Action", "Action", 1) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.PromiseResponse{")
+	if this.Okay != nil {
+		s = append(s, "Okay: "+valueToGoStringLog(this.Okay, "bool")+",\n")
+	}
+	if this.Proposal != nil {
+		s = append(s, "Proposal: "+valueToGoStringLog(this.Proposal, "uint64")+",\n")
+	}
+	if this.Position != nil {
+		s = append(s, "Position: "+valueToGoStringLog(this.Position, "uint64")+",\n")
+	}
+	if this.Action != nil {
+		s = append(s, "Action: "+fmt.Sprintf("%#v", this.Action)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *WriteRequest) String() string {
+func (this *WriteRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&WriteRequest{`,
-		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
-		`Position:` + valueToStringLog(this.Position) + `,`,
-		`Learned:` + valueToStringLog(this.Learned) + `,`,
-		`Type:` + valueToStringLog(this.Type) + `,`,
-		`Nop:` + strings2.Replace(fmt5.Sprintf("%v", this.Nop), "Action_Nop", "Action_Nop", 1) + `,`,
-		`Append:` + strings2.Replace(fmt5.Sprintf("%v", this.Append), "Action_Append", "Action_Append", 1) + `,`,
-		`Truncate:` + strings2.Replace(fmt5.Sprintf("%v", this.Truncate), "Action_Truncate", "Action_Truncate", 1) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 11)
+	s = append(s, "&mesosproto.WriteRequest{")
+	if this.Proposal != nil {
+		s = append(s, "Proposal: "+valueToGoStringLog(this.Proposal, "uint64")+",\n")
+	}
+	if this.Position != nil {
+		s = append(s, "Position: "+valueToGoStringLog(this.Position, "uint64")+",\n")
+	}
+	if this.Learned != nil {
+		s = append(s, "Learned: "+valueToGoStringLog(this.Learned, "bool")+",\n")
+	}
+	if this.Type != nil {
+		s = append(s, "Type: "+valueToGoStringLog(this.Type, "mesosproto.Action_Type")+",\n")
+	}
+	if this.Nop != nil {
+		s = append(s, "Nop: "+fmt.Sprintf("%#v", this.Nop)+",\n")
+	}
+	if this.Append != nil {
+		s = append(s, "Append: "+fmt.Sprintf("%#v", this.Append)+",\n")
+	}
+	if this.Truncate != nil {
+		s = append(s, "Truncate: "+fmt.Sprintf("%#v", this.Truncate)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *WriteResponse) String() string {
+func (this *WriteResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&WriteResponse{`,
-		`Okay:` + valueToStringLog(this.Okay) + `,`,
-		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
-		`Position:` + valueToStringLog(this.Position) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.WriteResponse{")
+	if this.Okay != nil {
+		s = append(s, "Okay: "+valueToGoStringLog(this.Okay, "bool")+",\n")
+	}
+	if this.Proposal != nil {
+		s = append(s, "Proposal: "+valueToGoStringLog(this.Proposal, "uint64")+",\n")
+	}
+	if this.Position != nil {
+		s = append(s, "Position: "+valueToGoStringLog(this.Position, "uint64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *LearnedMessage) String() string {
+func (this *LearnedMessage) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&LearnedMessage{`,
-		`Action:` + strings2.Replace(fmt5.Sprintf("%v", this.Action), "Action", "Action", 1) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.LearnedMessage{")
+	if this.Action != nil {
+		s = append(s, "Action: "+fmt.Sprintf("%#v", this.Action)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *RecoverRequest) String() string {
+func (this *RecoverRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&RecoverRequest{`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 4)
+	s = append(s, "&mesosproto.RecoverRequest{")
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *RecoverResponse) String() string {
+func (this *RecoverResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings2.Join([]string{`&RecoverResponse{`,
-		`Status:` + valueToStringLog(this.Status) + `,`,
-		`Begin:` + valueToStringLog(this.Begin) + `,`,
-		`End:` + valueToStringLog(this.End) + `,`,
-		`XXX_unrecognized:` + fmt5.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.RecoverResponse{")
+	if this.Status != nil {
+		s = append(s, "Status: "+valueToGoStringLog(this.Status, "mesosproto.Metadata_Status")+",\n")
+	}
+	if this.Begin != nil {
+		s = append(s, "Begin: "+valueToGoStringLog(this.Begin, "uint64")+",\n")
+	}
+	if this.End != nil {
+		s = append(s, "End: "+valueToGoStringLog(this.End, "uint64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func valueToStringLog(v interface{}) string {
-	rv := reflect2.ValueOf(v)
+func valueToGoStringLog(v interface{}, typ string) string {
+	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
 		return "nil"
 	}
-	pv := reflect2.Indirect(rv).Interface()
-	return fmt5.Sprintf("*%v", pv)
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
+}
+func extensionToGoStringLog(e map[int32]github_com_gogo_protobuf_proto.Extension) string {
+	if e == nil {
+		return "nil"
+	}
+	s := "map[int32]proto.Extension{"
+	keys := make([]int, 0, len(e))
+	for k := range e {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	ss := []string{}
+	for _, k := range keys {
+		ss = append(ss, strconv.Itoa(k)+": "+e[int32(k)].GoString())
+	}
+	s += strings.Join(ss, ",") + "}"
+	return s
+}
+func (m *Promise) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Promise) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Proposal == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Proposal))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Action) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Action) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Position == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("position")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Position))
+	}
+	if m.Promised == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("promised")
+	} else {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Promised))
+	}
+	if m.Performed != nil {
+		data[i] = 0x18
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Performed))
+	}
+	if m.Learned != nil {
+		data[i] = 0x20
+		i++
+		if *m.Learned {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.Type != nil {
+		data[i] = 0x28
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Type))
+	}
+	if m.Nop != nil {
+		data[i] = 0x32
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Nop.Size()))
+		n1, err := m.Nop.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
+	if m.Append != nil {
+		data[i] = 0x3a
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Append.Size()))
+		n2, err := m.Append.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
+	if m.Truncate != nil {
+		data[i] = 0x42
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Truncate.Size()))
+		n3, err := m.Truncate.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n3
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Action_Nop) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Action_Nop) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Action_Append) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Action_Append) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Bytes == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("bytes")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintLog(data, i, uint64(len(m.Bytes)))
+		i += copy(data[i:], m.Bytes)
+	}
+	if m.Cksum != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintLog(data, i, uint64(len(m.Cksum)))
+		i += copy(data[i:], m.Cksum)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Action_Truncate) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Action_Truncate) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.To == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("to")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.To))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Metadata) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Metadata) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Status == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Status))
+	}
+	if m.Promised == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("promised")
+	} else {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Promised))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Record) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Record) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Type == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Type))
+	}
+	if m.Promise != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Promise.Size()))
+		n4, err := m.Promise.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n4
+	}
+	if m.Action != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Action.Size()))
+		n5, err := m.Action.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	if m.Metadata != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Metadata.Size()))
+		n6, err := m.Metadata.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n6
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *PromiseRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PromiseRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Proposal == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Proposal))
+	}
+	if m.Position != nil {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Position))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *PromiseResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PromiseResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Okay == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("okay")
+	} else {
+		data[i] = 0x8
+		i++
+		if *m.Okay {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.Proposal == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	} else {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Proposal))
+	}
+	if m.Action != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Action.Size()))
+		n7, err := m.Action.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n7
+	}
+	if m.Position != nil {
+		data[i] = 0x20
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Position))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *WriteRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *WriteRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Proposal == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Proposal))
+	}
+	if m.Position == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("position")
+	} else {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Position))
+	}
+	if m.Learned != nil {
+		data[i] = 0x18
+		i++
+		if *m.Learned {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.Type == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
+	} else {
+		data[i] = 0x20
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Type))
+	}
+	if m.Nop != nil {
+		data[i] = 0x2a
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Nop.Size()))
+		n8, err := m.Nop.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n8
+	}
+	if m.Append != nil {
+		data[i] = 0x32
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Append.Size()))
+		n9, err := m.Append.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n9
+	}
+	if m.Truncate != nil {
+		data[i] = 0x3a
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Truncate.Size()))
+		n10, err := m.Truncate.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n10
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *WriteResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *WriteResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Okay == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("okay")
+	} else {
+		data[i] = 0x8
+		i++
+		if *m.Okay {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.Proposal == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	} else {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Proposal))
+	}
+	if m.Position == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("position")
+	} else {
+		data[i] = 0x18
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Position))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *LearnedMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *LearnedMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Action == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("action")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintLog(data, i, uint64(m.Action.Size()))
+		n11, err := m.Action.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n11
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RecoverRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RecoverRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RecoverResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RecoverResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Status == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Status))
+	}
+	if m.Begin != nil {
+		data[i] = 0x10
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.Begin))
+	}
+	if m.End != nil {
+		data[i] = 0x18
+		i++
+		i = encodeVarintLog(data, i, uint64(*m.End))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func encodeFixed64Log(data []byte, offset int, v uint64) int {
+	data[offset] = uint8(v)
+	data[offset+1] = uint8(v >> 8)
+	data[offset+2] = uint8(v >> 16)
+	data[offset+3] = uint8(v >> 24)
+	data[offset+4] = uint8(v >> 32)
+	data[offset+5] = uint8(v >> 40)
+	data[offset+6] = uint8(v >> 48)
+	data[offset+7] = uint8(v >> 56)
+	return offset + 8
+}
+func encodeFixed32Log(data []byte, offset int, v uint32) int {
+	data[offset] = uint8(v)
+	data[offset+1] = uint8(v >> 8)
+	data[offset+2] = uint8(v >> 16)
+	data[offset+3] = uint8(v >> 24)
+	return offset + 4
+}
+func encodeVarintLog(data []byte, offset int, v uint64) int {
+	for v >= 1<<7 {
+		data[offset] = uint8(v&0x7f | 0x80)
+		v >>= 7
+		offset++
+	}
+	data[offset] = uint8(v)
+	return offset + 1
+}
+func NewPopulatedPromise(r randyLog, easy bool) *Promise {
+	this := &Promise{}
+	v1 := uint64(uint64(r.Uint32()))
+	this.Proposal = &v1
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedAction(r randyLog, easy bool) *Action {
+	this := &Action{}
+	v2 := uint64(uint64(r.Uint32()))
+	this.Position = &v2
+	v3 := uint64(uint64(r.Uint32()))
+	this.Promised = &v3
+	if r.Intn(10) != 0 {
+		v4 := uint64(uint64(r.Uint32()))
+		this.Performed = &v4
+	}
+	if r.Intn(10) != 0 {
+		v5 := bool(bool(r.Intn(2) == 0))
+		this.Learned = &v5
+	}
+	if r.Intn(10) != 0 {
+		v6 := Action_Type([]int32{1, 2, 3}[r.Intn(3)])
+		this.Type = &v6
+	}
+	if r.Intn(10) != 0 {
+		this.Nop = NewPopulatedAction_Nop(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Append = NewPopulatedAction_Append(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Truncate = NewPopulatedAction_Truncate(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 9)
+	}
+	return this
+}
+
+func NewPopulatedAction_Nop(r randyLog, easy bool) *Action_Nop {
+	this := &Action_Nop{}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 1)
+	}
+	return this
+}
+
+func NewPopulatedAction_Append(r randyLog, easy bool) *Action_Append {
+	this := &Action_Append{}
+	v7 := r.Intn(100)
+	this.Bytes = make([]byte, v7)
+	for i := 0; i < v7; i++ {
+		this.Bytes[i] = byte(r.Intn(256))
+	}
+	if r.Intn(10) != 0 {
+		v8 := r.Intn(100)
+		this.Cksum = make([]byte, v8)
+		for i := 0; i < v8; i++ {
+			this.Cksum[i] = byte(r.Intn(256))
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedAction_Truncate(r randyLog, easy bool) *Action_Truncate {
+	this := &Action_Truncate{}
+	v9 := uint64(uint64(r.Uint32()))
+	this.To = &v9
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedMetadata(r randyLog, easy bool) *Metadata {
+	this := &Metadata{}
+	v10 := Metadata_Status([]int32{1, 2, 3, 4}[r.Intn(4)])
+	this.Status = &v10
+	v11 := uint64(uint64(r.Uint32()))
+	this.Promised = &v11
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedRecord(r randyLog, easy bool) *Record {
+	this := &Record{}
+	v12 := Record_Type([]int32{1, 2, 3}[r.Intn(3)])
+	this.Type = &v12
+	if r.Intn(10) != 0 {
+		this.Promise = NewPopulatedPromise(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Action = NewPopulatedAction(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Metadata = NewPopulatedMetadata(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedPromiseRequest(r randyLog, easy bool) *PromiseRequest {
+	this := &PromiseRequest{}
+	v13 := uint64(uint64(r.Uint32()))
+	this.Proposal = &v13
+	if r.Intn(10) != 0 {
+		v14 := uint64(uint64(r.Uint32()))
+		this.Position = &v14
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedPromiseResponse(r randyLog, easy bool) *PromiseResponse {
+	this := &PromiseResponse{}
+	v15 := bool(bool(r.Intn(2) == 0))
+	this.Okay = &v15
+	v16 := uint64(uint64(r.Uint32()))
+	this.Proposal = &v16
+	if r.Intn(10) != 0 {
+		this.Action = NewPopulatedAction(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		v17 := uint64(uint64(r.Uint32()))
+		this.Position = &v17
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedWriteRequest(r randyLog, easy bool) *WriteRequest {
+	this := &WriteRequest{}
+	v18 := uint64(uint64(r.Uint32()))
+	this.Proposal = &v18
+	v19 := uint64(uint64(r.Uint32()))
+	this.Position = &v19
+	if r.Intn(10) != 0 {
+		v20 := bool(bool(r.Intn(2) == 0))
+		this.Learned = &v20
+	}
+	v21 := Action_Type([]int32{1, 2, 3}[r.Intn(3)])
+	this.Type = &v21
+	if r.Intn(10) != 0 {
+		this.Nop = NewPopulatedAction_Nop(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Append = NewPopulatedAction_Append(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Truncate = NewPopulatedAction_Truncate(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 8)
+	}
+	return this
+}
+
+func NewPopulatedWriteResponse(r randyLog, easy bool) *WriteResponse {
+	this := &WriteResponse{}
+	v22 := bool(bool(r.Intn(2) == 0))
+	this.Okay = &v22
+	v23 := uint64(uint64(r.Uint32()))
+	this.Proposal = &v23
+	v24 := uint64(uint64(r.Uint32()))
+	this.Position = &v24
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 4)
+	}
+	return this
+}
+
+func NewPopulatedLearnedMessage(r randyLog, easy bool) *LearnedMessage {
+	this := &LearnedMessage{}
+	this.Action = NewPopulatedAction(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedRecoverRequest(r randyLog, easy bool) *RecoverRequest {
+	this := &RecoverRequest{}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 1)
+	}
+	return this
+}
+
+func NewPopulatedRecoverResponse(r randyLog, easy bool) *RecoverResponse {
+	this := &RecoverResponse{}
+	v25 := Metadata_Status([]int32{1, 2, 3, 4}[r.Intn(4)])
+	this.Status = &v25
+	if r.Intn(10) != 0 {
+		v26 := uint64(uint64(r.Uint32()))
+		this.Begin = &v26
+	}
+	if r.Intn(10) != 0 {
+		v27 := uint64(uint64(r.Uint32()))
+		this.End = &v27
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedLog(r, 4)
+	}
+	return this
+}
+
+type randyLog interface {
+	Float32() float32
+	Float64() float64
+	Int63() int64
+	Int31() int32
+	Uint32() uint32
+	Intn(n int) int
+}
+
+func randUTF8RuneLog(r randyLog) rune {
+	ru := r.Intn(62)
+	if ru < 10 {
+		return rune(ru + 48)
+	} else if ru < 36 {
+		return rune(ru + 55)
+	}
+	return rune(ru + 61)
+}
+func randStringLog(r randyLog) string {
+	v28 := r.Intn(100)
+	tmps := make([]rune, v28)
+	for i := 0; i < v28; i++ {
+		tmps[i] = randUTF8RuneLog(r)
+	}
+	return string(tmps)
+}
+func randUnrecognizedLog(r randyLog, maxFieldNumber int) (data []byte) {
+	l := r.Intn(5)
+	for i := 0; i < l; i++ {
+		wire := r.Intn(4)
+		if wire == 3 {
+			wire = 5
+		}
+		fieldNumber := maxFieldNumber + r.Intn(100)
+		data = randFieldLog(data, r, fieldNumber, wire)
+	}
+	return data
+}
+func randFieldLog(data []byte, r randyLog, fieldNumber int, wire int) []byte {
+	key := uint32(fieldNumber)<<3 | uint32(wire)
+	switch wire {
+	case 0:
+		data = encodeVarintPopulateLog(data, uint64(key))
+		v29 := r.Int63()
+		if r.Intn(2) == 0 {
+			v29 *= -1
+		}
+		data = encodeVarintPopulateLog(data, uint64(v29))
+	case 1:
+		data = encodeVarintPopulateLog(data, uint64(key))
+		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	case 2:
+		data = encodeVarintPopulateLog(data, uint64(key))
+		ll := r.Intn(100)
+		data = encodeVarintPopulateLog(data, uint64(ll))
+		for j := 0; j < ll; j++ {
+			data = append(data, byte(r.Intn(256)))
+		}
+	default:
+		data = encodeVarintPopulateLog(data, uint64(key))
+		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	}
+	return data
+}
+func encodeVarintPopulateLog(data []byte, v uint64) []byte {
+	for v >= 1<<7 {
+		data = append(data, uint8(uint64(v)&0x7f|0x80))
+		v >>= 7
+	}
+	data = append(data, uint8(v))
+	return data
 }
 func (m *Promise) Size() (n int) {
 	var l int
@@ -2305,12 +3211,12 @@ func (m *PromiseResponse) Size() (n int) {
 	if m.Proposal != nil {
 		n += 1 + sovLog(uint64(*m.Proposal))
 	}
-	if m.Position != nil {
-		n += 1 + sovLog(uint64(*m.Position))
-	}
 	if m.Action != nil {
 		l = m.Action.Size()
 		n += 1 + l + sovLog(uint64(l))
+	}
+	if m.Position != nil {
+		n += 1 + sovLog(uint64(*m.Position))
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -2422,2285 +3328,1819 @@ func sovLog(x uint64) (n int) {
 func sozLog(x uint64) (n int) {
 	return sovLog(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func NewPopulatedPromise(r randyLog, easy bool) *Promise {
-	this := &Promise{}
-	v1 := uint64(r.Uint32())
-	this.Proposal = &v1
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 2)
-	}
-	return this
-}
-
-func NewPopulatedAction(r randyLog, easy bool) *Action {
-	this := &Action{}
-	v2 := uint64(r.Uint32())
-	this.Position = &v2
-	v3 := uint64(r.Uint32())
-	this.Promised = &v3
-	if r.Intn(10) != 0 {
-		v4 := uint64(r.Uint32())
-		this.Performed = &v4
-	}
-	if r.Intn(10) != 0 {
-		v5 := bool(r.Intn(2) == 0)
-		this.Learned = &v5
-	}
-	if r.Intn(10) != 0 {
-		v6 := Action_Type([]int32{1, 2, 3}[r.Intn(3)])
-		this.Type = &v6
-	}
-	if r.Intn(10) != 0 {
-		this.Nop = NewPopulatedAction_Nop(r, easy)
-	}
-	if r.Intn(10) != 0 {
-		this.Append = NewPopulatedAction_Append(r, easy)
-	}
-	if r.Intn(10) != 0 {
-		this.Truncate = NewPopulatedAction_Truncate(r, easy)
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 9)
-	}
-	return this
-}
-
-func NewPopulatedAction_Nop(r randyLog, easy bool) *Action_Nop {
-	this := &Action_Nop{}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 1)
-	}
-	return this
-}
-
-func NewPopulatedAction_Append(r randyLog, easy bool) *Action_Append {
-	this := &Action_Append{}
-	v7 := r.Intn(100)
-	this.Bytes = make([]byte, v7)
-	for i := 0; i < v7; i++ {
-		this.Bytes[i] = byte(r.Intn(256))
-	}
-	if r.Intn(10) != 0 {
-		v8 := r.Intn(100)
-		this.Cksum = make([]byte, v8)
-		for i := 0; i < v8; i++ {
-			this.Cksum[i] = byte(r.Intn(256))
-		}
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 3)
-	}
-	return this
-}
-
-func NewPopulatedAction_Truncate(r randyLog, easy bool) *Action_Truncate {
-	this := &Action_Truncate{}
-	v9 := uint64(r.Uint32())
-	this.To = &v9
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 2)
-	}
-	return this
-}
-
-func NewPopulatedMetadata(r randyLog, easy bool) *Metadata {
-	this := &Metadata{}
-	v10 := Metadata_Status([]int32{1, 2, 3, 4}[r.Intn(4)])
-	this.Status = &v10
-	v11 := uint64(r.Uint32())
-	this.Promised = &v11
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 3)
-	}
-	return this
-}
-
-func NewPopulatedRecord(r randyLog, easy bool) *Record {
-	this := &Record{}
-	v12 := Record_Type([]int32{1, 2, 3}[r.Intn(3)])
-	this.Type = &v12
-	if r.Intn(10) != 0 {
-		this.Promise = NewPopulatedPromise(r, easy)
-	}
-	if r.Intn(10) != 0 {
-		this.Action = NewPopulatedAction(r, easy)
-	}
-	if r.Intn(10) != 0 {
-		this.Metadata = NewPopulatedMetadata(r, easy)
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 5)
-	}
-	return this
-}
-
-func NewPopulatedPromiseRequest(r randyLog, easy bool) *PromiseRequest {
-	this := &PromiseRequest{}
-	v13 := uint64(r.Uint32())
-	this.Proposal = &v13
-	if r.Intn(10) != 0 {
-		v14 := uint64(r.Uint32())
-		this.Position = &v14
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 3)
-	}
-	return this
-}
-
-func NewPopulatedPromiseResponse(r randyLog, easy bool) *PromiseResponse {
-	this := &PromiseResponse{}
-	v15 := bool(r.Intn(2) == 0)
-	this.Okay = &v15
-	v16 := uint64(r.Uint32())
-	this.Proposal = &v16
-	if r.Intn(10) != 0 {
-		v17 := uint64(r.Uint32())
-		this.Position = &v17
-	}
-	if r.Intn(10) != 0 {
-		this.Action = NewPopulatedAction(r, easy)
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 5)
-	}
-	return this
-}
-
-func NewPopulatedWriteRequest(r randyLog, easy bool) *WriteRequest {
-	this := &WriteRequest{}
-	v18 := uint64(r.Uint32())
-	this.Proposal = &v18
-	v19 := uint64(r.Uint32())
-	this.Position = &v19
-	if r.Intn(10) != 0 {
-		v20 := bool(r.Intn(2) == 0)
-		this.Learned = &v20
-	}
-	v21 := Action_Type([]int32{1, 2, 3}[r.Intn(3)])
-	this.Type = &v21
-	if r.Intn(10) != 0 {
-		this.Nop = NewPopulatedAction_Nop(r, easy)
-	}
-	if r.Intn(10) != 0 {
-		this.Append = NewPopulatedAction_Append(r, easy)
-	}
-	if r.Intn(10) != 0 {
-		this.Truncate = NewPopulatedAction_Truncate(r, easy)
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 8)
-	}
-	return this
-}
-
-func NewPopulatedWriteResponse(r randyLog, easy bool) *WriteResponse {
-	this := &WriteResponse{}
-	v22 := bool(r.Intn(2) == 0)
-	this.Okay = &v22
-	v23 := uint64(r.Uint32())
-	this.Proposal = &v23
-	v24 := uint64(r.Uint32())
-	this.Position = &v24
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 4)
-	}
-	return this
-}
-
-func NewPopulatedLearnedMessage(r randyLog, easy bool) *LearnedMessage {
-	this := &LearnedMessage{}
-	this.Action = NewPopulatedAction(r, easy)
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 2)
-	}
-	return this
-}
-
-func NewPopulatedRecoverRequest(r randyLog, easy bool) *RecoverRequest {
-	this := &RecoverRequest{}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 1)
-	}
-	return this
-}
-
-func NewPopulatedRecoverResponse(r randyLog, easy bool) *RecoverResponse {
-	this := &RecoverResponse{}
-	v25 := Metadata_Status([]int32{1, 2, 3, 4}[r.Intn(4)])
-	this.Status = &v25
-	if r.Intn(10) != 0 {
-		v26 := uint64(r.Uint32())
-		this.Begin = &v26
-	}
-	if r.Intn(10) != 0 {
-		v27 := uint64(r.Uint32())
-		this.End = &v27
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedLog(r, 4)
-	}
-	return this
-}
-
-type randyLog interface {
-	Float32() float32
-	Float64() float64
-	Int63() int64
-	Int31() int32
-	Uint32() uint32
-	Intn(n int) int
-}
-
-func randUTF8RuneLog(r randyLog) rune {
-	res := rune(r.Uint32() % 1112064)
-	if 55296 <= res {
-		res += 2047
-	}
-	return res
-}
-func randStringLog(r randyLog) string {
-	v28 := r.Intn(100)
-	tmps := make([]rune, v28)
-	for i := 0; i < v28; i++ {
-		tmps[i] = randUTF8RuneLog(r)
-	}
-	return string(tmps)
-}
-func randUnrecognizedLog(r randyLog, maxFieldNumber int) (data []byte) {
-	l := r.Intn(5)
-	for i := 0; i < l; i++ {
-		wire := r.Intn(4)
-		if wire == 3 {
-			wire = 5
-		}
-		fieldNumber := maxFieldNumber + r.Intn(100)
-		data = randFieldLog(data, r, fieldNumber, wire)
-	}
-	return data
-}
-func randFieldLog(data []byte, r randyLog, fieldNumber int, wire int) []byte {
-	key := uint32(fieldNumber)<<3 | uint32(wire)
-	switch wire {
-	case 0:
-		data = encodeVarintPopulateLog(data, uint64(key))
-		v29 := r.Int63()
-		if r.Intn(2) == 0 {
-			v29 *= -1
-		}
-		data = encodeVarintPopulateLog(data, uint64(v29))
-	case 1:
-		data = encodeVarintPopulateLog(data, uint64(key))
-		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
-	case 2:
-		data = encodeVarintPopulateLog(data, uint64(key))
-		ll := r.Intn(100)
-		data = encodeVarintPopulateLog(data, uint64(ll))
-		for j := 0; j < ll; j++ {
-			data = append(data, byte(r.Intn(256)))
-		}
-	default:
-		data = encodeVarintPopulateLog(data, uint64(key))
-		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
-	}
-	return data
-}
-func encodeVarintPopulateLog(data []byte, v uint64) []byte {
-	for v >= 1<<7 {
-		data = append(data, uint8(uint64(v)&0x7f|0x80))
-		v >>= 7
-	}
-	data = append(data, uint8(v))
-	return data
-}
-func (m *Promise) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Promise) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Proposal != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Proposal))
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Action) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Action) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Position != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Position))
-	}
-	if m.Promised != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Promised))
-	}
-	if m.Performed != nil {
-		data[i] = 0x18
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Performed))
-	}
-	if m.Learned != nil {
-		data[i] = 0x20
-		i++
-		if *m.Learned {
-			data[i] = 1
-		} else {
-			data[i] = 0
-		}
-		i++
-	}
-	if m.Type != nil {
-		data[i] = 0x28
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Type))
-	}
-	if m.Nop != nil {
-		data[i] = 0x32
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Nop.Size()))
-		n1, err := m.Nop.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n1
-	}
-	if m.Append != nil {
-		data[i] = 0x3a
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Append.Size()))
-		n2, err := m.Append.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n2
-	}
-	if m.Truncate != nil {
-		data[i] = 0x42
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Truncate.Size()))
-		n3, err := m.Truncate.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n3
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Action_Nop) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Action_Nop) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Action_Append) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Action_Append) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Bytes != nil {
-		data[i] = 0xa
-		i++
-		i = encodeVarintLog(data, i, uint64(len(m.Bytes)))
-		i += copy(data[i:], m.Bytes)
-	}
-	if m.Cksum != nil {
-		data[i] = 0x12
-		i++
-		i = encodeVarintLog(data, i, uint64(len(m.Cksum)))
-		i += copy(data[i:], m.Cksum)
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Action_Truncate) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Action_Truncate) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.To != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.To))
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Metadata) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Metadata) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Status != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Status))
-	}
-	if m.Promised != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Promised))
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Record) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *Record) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Type != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Type))
-	}
-	if m.Promise != nil {
-		data[i] = 0x12
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Promise.Size()))
-		n4, err := m.Promise.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n4
-	}
-	if m.Action != nil {
-		data[i] = 0x1a
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Action.Size()))
-		n5, err := m.Action.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n5
-	}
-	if m.Metadata != nil {
-		data[i] = 0x22
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Metadata.Size()))
-		n6, err := m.Metadata.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n6
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *PromiseRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *PromiseRequest) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Proposal != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Proposal))
-	}
-	if m.Position != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Position))
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *PromiseResponse) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *PromiseResponse) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Okay != nil {
-		data[i] = 0x8
-		i++
-		if *m.Okay {
-			data[i] = 1
-		} else {
-			data[i] = 0
-		}
-		i++
-	}
-	if m.Proposal != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Proposal))
-	}
-	if m.Position != nil {
-		data[i] = 0x20
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Position))
-	}
-	if m.Action != nil {
-		data[i] = 0x1a
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Action.Size()))
-		n7, err := m.Action.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n7
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *WriteRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *WriteRequest) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Proposal != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Proposal))
-	}
-	if m.Position != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Position))
-	}
-	if m.Learned != nil {
-		data[i] = 0x18
-		i++
-		if *m.Learned {
-			data[i] = 1
-		} else {
-			data[i] = 0
-		}
-		i++
-	}
-	if m.Type != nil {
-		data[i] = 0x20
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Type))
-	}
-	if m.Nop != nil {
-		data[i] = 0x2a
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Nop.Size()))
-		n8, err := m.Nop.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n8
-	}
-	if m.Append != nil {
-		data[i] = 0x32
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Append.Size()))
-		n9, err := m.Append.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n9
-	}
-	if m.Truncate != nil {
-		data[i] = 0x3a
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Truncate.Size()))
-		n10, err := m.Truncate.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n10
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *WriteResponse) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *WriteResponse) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Okay != nil {
-		data[i] = 0x8
-		i++
-		if *m.Okay {
-			data[i] = 1
-		} else {
-			data[i] = 0
-		}
-		i++
-	}
-	if m.Proposal != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Proposal))
-	}
-	if m.Position != nil {
-		data[i] = 0x18
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Position))
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *LearnedMessage) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *LearnedMessage) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Action != nil {
-		data[i] = 0xa
-		i++
-		i = encodeVarintLog(data, i, uint64(m.Action.Size()))
-		n11, err := m.Action.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n11
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *RecoverRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *RecoverRequest) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *RecoverResponse) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *RecoverResponse) MarshalTo(data []byte) (n int, err error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Status != nil {
-		data[i] = 0x8
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Status))
-	}
-	if m.Begin != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.Begin))
-	}
-	if m.End != nil {
-		data[i] = 0x18
-		i++
-		i = encodeVarintLog(data, i, uint64(*m.End))
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func encodeFixed64Log(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
-	return offset + 8
-}
-func encodeFixed32Log(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	return offset + 4
-}
-func encodeVarintLog(data []byte, offset int, v uint64) int {
-	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
-		v >>= 7
-		offset++
-	}
-	data[offset] = uint8(v)
-	return offset + 1
-}
-func (this *Promise) GoString() string {
+func (this *Promise) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Promise{` +
-		`Proposal:` + valueToGoStringLog(this.Proposal, "uint64"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Promise{`,
+		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *Action) GoString() string {
+func (this *Action) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Action{` +
-		`Position:` + valueToGoStringLog(this.Position, "uint64"),
-		`Promised:` + valueToGoStringLog(this.Promised, "uint64"),
-		`Performed:` + valueToGoStringLog(this.Performed, "uint64"),
-		`Learned:` + valueToGoStringLog(this.Learned, "bool"),
-		`Type:` + valueToGoStringLog(this.Type, "mesosproto.Action_Type"),
-		`Nop:` + fmt6.Sprintf("%#v", this.Nop),
-		`Append:` + fmt6.Sprintf("%#v", this.Append),
-		`Truncate:` + fmt6.Sprintf("%#v", this.Truncate),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Action{`,
+		`Position:` + valueToStringLog(this.Position) + `,`,
+		`Promised:` + valueToStringLog(this.Promised) + `,`,
+		`Performed:` + valueToStringLog(this.Performed) + `,`,
+		`Learned:` + valueToStringLog(this.Learned) + `,`,
+		`Type:` + valueToStringLog(this.Type) + `,`,
+		`Nop:` + strings.Replace(fmt.Sprintf("%v", this.Nop), "Action_Nop", "Action_Nop", 1) + `,`,
+		`Append:` + strings.Replace(fmt.Sprintf("%v", this.Append), "Action_Append", "Action_Append", 1) + `,`,
+		`Truncate:` + strings.Replace(fmt.Sprintf("%v", this.Truncate), "Action_Truncate", "Action_Truncate", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *Action_Nop) GoString() string {
+func (this *Action_Nop) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Action_Nop{` +
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Action_Nop{`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *Action_Append) GoString() string {
+func (this *Action_Append) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Action_Append{` +
-		`Bytes:` + valueToGoStringLog(this.Bytes, "byte"),
-		`Cksum:` + valueToGoStringLog(this.Cksum, "byte"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Action_Append{`,
+		`Bytes:` + valueToStringLog(this.Bytes) + `,`,
+		`Cksum:` + valueToStringLog(this.Cksum) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *Action_Truncate) GoString() string {
+func (this *Action_Truncate) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Action_Truncate{` +
-		`To:` + valueToGoStringLog(this.To, "uint64"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Action_Truncate{`,
+		`To:` + valueToStringLog(this.To) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *Metadata) GoString() string {
+func (this *Metadata) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Metadata{` +
-		`Status:` + valueToGoStringLog(this.Status, "mesosproto.Metadata_Status"),
-		`Promised:` + valueToGoStringLog(this.Promised, "uint64"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Metadata{`,
+		`Status:` + valueToStringLog(this.Status) + `,`,
+		`Promised:` + valueToStringLog(this.Promised) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *Record) GoString() string {
+func (this *Record) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.Record{` +
-		`Type:` + valueToGoStringLog(this.Type, "mesosproto.Record_Type"),
-		`Promise:` + fmt6.Sprintf("%#v", this.Promise),
-		`Action:` + fmt6.Sprintf("%#v", this.Action),
-		`Metadata:` + fmt6.Sprintf("%#v", this.Metadata),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&Record{`,
+		`Type:` + valueToStringLog(this.Type) + `,`,
+		`Promise:` + strings.Replace(fmt.Sprintf("%v", this.Promise), "Promise", "Promise", 1) + `,`,
+		`Action:` + strings.Replace(fmt.Sprintf("%v", this.Action), "Action", "Action", 1) + `,`,
+		`Metadata:` + strings.Replace(fmt.Sprintf("%v", this.Metadata), "Metadata", "Metadata", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *PromiseRequest) GoString() string {
+func (this *PromiseRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.PromiseRequest{` +
-		`Proposal:` + valueToGoStringLog(this.Proposal, "uint64"),
-		`Position:` + valueToGoStringLog(this.Position, "uint64"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&PromiseRequest{`,
+		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
+		`Position:` + valueToStringLog(this.Position) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *PromiseResponse) GoString() string {
+func (this *PromiseResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.PromiseResponse{` +
-		`Okay:` + valueToGoStringLog(this.Okay, "bool"),
-		`Proposal:` + valueToGoStringLog(this.Proposal, "uint64"),
-		`Position:` + valueToGoStringLog(this.Position, "uint64"),
-		`Action:` + fmt6.Sprintf("%#v", this.Action),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&PromiseResponse{`,
+		`Okay:` + valueToStringLog(this.Okay) + `,`,
+		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
+		`Action:` + strings.Replace(fmt.Sprintf("%v", this.Action), "Action", "Action", 1) + `,`,
+		`Position:` + valueToStringLog(this.Position) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *WriteRequest) GoString() string {
+func (this *WriteRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.WriteRequest{` +
-		`Proposal:` + valueToGoStringLog(this.Proposal, "uint64"),
-		`Position:` + valueToGoStringLog(this.Position, "uint64"),
-		`Learned:` + valueToGoStringLog(this.Learned, "bool"),
-		`Type:` + valueToGoStringLog(this.Type, "mesosproto.Action_Type"),
-		`Nop:` + fmt6.Sprintf("%#v", this.Nop),
-		`Append:` + fmt6.Sprintf("%#v", this.Append),
-		`Truncate:` + fmt6.Sprintf("%#v", this.Truncate),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&WriteRequest{`,
+		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
+		`Position:` + valueToStringLog(this.Position) + `,`,
+		`Learned:` + valueToStringLog(this.Learned) + `,`,
+		`Type:` + valueToStringLog(this.Type) + `,`,
+		`Nop:` + strings.Replace(fmt.Sprintf("%v", this.Nop), "Action_Nop", "Action_Nop", 1) + `,`,
+		`Append:` + strings.Replace(fmt.Sprintf("%v", this.Append), "Action_Append", "Action_Append", 1) + `,`,
+		`Truncate:` + strings.Replace(fmt.Sprintf("%v", this.Truncate), "Action_Truncate", "Action_Truncate", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *WriteResponse) GoString() string {
+func (this *WriteResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.WriteResponse{` +
-		`Okay:` + valueToGoStringLog(this.Okay, "bool"),
-		`Proposal:` + valueToGoStringLog(this.Proposal, "uint64"),
-		`Position:` + valueToGoStringLog(this.Position, "uint64"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&WriteResponse{`,
+		`Okay:` + valueToStringLog(this.Okay) + `,`,
+		`Proposal:` + valueToStringLog(this.Proposal) + `,`,
+		`Position:` + valueToStringLog(this.Position) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *LearnedMessage) GoString() string {
+func (this *LearnedMessage) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.LearnedMessage{` +
-		`Action:` + fmt6.Sprintf("%#v", this.Action),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&LearnedMessage{`,
+		`Action:` + strings.Replace(fmt.Sprintf("%v", this.Action), "Action", "Action", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *RecoverRequest) GoString() string {
+func (this *RecoverRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.RecoverRequest{` +
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&RecoverRequest{`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func (this *RecoverResponse) GoString() string {
+func (this *RecoverResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings3.Join([]string{`&mesosproto.RecoverResponse{` +
-		`Status:` + valueToGoStringLog(this.Status, "mesosproto.Metadata_Status"),
-		`Begin:` + valueToGoStringLog(this.Begin, "uint64"),
-		`End:` + valueToGoStringLog(this.End, "uint64"),
-		`XXX_unrecognized:` + fmt6.Sprintf("%#v", this.XXX_unrecognized) + `}`}, ", ")
+	s := strings.Join([]string{`&RecoverResponse{`,
+		`Status:` + valueToStringLog(this.Status) + `,`,
+		`Begin:` + valueToStringLog(this.Begin) + `,`,
+		`End:` + valueToStringLog(this.End) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
 	return s
 }
-func valueToGoStringLog(v interface{}, typ string) string {
-	rv := reflect3.ValueOf(v)
+func valueToStringLog(v interface{}) string {
+	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
 		return "nil"
 	}
-	pv := reflect3.Indirect(rv).Interface()
-	return fmt6.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
-func extensionToGoStringLog(e map[int32]github_com_gogo_protobuf_proto3.Extension) string {
-	if e == nil {
-		return "nil"
-	}
-	s := "map[int32]proto.Extension{"
-	keys := make([]int, 0, len(e))
-	for k := range e {
-		keys = append(keys, int(k))
-	}
-	sort1.Ints(keys)
-	ss := []string{}
-	for _, k := range keys {
-		ss = append(ss, strconv1.Itoa(k)+": "+e[int32(k)].GoString())
-	}
-	s += strings3.Join(ss, ",") + "}"
-	return s
-}
-func (this *Promise) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
+func (m *Promise) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return fmt7.Errorf("that == nil && this != nil")
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Proposal = &v
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
 	}
 
-	that1, ok := that.(*Promise)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Promise")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Promise but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Promisebut is not nil && this == nil")
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
-		}
-	} else if this.Proposal != nil {
-		return fmt7.Errorf("this.Proposal == nil && that.Proposal != nil")
-	} else if that1.Proposal != nil {
-		return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Promise) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *Action) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Position = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Promised", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Promised = &v
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Performed", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Performed = &v
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Learned", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Learned = &b
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var v Action_Type
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (Action_Type(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Type = &v
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nop", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Nop == nil {
+				m.Nop = &Action_Nop{}
+			}
+			if err := m.Nop.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Append", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Append == nil {
+				m.Append = &Action_Append{}
+			}
+			if err := m.Append.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Truncate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Truncate == nil {
+				m.Truncate = &Action_Truncate{}
+			}
+			if err := m.Truncate.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("position")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("promised")
 	}
 
-	that1, ok := that.(*Promise)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return false
-		}
-	} else if this.Proposal != nil {
-		return false
-	} else if that1.Proposal != nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *Action) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Action)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Action")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Action but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Actionbut is not nil && this == nil")
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return fmt7.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
-		}
-	} else if this.Position != nil {
-		return fmt7.Errorf("this.Position == nil && that.Position != nil")
-	} else if that1.Position != nil {
-		return fmt7.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
-	}
-	if this.Promised != nil && that1.Promised != nil {
-		if *this.Promised != *that1.Promised {
-			return fmt7.Errorf("Promised this(%v) Not Equal that(%v)", *this.Promised, *that1.Promised)
-		}
-	} else if this.Promised != nil {
-		return fmt7.Errorf("this.Promised == nil && that.Promised != nil")
-	} else if that1.Promised != nil {
-		return fmt7.Errorf("Promised this(%v) Not Equal that(%v)", this.Promised, that1.Promised)
-	}
-	if this.Performed != nil && that1.Performed != nil {
-		if *this.Performed != *that1.Performed {
-			return fmt7.Errorf("Performed this(%v) Not Equal that(%v)", *this.Performed, *that1.Performed)
-		}
-	} else if this.Performed != nil {
-		return fmt7.Errorf("this.Performed == nil && that.Performed != nil")
-	} else if that1.Performed != nil {
-		return fmt7.Errorf("Performed this(%v) Not Equal that(%v)", this.Performed, that1.Performed)
-	}
-	if this.Learned != nil && that1.Learned != nil {
-		if *this.Learned != *that1.Learned {
-			return fmt7.Errorf("Learned this(%v) Not Equal that(%v)", *this.Learned, *that1.Learned)
-		}
-	} else if this.Learned != nil {
-		return fmt7.Errorf("this.Learned == nil && that.Learned != nil")
-	} else if that1.Learned != nil {
-		return fmt7.Errorf("Learned this(%v) Not Equal that(%v)", this.Learned, that1.Learned)
-	}
-	if this.Type != nil && that1.Type != nil {
-		if *this.Type != *that1.Type {
-			return fmt7.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
-		}
-	} else if this.Type != nil {
-		return fmt7.Errorf("this.Type == nil && that.Type != nil")
-	} else if that1.Type != nil {
-		return fmt7.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
-	}
-	if !this.Nop.Equal(that1.Nop) {
-		return fmt7.Errorf("Nop this(%v) Not Equal that(%v)", this.Nop, that1.Nop)
-	}
-	if !this.Append.Equal(that1.Append) {
-		return fmt7.Errorf("Append this(%v) Not Equal that(%v)", this.Append, that1.Append)
-	}
-	if !this.Truncate.Equal(that1.Truncate) {
-		return fmt7.Errorf("Truncate this(%v) Not Equal that(%v)", this.Truncate, that1.Truncate)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Action) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *Action_Nop) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		switch fieldNum {
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
 	}
 
-	that1, ok := that.(*Action)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return false
-		}
-	} else if this.Position != nil {
-		return false
-	} else if that1.Position != nil {
-		return false
-	}
-	if this.Promised != nil && that1.Promised != nil {
-		if *this.Promised != *that1.Promised {
-			return false
-		}
-	} else if this.Promised != nil {
-		return false
-	} else if that1.Promised != nil {
-		return false
-	}
-	if this.Performed != nil && that1.Performed != nil {
-		if *this.Performed != *that1.Performed {
-			return false
-		}
-	} else if this.Performed != nil {
-		return false
-	} else if that1.Performed != nil {
-		return false
-	}
-	if this.Learned != nil && that1.Learned != nil {
-		if *this.Learned != *that1.Learned {
-			return false
-		}
-	} else if this.Learned != nil {
-		return false
-	} else if that1.Learned != nil {
-		return false
-	}
-	if this.Type != nil && that1.Type != nil {
-		if *this.Type != *that1.Type {
-			return false
-		}
-	} else if this.Type != nil {
-		return false
-	} else if that1.Type != nil {
-		return false
-	}
-	if !this.Nop.Equal(that1.Nop) {
-		return false
-	}
-	if !this.Append.Equal(that1.Append) {
-		return false
-	}
-	if !this.Truncate.Equal(that1.Truncate) {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *Action_Nop) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Action_Nop)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Action_Nop")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Action_Nop but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Action_Nopbut is not nil && this == nil")
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Action_Nop) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *Action_Append) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Bytes", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Bytes = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Cksum", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Cksum = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("bytes")
 	}
 
-	that1, ok := that.(*Action_Nop)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *Action_Append) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Action_Append)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Action_Append")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Action_Append but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Action_Appendbut is not nil && this == nil")
-	}
-	if !bytes1.Equal(this.Bytes, that1.Bytes) {
-		return fmt7.Errorf("Bytes this(%v) Not Equal that(%v)", this.Bytes, that1.Bytes)
-	}
-	if !bytes1.Equal(this.Cksum, that1.Cksum) {
-		return fmt7.Errorf("Cksum this(%v) Not Equal that(%v)", this.Cksum, that1.Cksum)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Action_Append) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *Action_Truncate) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field To", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.To = &v
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("to")
 	}
 
-	that1, ok := that.(*Action_Append)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if !bytes1.Equal(this.Bytes, that1.Bytes) {
-		return false
-	}
-	if !bytes1.Equal(this.Cksum, that1.Cksum) {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *Action_Truncate) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Action_Truncate)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Action_Truncate")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Action_Truncate but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Action_Truncatebut is not nil && this == nil")
-	}
-	if this.To != nil && that1.To != nil {
-		if *this.To != *that1.To {
-			return fmt7.Errorf("To this(%v) Not Equal that(%v)", *this.To, *that1.To)
-		}
-	} else if this.To != nil {
-		return fmt7.Errorf("this.To == nil && that.To != nil")
-	} else if that1.To != nil {
-		return fmt7.Errorf("To this(%v) Not Equal that(%v)", this.To, that1.To)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Action_Truncate) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *Metadata) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var v Metadata_Status
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (Metadata_Status(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Status = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Promised", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Promised = &v
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("promised")
 	}
 
-	that1, ok := that.(*Action_Truncate)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.To != nil && that1.To != nil {
-		if *this.To != *that1.To {
-			return false
-		}
-	} else if this.To != nil {
-		return false
-	} else if that1.To != nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *Metadata) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Metadata)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Metadata")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Metadata but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Metadatabut is not nil && this == nil")
-	}
-	if this.Status != nil && that1.Status != nil {
-		if *this.Status != *that1.Status {
-			return fmt7.Errorf("Status this(%v) Not Equal that(%v)", *this.Status, *that1.Status)
-		}
-	} else if this.Status != nil {
-		return fmt7.Errorf("this.Status == nil && that.Status != nil")
-	} else if that1.Status != nil {
-		return fmt7.Errorf("Status this(%v) Not Equal that(%v)", this.Status, that1.Status)
-	}
-	if this.Promised != nil && that1.Promised != nil {
-		if *this.Promised != *that1.Promised {
-			return fmt7.Errorf("Promised this(%v) Not Equal that(%v)", *this.Promised, *that1.Promised)
-		}
-	} else if this.Promised != nil {
-		return fmt7.Errorf("this.Promised == nil && that.Promised != nil")
-	} else if that1.Promised != nil {
-		return fmt7.Errorf("Promised this(%v) Not Equal that(%v)", this.Promised, that1.Promised)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Metadata) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *Record) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var v Record_Type
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (Record_Type(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Type = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Promise", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Promise == nil {
+				m.Promise = &Promise{}
+			}
+			if err := m.Promise.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Action", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Action == nil {
+				m.Action = &Action{}
+			}
+			if err := m.Action.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Metadata", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Metadata == nil {
+				m.Metadata = &Metadata{}
+			}
+			if err := m.Metadata.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
-	that1, ok := that.(*Metadata)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Status != nil && that1.Status != nil {
-		if *this.Status != *that1.Status {
-			return false
-		}
-	} else if this.Status != nil {
-		return false
-	} else if that1.Status != nil {
-		return false
-	}
-	if this.Promised != nil && that1.Promised != nil {
-		if *this.Promised != *that1.Promised {
-			return false
-		}
-	} else if this.Promised != nil {
-		return false
-	} else if that1.Promised != nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *Record) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Record)
-	if !ok {
-		return fmt7.Errorf("that is not of type *Record")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *Record but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *Recordbut is not nil && this == nil")
-	}
-	if this.Type != nil && that1.Type != nil {
-		if *this.Type != *that1.Type {
-			return fmt7.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
-		}
-	} else if this.Type != nil {
-		return fmt7.Errorf("this.Type == nil && that.Type != nil")
-	} else if that1.Type != nil {
-		return fmt7.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
-	}
-	if !this.Promise.Equal(that1.Promise) {
-		return fmt7.Errorf("Promise this(%v) Not Equal that(%v)", this.Promise, that1.Promise)
-	}
-	if !this.Action.Equal(that1.Action) {
-		return fmt7.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
-	}
-	if !this.Metadata.Equal(that1.Metadata) {
-		return fmt7.Errorf("Metadata this(%v) Not Equal that(%v)", this.Metadata, that1.Metadata)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *Record) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *PromiseRequest) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Proposal = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Position = &v
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
 	}
 
-	that1, ok := that.(*Record)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Type != nil && that1.Type != nil {
-		if *this.Type != *that1.Type {
-			return false
-		}
-	} else if this.Type != nil {
-		return false
-	} else if that1.Type != nil {
-		return false
-	}
-	if !this.Promise.Equal(that1.Promise) {
-		return false
-	}
-	if !this.Action.Equal(that1.Action) {
-		return false
-	}
-	if !this.Metadata.Equal(that1.Metadata) {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *PromiseRequest) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*PromiseRequest)
-	if !ok {
-		return fmt7.Errorf("that is not of type *PromiseRequest")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *PromiseRequest but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *PromiseRequestbut is not nil && this == nil")
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
-		}
-	} else if this.Proposal != nil {
-		return fmt7.Errorf("this.Proposal == nil && that.Proposal != nil")
-	} else if that1.Proposal != nil {
-		return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return fmt7.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
-		}
-	} else if this.Position != nil {
-		return fmt7.Errorf("this.Position == nil && that.Position != nil")
-	} else if that1.Position != nil {
-		return fmt7.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *PromiseRequest) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *PromiseResponse) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Okay", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Okay = &b
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Proposal = &v
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Action", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Action == nil {
+				m.Action = &Action{}
+			}
+			if err := m.Action.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Position = &v
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("okay")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
 	}
 
-	that1, ok := that.(*PromiseRequest)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return false
-		}
-	} else if this.Proposal != nil {
-		return false
-	} else if that1.Proposal != nil {
-		return false
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return false
-		}
-	} else if this.Position != nil {
-		return false
-	} else if that1.Position != nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *PromiseResponse) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*PromiseResponse)
-	if !ok {
-		return fmt7.Errorf("that is not of type *PromiseResponse")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *PromiseResponse but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *PromiseResponsebut is not nil && this == nil")
-	}
-	if this.Okay != nil && that1.Okay != nil {
-		if *this.Okay != *that1.Okay {
-			return fmt7.Errorf("Okay this(%v) Not Equal that(%v)", *this.Okay, *that1.Okay)
-		}
-	} else if this.Okay != nil {
-		return fmt7.Errorf("this.Okay == nil && that.Okay != nil")
-	} else if that1.Okay != nil {
-		return fmt7.Errorf("Okay this(%v) Not Equal that(%v)", this.Okay, that1.Okay)
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
-		}
-	} else if this.Proposal != nil {
-		return fmt7.Errorf("this.Proposal == nil && that.Proposal != nil")
-	} else if that1.Proposal != nil {
-		return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return fmt7.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
-		}
-	} else if this.Position != nil {
-		return fmt7.Errorf("this.Position == nil && that.Position != nil")
-	} else if that1.Position != nil {
-		return fmt7.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
-	}
-	if !this.Action.Equal(that1.Action) {
-		return fmt7.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *PromiseResponse) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *WriteRequest) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Proposal = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Position = &v
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Learned", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Learned = &b
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var v Action_Type
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (Action_Type(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Type = &v
+			hasFields[0] |= uint64(0x00000004)
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nop", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Nop == nil {
+				m.Nop = &Action_Nop{}
+			}
+			if err := m.Nop.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Append", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Append == nil {
+				m.Append = &Action_Append{}
+			}
+			if err := m.Append.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Truncate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Truncate == nil {
+				m.Truncate = &Action_Truncate{}
+			}
+			if err := m.Truncate.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("position")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
-	that1, ok := that.(*PromiseResponse)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Okay != nil && that1.Okay != nil {
-		if *this.Okay != *that1.Okay {
-			return false
-		}
-	} else if this.Okay != nil {
-		return false
-	} else if that1.Okay != nil {
-		return false
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return false
-		}
-	} else if this.Proposal != nil {
-		return false
-	} else if that1.Proposal != nil {
-		return false
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return false
-		}
-	} else if this.Position != nil {
-		return false
-	} else if that1.Position != nil {
-		return false
-	}
-	if !this.Action.Equal(that1.Action) {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *WriteRequest) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*WriteRequest)
-	if !ok {
-		return fmt7.Errorf("that is not of type *WriteRequest")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *WriteRequest but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *WriteRequestbut is not nil && this == nil")
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
-		}
-	} else if this.Proposal != nil {
-		return fmt7.Errorf("this.Proposal == nil && that.Proposal != nil")
-	} else if that1.Proposal != nil {
-		return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return fmt7.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
-		}
-	} else if this.Position != nil {
-		return fmt7.Errorf("this.Position == nil && that.Position != nil")
-	} else if that1.Position != nil {
-		return fmt7.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
-	}
-	if this.Learned != nil && that1.Learned != nil {
-		if *this.Learned != *that1.Learned {
-			return fmt7.Errorf("Learned this(%v) Not Equal that(%v)", *this.Learned, *that1.Learned)
-		}
-	} else if this.Learned != nil {
-		return fmt7.Errorf("this.Learned == nil && that.Learned != nil")
-	} else if that1.Learned != nil {
-		return fmt7.Errorf("Learned this(%v) Not Equal that(%v)", this.Learned, that1.Learned)
-	}
-	if this.Type != nil && that1.Type != nil {
-		if *this.Type != *that1.Type {
-			return fmt7.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
-		}
-	} else if this.Type != nil {
-		return fmt7.Errorf("this.Type == nil && that.Type != nil")
-	} else if that1.Type != nil {
-		return fmt7.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
-	}
-	if !this.Nop.Equal(that1.Nop) {
-		return fmt7.Errorf("Nop this(%v) Not Equal that(%v)", this.Nop, that1.Nop)
-	}
-	if !this.Append.Equal(that1.Append) {
-		return fmt7.Errorf("Append this(%v) Not Equal that(%v)", this.Append, that1.Append)
-	}
-	if !this.Truncate.Equal(that1.Truncate) {
-		return fmt7.Errorf("Truncate this(%v) Not Equal that(%v)", this.Truncate, that1.Truncate)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *WriteRequest) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *WriteResponse) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Okay", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Okay = &b
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Proposal", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Proposal = &v
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Position = &v
+			hasFields[0] |= uint64(0x00000004)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("okay")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("proposal")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("position")
 	}
 
-	that1, ok := that.(*WriteRequest)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return false
-		}
-	} else if this.Proposal != nil {
-		return false
-	} else if that1.Proposal != nil {
-		return false
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return false
-		}
-	} else if this.Position != nil {
-		return false
-	} else if that1.Position != nil {
-		return false
-	}
-	if this.Learned != nil && that1.Learned != nil {
-		if *this.Learned != *that1.Learned {
-			return false
-		}
-	} else if this.Learned != nil {
-		return false
-	} else if that1.Learned != nil {
-		return false
-	}
-	if this.Type != nil && that1.Type != nil {
-		if *this.Type != *that1.Type {
-			return false
-		}
-	} else if this.Type != nil {
-		return false
-	} else if that1.Type != nil {
-		return false
-	}
-	if !this.Nop.Equal(that1.Nop) {
-		return false
-	}
-	if !this.Append.Equal(that1.Append) {
-		return false
-	}
-	if !this.Truncate.Equal(that1.Truncate) {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *WriteResponse) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*WriteResponse)
-	if !ok {
-		return fmt7.Errorf("that is not of type *WriteResponse")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *WriteResponse but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *WriteResponsebut is not nil && this == nil")
-	}
-	if this.Okay != nil && that1.Okay != nil {
-		if *this.Okay != *that1.Okay {
-			return fmt7.Errorf("Okay this(%v) Not Equal that(%v)", *this.Okay, *that1.Okay)
-		}
-	} else if this.Okay != nil {
-		return fmt7.Errorf("this.Okay == nil && that.Okay != nil")
-	} else if that1.Okay != nil {
-		return fmt7.Errorf("Okay this(%v) Not Equal that(%v)", this.Okay, that1.Okay)
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", *this.Proposal, *that1.Proposal)
-		}
-	} else if this.Proposal != nil {
-		return fmt7.Errorf("this.Proposal == nil && that.Proposal != nil")
-	} else if that1.Proposal != nil {
-		return fmt7.Errorf("Proposal this(%v) Not Equal that(%v)", this.Proposal, that1.Proposal)
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return fmt7.Errorf("Position this(%v) Not Equal that(%v)", *this.Position, *that1.Position)
-		}
-	} else if this.Position != nil {
-		return fmt7.Errorf("this.Position == nil && that.Position != nil")
-	} else if that1.Position != nil {
-		return fmt7.Errorf("Position this(%v) Not Equal that(%v)", this.Position, that1.Position)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *WriteResponse) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *LearnedMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Action", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthLog
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Action == nil {
+				m.Action = &Action{}
+			}
+			if err := m.Action.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("action")
 	}
 
-	that1, ok := that.(*WriteResponse)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if this.Okay != nil && that1.Okay != nil {
-		if *this.Okay != *that1.Okay {
-			return false
-		}
-	} else if this.Okay != nil {
-		return false
-	} else if that1.Okay != nil {
-		return false
-	}
-	if this.Proposal != nil && that1.Proposal != nil {
-		if *this.Proposal != *that1.Proposal {
-			return false
-		}
-	} else if this.Proposal != nil {
-		return false
-	} else if that1.Proposal != nil {
-		return false
-	}
-	if this.Position != nil && that1.Position != nil {
-		if *this.Position != *that1.Position {
-			return false
-		}
-	} else if this.Position != nil {
-		return false
-	} else if that1.Position != nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *LearnedMessage) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*LearnedMessage)
-	if !ok {
-		return fmt7.Errorf("that is not of type *LearnedMessage")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *LearnedMessage but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *LearnedMessagebut is not nil && this == nil")
-	}
-	if !this.Action.Equal(that1.Action) {
-		return fmt7.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *LearnedMessage) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *RecoverRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		switch fieldNum {
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
 	}
 
-	that1, ok := that.(*LearnedMessage)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if !this.Action.Equal(that1.Action) {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *RecoverRequest) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*RecoverRequest)
-	if !ok {
-		return fmt7.Errorf("that is not of type *RecoverRequest")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *RecoverRequest but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *RecoverRequestbut is not nil && this == nil")
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *RecoverRequest) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func (m *RecoverResponse) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var v Metadata_Status
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (Metadata_Status(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Status = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Begin", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Begin = &v
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field End", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.End = &v
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipLog(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthLog
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
 	}
 
-	that1, ok := that.(*RecoverRequest)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
-		}
-		return false
-	} else if this == nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
-}
-func (this *RecoverResponse) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*RecoverResponse)
-	if !ok {
-		return fmt7.Errorf("that is not of type *RecoverResponse")
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt7.Errorf("that is type *RecoverResponse but is nil && this != nil")
-	} else if this == nil {
-		return fmt7.Errorf("that is type *RecoverResponsebut is not nil && this == nil")
-	}
-	if this.Status != nil && that1.Status != nil {
-		if *this.Status != *that1.Status {
-			return fmt7.Errorf("Status this(%v) Not Equal that(%v)", *this.Status, *that1.Status)
-		}
-	} else if this.Status != nil {
-		return fmt7.Errorf("this.Status == nil && that.Status != nil")
-	} else if that1.Status != nil {
-		return fmt7.Errorf("Status this(%v) Not Equal that(%v)", this.Status, that1.Status)
-	}
-	if this.Begin != nil && that1.Begin != nil {
-		if *this.Begin != *that1.Begin {
-			return fmt7.Errorf("Begin this(%v) Not Equal that(%v)", *this.Begin, *that1.Begin)
-		}
-	} else if this.Begin != nil {
-		return fmt7.Errorf("this.Begin == nil && that.Begin != nil")
-	} else if that1.Begin != nil {
-		return fmt7.Errorf("Begin this(%v) Not Equal that(%v)", this.Begin, that1.Begin)
-	}
-	if this.End != nil && that1.End != nil {
-		if *this.End != *that1.End {
-			return fmt7.Errorf("End this(%v) Not Equal that(%v)", *this.End, *that1.End)
-		}
-	} else if this.End != nil {
-		return fmt7.Errorf("this.End == nil && that.End != nil")
-	} else if that1.End != nil {
-		return fmt7.Errorf("End this(%v) Not Equal that(%v)", this.End, that1.End)
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return fmt7.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
-	}
 	return nil
 }
-func (this *RecoverResponse) Equal(that interface{}) bool {
-	if that == nil {
-		if this == nil {
-			return true
+func skipLog(data []byte) (n int, err error) {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return 0, io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
 		}
-		return false
-	}
-
-	that1, ok := that.(*RecoverResponse)
-	if !ok {
-		return false
-	}
-	if that1 == nil {
-		if this == nil {
-			return true
+		wireType := int(wire & 0x7)
+		switch wireType {
+		case 0:
+			for {
+				if iNdEx >= l {
+					return 0, io.ErrUnexpectedEOF
+				}
+				iNdEx++
+				if data[iNdEx-1] < 0x80 {
+					break
+				}
+			}
+			return iNdEx, nil
+		case 1:
+			iNdEx += 8
+			return iNdEx, nil
+		case 2:
+			var length int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return 0, io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				length |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			iNdEx += length
+			if length < 0 {
+				return 0, ErrInvalidLengthLog
+			}
+			return iNdEx, nil
+		case 3:
+			for {
+				var innerWire uint64
+				var start int = iNdEx
+				for shift := uint(0); ; shift += 7 {
+					if iNdEx >= l {
+						return 0, io.ErrUnexpectedEOF
+					}
+					b := data[iNdEx]
+					iNdEx++
+					innerWire |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				innerWireType := int(innerWire & 0x7)
+				if innerWireType == 4 {
+					break
+				}
+				next, err := skipLog(data[start:])
+				if err != nil {
+					return 0, err
+				}
+				iNdEx = start + next
+			}
+			return iNdEx, nil
+		case 4:
+			return iNdEx, nil
+		case 5:
+			iNdEx += 4
+			return iNdEx, nil
+		default:
+			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
-		return false
-	} else if this == nil {
-		return false
 	}
-	if this.Status != nil && that1.Status != nil {
-		if *this.Status != *that1.Status {
-			return false
-		}
-	} else if this.Status != nil {
-		return false
-	} else if that1.Status != nil {
-		return false
-	}
-	if this.Begin != nil && that1.Begin != nil {
-		if *this.Begin != *that1.Begin {
-			return false
-		}
-	} else if this.Begin != nil {
-		return false
-	} else if that1.Begin != nil {
-		return false
-	}
-	if this.End != nil && that1.End != nil {
-		if *this.End != *that1.End {
-			return false
-		}
-	} else if this.End != nil {
-		return false
-	} else if that1.End != nil {
-		return false
-	}
-	if !bytes1.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
-		return false
-	}
-	return true
+	panic("unreachable")
 }
+
+var (
+	ErrInvalidLengthLog = fmt.Errorf("proto: negative length found during unmarshaling")
+)

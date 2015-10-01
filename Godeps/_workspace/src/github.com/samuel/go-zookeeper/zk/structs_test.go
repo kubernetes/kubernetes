@@ -58,3 +58,14 @@ func TestDecodeShortBuffer(t *testing.T) {
 		return
 	}
 }
+
+func BenchmarkEncode(b *testing.B) {
+	buf := make([]byte, 4096)
+	st := &connectRequest{Passwd: []byte("1234567890")}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := encodePacket(buf, st); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

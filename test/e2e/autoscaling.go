@@ -53,11 +53,11 @@ var _ = Describe("Autoscaling", func() {
 	})
 
 	It("[Skipped][Autoscaling Suite] should scale cluster size based on cpu utilization", func() {
-		setUpAutoscaler("cpu/node_utilization", 0.5, nodeCount, nodeCount+1)
+		setUpAutoscaler("cpu/node_utilization", 0.4, nodeCount, nodeCount+1)
 
-		// Consume 60% CPU
-		millicoresPerReplica := 600
-		rc := NewStaticResourceConsumer("rc", nodeCount*coresPerNode, millicoresPerReplica*nodeCount*coresPerNode, 0, int64(millicoresPerReplica), 100, f)
+		// Consume 50% CPU
+		millicoresPerReplica := 500
+		rc := NewStaticResourceConsumer("cpu-utilization", nodeCount*coresPerNode, millicoresPerReplica*nodeCount*coresPerNode, 0, int64(millicoresPerReplica), 100, f)
 		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
 
 		rc.CleanUp()
@@ -79,7 +79,7 @@ var _ = Describe("Autoscaling", func() {
 
 		// Consume 60% of total memory capacity
 		megabytesPerReplica := int(memCapacityMb * 6 / 10 / coresPerNode)
-		rc := NewStaticResourceConsumer("rc", nodeCount*coresPerNode, 0, megabytesPerReplica*nodeCount*coresPerNode, 100, int64(megabytesPerReplica+100), f)
+		rc := NewStaticResourceConsumer("mem-utilization", nodeCount*coresPerNode, 0, megabytesPerReplica*nodeCount*coresPerNode, 100, int64(megabytesPerReplica+100), f)
 		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
 
 		rc.CleanUp()

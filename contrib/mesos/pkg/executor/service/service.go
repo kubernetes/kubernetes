@@ -36,8 +36,10 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/redirfd"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -103,8 +105,8 @@ func (s *KubeletExecutorServer) syncExternalShutdownWatcher() (io.Closer, error)
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	oomAdjuster := oom.NewOomAdjuster()
-	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOOMAdjuster()
+	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
 		log.Info(err)
 	}
 
@@ -233,6 +235,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		ResolverConfig:            s.ResolverConfig,
 		CPUCFSQuota:               s.CPUCFSQuota,
 		Writer:                    writer,
+		MaxOpenFiles:              s.MaxOpenFiles,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
@@ -372,6 +375,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 			return klet.GetRuntime().GetPodStatus(pod)
 		},
 		StaticPodsConfigPath: staticPodsConfigPath,
+		PodLW:                cache.NewListWatchFromClient(kc.KubeClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, kc.NodeName)),
 	})
 
 	go exec.InitializeStaticPodsSource(func() {

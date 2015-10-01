@@ -25,11 +25,6 @@ import (
 
 func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
-		func(obj *APIVersion) {
-			if len(obj.APIGroup) == 0 {
-				obj.APIGroup = "experimental"
-			}
-		},
 		func(obj *ReplicationController) {
 			var labels map[string]string
 			if obj.Spec.Template != nil {
@@ -90,6 +85,24 @@ func addDefaultingFuncs() {
 				}
 				if sp.TargetPort == util.NewIntOrStringFromInt(0) || sp.TargetPort == util.NewIntOrStringFromString("") {
 					sp.TargetPort = util.NewIntOrStringFromInt(sp.Port)
+				}
+			}
+		},
+		func(obj *Pod) {
+			// If limits are specified, but requests are not, default requests to limits
+			// This is done here rather than a more specific defaulting pass on ResourceRequirements
+			// because we only want this defaulting semantic to take place on a Pod and not a PodTemplate
+			for i := range obj.Spec.Containers {
+				// set requests to limits if requests are not specified, but limits are
+				if obj.Spec.Containers[i].Resources.Limits != nil {
+					if obj.Spec.Containers[i].Resources.Requests == nil {
+						obj.Spec.Containers[i].Resources.Requests = make(ResourceList)
+					}
+					for key, value := range obj.Spec.Containers[i].Resources.Limits {
+						if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
+							obj.Spec.Containers[i].Resources.Requests[key] = *(value.Copy())
+						}
+					}
 				}
 			}
 		},
@@ -163,19 +176,6 @@ func addDefaultingFuncs() {
 		func(obj *ObjectFieldSelector) {
 			if obj.APIVersion == "" {
 				obj.APIVersion = "v1"
-			}
-		},
-		func(obj *ResourceRequirements) {
-			// Set requests to limits if requests are not specified (but limits are).
-			if obj.Limits != nil {
-				if obj.Requests == nil {
-					obj.Requests = make(ResourceList)
-				}
-				for key, value := range obj.Limits {
-					if _, exists := obj.Requests[key]; !exists {
-						obj.Requests[key] = *(value.Copy())
-					}
-				}
 			}
 		},
 		func(obj *LimitRangeItem) {

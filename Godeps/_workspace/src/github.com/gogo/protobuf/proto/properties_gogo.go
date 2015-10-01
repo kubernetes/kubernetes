@@ -49,53 +49,6 @@ func (p *Properties) setCustomEncAndDec(typ reflect.Type) {
 	}
 }
 
-func (p *Properties) setNonNullableEncAndDec(typ reflect.Type) bool {
-	switch typ.Kind() {
-	case reflect.Bool:
-		p.enc = (*Buffer).enc_ref_bool
-		p.dec = (*Buffer).dec_ref_bool
-		p.size = size_ref_bool
-	case reflect.Int32:
-		p.enc = (*Buffer).enc_ref_int32
-		p.dec = (*Buffer).dec_ref_int32
-		p.size = size_ref_int32
-	case reflect.Uint32:
-		p.enc = (*Buffer).enc_ref_uint32
-		p.dec = (*Buffer).dec_ref_int32
-		p.size = size_ref_uint32
-	case reflect.Int64, reflect.Uint64:
-		p.enc = (*Buffer).enc_ref_int64
-		p.dec = (*Buffer).dec_ref_int64
-		p.size = size_ref_int64
-	case reflect.Float32:
-		p.enc = (*Buffer).enc_ref_uint32 // can just treat them as bits
-		p.dec = (*Buffer).dec_ref_int32
-		p.size = size_ref_uint32
-	case reflect.Float64:
-		p.enc = (*Buffer).enc_ref_int64 // can just treat them as bits
-		p.dec = (*Buffer).dec_ref_int64
-		p.size = size_ref_int64
-	case reflect.String:
-		p.dec = (*Buffer).dec_ref_string
-		p.enc = (*Buffer).enc_ref_string
-		p.size = size_ref_string
-	case reflect.Struct:
-		p.stype = typ
-		p.isMarshaler = isMarshaler(typ)
-		p.isUnmarshaler = isUnmarshaler(typ)
-		if p.Wire == "bytes" {
-			p.enc = (*Buffer).enc_ref_struct_message
-			p.dec = (*Buffer).dec_ref_struct_message
-			p.size = size_ref_struct_message
-		} else {
-			fmt.Fprintf(os.Stderr, "proto: no coders for struct %T\n", typ)
-		}
-	default:
-		return false
-	}
-	return true
-}
-
 func (p *Properties) setSliceOfNonPointerStructs(typ reflect.Type) {
 	t2 := typ.Elem()
 	p.sstype = typ

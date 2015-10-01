@@ -35,10 +35,10 @@ import (
 
 const (
 	heapsterNamespace = "kube-system"
-	heapsterService   = "monitoring-heapster"
+	heapsterService   = "heapster"
 )
 
-var heapsterQueryStart, _ = time.ParseDuration("-5m")
+var heapsterQueryStart = -5 * time.Minute
 
 // An interface for getting metrics for pods.
 type MetricsClient interface {
@@ -161,9 +161,9 @@ func calculateSumFromLatestSample(metrics heapster.MetricResultList) (uint64, in
 	for _, metrics := range metrics.Items {
 		var newest *heapster.MetricPoint
 		newest = nil
-		for _, metricPoint := range metrics.Metrics {
+		for i, metricPoint := range metrics.Metrics {
 			if newest == nil || newest.Timestamp.Before(metricPoint.Timestamp) {
-				newest = &metricPoint
+				newest = &metrics.Metrics[i]
 			}
 		}
 		if newest != nil {

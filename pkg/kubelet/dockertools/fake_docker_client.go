@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 
@@ -31,6 +32,7 @@ import (
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
+// TODO: create a proper constructor for FakeDockerClient, so we won't need to check if ContainerMap is not nil.
 type FakeDockerClient struct {
 	sync.Mutex
 	ContainerList       []docker.APIContainers
@@ -186,7 +188,12 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 		// Docker likes to add a '/', so copy that behavior.
 		name := "/" + c.Name
 		f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}, Image: c.Config.Image})
-		return &docker.Container{ID: name}, nil
+		container := docker.Container{ID: name, Name: name, Config: c.Config}
+		if f.ContainerMap != nil {
+			containerCopy := container
+			f.ContainerMap[name] = &containerCopy
+		}
+		return &container, nil
 	}
 	return nil, err
 }
@@ -206,10 +213,25 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 			Config:     &docker.Config{Image: "testimage"},
 			HostConfig: hostConfig,
 			State: docker.State{
-				Running: true,
-				Pid:     os.Getpid(),
+				Running:   true,
+				Pid:       os.Getpid(),
+				StartedAt: time.Now(),
 			},
 			NetworkSettings: &docker.NetworkSettings{IPAddress: "1.2.3.4"},
+		}
+		if f.ContainerMap != nil {
+			container, ok := f.ContainerMap[id]
+			if !ok {
+				container = &docker.Container{ID: id, Name: id}
+			}
+			container.HostConfig = hostConfig
+			container.State = docker.State{
+				Running:   true,
+				Pid:       os.Getpid(),
+				StartedAt: time.Now(),
+			}
+			container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
+			f.ContainerMap[id] = container
 		}
 	}
 	return err
@@ -233,6 +255,25 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 			newList = append(newList, container)
 		}
 		f.ContainerList = newList
+		if f.ContainerMap != nil {
+			container, ok := f.ContainerMap[id]
+			if !ok {
+				container = &docker.Container{
+					ID:   id,
+					Name: id,
+					State: docker.State{
+						Running:    false,
+						StartedAt:  time.Now().Add(-time.Second),
+						FinishedAt: time.Now(),
+					},
+				}
+			} else {
+				container.State.FinishedAt = time.Now()
+				container.State.Running = false
+			}
+			f.ContainerMap[id] = container
+		}
+
 	}
 	return err
 }
@@ -244,6 +285,9 @@ func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) e
 	err := f.popError("remove")
 	if err == nil {
 		f.Removed = append(f.Removed, opts.ID)
+	}
+	if f.ContainerMap != nil {
+		delete(f.ContainerMap, opts.ID)
 	}
 	return err
 }

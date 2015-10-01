@@ -228,9 +228,11 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 		if serverVersions.Has(clientVersion) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
-			if len(version) != 0 {
-				glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
-			}
+			// TODO: caesarxuchao: enable the warning message when we have
+			// proper fix. Please refer to issue #14895.
+			// if len(version) != 0 {
+			// 	glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
+			// }
 			return clientVersion, nil
 		}
 	}
@@ -259,7 +261,7 @@ func InClusterConfig() (*Config, error) {
 	tlsClientConfig := TLSClientConfig{}
 	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
 	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
-		glog.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
 	}

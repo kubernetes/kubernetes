@@ -131,7 +131,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t:            t,
 	}
 	kubelet.volumeManager = newVolumeManager()
-	kubelet.containerManager, _ = newContainerManager(mockCadvisor, "", "", "")
+	kubelet.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), mockCadvisor, "", "", "")
 	kubelet.networkConfigured = true
 	fakeClock := &util.FakeClock{Time: time.Now()}
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
@@ -1757,11 +1757,8 @@ func getNotReadyStatus(cName string) api.ContainerStatus {
 }
 func getReadyCondition(status api.ConditionStatus, transitionTime unversioned.Time, reason, message string) []api.PodCondition {
 	return []api.PodCondition{{
-		Type:               api.PodReady,
-		Status:             status,
-		LastTransitionTime: transitionTime,
-		Reason:             reason,
-		Message:            message,
+		Type:   api.PodReady,
+		Status: status,
 	}}
 }
 
@@ -3111,7 +3108,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		done <- struct{}{}
 	}()
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("timed out waiting for registration")
 	case <-done:
 		return

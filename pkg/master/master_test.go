@@ -289,11 +289,11 @@ func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
 	expAPIGroup := master.experimental(&config)
-	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix+"/"+latest.GroupOrDie("experimental").Group)
+	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").GroupVersion)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
@@ -577,7 +577,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return testapi.Default.Codec().Encode(&thirdPartyData)
+	return testapi.Experimental.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {

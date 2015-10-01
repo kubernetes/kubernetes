@@ -105,52 +105,83 @@ message ContainerID {
 
 
 /**
- * Describes a framework. The user field is used to determine the
- * Unix user that an executor/task should be launched as. If the user
- * field is set to an empty string Mesos will automagically set it
- * to the current user. Note that the ID is only available after a
- * framework has registered, however, it is included here in order to
- * facilitate scheduler failover (i.e., if it is set then the
- * MesosSchedulerDriver expects the scheduler is performing failover).
- * The amount of time that the master will wait for the scheduler to
- * failover before removing the framework is specified by
- * failover_timeout. If checkpoint is set, framework pid, executor
- * pids and status updates are checkpointed to disk by the slaves.
- * Checkpointing allows a restarted slave to reconnect with old
- * executors and recover status updates, at the cost of disk I/O.
- * The role field is used to group frameworks for allocation
- * decisions, depending on the allocation policy being used.
- * If the hostname field is set to an empty string Mesos will
- * automagically set it to the current hostname.
- * The principal field should match the credential the framework uses
- * in authentication. This field is used for framework API rate
- * exporting and limiting and should be set even if authentication is
- * not enabled if these features are desired.
- * The webui_url field allows a framework to advertise its web UI, so
- * that the Mesos web UI can link to it. It is expected to be a full
- * URL, for example http://my-scheduler.example.com:8080/.
+ * Describes a framework.
  */
 message FrameworkInfo {
+  // Used to determine the Unix user that an executor or task should
+  // be launched as. If the user field is set to an empty string Mesos
+  // will automagically set it to the current user.
   required string user = 1;
+
+  // Name of the framework that shows up in the Mesos Web UI.
   required string name = 2;
+
+  // Note that 'id' is only available after a framework has
+  // registered, however, it is included here in order to facilitate
+  // scheduler failover (i.e., if it is set then the
+  // MesosSchedulerDriver expects the scheduler is performing
+  // failover).
   optional FrameworkID id = 3;
+
+  // The amount of time that the master will wait for the scheduler to
+  // failover before it tears down the framework by killing all its
+  // tasks/executors. This should be non-zero if a framework expects
+  // to reconnect after a failover and not lose its tasks/executors.
   optional double failover_timeout = 4 [default = 0.0];
+
+  // If set, framework pid, executor pids and status updates are
+  // checkpointed to disk by the slaves. Checkpointing allows a
+  // restarted slave to reconnect with old executors and recover
+  // status updates, at the cost of disk I/O.
   optional bool checkpoint = 5 [default = false];
+
+  // Used to group frameworks for allocation decisions, depending on
+  // the allocation policy being used.
   optional string role = 6 [default = "*"];
+
+  // Used to indicate the current host from which the scheduler is
+  // registered in the Mesos Web UI. If set to an empty string Mesos
+  // will automagically set it to the current hostname.
   optional string hostname = 7;
+
+  // This field should match the credential's principal the framework
+  // uses for authentication. This field is used for framework API
+  // rate limiting and dynamic reservations. It should be set even
+  // if authentication is not enabled if these features are desired.
   optional string principal = 8;
+
+  // This field allows a framework to advertise its web UI, so that
+  // the Mesos web UI can link to it. It is expected to be a full URL,
+  // for example http://my-scheduler.example.com:8080/.
   optional string webui_url = 9;
+
+  message Capability {
+    enum Type {
+      // Receive offers with revocable resources. See 'Resource'
+      // message for details.
+      // TODO(vinod): This is currently a no-op.
+      REVOCABLE_RESOURCES = 1;
+    }
+
+    required Type type = 1;
+  }
+
+  // This field allows a framework to advertise its set of
+  // capabilities (e.g., ability to receive offers for revocable
+  // resources).
+  repeated Capability capabilities = 10;
 }
 
 
 /**
  * Describes a health check for a task or executor (or any arbitrary
  * process/command). A "strategy" is picked by specifying one of the
- * optional fields, currently only 'http' and 'command' are
- * supported. Specifying more than one strategy is an error.
+ * optional fields; currently only 'command' is supported.
+ * Specifying more than one strategy is an error.
  */
 message HealthCheck {
-  // Describes an HTTP health check.
+  // Describes an HTTP health check. This is not fully implemented and not
+  // recommended for use - see MESOS-2533.
   message HTTP {
     // Port to send the HTTP request.
     required uint32 port = 1;
@@ -170,6 +201,7 @@ message HealthCheck {
     // for specific data in the response.
   }
 
+  // HTTP health check - not yet recommended for use, see MESOS-2533.
   optional HTTP http = 1;
 
   // TODO(benh): Consider adding a URL health check strategy which
@@ -177,12 +209,7 @@ message HealthCheck {
   // encapsulates all the details in a single string field.
 
   // TODO(benh): Other possible health check strategies could include
-  // one for TCP/UDP or a "command". A "command" could be running a
-  // (shell) command to check the healthiness. We'd need to determine
-  // what arguments (or environment variables) we'd want to set so
-  // that the command could do it's job (i.e., do we want to expose
-  // the stdout/stderr and/or the pid to make checking for healthiness
-  // easier).
+  // one for TCP/UDP.
 
   // Amount of time to wait until starting the health checks.
   optional double delay_seconds = 2 [default = 15.0];
@@ -218,7 +245,24 @@ message CommandInfo {
   message URI {
     required string value = 1;
     optional bool executable = 2;
+
+    // In case the fetched file is recognized as an archive, extract
+    // its contents into the sandbox. Note that a cached archive is
+    // not copied from the cache to the sandbox in case extraction
+    // originates from an archive in the cache.
     optional bool extract = 3 [default = true];
+
+    // If this field is "true", the fetcher cache will be used. If not,
+    // fetching bypasses the cache and downloads directly into the
+    // sandbox directory, no matter whether a suitable cache file is
+    // available or not. The former directs the fetcher to download to
+    // the file cache, then copy from there to the sandbox. Subsequent
+    // fetch attempts with the same URI will omit downloading and copy
+    // from the cache as long as the file is resident there. Cache files
+    // may get evicted at any time, which then leads to renewed
+    // downloading. See also "docs/fetcher.md" and
+    // "docs/fetcher-cache-internals.md".
+    optional bool cache = 4;
   }
 
   // Describes a container.
@@ -293,6 +337,12 @@ message ExecutorInfo {
   // usage information into a time series database for monitoring.
   optional string source = 10;
   optional bytes data = 4;
+
+  // Service discovery information for the executor. It is not
+  // interpreted or acted upon by Mesos. It is up to a service
+  // discovery system to use this information as needed and to handle
+  // executors without service discovery information.
+  optional DiscoveryInfo discovery = 12;
 }
 
 
@@ -307,6 +357,7 @@ message MasterInfo {
   required uint32 port = 3 [default = 5050];
   optional string pid = 4;
   optional string hostname = 5;
+  optional string version = 6;
 }
 
 
@@ -323,6 +374,8 @@ message SlaveInfo {
   repeated Resource resources = 3;
   repeated Attribute attributes = 5;
   optional SlaveID id = 6;
+  // TODO(joerg84): Remove checkpoint field as with 0.22.0
+  // slave checkpointing is enabled for all slaves (MESOS-2317).
   optional bool checkpoint = 7 [default = false];
 }
 
@@ -399,14 +452,121 @@ message Resource {
   optional Value.Ranges ranges = 4;
   optional Value.Set set = 5;
   optional string role = 6 [default = "*"];
+
+  message ReservationInfo {
+    // Describes a dynamic reservation. A dynamic reservation is
+    // acquired by an operator via the '/reserve' HTTP endpoint or by
+    // a framework via the offer cycle by sending back an
+    // 'Offer::Operation::Reserve' message.
+    // NOTE: We currently do not allow frameworks with role "*" to
+    // make dynamic reservations.
+
+    // This field indicates the principal of the operator or framework
+    // that reserved this resource. It is used in conjunction with the
+    // "unreserve" ACL to determine whether the entity attempting to
+    // unreserve this resource is permitted to do so.
+    // NOTE: This field should match the FrameworkInfo.principal of
+    // the framework that reserved this resource.
+    required string principal = 1;
+  }
+
+  // If this is set, this resource was dynamically reserved by an
+  // operator or a framework. Otherwise, this resource is either unreserved
+  // or statically reserved by an operator via the --resources flag.
+  optional ReservationInfo reservation = 8;
+
+  message DiskInfo {
+    // Describes a persistent disk volume.
+    // A persistent disk volume will not be automatically garbage
+    // collected if the task/executor/slave terminates, but is
+    // re-offered to the framework(s) belonging to the 'role'.
+    // A framework can set the ID (if it is not set yet) to express
+    // the intention to create a new persistent disk volume from a
+    // regular disk resource. To reuse a previously created volume, a
+    // framework can launch a task/executor when it receives an offer
+    // with a persistent volume, i.e., ID is set.
+    // NOTE: Currently, we do not allow a persistent disk volume
+    // without a reservation (i.e., 'role' should not be '*').
+    message Persistence {
+      // A unique ID for the persistent disk volume.
+      // NOTE: The ID needs to be unique per role on each slave.
+      required string id = 1;
+    }
+
+    optional Persistence persistence = 1;
+
+    // Describes how this disk resource will be mounted in the
+    // container. If not set, the disk resource will be used as the
+    // sandbox. Otherwise, it will be mounted according to the
+    // 'container_path' inside 'volume'. The 'host_path' inside
+    // 'volume' is ignored.
+    // NOTE: If 'volume' is set but 'persistence' is not set, the
+    // volume will be automatically garbage collected after
+    // task/executor terminates. Currently, if 'persistence' is set,
+    // 'volume' must be set.
+    optional Volume volume = 2;
+  }
+
+  optional DiskInfo disk = 7;
+
+  message RevocableInfo {}
+
+  // If this is set, the resources are revocable, i.e., any tasks or
+  // executors launched using these resources could get preempted or
+  // throttled at any time. This could be used by frameworks to run
+  // best effort tasks that do not need strict uptime or performance
+  // guarantees. Note that if this is set, 'disk' or 'reservation'
+  // cannot be set.
+  optional RevocableInfo revocable = 9;
+}
+
+/**
+ * When the network bandwidth caps are enabled and the container
+ * is over its limit, outbound packets may be either delayed or
+ * dropped completely either because it exceeds the maximum bandwidth
+ * allocation for a single container (the cap) or because the combined
+ * network traffic of multiple containers on the host exceeds the
+ * transmit capacity of the host (the share). We can report the
+ * following statistics for each of these conditions exported directly
+ * from the Linux Traffic Control Queueing Discipline.
+ *
+ * id         : name of the limiter, e.g. 'tx_bw_cap'
+ * backlog    : number of packets currently delayed
+ * bytes      : total bytes seen
+ * drops      : number of packets dropped in total
+ * overlimits : number of packets which exceeded allocation
+ * packets    : total packets seen
+ * qlen       : number of packets currently queued
+ * rate_bps   : throughput in bytes/sec
+ * rate_pps   : throughput in packets/sec
+ * requeues   : number of times a packet has been delayed due to
+ *              locking or device contention issues
+ *
+ * More information on the operation of Linux Traffic Control can be
+ * found at http://www.lartc.org/lartc.html.
+ */
+message TrafficControlStatistics {
+  required string id = 1;
+  optional uint64 backlog = 2;
+  optional uint64 bytes = 3;
+  optional uint64 drops = 4;
+  optional uint64 overlimits = 5;
+  optional uint64 packets = 6;
+  optional uint64 qlen = 7;
+  optional uint64 ratebps = 8;
+  optional uint64 ratepps = 9;
+  optional uint64 requeues = 10;
 }
 
 
-/*
+/**
  * A snapshot of resource usage statistics.
  */
 message ResourceStatistics {
   required double timestamp = 1; // Snapshot time, in seconds since the Epoch.
+
+  optional uint32 processes = 30;
+  optional uint32 threads = 31;
 
   // CPU Usage Information:
   // Total CPU time spent in user mode, and kernel mode.
@@ -422,17 +582,55 @@ message ResourceStatistics {
   optional double cpus_throttled_time_secs = 9;
 
   // Memory Usage Information:
-  optional uint64 mem_rss_bytes = 5; // Resident Set Size.
 
-  // Amount of memory resources allocated.
+  // mem_total_bytes was added in 0.23.0 to represent the total memory
+  // of a process in RAM (as opposed to in Swap). This was previously
+  // reported as mem_rss_bytes, which was also changed in 0.23.0 to
+  // represent only the anonymous memory usage, to keep in sync with
+  // Linux kernel's (arguably erroneous) use of terminology.
+  optional uint64 mem_total_bytes = 36;
+
+  // Total memory + swap usage. This is set if swap is enabled.
+  optional uint64 mem_total_memsw_bytes = 37;
+
+  // Hard memory limit for a container.
   optional uint64 mem_limit_bytes = 6;
 
-  // Broken out memory usage information (files, anonymous, and mmaped files)
+  // Soft memory limit for a container.
+  optional uint64 mem_soft_limit_bytes = 38;
+
+  // Broken out memory usage information: pagecache, rss (anonymous),
+  // mmaped files and swap.
+
+  // TODO(chzhcn) mem_file_bytes and mem_anon_bytes are deprecated in
+  // 0.23.0 and will be removed in 0.24.0.
   optional uint64 mem_file_bytes = 10;
   optional uint64 mem_anon_bytes = 11;
-  optional uint64 mem_mapped_file_bytes = 12;
 
-  // TODO(bmahler): Add disk usage.
+  // mem_cache_bytes is added in 0.23.0 to represent page cache usage.
+  optional uint64 mem_cache_bytes = 39;
+
+  // Since 0.23.0, mem_rss_bytes is changed to represent only
+  // anonymous memory usage. Note that neither its requiredness, type,
+  // name nor numeric tag has been changed.
+  optional uint64 mem_rss_bytes = 5;
+
+  optional uint64 mem_mapped_file_bytes = 12;
+  // This is only set if swap is enabled.
+  optional uint64 mem_swap_bytes = 40;
+
+  // Number of occurrences of different levels of memory pressure
+  // events reported by memory cgroup. Pressure listening (re)starts
+  // with these values set to 0 when slave (re)starts. See
+  // https://www.kernel.org/doc/Documentation/cgroups/memory.txt for
+  // more details.
+  optional uint64 mem_low_pressure_counter = 32;
+  optional uint64 mem_medium_pressure_counter = 33;
+  optional uint64 mem_critical_pressure_counter = 34;
+
+  // Disk Usage Information for executor working directory.
+  optional uint64 disk_limit_bytes = 26;
+  optional uint64 disk_used_bytes = 27;
 
   // Perf statistics.
   optional PerfStatistics perf = 13;
@@ -453,34 +651,36 @@ message ResourceStatistics {
   optional double net_tcp_rtt_microsecs_p90 = 23;
   optional double net_tcp_rtt_microsecs_p95 = 24;
   optional double net_tcp_rtt_microsecs_p99 = 25;
+
+  optional double net_tcp_active_connections = 28;
+  optional double net_tcp_time_wait_connections = 29;
+
+  // Network traffic flowing into or out of a container can be delayed
+  // or dropped due to congestion or policy inside and outside the
+  // container.
+  repeated TrafficControlStatistics net_traffic_control_statistics = 35;
 }
 
 
 /**
- * Describes a snapshot of the resource usage for an executor.
- *
- * TODO(bmahler): Note that we want to be sending this information
- * to the master, and subsequently to the relevant scheduler. So
- * this proto is designed to be easy for the scheduler to use, this
- * is why we provide the slave id, executor info / task info.
+ * Describes a snapshot of the resource usage for executors.
  */
 message ResourceUsage {
-  required SlaveID slave_id = 1;
-  required FrameworkID framework_id = 2;
+  message Executor {
+    required ExecutorInfo executor_info = 1;
 
-  // Resource usage is for an executor. For tasks launched with
-  // an explicit executor, the executor id is provided. For tasks
-  // launched without an executor, our internal executor will be
-  // used. In this case, we provide the task id here instead, in
-  // order to make this message easier for schedulers to work with.
+    // This includes resources used by the executor itself
+    // as well as its active tasks.
+    repeated Resource allocated = 2;
 
-  optional ExecutorID executor_id = 3; // If present, this executor was
-  optional string executor_name = 4;   // explicitly specified.
+    // Current resource usage. If absent, the containerizer
+    // cannot provide resource usage.
+    optional ResourceStatistics statistics = 3;
+  }
 
-  optional TaskID task_id = 5; // If present, the task did not have an executor.
+  repeated Executor executors = 1;
 
-  // If missing, the isolation module cannot provide resource usage.
-  optional ResourceStatistics statistics = 6;
+  // TODO(jieyu): Include slave's total resources here.
 }
 
 
@@ -564,6 +764,8 @@ message PerfStatistics {
  * to proactively influence the allocator.  If 'slave_id' is provided
  * then this request is assumed to only apply to resources on that
  * slave.
+ *
+ * TODO(vinod): Remove this once the old driver is removed.
  */
 message Request {
   optional SlaveID slave_id = 1;
@@ -583,6 +785,44 @@ message Offer {
   repeated Resource resources = 5;
   repeated Attribute attributes = 7;
   repeated ExecutorID executor_ids = 6;
+
+  // Defines an operation that can be performed against offers.
+  message Operation {
+    enum Type {
+      LAUNCH = 1;
+      RESERVE = 2;
+      UNRESERVE = 3;
+      CREATE = 4;
+      DESTROY = 5;
+    }
+
+    message Launch {
+      repeated TaskInfo task_infos = 1;
+    }
+
+    message Reserve {
+      repeated Resource resources = 1;
+    }
+
+    message Unreserve {
+      repeated Resource resources = 1;
+    }
+
+    message Create {
+      repeated Resource volumes = 1;
+    }
+
+    message Destroy {
+      repeated Resource volumes = 1;
+    }
+
+    required Type type = 1;
+    optional Launch launch = 2;
+    optional Reserve reserve = 3;
+    optional Unreserve unreserve = 4;
+    optional Create create = 5;
+    optional Destroy destroy = 6;
+  }
 }
 
 
@@ -607,6 +847,19 @@ message TaskInfo {
   // A health check for the task (currently in *alpha* and initial
   // support will only be for TaskInfo's that have a CommandInfo).
   optional HealthCheck health_check = 8;
+
+  // Labels are free-form key value pairs which are exposed through
+  // master and slave endpoints. Labels will not be interpreted or
+  // acted upon by Mesos itself. As opposed to the data field, labels
+  // will be kept in memory on master and slave processes. Therefore,
+  // labels should be used to tag tasks with light-weight meta-data.
+  optional Labels labels = 10;
+
+  // Service discovery information for the task. It is not interpreted
+  // or acted upon by Mesos. It is up to a service discovery system
+  // to use this information as needed and to handle tasks without
+  // service discovery information.
+  optional DiscoveryInfo discovery = 11;
 }
 
 
@@ -625,8 +878,6 @@ enum TaskState {
   TASK_FAILED = 3; // TERMINAL. The task failed to finish successfully.
   TASK_KILLED = 4; // TERMINAL. The task was killed by the executor.
   TASK_LOST = 5; // TERMINAL. The task failed but can be rescheduled.
-  // TASK_ERROR is currently unused but will be introduced in 0.22.0.
-  // TODO(dhamon): Start using TASK_ERROR.
   TASK_ERROR = 7; // TERMINAL. The task description contains an error.
 }
 
@@ -635,16 +886,20 @@ enum TaskState {
  * Describes the current status of a task.
  */
 message TaskStatus {
-  /** Describes the source of the task status update. */
+  // Describes the source of the task status update.
   enum Source {
     SOURCE_MASTER = 0;
     SOURCE_SLAVE = 1;
     SOURCE_EXECUTOR = 2;
   }
 
-  /** Detailed reason for the task status update. */
+  // Detailed reason for the task status update.
+  //
+  // TODO(bmahler): Differentiate between slave removal reasons
+  // (e.g. unhealthy vs. unregistered for maintenance).
   enum Reason {
     REASON_COMMAND_EXECUTOR_FAILED = 0;
+    REASON_EXECUTOR_PREEMPTED = 17;
     REASON_EXECUTOR_TERMINATED = 1;
     REASON_EXECUTOR_UNREGISTERED = 2;
     REASON_FRAMEWORK_REMOVED = 3;
@@ -654,6 +909,7 @@ message TaskStatus {
     REASON_MASTER_DISCONNECTED = 7;
     REASON_MEMORY_LIMIT = 8;
     REASON_RECONCILIATION = 9;
+    REASON_RESOURCES_UNKNOWN = 18;
     REASON_SLAVE_DISCONNECTED = 10;
     REASON_SLAVE_REMOVED = 11;
     REASON_SLAVE_RESTARTED = 12;
@@ -672,6 +928,17 @@ message TaskStatus {
   optional SlaveID slave_id = 5;
   optional ExecutorID executor_id = 7; // TODO(benh): Use in master/slave.
   optional double timestamp = 6;
+
+  // Statuses that are delivered reliably to the scheduler will
+  // include a 'uuid'. The status is considered delivered once
+  // it is acknowledged by the scheduler. Schedulers can choose
+  // to either explicitly acknowledge statuses or let the scheduler
+  // driver implicitly acknowledge (default).
+  //
+  // TODO(bmahler): This is currently overwritten in the scheduler
+  // driver and executor driver, but executors will need to set this
+  // to a valid RFC-4122 UUID if using the HTTP API.
+  optional bytes uuid = 11;
 
   // Describes whether the task has been determined to be healthy
   // (true) or unhealthy (false) according to the HealthCheck field in
@@ -928,10 +1195,15 @@ message ContainerInfo {
     optional bool privileged = 4 [default = false];
 
     // Allowing arbitrary parameters to be passed to docker CLI.
-    // Note that anything passed to this field is not guranteed
+    // Note that anything passed to this field is not guaranteed
     // to be supported moving forward, as we might move away from
     // the docker CLI.
     repeated Parameter parameters = 5;
+
+    // With this flag set to true, the docker containerizer will
+    // pull the docker image from the registry even if the image
+    // is already downloaded on the slave.
+    optional bool force_pull_image = 6;
   }
 
   required Type type = 1;
@@ -939,4 +1211,69 @@ message ContainerInfo {
   optional string hostname = 4;
 
   optional DockerInfo docker = 3;
+}
+
+
+/**
+ * Collection of labels.
+ */
+message Labels {
+    repeated Label labels = 1;
+}
+
+
+/**
+ * Key, value pair used to store free form user-data.
+ */
+message Label {
+  required string key = 1;
+  optional string value = 2;
+}
+
+
+/**
+ * Named port used for service discovery.
+ */
+message Port {
+  required uint32 number = 1;
+  optional string name = 2;
+  optional string protocol = 3;
+}
+
+
+/**
+ * Collection of ports.
+ */
+message Ports {
+  repeated Port ports = 1;
+}
+
+
+/**
+* Service discovery information.
+* The visibility field restricts discovery within a framework
+* (FRAMEWORK), within a Mesos cluster (CLUSTER), or  places no
+* restrictions (EXTERNAL).
+* The environment, location, and version fields provide first class
+* support for common attributes used to differentiate between
+* similar services. The environment may receive values such as
+* PROD/QA/DEV, the location field may receive values like
+* EAST-US/WEST-US/EUROPE/AMEA, and the version field may receive
+* values like v2.0/v0.9. The exact use of these fields is up to each
+* service discovery system.
+*/
+message DiscoveryInfo {
+  enum Visibility {
+    FRAMEWORK = 0;
+    CLUSTER = 1;
+    EXTERNAL = 2;
+  }
+
+  required Visibility visibility = 1;
+  optional string name = 2;
+  optional string environment = 3;
+  optional string location = 4;
+  optional string version = 5;
+  optional Ports ports = 6;
+  optional Labels labels = 7;
 }

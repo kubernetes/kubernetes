@@ -114,6 +114,23 @@ func ValidateDaemonSetUpdate(oldController, controller *experimental.DaemonSet) 
 	return allErrs
 }
 
+// validateDaemonSetStatus validates a DaemonSetStatus
+func validateDaemonSetStatus(status *experimental.DaemonSetStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentNumberScheduled), "currentNumberScheduled")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.NumberMisscheduled), "numberMisscheduled")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredNumberScheduled), "desiredNumberScheduled")...)
+	return allErrs
+}
+
+// ValidateDaemonSetStatus validates tests if required fields in the DaemonSet Status section
+func ValidateDaemonSetStatusUpdate(controller, oldController *experimental.DaemonSet) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, validateDaemonSetStatus(&controller.Status)...)
+	return allErrs
+}
+
 // ValidateDaemonSetTemplateUpdate tests that certain fields in the daemon set's pod template are not updated.
 func ValidateDaemonSetTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplateSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -312,10 +329,25 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 	return allErrs
 }
 
+func ValidateJobStatus(status *experimental.JobStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), "active")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Successful), "successful")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Unsuccessful), "unsuccessful")...)
+	return allErrs
+}
+
 func ValidateJobUpdate(oldJob, job *experimental.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateJobSpecUpdate(oldJob.Spec, job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidateJobUpdateStatus(oldJob, job *experimental.Job) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateJobStatusUpdate(oldJob.Status, job.Status).Prefix("status")...)
 	return allErrs
 }
 
@@ -331,5 +363,11 @@ func ValidateJobSpecUpdate(oldSpec, spec experimental.JobSpec) errs.ValidationEr
 	if !api.Semantic.DeepEqual(oldSpec.Template, spec.Template) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("template", "[omitted]", "field is immutable"))
 	}
+	return allErrs
+}
+
+func ValidateJobStatusUpdate(oldStatus, status experimental.JobStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateJobStatus(&status)...)
 	return allErrs
 }

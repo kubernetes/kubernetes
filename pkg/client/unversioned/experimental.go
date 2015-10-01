@@ -129,22 +129,21 @@ func setExperimentalDefaults(config *Config) error {
 	if err != nil {
 		return err
 	}
-	config.Prefix = "apis/" + g.Group
+	config.Prefix = "apis/"
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if config.Version == "" {
-		config.Version = g.Version
-	}
+	// TODO: Unconditionally set the config.Version, until we fix the config.
+	//if config.Version == "" {
+	config.Version = g.GroupVersion
+	//}
 
 	versionInterfaces, err := g.InterfacesFor(config.Version)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
 			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
 	}
-	if config.Codec == nil {
-		config.Codec = versionInterfaces.Codec
-	}
+	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

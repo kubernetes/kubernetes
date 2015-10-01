@@ -107,6 +107,42 @@ func mockCreateResponse(t *testing.T, lbID int) {
 	})
 }
 
+func mockCreateErrResponse(t *testing.T, lbID int) {
+	th.Mux.HandleFunc(_rootURL(lbID), func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "POST")
+		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
+
+		th.TestJSONRequest(t, r, `
+{
+  "nodes": [
+    {
+      "address": "10.2.2.3",
+      "port": 80,
+      "condition": "ENABLED",
+      "type": "PRIMARY"
+    },
+    {
+      "address": "10.2.2.4",
+      "port": 81,
+      "condition": "ENABLED",
+      "type": "SECONDARY"
+    }
+  ]
+}
+    `)
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(422) // Unprocessable Entity
+
+		fmt.Fprintf(w, `
+{
+  "code": 422,
+  "message": "Load Balancer '%d' has a status of 'PENDING_UPDATE' and is considered immutable."
+}
+  `, lbID)
+	})
+}
+
 func mockBatchDeleteResponse(t *testing.T, lbID int, ids []int) {
 	th.Mux.HandleFunc(_rootURL(lbID), func(w http.ResponseWriter, r *http.Request) {
 		th.TestMethod(t, r, "DELETE")

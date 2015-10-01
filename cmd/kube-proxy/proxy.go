@@ -35,8 +35,8 @@ func init() {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewProxyServer()
-	s.AddFlags(pflag.CommandLine)
+	config := app.NewProxyConfig()
+	config.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
 	util.InitLogs()
@@ -44,7 +44,13 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+	s, err := app.NewProxyServerDefault(config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
+	if err = s.Run(pflag.CommandLine.Args()); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

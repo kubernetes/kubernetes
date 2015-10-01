@@ -62,7 +62,7 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 			additions := expected.Difference(actual)
 			removals := actual.Difference(expected)
 
-			if len(removals) != 0 {
+			if removals.Len() != 0 {
 				request := &elb.DetachLoadBalancerFromSubnetsInput{}
 				request.LoadBalancerName = aws.String(name)
 				request.Subnets = stringSetToPointers(removals)
@@ -74,7 +74,7 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 				dirty = true
 			}
 
-			if len(additions) != 0 {
+			if additions.Len() != 0 {
 				request := &elb.AttachLoadBalancerToSubnetsInput{}
 				request.LoadBalancerName = aws.String(name)
 				request.Subnets = stringSetToPointers(additions)
@@ -133,7 +133,7 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
 						continue
 					}
-					if orEmpty(actual.SSLCertificateID) != orEmpty(expected.SSLCertificateID) {
+					if orEmpty(actual.SSLCertificateId) != orEmpty(expected.SSLCertificateId) {
 						continue
 					}
 					found = i
@@ -247,28 +247,28 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerD
 func (s *AWSCloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
 	expected := sets.NewString()
 	for _, instance := range instances {
-		expected.Insert(orEmpty(instance.InstanceID))
+		expected.Insert(orEmpty(instance.InstanceId))
 	}
 
 	actual := sets.NewString()
 	for _, lbInstance := range lbInstances {
-		actual.Insert(orEmpty(lbInstance.InstanceID))
+		actual.Insert(orEmpty(lbInstance.InstanceId))
 	}
 
 	additions := expected.Difference(actual)
 	removals := actual.Difference(expected)
 
 	addInstances := []*elb.Instance{}
-	for instanceId := range additions {
+	for _, instanceId := range additions.List() {
 		addInstance := &elb.Instance{}
-		addInstance.InstanceID = aws.String(instanceId)
+		addInstance.InstanceId = aws.String(instanceId)
 		addInstances = append(addInstances, addInstance)
 	}
 
 	removeInstances := []*elb.Instance{}
-	for instanceId := range removals {
+	for _, instanceId := range removals.List() {
 		removeInstance := &elb.Instance{}
-		removeInstance.InstanceID = aws.String(instanceId)
+		removeInstance.InstanceId = aws.String(instanceId)
 		removeInstances = append(removeInstances, removeInstance)
 	}
 

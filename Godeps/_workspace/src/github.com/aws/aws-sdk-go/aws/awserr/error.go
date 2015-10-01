@@ -10,23 +10,23 @@ package awserr
 //
 // Example:
 //
-//    output, err := s3manage.Upload(svc, input, opts)
-//    if err != nil {
-//        if awsErr, ok := err.(awserr.Error); ok {
-//            // Get error details
-//            log.Println("Error:", err.Code(), err.Message())
+//     output, err := s3manage.Upload(svc, input, opts)
+//     if err != nil {
+//         if awsErr, ok := err.(awserr.Error); ok {
+//             // Get error details
+//             log.Println("Error:", err.Code(), err.Message())
 //
-//            Prints out full error message, including original error if there was one.
-//            log.Println("Error:", err.Error())
+//             // Prints out full error message, including original error if there was one.
+//             log.Println("Error:", err.Error())
 //
-//            // Get original error
-//            if origErr := err.Err(); origErr != nil {
-//                // operate on original error.
-//            }
-//        } else {
-//            fmt.Println(err.Error())
-//        }
-//    }
+//             // Get original error
+//             if origErr := err.Err(); origErr != nil {
+//                 // operate on original error.
+//             }
+//         } else {
+//             fmt.Println(err.Error())
+//         }
+//     }
 //
 type Error interface {
 	// Satisfy the generic error interface.
@@ -40,6 +40,17 @@ type Error interface {
 
 	// Returns the original error if one was set.  Nil is returned if not set.
 	OrigErr() error
+}
+
+// New returns an Error object described by the code, message, and origErr.
+//
+// If origErr satisfies the Error interface it will not be wrapped within a new
+// Error object and will instead be returned.
+func New(code, message string, origErr error) Error {
+	if e, ok := origErr.(Error); ok && e != nil {
+		return e
+	}
+	return newBaseError(code, message, origErr)
 }
 
 // A RequestFailure is an interface to extract request failure information from
@@ -85,4 +96,10 @@ type RequestFailure interface {
 	// be empty if no request ID is available such as the request failed due
 	// to a connection error.
 	RequestID() string
+}
+
+// NewRequestFailure returns a new request error wrapper for the given Error
+// provided.
+func NewRequestFailure(err Error, statusCode int, reqID string) RequestFailure {
+	return newRequestError(err, statusCode, reqID)
 }

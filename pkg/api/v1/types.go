@@ -1496,10 +1496,21 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
 
-	// ExternalIPs are used by external load balancers, or can be set by
-	// users to handle external traffic that arrives at a node.
-	// Externally visible IPs (e.g. load balancers) that should be proxied to this service.
+	// externalIPs is a list of IP addresses for which nodes in the cluster
+	// will also accept traffic for this service.  These IPs are not managed by
+	// Kubernetes.  The user is responsible for ensuring that traffic arrives
+	// at a node with this IP.  A common example is external load-balancers
+	// that are not part of the Kubernetes system.  A previous form of this
+	// functionality exists as the deprecatedPublicIPs field.  When using this
+	// field, callers should also clear the deprecatedPublicIPs field.
 	ExternalIPs []string `json:"externalIPs,omitempty"`
+
+	// deprecatedPublicIPs is deprecated and replaced by the externalIPs field
+	// with almost the exact same semantics.  This field is retained in the v1
+	// API for compatibility until at least 8/20/2016.  It will be removed from
+	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
+	// set, deprecatedPublicIPs is used.
+	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
 	// Enable client IP based session affinity.
@@ -2490,50 +2501,4 @@ type RangeAllocation struct {
 	Range string `json:"range"`
 	// Data is a bit array containing all allocated addresses in the previous segment.
 	Data []byte `json:"data"`
-}
-
-// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
-// types to the API.  It consists of one or more Versions of the api.
-type ThirdPartyResource struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	ObjectMeta `json:"metadata,omitempty"`
-
-	// The description of this object.
-	Description string `json:"description,omitempty"`
-
-	// The versions for this third party object.
-	Versions []APIVersion `json:"versions,omitempty"`
-}
-
-// ThirdPartyResourceList is a list of ThirdPartyResource.
-type ThirdPartyResourceList struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
-
-	// Items is a list of schema objects.
-	Items []ThirdPartyResource `json:"items"`
-}
-
-// An APIVersion represents a single concrete version of an object model.
-type APIVersion struct {
-	// Name of this version (e.g. 'v1').
-	Name string `json:"name,omitempty"`
-	// The API group to add this object into.
-	// Default 'experimental'.
-	APIGroup string `json:"apiGroup,omitempty"`
-}
-
-// An internal object, used for versioned storage in etcd. Not exposed to the end user.
-type ThirdPartyResourceData struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	ObjectMeta `json:"metadata,omitempty"`
-
-	// The raw JSON data for this data.
-	Data []byte `json:"name,omitempty"`
 }

@@ -40,6 +40,10 @@ import (
 	"reflect"
 )
 
+func NewRequiredNotSetError(field string) *RequiredNotSetError {
+	return &RequiredNotSetError{field}
+}
+
 type Sizer interface {
 	Size() int
 }
@@ -64,12 +68,9 @@ func size_ext_slice_byte(p *Properties, base structPointer) (n int) {
 
 // Encode a reference to bool pointer.
 func (o *Buffer) enc_ref_bool(p *Properties, base structPointer) error {
-	v := structPointer_RefBool(base, p.field)
-	if v == nil {
-		return ErrNil
-	}
+	v := *structPointer_BoolVal(base, p.field)
 	x := 0
-	if *v {
+	if v {
 		x = 1
 	}
 	o.buf = append(o.buf, p.tagcode...)
@@ -78,53 +79,37 @@ func (o *Buffer) enc_ref_bool(p *Properties, base structPointer) error {
 }
 
 func size_ref_bool(p *Properties, base structPointer) int {
-	v := structPointer_RefBool(base, p.field)
-	if v == nil {
-		return 0
-	}
 	return len(p.tagcode) + 1 // each bool takes exactly one byte
 }
 
 // Encode a reference to int32 pointer.
 func (o *Buffer) enc_ref_int32(p *Properties, base structPointer) error {
-	v := structPointer_RefWord32(base, p.field)
-	if refWord32_IsNil(v) {
-		return ErrNil
-	}
-	x := int32(refWord32_Get(v))
+	v := structPointer_Word32Val(base, p.field)
+	x := int32(word32Val_Get(v))
 	o.buf = append(o.buf, p.tagcode...)
 	p.valEnc(o, uint64(x))
 	return nil
 }
 
 func size_ref_int32(p *Properties, base structPointer) (n int) {
-	v := structPointer_RefWord32(base, p.field)
-	if refWord32_IsNil(v) {
-		return 0
-	}
-	x := int32(refWord32_Get(v))
+	v := structPointer_Word32Val(base, p.field)
+	x := int32(word32Val_Get(v))
 	n += len(p.tagcode)
 	n += p.valSize(uint64(x))
 	return
 }
 
 func (o *Buffer) enc_ref_uint32(p *Properties, base structPointer) error {
-	v := structPointer_RefWord32(base, p.field)
-	if refWord32_IsNil(v) {
-		return ErrNil
-	}
-	x := refWord32_Get(v)
+	v := structPointer_Word32Val(base, p.field)
+	x := word32Val_Get(v)
 	o.buf = append(o.buf, p.tagcode...)
 	p.valEnc(o, uint64(x))
 	return nil
 }
 
 func size_ref_uint32(p *Properties, base structPointer) (n int) {
-	v := structPointer_RefWord32(base, p.field)
-	if refWord32_IsNil(v) {
-		return 0
-	}
-	x := refWord32_Get(v)
+	v := structPointer_Word32Val(base, p.field)
+	x := word32Val_Get(v)
 	n += len(p.tagcode)
 	n += p.valSize(uint64(x))
 	return
@@ -132,22 +117,16 @@ func size_ref_uint32(p *Properties, base structPointer) (n int) {
 
 // Encode a reference to an int64 pointer.
 func (o *Buffer) enc_ref_int64(p *Properties, base structPointer) error {
-	v := structPointer_RefWord64(base, p.field)
-	if refWord64_IsNil(v) {
-		return ErrNil
-	}
-	x := refWord64_Get(v)
+	v := structPointer_Word64Val(base, p.field)
+	x := word64Val_Get(v)
 	o.buf = append(o.buf, p.tagcode...)
 	p.valEnc(o, x)
 	return nil
 }
 
 func size_ref_int64(p *Properties, base structPointer) (n int) {
-	v := structPointer_RefWord64(base, p.field)
-	if refWord64_IsNil(v) {
-		return 0
-	}
-	x := refWord64_Get(v)
+	v := structPointer_Word64Val(base, p.field)
+	x := word64Val_Get(v)
 	n += len(p.tagcode)
 	n += p.valSize(x)
 	return
@@ -155,24 +134,16 @@ func size_ref_int64(p *Properties, base structPointer) (n int) {
 
 // Encode a reference to a string pointer.
 func (o *Buffer) enc_ref_string(p *Properties, base structPointer) error {
-	v := structPointer_RefString(base, p.field)
-	if v == nil {
-		return ErrNil
-	}
-	x := *v
+	v := *structPointer_StringVal(base, p.field)
 	o.buf = append(o.buf, p.tagcode...)
-	o.EncodeStringBytes(x)
+	o.EncodeStringBytes(v)
 	return nil
 }
 
 func size_ref_string(p *Properties, base structPointer) (n int) {
-	v := structPointer_RefString(base, p.field)
-	if v == nil {
-		return 0
-	}
-	x := *v
+	v := *structPointer_StringVal(base, p.field)
 	n += len(p.tagcode)
-	n += sizeStringBytes(x)
+	n += sizeStringBytes(v)
 	return
 }
 
@@ -232,7 +203,7 @@ func (o *Buffer) enc_slice_ref_struct_message(p *Properties, base structPointer)
 	for i := 0; i < l; i++ {
 		structp := structPointer_Add(ss1, field(uintptr(i)*size))
 		if structPointer_IsNil(structp) {
-			return ErrRepeatedHasNil
+			return errRepeatedHasNil
 		}
 
 		// Can the object marshal itself?
@@ -251,7 +222,7 @@ func (o *Buffer) enc_slice_ref_struct_message(p *Properties, base structPointer)
 		err := o.enc_len_struct(p.sprop, structp, &state)
 		if err != nil && !state.shouldContinue(err, nil) {
 			if err == ErrNil {
-				return ErrRepeatedHasNil
+				return errRepeatedHasNil
 			}
 			return err
 		}

@@ -1,6 +1,8 @@
 package ports
 
 import (
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -222,4 +224,37 @@ func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
 	_, res.Err = c.Delete(deleteURL(c, id), nil)
 	return res
+}
+
+// IDFromName is a convenience function that returns a port's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	portCount := 0
+	portID := ""
+	if name == "" {
+		return "", fmt.Errorf("A port name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		portList, err := ExtractPorts(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, p := range portList {
+			if p.Name == name {
+				portCount++
+				portID = p.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch portCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find port: %s", name)
+	case 1:
+		return portID, nil
+	default:
+		return "", fmt.Errorf("Found %d ports matching %s", portCount, name)
+	}
 }

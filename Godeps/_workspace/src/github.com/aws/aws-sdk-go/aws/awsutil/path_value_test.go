@@ -16,8 +16,8 @@ type Struct struct {
 }
 
 var data = Struct{
-	A: []Struct{Struct{C: "value1"}, Struct{C: "value2"}, Struct{C: "value3"}},
-	z: []Struct{Struct{C: "value1"}, Struct{C: "value2"}, Struct{C: "value3"}},
+	A: []Struct{{C: "value1"}, {C: "value2"}, {C: "value3"}},
+	z: []Struct{{C: "value1"}, {C: "value2"}, {C: "value3"}},
 	B: &Struct{B: &Struct{C: "terminal"}, D: &Struct{C: "terminal2"}},
 	C: "initial",
 }
@@ -44,6 +44,7 @@ func TestValueAtPathFailure(t *testing.T) {
 	assert.Equal(t, []interface{}{}, awsutil.ValuesAtPath(data, "B.B.C.Z"))
 	assert.Equal(t, []interface{}(nil), awsutil.ValuesAtPath(data, "z[-1].C"))
 	assert.Equal(t, []interface{}{}, awsutil.ValuesAtPath(nil, "A.B.C"))
+	assert.Equal(t, []interface{}{}, awsutil.ValuesAtPath(Struct{}, "A"))
 }
 
 func TestSetValueAtPathSuccess(t *testing.T) {
@@ -62,4 +63,6 @@ func TestSetValueAtPathSuccess(t *testing.T) {
 	var s2 Struct
 	awsutil.SetValueAtAnyPath(&s2, "b.b.c", "test0")
 	assert.Equal(t, "test0", s2.B.B.C)
+	awsutil.SetValueAtAnyPath(&s2, "A", []Struct{{}})
+	assert.Equal(t, []Struct{{}}, s2.A)
 }

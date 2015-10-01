@@ -46,6 +46,7 @@ func mockEnableResponse(t *testing.T, lbID int) {
     `)
 
 		w.WriteHeader(http.StatusAccepted)
+		fmt.Fprintf(w, `{}`)
 	})
 }
 

@@ -8,6 +8,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,16 +24,14 @@ func buildSigner(serviceName string, region string, signTime time.Time, expireTi
 	req.Header.Add("X-Amz-Meta-Other-Header", "some-value=!@#$%^&* (+)")
 
 	return signer{
-		Request:         req,
-		Time:            signTime,
-		ExpireTime:      expireTime,
-		Query:           req.URL.Query(),
-		Body:            reader,
-		ServiceName:     serviceName,
-		Region:          region,
-		AccessKeyID:     "AKID",
-		SecretAccessKey: "SECRET",
-		SessionToken:    "SESSION",
+		Request:     req,
+		Time:        signTime,
+		ExpireTime:  expireTime,
+		Query:       req.URL.Query(),
+		Body:        reader,
+		ServiceName: serviceName,
+		Region:      region,
+		Credentials: credentials.NewStaticCredentials("AKID", "SECRET", "SESSION"),
 	}
 }
 
@@ -118,9 +118,9 @@ func TestSignPrecomputedBodyChecksum(t *testing.T) {
 }
 
 func TestAnonymousCredentials(t *testing.T) {
-	r := aws.NewRequest(
-		aws.NewService(&aws.Config{Credentials: credentials.AnonymousCredentials}),
-		&aws.Operation{
+	svc := service.New(&aws.Config{Credentials: credentials.AnonymousCredentials})
+	r := svc.NewRequest(
+		&request.Operation{
 			Name:       "BatchGetItem",
 			HTTPMethod: "POST",
 			HTTPPath:   "/",
@@ -139,6 +139,97 @@ func TestAnonymousCredentials(t *testing.T) {
 	hQ := r.HTTPRequest.Header
 	assert.Empty(t, hQ.Get("Authorization"))
 	assert.Empty(t, hQ.Get("X-Amz-Date"))
+}
+
+func TestIgnoreResignRequestWithValidCreds(t *testing.T) {
+	svc := service.New(&aws.Config{
+		Credentials: credentials.NewStaticCredentials("AKID", "SECRET", "SESSION"),
+		Region:      aws.String("us-west-2"),
+	})
+	r := svc.NewRequest(
+		&request.Operation{
+			Name:       "BatchGetItem",
+			HTTPMethod: "POST",
+			HTTPPath:   "/",
+		},
+		nil,
+		nil,
+	)
+
+	Sign(r)
+	sig := r.HTTPRequest.Header.Get("Authorization")
+
+	Sign(r)
+	assert.Equal(t, sig, r.HTTPRequest.Header.Get("Authorization"))
+}
+
+func TestIgnorePreResignRequestWithValidCreds(t *testing.T) {
+	svc := service.New(&aws.Config{
+		Credentials: credentials.NewStaticCredentials("AKID", "SECRET", "SESSION"),
+		Region:      aws.String("us-west-2"),
+	})
+	r := svc.NewRequest(
+		&request.Operation{
+			Name:       "BatchGetItem",
+			HTTPMethod: "POST",
+			HTTPPath:   "/",
+		},
+		nil,
+		nil,
+	)
+	r.ExpireTime = time.Minute * 10
+
+	Sign(r)
+	sig := r.HTTPRequest.Header.Get("X-Amz-Signature")
+
+	Sign(r)
+	assert.Equal(t, sig, r.HTTPRequest.Header.Get("X-Amz-Signature"))
+}
+
+func TestResignRequestExpiredCreds(t *testing.T) {
+	creds := credentials.NewStaticCredentials("AKID", "SECRET", "SESSION")
+	svc := service.New(&aws.Config{Credentials: creds})
+	r := svc.NewRequest(
+		&request.Operation{
+			Name:       "BatchGetItem",
+			HTTPMethod: "POST",
+			HTTPPath:   "/",
+		},
+		nil,
+		nil,
+	)
+	Sign(r)
+	querySig := r.HTTPRequest.Header.Get("Authorization")
+
+	creds.Expire()
+
+	Sign(r)
+	assert.NotEqual(t, querySig, r.HTTPRequest.Header.Get("Authorization"))
+}
+
+func TestPreResignRequestExpiredCreds(t *testing.T) {
+	provider := &credentials.StaticProvider{credentials.Value{"AKID", "SECRET", "SESSION"}}
+	creds := credentials.NewCredentials(provider)
+	svc := service.New(&aws.Config{Credentials: creds})
+	r := svc.NewRequest(
+		&request.Operation{
+			Name:       "BatchGetItem",
+			HTTPMethod: "POST",
+			HTTPPath:   "/",
+		},
+		nil,
+		nil,
+	)
+	r.ExpireTime = time.Minute * 10
+
+	Sign(r)
+	querySig := r.HTTPRequest.URL.Query().Get("X-Amz-Signature")
+
+	creds.Expire()
+	r.Time = time.Now().Add(time.Hour * 48)
+
+	Sign(r)
+	assert.NotEqual(t, querySig, r.HTTPRequest.URL.Query().Get("X-Amz-Signature"))
 }
 
 func BenchmarkPresignRequest(b *testing.B) {

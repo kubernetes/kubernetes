@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -105,6 +105,7 @@ type KubeletServer struct {
 	ManifestURLHeader              string
 	MasterServiceNamespace         string
 	MaxContainerCount              int
+	MaxOpenFiles                   uint64
 	MaxPerPodContainerCount        int
 	MaxPods                        int
 	MinimumGCAge                   time.Duration
@@ -183,11 +184,12 @@ func NewKubeletServer() *KubeletServer {
 		MasterServiceNamespace:      api.NamespaceDefault,
 		MaxContainerCount:           100,
 		MaxPerPodContainerCount:     2,
+		MaxOpenFiles:                1000000,
 		MinimumGCAge:                1 * time.Minute,
 		NetworkPluginDir:            "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
 		NetworkPluginName:           "",
 		NodeStatusUpdateFrequency:   10 * time.Second,
-		OOMScoreAdj:                 qos.KubeletOomScoreAdj,
+		OOMScoreAdj:                 qos.KubeletOOMScoreAdj,
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
 		Port:              ports.KubeletPort,
 		ReadOnlyPort:      ports.KubeletReadOnlyPort,
@@ -275,6 +277,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
+	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", 1000000, "Number of files that can be opened by Kubelet process. [default=1000000]")
 }
 
 // KubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -370,6 +373,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		ManifestURLHeader:         manifestURLHeader,
 		MasterServiceNamespace:    s.MasterServiceNamespace,
 		MaxContainerCount:         s.MaxContainerCount,
+		MaxOpenFiles:              s.MaxOpenFiles,
 		MaxPerPodContainerCount:   s.MaxPerPodContainerCount,
 		MaxPods:                   s.MaxPods,
 		MinimumGCAge:              s.MinimumGCAge,
@@ -445,8 +449,8 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 	glog.V(2).Infof("Using root directory: %v", s.RootDirectory)
 
 	// TODO(vmarmol): Do this through container config.
-	oomAdjuster := oom.NewOomAdjuster()
-	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOOMAdjuster()
+	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Warning(err)
 	}
 
@@ -595,8 +599,9 @@ func SimpleKubelet(client *client.Client,
 	configFilePath string,
 	cloud cloudprovider.Interface,
 	osInterface kubecontainer.OSInterface,
-	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency time.Duration) *KubeletConfig {
-
+	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency time.Duration,
+	maxPods int,
+) *KubeletConfig {
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -628,8 +633,9 @@ func SimpleKubelet(client *client.Client,
 		ManifestURL:               manifestURL,
 		MasterServiceNamespace:    masterServiceNamespace,
 		MaxContainerCount:         100,
+		MaxOpenFiles:              1024,
 		MaxPerPodContainerCount:   2,
-		MaxPods:                   32,
+		MaxPods:                   maxPods,
 		MinimumGCAge:              minimumGCAge,
 		Mounter:                   mount.New(),
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
@@ -714,6 +720,9 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
+
+	util.ApplyRLimitForSelf(kcfg.MaxOpenFiles)
+
 	// process pods and exit.
 	if kcfg.Runonce {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
@@ -801,6 +810,7 @@ type KubeletConfig struct {
 	ManifestURLHeader              http.Header
 	MasterServiceNamespace         string
 	MaxContainerCount              int
+	MaxOpenFiles                   uint64
 	MaxPerPodContainerCount        int
 	MaxPods                        int
 	MinimumGCAge                   time.Duration

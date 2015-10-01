@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/registered"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	_ "k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/v1"
+	"k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -51,14 +51,16 @@ func init() {
 		GroupVersion: groupVersion,
 		Group:        apiutil.GetGroup(groupVersion),
 		Version:      apiutil.GetVersion(groupVersion),
-		// TODO: caesarxuchao: change it to groupVersion when we support multiple groups
-		Codec: runtime.CodecFor(api.Scheme, apiutil.GetVersion(groupVersion)),
+		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
 	}
 	var versions []string
+	var groupVersions []string
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
 		versions = append(versions, apiutil.GetVersion(registeredGroupVersions[i]))
+		groupVersions = append(groupVersions, registeredGroupVersions[i])
 	}
 	groupMeta.Versions = versions
+	groupMeta.GroupVersions = groupVersions
 
 	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 
@@ -68,7 +70,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper("experimental", versions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	groupMeta.RESTMapper = api.NewDefaultRESTMapper("experimental", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 }
@@ -77,9 +79,9 @@ func init() {
 // string, or an error if the version is not known.
 func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "v1":
+	case "experimental/v1alpha1":
 		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
+			Codec:            v1alpha1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil

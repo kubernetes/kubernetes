@@ -60,25 +60,27 @@ type RollingUpdaterConfig struct {
 	// CleanupPolicy defines the cleanup action to take after the deployment is
 	// complete.
 	CleanupPolicy RollingUpdaterCleanupPolicy
-	// The maximum number of pods that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of total pods at
-	// the start of update (ex: 10%). Absolute number is calculated from
-	// percentage by rounding up. This can not be 0 if MaxSurge is 0. By
-	// default, a fixed value of 1 is used. Example: when this is set to 30%,
-	// the old RC can be scaled down by 30% immediately when the rolling update
-	// starts. Once new pods are ready, old RC can be scaled down further,
-	// followed by scaling up the new RC, ensuring that at least 70% of original
-	// number of pods are available at all times during the update.
+	// MaxUnavailable is the maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// This can not be 0 if MaxSurge is 0.
+	// By default, a fixed value of 1 is used.
+	// Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods
+	// immediately when the rolling update starts. Once new pods are ready, old RC
+	// can be scaled down further, followed by scaling up the new RC, ensuring
+	// that the total number of pods available at all times during the update is at
+	// least 70% of desired pods.
 	MaxUnavailable util.IntOrString
-	// The maximum number of pods that can be scheduled above the original
-	// number of pods. Value can be an absolute number (ex: 5) or a percentage of total
-	// pods at the start of the update (ex: 10%). This can not be 0 if
-	// MaxUnavailable is 0. Absolute number is calculated from percentage by
-	// rounding up. By default, a value of 1 is used. Example: when this is set
-	// to 30%, the new RC can be scaled up by 30% immediately when the rolling
-	// update starts. Once old pods have been killed, new RC can be scaled up
+	// MaxSurge is the maximum number of pods that can be scheduled above the desired number of pods.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// This can not be 0 if MaxUnavailable is 0.
+	// Absolute number is calculated from percentage by rounding up.
+	// By default, a value of 1 is used.
+	// Example: when this is set to 30%, the new RC can be scaled up immediately
+	// when the rolling update starts, such that the total number of old and new pods do not exceed
+	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
-	// the update is atmost 130% of original pods.
+	// the update is atmost 130% of desired pods.
 	MaxSurge util.IntOrString
 }
 
@@ -197,12 +199,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 			oldRc.Name, originalReplicasAnnotation, oldRc.Annotations[originalReplicasAnnotation])
 	}
 	// The maximum pods which can go unavailable during the update.
-	maxUnavailable, err := extractMaxValue(config.MaxUnavailable, "maxUnavailable", original)
+	maxUnavailable, err := extractMaxValue(config.MaxUnavailable, "maxUnavailable", desired)
 	if err != nil {
 		return err
 	}
 	// The maximum scaling increment.
-	maxSurge, err := extractMaxValue(config.MaxSurge, "maxSurge", original)
+	maxSurge, err := extractMaxValue(config.MaxSurge, "maxSurge", desired)
 	if err != nil {
 		return err
 	}
@@ -340,8 +342,7 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 
 // scalerScaleAndWait scales a controller using a Scaler and a real client.
 func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-	scalerClient := NewScalerClient(r.c)
-	scaler, err := ScalerFor("ReplicationController", scalerClient)
+	scaler, err := ScalerFor("ReplicationController", r.c)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't make scaler: %s", err)
 	}
@@ -452,8 +453,7 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 	if err != nil {
 		return err
 	}
-	scalerClient := NewScalerClient(r.c)
-	if err = wait.Poll(config.Interval, config.Timeout, scalerClient.ControllerHasDesiredReplicas(newRc)); err != nil {
+	if err = wait.Poll(config.Interval, config.Timeout, client.ControllerHasDesiredReplicas(r.c, newRc)); err != nil {
 		return err
 	}
 	newRc, err = r.c.ReplicationControllers(r.ns).Get(newRc.Name)
@@ -482,8 +482,8 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 }
 
 // func extractMaxValue is a helper to extract config max values as either
-// absolute numbers or based on percentages of the original rc.
-func extractMaxValue(field util.IntOrString, name string, original int) (int, error) {
+// absolute numbers or based on percentages of the given value.
+func extractMaxValue(field util.IntOrString, name string, value int) (int, error) {
 	switch field.Kind {
 	case util.IntstrInt:
 		if field.IntVal < 0 {
@@ -499,7 +499,7 @@ func extractMaxValue(field util.IntOrString, name string, original int) (int, er
 		if v < 0 {
 			return 0, fmt.Errorf("%s must be >= 0", name)
 		}
-		return int(math.Ceil(float64(original) * (float64(v)) / 100)), nil
+		return int(math.Ceil(float64(value) * (float64(v)) / 100)), nil
 	}
 	return 0, fmt.Errorf("invalid kind %q for %s", field.Kind, name)
 }
@@ -564,7 +564,7 @@ func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldNa
 	return newRc, nil
 }
 
-func AbortRollingUpdate(c *RollingUpdaterConfig) {
+func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	// Swap the controllers
 	tmp := c.OldRc
 	c.OldRc = c.NewRc
@@ -574,12 +574,18 @@ func AbortRollingUpdate(c *RollingUpdaterConfig) {
 		c.NewRc.Annotations = map[string]string{}
 	}
 	c.NewRc.Annotations[sourceIdAnnotation] = fmt.Sprintf("%s:%s", c.OldRc.Name, c.OldRc.UID)
-	desiredSize, found := c.OldRc.Annotations[desiredReplicasAnnotation]
-	if found {
-		fmt.Printf("Found desired replicas.")
-		c.NewRc.Annotations[desiredReplicasAnnotation] = desiredSize
+
+	// Use the original value since the replica count change from old to new
+	// could be asymmetric. If we don't know the original count, we can't safely
+	// roll back to a known good size.
+	originalSize, foundOriginal := tmp.Annotations[originalReplicasAnnotation]
+	if !foundOriginal {
+		return fmt.Errorf("couldn't find original replica count of %q", tmp.Name)
 	}
+	fmt.Fprintf(c.Out, "Setting %q replicas to %s\n", c.NewRc.Name, originalSize)
+	c.NewRc.Annotations[desiredReplicasAnnotation] = originalSize
 	c.CleanupPolicy = DeleteRollingUpdateCleanupPolicy
+	return nil
 }
 
 func GetNextControllerAnnotation(rc *api.ReplicationController) (string, bool) {

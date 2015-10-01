@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -154,7 +155,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()}), nil)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
-		perPodBackoff:   map[string]*backoffEntry{},
+		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &fakeClock{},
 		defaultDuration: 1 * time.Millisecond,
 		maxDuration:     1 * time.Second,
@@ -249,53 +250,59 @@ func TestBind(t *testing.T) {
 func TestBackoff(t *testing.T) {
 	clock := fakeClock{}
 	backoff := podBackoff{
-		perPodBackoff:   map[string]*backoffEntry{},
+		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &clock,
 		defaultDuration: 1 * time.Second,
 		maxDuration:     60 * time.Second,
 	}
 
 	tests := []struct {
-		podID            string
+		podID            types.NamespacedName
 		expectedDuration time.Duration
 		advanceClock     time.Duration
 	}{
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 1 * time.Second,
 		},
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 2 * time.Second,
 		},
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 4 * time.Second,
 		},
 		{
-			podID:            "bar",
+			podID:            types.NamespacedName{Namespace: "default", Name: "bar"},
 			expectedDuration: 1 * time.Second,
 			advanceClock:     120 * time.Second,
 		},
 		// 'foo' should have been gc'd here.
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 1 * time.Second,
 		},
 	}
 
 	for _, test := range tests {
-		duration := backoff.getBackoff(test.podID)
+		duration := backoff.getEntry(test.podID).getBackoff(backoff.maxDuration)
 		if duration != test.expectedDuration {
 			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
 		}
 		clock.t = clock.t.Add(test.advanceClock)
 		backoff.gc()
 	}
-
-	backoff.perPodBackoff["foo"].backoff = 60 * time.Second
-	duration := backoff.getBackoff("foo")
+	fooID := types.NamespacedName{Namespace: "default", Name: "foo"}
+	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
+	duration := backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
 	if duration != 60*time.Second {
 		t.Errorf("expected: 60, got %s", duration.String())
+	}
+	// Verify that we split on namespaces correctly, same name, different namespace
+	fooID.Namespace = "other"
+	duration = backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
+	if duration != 1*time.Second {
+		t.Errorf("expected: 1, got %s", duration.String())
 	}
 }

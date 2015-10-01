@@ -6,7 +6,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 
 1. Docker, using one of the two following configurations:
   1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
-  **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852))
+  * **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
 2. [Python](https://www.python.org)
 3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
@@ -91,7 +91,7 @@ These are in no particular order
 
 * [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
 * [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Finish support for the Dockerized runtime. Issue (#19)[http://issue.k8s.io/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
+* [ ] Finish support for the Dockerized runtime. Issue [#19](http://issue.k8s.io/19).  A key issue here is to make this fast/light enough that we can use it for development workflows.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()
