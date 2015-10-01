@@ -67,15 +67,10 @@ type ProxyServerConfig struct {
 }
 
 type ProxyServer struct {
-	Client           *kubeclient.Client
-	Config           *ProxyServerConfig
-	EndpointsConfig  *proxyconfig.EndpointsConfig
-	EndpointsHandler proxyconfig.EndpointsConfigHandler
-	IptInterface     utiliptables.Interface
-	OOMAdjuster      *oom.OOMAdjuster
-	Proxier          proxy.ProxyProvider
-	Recorder         record.EventRecorder
-	ServiceConfig    *proxyconfig.ServiceConfig
+	Config       *ProxyServerConfig
+	IptInterface utiliptables.Interface
+	Proxier      proxy.ProxyProvider
+	Recorder     record.EventRecorder
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
@@ -122,25 +117,15 @@ func NewProxyConfig() *ProxyServerConfig {
 
 func NewProxyServer(
 	config *ProxyServerConfig,
-	client *kubeclient.Client,
-	endpointsConfig *proxyconfig.EndpointsConfig,
-	endpointsHandler proxyconfig.EndpointsConfigHandler,
 	iptInterface utiliptables.Interface,
-	oomAdjuster *oom.OOMAdjuster,
 	proxier proxy.ProxyProvider,
 	recorder record.EventRecorder,
-	serviceConfig *proxyconfig.ServiceConfig,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
-		Client:           client,
-		Config:           config,
-		EndpointsConfig:  endpointsConfig,
-		EndpointsHandler: endpointsHandler,
-		IptInterface:     iptInterface,
-		OOMAdjuster:      oomAdjuster,
-		Proxier:          proxier,
-		Recorder:         recorder,
-		ServiceConfig:    serviceConfig,
+		Config:       config,
+		IptInterface: iptInterface,
+		Proxier:      proxier,
+		Recorder:     recorder,
 	}, nil
 }
 
@@ -272,8 +257,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		UID:       types.UID(hostname),
 		Namespace: "",
 	}
-
-	return NewProxyServer(config, client, endpointsConfig, endpointsHandler, iptInterface, oomAdjuster, proxier, recorder, serviceConfig)
+	return NewProxyServer(config, iptInterface, proxier, recorder)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
