@@ -15,6 +15,7 @@
 # limitations under the License.
 
 # Script that creates a Kubemark cluster with Master running on GCE.
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
@@ -23,9 +24,24 @@ source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 detect-project &> /dev/null
 export PROJECT
 
+
+RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
+MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
+
+if [ "${RUN_FROM_DISTRO}" == "false" ]; then
+  # Running from repository
+  cp "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kubemark" "${MAKE_DIR}"
+else
+  cp "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" "."
+  tar -xzf kubernetes-server-linux-amd64.tar.gz
+  cp "kubernetes/server/bin/kubemark" "${MAKE_DIR}"
+  rm -rf "kubernetes-server-linux-amd64.tar.gz" "kubernetes"
+fi
+
 CURR_DIR=`pwd`
-cd ${KUBE_ROOT}/cluster/images/kubemark
+cd "${MAKE_DIR}"
 make
+rm kubemark
 cd $CURR_DIR
 
 MASTER_NAME="hollow-cluster-master"
@@ -49,17 +65,26 @@ gcloud compute instances create ${MASTER_NAME} \
 
 MASTER_IP=`gcloud compute instances describe hollow-cluster-master --zone=${ZONE} | grep networkIP | cut -f2 -d":" | sed "s/ //g"`
 
-until gcloud compute ssh --zone=${ZONE} hollow-cluster-master --command="ls" &> /dev/null; do
+until gcloud compute ssh --zone="${ZONE}" hollow-cluster-master --command="ls" &> /dev/null; do
   sleep 1
 done
 
-gcloud compute copy-files --zone=${ZONE} \
-  ${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz \
-  ${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh \
-  ${KUBE_ROOT}/test/kubemark/configure-kubectl.sh \
-  hollow-cluster-master:~
+if [ "${RUN_FROM_DISTRO}" == "false" ]; then
+  gcloud compute copy-files --zone="${ZONE}" \
+    "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" \
+    "${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh" \
+    "${KUBE_ROOT}/test/kubemark/configure-kubectl.sh" \
+    "hollow-cluster-master":~
+else
+  gcloud compute copy-files --zone="${ZONE}" \
+    "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" \
+    "${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh" \
+    "${KUBE_ROOT}/test/kubemark/configure-kubectl.sh" \
+    "hollow-cluster-master":~
+fi
 
-gcloud compute ssh --zone=${ZONE} hollow-cluster-master --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh"
+gcloud compute ssh --zone=${ZONE} hollow-cluster-master \
+  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh"
 
 sed "s/##masterip##/\"${MASTER_IP}\"/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 sed -i'' -e "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
