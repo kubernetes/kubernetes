@@ -752,6 +752,7 @@ fi
 
 ### Start Kubemark ###
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
+  export RUN_FROM_DISTRO=true
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
   if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
@@ -760,6 +761,7 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
         gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
   fi
   ./test/kubemark/stop-kubemark.sh
+  unset RUN_FROM_DISTRO
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
