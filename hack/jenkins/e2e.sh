@@ -120,7 +120,6 @@ GCE_FLAKY_TESTS=(
     "DaemonRestart"
     "Daemon\sset\sshould\slaunch\sa\sdaemon\spod\son\severy\snode\sof\sthe\scluster"
     "Resource\susage\sof\ssystem\scontainers"
-    "monotonically\sincreasing\srestart\scount"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
     "should\srelease\sthe\sload\sbalancer\swhen\sType\sgoes\sfrom\sLoadBalancer" # timeouts in 20 minutes in last builds. #14424
@@ -138,6 +137,7 @@ GCE_SLOW_TESTS=(
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
     "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
+    "monotonically\sincreasing\srestart\scount"       # 1.5 to 5 min, file: pods.go,                 slow by design
     )
 
 # Tests which are not able to be run in parallel.
