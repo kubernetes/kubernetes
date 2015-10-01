@@ -220,7 +220,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	// use the default printer for each object
-	return b.Do().Visit(func(r *resource.Info, err error) error {
+	return b.Flatten().Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
