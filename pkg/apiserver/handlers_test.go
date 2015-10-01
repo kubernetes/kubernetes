@@ -62,6 +62,9 @@ func TestMaxInFlight(t *testing.T) {
 	const Iterations = 3
 	block := sync.WaitGroup{}
 	block.Add(1)
+	oneFinished := sync.WaitGroup{}
+	oneFinished.Add(1)
+	var once sync.Once
 	sem := make(chan bool, Iterations)
 
 	re := regexp.MustCompile("[.*\\/watch][^\\/proxy.*]")
@@ -86,6 +89,7 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
+			once.Do(oneFinished.Done)
 		}()
 	}
 
@@ -93,6 +97,7 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL+"/proxy/foo/bar", http.StatusOK, t)
+			once.Do(oneFinished.Done)
 		}()
 	}
 	expectHTTP(server.URL+"/dontwait", http.StatusOK, t)
@@ -101,6 +106,7 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL, http.StatusOK, t)
+			once.Do(oneFinished.Done)
 		}()
 	}
 	calls.Wait()
@@ -117,6 +123,8 @@ func TestMaxInFlight(t *testing.T) {
 	block.Done()
 
 	// Show that we recover from being blocked up.
+	// However, we should until at least one of the requests really finishes.
+	oneFinished.Wait()
 	expectHTTP(server.URL, http.StatusOK, t)
 }
 
