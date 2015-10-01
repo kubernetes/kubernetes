@@ -293,9 +293,9 @@ var _ = Describe("Services", func() {
 
 		By("Removing iptable rules")
 		_, _, code, err := SSH(`
-				sudo iptables -t nat -F KUBE-SERVICES || true;
-				sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-				sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
+					sudo iptables -t nat -F KUBE-SERVICES || true;
+					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
+					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
 		if err != nil || code != 0 {
 			Failf("couldn't remove iptable rules: %v (code %v)", err, code)
 		}
@@ -340,129 +340,6 @@ var _ = Describe("Services", func() {
 		}
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
-	})
-
-	It("should be able to create a functioning external load balancer", func() {
-		// requires ExternalLoadBalancer
-		SkipUnlessProviderIs("gce", "gke", "aws")
-
-		serviceName := "external-lb-test"
-		ns := f.Namespace.Name
-
-		t := NewWebserverTest(c, ns, serviceName)
-		defer func() {
-			defer GinkgoRecover()
-			errs := t.Cleanup()
-			if len(errs) != 0 {
-				Failf("errors in cleanup: %v", errs)
-			}
-		}()
-
-		inboundPort := 3000
-
-		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
-		service := t.BuildServiceSpec()
-		service.Spec.Type = api.ServiceTypeLoadBalancer
-		service.Spec.Ports[0].Port = inboundPort
-		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
-		result, err := t.CreateService(service)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Wait for the load balancer to be created asynchronously, which is
-		// currently indicated by ingress point(s) being added to the status.
-		result, err = waitForLoadBalancerIngress(c, serviceName, ns)
-		Expect(err).NotTo(HaveOccurred())
-		if len(result.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
-		}
-		ingress := result.Status.LoadBalancer.Ingress[0]
-		if len(result.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
-		}
-		port := result.Spec.Ports[0]
-		if port.NodePort == 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
-		}
-		if !ServiceNodePortRange.Contains(port.NodePort) {
-			Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
-		}
-
-		By("creating pod to be part of service " + serviceName)
-		t.CreateWebserverRC(1)
-
-		By("hitting the pod through the service's NodePort")
-		testReachable(pickNodeIP(c), port.NodePort)
-
-		By("hitting the pod through the service's external load balancer")
-		testLoadBalancerReachable(ingress, inboundPort)
-	})
-
-	It("should be able to create a functioning external load balancer with user-provided load balancer ip", func() {
-		// requires ExternalLoadBalancer
-		SkipUnlessProviderIs("gce", "gke")
-
-		serviceName := "lb-test-with-user-ip"
-		ns := f.Namespace.Name
-
-		t := NewWebserverTest(c, ns, serviceName)
-		defer func() {
-			defer GinkgoRecover()
-			errs := t.Cleanup()
-			if len(errs) != 0 {
-				Failf("errors in cleanup: %v", errs)
-			}
-		}()
-
-		inboundPort := 3000
-
-		service := t.BuildServiceSpec()
-		service.Spec.Type = api.ServiceTypeLoadBalancer
-		service.Spec.Ports[0].Port = inboundPort
-		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
-
-		By("creating an external static ip")
-		rand.Seed(time.Now().UTC().UnixNano())
-		staticIPName := fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
-		loadBalancerIP, err := createGCEStaticIP(staticIPName)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			deleteGCEStaticIP(staticIPName)
-		}()
-
-		service.Spec.LoadBalancerIP = loadBalancerIP
-
-		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
-		result, err := t.CreateService(service)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Wait for the load balancer to be created asynchronously, which is
-		// currently indicated by ingress point(s) being added to the status.
-		result, err = waitForLoadBalancerIngress(c, serviceName, ns)
-		Expect(err).NotTo(HaveOccurred())
-		if len(result.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
-		}
-		ingress := result.Status.LoadBalancer.Ingress[0]
-		Expect(ingress.IP).To(Equal(loadBalancerIP))
-		if len(result.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
-		}
-		port := result.Spec.Ports[0]
-		if port.NodePort == 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
-		}
-		if !ServiceNodePortRange.Contains(port.NodePort) {
-			Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
-		}
-
-		By("creating pod to be part of service " + serviceName)
-		t.CreateWebserverRC(1)
-
-		By("hitting the pod through the service's NodePort")
-		testReachable(pickNodeIP(c), port.NodePort)
-
-		By("hitting the pod through the service's external load balancer")
-		testLoadBalancerReachable(ingress, inboundPort)
 	})
 
 	It("should be able to create a functioning NodePort service", func() {
@@ -879,61 +756,98 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
+	// This test hits several load-balancer cases because LB turnup is slow.
+	It("should serve identically named services in different namespaces on different load-balancers", func() {
 		// requires ExternalLoadBalancer
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
-		namespaces := []string{f.Namespace.Name}
+		ns1 := f.Namespace.Name
+
 		By("Building a second namespace api object")
 		namespacePtr, err := createTestingNS("services", c)
 		Expect(err).NotTo(HaveOccurred())
-		namespaces = append(namespaces, namespacePtr.Name)
-		extraNamespaces = append(extraNamespaces, namespacePtr.Name)
+		ns2 := namespacePtr.Name
+		extraNamespaces = append(extraNamespaces, ns2)
 
-		serviceNames := []string{"s0"} // Could add more here, but then it takes longer.
-		labels := map[string]string{
-			"key0": "value0",
-			"key1": "value1",
+		serviceName := "test-svc"
+		servicePort := 9376
+
+		By("creating service " + serviceName + " with load balancer in namespace " + ns1)
+		t1 := NewWebserverTest(c, ns1, serviceName)
+		svc1 := t1.BuildServiceSpec()
+		svc1.Spec.Type = api.ServiceTypeLoadBalancer
+		svc1.Spec.Ports[0].Port = servicePort
+		svc1.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		_, err = t1.CreateService(svc1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating pod to be part of service " + serviceName + " in namespace " + ns1)
+		t1.CreateWebserverRC(1)
+
+		loadBalancerIP := ""
+		if providerIs("gce", "gke") {
+			By("creating a static IP")
+			rand.Seed(time.Now().UTC().UnixNano())
+			staticIPName := fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
+			loadBalancerIP, err = createGCEStaticIP(staticIPName)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				// Release GCE static IP - this is not kube-managed and will not be automatically released.
+				deleteGCEStaticIP(staticIPName)
+			}()
 		}
-		service := &api.Service{
-			ObjectMeta: api.ObjectMeta{},
-			Spec: api.ServiceSpec{
-				Selector: labels,
-				Ports: []api.ServicePort{{
-					Port:       80,
-					TargetPort: util.NewIntOrStringFromInt(80),
-				}},
-				Type: api.ServiceTypeLoadBalancer,
-			},
-		}
+
+		By("creating service " + serviceName + " with load balancer in namespace " + ns2)
+		t2 := NewWebserverTest(c, ns2, serviceName)
+		svc2 := t2.BuildServiceSpec()
+		svc2.Spec.Type = api.ServiceTypeLoadBalancer
+		svc2.Spec.Ports[0].Port = servicePort
+		svc2.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		svc2.Spec.LoadBalancerIP = loadBalancerIP
+		_, err = t2.CreateService(svc2)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating pod to be part of service " + serviceName + " in namespace " + ns2)
+		t2.CreateWebserverRC(2)
 
 		ingressPoints := []string{}
-		for _, namespace := range namespaces {
-			for _, serviceName := range serviceNames {
-				service.ObjectMeta.Name = serviceName
-				service.ObjectMeta.Namespace = namespace
-				By("creating service " + serviceName + " in namespace " + namespace)
-				_, err := c.Services(namespace).Create(service)
-				Expect(err).NotTo(HaveOccurred())
-				defer func(namespace, serviceName string) { // clean up when we're done
-					By("deleting service " + serviceName + " in namespace " + namespace)
-					err := c.Services(namespace).Delete(serviceName)
-					Expect(err).NotTo(HaveOccurred())
-				}(namespace, serviceName)
+		svcs := []*api.Service{svc1, svc2}
+		for _, svc := range svcs {
+			namespace := svc.Namespace
+			lbip := svc.Spec.LoadBalancerIP
+
+			// Wait for the load balancer to be created asynchronously, which is
+			// currently indicated by ingress point(s) being added to the status.
+			result, err := waitForLoadBalancerIngress(c, serviceName, namespace)
+			Expect(err).NotTo(HaveOccurred())
+			if len(result.Status.LoadBalancer.Ingress) != 1 {
+				Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
 			}
-		}
-		for _, namespace := range namespaces {
-			for _, serviceName := range serviceNames {
-				result, err := waitForLoadBalancerIngress(c, serviceName, namespace)
-				Expect(err).NotTo(HaveOccurred())
-				for i := range result.Status.LoadBalancer.Ingress {
-					ingress := result.Status.LoadBalancer.Ingress[i].IP
-					if ingress == "" {
-						ingress = result.Status.LoadBalancer.Ingress[i].Hostname
-					}
-					ingressPoints = append(ingressPoints, ingress) // Save 'em to check uniqueness
-				}
+			ingress := result.Status.LoadBalancer.Ingress[0]
+			if len(result.Spec.Ports) != 1 {
+				Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
 			}
+			if lbip != "" {
+				Expect(ingress.IP).To(Equal(lbip))
+			}
+			port := result.Spec.Ports[0]
+			if port.NodePort == 0 {
+				Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
+			}
+			if !ServiceNodePortRange.Contains(port.NodePort) {
+				Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
+			}
+			ing := result.Status.LoadBalancer.Ingress[0].IP
+			if ing == "" {
+				ing = result.Status.LoadBalancer.Ingress[0].Hostname
+			}
+			ingressPoints = append(ingressPoints, ing) // Save 'em to check uniqueness
+
+			By("hitting the pod through the service's NodePort")
+			testReachable(pickNodeIP(c), port.NodePort)
+
+			By("hitting the pod through the service's external load balancer")
+			testLoadBalancerReachable(ingress, servicePort)
 		}
 		validateUniqueOrFail(ingressPoints)
 	})
@@ -1467,7 +1381,8 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 func (t *WebserverTest) BuildServiceSpec() *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name: t.ServiceName,
+			Name:      t.ServiceName,
+			Namespace: t.Namespace,
 		},
 		Spec: api.ServiceSpec{
 			Selector: t.Labels,
