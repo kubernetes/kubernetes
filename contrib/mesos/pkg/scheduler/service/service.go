@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -454,9 +455,9 @@ func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, stati
 	}()
 
 	// validate cpu and memory limits, tracking the running totals in staticPod{CPUs,Mem}
-	validateResourceLimits := StaticPodValidator(
-		s.DefaultContainerCPULimit,
-		s.DefaultContainerMemLimit,
+	validateResourceLimits := staticPodValidator(
+		//s.DefaultContainerCPULimit, // unused until we support setting defaults for static pods
+		//s.DefaultContainerMemLimit,
 		&staticPodCPUs,
 		&staticPodMem,
 		!s.AccountForPodResources)
