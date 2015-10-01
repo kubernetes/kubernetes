@@ -26,20 +26,30 @@ const (
 	KubeProxyOOMScoreAdj int = -999
 )
 
-// isMemoryBestEffort returns true if the container's memory requirements are best-effort.
-func isMemoryBestEffort(container *api.Container) bool {
-	// A container is memory best-effort if its memory request is unspecified or 0.
-	// If a request is specified, then the user expects some kind of resource guarantee.
-	return container.Resources.Requests.Memory().Value() == 0
+// isBestEffort returns true if the container's resource requirements are best-effort.
+func isBestEffort(container *api.Container) bool {
+	// A container is best-effort if any of its resource requests is unspecified or 0.
+	if container.Resources.Requests.Memory().Value() == 0 ||
+		container.Resources.Requests.Cpu().Value() == 0 {
+		return true
+	}
+	return false
 }
 
-// isMemoryGuaranteed returns true if the container's memory requirements are Guaranteed.
-func isMemoryGuaranteed(container *api.Container) bool {
-	// A container is memory guaranteed if its memory request == memory limit.
-	// If memory request == memory limit, the user is very confident of resource consumption.
-	memoryRequest := container.Resources.Requests.Memory()
-	memoryLimit := container.Resources.Limits.Memory()
-	return (*memoryRequest).Cmp(*memoryLimit) == 0 && memoryRequest.Value() != 0
+// isGuaranteed returns true if the container's resource requirements are Guaranteed.
+func isGuaranteed(container *api.Container) bool {
+	// A container is guaranteed if all its request == limit.
+	memoryRequest := container.Resources.Requests.Memory().Value()
+	memoryLimit := container.Resources.Limits.Memory().Value()
+	cpuRequest := container.Resources.Requests.Cpu().Value()
+	cpuLimit := container.Resources.Limits.Cpu().Value()
+	if memoryRequest != 0 &&
+		cpuRequest != 0 &&
+		cpuRequest == cpuLimit &&
+		memoryRequest == memoryLimit {
+		return true
+	}
+	return false
 }
 
 // GetContainerOOMAdjust returns the amount by which the OOM score of all processes in the
@@ -48,25 +58,25 @@ func isMemoryGuaranteed(container *api.Container) bool {
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(container *api.Container, memoryCapacity int64) int {
-	if isMemoryGuaranteed(container) {
-		// Memory guaranteed containers should be the last to get killed.
+	if isGuaranteed(container) {
+		// Guaranteed containers should be the last to get killed.
 		return -999
-	} else if isMemoryBestEffort(container) {
-		// Memory best-effort containers should be the first to be killed.
+	} else if isBestEffort(container) {
+		// Best-effort containers should be the first to be killed.
 		return 1000
 	} else {
 		// Burstable containers are a middle tier, between Guaranteed and Best-Effort. Ideally,
 		// we want to protect Burstable containers that consume less memory than requested.
 		// The formula below is a heuristic. A container requesting for 10% of a system's
-		// memory will have an oom score adjust of 900. If a process in container Y
+		// memory will have an OOM score adjust of 900. If a process in container Y
 		// uses over 10% of memory, its OOM score will be 1000. The idea is that containers
 		// which use more than their request will have an OOM score of 1000 and will be prime
 		// targets for OOM kills.
 		// Note that this is a heuristic, it won't work if a container has many small processes.
 		memoryRequest := container.Resources.Requests.Memory().Value()
 		oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
-		// A memory guaranteed container using 100% of memory can have an OOM score of 1. Ensure
-		// that memory burstable containers have a higher OOM score.
+		// A guaranteed container using 100% of memory can have an OOM score of 1. Ensure
+		// that burstable containers have a higher OOM score.
 		if oomScoreAdjust < 2 {
 			return 2
 		}
