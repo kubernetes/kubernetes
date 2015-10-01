@@ -305,7 +305,11 @@ func TestValidateCachesSchema(t *testing.T) {
 }
 
 func TestSubstitueUser(t *testing.T) {
-	usr, _ := user.Current()
+	usr, err := user.Current()
+	if err != nil {
+		t.Logf("SKIPPING TEST: unexpected error: %v", err)
+		return
+	}
 	tests := []struct {
 		input     string
 		expected  string
