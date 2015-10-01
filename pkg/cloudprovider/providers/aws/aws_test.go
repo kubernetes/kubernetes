@@ -247,7 +247,9 @@ func TestNewAWSCloud(t *testing.T) {
 }
 
 type FakeEC2 struct {
-	aws *FakeAWSServices
+	aws                  *FakeAWSServices
+	Subnets              []*ec2.Subnet
+	DescribeSubnetsInput *ec2.DescribeSubnetsInput
 }
 
 func contains(haystack []*string, needle string) bool {
@@ -385,8 +387,9 @@ func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVpcsInput) ([]*ec2.Vpc, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
-	panic("Not implemented")
+func (ec2 *FakeEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
+	ec2.DescribeSubnetsInput = request
+	return ec2.Subnets, nil
 }
 
 func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
@@ -696,4 +699,93 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 	if err == nil || err.Error() != errorMessage {
 		t.Errorf("Expected UpdateTCPLoadBalancer region mismatch error.")
 	}
+}
+
+func constructSubnets(subnetsIn map[int]map[string]string) (subnetsOut []*ec2.Subnet) {
+	for i := range subnetsIn {
+		subnetsOut = append(
+			subnetsOut,
+			constructSubnet(
+				subnetsIn[i]["id"],
+				subnetsIn[i]["az"],
+			),
+		)
+	}
+	return
+}
+
+func constructSubnet(id string, az string) *ec2.Subnet {
+	return &ec2.Subnet{
+		SubnetId:         &id,
+		AvailabilityZone: &az,
+	}
+}
+
+func TestSubnetIDsinVPC(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	vpcID := "vpc-deadbeef"
+	vpc := &ec2.Vpc{
+		VpcId: &vpcID,
+	}
+
+	// test with 3 subnets from 3 different AZs
+	subnets := make(map[int]map[string]string)
+	subnets[0] = make(map[string]string)
+	subnets[0]["id"] = "subnet-a0000001"
+	subnets[0]["az"] = "af-south-1a"
+	subnets[1] = make(map[string]string)
+	subnets[1]["id"] = "subnet-b0000001"
+	subnets[1]["az"] = "af-south-1b"
+	subnets[2] = make(map[string]string)
+	subnets[2]["id"] = "subnet-c0000001"
+	subnets[2]["az"] = "af-south-1c"
+	awsServices.ec2.Subnets = constructSubnets(subnets)
+
+	result, err := c.listSubnetIDsinVPC(vpc)
+	if err != nil {
+		t.Errorf("Error listing subnets: %v", err)
+		return
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 subnets but got %d", len(result))
+		return
+	}
+
+	result_set := make(map[string]bool)
+	for _, v := range result {
+		result_set[v] = true
+	}
+
+	for i := range subnets {
+		if !result_set[subnets[i]["id"]] {
+			t.Errorf("Expected subnet%d '%s' in result: %v", i, subnets[i]["id"], result)
+			return
+		}
+	}
+
+	// test with 4 subnets from 3 different AZs
+	// add duplicate az subnet
+	subnets[3] = make(map[string]string)
+	subnets[3]["id"] = "subnet-c0000002"
+	subnets[3]["az"] = "af-south-1c"
+	awsServices.ec2.Subnets = constructSubnets(subnets)
+
+	result, err = c.listSubnetIDsinVPC(vpc)
+	if err != nil {
+		t.Errorf("Error listing subnets: %v", err)
+		return
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 subnets but got %d", len(result))
+		return
+	}
+
 }
