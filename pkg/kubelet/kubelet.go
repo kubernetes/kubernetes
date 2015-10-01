@@ -1304,9 +1304,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// status. Any race conditions here effectively boils down to -- the pod worker didn't sync
 	// state of a newly started container with the apiserver before the kubelet restarted, so
 	// it's OK to pretend like the kubelet started them after it restarted.
-	//
-	// Also note that deletes currently have an updateType of `create` set in UpdatePods.
-	// This, again, does not matter because deletes are not processed by this method.
 
 	var podStatus api.PodStatus
 	if updateType == SyncPodCreate {
@@ -1952,7 +1949,7 @@ func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType SyncPodType, mirrorPod *a
 		return
 	}
 	// Run the sync in an async worker.
-	kl.podWorkers.UpdatePod(pod, mirrorPod, func() {
+	kl.podWorkers.UpdatePod(pod, mirrorPod, syncType, func() {
 		metrics.PodWorkerLatency.WithLabelValues(syncType.String()).Observe(metrics.SinceInMicroseconds(start))
 	})
 	// Note the number of containers for new pods.
