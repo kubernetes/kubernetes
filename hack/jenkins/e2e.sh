@@ -581,6 +581,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
+    NUM_MINIONS=3
     ;;
 
   kubernetes-upgrade-gce-step2-upgrade)
@@ -594,6 +595,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
+    NUM_MINIONS=3
     ;;
 
   kubernetes-upgrade-gce-step3-e2e)
@@ -611,6 +613,7 @@ case ${JOB_NAME} in
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
+    NUM_MINIONS=3
     ;;
 
   kubernetes-kubemark-gce)
