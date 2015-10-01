@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 func newPod(uid, name string) *api.Pod {
@@ -94,7 +93,7 @@ func TestUpdatePod(t *testing.T) {
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
-			podWorkers.UpdatePod(newPod(string(j), string(i)), nil, func() {})
+			podWorkers.UpdatePod(newPod(string(j), string(i)), nil, SyncPodCreate, func() {})
 		}
 	}
 	drainWorkers(podWorkers, numPods)
@@ -122,44 +121,12 @@ func TestUpdatePod(t *testing.T) {
 	}
 }
 
-func TestUpdateType(t *testing.T) {
-	syncType := make(chan SyncPodType)
-	fakeRecorder := &record.FakeRecorder{}
-	podWorkers := newPodWorkers(
-		createFakeRuntimeCache(fakeRecorder),
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
-			func() {
-				syncType <- updateType
-			}()
-			return nil
-		},
-		fakeRecorder,
-	)
-	cases := map[*api.Pod][]SyncPodType{
-		newPod("u1", "n1"): {SyncPodCreate, SyncPodUpdate},
-		newPod("u2", "n1"): {SyncPodCreate},
-	}
-	for p, expectedTypes := range cases {
-		for i := range expectedTypes {
-			podWorkers.UpdatePod(p, nil, func() {})
-			select {
-			case gotType := <-syncType:
-				if gotType != expectedTypes[i] {
-					t.Fatalf("Expected sync type %v got %v for pod with uid %v", expectedTypes[i], gotType, p.UID)
-				}
-			case <-time.After(util.ForeverTestTimeout):
-				t.Errorf("Unexpected delay is running pod worker")
-			}
-		}
-	}
-}
-
 func TestForgetNonExistingPodWorkers(t *testing.T) {
 	podWorkers, _ := createPodWorkers()
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		podWorkers.UpdatePod(newPod(string(i), "name"), nil, func() {})
+		podWorkers.UpdatePod(newPod(string(i), "name"), nil, SyncPodUpdate, func() {})
 	}
 	drainWorkers(podWorkers, numPods)
 
@@ -386,8 +353,8 @@ func TestFakePodWorkers(t *testing.T) {
 		kubeletForRealWorkers.wg.Add(1)
 
 		fakeDocker.ContainerList = tt.containerList
-		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, func() {})
-		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, func() {})
+		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, SyncPodUpdate, func() {})
+		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, SyncPodUpdate, func() {})
 
 		kubeletForRealWorkers.wg.Wait()
 
