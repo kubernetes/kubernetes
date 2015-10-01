@@ -85,7 +85,7 @@ func main() {
 
 	_, err := data.WriteString(fmt.Sprintf("package %v\n", version))
 	if err != nil {
-		glog.Fatalf("error writing package line: %v", err)
+		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
 	versionPath := pkgPath(group, version)
@@ -99,12 +99,12 @@ func main() {
 			continue
 		}
 		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
-			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
+			glog.Errorf("Error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}
 	generator.RepackImports(sets.NewString())
 	if err := generator.WriteImports(data); err != nil {
-		glog.Fatalf("error while writing imports: %v", err)
+		glog.Fatalf("Error while writing imports: %v", err)
 	}
 	if err := generator.WriteConversionFunctions(data); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
@@ -115,9 +115,9 @@ func main() {
 
 	b, err := imports.Process("", data.Bytes(), nil)
 	if err != nil {
-		glog.Fatalf("error while update imports: %v", err)
+		glog.Fatalf("Error while update imports: %v", err)
 	}
 	if _, err := funcOut.Write(b); err != nil {
-		glog.Fatalf("error while writing out the resulting file: %v", err)
+		glog.Fatalf("Error while writing out the resulting file: %v", err)
 	}
 }
