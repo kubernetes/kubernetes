@@ -57,12 +57,12 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -70,6 +70,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
+	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -81,14 +82,16 @@ import (
 )
 
 const (
-	defaultMesosMaster       = "localhost:5050"
-	defaultMesosUser         = "root" // should have privs to execute docker and iptables commands
-	defaultReconcileInterval = 300    // 5m default task reconciliation interval
-	defaultReconcileCooldown = 15 * time.Second
-	defaultNodeRelistPeriod  = 5 * time.Minute
-	defaultFrameworkName     = "Kubernetes"
-	defaultExecutorCPUs      = mresource.CPUShares(0.25)  // initial CPU allocated for executor
-	defaultExecutorMem       = mresource.MegaBytes(128.0) // initial memory allocated for executor
+	defaultMesosMaster           = "localhost:5050"
+	defaultMesosUser             = "root" // should have privs to execute docker and iptables commands
+	defaultMesosRoles            = "*"
+	defaultReconcileInterval     = 300 // 5m default task reconciliation interval
+	defaultReconcileCooldown     = 15 * time.Second
+	defaultNodeRelistPeriod      = 5 * time.Minute
+	defaultFrameworkName         = "Kubernetes"
+	defaultExecutorCPUs          = mresource.CPUShares(0.25)  // initial CPU allocated for executor
+	defaultExecutorMem           = mresource.MegaBytes(128.0) // initial memory allocated for executor
+	defaultExecutorInfoCacheSize = 10000
 )
 
 type SchedulerServer struct {
@@ -104,7 +107,7 @@ type SchedulerServer struct {
 	proxyPath           string
 	mesosMaster         string
 	mesosUser           string
-	mesosRole           string
+	mesosRoles          []string
 	mesosAuthPrincipal  string
 	mesosAuthSecretFile string
 	mesosCgroupPrefix   string
@@ -156,7 +159,6 @@ type SchedulerServer struct {
 	staticPodsConfigPath          string
 	dockerCfgPath                 string
 	containPodResources           bool
-	accountForPodResources        bool
 	nodeRelistPeriod              time.Duration
 	sandboxOverlay                string
 
@@ -193,23 +195,23 @@ func NewSchedulerServer() *SchedulerServer {
 		minionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
 		minionLogMaxAgeInDays: minioncfg.DefaultLogMaxAgeInDays,
 
-		mesosAuthProvider:      sasl.ProviderName,
-		mesosCgroupPrefix:      minioncfg.DefaultCgroupPrefix,
-		mesosMaster:            defaultMesosMaster,
-		mesosUser:              defaultMesosUser,
-		mesosExecutorCPUs:      defaultExecutorCPUs,
-		mesosExecutorMem:       defaultExecutorMem,
-		reconcileInterval:      defaultReconcileInterval,
-		reconcileCooldown:      defaultReconcileCooldown,
-		checkpoint:             true,
-		frameworkName:          defaultFrameworkName,
-		ha:                     false,
-		mux:                    http.NewServeMux(),
-		kubeletCadvisorPort:    4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
-		kubeletSyncFrequency:   10 * time.Second,
-		containPodResources:    true,
-		accountForPodResources: true,
-		nodeRelistPeriod:       defaultNodeRelistPeriod,
+		mesosAuthProvider:    sasl.ProviderName,
+		mesosCgroupPrefix:    minioncfg.DefaultCgroupPrefix,
+		mesosMaster:          defaultMesosMaster,
+		mesosUser:            defaultMesosUser,
+		mesosExecutorCPUs:    defaultExecutorCPUs,
+		mesosExecutorMem:     defaultExecutorMem,
+		mesosRoles:           strings.Split(defaultMesosRoles, ","),
+		reconcileInterval:    defaultReconcileInterval,
+		reconcileCooldown:    defaultReconcileCooldown,
+		checkpoint:           true,
+		frameworkName:        defaultFrameworkName,
+		ha:                   false,
+		mux:                  http.NewServeMux(),
+		kubeletCadvisorPort:  4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		kubeletSyncFrequency: 10 * time.Second,
+		containPodResources:  true,
+		nodeRelistPeriod:     defaultNodeRelistPeriod,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -238,7 +240,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.mesosMaster, "mesos-master", s.mesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
 	fs.StringVar(&s.mesosUser, "mesos-user", s.mesosUser, "Mesos user for this framework, defaults to root.")
-	fs.StringVar(&s.mesosRole, "mesos-role", s.mesosRole, "Mesos role for this framework, defaults to none.")
+	fs.StringSliceVar(&s.mesosRoles, "mesos-roles", s.mesosRoles, "Mesos framework roles. The first role will be used to launch pods having no "+meta.RolesKey+" label.")
 	fs.StringVar(&s.mesosAuthPrincipal, "mesos-authentication-principal", s.mesosAuthPrincipal, "Mesos authentication principal.")
 	fs.StringVar(&s.mesosAuthSecretFile, "mesos-authentication-secret-file", s.mesosAuthSecretFile, "Mesos authentication secret file.")
 	fs.StringVar(&s.mesosAuthProvider, "mesos-authentication-provider", s.mesosAuthProvider, fmt.Sprintf("Authentication provider to use, default is SASL that supports mechanisms: %+v", mech.ListSupported()))
@@ -262,7 +264,6 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.defaultContainerCPULimit, "default-container-cpu-limit", "Containers without a CPU resource limit are admitted this much CPU shares")
 	fs.Var(&s.defaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
 	fs.BoolVar(&s.containPodResources, "contain-pod-resources", s.containPodResources, "Reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
-	fs.BoolVar(&s.accountForPodResources, "account-for-pod-resources", s.accountForPodResources, "Allocate pod CPU and memory resources from offers (Default: true)")
 	fs.DurationVar(&s.nodeRelistPeriod, "node-monitor-period", s.nodeRelistPeriod, "Period between relisting of all nodes from the apiserver.")
 
 	fs.IntVar(&s.executorLogV, "executor-logv", s.executorLogV, "Logging verbosity of spawned minion and executor processes.")
@@ -332,7 +333,7 @@ func (s *SchedulerServer) serveFrameworkArtifactWithFilename(path string, filena
 	return hostURI
 }
 
-func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, *uid.UID, error) {
+func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, error) {
 	ci := &mesos.CommandInfo{
 		Shell: proto.Bool(false),
 	}
@@ -342,7 +343,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 		ci.Value = proto.String(fmt.Sprintf("./%s", executorCmd))
 	} else if !hks.FindServer(hyperkube.CommandMinion) {
-		return nil, nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
+		return nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
 	} else {
 		if strings.Index(s.kmPath, "://") > 0 {
 			// URI could point directly to executable, e.g. hdfs:///km
@@ -374,7 +375,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 
 	if s.sandboxOverlay != "" {
 		if _, err := os.Stat(s.sandboxOverlay); os.IsNotExist(err) {
-			return nil, nil, fmt.Errorf("Sandbox overlay archive not found: %s", s.sandboxOverlay)
+			return nil, fmt.Errorf("Sandbox overlay archive not found: %s", s.sandboxOverlay)
 		}
 		uri, _ := s.serveFrameworkArtifact(s.sandboxOverlay)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(false), Extract: proto.Bool(true)})
@@ -441,19 +442,23 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	// Check for staticPods
 	data, staticPodCPUs, staticPodMem := s.prepareStaticPods()
 
+	// set prototype resource. During procument these act as the blue print only.
+	// In a final ExecutorInfo they might differ due to different procured
+	// resource roles.
 	execInfo.Resources = []*mesos.Resource{
 		mutil.NewScalarResource("cpus", float64(s.mesosExecutorCPUs)+staticPodCPUs),
 		mutil.NewScalarResource("mem", float64(s.mesosExecutorMem)+staticPodMem),
 	}
 
-	// calculate ExecutorInfo hash to be used for validating compatibility
-	// of ExecutorInfo's generated by other HA schedulers.
-	ehash := hashExecutorInfo(execInfo)
-	eid := uid.New(ehash, execcfg.DefaultInfoID)
-	execInfo.ExecutorId = &mesos.ExecutorID{Value: proto.String(eid.String())}
+	// calculate the ExecutorInfo hash to be used for validating compatibility.
+	// It is used to determine whether a running executor is compatible with the
+	// current scheduler configuration. If it is not, offers for those nodes
+	// are declined by our framework and the operator has to phase out those
+	// running executors in a cluster.
+	execInfo.ExecutorId = executorinfo.NewID(execInfo)
 	execInfo.Data = data
 
-	return execInfo, eid, nil
+	return execInfo, nil
 }
 
 func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, staticPodMem float64) {
@@ -531,6 +536,10 @@ func (s *SchedulerServer) getDriver() (driver bindings.SchedulerDriver) {
 }
 
 func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
+	if n := len(s.mesosRoles); n == 0 || n > 2 || (n == 2 && s.mesosRoles[0] != "*" && s.mesosRoles[1] != "*") {
+		log.Fatalf(`only one custom role allowed in addition to "*"`)
+	}
+
 	// get scheduler low-level config
 	sc := schedcfg.CreateDefaultConfig()
 	if s.schedulerConfigFileName != "" {
@@ -559,9 +568,8 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 		validation := ha.ValidationFunc(validateLeadershipTransition)
 		srv := ha.NewCandidate(schedulerProcess, driverFactory, validation)
 		path := fmt.Sprintf(meta.DefaultElectionFormat, s.frameworkName)
-		sid := uid.New(eid.Group(), "").String()
-		log.Infof("registering for election at %v with id %v", path, sid)
-		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, sid, srv, nil)
+		log.Infof("registering for election at %v with id %v", path, eid.GetValue())
+		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, eid.GetValue(), srv, nil)
 	} else {
 		log.Infoln("self-electing in non-HA mode")
 		schedulerProcess.Elect(driverFactory)
@@ -616,14 +624,8 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 
 func validateLeadershipTransition(desired, current string) {
 	log.Infof("validating leadership transition")
-	d := uid.Parse(desired).Group()
-	c := uid.Parse(current).Group()
-	if d == 0 {
-		// should *never* happen, but..
-		log.Fatalf("illegal scheduler UID: %q", desired)
-	}
-	if d != c && c != 0 {
-		log.Fatalf("desired scheduler group (%x) != current scheduler group (%x)", d, c)
+	if desired != current && current != "" {
+		log.Fatalf("desired executor id != current executor id", desired, current)
 	}
 }
 
@@ -637,8 +639,7 @@ func newEtcd(etcdConfigFile string, etcdServerList []string) (client tools.EtcdC
 	return
 }
 
-func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, tools.EtcdClient, *uid.UID) {
-
+func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, tools.EtcdClient, *mesos.ExecutorID) {
 	s.frameworkName = strings.TrimSpace(s.frameworkName)
 	if s.frameworkName == "" {
 		log.Fatalf("framework-name must be a non-empty string")
@@ -669,7 +670,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Warningf("user-specified reconcile cooldown too small, defaulting to %v", s.reconcileCooldown)
 	}
 
-	executor, eid, err := s.prepareExecutorInfo(hks)
+	eiPrototype, err := s.prepareExecutorInfo(hks)
 	if err != nil {
 		log.Fatalf("misconfigured executor: %v", err)
 	}
@@ -683,32 +684,22 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("misconfigured etcd: %v", err)
 	}
 
-	as := podschedulers.NewAllocationStrategy(
-		podtask.NewDefaultPredicate(
-			s.defaultContainerCPULimit,
-			s.defaultContainerMemLimit,
-		),
-		podtask.NewDefaultProcurement(
-			s.defaultContainerCPULimit,
-			s.defaultContainerMemLimit,
-		),
-	)
-
-	// downgrade allocation strategy if user disables "account-for-pod-resources"
-	if !s.accountForPodResources {
-		as = podschedulers.NewAllocationStrategy(
-			podtask.DefaultMinimalPredicate,
-			podtask.DefaultMinimalProcurement)
-	}
-
 	// mirror all nodes into the nodeStore
+	var eiRegistry executorinfo.Registry
 	nodesClient, err := s.createAPIServerClient()
 	if err != nil {
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
-	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nodeLW := cache.NewListWatchFromClient(nodesClient, "nodes", api.NamespaceAll, fields.Everything())
-	cache.NewReflector(nodeLW, &api.Node{}, nodeStore, s.nodeRelistPeriod).Run()
+	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
+		DeleteFunc: func(obj interface{}) {
+			node := obj.(*api.Node)
+			if eiRegistry != nil {
+				log.V(2).Infof("deleting node %q from registry", node.Name)
+				eiRegistry.Invalidate(node.Name)
+			}
+		},
+	})
 
 	lookupNode := func(hostName string) *api.Node {
 		n, _, _ := nodeStore.GetByKey(hostName) // ignore error and return nil then
@@ -718,10 +709,21 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		return n.(*api.Node)
 	}
 
-	fcfs := podschedulers.NewFCFSPodScheduler(as, lookupNode)
+	execInfoCache, err := executorinfo.NewCache(defaultExecutorInfoCacheSize)
+	if err != nil {
+		log.Fatalf("cannot create executorinfo cache: %v", err)
+	}
+
+	eiRegistry, err = executorinfo.NewRegistry(lookupNode, eiPrototype, execInfoCache)
+	if err != nil {
+		log.Fatalf("cannot create executorinfo registry: %v", err)
+	}
+
+	pr := podtask.NewDefaultProcurement(eiPrototype, eiRegistry)
+	fcfs := podschedulers.NewFCFSPodScheduler(pr, lookupNode)
+
 	framework := framework.New(framework.Config{
 		SchedulerConfig:   *sc,
-		Executor:          executor,
 		Client:            client,
 		FailoverTimeout:   s.failoverTimeout,
 		ReconcileInterval: s.reconcileInterval,
@@ -734,6 +736,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 				log.Errorf("failed to renew frameworkId TTL: %v", err)
 			}
 		},
+		ExecutorId: eiPrototype.GetExecutorId(),
 	})
 
 	masterUri := s.mesosMaster
@@ -765,10 +768,24 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	// create scheduler core with all components arranged around it
 	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
-	sched := components.New(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
+	sched := components.New(
+		sc,
+		framework,
+		fcfs,
+		client,
+		recorder,
+		schedulerProcess.Terminal(),
+		s.mux,
+		lw,
+		eiPrototype,
+		s.mesosRoles,
+		s.defaultContainerCPULimit,
+		s.defaultContainerMemLimit,
+	)
 
 	runtime.On(framework.Registration(), func() { sched.Run(schedulerProcess.Terminal()) })
 	runtime.On(framework.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
+	runtime.On(framework.Registration(), func() { nodeCtl.Run(schedulerProcess.Terminal()) })
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {
 		log.V(1).Infoln("performing deferred initialization")
@@ -792,7 +809,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		return drv, nil
 	})
 
-	return schedulerProcess, driverFactory, etcdClient, eid
+	return schedulerProcess, driverFactory, etcdClient, eiPrototype.GetExecutorId()
 }
 
 func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkube.Interface) error {
@@ -871,9 +888,18 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 	if s.failoverTimeout > 0 {
 		info.FailoverTimeout = proto.Float64(s.failoverTimeout)
 	}
-	if s.mesosRole != "" {
-		info.Role = proto.String(s.mesosRole)
+
+	// set the framework's role to the first configured non-star role.
+	// once Mesos supports multiple roles simply set the configured mesos roles slice.
+	for _, role := range s.mesosRoles {
+		if role != "*" {
+			// mesos currently supports only one role per framework info
+			// The framework will be offered role's resources as well as * resources
+			info.Role = proto.String(role)
+			break
+		}
 	}
+
 	if s.mesosAuthPrincipal != "" {
 		info.Principal = proto.String(s.mesosAuthPrincipal)
 		if s.mesosAuthSecretFile == "" {
