@@ -110,6 +110,13 @@ var _ = Describe("Kubelet", func() {
 				for time.Now().Before(deadline) {
 					Logf("Still running...%v left", deadline.Sub(time.Now()))
 					time.Sleep(reportingPeriod)
+					timeLeft := deadline.Sub(time.Now())
+					Logf("Still running...%v left", timeLeft)
+					if timeLeft < reportingPeriod {
+						time.Sleep(timeLeft)
+					} else {
+						time.Sleep(reportingPeriod)
+					}
 					logPodsOnNodes(framework.Client, nodeNames.List())
 				}
 
