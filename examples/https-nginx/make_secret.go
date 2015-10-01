@@ -29,6 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
+
+	// This installs the legacy v1 API
+	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 // TODO:
