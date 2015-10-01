@@ -29,44 +29,40 @@ const (
 )
 
 var (
-	zeroRequestMemoryBestEffort = api.Container{
+	zeroRequestBestEffort = api.Container{
+		Resources: api.ResourceRequirements{
+			Limits: api.ResourceList{
+				api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+			},
+		},
+	}
+
+	edgeBestEffort = api.Container{
 		Resources: api.ResourceRequirements{
 			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceCPU): resource.MustParse("0"),
+			},
+			Limits: api.ResourceList{
+				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+			},
+		},
+	}
+
+	noRequestBestEffort = api.Container{
+		Resources: api.ResourceRequirements{
+			Limits: api.ResourceList{
+				api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+			},
+		},
+	}
+
+	noLimitBestEffort = api.Container{}
+
+	guaranteed = api.Container{
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
-				api.ResourceName(api.ResourceMemory): resource.MustParse("0G"),
-			},
-			Limits: api.ResourceList{
-				api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
-				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-			},
-		},
-	}
-
-	edgeMemoryBestEffort = api.Container{
-		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceMemory): resource.MustParse("0G"),
-			},
-			Limits: api.ResourceList{
-				api.ResourceName(api.ResourceMemory): resource.MustParse("0G"),
-			},
-		},
-	}
-
-	noRequestMemoryBestEffort = api.Container{
-		Resources: api.ResourceRequirements{
-			Limits: api.ResourceList{
-				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-			},
-		},
-	}
-
-	noLimitMemoryBestEffort = api.Container{}
-
-	memoryGuaranteed = api.Container{
-		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 			},
 			Limits: api.ResourceList{
 				api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
@@ -75,10 +71,11 @@ var (
 		},
 	}
 
-	memoryBurstable = api.Container{
+	burstable = api.Container{
 		Resources: api.ResourceRequirements{
 			Requests: api.ResourceList{
 				api.ResourceName(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount / 2)),
+				api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
 			},
 			Limits: api.ResourceList{
 				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
@@ -86,41 +83,42 @@ var (
 		},
 	}
 
-	memoryBurstableNoLimit = api.Container{
+	burstableNoLimit = api.Container{
 		Resources: api.ResourceRequirements{
 			Requests: api.ResourceList{
 				api.ResourceName(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount - 1)),
+				api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
 			},
 		},
 	}
 )
 
-func TestIsMemoryBestEffort(t *testing.T) {
-	validCases := []api.Container{zeroRequestMemoryBestEffort, noRequestMemoryBestEffort, noLimitMemoryBestEffort, edgeMemoryBestEffort}
+func TestIsBestEffort(t *testing.T) {
+	validCases := []api.Container{zeroRequestBestEffort, noRequestBestEffort, noLimitBestEffort, edgeBestEffort}
 	for _, container := range validCases {
-		if !isMemoryBestEffort(&container) {
-			t.Errorf("container %+v is memory best-effort", container)
+		if !isBestEffort(&container) {
+			t.Errorf("container %+v is best-effort", container)
 		}
 	}
-	invalidCases := []api.Container{memoryGuaranteed, memoryBurstable}
+	invalidCases := []api.Container{guaranteed, burstable}
 	for _, container := range invalidCases {
-		if isMemoryBestEffort(&container) {
-			t.Errorf("container %+v is not memory best-effort", container)
+		if isBestEffort(&container) {
+			t.Errorf("container %+v is not best-effort", container)
 		}
 	}
 }
 
-func TestIsMemoryGuaranteed(t *testing.T) {
-	validCases := []api.Container{memoryGuaranteed}
+func TestIsGuaranteed(t *testing.T) {
+	validCases := []api.Container{guaranteed}
 	for _, container := range validCases {
-		if !isMemoryGuaranteed(&container) {
-			t.Errorf("container %+v is memory guaranteed", container)
+		if !isGuaranteed(&container) {
+			t.Errorf("container %+v is guaranteed", container)
 		}
 	}
-	invalidCases := []api.Container{zeroRequestMemoryBestEffort, noRequestMemoryBestEffort, noLimitMemoryBestEffort, edgeMemoryBestEffort, memoryBurstable}
+	invalidCases := []api.Container{zeroRequestBestEffort, noRequestBestEffort, noLimitBestEffort, edgeBestEffort, burstable}
 	for _, container := range invalidCases {
-		if isMemoryGuaranteed(&container) {
-			t.Errorf("container %+v is not memory guaranteed", container)
+		if isGuaranteed(&container) {
+			t.Errorf("container %+v is not guaranteed", container)
 		}
 	}
 }
@@ -133,46 +131,45 @@ type oomTest struct {
 }
 
 func TestGetContainerOOMScoreAdjust(t *testing.T) {
-
 	oomTests := []oomTest{
 		{
-			container:       &zeroRequestMemoryBestEffort,
+			container:       &zeroRequestBestEffort,
 			memoryCapacity:  4000000000,
 			lowOOMScoreAdj:  1000,
 			highOOMScoreAdj: 1000,
 		},
 		{
-			container:       &edgeMemoryBestEffort,
+			container:       &edgeBestEffort,
 			memoryCapacity:  8000000000,
 			lowOOMScoreAdj:  1000,
 			highOOMScoreAdj: 1000,
 		},
 		{
-			container:       &noRequestMemoryBestEffort,
+			container:       &noRequestBestEffort,
 			memoryCapacity:  7230457451,
 			lowOOMScoreAdj:  1000,
 			highOOMScoreAdj: 1000,
 		},
 		{
-			container:       &noLimitMemoryBestEffort,
+			container:       &noLimitBestEffort,
 			memoryCapacity:  4000000000,
 			lowOOMScoreAdj:  1000,
 			highOOMScoreAdj: 1000,
 		},
 		{
-			container:       &memoryGuaranteed,
+			container:       &guaranteed,
 			memoryCapacity:  123456789,
 			lowOOMScoreAdj:  -999,
 			highOOMScoreAdj: -999,
 		},
 		{
-			container:       &memoryBurstable,
+			container:       &burstable,
 			memoryCapacity:  standardMemoryAmount,
 			lowOOMScoreAdj:  495,
 			highOOMScoreAdj: 505,
 		},
 		{
-			container:       &memoryBurstableNoLimit,
+			container:       &burstableNoLimit,
 			memoryCapacity:  standardMemoryAmount,
 			lowOOMScoreAdj:  2,
 			highOOMScoreAdj: 2,

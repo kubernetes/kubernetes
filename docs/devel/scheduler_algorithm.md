@@ -42,7 +42,7 @@ The purpose of filtering the nodes is to filter out the nodes that do not meet c
 
 - `NoDiskConflict`: Evaluate if a pod can fit due to the volumes it requests, and those that are already mounted.
 - `NoVolumeZoneConflict`: Evaluate if the volumes a pod requests are available on the node, given the Zone restrictions.
-- `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of requests of all Pods on the node. To learn more about the resource QoS in Kubernetes, please check [QoS proposal](../proposals/resource-qos.md).
+- `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of requests of all Pods on the node. To learn more about the resource QoS in Kubernetes, please check [QoS proposal](../design/resource-qos.md).
 - `PodFitsHostPorts`: Check if any HostPort required by the Pod is already occupied on the node.
 - `HostName`: Filter out all nodes except the one specified in the PodSpec's NodeName field.
 - `MatchNodeSelector`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field and, as of Kubernetes v1.2, also match the `scheduler.alpha.kubernetes.io/affinity` pod annotation if present. See [here](../user-guide/node-selection/) for more details on both.
