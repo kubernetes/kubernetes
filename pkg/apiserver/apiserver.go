@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -79,6 +80,7 @@ type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
 	Root    string
+	Group   string
 	Version string
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
@@ -119,8 +121,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	installer := g.newInstaller()
 	ws := installer.NewWebService()
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
-	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	AddSupportedResourcesWebService(ws, apiutil.GetGroupVersion(g.Group, g.Version), apiResources)
 	container.Add(ws)
 	return errors.NewAggregate(registrationErrors)
 }
@@ -144,8 +145,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
-	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	AddSupportedResourcesWebService(ws, apiutil.GetGroupVersion(g.Group, g.Version), apiResources)
 	return errors.NewAggregate(registrationErrors)
 }
 
@@ -153,7 +153,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	info := &APIRequestInfoResolver{sets.NewString(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
-	prefix := path.Join(g.Root, g.Version)
+	prefix := path.Join(g.Root, g.Group, g.Version)
 	installer := &APIInstaller{
 		group:             g,
 		info:              info,
