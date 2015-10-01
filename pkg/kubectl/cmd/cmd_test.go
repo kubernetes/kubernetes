@@ -228,9 +228,18 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
-		Generator: func(name string) (kubectl.Generator, bool) {
+		CanBeExposed: func(kind string) error {
+			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
+		},
+		Generator: func(name string) (kubectl.Generator, error) {
 			generator, ok := generators[name]
-			return generator, ok
+			if !ok {
+				return nil, fmt.Errorf("generator: %s not found", name)
+			}
+			return generator, nil
 		},
 	}
 	rf := cmdutil.NewFactory(nil)

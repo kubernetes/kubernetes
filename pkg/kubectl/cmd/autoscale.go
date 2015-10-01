@@ -101,9 +101,9 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := f.Generator(generatorName)
-	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
+	generator, err := f.Generator(generatorName)
+	if err != nil {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found (%v).", generatorName, err))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)

@@ -147,9 +147,9 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			generatorName = "run-pod/v1"
 		}
 	}
-	generator, found := f.Generator(generatorName)
-	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generatorName))
+	generator, err := f.Generator(generatorName)
+	if err != nil {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("error loading generator %s: (%v)", generatorName, err))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
@@ -305,9 +305,9 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 }
 
 func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
-	generator, found := f.Generator(serviceGenerator)
-	if !found {
-		return fmt.Errorf("missing service generator: %s", serviceGenerator)
+	generator, err := f.Generator(serviceGenerator)
+	if err != nil {
+		return fmt.Errorf("missing service generator: %s (%v)", serviceGenerator, err)
 	}
 	names := generator.ParamNames()
 
