@@ -45,9 +45,25 @@ type ConditionFunc func() (done bool, err error)
 // may be missed if the condition takes too long or the time window is too short.
 // If you want to Poll something forever, see PollInfinite.
 // Poll always waits the interval before the first check of the condition.
-// TODO: create a separate PollImmediate function that does not wait.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
-	return WaitFor(poller(interval, timeout), condition)
+	return pollInternal(poller(interval, timeout), condition)
+}
+func pollInternal(wait WaitFunc, condition ConditionFunc) error {
+	return WaitFor(wait, condition)
+}
+
+func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
+	return pollImmediateInternal(poller(interval, timeout), condition)
+}
+func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
+	done, err := condition()
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	return pollInternal(wait, condition)
 }
 
 // PollInfinite polls forever.
@@ -59,16 +75,16 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 // should be executed and is closed when the last test should be invoked.
 type WaitFunc func() <-chan struct{}
 
-// WaitFor gets a channel from wait(), and then invokes c once for every value
-// placed on the channel and once more when the channel is closed.  If c
-// returns an error the loop ends and that error is returned, and if c returns
+// WaitFor gets a channel from wait(), and then invokes fn once for every value
+// placed on the channel and once more when the channel is closed.  If fn
+// returns an error the loop ends and that error is returned, and if fn returns
 // true the loop ends and nil is returned. ErrWaitTimeout will be returned if
-// the channel is closed without c ever returning true.
-func WaitFor(wait WaitFunc, c ConditionFunc) error {
-	w := wait()
+// the channel is closed without fn ever returning true.
+func WaitFor(wait WaitFunc, fn ConditionFunc) error {
+	c := wait()
 	for {
-		_, open := <-w
-		ok, err := c()
+		_, open := <-c
+		ok, err := fn()
 		if err != nil {
 			return err
 		}
