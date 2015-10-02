@@ -26,7 +26,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,7 +77,7 @@ var _ = Describe("Load capacity", func() {
 		deleteAllRC(configs)
 
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, sets.NewString("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 
