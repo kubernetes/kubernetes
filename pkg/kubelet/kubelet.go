@@ -2362,13 +2362,12 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			LastHeartbeatTime: currentTime,
 		}
 	} else {
-		var reasons []string
 		var messages []string
 		if !containerRuntimeUp {
 			messages = append(messages, "container runtime is down")
 		}
 		if !networkConfigured {
-			messages = append(reasons, "network not configured correctly")
+			messages = append(messages, "network not configured correctly")
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
