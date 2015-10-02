@@ -29,10 +29,7 @@ kube::contrib::mesos::server_targets() {
 # The set of test targets that we are building for all platforms
 # Used by hack/lib/golang.sh
 kube::contrib::mesos::test_targets() {
-  local -r targets=(
-    contrib/mesos/cmd/k8sm-redirfd
-  )
-  echo "${targets[@]}"
+  true
 }
 
 # The set of source targets to include in the kube-build image
