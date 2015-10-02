@@ -66,7 +66,7 @@ const (
 	nonExist = "NonExist"
 
 	// How often to poll pods and nodes.
-	poll = 5 * time.Second
+	poll = 2 * time.Second
 
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
@@ -331,7 +331,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
-	if wait.Poll(poll, timeout, func() (bool, error) {
+	if wait.PollImmediate(poll, timeout, func() (bool, error) {
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
 		// ensure they are also checked.
@@ -466,7 +466,7 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 	}
 	// Be robust about making the namespace creation call.
 	var got *api.Namespace
-	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
 		var err error
 		got, err = c.Namespaces().Create(namespaceObj)
 		if err != nil {
@@ -531,7 +531,7 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 		return err
 	}
 
-	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
 		if _, err := c.Namespaces().Get(namespace); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
@@ -619,7 +619,7 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	var p *api.Pod = nil
-	err := wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
+	err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		Logf("Waiting for pod %s to appear on node %s", rcName, node)
 		pods, err := c.Pods(ns).List(label, fields.Everything())
 		if err != nil {
@@ -638,7 +638,7 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 }
 
 func waitForPodToDisappear(c *client.Client, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
 		pods, err := c.Pods(ns).List(label, fields.Everything())
 		if err != nil {
@@ -668,7 +668,7 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 
 // waitForService waits until the service appears (exist == true), or disappears (exist == false)
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	err := wait.Poll(interval, timeout, func() (bool, error) {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
 		switch {
 		case err == nil:
@@ -723,7 +723,7 @@ func countEndpointsNum(e *api.Endpoints) int {
 
 // waitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func waitForReplicationController(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	err := wait.Poll(interval, timeout, func() (bool, error) {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		_, err := c.ReplicationControllers(namespace).Get(name)
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
@@ -818,13 +818,13 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
 	By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	return wait.Poll(poll, podRespondingTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
+	return wait.PollImmediate(poll, podRespondingTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
 }
 
 func serviceResponding(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
-	return wait.Poll(poll, serviceRespondingTimeout, func() (done bool, err error) {
+	return wait.PollImmediate(poll, serviceRespondingTimeout, func() (done bool, err error) {
 		body, err := c.Get().
 			Prefix("proxy").
 			Namespace(ns).
@@ -1569,7 +1569,7 @@ func DeleteRC(c *client.Client, ns, name string) error {
 // waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
 // have completed termination).
 func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
-	return wait.Poll(poll, 2*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(poll, 2*time.Minute, func() (bool, error) {
 		if pods, err := c.Pods(rc.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
 			return true, nil
 		}
@@ -1630,7 +1630,7 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 func listNodes(c *client.Client, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	var nodes *api.NodeList
 	var errLast error
-	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
 		nodes, errLast = c.Nodes().List(label, field)
 		return errLast == nil, nil
 	}) != nil {
@@ -1872,7 +1872,7 @@ func allNodesReady(c *client.Client, timeout time.Duration) error {
 	Logf("Waiting up to %v for all nodes to be ready", timeout)
 
 	var notReady []api.Node
-	err := wait.Poll(poll, timeout, func() (bool, error) {
+	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
 		notReady = nil
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
