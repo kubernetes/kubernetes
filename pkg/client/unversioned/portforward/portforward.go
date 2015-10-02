@@ -25,10 +25,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
@@ -51,10 +53,12 @@ type PortForwarder struct {
 	ports    []ForwardedPort
 	stopChan <-chan struct{}
 
-	streamConn httpstream.Connection
-	listeners  []io.Closer
-	upgrader   upgrader
-	Ready      chan struct{}
+	streamConn    httpstream.Connection
+	listeners     []io.Closer
+	upgrader      upgrader
+	Ready         chan struct{}
+	requestIDLock sync.Mutex
+	requestID     int
 }
 
 // ForwardedPort contains a Local:Remote port pairing.
@@ -145,7 +149,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	var err error
 	pf.streamConn, err = pf.upgrader.upgrade(pf.req, pf.config)
 	if err != nil {
-		return fmt.Errorf("Error upgrading connection: %s", err)
+		return fmt.Errorf("error upgrading connection: %s", err)
 	}
 	defer pf.streamConn.Close()
 
@@ -179,7 +183,7 @@ func (pf *PortForwarder) forward() error {
 	select {
 	case <-pf.stopChan:
 	case <-pf.streamConn.CloseChan():
-		glog.Errorf("Lost connection to pod")
+		util.HandleError(errors.New("lost connection to pod"))
 	}
 
 	return nil
@@ -213,7 +217,7 @@ func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol st
 func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (net.Listener, error) {
 	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%d", hostname, port.Local))
 	if err != nil {
-		glog.Errorf("Unable to create listener: Error %s", err)
+		util.HandleError(fmt.Errorf("Unable to create listener: Error %s", err))
 		return nil, err
 	}
 	listenerAddress := listener.Addr().String()
@@ -237,12 +241,20 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 		if err != nil {
 			// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
 			if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
-				glog.Errorf("Error accepting connection on port %d: %v", port.Local, err)
+				util.HandleError(fmt.Errorf("Error accepting connection on port %d: %v", port.Local, err))
 			}
 			return
 		}
 		go pf.handleConnection(conn, port)
 	}
+}
+
+func (pf *PortForwarder) nextRequestID() int {
+	pf.requestIDLock.Lock()
+	defer pf.requestIDLock.Unlock()
+	id := pf.requestID
+	pf.requestID++
+	return id
 }
 
 // handleConnection copies data between the local connection and the stream to
@@ -252,65 +264,76 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	glog.Infof("Handling connection for %d", port.Local)
 
-	errorChan := make(chan error)
-	doneChan := make(chan struct{}, 2)
+	requestID := pf.nextRequestID()
 
 	// create error stream
 	headers := http.Header{}
 	headers.Set(api.StreamType, api.StreamTypeError)
 	headers.Set(api.PortHeader, fmt.Sprintf("%d", port.Remote))
+	headers.Set(api.PortForwardRequestIDHeader, strconv.Itoa(requestID))
 	errorStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
-		glog.Errorf("Error creating error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		util.HandleError(fmt.Errorf("error creating error stream for port %d -> %d: %v", port.Local, port.Remote, err))
 		return
 	}
-	defer errorStream.Reset()
+	// we're not writing to this stream
+	errorStream.Close()
+
+	errorChan := make(chan error)
 	go func() {
 		message, err := ioutil.ReadAll(errorStream)
-		if err != nil && err != io.EOF {
-			errorChan <- fmt.Errorf("Error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		switch {
+		case err != nil:
+			errorChan <- fmt.Errorf("error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		case len(message) > 0:
+			errorChan <- fmt.Errorf("an error occurred forwarding %d -> %d: %v", port.Local, port.Remote, string(message))
 		}
-		if len(message) > 0 {
-			errorChan <- fmt.Errorf("An error occurred forwarding %d -> %d: %v", port.Local, port.Remote, string(message))
-		}
+		close(errorChan)
 	}()
 
 	// create data stream
 	headers.Set(api.StreamType, api.StreamTypeData)
 	dataStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
-		glog.Errorf("Error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		util.HandleError(fmt.Errorf("error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err))
 		return
 	}
-	// Send a Reset when this function exits to completely tear down the stream here
-	// and in the remote server.
-	defer dataStream.Reset()
+
+	localError := make(chan struct{})
+	remoteDone := make(chan struct{})
 
 	go func() {
-		// Copy from the remote side to the local port. We won't get an EOF from
-		// the server as it has no way of knowing when to close the stream.  We'll
-		// take care of closing both ends of the stream with the call to
-		// stream.Reset() when this function exits.
-		if _, err := io.Copy(conn, dataStream); err != nil && err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
-			glog.Errorf("Error copying from remote stream to local connection: %v", err)
+		// Copy from the remote side to the local port.
+		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			util.HandleError(fmt.Errorf("error copying from remote stream to local connection: %v", err))
 		}
-		doneChan <- struct{}{}
+
+		// inform the select below that the remote copy is done
+		close(remoteDone)
 	}()
 
 	go func() {
-		// Copy from the local port to the remote side. Here we will be able to know
-		// when the Copy gets an EOF from conn, as that will happen as soon as conn is
-		// closed (i.e. client disconnected).
-		if _, err := io.Copy(dataStream, conn); err != nil && err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
-			glog.Errorf("Error copying from local connection to remote stream: %v", err)
+		// inform server we're not sending any more data after copy unblocks
+		defer dataStream.Close()
+
+		// Copy from the local port to the remote side.
+		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			util.HandleError(fmt.Errorf("error copying from local connection to remote stream: %v", err))
+			// break out of the select below without waiting for the other copy to finish
+			close(localError)
 		}
-		doneChan <- struct{}{}
 	}()
 
+	// wait for either a local->remote error or for copying from remote->local to finish
 	select {
-	case err := <-errorChan:
-		glog.Error(err)
-	case <-doneChan:
+	case <-remoteDone:
+	case <-localError:
+	}
+
+	// always expect something on errorChan (it may be nil)
+	err = <-errorChan
+	if err != nil {
+		util.HandleError(err)
 	}
 }
 
@@ -318,7 +341,7 @@ func (pf *PortForwarder) Close() {
 	// stop all listeners
 	for _, l := range pf.listeners {
 		if err := l.Close(); err != nil {
-			glog.Errorf("Error closing listener: %v", err)
+			util.HandleError(fmt.Errorf("error closing listener: %v", err))
 		}
 	}
 }
