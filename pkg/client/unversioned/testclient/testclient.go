@@ -327,3 +327,7 @@ func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
 func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
 	return &FakeJobs{Fake: c, Namespace: namespace}
 }
+
+func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
+	return &FakeIngress{Fake: c, Namespace: namespace}
+}

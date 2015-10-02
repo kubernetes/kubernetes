@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -837,6 +838,107 @@ func TestValidateJob(t *testing.T) {
 
 	for k, v := range errorCases {
 		errs := ValidateJob(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0].(*errors.ValidationError)
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+			}
+		}
+	}
+}
+
+type ingressRules map[string]string
+
+func TestValidateIngress(t *testing.T) {
+	defaultBackend := experimental.IngressBackend{
+		ServiceName: "default-backend",
+		ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+	}
+
+	newValid := func() experimental.Ingress {
+		return experimental.Ingress{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "foo",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: experimental.IngressSpec{
+				Backend: &experimental.IngressBackend{
+					ServiceName: "default-backend",
+					ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+				},
+				Rules: []experimental.IngressRule{
+					{
+						Host: "foo.bar.com",
+						IngressRuleValue: experimental.IngressRuleValue{
+							HTTP: &experimental.HTTPIngressRuleValue{
+								Paths: []experimental.HTTPIngressPath{
+									{
+										Path:    "/foo",
+										Backend: defaultBackend,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Status: experimental.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{IP: "127.0.0.1"},
+					},
+				},
+			},
+		}
+	}
+	servicelessBackend := newValid()
+	servicelessBackend.Spec.Backend.ServiceName = ""
+	invalidNameBackend := newValid()
+	invalidNameBackend.Spec.Backend.ServiceName = "defaultBackend"
+	noPortBackend := newValid()
+	noPortBackend.Spec.Backend = &experimental.IngressBackend{ServiceName: defaultBackend.ServiceName}
+	noForwardSlashPath := newValid()
+	noForwardSlashPath.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []experimental.HTTPIngressPath{
+		{
+			Path:    "invalid",
+			Backend: defaultBackend,
+		},
+	}
+	noPaths := newValid()
+	noPaths.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []experimental.HTTPIngressPath{}
+	badHost := newValid()
+	badHost.Spec.Rules[0].Host = "foobar:80"
+	badRegexPath := newValid()
+	badPathExpr := "/invalid["
+	badRegexPath.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []experimental.HTTPIngressPath{
+		{
+			Path:    badPathExpr,
+			Backend: defaultBackend,
+		},
+	}
+	badPathErr := fmt.Sprintf("spec.rules.ingressRule.http.path: invalid value '%v'",
+		badPathExpr)
+	hostIP := "127.0.0.1"
+	badHostIP := newValid()
+	badHostIP.Spec.Rules[0].Host = hostIP
+	badHostIPErr := fmt.Sprintf("spec.rules.host: invalid value '%v'", hostIP)
+
+	errorCases := map[string]experimental.Ingress{
+		"spec.backend.serviceName: required value":          servicelessBackend,
+		"spec.backend.serviceName: invalid value":           invalidNameBackend,
+		"spec.backend.servicePort: invalid value":           noPortBackend,
+		"spec.rules.host: invalid value":                    badHost,
+		"spec.rules.ingressRule.http.paths: required value": noPaths,
+		"spec.rules.ingressRule.http.path: invalid value":   noForwardSlashPath,
+	}
+	errorCases[badPathErr] = badRegexPath
+	errorCases[badHostIPErr] = badHostIP
+
+	for k, v := range errorCases {
+		errs := ValidateIngress(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
