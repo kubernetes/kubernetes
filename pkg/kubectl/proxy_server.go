@@ -179,8 +179,8 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 }
 
 // Listen is a simple wrapper around net.Listen.
-func (s *ProxyServer) Listen(port int) (net.Listener, error) {
-	return net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+func (s *ProxyServer) Listen(address string, port int) (net.Listener, error) {
+	return net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 }
 
 // ListenUnix does net.Listen for a unix socket
