@@ -157,6 +157,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		kubecontainer.FakeOS{},
 		networkPlugin,
 		nil,
+		nil,
 		nil)
 
 	return dockerManager, fakeDocker
