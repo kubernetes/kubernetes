@@ -30,7 +30,7 @@ import (
 
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
-	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func())
+	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType SyncPodType, updateComplete func())
 	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
 	ForgetWorker(uid types.UID)
 }
@@ -121,18 +121,10 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 }
 
 // Apply the new setting to the specified pod. updateComplete is called when the update is completed.
-func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func()) {
+func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType SyncPodType, updateComplete func()) {
 	uid := pod.UID
 	var podUpdates chan workUpdate
 	var exists bool
-
-	// TODO: Pipe this through from the kubelet. Currently kubelets operating with
-	// snapshot updates (PodConfigNotificationSnapshot) will send updates, creates
-	// and deletes as SET operations, which makes updates indistinguishable from
-	// creates. The intent here is to communicate to the pod worker that it can take
-	// certain liberties, like skipping status generation, when it receives a create
-	// event for a pod.
-	updateType := SyncPodUpdate
 
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
@@ -148,7 +140,6 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 		// kubelet just restarted. In either case the kubelet is willing to believe
 		// the status of the pod for the first pod worker sync. See corresponding
 		// comment in syncPod.
-		updateType = SyncPodCreate
 		go func() {
 			defer util.HandleCrash()
 			p.managePodLoop(podUpdates)
