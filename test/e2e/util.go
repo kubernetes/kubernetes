@@ -94,6 +94,7 @@ const (
 
 	podRespondingTimeout     = 2 * time.Minute
 	serviceRespondingTimeout = 2 * time.Minute
+	endpointRegisterTimeout  = time.Minute
 
 	// How wide to print pod names, by default. Useful for aligning printing to
 	// quickly scan through output.
@@ -729,6 +730,20 @@ func waitForReplicationController(c *client.Client, namespace, name string, exis
 		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %v", namespace, name, stateMsg[exist], err)
 	}
 	return nil
+}
+
+func waitForEndpoint(c *client.Client, ns, name string) error {
+	for t := time.Now(); time.Since(t) < endpointRegisterTimeout; time.Sleep(poll) {
+		endpoint, err := c.Endpoints(ns).Get(name)
+		Expect(err).NotTo(HaveOccurred())
+		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
+			Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		} else {
+			return nil
+		}
+	}
+	return fmt.Errorf("Failed to get entpoints for %s/%s", ns, name)
 }
 
 // Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
