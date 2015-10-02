@@ -820,16 +820,26 @@ func (r *runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 // getPodStatus reads the service file and invokes 'rkt status $UUID' to get the
 // pod's status.
 func (r *runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
+	var status api.PodStatus
+
 	// TODO(yifan): Get rkt uuid from the service file name.
 	pod, rktInfo, err := r.readServiceFile(serviceName)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+
+	if os.IsNotExist(err) {
+		// Pod does not exit, means it's not been created yet,
+		// return empty status for now.
+		// TODO(yifan): Maybe inspect the image and return waiting status.
+		return &status, nil
+	}
+
 	podInfo, err := r.getPodInfo(rktInfo.uuid)
 	if err != nil {
 		return nil, err
 	}
-	status := makePodStatus(pod, podInfo, rktInfo)
+	status = makePodStatus(pod, podInfo, rktInfo)
 	return &status, nil
 }
 
@@ -979,10 +989,6 @@ func (r *runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 // SyncPod syncs the running pod to match the specified desired pod.
 func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
 	podFullName := kubeletUtil.FormatPodName(pod)
-	if len(runningPod.Containers) == 0 {
-		glog.V(4).Infof("Pod %q is not running, will start it", podFullName)
-		return r.RunPod(pod, pullSecrets)
-	}
 
 	// Add references to all containers.
 	unidentifiedContainers := make(map[types.UID]*kubecontainer.Container)
@@ -1036,8 +1042,11 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 	}
 
 	if restartPod {
-		if err := r.KillPod(pod, runningPod); err != nil {
-			return err
+		// Kill the pod only if the pod is actually running.
+		if len(runningPod.Containers) > 0 {
+			if err := r.KillPod(pod, runningPod); err != nil {
+				return err
+			}
 		}
 		if err := r.RunPod(pod, pullSecrets); err != nil {
 			return err
