@@ -389,6 +389,15 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 	return map_FCVolumeSource
 }
 
+var map_FlockerVolumeSource = map[string]string{
+	"":            "FlockerVolumeSource represents a Flocker volume mounted by the Flocker agent.",
+	"datasetName": "Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker",
+}
+
+func (FlockerVolumeSource) SwaggerDoc() map[string]string {
+	return map_FlockerVolumeSource
+}
+
 var map_GCEPersistentDiskVolumeSource = map[string]string{
 	"":          "GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once.",
 	"pdName":    "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
@@ -847,6 +856,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1358,6 +1368,7 @@ var map_VolumeSource = map[string]string{
 	"rbd":         "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
 	"cinder":      "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":      "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"flocker":     "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
 	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
 	"fc":          "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 }
