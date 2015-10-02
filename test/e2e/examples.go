@@ -34,10 +34,9 @@ import (
 )
 
 const (
-	podListTimeout          = time.Minute
-	serverStartTimeout      = podStartTimeout + 3*time.Minute
-	dnsReadyTimeout         = time.Minute
-	endpointRegisterTimeout = time.Minute
+	podListTimeout     = time.Minute
+	serverStartTimeout = podStartTimeout + 3*time.Minute
+	dnsReadyTimeout    = time.Minute
 )
 
 const queryDnsPythonTemplate string = `
@@ -149,6 +148,8 @@ var _ = Describe("Examples e2e", func() {
 				_, err := lookForStringInLog(ns, pod.Name, "rabbitmq", "Server startup complete", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
+			waitForEndpoint(c, ns, "rabbitmq-service")
+
 			By("starting celery")
 			runKubectl("create", "-f", celeryControllerYaml, nsFlag)
 			forEachPod(c, ns, "component", "celery", func(pod api.Pod) {
@@ -192,6 +193,9 @@ var _ = Describe("Examples e2e", func() {
 			_, err = lookForStringInLog(ns, "spark-driver", "spark-driver", "Use kubectl exec", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
 
+			By("waiting for master endpoint")
+			waitForEndpoint(c, ns, "spark-master")
+
 			By("starting workers")
 			runKubectl("create", "-f", workerControllerJson, nsFlag)
 			ScaleRC(c, ns, "spark-worker-controller", 2, true)
@@ -220,6 +224,8 @@ var _ = Describe("Examples e2e", func() {
 
 			_, err = lookForStringInLog(ns, "cassandra", "cassandra", "Listening for thrift clients", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
+
+			waitForEndpoint(c, ns, "cassandra")
 
 			By("create and scale rc")
 			runKubectl("create", "-f", controllerYaml, nsFlag)
@@ -263,12 +269,14 @@ var _ = Describe("Examples e2e", func() {
 			By("checking if zookeeper is up and running")
 			_, err = lookForStringInLog(ns, zookeeperPod, "zookeeper", "binding to port", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
+			waitForEndpoint(c, ns, "zookeeper")
 
 			By("starting Nimbus")
 			runKubectl("create", "-f", nimbusPodJson, nsFlag)
 			runKubectl("create", "-f", nimbusServiceJson, nsFlag)
 			err = waitForPodRunningInNamespace(c, "nimbus", ns)
 			Expect(err).NotTo(HaveOccurred())
+			waitForEndpoint(c, ns, "nimbus")
 
 			By("starting workers")
 			runKubectl("create", "-f", workerControllerJson, nsFlag)
@@ -382,6 +390,7 @@ var _ = Describe("Examples e2e", func() {
 				})
 			}
 			checkDbInstances()
+			waitForEndpoint(c, ns, "rethinkdb-driver")
 
 			By("scaling rethinkdb")
 			ScaleRC(c, ns, "rethinkdb-rc", 2, true)
@@ -419,6 +428,8 @@ var _ = Describe("Examples e2e", func() {
 				_, err = lookForStringInLog(ns, pod.Name, "hazelcast", "is STARTED", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
+
+			waitForEndpoint(c, ns, "hazelcast")
 
 			By("scaling hazelcast")
 			ScaleRC(c, ns, "hazelcast", 2, true)
