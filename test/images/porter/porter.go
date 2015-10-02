@@ -30,6 +30,7 @@ import (
 )
 
 const prefix = "SERVE_PORT_"
+const tlsPrefix = "SERVE_TLS_PORT_"
 
 func main() {
 	for _, vk := range os.Environ() {
@@ -42,6 +43,10 @@ func main() {
 		if strings.HasPrefix(key, prefix) {
 			port := strings.TrimPrefix(key, prefix)
 			go servePort(port, value)
+		}
+		if strings.HasPrefix(key, tlsPrefix) {
+			port := strings.TrimPrefix(key, tlsPrefix)
+			go serveTLSPort(port, value)
 		}
 	}
 
@@ -56,4 +61,22 @@ func servePort(port, value string) {
 		}),
 	}
 	log.Printf("server on port %q failed: %v", port, s.ListenAndServe())
+}
+
+func serveTLSPort(port, value string) {
+	s := &http.Server{
+		Addr: "0.0.0.0:" + port,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, value)
+		}),
+	}
+	certFile := os.Getenv("CERT_FILE")
+	if len(certFile) == 0 {
+		certFile = "localhost.crt"
+	}
+	keyFile := os.Getenv("KEY_FILE")
+	if len(keyFile) == 0 {
+		keyFile = "localhost.key"
+	}
+	log.Printf("tls server on port %q with certFile=%q, keyFile=%q failed: %v", port, certFile, keyFile, s.ListenAndServeTLS(certFile, keyFile))
 }
