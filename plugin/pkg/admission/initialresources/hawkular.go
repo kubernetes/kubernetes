@@ -29,6 +29,6 @@ func newHawkularSource() (dataSource, error) {
 	return nil, fmt.Errorf("hawkular source not implemented")
 }
 
-func (s *hawkularSource) GetUsagePercentile(kind api.ResourceName, perc int64, image string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+func (s *hawkularSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 	return 0, 0, fmt.Errorf("gcm source not implemented")
 }

@@ -122,6 +122,7 @@ iptables-sync-period
 ir-data-source
 ir-dbname
 ir-influxdb-host
+ir-namespace-only
 ir-password
 ir-user
 jenkins-host
