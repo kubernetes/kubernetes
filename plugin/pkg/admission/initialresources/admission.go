@@ -32,8 +32,9 @@ import (
 )
 
 var (
-	source     = flag.String("ir-data-source", "influxdb", "Data source used by InitialResources. Supported options: influxdb.")
+	source     = flag.String("ir-data-source", "influxdb", "Data source used by InitialResources. Supported options: influxdb, gcm.")
 	percentile = flag.Int64("ir-percentile", 90, "Which percentile of samples should InitialResources use when estimating resources. For experiment purposes.")
+	nsOnly     = flag.Bool("ir-namespace-only", false, "Whether the estimation should be made only based on data from the same namespace.")
 )
 
 const (
@@ -50,19 +51,23 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		return newInitialResources(s), nil
+		return newInitialResources(s, *percentile, *nsOnly), nil
 	})
 }
 
 type initialResources struct {
 	*admission.Handler
-	source dataSource
+	source     dataSource
+	percentile int64
+	nsOnly     bool
 }
 
-func newInitialResources(source dataSource) admission.Interface {
+func newInitialResources(source dataSource, percentile int64, nsOnly bool) admission.Interface {
 	return &initialResources{
-		Handler: admission.NewHandler(admission.Create),
-		source:  source,
+		Handler:    admission.NewHandler(admission.Create),
+		source:     source,
+		percentile: percentile,
+		nsOnly:     nsOnly,
 	}
 }
 
@@ -92,7 +97,7 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 		var err error
 		if _, ok := req[api.ResourceCPU]; !ok {
 			if _, ok2 := lim[api.ResourceCPU]; !ok2 {
-				cpu, err = ir.getEstimation(api.ResourceCPU, c)
+				cpu, err = ir.getEstimation(api.ResourceCPU, c, pod.ObjectMeta.Namespace)
 				if err != nil {
 					glog.Errorf("Error while trying to estimate resources: %v", err)
 				}
@@ -100,7 +105,7 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 		}
 		if _, ok := req[api.ResourceMemory]; !ok {
 			if _, ok2 := lim[api.ResourceMemory]; !ok2 {
-				mem, err = ir.getEstimation(api.ResourceMemory, c)
+				mem, err = ir.getEstimation(api.ResourceMemory, c, pod.ObjectMeta.Namespace)
 				if err != nil {
 					glog.Errorf("Error while trying to estimate resources: %v", err)
 				}
@@ -138,29 +143,56 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 	}
 }
 
-func (ir initialResources) getEstimation(kind api.ResourceName, c *api.Container) (*resource.Quantity, error) {
+func (ir initialResources) getEstimation(kind api.ResourceName, c *api.Container, ns string) (*resource.Quantity, error) {
 	end := time.Now()
 	start := end.Add(-week)
 	var usage, samples int64
 	var err error
 
-	// Historical data from last 7 days for the same image:tag.
-	if usage, samples, err = ir.source.GetUsagePercentile(kind, *percentile, c.Image, true, start, end); err != nil {
+	// Historical data from last 7 days for the same image:tag within the same namespace.
+	if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, ns, true, start, end); err != nil {
 		return nil, err
 	}
 	if samples < samplesThreshold {
-		// Historical data from last 30 days for the same image:tag.
+		// Historical data from last 30 days for the same image:tag within the same namespace.
 		start := end.Add(-month)
-		if usage, samples, err = ir.source.GetUsagePercentile(kind, *percentile, c.Image, true, start, end); err != nil {
+		if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, ns, true, start, end); err != nil {
 			return nil, err
 		}
 	}
-	if samples < samplesThreshold {
-		// Historical data from last 30 days for the same image.
-		start := end.Add(-month)
-		image := strings.Split(c.Image, ":")[0]
-		if usage, samples, err = ir.source.GetUsagePercentile(kind, *percentile, image, false, start, end); err != nil {
-			return nil, err
+
+	// If we are allowed to estimate only based on data from the same namespace.
+	if ir.nsOnly {
+		if samples < samplesThreshold {
+			// Historical data from last 30 days for the same image within the same namespace.
+			start := end.Add(-month)
+			image := strings.Split(c.Image, ":")[0]
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, image, ns, false, start, end); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		if samples < samplesThreshold {
+			// Historical data from last 7 days for the same image:tag within all namespaces.
+			start := end.Add(-week)
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, "", true, start, end); err != nil {
+				return nil, err
+			}
+		}
+		if samples < samplesThreshold {
+			// Historical data from last 30 days for the same image:tag within all namespaces.
+			start := end.Add(-month)
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, "", true, start, end); err != nil {
+				return nil, err
+			}
+		}
+		if samples < samplesThreshold {
+			// Historical data from last 30 days for the same image within all namespaces.
+			start := end.Add(-month)
+			image := strings.Split(c.Image, ":")[0]
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, image, "", false, start, end); err != nil {
+				return nil, err
+			}
 		}
 	}
 
