@@ -32,5 +32,6 @@ detect-master
 
 export KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
 export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/kubeconfig.loc"
+export E2E_MIN_STARTUP_PODS=0
 
 ${KUBE_ROOT}/hack/ginkgo-e2e.sh --e2e-verify-service-account=false --ginkgo.focus="should\sallow\sstarting\s30\spods\sper\snode"
