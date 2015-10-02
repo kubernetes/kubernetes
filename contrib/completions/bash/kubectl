@@ -687,6 +687,7 @@ _kubectl_proxy()
 
     flags+=("--accept-hosts=")
     flags+=("--accept-paths=")
+    flags+=("--address=")
     flags+=("--api-prefix=")
     flags+=("--disable-filter")
     flags+=("--port=")
