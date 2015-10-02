@@ -78,6 +78,8 @@ type Stream interface {
 	Reset() error
 	// Headers returns the headers used to create the stream.
 	Headers() http.Header
+	// Identifier returns the stream's ID.
+	Identifier() uint32
 }
 
 // IsUpgradeRequest returns true if the given request is a connection upgrade request
