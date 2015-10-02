@@ -17,6 +17,22 @@
           {
             "name": "SERVE_PORT_81",
             "value": "<html><head></head><body><a href=\"/rewriteme\">rewritten link</a></body></html>"
+          },
+          {
+            "name": "SERVE_TLS_PORT_443",
+            "value": "tls foo"
+          },
+          {
+            "name": "SERVE_TLS_PORT_444",
+            "value": "<html><head></head><body><a href=\"/tls-rewriteme\">tls rewritten link</a></body></html>"
+          },
+          {
+          	"name": "CERT_FILE",
+          	"value": "/localhost.crt"
+          },
+          {
+          	"name": "KEY_FILE",
+          	"value": "/localhost.key"
           }
         ],
         "ports": [
@@ -27,6 +43,14 @@
           {
             "name": "p81",
             "containerPort": 81
+          },
+          {
+            "name": "p443",
+            "containerPort": 443
+          },
+          {
+            "name": "p444",
+            "containerPort": 444
           }
         ]
       }
