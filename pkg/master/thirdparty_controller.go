@@ -30,10 +30,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const thirdpartyprefix = "/apis/"
+const thirdpartyprefix = "/apis"
 
 func makeThirdPartyPath(group string) string {
-	return thirdpartyprefix + group
+	if len(group) == 0 {
+		return thirdpartyprefix
+	}
+	return thirdpartyprefix + "/" + group
 }
 
 // resourceInterface is the interface for the parts of the master that know how to add/remove
