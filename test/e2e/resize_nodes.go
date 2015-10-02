@@ -384,28 +384,17 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 }
 
 var _ = Describe("Nodes", func() {
+	framework := Framework{BaseName: "resize-nodes"}
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		testingNs, err := createTestingNS("resize-nodes", c)
-		ns = testingNs.Name
-		Expect(err).NotTo(HaveOccurred())
+		framework.beforeEach()
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		By("checking whether all nodes are healthy")
-		if err := allNodesReady(c, time.Minute); err != nil {
-			Failf("Not all nodes are ready: %v", err)
-		}
-		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-			Failf("Couldn't delete namespace '%s', %v", ns, err)
-		}
-	})
+	AfterEach(framework.afterEach)
 
 	Describe("Resize", func() {
 		var skipped bool
