@@ -814,6 +814,7 @@ fi
 ### Start Kubemark ###
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   export RUN_FROM_DISTRO=true
+  ./test/kubemark/stop-kubemark.sh
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
   if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
