@@ -28,6 +28,20 @@
                 "name": "http-server",
                 "containerPort": 80
               }
+            ],
+            "env": [
+              {
+                "name": "MYSQL_SERVICE_IP",
+                "value": "1.2.3.4"
+              },
+              {
+                "name": "MYSQL_SERVICE_PORT",
+                "value": "3306"
+              },
+              {
+                "name": "MYSQL_PASSWORD",
+                "value": "1234"
+              }
             ]
           }
         ]
