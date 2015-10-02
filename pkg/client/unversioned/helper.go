@@ -380,15 +380,9 @@ func tlsTransportFor(config *Config) (http.RoundTripper, error) {
 	}
 
 	// Cache a single transport for these options
-	tlsTransports[key] = &http.Transport{
+	tlsTransports[key] = util.SetTransportDefaults(&http.Transport{
 		TLSClientConfig: tlsConfig,
-		Proxy:           http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
+	})
 	return tlsTransports[key], nil
 }
 
