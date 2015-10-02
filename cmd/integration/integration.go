@@ -204,7 +204,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
