@@ -79,16 +79,17 @@ until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" hollow-cluster-
   sleep 1
 done
 
-gcloud compute ssh --zone=${ZONE} hollow-cluster-master --command="sudo mkdir /srv/kubernetes -p && \
-sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
-sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
-sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
-sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
-sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
-sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
-sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
-sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
-sudo bash -c \"echo admin,admin,admin > /srv/kubernetes/basic_auth.csv\""
+gcloud compute ssh --zone=${ZONE} --project="${PROJECT}" hollow-cluster-master \
+  --command="sudo mkdir /srv/kubernetes -p && \
+  sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
+  sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
+  sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
+  sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
+  sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
+  sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
+  sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
+  sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
+  sudo bash -c \"echo admin,admin,admin > /srv/kubernetes/basic_auth.csv\""
 
 if [ "${RUN_FROM_DISTRO}" == "false" ]; then
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
