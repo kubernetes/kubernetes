@@ -89,6 +89,16 @@ git remote set-url --push upstream no_push
 
 ### Committing changes to your fork
 
+Before committing any changes, please link/copy these pre-commit hooks into your .git
+directory. This will keep you from accidentally committing non-gofmt'd go code.
+
+```sh
+cd kubernetes/.git/hooks/
+ln -s ../../hooks/pre-commit .
+```
+
+Then you can commit your changes and push them to your fork:
+
 ```sh
 git commit
 git push -f origin myfeature
@@ -202,16 +212,6 @@ updated by godeps.  It then may be necessary to perform a `godep save ./...` to 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
-
-## Hooks
-
-Before committing any changes, please link/copy these hooks into your .git
-directory. This will keep you from accidentally committing non-gofmt'd go code.
-
-```sh
-cd kubernetes/.git/hooks/
-ln -s ../../hooks/pre-commit .
-```
 
 ## Unit tests
 
