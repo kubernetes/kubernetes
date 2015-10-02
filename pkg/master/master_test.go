@@ -681,7 +681,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		},
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
-			APIVersion: version,
+			APIVersion: "company.com/" + version,
 		},
 		SomeField:  "test field",
 		OtherField: 10,
