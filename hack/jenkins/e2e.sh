@@ -100,6 +100,7 @@ REBOOT_SKIP_TESTS=(
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
     "Reboot"
+    "ServiceLoadBalancer"
     )
 
 # Tests which cannot be run on GKE, e.g. because they require
