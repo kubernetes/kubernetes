@@ -209,6 +209,10 @@ func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namesp
 		if err != nil {
 			return estimate, err
 		}
+		err = deleteIngress(kubeClient.Experimental(), namespace)
+		if err != nil {
+			return estimate, err
+		}
 	}
 	return estimate, nil
 }
@@ -490,6 +494,20 @@ func deleteDeployments(expClient client.ExperimentalInterface, ns string) error 
 	}
 	for i := range items.Items {
 		err := expClient.Deployments(ns).Delete(items.Items[i].Name, nil)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteIngress(expClient client.ExperimentalInterface, ns string) error {
+	items, err := expClient.Ingress(ns).List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.Ingress(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
