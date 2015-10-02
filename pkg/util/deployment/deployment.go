@@ -107,3 +107,40 @@ func GetPodTemplateSpecHash(template *api.PodTemplateSpec) uint32 {
 	util.DeepHashObject(podTemplateSpecHasher, template)
 	return podTemplateSpecHasher.Sum32()
 }
+
+// Returns the sum of Replicas of the given replication controllers.
+func GetReplicaCountForRCs(replicationControllers []*api.ReplicationController) int {
+	totalReplicaCount := 0
+	for _, rc := range replicationControllers {
+		totalReplicaCount += rc.Spec.Replicas
+	}
+	return totalReplicaCount
+}
+
+// Returns the number of available pods corresponding to the given RCs.
+func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController) (int, error) {
+	// TODO: Use MinReadySeconds once https://github.com/kubernetes/kubernetes/pull/12894 is merged.
+	allPods, err := getPodsForRCs(c, rcs)
+	if err != nil {
+		return 0, err
+	}
+	readyPodCount := 0
+	for _, pod := range allPods {
+		if api.IsPodReady(&pod) {
+			readyPodCount++
+		}
+	}
+	return readyPodCount, nil
+}
+
+func getPodsForRCs(c client.Interface, replicationControllers []*api.ReplicationController) ([]api.Pod, error) {
+	allPods := []api.Pod{}
+	for _, rc := range replicationControllers {
+		podList, err := c.Pods(rc.ObjectMeta.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
+		if err != nil {
+			return allPods, fmt.Errorf("error listing pods: %v", err)
+		}
+		allPods = append(allPods, podList.Items...)
+	}
+	return allPods, nil
+}
