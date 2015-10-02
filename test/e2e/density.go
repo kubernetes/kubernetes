@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
@@ -63,12 +62,17 @@ func (a latencySlice) Len() int           { return len(a) }
 func (a latencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a latencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
-func printLatencies(latencies []podLatencyData, header string) {
+func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
 	perc50 := latencies[len(latencies)/2].Latency
 	perc90 := latencies[(len(latencies)*9)/10].Latency
 	perc99 := latencies[(len(latencies)*99)/100].Latency
+	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
+}
+
+func printLatencies(latencies []podLatencyData, header string) {
+	metrics := extractLatencyMetrics(latencies)
 	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:len(latencies)])
-	Logf("perc50: %v, perc90: %v, perc99: %v", perc50, perc90, perc99)
+	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
 
 // This test suite can take a long time to run, so by default it is added to
@@ -139,7 +143,7 @@ var _ = Describe("Density", func() {
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, sets.NewString("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 
@@ -379,14 +383,10 @@ var _ = Describe("Density", func() {
 				printLatencies(e2eLag, "worst e2e total latencies")
 
 				// Test whether e2e pod startup time is acceptable.
+				podStartupLatency := PodStartupLatency{Latency: extractLatencyMetrics(e2eLag)}
 				// TODO: Switch it to 5 seconds once we are sure our tests are passing.
 				podStartupThreshold := 8 * time.Second
-				e2ePodStartupTime50perc := e2eLag[len(e2eLag)/2].Latency
-				e2ePodStartupTime90perc := e2eLag[len(e2eLag)*9/10].Latency
-				e2ePodStartupTime99perc := e2eLag[len(e2eLag)*99/100].Latency
-				Expect(e2ePodStartupTime50perc < podStartupThreshold).To(Equal(true), "Too high pod startup time 50th percentile")
-				Expect(e2ePodStartupTime90perc < podStartupThreshold).To(Equal(true), "Too high pod startup time 90th percentile")
-				Expect(e2ePodStartupTime99perc < podStartupThreshold).To(Equal(true), "Too high pod startup time 99th percentile")
+				expectNoError(VerifyPodStartupLatency(podStartupLatency, podStartupThreshold))
 
 				// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
 				for _, l := range startupLag {
