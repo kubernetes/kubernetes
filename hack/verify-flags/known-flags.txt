@@ -17,6 +17,7 @@ api-servers
 api-server-port
 api-token
 api-version
+kubernetes-service-node-port
 authorization-mode
 authorization-policy-file
 auth-path

@@ -57,9 +57,10 @@ type Controller struct {
 
 	PublicIP net.IP
 
-	ServiceIP         net.IP
-	ServicePort       int
-	PublicServicePort int
+	ServiceIP                 net.IP
+	ServicePort               int
+	PublicServicePort         int
+	KubernetesServiceNodePort int
 
 	runner *util.Runner
 }
@@ -110,7 +111,7 @@ func (c *Controller) UpdateKubernetesService() error {
 		return err
 	}
 	if c.ServiceIP != nil {
-		if err := c.CreateMasterServiceIfNeeded("kubernetes", c.ServiceIP, c.ServicePort); err != nil {
+		if err := c.CreateMasterServiceIfNeeded("kubernetes", c.ServiceIP, c.ServicePort, c.KubernetesServiceNodePort); err != nil {
 			return err
 		}
 		if err := c.SetEndpoints("kubernetes", c.PublicIP, c.PublicServicePort); err != nil {
@@ -140,14 +141,33 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 	return err
 }
 
+// createPortAndServiceSpec creates an array of service ports.
+// If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
+func createPortAndServiceSpec(servicePort int, nodePort int) ([]api.ServicePort, api.ServiceType) {
+	//Use the Cluster IP type for the service port if NodePort isn't provided.
+	//Otherwise, we will be binding the master service to a NodePort.
+	if nodePort <= 0 {
+		return []api.ServicePort{{Protocol: api.ProtocolTCP,
+			Port:       servicePort,
+			TargetPort: util.NewIntOrStringFromInt(servicePort)}}, api.ServiceTypeClusterIP
+	}
+	return []api.ServicePort{{Protocol: api.ProtocolTCP,
+		Port:       servicePort,
+		TargetPort: util.NewIntOrStringFromInt(servicePort),
+		NodePort:   nodePort,
+	}}, api.ServiceTypeNodePort
+}
+
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort int) error {
+func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort, nodePort int) error {
 	ctx := api.NewDefaultContext()
 	if _, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
 		// The service already exists.
 		return nil
 	}
+
+	ports, serviceType := createPortAndServiceSpec(servicePort, nodePort)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      serviceName,
@@ -155,15 +175,14 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP, TargetPort: util.NewIntOrStringFromInt(servicePort)}},
+			Ports: ports,
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
 			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
+			Type:            serviceType,
 		},
 	}
-
 	if err := rest.BeforeCreate(rest.Services, ctx, svc); err != nil {
 		return err
 	}
