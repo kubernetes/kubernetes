@@ -97,7 +97,7 @@ type Proxier struct {
 // assert Proxier is a ProxyProvider
 var _ proxy.ProxyProvider = &Proxier{}
 
-// A key for the portMap.  The ip has to be a tring because slices can't be map
+// A key for the portMap.  The ip has to be a string because slices can't be map
 // keys.
 type portMapKey struct {
 	ip       string
@@ -208,7 +208,7 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	// flush and delete chains.
 	chains := []iptables.Chain{iptablesContainerPortalChain, iptablesHostPortalChain, iptablesHostNodePortChain, iptablesContainerNodePortChain}
 	for _, c := range chains {
-		// flush chain, then if sucessful delete, delete will fail if flush fails.
+		// flush chain, then if successful delete, delete will fail if flush fails.
 		if err := ipt.FlushChain(iptables.TableNAT, c); err != nil {
 			glog.Errorf("Error flushing userspace chain: %v", err)
 			encounteredError = true
@@ -338,7 +338,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 // How long we leave idle UDP connections open.
 const udpIdleTimeout = 1 * time.Second
 
-// OnUpdate manages the active set of service proxies.
+// OnServiceUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
 func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
@@ -913,7 +913,7 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, addDstLocalMatch b
 	// If the proxy is bound (see Proxier.listenIP) to 0.0.0.0 ("any
 	// interface") we want to do the same as from-container traffic and use
 	// REDIRECT.  Except that it doesn't work (empirically).  REDIRECT on
-	// localpackets sends the traffic to localhost (special case, but it is
+	// local packets sends the traffic to localhost (special case, but it is
 	// documented) but the response comes from the eth0 IP (not sure why,
 	// truthfully), which makes DNS unhappy.
 	//

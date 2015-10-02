@@ -106,7 +106,7 @@ type RestoreCountersFlag bool
 const RestoreCounters RestoreCountersFlag = true
 const NoRestoreCounters RestoreCountersFlag = false
 
-// Option flag for Restore
+// Option flag for Flush
 type FlushFlag bool
 
 const FlushTables FlushFlag = true
@@ -226,7 +226,7 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	// TODO: we could call iptable -S first, ignore the output and check for non-zero return (more like DeleteRule)
+	// TODO: we could call iptables -S first, ignore the output and check for non-zero return (more like DeleteRule)
 	out, err := runner.run(opDeleteChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
