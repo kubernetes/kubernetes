@@ -641,11 +641,8 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 	return p, err
 }
 
-// waitForRCPodToDisappear returns nil if the pod from the given replication controller (described by rcName) no longer exists.
-// In case of failure or too long waiting time, an error is returned.
-func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	return wait.Poll(20*time.Second, 5*time.Minute, func() (bool, error) {
+func waitForPodToDisappear(c *client.Client, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
+	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
 		pods, err := c.Pods(ns).List(label, fields.Everything())
 		if err != nil {
@@ -664,6 +661,13 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 		}
 		return false, nil
 	})
+}
+
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (described by rcName) no longer exists.
+// In case of failure or too long waiting time, an error is returned.
+func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	return waitForPodToDisappear(c, ns, podName, label, 20*time.Second, 5*time.Minute)
 }
 
 // waitForService waits until the service appears (exist == true), or disappears (exist == false)
@@ -693,6 +697,32 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
 	}
 	return nil
+}
+
+//waitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+func waitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
+	return wait.Poll(interval, timeout, func() (bool, error) {
+		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
+		list, err := c.Endpoints(namespace).List(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+
+		for _, e := range list.Items {
+			if e.Name == serviceName && countEndpointsNum(&e) == expectNum {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+func countEndpointsNum(e *api.Endpoints) int {
+	num := 0
+	for _, sub := range e.Subsets {
+		num += len(sub.Addresses)
+	}
+	return num
 }
 
 // waitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
