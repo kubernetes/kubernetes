@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version, kind string, err error) {
@@ -41,7 +44,25 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 	if err := json.Unmarshal(data, obj); err != nil {
 		return nil, "", "", err
 	}
+	if s.SaveRawData {
+		setRawData(obj, version, data)
+	}
 	return
+}
+
+func setRawData(obj interface{}, version string, data []byte) {
+	val := reflect.ValueOf(obj)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	rawField := val.FieldByName("Raw")
+	if rawField.IsValid() {
+		raw := &unversioned.RawData{
+			DataAPIVersion: version,
+			Data:           data,
+		}
+		rawField.Set(reflect.ValueOf(raw))
+	}
 }
 
 // Decode converts a JSON string back into a pointer to an api object.
@@ -146,7 +167,9 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 	if err := s.converter.Convert(external, obj, flags, meta); err != nil {
 		return err
 	}
-
+	if s.SaveRawData {
+		setRawData(obj, dataVersion, data)
+	}
 	// Version and Kind should be blank in memory.
 	return s.SetVersionAndKind("", "", obj)
 }
