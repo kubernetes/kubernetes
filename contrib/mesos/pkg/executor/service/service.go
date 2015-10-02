@@ -320,6 +320,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		&api.NodeDaemonEndpoints{
 			KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
 		},
+		kc.OOMAdjuster,
 	)
 	if err != nil {
 		return nil, nil, err
