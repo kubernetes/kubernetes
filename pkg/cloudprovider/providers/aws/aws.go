@@ -491,6 +491,8 @@ func isRegionValid(region string) bool {
 		"ap-southeast-1",
 		"ap-southeast-2",
 		"ap-northeast-1",
+		"cn-north-1",
+		"us-gov-west-1",
 		"sa-east-1",
 	}
 	for _, r := range regions {
