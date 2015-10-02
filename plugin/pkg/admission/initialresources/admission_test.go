@@ -26,11 +26,11 @@ import (
 )
 
 type fakeSource struct {
-	f func(kind api.ResourceName, perc int64, image string, exactMatch bool, start, end time.Time) (int64, int64, error)
+	f func(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error)
 }
 
-func (s *fakeSource) GetUsagePercentile(kind api.ResourceName, perc int64, image string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error) {
-	return s.f(kind, perc, image, exactMatch, start, end)
+func (s *fakeSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error) {
+	return s.f(kind, perc, image, namespace, exactMatch, start, end)
 }
 
 func parseReq(cpu, mem string) api.ResourceList {
@@ -57,7 +57,7 @@ func addContainer(pod *api.Pod, name, image string, request api.ResourceList) {
 
 func createPod(name string, image string, request api.ResourceList) *api.Pod {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test-ns"},
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = []api.Container{}
@@ -113,15 +113,7 @@ func admit(t *testing.T, ir admission.Interface, pods []*api.Pod) {
 	}
 }
 
-func TestEstimationBasedOnTheSameImage7d(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _ string, exactMatch bool, start, end time.Time) (int64, int64, error) {
-		if exactMatch && end.Sub(start) == week {
-			return 100, 120, nil
-		}
-		return 200, 120, nil
-	}
-	ir := newInitialResources(&fakeSource{f: f})
-
+func performTest(t *testing.T, ir admission.Interface) {
 	pods := getPods()
 	admit(t, ir, pods)
 
@@ -136,50 +128,74 @@ func TestEstimationBasedOnTheSameImage7d(t *testing.T) {
 	expectNoAnnotation(t, pods[3])
 }
 
-func TestEstimationBasedOnTheSameImage30d(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _ string, exactMatch bool, start, end time.Time) (int64, int64, error) {
-		if exactMatch && end.Sub(start) == week {
-			return 200, 20, nil
-		}
-		if exactMatch && end.Sub(start) == month {
+func TestEstimationBasedOnTheSameImageSameNamespace7d(t *testing.T) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+		if exactMatch && end.Sub(start) == week && ns == "test-ns" {
 			return 100, 120, nil
 		}
 		return 200, 120, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f})
+	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
 
-	pods := getPods()
-	admit(t, ir, pods)
+}
 
-	verifyPod(t, pods[0], 100, 100)
-	verifyPod(t, pods[1], 100, 300)
-	verifyPod(t, pods[2], 300, 100)
-	verifyPod(t, pods[3], 300, 300)
+func TestEstimationBasedOnTheSameImageSameNamespace30d(t *testing.T) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+		if exactMatch && end.Sub(start) == week && ns == "test-ns" {
+			return 200, 20, nil
+		}
+		if exactMatch && end.Sub(start) == month && ns == "test-ns" {
+			return 100, 120, nil
+		}
+		return 200, 120, nil
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+}
+
+func TestEstimationBasedOnTheSameImageAllNamespaces7d(t *testing.T) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+		if exactMatch && ns == "test-ns" {
+			return 200, 20, nil
+		}
+		if exactMatch && end.Sub(start) == week && ns == "" {
+			return 100, 120, nil
+		}
+		return 200, 120, nil
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+}
+
+func TestEstimationBasedOnTheSameImageAllNamespaces30d(t *testing.T) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+		if exactMatch && ns == "test-ns" {
+			return 200, 20, nil
+		}
+		if exactMatch && end.Sub(start) == week && ns == "" {
+			return 200, 20, nil
+		}
+		if exactMatch && end.Sub(start) == month && ns == "" {
+			return 100, 120, nil
+		}
+		return 200, 120, nil
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
 }
 
 func TestEstimationBasedOnOtherImages(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, image string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
-		if image == "image" && !exactMatch {
+	f := func(_ api.ResourceName, _ int64, image, ns string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
+		if image == "image" && !exactMatch && ns == "" {
 			return 100, 5, nil
 		}
 		return 200, 20, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f})
-
-	pods := getPods()
-	admit(t, ir, pods)
-
-	verifyPod(t, pods[0], 100, 100)
-	verifyPod(t, pods[1], 100, 300)
-	verifyPod(t, pods[2], 300, 100)
-	verifyPod(t, pods[3], 300, 300)
+	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
 }
 
 func TestNoData(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _ string, _ bool, _, _ time.Time) (int64, int64, error) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, _ bool, _, _ time.Time) (int64, int64, error) {
 		return 200, 0, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f})
+	ir := newInitialResources(&fakeSource{f: f}, 90, false)
 
 	pods := []*api.Pod{
 		createPod("p0", "image:v0", parseReq("", "")),
@@ -194,13 +210,13 @@ func TestNoData(t *testing.T) {
 }
 
 func TestManyContainers(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _ string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
 		if exactMatch {
 			return 100, 120, nil
 		}
 		return 200, 30, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f})
+	ir := newInitialResources(&fakeSource{f: f}, 90, false)
 
 	pod := createPod("p", "image:v0", parseReq("", ""))
 	addContainer(pod, "c1", "image:v1", parseReq("", "300"))
@@ -214,4 +230,25 @@ func TestManyContainers(t *testing.T) {
 	verifyContainer(t, &pod.Spec.Containers[3], 300, 300)
 
 	verifyAnnotation(t, pod, "Initial Resources plugin set: cpu, memory request for container c0; cpu request for container c1; memory request for container c2")
+}
+
+func TestNamespaceAware(t *testing.T) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+		if ns == "test-ns" {
+			return 200, 0, nil
+		}
+		return 200, 120, nil
+	}
+	ir := newInitialResources(&fakeSource{f: f}, 90, true)
+
+	pods := []*api.Pod{
+		createPod("p0", "image:v0", parseReq("", "")),
+	}
+	admit(t, ir, pods)
+
+	if pods[0].Spec.Containers[0].Resources.Requests != nil {
+		t.Errorf("Unexpected resource estimation")
+	}
+
+	expectNoAnnotation(t, pods[0])
 }

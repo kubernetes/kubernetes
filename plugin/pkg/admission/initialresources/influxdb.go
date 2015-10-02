@@ -29,8 +29,8 @@ import (
 const (
 	cpuSeriesName      = "autoscaling.cpu.usage.1m"
 	memSeriesName      = "autoscaling.memory.usage.1m"
-	cpuContinuousQuery = "select derivative(value) as value from \"cpu/usage_ns_cumulative\" where pod_id <> '' group by pod_id, container_name, container_base_image, time(1m) into " + cpuSeriesName
-	memContinuousQuery = "select mean(value) as value from \"memory/usage_bytes_gauge\" where pod_id <> '' group by pod_id, container_name, container_base_image, time(1m) into " + memSeriesName
+	cpuContinuousQuery = "select derivative(value) as value from \"cpu/usage_ns_cumulative\" where pod_id <> '' group by pod_id, pod_namespace, container_name, container_base_image, time(1m) into " + cpuSeriesName
+	memContinuousQuery = "select mean(value) as value from \"memory/usage_bytes_gauge\" where pod_id <> '' group by pod_id, pod_namespace, container_name, container_base_image, time(1m) into " + memSeriesName
 	timeFormat         = "2006-01-02 15:04:05"
 )
 
@@ -112,7 +112,7 @@ func (s *influxdbSource) query(query string, precision ...influxdb.TimePrecision
 	return client.Query(query, precision...)
 }
 
-func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, image string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 	var series string
 	if kind == api.ResourceCPU {
 		series = cpuSeriesName
@@ -126,8 +126,12 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 	} else {
 		imgPattern = "=~/^" + image + "/"
 	}
+	var namespaceCond string
+	if namespace != "" {
+		namespaceCond = " and pod_namespace='" + namespace + "'"
+	}
 
-	query := fmt.Sprintf("select percentile(value, %v), count(pod_id) from %v where container_base_image%v and time > '%v' and time < '%v'", perc, series, imgPattern, start.UTC().Format(timeFormat), end.UTC().Format(timeFormat))
+	query := fmt.Sprintf("select percentile(value, %v), count(pod_id) from %v where container_base_image%v%v and time > '%v' and time < '%v'", perc, series, imgPattern, namespaceCond, start.UTC().Format(timeFormat), end.UTC().Format(timeFormat))
 	var res []*influxdb.Series
 	var err error
 	if res, err = s.query(query, influxdb.Second); err != nil {
