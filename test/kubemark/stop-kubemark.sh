@@ -27,7 +27,7 @@ MASTER_NAME="hollow-cluster-master"
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
 
-gcloud compute instances delete ${MASTER_NAME} \
+gcloud compute instances delete "${MASTER_NAME}" \
     --project "${PROJECT}" \
     --quiet \
     --zone "${ZONE}" || true
