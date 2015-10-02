@@ -281,16 +281,49 @@ func taskRunning(t *Task) taskStateFn {
 
 	select {
 	case <-t.shouldQuit:
-		t.tryComplete(t.awaitDeath(defaultKillGracePeriod, waitCh))
+		t.tryComplete(t.awaitDeath(&defaultTimer{}, defaultKillGracePeriod, waitCh))
 	case wr := <-waitCh:
 		t.tryComplete(wr)
 	}
 	return taskShouldRestart
 }
 
+type timer interface {
+	set(time.Duration)
+	discard()
+	await() <-chan time.Time
+}
+
+type defaultTimer struct {
+	*time.Timer
+}
+
+func (t *defaultTimer) set(d time.Duration) {
+	if t.Timer == nil {
+		t.Timer = time.NewTimer(d)
+	} else {
+		t.Reset(d)
+	}
+}
+
+func (t *defaultTimer) await() <-chan time.Time {
+	if t.Timer == nil {
+		return nil
+	}
+	return t.C
+}
+
+func (t *defaultTimer) discard() {
+	if t.Timer != nil {
+		t.Stop()
+	}
+}
+
 // awaitDeath waits for the process to complete, or else for a "quit" signal on the task-
 // at which point we'll attempt to kill manually.
-func (t *Task) awaitDeath(gracePeriod time.Duration, waitCh <-chan *Completion) *Completion {
+func (t *Task) awaitDeath(timer timer, gracePeriod time.Duration, waitCh <-chan *Completion) *Completion {
+	defer timer.discard()
+
 	select {
 	case wr := <-waitCh:
 		// got a signal to quit, but we're already finished
@@ -318,10 +351,11 @@ waitLoop:
 		}
 
 		// Wait for the kill to be processed, and child proc resources cleaned up; try to avoid zombies!
+		timer.set(gracePeriod)
 		select {
 		case wr = <-waitCh:
 			break waitLoop
-		case <-time.After(gracePeriod):
+		case <-timer.await():
 			// want a timeout, but a shorter one than we used initially.
 			// using /= 2 is deterministic and yields the desirable effect.
 			gracePeriod /= 2
