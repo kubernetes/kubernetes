@@ -1,26 +1,26 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: heapster-v9
+  name: heapster-v10
   namespace: kube-system
   labels:
     k8s-app: heapster
-    version: v9
+    version: v10
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
     k8s-app: heapster
-    version: v9
+    version: v10
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v9
+        version: v10
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v0.18.1
+        - image: gcr.io/google_containers/heapster:v0.18.2
           name: heapster
           resources:
             limits:
