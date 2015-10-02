@@ -63,28 +63,6 @@ type podManager interface {
 	mirrorClient
 }
 
-// SyncPodType classifies pod updates, eg: create, update.
-type SyncPodType int
-
-const (
-	SyncPodSync SyncPodType = iota
-	SyncPodUpdate
-	SyncPodCreate
-)
-
-func (sp SyncPodType) String() string {
-	switch sp {
-	case SyncPodCreate:
-		return "create"
-	case SyncPodUpdate:
-		return "update"
-	case SyncPodSync:
-		return "sync"
-	default:
-		return "unknown"
-	}
-}
-
 // All maps in basicPodManager should be set by calling UpdatePods();
 // individual arrays/maps are not immutable and no other methods should attempt
 // to modify them.
