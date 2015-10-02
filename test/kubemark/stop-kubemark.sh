@@ -38,4 +38,4 @@ gcloud compute disks delete \
       --zone "${ZONE}" \
       "${MASTER_NAME}"-pd || true
 
-rm -rf "kubeconfig.loc" &> /dev/null || true
+rm -rf "${KUBE_ROOT}/test/kubemark/kubeconfig.loc" &> /dev/null || true
