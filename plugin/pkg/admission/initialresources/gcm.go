@@ -34,6 +34,7 @@ const (
 	cpuMetricName = kubePrefix + "cpu/usage_rate"
 	memMetricName = kubePrefix + "memory/usage"
 	labelImage    = kubePrefix + "label/container_base_image"
+	labelNs       = kubePrefix + "label/pod_namespace"
 )
 
 type gcmSource struct {
@@ -61,12 +62,14 @@ func newGcmSource() (dataSource, error) {
 	}, nil
 }
 
-func (s *gcmSource) query(metric, oldest, youngest, label, pageToken string) (*gcm.ListTimeseriesResponse, error) {
+func (s *gcmSource) query(metric, oldest, youngest string, labels []string, pageToken string) (*gcm.ListTimeseriesResponse, error) {
 	req := s.gcmService.Timeseries.List(s.project, metric, youngest, nil).
 		Oldest(oldest).
-		Labels(label).
 		Aggregator("mean").
 		Window("1m")
+	for _, l := range labels {
+		req = req.Labels(l)
+	}
 	if pageToken != "" {
 		req = req.PageToken(pageToken)
 	}
@@ -81,7 +84,7 @@ func retrieveRawSamples(res *gcm.ListTimeseriesResponse, output *[]int) {
 	}
 }
 
-func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 	var metric string
 	if kind == api.ResourceCPU {
 		metric = cpuMetricName
@@ -89,11 +92,14 @@ func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image 
 		metric = memMetricName
 	}
 
-	var label string
+	var labels []string
 	if exactMatch {
-		label = labelImage + "==" + image
+		labels = append(labels, labelImage+"=="+image)
 	} else {
-		label = labelImage + "=~" + image + ".*"
+		labels = append(labels, labelImage+"=~"+image+".*")
+	}
+	if namespace != "" {
+		labels = append(labels, labelNs+"=="+namespace)
 	}
 
 	oldest := start.Format(time.RFC3339)
@@ -102,7 +108,7 @@ func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image 
 	rawSamples := make([]int, 0)
 	pageToken := ""
 	for {
-		res, err := s.query(metric, oldest, youngest, label, pageToken)
+		res, err := s.query(metric, oldest, youngest, labels, pageToken)
 		if err != nil {
 			return 0, 0, err
 		}
