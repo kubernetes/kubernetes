@@ -20,31 +20,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ -z "$1" ]]; then
-  echo "Usage: $0 <version>"
+KUBE_RELEASE_VERSION="${1-}"
+
+KUBE_GCS_MAKE_PUBLIC='y'
+KUBE_GCS_RELEASE_BUCKET='kubernetes-release'
+KUBE_GCS_RELEASE_PREFIX="release/${KUBE_RELEASE_VERSION}"
+KUBE_GCS_PUBLISH_FILE='release/stable.txt'
+KUBE_GCS_PUBLISH_VERSION="${KUBE_RELEASE_VERSION}"
+
+KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
+source "${KUBE_ROOT}/build/common.sh"
+
+if "${KUBE_ROOT}/cluster/kubectl.sh" 'version' | grep 'Client' | grep 'dirty'; then
+  echo "!!! Tag at invalid point, or something else is bad. Build is dirty. Don't push this build." >&2
   exit 1
 fi
 
-if ! gsutil ls gs://kubernetes-release/release/${1}/kubernetes.tar.gz; then
-  echo "Release files don't exist, aborting."
-  exit 2
-fi
-
-STABLE_FILE_LOCATION="kubernetes-release/release/stable.txt"
-
-version_file=$(mktemp -t stable.XXXXXX)
-
-echo $1 >> ${version_file}
-echo "Uploading stable version $1 to google storage"
-gsutil cp ${version_file} "gs://${STABLE_FILE_LOCATION}"
-echo "Making it world readable"
-gsutil acl ch -R -g all:R "gs://${STABLE_FILE_LOCATION}"
-
-rm ${version_file}
-
-value=$(curl -s https://storage.googleapis.com/${STABLE_FILE_LOCATION})
-echo "Validating version file"
-if [[ "${value}" != "${1}" ]]; then
-  echo "Error validating upload, :${value}: vs expected :${1}:"
-  exit 1
-fi
+kube::release::gcs::publish_official

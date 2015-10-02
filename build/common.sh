@@ -41,8 +41,8 @@ readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 # KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
 readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel}/
 readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
-readonly KUBE_GCS_LATEST_FILE=${KUBE_GCS_LATEST_FILE:-}
-readonly KUBE_GCS_LATEST_CONTENTS=${KUBE_GCS_LATEST_CONTENTS:-}
+readonly KUBE_GCS_PUBLISH_FILE=${KUBE_GCS_PUBLISH_FILE:-}
+readonly KUBE_GCS_PUBLISH_VERSION=${KUBE_GCS_PUBLISH_VERSION:-}
 readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
@@ -105,6 +105,8 @@ readonly KUBE_ADDON_PATHS=(
   gcr.io/google_containers/pause:0.8.0
   gcr.io/google_containers/kube-registry-proxy:0.3
 )
+
+readonly VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
 
 # ---------------------------------------------------------------------------
 # Basic setup functions
@@ -1006,42 +1008,56 @@ function kube::release::gcs::copy_release_artifacts() {
   gsutil ls -lhr "${gcs_destination}" || return 1
 }
 
-function kube::release::gcs::publish_latest() {
-  local latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+function kube::release::gcs::publish() {
+  local -r latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_PUBLISH_FILE}"
 
   mkdir -p "${RELEASE_STAGE}/upload" || return 1
-  echo ${KUBE_GCS_LATEST_CONTENTS} > "${RELEASE_STAGE}/upload/latest" || return 1
+  echo ${KUBE_GCS_PUBLISH_VERSION} > "${RELEASE_STAGE}/upload/latest" || return 1
+
+  local -r release_dir="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_RELEASE_PREFIX}"
+  if ! gsutil ls "${release_dir}" >/dev/null 2>&1 ; then
+    kube::log::error "Release files don't exist at '${release_dir}'"
+    return 1
+  fi
 
   gsutil -m cp "${RELEASE_STAGE}/upload/latest" "${latest_file_dst}" || return 1
 
+  local contents
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
     gsutil acl ch -R -g all:R "${latest_file_dst}" >/dev/null 2>&1 || return 1
+    # If public, validate public link
+    local -r public_link="https://storage.googleapis.com/${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_PUBLISH_FILE}"
+    kube::log::status "Validating uploaded version file at ${public_link}"
+    contents="$(curl -s ${public_link})"
+  else
+    # If not public, validate using gsutil
+    kube::log::status "Validating uploaded version file at ${latest_file_dst}"
+    contents="$(gsutil cat "${latest_file_dst}")"
   fi
-
-  kube::log::status "gsutil cat ${latest_file_dst}:"
-  gsutil cat ${latest_file_dst} || return 1
+  if [[ "${contents}" == "${KUBE_GCS_PUBLISH_VERSION}" ]]; then
+    kube::log::error "Contents as expected: ${contents}"
+  else
+    kube::log::error "Expected contents of file to be ${KUBE_GCS_PUBLISH_VERSION}, but got ${contents}"
+    return 1
+  fi
 }
 
 # Publish a new latest.txt, but only if the release we're dealing with
 # is newer than the contents in GCS.
-function kube::release::gcs::publish_latest_official() {
-  local -r new_version=${KUBE_GCS_LATEST_CONTENTS}
-  local -r latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+function kube::release::gcs::publish_official() {
+  local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
+  local -r latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_PUBLISH_FILE}"
 
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-  [[ ${new_version} =~ ${version_regex} ]] || {
-    kube::log::error "publish_latest_official passed bogus value: '${new_version}'"
-    return 1
-  }
+  kube::release::gcs::validate_release_version "${new_version}" || return 1
 
   local -r version_major="${BASH_REMATCH[1]}"
   local -r version_minor="${BASH_REMATCH[2]}"
   local -r version_patch="${BASH_REMATCH[3]}"
 
   local gcs_version
-  gcs_version=$(gsutil cat "${latest_file_dst}")
+  gcs_version="$(gsutil cat "${latest_file_dst}")"
 
-  [[ ${gcs_version} =~ ${version_regex} ]] || {
+  kube::release::gcs::validate_release_version "${gcs_version}" || {
     kube::log::error "${latest_file_dst} contains invalid release version, can't compare: '${gcs_version}'"
     return 1
   }
@@ -1064,10 +1080,26 @@ function kube::release::gcs::publish_latest_official() {
   fi
 
   if [[ "${greater}" != "true" ]]; then
-    kube::log::status "${gcs_version} (latest on GCS) >= ${new_version} (just uploaded), not updating ${latest_file_dst}"
+    kube::log::status "${new_version} (just uploaded) <= ${gcs_version} (latest on GCS), not updating ${latest_file_dst}"
     return 0
   fi
 
   kube::log::status "${new_version} (just uploaded) > ${gcs_version} (latest on GCS), updating ${latest_file_dst}"
-  kube::release::gcs::publish_latest || return 1
+  kube::release::gcs::publish || return 1
+}
+
+# Validate a release version
+#
+# Globals:
+#   VERSION_REGEX
+# Arguments:
+#   version
+# Returns:
+#   If version is a valid release version
+function kube::release::gcs::validate_release_version() {
+  local -r version="${1-}"
+  [[ "${version}" =~ ${VERSION_REGEX} ]] || {
+    kube::log::error "Invalid release version: '${version}'"
+    return 1
+  }
 }
