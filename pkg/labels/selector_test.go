@@ -45,7 +45,7 @@ func TestSelectorParse(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v: error %v (%#v)\n", test, err, err)
 		}
-		if test != lq.String() {
+		if strings.Replace(test, " ", "", -1) != lq.String() {
 			t.Errorf("%v restring gave: %v\n", test, lq.String())
 		}
 	}
