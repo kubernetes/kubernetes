@@ -143,6 +143,7 @@ scheduler:
     --mesos-master=mesosmaster1:5050
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
+    --static-pods-config=/static-pods
     --v=4
   environment:
   - MESOS_DOCKER_ETCD_TIMEOUT
@@ -152,6 +153,8 @@ scheduler:
   - etcd
   - mesosmaster1
   - apiserver
+  volumes:
+  - busybox.json:/static-pods/busybox.json
 keygen:
   image: mesosphere/kubernetes-mesos-keygen
   command:

@@ -24,25 +24,27 @@ import (
 
 // bogus numbers that we use to make sure that there's some set of minimal offered resources on the slave
 const (
-	minimalCpus = 0.01
-	minimalMem  = 0.25
+	MinimalCpus = 0.01
+	MinimalMem  = 0.25
 )
 
 var (
-	DefaultMinimalPredicate = RequireAllPredicate([]FitPredicate{
+	DefaultMinimalPredicate = FitPredicate(RequireAllPredicate([]FitPredicate{
 		ValidationPredicate,
 		NodeSelectorPredicate,
 		MinimalPodResourcesPredicate,
 		PortsPredicate,
-	}).Fit
+	}).Fit)
+)
 
-	DefaultMinimalProcurement = AllOrNothingProcurement([]Procurement{
+func NewDefaultMinimalProcurement(other ...Procurement) Procurement {
+	return Procurement(AllOrNothingProcurement(append([]Procurement{
 		ValidateProcurement,
 		NodeProcurement,
 		MinimalPodResourcesProcurement,
 		PortsProcurement,
-	}).Procure
-)
+	}, other...)).Procure)
+}
 
 func MinimalPodResourcesPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 	var (
@@ -58,17 +60,17 @@ func MinimalPodResourcesPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 			offeredMem = resource.GetScalar().GetValue()
 		}
 	}
-	log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, minimalCpus, minimalMem)
-	if (minimalCpus > offeredCpus) || (minimalMem > offeredMem) {
-		log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, minimalCpus, minimalMem)
+	log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, MinimalCpus, MinimalMem)
+	if (MinimalCpus > offeredCpus) || (MinimalMem > offeredMem) {
+		log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, MinimalCpus, MinimalMem)
 		return false
 	}
 	return true
 }
 
 func MinimalPodResourcesProcurement(t *T, details *mesos.Offer) error {
-	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", details.Id, t.Pod.Namespace, t.Pod.Name, minimalCpus, minimalMem)
-	t.Spec.CPU = minimalCpus
-	t.Spec.Memory = minimalMem
+	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", details.Id, t.Pod.Namespace, t.Pod.Name, MinimalCpus, MinimalMem)
+	t.Spec.CPU = MinimalCpus
+	t.Spec.Memory = MinimalMem
 	return nil
 }
