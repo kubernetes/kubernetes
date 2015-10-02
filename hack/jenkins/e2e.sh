@@ -390,6 +390,24 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
 
+  # Runs non-flaky tests on GCE on the release candidate branch,
+  # sequentially. As a reminder, if you need to change the skip list
+  # or flaky test list on the release branch, you'll need to propose a
+  # pull request directly to the release branch itself.
+  kubernetes-e2e-gce-rc)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-rc"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-e2e-rc"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-rc"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-release"}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    ;;
+
   kubernetes-e2e-gke-prod)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-prod"}
