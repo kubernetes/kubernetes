@@ -36,4 +36,4 @@ gcloud compute disks delete \
       --project "${PROJECT}" \
       --quiet \
       --zone "${ZONE}" \
-      "${MASTER_NAME}"-pd
+      "${MASTER_NAME}"-pd || true
