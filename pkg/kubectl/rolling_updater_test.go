@@ -817,7 +817,7 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(fake.Actions()) != len(test.expected) {
-			t.Fatalf("%s: unexpected actions: %v, expected %v", test.name, fake.Actions, test.expected)
+			t.Fatalf("%s: unexpected actions: %v, expected %v", test.name, fake.Actions(), test.expected)
 		}
 		for j, action := range fake.Actions() {
 			if e, a := test.expected[j], action.GetVerb(); e != a {
