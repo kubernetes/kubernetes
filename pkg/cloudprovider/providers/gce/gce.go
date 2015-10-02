@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -378,9 +379,8 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("Cannot EnsureTCPLoadBalancer() with no hosts")
 	}
 
-	glog.V(2).Infof("Checking if load balancer already exists: %s", name)
 	if loadBalancerIP == nil {
-		glog.V(2).Info("Checking if the external ip address already exists: %s", name)
+		glog.V(2).Info("Checking if the static IP address already exists: %s", name)
 		address, exists, err := gce.getAddress(name, region)
 		if err != nil {
 			return nil, fmt.Errorf("error looking for gce address: %v", err)
@@ -613,52 +613,85 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 
 // EnsureTCPLoadBalancerDeleted is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
+	err := errors.AggregateGoroutines(
+		func() error { return gce.deleteFirewall(name, region) },
+		func() error {
+			if err := gce.deleteForwardingRule(name, region); err != nil {
+				return err
+			}
+			// The forwarding rule must be deleted before either the target pool or
+			// static IP address can, unfortunately.
+			err := errors.AggregateGoroutines(
+				func() error { return gce.deleteTargetPool(name, region) },
+				func() error { return gce.deleteStaticIP(name, region) },
+			)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return errors.Flatten(err)
+	}
+	return nil
+}
+
+func (gce *GCECloud) deleteForwardingRule(name, region string) error {
+	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Forwarding rule %s already deleted. Continuing to delete other resources.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete forwarding rule %s: got error %s.", name, err.Error())
+		return err
+	} else {
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for forwarding rule %s to be deleted: got error %s.", name, err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func (gce *GCECloud) deleteTargetPool(name, region string) error {
+	op, err := gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Target pool %s already deleted. Continuing to delete other resources.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete target pool %s, got error %s.", name, err.Error())
+		return err
+	} else {
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for target pool %s to be deleted: got error %s.", name, err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func (gce *GCECloud) deleteFirewall(name, region string) error {
 	fwName := makeFirewallName(name)
 	op, err := gce.service.Firewalls.Delete(gce.projectID, fwName).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Firewall %s already deleted. Moving on to delete forwarding rule.", name)
+		glog.Infof("Firewall %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete firewall %s, got error %v", fwName, err)
 		return err
 	} else {
-		if err = gce.waitForGlobalOp(op); err != nil {
+		if err := gce.waitForGlobalOp(op); err != nil {
 			glog.Warningf("Failed waiting for Firewall %s to be deleted.  Got error: %v", fwName, err)
 			return err
 		}
 	}
+	return nil
+}
 
-	op, err = gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
+func (gce *GCECloud) deleteStaticIP(name, region string) error {
+	op, err := gce.service.Addresses.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Forwarding rule %s already deleted. Moving on to delete target pool.", name)
+		glog.Infof("Static IP address %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
-		glog.Warningf("Failed to delete Forwarding Rules %s: got error %s.", name, err.Error())
-		return err
-	} else {
-		err = gce.waitForRegionOp(op, region)
-		if err != nil {
-			glog.Warningf("Failed waiting for Forwarding Rule %s to be deleted: got error %s.", name, err.Error())
-			return err
-		}
-	}
-
-	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
-	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Target pool %s already deleted. Moving on to delete static IP address.", name)
-	} else if err != nil {
-		glog.Warningf("Failed to delete Target Pool %s, got error %s.", name, err.Error())
-		return err
-	} else {
-		if err := gce.waitForRegionOp(op, region); err != nil {
-			glog.Warningf("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
-			return err
-		}
-	}
-
-	op, err = gce.service.Addresses.Delete(gce.projectID, region, name).Do()
-	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Static IP address %s already deleted. Done deleting load balancer.", name)
-	} else if err != nil {
-		glog.Warningf("Failed to delete static IP Address %s, got error %v", name, err)
+		glog.Warningf("Failed to delete static IP address %s, got error %v", name, err)
 		return err
 	} else {
 		if err := gce.waitForRegionOp(op, region); err != nil {
@@ -666,7 +699,6 @@ func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
