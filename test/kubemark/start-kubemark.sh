@@ -51,7 +51,7 @@ gcloud compute disks create "${MASTER_NAME}-pd" \
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
 
-gcloud compute instances create ${MASTER_NAME} \
+gcloud compute instances create "${MASTER_NAME}" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
@@ -61,6 +61,13 @@ gcloud compute instances create ${MASTER_NAME} \
     --network "${NETWORK}" \
     --scopes "storage-ro,compute-rw,logging-write" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+
+gcloud compute firewall-rules create "kubemark-master-https" \
+    --project "${PROJECT}" \
+    --network "${NETWORK}" \
+    --source-ranges "0.0.0.0/0" \
+    --target-tags "${MASTER_NAME}" \
+    --allow "tcp:443" || true
 
 MASTER_IP=$(gcloud compute instances describe hollow-cluster-master \
   --zone="${ZONE}" --project="${PROJECT}" | grep natIP: | cut -f2 -d":" | sed "s/ //g")
