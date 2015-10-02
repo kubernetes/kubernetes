@@ -1110,7 +1110,8 @@ func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 		readWrite = "READ_ONLY"
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
-	_, err = gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
+
+	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
 	if err != nil {
 		// Check if the disk is already attached to this instance.  We do this only
 		// in the error case, since it is expected to be exceptional.
@@ -1124,14 +1125,18 @@ func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 				return nil
 			}
 		}
-
 	}
-	return err
+
+	return gce.waitForZoneOp(attachOp)
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string) error {
-	_, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
-	return err
+	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
+	if err != nil {
+		return err
+	}
+
+	return gce.waitForZoneOp(detachOp)
 }
 
 func (gce *GCECloud) getDisk(diskName string) (*compute.Disk, error) {
