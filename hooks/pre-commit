@@ -122,6 +122,18 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for ffjson files that need updating..."
+if ! hack/verify-ffjson.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some ffjson encodings are out of sync."
+  echo "To regenerate run:"
+  echo "  hack/update-generated-ffjson.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 echo -ne "Checking for docs that need updating... "
 if ! hack/after-build/verify-generated-docs.sh > /dev/null; then
   echo "${red}ERROR!"

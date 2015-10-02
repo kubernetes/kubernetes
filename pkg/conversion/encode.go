@@ -18,10 +18,11 @@ package conversion
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"path"
+
+	json "github.com/pquerna/ffjson/ffjson"
 )
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.

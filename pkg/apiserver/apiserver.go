@@ -46,6 +46,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
+	"github.com/pquerna/ffjson/ffjson"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -410,6 +411,8 @@ func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWrite
 		return
 	}
 	w.Write(formatted.Bytes())
+	// Hand the buffer back to the json encoding library
+	ffjson.Pool(output)
 }
 
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
