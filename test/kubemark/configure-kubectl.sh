@@ -18,5 +18,5 @@ curl https://sdk.cloud.google.com | bash
 sudo gcloud components update kubectl -q
 sudo ln -s /usr/local/share/google/google-cloud-sdk/bin/kubectl /bin/
 kubectl config set-cluster hollow-cluster --server=http://localhost:8080 --insecure-skip-tls-verify=true
-kubectl config set-credentials `whoami`
-kubectl config set-context hollow-context --cluster=hollow-cluster --user=`whoami`
+kubectl config set-credentials $(whoami)
+kubectl config set-context hollow-context --cluster=hollow-cluster --user=$(whoami)

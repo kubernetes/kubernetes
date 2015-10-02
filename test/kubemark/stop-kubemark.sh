@@ -37,3 +37,5 @@ gcloud compute disks delete \
       --quiet \
       --zone "${ZONE}" \
       "${MASTER_NAME}"-pd || true
+
+rm -rf "kubeconfig.loc" &> /dev/null || true
