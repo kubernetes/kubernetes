@@ -1992,3 +1992,26 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 	}
 	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
 }
+
+// getHostExternalAddress gets the node for a pod and returns the first External
+// address. Returns an error if the node the pod is on doesn't have an External
+// address.
+func getHostExternalAddress(client *client.Client, p *api.Pod) (externalAddress string, err error) {
+	node, err := client.Nodes().Get(p.Spec.NodeName)
+	if err != nil {
+		return "", err
+	}
+	for _, address := range node.Status.Addresses {
+		if address.Type == api.NodeExternalIP {
+			if address.Address != "" {
+				externalAddress = address.Address
+				break
+			}
+		}
+	}
+	if externalAddress == "" {
+		err = fmt.Errorf("No external address for pod %v on node %v",
+			p.Name, p.Spec.NodeName)
+	}
+	return
+}
