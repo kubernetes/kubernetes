@@ -66,7 +66,7 @@ const iptablesMasqueradeMark = "0x4d415351"
 // ShouldUseIptablesProxier returns true if we should use the iptables Proxier
 // instead of the "classic" userspace Proxier.  This is determined by checking
 // the iptables version and for the existence of kernel features. It may return
-// an error if it fails to get the itpables version without error, in which
+// an error if it fails to get the iptables version without error, in which
 // case it will also return false.
 func ShouldUseIptablesProxier() (bool, error) {
 	exec := utilexec.New()
@@ -479,7 +479,7 @@ func (proxier *Proxier) syncProxyRules() {
 	existingChains := make(map[utiliptables.Chain]string)
 	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableNAT)
 	if err != nil { // if we failed to get any rules
-		glog.Errorf("Failed to execute iptable-save, syncing all rules. %s", err.Error())
+		glog.Errorf("Failed to execute iptables-save, syncing all rules. %s", err.Error())
 	} else { // otherwise parse the output
 		existingChains = getChainLines(utiliptables.TableNAT, iptablesSaveRaw)
 	}
