@@ -18,9 +18,12 @@ package executor
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -29,6 +32,7 @@ import (
 
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	kmruntime "k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
@@ -248,121 +252,89 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	mockDriver.AssertExpectations(t)
 }
 
-/*
 // TestExecutorStaticPods test that the ExecutorInfo.data is parsed
 // as a zip archive with pod definitions.
-func TestExecutorStaticPods(t *testing.T) {
+func TestExecutorInitializeStaticPodsSource(t *testing.T) {
 	// create some zip with static pod definition
-	var buf bytes.Buffer
-	createStaticPodFile := func(fileName, id, name string) {
-		spod := `{
-	"apiVersion": "v1",
-	"kind": "Pod",
-	"metadata": {
-		"name": "%v",
-		"labels": { "name": "foo", "cluster": "bar" }
-	},
-	"spec": {
-		"containers": [{
-			"name": "%v",
-			"image": "library/nginx",
-			"ports": [{ "containerPort": 80, "name": "http" }],
-			"livenessProbe": {
-				"enabled": true,
-				"type": "http",
-				"initialDelaySeconds": 30,
-				"httpGet": { "path": "/", "port": 80 }
+	givenPodsDir, err := ioutil.TempDir("/tmp", "executor-givenpods")
+	assert.NoError(t, err)
+	defer os.RemoveAll(givenPodsDir)
+
+	var wg sync.WaitGroup
+	reportErrors := func(errCh <-chan error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for err := range errCh {
+				t.Error(err)
 			}
-		}]
+		}()
 	}
-	}`
-		err = ioutil.WriteFile(fileName, []byte(fmt.Sprintf(spod, id, name)), 0660)
+
+	createStaticPodFile := func(fileName, name string) {
+		spod := `{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "%v",
+				"namespace": "staticpods",
+				"labels": { "name": "foo", "cluster": "bar" }
+			},
+			"spec": {
+				"containers": [{
+					"name": "%v",
+					"image": "library/nginx",
+					"ports": [{ "containerPort": 80, "name": "http" }]
+				}]
+			}
+		}`
+		destfile := filepath.Join(givenPodsDir, fileName)
+		err = os.MkdirAll(filepath.Dir(destfile), 0770)
+		assert.NoError(t, err)
+		err = ioutil.WriteFile(destfile, []byte(fmt.Sprintf(spod, name, name)), 0660)
 		assert.NoError(t, err)
 	}
-	createStaticPodFile("spod.json", "spod-id-01", "spod-01")
-	createStaticPodFile("spod2.json", "spod-id-02", "spod-02")
-	createStaticPodFile("dir/spod.json", "spod-id-03", "spod-03") // same file name as first one to check for overwriting
+
+	createStaticPodFile("spod.json", "spod-01")
+	createStaticPodFile("spod2.json", "spod-02")
+	createStaticPodFile("dir/spod.json", "spod-03") // same file name as first one to check for overwriting
+	staticpods, errs := podutil.ReadFromDir(givenPodsDir)
+	reportErrors(errs)
+
+	gzipped, err := podutil.Gzip(staticpods)
+	assert.NoError(t, err)
 
 	expectedStaticPodsNum := 2 // subdirectories are ignored by FileSource, hence only 2
-
-	// create fake apiserver
-	testApiServer := NewTestServer(t, api.NamespaceDefault, nil)
-	defer testApiServer.server.Close()
 
 	// temporary directory which is normally located in the executor sandbox
 	staticPodsConfigPath, err := ioutil.TempDir("/tmp", "executor-k8sm-archive")
 	assert.NoError(t, err)
 	defer os.RemoveAll(staticPodsConfigPath)
 
-	mockDriver := &MockExecutorDriver{}
-	updates := make(chan interface{}, 1024)
-	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1), // allow kube-executor source to proceed past init
-		APIClient: client.NewOrDie(&client.Config{
-			Host:    testApiServer.server.URL,
-			Version: testapi.Default.Version(),
-		}),
-		Kubelet: &kubelet.Kubelet{},
-		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
-			return &api.PodStatus{
-				ContainerStatuses: []api.ContainerStatus{
-					{
-						Name: "foo",
-						State: api.ContainerState{
-							Running: &api.ContainerStateRunning{},
-						},
-					},
-				},
-				Phase: api.PodRunning,
-			}, nil
-		},
-		StaticPodsConfigPath: staticPodsConfigPath,
+	executor := &KubernetesExecutor{
+		initialRegComplete: func() chan struct{} {
+			ch := make(chan struct{})
+			close(ch)
+			return ch
+		}(),
+		staticPodsConfig:     gzipped,
+		staticPodsConfigPath: staticPodsConfigPath,
 	}
-	executor := New(config)
+
+	// extract the pods into staticPodsConfigPath
 	hostname := "h1"
-	go executor.InitializeStaticPodsSource(func() {
-		kconfig.NewSourceFile(staticPodsConfigPath, hostname, 1*time.Second, updates)
-	})
+	called := make(chan struct{})
+	executor.InitializeStaticPodsSource(hostname, func() { close(called) })
+	<-called
 
-	// create ExecutorInfo with static pod zip in data field
-	executorInfo := mesosutil.NewExecutorInfo(
-		mesosutil.NewExecutorID("ex1"),
-		mesosutil.NewCommandInfo("k8sm-executor"),
-	)
-	executorInfo.Data = buf.Bytes()
+	actualpods, errs := podutil.ReadFromDir(staticPodsConfigPath)
+	reportErrors(errs)
 
-	// start the executor with the static pod data
-	executor.Init(mockDriver)
-	executor.Registered(mockDriver, executorInfo, nil, nil)
-
-	// wait for static pod to start
-	seenPods := map[string]struct{}{}
-	timeout := time.After(time.Second)
-	defer mockDriver.AssertExpectations(t)
-	for {
-		// filter by PodUpdate type
-		select {
-		case <-timeout:
-			t.Fatalf("Executor should send pod updates for %v pods, only saw %v", expectedStaticPodsNum, len(seenPods))
-		case update, ok := <-updates:
-			if !ok {
-				return
-			}
-			podUpdate, ok := update.(kubelet.PodUpdate)
-			if !ok {
-				continue
-			}
-			for _, pod := range podUpdate.Pods {
-				seenPods[pod.Name] = struct{}{}
-			}
-			if len(seenPods) == expectedStaticPodsNum {
-				return
-			}
-		}
-	}
+	list := podutil.List(actualpods)
+	assert.NotNil(t, list)
+	assert.Equal(t, expectedStaticPodsNum, len(list.Items))
+	wg.Wait()
 }
-*/
 
 // TestExecutorFrameworkMessage ensures that the executor is able to
 // handle messages from the framework, specifically about lost tasks
