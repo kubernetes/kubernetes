@@ -48,13 +48,17 @@ type ConditionFunc func() (done bool, err error)
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 	return pollInternal(poller(interval, timeout), condition)
 }
+
 func pollInternal(wait WaitFunc, condition ConditionFunc) error {
-	return WaitFor(wait, condition)
+	done := make(chan struct{})
+	defer close(done)
+	return WaitFor(wait, condition, done)
 }
 
 func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
 	return pollImmediateInternal(poller(interval, timeout), condition)
 }
+
 func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
 	done, err := condition()
 	if err != nil {
@@ -68,20 +72,22 @@ func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
 
 // PollInfinite polls forever.
 func PollInfinite(interval time.Duration, condition ConditionFunc) error {
-	return WaitFor(poller(interval, 0), condition)
+	done := make(chan struct{})
+	defer close(done)
+	return WaitFor(poller(interval, 0), condition, done)
 }
 
 // WaitFunc creates a channel that receives an item every time a test
 // should be executed and is closed when the last test should be invoked.
-type WaitFunc func() <-chan struct{}
+type WaitFunc func(done <-chan struct{}) <-chan struct{}
 
 // WaitFor gets a channel from wait(), and then invokes fn once for every value
 // placed on the channel and once more when the channel is closed.  If fn
 // returns an error the loop ends and that error is returned, and if fn returns
 // true the loop ends and nil is returned. ErrWaitTimeout will be returned if
 // the channel is closed without fn ever returning true.
-func WaitFor(wait WaitFunc, fn ConditionFunc) error {
-	c := wait()
+func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
+	c := wait(done)
 	for {
 		_, open := <-c
 		ok, err := fn()
@@ -104,11 +110,15 @@ func WaitFor(wait WaitFunc, fn ConditionFunc) error {
 // the channel is closed.  If timeout is 0, the channel
 // will never be closed.
 func poller(interval, timeout time.Duration) WaitFunc {
-	return WaitFunc(func() <-chan struct{} {
+	return WaitFunc(func(done <-chan struct{}) <-chan struct{} {
 		ch := make(chan struct{})
+
 		go func() {
+			defer close(ch)
+
 			tick := time.NewTicker(interval)
 			defer tick.Stop()
+
 			var after <-chan time.Time
 			if timeout != 0 {
 				// time.After is more convenient, but it
@@ -118,16 +128,19 @@ func poller(interval, timeout time.Duration) WaitFunc {
 				after = timer.C
 				defer timer.Stop()
 			}
+
 			for {
 				select {
 				case <-tick.C:
 					ch <- struct{}{}
 				case <-after:
-					close(ch)
+					return
+				case <-done:
 					return
 				}
 			}
 		}()
+
 		return ch
 	})
 }
