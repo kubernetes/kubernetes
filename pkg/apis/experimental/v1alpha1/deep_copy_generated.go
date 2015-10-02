@@ -988,13 +988,8 @@ func deepCopy_v1alpha1_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *
 	if err := deepCopy_v1alpha1_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if in.Status != nil {
-		out.Status = new(HorizontalPodAutoscalerStatus)
-		if err := deepCopy_v1alpha1_HorizontalPodAutoscalerStatus(*in.Status, out.Status, c); err != nil {
-			return err
-		}
-	} else {
-		out.Status = nil
+	if err := deepCopy_v1alpha1_HorizontalPodAutoscalerStatus(in.Status, &out.Status, c); err != nil {
+		return err
 	}
 	return nil
 }

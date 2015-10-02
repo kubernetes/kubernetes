@@ -1281,7 +1281,7 @@ func printHorizontalPodAutoscaler(hpa *experimental.HorizontalPodAutoscaler, w i
 	target := fmt.Sprintf("%s %v", hpa.Spec.Target.Quantity.String(), hpa.Spec.Target.Resource)
 
 	current := "<waiting>"
-	if hpa.Status != nil && hpa.Status.CurrentConsumption != nil {
+	if hpa.Status.CurrentConsumption != nil {
 		current = fmt.Sprintf("%s %v", hpa.Status.CurrentConsumption.Quantity.String(), hpa.Status.CurrentConsumption.Resource)
 	}
 	minPods := hpa.Spec.MinReplicas
