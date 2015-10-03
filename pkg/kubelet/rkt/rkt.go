@@ -1083,7 +1083,7 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 // GarbageCollect collects the pods/containers.
 // TODO(yifan): Enforce the gc policy, also, it would be better if we can
 // just GC kubernetes pods.
-func (r *Runtime) GarbageCollect() error {
+func (r *runtime) GarbageCollect(maxPerPodContainer, maxContainers int, minAge time.Duration) error {
 	if err := exec.Command("systemctl", "reset-failed").Run(); err != nil {
 		glog.Errorf("rkt: Failed to reset failed systemd services: %v", err)
 	}
