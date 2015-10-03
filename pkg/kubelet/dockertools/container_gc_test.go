@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package dockertools
 
 import (
 	"fmt"
@@ -25,23 +25,17 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
-func newTestContainerGC(t *testing.T, MinAge time.Duration, MaxPerPodContainer, MaxContainers int) (containerGC, *dockertools.FakeDockerClient) {
-	fakeDocker := new(dockertools.FakeDockerClient)
-	gc, err := newContainerGC(fakeDocker, ContainerGCPolicy{
-		MinAge:             MinAge,
-		MaxPerPodContainer: MaxPerPodContainer,
-		MaxContainers:      MaxContainers,
-	})
-	require.Nil(t, err)
+func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
+	fakeDocker := new(FakeDockerClient)
+	gc := NewContainerGC(fakeDocker, "")
 	return gc, fakeDocker
 }
 
 // Makes a stable time object, lower id is earlier time.
 func makeTime(id int) time.Time {
+	var zero time.Time
 	return zero.Add(time.Duration(id) * time.Second)
 }
 
@@ -90,7 +84,7 @@ func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
 }
 
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t, time.Minute, 1, 0)
+	gc, fakeDocker := newTestContainerGC(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		makeAPIContainer("foo", "POD", "1876"),
 	}
@@ -98,12 +92,12 @@ func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 		makeContainerDetail("1876", false, makeTime(0)),
 	)
 
-	assert.Nil(t, gc.GarbageCollect())
+	assert.Nil(t, gc.GarbageCollect(1, 0, time.Minute))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
 func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t, time.Minute, -1, 4)
+	gc, fakeDocker := newTestContainerGC(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		makeAPIContainer("foo", "POD", "1876"),
 		makeAPIContainer("foo1", "POD", "2876"),
@@ -119,12 +113,12 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 		makeContainerDetail("5876", false, makeTime(4)),
 	)
 
-	assert.Nil(t, gc.GarbageCollect())
+	assert.Nil(t, gc.GarbageCollect(-1, 4, time.Minute))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
 func TestGarbageCollectNoMaxLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t, time.Minute, 1, -1)
+	gc, fakeDocker := newTestContainerGC(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		makeAPIContainer("foo", "POD", "1876"),
 		makeAPIContainer("foo1", "POD", "2876"),
@@ -140,7 +134,7 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 		makeContainerDetail("5876", false, makeTime(0)),
 	)
 
-	assert.Nil(t, gc.GarbageCollect())
+	assert.Nil(t, gc.GarbageCollect(1, -1, time.Minute))
 	assert.Len(t, fakeDocker.Removed, 0)
 }
 
@@ -309,10 +303,10 @@ func TestGarbageCollect(t *testing.T) {
 	}
 	for i, test := range tests {
 		t.Logf("Running test case with index %d", i)
-		gc, fakeDocker := newTestContainerGC(t, time.Hour, 2, 6)
+		gc, fakeDocker := newTestContainerGC(t)
 		fakeDocker.ContainerList = test.containers
 		fakeDocker.ContainerMap = test.containerDetails
-		assert.Nil(t, gc.GarbageCollect())
+		assert.Nil(t, gc.GarbageCollect(2, 6, time.Hour))
 		verifyStringArrayEqualsAnyOrder(t, fakeDocker.Removed, test.expectedRemoved)
 	}
 }
