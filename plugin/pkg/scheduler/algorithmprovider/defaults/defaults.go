@@ -46,12 +46,15 @@ func init() {
 			Weight: 1,
 		},
 	)
+	// PodFitsPorts has been replaced by PodFitsHostPorts for better user understanding.
+	// For backwards compatibility with 1.0, PodFitsPorts is regitered as well.
+	factory.RegisterFitPredicate("PodFitsPorts", predicates.PodFitsHostPorts)
 }
 
 func defaultPredicates() sets.String {
 	return sets.NewString(
 		// Fit is defined based on the absence of port conflicts.
-		factory.RegisterFitPredicate("PodFitsPorts", predicates.PodFitsPorts),
+		factory.RegisterFitPredicate("PodFitsHostPorts", predicates.PodFitsHostPorts),
 		// Fit is determined by resource availability.
 		factory.RegisterFitPredicateFactory(
 			"PodFitsResources",
