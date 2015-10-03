@@ -128,6 +128,10 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
   admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
   enable_cpu_cfs_quota: '$(echo "$ENABLE_CPU_CFS_QUOTA" | sed -e "s/'/''/g")'
+  network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
+  opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
+  opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/'/''/g")'
+  opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master
