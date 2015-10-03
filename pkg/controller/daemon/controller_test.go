@@ -35,10 +35,20 @@ var (
 	simpleDaemonSetLabel2 = map[string]string{"name": "simple-daemon", "type": "test"}
 	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
 	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
+	alwaysReady           = func() bool { return true }
 )
 
 func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
+}
+
+func getKey(ds *experimental.DaemonSet, t *testing.T) string {
+	if key, err := controller.KeyFunc(ds); err != nil {
+		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
+		return ""
+	} else {
+		return key
+	}
 }
 
 func newDaemonSet(name string) *experimental.DaemonSet {
@@ -121,6 +131,7 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
 	manager := NewDaemonSetsController(client)
+	manager.podStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}
 	manager.podControl = podControl
 	return manager, podControl
@@ -281,4 +292,26 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 	ds.Spec.Template.Spec.NodeName = "node-0"
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+func TestDSManagerNotReady(t *testing.T) {
+	manager, podControl := newTestController()
+	manager.podStoreSynced = func() bool { return false }
+	addNodes(manager.nodeStore.Store, 0, 1, nil)
+
+	// Simulates the ds reflector running before the pod reflector. We don't
+	// want to end up creating daemon pods in this case until the pod reflector
+	// has synced, so the ds manager should just requeue the ds.
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+
+	dsKey := getKey(ds, t)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	queueDS, _ := manager.queue.Get()
+	if queueDS != dsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", dsKey, queueDS)
+	}
+
+	manager.podStoreSynced = alwaysReady
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
