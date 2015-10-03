@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.k8s.cassandra</groupId>
   <artifactId>kubernetes-cassandra</artifactId>
-  <version>0.0.4</version>
+  <version>0.0.5</version>
   <build>
     <sourceDirectory>src</sourceDirectory>
     <plugins>
