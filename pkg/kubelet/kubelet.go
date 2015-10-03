@@ -236,11 +236,6 @@ func NewMainKubelet(
 		Namespace: "",
 	}
 
-	containerGC, err := newContainerGC(dockerClient, containerGCPolicy)
-	if err != nil {
-		return nil, err
-	}
-
 	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
@@ -275,7 +270,6 @@ func NewMainKubelet(
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
-		containerGC:                    containerGC,
 		diskSpaceManager:               diskSpaceManager,
 		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
@@ -360,6 +354,13 @@ func NewMainKubelet(
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
+
+	// setup containerGC
+	containerGC, err := newContainerGC(klet.containerRuntime, containerGCPolicy)
+	if err != nil {
+		return nil, err
+	}
+	klet.containerGC = containerGC
 
 	// setup imageManager
 	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)

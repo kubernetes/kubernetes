@@ -22,6 +22,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -74,6 +75,8 @@ type Runtime interface {
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
+	// Garbage collection of dead containers
+	GarbageCollect(maxPerPodContainer, maxContainers int, minAge time.Duration) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
