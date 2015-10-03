@@ -110,7 +110,7 @@ func (c *Controller) UpdateKubernetesService() error {
 		return err
 	}
 	if c.ServiceIP != nil {
-		if err := c.CreateMasterServiceIfNeeded("kubernetes", c.ServiceIP, c.ServicePort); err != nil {
+		if err := c.CreateMasterServiceIfNeeded("kubernetes", "https", c.ServiceIP, c.ServicePort); err != nil {
 			return err
 		}
 		if err := c.SetEndpoints("kubernetes", c.PublicIP, c.PublicServicePort); err != nil {
@@ -142,7 +142,7 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort int) error {
+func (c *Controller) CreateMasterServiceIfNeeded(serviceName, servicePortName string, serviceIP net.IP, servicePort int) error {
 	ctx := api.NewDefaultContext()
 	if _, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
 		// The service already exists.
@@ -155,7 +155,7 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP, TargetPort: util.NewIntOrStringFromInt(servicePort)}},
+			Ports: []api.ServicePort{{Port: servicePort, Name: servicePortName, Protocol: api.ProtocolTCP, TargetPort: util.NewIntOrStringFromInt(servicePort)}},
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
