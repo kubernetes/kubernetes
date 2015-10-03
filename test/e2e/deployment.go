@@ -95,7 +95,12 @@ func testRollingUpdateDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
 	// Create nginx pods.
-	podLabels := map[string]string{"name": "sample-pod"}
+	deploymentPodLabels := map[string]string{"name": "sample-pod"}
+	rcPodLabels := map[string]string{
+		"name": "sample-pod",
+		"pod":  "nginx",
+	}
+
 	rcName := "nginx-controller"
 	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
@@ -103,10 +108,10 @@ func testRollingUpdateDeployment(f *Framework) {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 3,
-			Selector: podLabels,
+			Selector: rcPodLabels,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: podLabels,
+					Labels: rcPodLabels,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -140,11 +145,11 @@ func testRollingUpdateDeployment(f *Framework) {
 		},
 		Spec: experimental.DeploymentSpec{
 			Replicas:       3,
-			Selector:       podLabels,
+			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: podLabels,
+					Labels: deploymentPodLabels,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -164,14 +169,19 @@ func testRollingUpdateDeployment(f *Framework) {
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 	}()
 
-	waitForDeploymentStatus(c, ns, deploymentName, 3, 2, 4)
+	err = waitForDeploymentStatus(c, ns, deploymentName, 3, 2, 4)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func testRollingUpdateDeploymentEvents(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
 	// Create nginx pods.
-	podLabels := map[string]string{"name": "sample-pod"}
+	deploymentPodLabels := map[string]string{"name": "sample-pod"}
+	rcPodLabels := map[string]string{
+		"name": "sample-pod",
+		"pod":  "nginx",
+	}
 	rcName := "nginx-controller"
 	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
@@ -179,10 +189,10 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
-			Selector: podLabels,
+			Selector: rcPodLabels,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: podLabels,
+					Labels: rcPodLabels,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -216,11 +226,11 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		},
 		Spec: experimental.DeploymentSpec{
 			Replicas:       1,
-			Selector:       podLabels,
+			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: podLabels,
+					Labels: deploymentPodLabels,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -240,7 +250,8 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 	}()
 
-	waitForDeploymentStatus(c, ns, deploymentName, 1, 0, 2)
+	err = waitForDeploymentStatus(c, ns, deploymentName, 1, 0, 2)
+	Expect(err).NotTo(HaveOccurred())
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
