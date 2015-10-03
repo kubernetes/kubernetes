@@ -759,7 +759,9 @@ __EOF__
 
   FILES="hack/testdata/multi-resource-yaml
   hack/testdata/multi-resource-list
-  hack/testdata/multi-resource-json"
+  hack/testdata/multi-resource-json
+  hack/testdata/multi-resource-rclist
+  hack/testdata/multi-resource-svclist"
   YAML=".yaml"
   JSON=".json"
   for file in $FILES; do
@@ -772,41 +774,98 @@ __EOF__
       replace_file="${file%.json}-modify.json"
     fi
 
-    ### Create, get, describe, replace, label, annotate, and then delete service nginxsvc and replication controller my-nginx from 3 types of files:
+    has_svc=true
+    has_rc=true
+    two_rcs=false
+    two_svcs=false
+    if [[ "${file}" == *rclist* ]]; then
+      has_svc=false
+      two_rcs=true
+    fi
+    if [[ "${file}" == *svclist* ]]; then
+      has_rc=false
+      two_svcs=true
+    fi
+
+    ### Create, get, describe, replace, label, annotate, and then delete service nginxsvc and replication controller my-nginx from 5 types of files:
     ### 1) YAML, separated by ---; 2) JSON, with a List type; 3) JSON, with JSON object concatenation
+    ### 4) JSON, with a ReplicationControllerList type; 5) JSON, with a ServiceList type
+    echo "Testing with file ${file} and replace with file ${replace_file}"
     # Pre-condition: no service (other than default kubernetes services) or replication controller is running
     kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
     kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
     # Command
     # TODO: remove --validate=false when PR "Add validate support for list kind #14726" is merged
-    kubectl create -f $file --validate=false "${kube_flags[@]}"
-    # Post-condition: mock service is running
-    kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:mock:'
-    # Post-condition: mock rc is running
-    kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'mock:'
+    kubectl create -f "${file}" --validate=false "${kube_flags[@]}"
+    # Post-condition: mock service (and mock2) is running
+    if [ "$has_svc" = true ]; then
+      if [ "$two_svcs" = true ]; then
+        kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:mock:mock2:'
+      else
+        kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:mock:'
+      fi
+    fi
+    # Post-condition: mock rc (and mock2) is running
+    if [ "$has_rc" = true ]; then
+      if [ "$two_rcs" = true ]; then
+        kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'mock:mock2:'
+      else
+        kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'mock:'
+      fi
+    fi
     # Command
     # kubectl create -f $file "${kube_flags[@]}" # test fails here now
     # TODO: test get when PR "Fix get with List #14888" is merged
-    # kubectl get -f $file "${kube_flags[@]}"
-    kubectl describe -f $file "${kube_flags[@]}"
+    # kubectl get -f "${file}" "${kube_flags[@]}"
+    kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
     # TODO: remove --validate=false when PR "Add validate support for list kind #14726" is merged
     kubectl replace -f $replace_file --force --validate=false "${kube_flags[@]}"
-    # Post-condition: mock service and mock rc are replaced
-    kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'
-    kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'replaced'
+    # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
+    if [ "$has_svc" = true ]; then
+      kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'
+      if [ "$two_svcs" = true ]; then
+        kube::test::get_object_assert 'services mock2' "{{${labels_field}.status}}" 'replaced'
+      fi
+    fi
+    if [ "$has_rc" = true ]; then
+      kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'replaced'
+      if [ "$two_rcs" = true ]; then
+        kube::test::get_object_assert 'rc mock2' "{{${labels_field}.status}}" 'replaced'
+      fi
+    fi
     # Command
-    kubectl label -f $file labeled=true "${kube_flags[@]}"
-    # Post-condition: mock service and mock rc are labeled
-    kube::test::get_object_assert 'services mock' "{{${labels_field}.labeled}}" 'true'
-    kube::test::get_object_assert 'rc mock' "{{${labels_field}.labeled}}" 'true'
+    kubectl label -f "${file}" labeled=true "${kube_flags[@]}"
+    # Post-condition: mock service and mock rc (and mock2) are labeled
+    if [ "$has_svc" = true ]; then
+      kube::test::get_object_assert 'services mock' "{{${labels_field}.labeled}}" 'true'
+      if [ "$two_svcs" = true ]; then
+        kube::test::get_object_assert 'services mock2' "{{${labels_field}.labeled}}" 'true'
+      fi
+    fi
+    if [ "$has_rc" = true ]; then
+      kube::test::get_object_assert 'rc mock' "{{${labels_field}.labeled}}" 'true'
+      if [ "$two_rcs" = true ]; then
+        kube::test::get_object_assert 'rc mock2' "{{${labels_field}.labeled}}" 'true'
+      fi
+    fi
     # Command
-    kubectl annotate -f $file annotated=true "${kube_flags[@]}"
-    # Post-condition: mock service and mock rc are annotated
-    kube::test::get_object_assert 'services mock' "{{${annotations_field}.annotated}}" 'true'
-    kube::test::get_object_assert 'rc mock' "{{${annotations_field}.annotated}}" 'true'
-    # Cleanup services and rc
-    kubectl delete -f $file "${kube_flags[@]}"
+    kubectl annotate -f "${file}" annotated=true "${kube_flags[@]}"
+    # Post-condition: mock service (and mock2) and mock rc (and mock2) are annotated
+    if [ "$has_svc" = true ]; then
+      kube::test::get_object_assert 'services mock' "{{${annotations_field}.annotated}}" 'true'
+      if [ "$two_svcs" = true ]; then
+        kube::test::get_object_assert 'services mock2' "{{${annotations_field}.annotated}}" 'true'
+      fi
+    fi
+    if [ "$has_rc" = true ]; then
+      kube::test::get_object_assert 'rc mock' "{{${annotations_field}.annotated}}" 'true'
+      if [ "$two_rcs" = true ]; then
+        kube::test::get_object_assert 'rc mock2' "{{${annotations_field}.annotated}}" 'true'
+      fi
+    fi
+    # Cleanup resources created
+    kubectl delete -f "${file}" "${kube_flags[@]}"
   done
 
   ######################
