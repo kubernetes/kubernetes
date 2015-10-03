@@ -65,13 +65,13 @@ var _ = Describe("Autoscaling", func() {
 	})
 
 	It("[Skipped] should scale cluster size based on cpu reservation", func() {
-		setUpAutoscaler("cpu/node_reservation", 0.7, 1, 10)
+		setUpAutoscaler("cpu/node_reservation", 0.5, nodeCount, nodeCount+1)
 
-		ReserveCpu(f, "cpu-reservation", 800)
-		expectNoError(waitForClusterSize(f.Client, 2, 20*time.Minute))
+		ReserveCpu(f, "cpu-reservation", 600*nodeCount*coresPerNode)
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
 
-		StopConsuming(f, "cpu-reservation")
-		expectNoError(waitForClusterSize(f.Client, 1, 20*time.Minute))
+		expectNoError(DeleteRC(f.Client, f.Namespace.Name, "cpu-reservation"))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
 	})
 
 	It("[Skipped][Autoscaling Suite] should scale cluster size based on memory utilization", func() {
@@ -87,13 +87,13 @@ var _ = Describe("Autoscaling", func() {
 	})
 
 	It("[Skipped] should scale cluster size based on memory reservation", func() {
-		setUpAutoscaler("memory/node_reservation", 0.5, 1, 10)
+		setUpAutoscaler("memory/node_reservation", 0.5, nodeCount, nodeCount+1)
 
-		ReserveMemory(f, "memory-reservation", 2)
-		expectNoError(waitForClusterSize(f.Client, 2, 20*time.Minute))
+		ReserveMemory(f, "memory-reservation", nodeCount*memCapacityMb*6/10)
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
 
-		StopConsuming(f, "memory-reservation")
-		expectNoError(waitForClusterSize(f.Client, 1, 20*time.Minute))
+		expectNoError(DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
 	})
 })
 
@@ -124,35 +124,27 @@ func cleanUpAutoscaler() {
 func ReserveCpu(f *Framework, id string, millicores int) {
 	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
 	config := &RCConfig{
-		Client:    f.Client,
-		Name:      id,
-		Namespace: f.Namespace.Name,
-		Timeout:   10 * time.Minute,
-		Image:     "gcr.io/google_containers/pause",
-		Replicas:  millicores / 100,
-		CpuLimit:  100,
+		Client:     f.Client,
+		Name:       id,
+		Namespace:  f.Namespace.Name,
+		Timeout:    10 * time.Minute,
+		Image:      "gcr.io/google_containers/pause",
+		Replicas:   millicores / 100,
+		CpuRequest: 100,
 	}
 	expectNoError(RunRC(*config))
 }
 
-func ReserveMemory(f *Framework, id string, gigabytes int) {
-	By(fmt.Sprintf("Running RC which reserves %v GB of memory", gigabytes))
+func ReserveMemory(f *Framework, id string, megabytes int) {
+	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	config := &RCConfig{
-		Client:    f.Client,
-		Name:      id,
-		Namespace: f.Namespace.Name,
-		Timeout:   10 * time.Minute,
-		Image:     "gcr.io/google_containers/pause",
-		Replicas:  5 * gigabytes,
-		MemLimit:  200 * 1024 * 1024,
+		Client:     f.Client,
+		Name:       id,
+		Namespace:  f.Namespace.Name,
+		Timeout:    10 * time.Minute,
+		Image:      "gcr.io/google_containers/pause",
+		Replicas:   megabytes / 500,
+		MemRequest: 500 * 1024 * 1024,
 	}
 	expectNoError(RunRC(*config))
-}
-
-func StopConsuming(f *Framework, id string) {
-	By("Stopping service " + id)
-	err := f.Client.Services(f.Namespace.Name).Delete(id)
-	Expect(err).NotTo(HaveOccurred())
-	By("Stopping RC " + id)
-	expectNoError(DeleteRC(f.Client, f.Namespace.Name, id))
 }
