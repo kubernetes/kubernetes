@@ -716,6 +716,7 @@ func (dm *DockerManager) runContainer(
 			Labels:     labels,
 			// Interactive containers:
 			OpenStdin: container.Stdin,
+			StdinOnce: container.StdinOnce,
 			Tty:       container.TTY,
 		},
 	}

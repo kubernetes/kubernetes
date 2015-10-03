@@ -794,8 +794,9 @@ type Container struct {
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
-	Stdin bool `json:"stdin,omitempty"`
-	TTY   bool `json:"tty,omitempty"`
+	Stdin     bool `json:"stdin,omitempty"`
+	StdinOnce bool `json:"stdinOnce,omitempty"`
+	TTY       bool `json:"tty,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
