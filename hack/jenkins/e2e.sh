@@ -123,7 +123,7 @@ AWS_REQUIRED_SKIP_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
-    "DaemonRestart"
+    "DaemonRestart\sController\sManager"
     "Daemon\sset\sshould\slaunch\sa\sdaemon\spod\son\severy\snode\sof\sthe\scluster"
     "Resource\susage\sof\ssystem\scontainers"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
