@@ -11,7 +11,7 @@ metadata:
 spec:
   containers:
     - name: vttablet
-      image: vitess/lite:v2.0
+      image: vitess/lite:v2.0.0-alpha3
       volumeMounts:
         - name: syslog
           mountPath: /dev/log
@@ -48,7 +48,8 @@ spec:
           -alsologtostderr
           -port {{port}}
           -grpc_port {{grpc_port}}
-          -service_map 'grpc-queryservice'
+          -service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream'
+          -binlog_player_protocol grpc
           -tablet-path {{alias}}
           -tablet_hostname $(hostname -i)
           -init_keyspace {{keyspace}}
@@ -71,7 +72,7 @@ spec:
           -rowcache-bin /usr/bin/memcached
           -rowcache-socket $VTDATAROOT/{{tablet_subdir}}/memcache.sock" vitess
     - name: mysql
-      image: vitess/lite:v2.0
+      image: vitess/lite:v2.0.0-alpha3
       volumeMounts:
         - name: syslog
           mountPath: /dev/log
