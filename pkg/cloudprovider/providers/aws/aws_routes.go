@@ -56,8 +56,8 @@ func (s *AWSCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error
 
 	var routes []*cloudprovider.Route
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceID)
-		destinationCIDR := orEmpty(r.DestinationCIDRBlock)
+		instanceID := orEmpty(r.InstanceId)
+		destinationCIDR := orEmpty(r.DestinationCidrBlock)
 
 		if instanceID == "" || destinationCIDR == "" {
 			continue
@@ -67,7 +67,7 @@ func (s *AWSCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error
 		if err != nil {
 			return nil, err
 		}
-		instanceName := orEmpty(instance.PrivateDNSName)
+		instanceName := orEmpty(instance.PrivateDnsName)
 		routeName := clusterName + "-" + destinationCIDR
 		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetInstance: instanceName, DestinationCIDR: destinationCIDR})
 	}
@@ -78,8 +78,8 @@ func (s *AWSCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error
 // Sets the instance attribute "source-dest-check" to the specified value
 func (s *AWSCloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCheck bool) error {
 	request := &ec2.ModifyInstanceAttributeInput{}
-	request.InstanceID = aws.String(instanceID)
-	request.SourceDestCheck = &ec2.AttributeBooleanValue{Value: aws.Boolean(sourceDestCheck)}
+	request.InstanceId = aws.String(instanceID)
+	request.SourceDestCheck = &ec2.AttributeBooleanValue{Value: aws.Bool(sourceDestCheck)}
 
 	_, err := s.ec2.ModifyInstanceAttribute(request)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *AWSCloud) CreateRoute(clusterName string, nameHint string, route *cloud
 
 	// In addition to configuring the route itself, we also need to configure the instance to accept that traffic
 	// On AWS, this requires turning source-dest checks off
-	err = s.configureInstanceSourceDestCheck(orEmpty(instance.InstanceID), false)
+	err = s.configureInstanceSourceDestCheck(orEmpty(instance.InstanceId), false)
 	if err != nil {
 		return err
 	}
@@ -110,9 +110,9 @@ func (s *AWSCloud) CreateRoute(clusterName string, nameHint string, route *cloud
 
 	request := &ec2.CreateRouteInput{}
 	// TODO: use ClientToken for idempotency?
-	request.DestinationCIDRBlock = aws.String(route.DestinationCIDR)
-	request.InstanceID = instance.InstanceID
-	request.RouteTableID = table.RouteTableID
+	request.DestinationCidrBlock = aws.String(route.DestinationCIDR)
+	request.InstanceId = instance.InstanceId
+	request.RouteTableId = table.RouteTableId
 
 	_, err = s.ec2.CreateRoute(request)
 	if err != nil {
@@ -131,8 +131,8 @@ func (s *AWSCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) e
 	}
 
 	request := &ec2.DeleteRouteInput{}
-	request.DestinationCIDRBlock = aws.String(route.DestinationCIDR)
-	request.RouteTableID = table.RouteTableID
+	request.DestinationCidrBlock = aws.String(route.DestinationCIDR)
+	request.RouteTableId = table.RouteTableId
 
 	_, err = s.ec2.DeleteRoute(request)
 	if err != nil {

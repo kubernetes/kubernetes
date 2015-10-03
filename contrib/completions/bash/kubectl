@@ -292,6 +292,7 @@ _kubectl_get()
     must_have_one_noun+=("endpoints")
     must_have_one_noun+=("event")
     must_have_one_noun+=("horizontalpodautoscaler")
+    must_have_one_noun+=("ingress")
     must_have_one_noun+=("job")
     must_have_one_noun+=("limitrange")
     must_have_one_noun+=("namespace")
@@ -329,7 +330,6 @@ _kubectl_describe()
 
     must_have_one_flag=()
     must_have_one_noun=()
-    must_have_one_noun+=("daemonset")
     must_have_one_noun+=("limitrange")
     must_have_one_noun+=("minion")
     must_have_one_noun+=("namespace")
@@ -463,6 +463,7 @@ _kubectl_delete()
     must_have_one_noun+=("endpoints")
     must_have_one_noun+=("event")
     must_have_one_noun+=("horizontalpodautoscaler")
+    must_have_one_noun+=("ingress")
     must_have_one_noun+=("job")
     must_have_one_noun+=("limitrange")
     must_have_one_noun+=("namespace")
@@ -688,6 +689,7 @@ _kubectl_proxy()
 
     flags+=("--accept-hosts=")
     flags+=("--accept-paths=")
+    flags+=("--address=")
     flags+=("--api-prefix=")
     flags+=("--disable-filter")
     flags+=("--port=")
@@ -864,6 +866,7 @@ _kubectl_label()
     must_have_one_noun+=("endpoints")
     must_have_one_noun+=("event")
     must_have_one_noun+=("horizontalpodautoscaler")
+    must_have_one_noun+=("ingress")
     must_have_one_noun+=("job")
     must_have_one_noun+=("limitrange")
     must_have_one_noun+=("namespace")
@@ -1106,6 +1109,22 @@ _kubectl_version()
     must_have_one_noun=()
 }
 
+_kubectl_explain()
+{
+    last_command="kubectl_explain"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--recursive")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
 _kubectl()
 {
     last_command="kubectl"
@@ -1134,6 +1153,7 @@ _kubectl()
     commands+=("cluster-info")
     commands+=("api-versions")
     commands+=("version")
+    commands+=("explain")
 
     flags=()
     two_word_flags=()

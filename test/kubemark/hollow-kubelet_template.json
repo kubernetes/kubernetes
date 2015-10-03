@@ -1,0 +1,68 @@
+{
+	"kind": "ReplicationController",
+	"apiVersion": "v1",
+	"metadata": {
+		"name": "hollow-kubelet",
+		"labels": {
+			"name": "hollow-kubelet"
+		}
+	},
+	"spec": {
+		"replicas": ##numreplicas##,
+		"selector": {
+			"name": "hollow-kubelet"
+		},
+		"template": {
+		  "metadata": {
+				"labels": {
+					"name": "hollow-kubelet"
+				}
+			},
+			"spec": {
+				"volumes": [
+					{
+						"name": "kubeconfig-volume",
+						"secret": {
+							"secretName": "kubeconfig"
+						}
+					}
+				],
+				"containers": [{
+					"name": "hollow-kubelet",
+					"image": "gcr.io/##project##/kubemark:latest",
+					"ports": [
+						{"containerPort": 4194},
+						{"containerPort": 10250},
+						{"containerPort": 10255}
+					],
+					"env": [
+						{
+							"name": "MASTER_IP",
+							"value": ##masterip##
+						}
+					],
+					"command": [
+						"./kubemark.sh"
+					],
+					"args": [
+						"--server=$(MASTER_IP)",
+						"--api-server-port=8080",
+						"--v=3"
+					],
+					"volumeMounts": [
+						{
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig"
+						}
+					],
+					"resources": {
+						"requests": {
+							"cpu": "50m",
+							"memory": "100M"
+						}
+					}
+				}]
+			}
+		}
+	}
+}

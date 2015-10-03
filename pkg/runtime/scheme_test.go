@@ -246,13 +246,16 @@ func TestExtensionMapping(t *testing.T) {
 	}{
 		{
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}
+`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}
+`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}
+`,
 		},
 	}
 
@@ -261,7 +264,7 @@ func TestExtensionMapping(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%#v)", err, item.obj)
 		} else if e, a := item.encoded, string(gotEncoded); e != a {
-			t.Errorf("expected %v, got %v", e, a)
+			t.Errorf("expected\n%#v\ngot\n%#v\n", e, a)
 		}
 
 		gotDecoded, err := scheme.Decode([]byte(item.encoded))

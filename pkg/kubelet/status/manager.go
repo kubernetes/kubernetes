@@ -127,6 +127,21 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 		status.StartTime = oldStatus.StartTime
 	}
 
+	// Set ReadyCondition.LastTransitionTime.
+	// Note we cannot do this while generating the status since we do not have oldStatus
+	// at that time for mirror pods.
+	if readyCondition := api.GetPodReadyCondition(status); readyCondition != nil {
+		// Need to set LastTransitionTime.
+		lastTransitionTime := unversioned.Now()
+		if found {
+			oldReadyCondition := api.GetPodReadyCondition(oldStatus)
+			if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
+				lastTransitionTime = oldReadyCondition.LastTransitionTime
+			}
+		}
+		readyCondition.LastTransitionTime = lastTransitionTime
+	}
+
 	// if the status has no start time, we need to set an initial time
 	// TODO(yujuhong): Consider setting StartTime when generating the pod
 	// status instead, which would allow manager to become a simple cache

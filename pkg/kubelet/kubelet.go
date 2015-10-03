@@ -178,7 +178,8 @@ func NewMainKubelet(
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
 	cpuCFSQuota bool,
-	daemonEndpoints *api.NodeDaemonEndpoints) (*Kubelet, error) {
+	daemonEndpoints *api.NodeDaemonEndpoints,
+	oomAdjuster *oom.OOMAdjuster) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -237,10 +238,7 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, err
 	}
-	imageManager, err := newImageManager(dockerClient, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
-	}
+
 	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
@@ -278,7 +276,6 @@ func NewMainKubelet(
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
 		containerGC:                    containerGC,
-		imageManager:                   imageManager,
 		diskSpaceManager:               diskSpaceManager,
 		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
@@ -311,7 +308,6 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	oomAdjuster := oom.NewOomAdjuster()
 	procFs := procfs.NewProcFs()
 
 	// Initialize the runtime.
@@ -360,9 +356,16 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 
+	// setup imageManager
+	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
+	}
+	klet.imageManager = imageManager
+
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
-	containerManager, err := newContainerManager(cadvisorInterface, dockerDaemonContainer, systemContainer, resourceContainer)
+	containerManager, err := newContainerManager(mounter, cadvisorInterface, dockerDaemonContainer, systemContainer, resourceContainer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
 	}
@@ -758,6 +761,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 
 	// Move Kubelet to a container.
 	if kl.resourceContainer != "" {
+		// Fixme: I need to reside inside ContainerManager interface.
 		err := util.RunInResourceContainer(kl.resourceContainer)
 		if err != nil {
 			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
@@ -1300,9 +1304,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// status. Any race conditions here effectively boils down to -- the pod worker didn't sync
 	// state of a newly started container with the apiserver before the kubelet restarted, so
 	// it's OK to pretend like the kubelet started them after it restarted.
-	//
-	// Also note that deletes currently have an updateType of `create` set in UpdatePods.
-	// This, again, does not matter because deletes are not processed by this method.
 
 	var podStatus api.PodStatus
 	if updateType == SyncPodCreate {
@@ -1948,7 +1949,7 @@ func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType SyncPodType, mirrorPod *a
 		return
 	}
 	// Run the sync in an async worker.
-	kl.podWorkers.UpdatePod(pod, mirrorPod, func() {
+	kl.podWorkers.UpdatePod(pod, mirrorPod, syncType, func() {
 		metrics.PodWorkerLatency.WithLabelValues(syncType.String()).Observe(metrics.SinceInMicroseconds(start))
 	})
 	// Note the number of containers for new pods.
@@ -2358,13 +2359,12 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			LastHeartbeatTime: currentTime,
 		}
 	} else {
-		var reasons []string
 		var messages []string
 		if !containerRuntimeUp {
 			messages = append(messages, "container runtime is down")
 		}
 		if !networkConfigured {
-			messages = append(reasons, "network not configured correctly")
+			messages = append(messages, "network not configured correctly")
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
@@ -2508,8 +2508,7 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-func readyPodCondition(isPodReady bool, reason, message string, existingStatus *api.PodStatus) []api.PodCondition {
-	currentTime := unversioned.Now()
+func readyPodCondition(isPodReady bool, reason, message string) []api.PodCondition {
 	condition := api.PodCondition{
 		Type: api.PodReady,
 	}
@@ -2518,29 +2517,16 @@ func readyPodCondition(isPodReady bool, reason, message string, existingStatus *
 	} else {
 		condition.Status = api.ConditionFalse
 	}
-	condition.LastProbeTime = currentTime
 	condition.Reason = reason
 	condition.Message = message
-	if existingStatus != nil {
-		if api.IsPodReadyConditionTrue(*existingStatus) != isPodReady {
-			// condition has transitioned, update transition time.
-			condition.LastTransitionTime = currentTime
-		} else {
-			// retain the existing transition time.
-			existingCondition := api.GetPodReadyCondition(*existingStatus)
-			if existingCondition != nil {
-				condition.LastTransitionTime = existingCondition.LastTransitionTime
-			}
-		}
-	}
 	return []api.PodCondition{condition}
 }
 
 // getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
-func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, existingStatus *api.PodStatus) []api.PodCondition {
+func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus) []api.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil {
-		return readyPodCondition(false, "UnknownContainerStatuses", "", existingStatus)
+		return readyPodCondition(false, "UnknownContainerStatuses", "")
 	}
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
@@ -2563,10 +2549,10 @@ func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerSt
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
 		// return unready status.
-		return readyPodCondition(false, fmt.Sprint("ContainersNotReady"), unreadyMessage, existingStatus)
+		return readyPodCondition(false, fmt.Sprint("ContainersNotReady"), unreadyMessage)
 	}
 	// return ready status.
-	return readyPodCondition(true, "", "", existingStatus)
+	return readyPodCondition(true, "", "")
 }
 
 // By passing the pod directly, this method avoids pod lookup, which requires
@@ -2580,8 +2566,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
-	existingStatus, hasExistingStatus := kl.statusManager.GetPodStatus(pod.UID)
-	if hasExistingStatus {
+	if existingStatus, hasExistingStatus := kl.statusManager.GetPodStatus(pod.UID); hasExistingStatus {
 		// This is a hacky fix to ensure container restart counts increment
 		// monotonically. Normally, we should not modify given pod. In this
 		// case, we check if there are cached status for this pod, and update
@@ -2633,11 +2618,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 			}
 		}
 	}
-	if hasExistingStatus {
-		podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, &existingStatus)...)
-	} else {
-		podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, nil)...)
-	}
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
 
 	if !kl.standaloneMode {
 		hostIP, err := kl.GetHostIP()

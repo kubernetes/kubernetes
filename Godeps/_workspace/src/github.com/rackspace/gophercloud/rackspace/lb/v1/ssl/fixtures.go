@@ -63,6 +63,7 @@ func mockUpdateResponse(t *testing.T, lbID int) {
     `)
 
 		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{}`)
 	})
 }
 

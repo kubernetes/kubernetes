@@ -46,6 +46,10 @@ import (
 // errOverflow is returned when an integer is too large to be represented.
 var errOverflow = errors.New("proto: integer overflow")
 
+// ErrInternalBadWireType is returned by generated code when an incorrect
+// wire type is encountered. It does not get returned to user code.
+var ErrInternalBadWireType = errors.New("proto: internal error: bad wiretype for oneof")
+
 // The fundamental decoders that interpret bytes on the wire.
 // Those that take integer types all return uint64 and are
 // therefore of type valueDecoder.
@@ -178,7 +182,7 @@ func (p *Buffer) DecodeZigzag32() (x uint64, err error) {
 func (p *Buffer) DecodeRawBytes(alloc bool) (buf []byte, err error) {
 	n, err := p.DecodeVarint()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	nb := int(n)
@@ -314,6 +318,24 @@ func UnmarshalMerge(buf []byte, pb Message) error {
 	return NewBuffer(buf).Unmarshal(pb)
 }
 
+// DecodeMessage reads a count-delimited message from the Buffer.
+func (p *Buffer) DecodeMessage(pb Message) error {
+	enc, err := p.DecodeRawBytes(false)
+	if err != nil {
+		return err
+	}
+	return NewBuffer(enc).Unmarshal(pb)
+}
+
+// DecodeGroup reads a tag-delimited group from the Buffer.
+func (p *Buffer) DecodeGroup(pb Message) error {
+	typ, base, err := getbase(pb)
+	if err != nil {
+		return err
+	}
+	return p.unmarshalType(typ.Elem(), GetProperties(typ.Elem()), true, base)
+}
+
 // Unmarshal parses the protocol buffer representation in the
 // Buffer and places the decoded result in pb.  If the struct
 // underlying pb does not match the data in the buffer, the results can be
@@ -370,15 +392,29 @@ func (o *Buffer) unmarshalType(st reflect.Type, prop *StructProperties, is_group
 			if prop.extendable {
 				if e := structPointer_Interface(base, st).(extendableProto); isExtensionField(e, int32(tag)) {
 					if err = o.skip(st, tag, wire); err == nil {
-						if ee, ok := e.(extensionsMap); ok {
+						if ee, eok := e.(extensionsMap); eok {
 							ext := ee.ExtensionMap()[int32(tag)] // may be missing
 							ext.enc = append(ext.enc, o.buf[oi:o.index]...)
 							ee.ExtensionMap()[int32(tag)] = ext
-						} else if ee, ok := e.(extensionsBytes); ok {
+						} else if ee, eok := e.(extensionsBytes); eok {
 							ext := ee.GetExtensions()
 							*ext = append(*ext, o.buf[oi:o.index]...)
 						}
 					}
+					continue
+				}
+			}
+			// Maybe it's a oneof?
+			if prop.oneofUnmarshaler != nil {
+				m := structPointer_Interface(base, st).(Message)
+				// First return value indicates whether tag is a oneof field.
+				ok, err = prop.oneofUnmarshaler(m, tag, wire, o)
+				if err == ErrInternalBadWireType {
+					// Map the error to something more descriptive.
+					// Do the formatting here to save generated code space.
+					err = fmt.Errorf("bad wiretype for oneof field in %T", m)
+				}
+				if ok {
 					continue
 				}
 			}
@@ -470,6 +506,15 @@ func (o *Buffer) dec_bool(p *Properties, base structPointer) error {
 	return nil
 }
 
+func (o *Buffer) dec_proto3_bool(p *Properties, base structPointer) error {
+	u, err := p.valDec(o)
+	if err != nil {
+		return err
+	}
+	*structPointer_BoolVal(base, p.field) = u != 0
+	return nil
+}
+
 // Decode an int32.
 func (o *Buffer) dec_int32(p *Properties, base structPointer) error {
 	u, err := p.valDec(o)
@@ -477,6 +522,15 @@ func (o *Buffer) dec_int32(p *Properties, base structPointer) error {
 		return err
 	}
 	word32_Set(structPointer_Word32(base, p.field), o, uint32(u))
+	return nil
+}
+
+func (o *Buffer) dec_proto3_int32(p *Properties, base structPointer) error {
+	u, err := p.valDec(o)
+	if err != nil {
+		return err
+	}
+	word32Val_Set(structPointer_Word32Val(base, p.field), uint32(u))
 	return nil
 }
 
@@ -490,15 +544,31 @@ func (o *Buffer) dec_int64(p *Properties, base structPointer) error {
 	return nil
 }
 
+func (o *Buffer) dec_proto3_int64(p *Properties, base structPointer) error {
+	u, err := p.valDec(o)
+	if err != nil {
+		return err
+	}
+	word64Val_Set(structPointer_Word64Val(base, p.field), o, u)
+	return nil
+}
+
 // Decode a string.
 func (o *Buffer) dec_string(p *Properties, base structPointer) error {
 	s, err := o.DecodeStringBytes()
 	if err != nil {
 		return err
 	}
-	sp := new(string)
-	*sp = s
-	*structPointer_String(base, p.field) = sp
+	*structPointer_String(base, p.field) = &s
+	return nil
+}
+
+func (o *Buffer) dec_proto3_string(p *Properties, base structPointer) error {
+	s, err := o.DecodeStringBytes()
+	if err != nil {
+		return err
+	}
+	*structPointer_StringVal(base, p.field) = s
 	return nil
 }
 
@@ -634,6 +704,78 @@ func (o *Buffer) dec_slice_slice_byte(p *Properties, base structPointer) error {
 	}
 	v := structPointer_BytesSlice(base, p.field)
 	*v = append(*v, b)
+	return nil
+}
+
+// Decode a map field.
+func (o *Buffer) dec_new_map(p *Properties, base structPointer) error {
+	raw, err := o.DecodeRawBytes(false)
+	if err != nil {
+		return err
+	}
+	oi := o.index       // index at the end of this map entry
+	o.index -= len(raw) // move buffer back to start of map entry
+
+	mptr := structPointer_NewAt(base, p.field, p.mtype) // *map[K]V
+	if mptr.Elem().IsNil() {
+		mptr.Elem().Set(reflect.MakeMap(mptr.Type().Elem()))
+	}
+	v := mptr.Elem() // map[K]V
+
+	// Prepare addressable doubly-indirect placeholders for the key and value types.
+	// See enc_new_map for why.
+	keyptr := reflect.New(reflect.PtrTo(p.mtype.Key())).Elem() // addressable *K
+	keybase := toStructPointer(keyptr.Addr())                  // **K
+
+	var valbase structPointer
+	var valptr reflect.Value
+	switch p.mtype.Elem().Kind() {
+	case reflect.Slice:
+		// []byte
+		var dummy []byte
+		valptr = reflect.ValueOf(&dummy)  // *[]byte
+		valbase = toStructPointer(valptr) // *[]byte
+	case reflect.Ptr:
+		// message; valptr is **Msg; need to allocate the intermediate pointer
+		valptr = reflect.New(reflect.PtrTo(p.mtype.Elem())).Elem() // addressable *V
+		valptr.Set(reflect.New(valptr.Type().Elem()))
+		valbase = toStructPointer(valptr)
+	default:
+		// everything else
+		valptr = reflect.New(reflect.PtrTo(p.mtype.Elem())).Elem() // addressable *V
+		valbase = toStructPointer(valptr.Addr())                   // **V
+	}
+
+	// Decode.
+	// This parses a restricted wire format, namely the encoding of a message
+	// with two fields. See enc_new_map for the format.
+	for o.index < oi {
+		// tagcode for key and value properties are always a single byte
+		// because they have tags 1 and 2.
+		tagcode := o.buf[o.index]
+		o.index++
+		switch tagcode {
+		case p.mkeyprop.tagcode[0]:
+			if err := p.mkeyprop.dec(o, p.mkeyprop, keybase); err != nil {
+				return err
+			}
+		case p.mvalprop.tagcode[0]:
+			if err := p.mvalprop.dec(o, p.mvalprop, valbase); err != nil {
+				return err
+			}
+		default:
+			// TODO: Should we silently skip this instead?
+			return fmt.Errorf("proto: bad map data tag %d", raw[0])
+		}
+	}
+	keyelem, valelem := keyptr.Elem(), valptr.Elem()
+	if !keyelem.IsValid() || !valelem.IsValid() {
+		// We did not decode the key or the value in the map entry.
+		// Either way, it's an invalid map entry.
+		return fmt.Errorf("proto: bad map data: missing key/val")
+	}
+
+	v.SetMapIndex(keyelem, valelem)
 	return nil
 }
 

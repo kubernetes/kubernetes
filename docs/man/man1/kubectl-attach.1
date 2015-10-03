@@ -19,7 +19,7 @@ Attach to a a process that is already running inside an existing container.
 .SH OPTIONS
 .PP
 \fB\-c\fP, \fB\-\-container\fP=""
-    Container name
+    Container name. If omitted, the first container in the pod will be chosen
 
 .PP
 \fB\-i\fP, \fB\-\-stdin\fP=false
@@ -135,7 +135,7 @@ $ kubectl attach 123456\-7890
 # Get output from ruby\-container from pod 123456\-7890
 $ kubectl attach 123456\-7890 \-c ruby\-container date
 
-# Switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
+# Switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-7890
 # and sends stdout/stderr from 'bash' back to the client
 $ kubectl attach 123456\-7890 \-c ruby\-container \-i \-t
 

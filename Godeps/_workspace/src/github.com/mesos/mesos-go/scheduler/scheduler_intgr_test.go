@@ -37,9 +37,10 @@ import (
 
 // testScuduler is used for testing Schduler callbacks.
 type testScheduler struct {
-	ch chan bool
-	wg *sync.WaitGroup
-	s  *SchedulerIntegrationTestSuite
+	ch     chan bool
+	wg     *sync.WaitGroup
+	s      *SchedulerIntegrationTestSuite
+	errors chan string // yields errors received by Scheduler.Error
 }
 
 // convenience
@@ -83,7 +84,7 @@ func (sched *testScheduler) StatusUpdate(dr SchedulerDriver, stat *mesos.TaskSta
 	sched.s.NotNil(stat)
 	sched.s.Equal("test-task-001", stat.GetTaskId().GetValue())
 	sched.wg.Done()
-	log.Infof("Status update done with waitGroup %v \n", sched.wg)
+	log.Infof("Status update done with waitGroup")
 }
 
 func (sched *testScheduler) SlaveLost(dr SchedulerDriver, slaveId *mesos.SlaveID) {
@@ -109,7 +110,7 @@ func (sched *testScheduler) ExecutorLost(SchedulerDriver, *mesos.ExecutorID, *me
 
 func (sched *testScheduler) Error(dr SchedulerDriver, err string) {
 	log.Infoln("Sched.Error() called.")
-	sched.s.Equal("test-error-999", err)
+	sched.errors <- err
 	sched.ch <- true
 }
 
@@ -128,7 +129,7 @@ func (sched *testScheduler) waitForCallback(timeout time.Duration) bool {
 }
 
 func newTestScheduler(s *SchedulerIntegrationTestSuite) *testScheduler {
-	return &testScheduler{ch: make(chan bool), s: s}
+	return &testScheduler{ch: make(chan bool), s: s, errors: make(chan string, 2)}
 }
 
 type mockServerConfigurator func(frameworkId *mesos.FrameworkID, suite *SchedulerIntegrationTestSuite)
@@ -168,8 +169,12 @@ func (suite *SchedulerIntegrationTestSuite) configure(frameworkId *mesos.Framewo
 	suite.sched = newTestScheduler(suite)
 	suite.sched.ch = make(chan bool, 10) // big enough that it doesn't block callback processing
 
-	suite.driver = newTestSchedulerDriver(suite.T(), suite.sched, suite.framework, suite.server.Addr, nil)
-
+	cfg := DriverConfig{
+		Scheduler: suite.sched,
+		Framework: suite.framework,
+		Master:    suite.server.Addr,
+	}
+	suite.driver = newTestSchedulerDriver(suite.T(), cfg).MesosSchedulerDriver
 	suite.config(frameworkId, suite)
 
 	stat, err := suite.driver.Start()
@@ -205,7 +210,9 @@ var defaultMockServerConfigurator = mockServerConfigurator(func(frameworkId *mes
 			rsp.WriteHeader(http.StatusAccepted)
 		}
 		// this is what the mocked scheduler is expecting to receive
-		suite.driver.frameworkRegistered(suite.driver.MasterPid, &mesos.FrameworkRegisteredMessage{
+		suite.driver.eventLock.Lock()
+		defer suite.driver.eventLock.Unlock()
+		suite.driver.frameworkRegistered(suite.driver.masterPid, &mesos.FrameworkRegisteredMessage{
 			FrameworkId: frameworkId,
 			MasterInfo:  masterInfo,
 		})
@@ -219,7 +226,9 @@ var defaultMockServerConfigurator = mockServerConfigurator(func(frameworkId *mes
 			rsp.WriteHeader(http.StatusAccepted)
 		}
 		// this is what the mocked scheduler is expecting to receive
-		suite.driver.frameworkReregistered(suite.driver.MasterPid, &mesos.FrameworkReregisteredMessage{
+		suite.driver.eventLock.Lock()
+		defer suite.driver.eventLock.Unlock()
+		suite.driver.frameworkReregistered(suite.driver.masterPid, &mesos.FrameworkReregisteredMessage{
 			FrameworkId: frameworkId,
 			MasterInfo:  masterInfo,
 		})
@@ -239,8 +248,12 @@ func (s *SchedulerIntegrationTestSuite) TearDownTest() {
 	if s.server != nil {
 		s.server.Close()
 	}
-	if s.driver != nil && s.driver.Status() == mesos.Status_DRIVER_RUNNING {
+	if s.driver != nil {
 		s.driver.Abort()
+
+		// wait for all events to finish processing, otherwise we can get into a data
+		// race when the suite object is reused for the next test.
+		<-s.driver.done
 	}
 }
 
@@ -353,7 +366,7 @@ func (suite *SchedulerIntegrationTestSuite) TestSchedulerDriverStatusUpdatedEven
 			defer req.Body.Close()
 			assert.NotNil(t, data)
 			wg.Done()
-			log.Infof("MockMaster - Done with wait group %v \n", wg)
+			log.Infof("MockMaster - Done with wait group")
 		})
 		suite.sched.wg = &wg
 	})
@@ -369,7 +382,8 @@ func (suite *SchedulerIntegrationTestSuite) TestSchedulerDriverStatusUpdatedEven
 			float64(time.Now().Unix()),
 			[]byte("test-abcd-ef-3455-454-001"),
 		),
-		Pid: proto.String(suite.driver.self.String()),
+		// note: cannot use driver's pid here if we want an ACK
+		Pid: proto.String("test-slave-001(1)@foo.bar:1234"),
 	}
 	pbMsg.Update.SlaveId = &mesos.SlaveID{Value: proto.String("test-slave-001")}
 
@@ -437,6 +451,8 @@ func (suite *SchedulerIntegrationTestSuite) TestSchedulerDriverFrameworkErrorEve
 
 	c := suite.newMockClient()
 	c.SendMessage(suite.driver.self, pbMsg)
-	suite.sched.waitForCallback(0)
+	message := <-suite.sched.errors
+	suite.Equal("test-error-999", message)
+	suite.sched.waitForCallback(10 * time.Second)
 	suite.Equal(mesos.Status_DRIVER_ABORTED, suite.driver.Status())
 }

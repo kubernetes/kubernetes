@@ -522,8 +522,8 @@ func migTemplate() (string, error) {
 		// An `instance-groups managed describe` call outputs what we want to stdout.
 		output, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"describe",
+			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			testContext.CloudConfig.NodeInstanceGroup)
 		if err != nil {
 			errLast = fmt.Errorf("gcloud compute instance-groups managed describe call failed with err: %v", err)

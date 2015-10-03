@@ -55,7 +55,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 		if delKey != key {
 			t.Errorf("Unexpected delete for key %s", key)
 		}
-	case <-time.After(time.Millisecond * 100):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Errorf("Unexpected timeout waiting on delete")
 	}
 	close(deleteChan)
@@ -100,7 +100,7 @@ func TestTTLList(t *testing.T) {
 				t.Errorf("Unexpected delete for key %s", delKey)
 			}
 			expireKeys.Delete(delKey)
-		case <-time.After(time.Millisecond * 100):
+		case <-time.After(util.ForeverTestTimeout):
 			t.Errorf("Unexpected timeout waiting on delete")
 			return
 		}

@@ -24,59 +24,73 @@ source "${KUBE_ROOT}/cluster/kube-env.sh"
 SILENT=true
 
 function is-excluded {
-	for e in $EXCLUDE; do
-		if [[ $1 -ef ${BASH_SOURCE} ]]; then
-			return
-		fi
-		if [[ $1 -ef "$KUBE_ROOT/hack/$e" ]]; then
-			return
-		fi
-	done
-	return 1
+  for e in $EXCLUDE; do
+    if [[ $1 -ef ${BASH_SOURCE} ]]; then
+      return
+    fi
+    if [[ $1 -ef "$KUBE_ROOT/hack/$e" ]]; then
+      return
+    fi
+  done
+  return 1
+}
+
+function run-cmd() {
+  if ${SILENT}; then
+    "$@" &> /dev/null
+  else
+    "$@"
+  fi
 }
 
 while getopts ":v" opt; do
-	case $opt in
-		v)
-			SILENT=false
-			;;
-		\?)
-			echo "Invalid flag: -$OPTARG" >&2
-			exit 1
-			;;
-	esac
+  case $opt in
+    v)
+      SILENT=false
+      ;;
+    \?)
+      echo "Invalid flag: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
 done
 
 if $SILENT ; then
-	echo "Running in the silent mode, run with -v if you want to see script logs."
+  echo "Running in the silent mode, run with -v if you want to see script logs."
 fi
 
 EXCLUDE="verify-godeps.sh"
 
+ret=0
 for t in `ls $KUBE_ROOT/hack/verify-*.sh`
 do
-	if is-excluded $t ; then
-		echo "Skipping $t"
-		continue
-	fi
-	if $SILENT ; then
-		echo -e "Verifying $t"
-		bash "$t" &> /dev/null && echo -e "${color_green}SUCCESS${color_norm}" || echo -e "${color_red}FAILED${color_norm}" 
-	else
-		bash "$t" || true
-	fi
+  if is-excluded $t ; then
+    echo "Skipping $t"
+    continue
+  fi
+  echo -e "Verifying $t"
+  if run-cmd bash "$t"; then
+    echo -e "${color_green}SUCCESS${color_norm}"
+  else
+    echo -e "${color_red}FAILED${color_norm}"
+    ret=1
+  fi
 done
 
 for t in `ls $KUBE_ROOT/hack/verify-*.py`
 do
-	if is-excluded $t ; then
-		echo "Skipping $t"
-		continue
-	fi
-	if $SILENT ; then
-		echo -e "Verifying $t"
-		python "$t" &> /dev/null && echo -e "${color_green}SUCCESS${color_norm}" || echo -e "${color_red}FAILED${color_norm}" 
-	else 
-		python "$t" || true
-	fi
+  if is-excluded $t ; then
+    echo "Skipping $t"
+    continue
+  fi
+  echo -e "Verifying $t"
+  if run-cmd python "$t"; then
+    echo -e "${color_green}SUCCESS${color_norm}"
+  else
+    echo -e "${color_red}FAILED${color_norm}"
+    ret=1
+  fi
 done
+exit $ret
+
+# ex: ts=2 sw=2 et filetype=sh

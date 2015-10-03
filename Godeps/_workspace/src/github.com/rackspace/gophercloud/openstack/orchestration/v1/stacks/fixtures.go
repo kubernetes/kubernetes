@@ -95,7 +95,7 @@ const FullListOutput = `
     ],
     "stack_status_reason": "Stack CREATE completed successfully",
     "stack_name": "postman_stack",
-    "creation_time": "2015-02-03T20:07:39Z",
+    "creation_time": "2015-02-03T20:07:39",
     "updated_time": null,
     "stack_status": "CREATE_COMPLETE",
     "id": "16ef0584-4458-41eb-87c8-0dc8d5f66c87"
@@ -110,8 +110,8 @@ const FullListOutput = `
     ],
     "stack_status_reason": "Stack successfully updated",
     "stack_name": "gophercloud-test-stack-2",
-    "creation_time": "2014-12-11T17:39:16Z",
-    "updated_time": "2014-12-11T17:40:37Z",
+    "creation_time": "2014-12-11T17:39:16",
+    "updated_time": "2014-12-11T17:40:37",
     "stack_status": "UPDATE_COMPLETE",
     "id": "db6977b2-27aa-4775-9ae7-6213212d4ada"
   }
@@ -181,7 +181,7 @@ const GetOutput = `
     "stack_status_reason": "Stack CREATE completed successfully",
     "stack_name": "postman_stack",
     "outputs": [],
-    "creation_time": "2015-02-03T20:07:39Z",
+    "creation_time": "2015-02-03T20:07:39",
     "links": [
     {
       "href": "http://166.76.160.117:8004/v1/98606384f58d4ad0b3db7d0d779549ac/stacks/postman_stack/16ef0584-4458-41eb-87c8-0dc8d5f66c87",

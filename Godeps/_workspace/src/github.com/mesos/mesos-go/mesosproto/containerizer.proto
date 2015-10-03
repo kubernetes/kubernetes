@@ -82,6 +82,8 @@ message Usage {
 message Termination {
   // A container may be killed if it exceeds its resources; this will
   // be indicated by killed=true and described by the message string.
+  // TODO(jaybuff): As part of MESOS-2035 we should remove killed and
+  // replace it with a TaskStatus::Reason.
   required bool killed = 1;
   required string message = 2;
 

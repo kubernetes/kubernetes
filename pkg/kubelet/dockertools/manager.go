@@ -74,6 +74,8 @@ const (
 	kubernetesPodLabel                    = "io.kubernetes.pod.data"
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
+
+	DockerNetnsFmt = "/proc/%v/ns/net"
 )
 
 // DockerManager implements the Runtime interface.
@@ -131,7 +133,7 @@ type DockerManager struct {
 	execHandler ExecHandler
 
 	// Used to set OOM scores of processes.
-	oomAdjuster *oom.OomAdjuster
+	oomAdjuster *oom.OOMAdjuster
 
 	// Get information from /proc mount.
 	procFs procfs.ProcFsInterface
@@ -155,7 +157,7 @@ func NewDockerManager(
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
 	execHandler ExecHandler,
-	oomAdjuster *oom.OomAdjuster,
+	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFsInterface,
 	cpuCFSQuota bool) *DockerManager {
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
@@ -320,7 +322,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 		return &result
 	}
 
-	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
+	glog.V(4).Infof("Container inspect result: %+v", *inspectResult)
 	result.status = api.ContainerStatus{
 		Name:        containerName,
 		Image:       inspectResult.Config.Image,
@@ -1177,17 +1179,66 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	}
 
 	containerPid := container.State.Pid
-	// TODO what if the host doesn't have it???
-	_, lookupErr := exec.LookPath("socat")
+	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
-		return fmt.Errorf("Unable to do port forwarding: socat not found.")
+		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
-	// TODO use exec.LookPath
-	command := exec.Command("nsenter", args...)
-	command.Stdin = stream
+
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+
+	nsenterPath, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
+	}
+
+	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream
+
+	// If we use Stdin, command.Run() won't return until the goroutine that's copying
+	// from stream finishes. Unfortunately, if you have a client like telnet connected
+	// via port forwarding, as long as the user's telnet client is connected to the user's
+	// local listener that port forwarding sets up, the telnet session never exits. This
+	// means that even if socat has finished running, command.Run() won't ever return
+	// (because the client still has the connection and stream open).
+	//
+	// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
+	// when the command (socat) exits.
+	inPipe, err := command.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
+	}
+	go func() {
+		io.Copy(inPipe, stream)
+		inPipe.Close()
+	}()
+
 	return command.Run()
+}
+
+// Get the IP address of a container's interface using nsenter
+func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (string, error) {
+	_, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return "", fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
+	}
+	container, err := dm.client.InspectContainer(containerID)
+	if err != nil {
+		return "", err
+	}
+
+	if !container.State.Running {
+		return "", fmt.Errorf("container not running (%s)", container.ID)
+	}
+
+	containerPid := container.State.Pid
+	extractIPCmd := fmt.Sprintf("ip -4 addr show %s | grep inet | awk -F\" \" '{print $2}'", interfaceName)
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
+	command := exec.Command("nsenter", args...)
+	out, err := command.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 // Kills all containers in the specified pod
@@ -1470,15 +1521,15 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// whole pod will die.
 	var oomScoreAdj int
 	if container.Name == PodInfraContainerName {
-		oomScoreAdj = qos.PodInfraOomAdj
+		oomScoreAdj = qos.PodInfraOOMAdj
 	} else {
-		oomScoreAdj = qos.GetContainerOomScoreAdjust(container, dm.machineInfo.MemoryCapacity)
+		oomScoreAdj = qos.GetContainerOOMScoreAdjust(container, dm.machineInfo.MemoryCapacity)
 	}
 	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
 	if err != nil {
 		return "", err
 	}
-	if err = dm.oomAdjuster.ApplyOomScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
+	if err = dm.oomAdjuster.ApplyOOMScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
 		return "", err
 	}
 
@@ -1535,6 +1586,10 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	netNamespace := ""
 	var ports []api.ContainerPort
 
+	if dm.networkPlugin.Name() == "cni" {
+		netNamespace = "none"
+	}
+
 	if pod.Spec.HostNetwork {
 		netNamespace = "host"
 	} else {
@@ -1557,7 +1612,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod, ""), getPidMode(pod))
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod))
 	if err != nil {
 		return "", err
 	}
@@ -1812,8 +1867,12 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		}
 
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
+		// Note: when configuring the pod's containers anything that can be configured by pointing
+		// to the namespace of the infra container should use namespaceMode.  This includes things like the net namespace
+		// and IPC namespace.  PID mode cannot point to another container right now.
+		// See createPodInfraContainer for infra container setup.
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err = dm.runContainerInPod(pod, container, namespaceMode, getIPCMode(pod, namespaceMode), getPidMode(pod))
+		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod))
 		dm.updateReasonCache(pod, container, "RunContainerError", err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
@@ -1938,9 +1997,21 @@ func getPidMode(pod *api.Pod) string {
 }
 
 // getIPCMode returns the ipc mode to use on the docker container based on pod.Spec.HostIPC.
-func getIPCMode(pod *api.Pod, ipcMode string) string {
+func getIPCMode(pod *api.Pod) string {
+	ipcMode := ""
 	if pod.Spec.HostIPC {
 		ipcMode = "host"
 	}
 	return ipcMode
+}
+
+// GetNetNs returns the network namespace path for the given container
+func (dm *DockerManager) GetNetNs(containerID string) (string, error) {
+	inspectResult, err := dm.client.InspectContainer(string(containerID))
+	if err != nil {
+		glog.Errorf("Error inspecting container: '%v'", err)
+		return "", err
+	}
+	netnsPath := fmt.Sprintf(DockerNetnsFmt, inspectResult.State.Pid)
+	return netnsPath, nil
 }

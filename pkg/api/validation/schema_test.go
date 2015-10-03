@@ -125,3 +125,31 @@ func TestValid(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionRegex(t *testing.T) {
+	testCases := []struct {
+		typeName string
+		match    bool
+	}{
+		{
+			typeName: "v1.Binding",
+			match:    true,
+		},
+		{
+			typeName: "v1alpha1.Binding",
+			match:    true,
+		},
+		{
+			typeName: "Binding",
+			match:    false,
+		},
+	}
+	for _, test := range testCases {
+		if versionRegexp.MatchString(test.typeName) && !test.match {
+			t.Errorf("unexpected error: expect %s not to match the regular expression", test.typeName)
+		}
+		if !versionRegexp.MatchString(test.typeName) && test.match {
+			t.Errorf("unexpected error: expect %s to match the regular expression", test.typeName)
+		}
+	}
+}

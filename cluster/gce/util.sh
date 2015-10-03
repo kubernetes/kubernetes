@@ -55,10 +55,10 @@ function join_csv {
 function verify-prereqs {
   if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
     if [[ -z "${RUNTIME_CONFIG}" ]]; then
-      RUNTIME_CONFIG="experimental/v1=true"
+      RUNTIME_CONFIG="experimental/v1alpha1=true"
     else
-      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1=false" and appending "experimental/v1=true" if not.
-      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1=true"; then
+      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1alpha1=false" and appending "experimental/v1alpha1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
         echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
         exit 1
       fi
@@ -357,6 +357,12 @@ function create-firewall-rule {
   done
 }
 
+# $1: version (required)
+function get-template-name-from-version {
+  # trim template name to pass gce name validation
+  echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
+}
+
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
@@ -364,14 +370,15 @@ function create-firewall-rule {
 # $4: The kube-env metadata.
 function create-node-template {
   detect-project
+  local template_name="$1"
 
   # First, ensure the template doesn't exist.
   # TODO(zmerlynn): To make this really robust, we need to parse the output and
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
-  if gcloud compute instance-templates describe "$1" --project "${PROJECT}" &>/dev/null; then
+  if gcloud compute instance-templates describe "$template_name" --project "${PROJECT}" &>/dev/null; then
     echo "Instance template ${1} already exists; deleting." >&2
-    if ! gcloud compute instance-templates delete "$1" --project "${PROJECT}" &>/dev/null; then
+    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" &>/dev/null; then
       echo -e "${color_yellow}Failed to delete existing instance template${color_norm}" >&2
       exit 2
     fi
@@ -384,7 +391,7 @@ function create-node-template {
   fi
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
-    if ! gcloud compute instance-templates create "$1" \
+    if ! gcloud compute instance-templates create "$template_name" \
       --project "${PROJECT}" \
       --machine-type "${MINION_SIZE}" \
       --boot-disk-type "${MINION_DISK_TYPE}" \
@@ -398,10 +405,10 @@ function create-node-template {
       --can-ip-forward \
       --metadata-from-file "$3","$4" >&2; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create instance template $1 ${color_norm}" >&2
+          echo -e "${color_red}Failed to create instance template $template_name ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt ${attempt} failed to create instance template $1. Retrying.${color_norm}" >&2
+        echo -e "${color_yellow}Attempt ${attempt} failed to create instance template $template_name. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -675,7 +682,10 @@ function kube-up {
   fi
 
   write-node-env
-  create-node-instance-template
+
+  local template_name="${NODE_INSTANCE_PREFIX}-template"
+  
+  create-node-instance-template $template_name
 
   gcloud compute instance-groups managed \
       create "${NODE_INSTANCE_PREFIX}-group" \
@@ -683,7 +693,7 @@ function kube-up {
       --zone "${ZONE}" \
       --base-instance-name "${NODE_INSTANCE_PREFIX}" \
       --size "${NUM_MINIONS}" \
-      --template "${NODE_INSTANCE_PREFIX}-template" || true;
+      --template "$template_name" || true;
   gcloud compute instance-groups managed wait-until-stable \
       "${NODE_INSTANCE_PREFIX}-group" \
 			--zone "${ZONE}" \
@@ -694,12 +704,20 @@ function kube-up {
   # Create autoscaler for nodes if requested
   if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
     METRICS=""
+    # Current usage
     METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
     METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
     METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
     METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+
+    # Reservation
+    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
+    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
+    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+
     echo "Creating node autoscaler."
-    gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project $"{PROJECT}" \
+    gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
         --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
   fi
 
@@ -1038,31 +1056,33 @@ function prepare-push() {
 
     # Ugly hack: Since it is not possible to delete instance-template that is currently
     # being used, create a temp one, then delete the old one and recreate it once again.
-    create-node-instance-template "tmp"
+    local tmp_template_name="${NODE_INSTANCE_PREFIX}-template-tmp"
+    create-node-instance-template $tmp_template_name
 
+    local template_name="${NODE_INSTANCE_PREFIX}-template"
     gcloud compute instance-groups managed \
       set-instance-template "${NODE_INSTANCE_PREFIX}-group" \
-      --template "${NODE_INSTANCE_PREFIX}-template-tmp" \
+      --template "$tmp_template_name" \
       --zone "${ZONE}" \
       --project "${PROJECT}" || true;
 
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
       --quiet \
-      "${NODE_INSTANCE_PREFIX}-template" || true
+      "$template_name" || true
 
-    create-node-instance-template
+    create-node-instance-template "$template_name"
 
     gcloud compute instance-groups managed \
       set-instance-template "${NODE_INSTANCE_PREFIX}-group" \
-      --template "${NODE_INSTANCE_PREFIX}-template" \
+      --template "$template_name" \
       --zone "${ZONE}" \
       --project "${PROJECT}" || true;
 
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
       --quiet \
-      "${NODE_INSTANCE_PREFIX}-template-tmp" || true
+      "$tmp_template_name" || true
   fi
 }
 

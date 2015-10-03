@@ -350,7 +350,7 @@ func (e *endpointController) syncService(key string) {
 		}
 	}
 	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) && reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
-		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+		glog.V(5).Infof("Endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return
 	}
 	newEndpoints := currentEndpoints

@@ -150,6 +150,14 @@ func TestProxyTransport(t *testing.T) {
 			redirectWant: "http://example.com/redirected/target/",
 			forwardedURI: "/proxy/minion/minion1:10250/redirect",
 		},
+		"source contains the redirect already": {
+			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			sourceURL:    "http://foo.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
+		},
 	}
 
 	testItem := func(name string, item *Item) {

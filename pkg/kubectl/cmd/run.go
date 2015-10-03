@@ -42,7 +42,7 @@ $ kubectl run nginx --image=nginx
 $ kubectl run hazelcast --image=hazelcast --port=5701
 
 # Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
-$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=local" --env="POD_NAMESPACE=default"
+$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
 # Start a replicated instance of nginx.
 $ kubectl run nginx --image=nginx --replicas=5
@@ -291,12 +291,16 @@ func handleAttachPod(c *client.Client, pod *api.Pod, opts *AttachOptions) error 
 		return err
 	}
 	if status == api.PodSucceeded || status == api.PodFailed {
-		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: pod.Spec.Containers[0].Name}, opts.Out)
+		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: opts.GetContainerName(pod)}, opts.Out)
 	}
 	opts.Client = c
 	opts.PodName = pod.Name
 	opts.Namespace = pod.Namespace
-	return opts.Run()
+	if err := opts.Run(); err != nil {
+		fmt.Fprintf(opts.Out, "Error attaching, falling back to logs: %v\n", err)
+		return handleLog(c, pod.Namespace, pod.Name, &api.PodLogOptions{Container: opts.GetContainerName(pod)}, opts.Out)
+	}
+	return nil
 }
 
 func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, error) {

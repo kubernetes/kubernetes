@@ -48,8 +48,8 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
 
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
-POLL_SLEEP_INTERVAL=3
-SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
+POLL_SLEEP_INTERVAL="${POLL_SLEEP_INTERVAL:-3}"
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
@@ -100,6 +100,12 @@ fi
 # Experimental feature, not ready for production use.
 ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
 if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+
+# Optional: Enable deployment experimental feature, not ready for production use.
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
+if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
 

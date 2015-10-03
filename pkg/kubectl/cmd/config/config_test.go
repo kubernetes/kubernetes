@@ -101,7 +101,7 @@ func TestSetNonExistentContext(t *testing.T) {
 		args:            []string{"use-context", "non-existent-config"},
 		startingConfig:  expectedConfig,
 		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{`No context exists with the name: "non-existent-config"`},
+		expectedOutputs: []string{`no context exists with the name: "non-existent-config"`},
 	}
 	test.run(t)
 }

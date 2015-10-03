@@ -1762,6 +1762,12 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	}
 }
 
+type fakeReadWriteCloser struct{}
+
+func (*fakeReadWriteCloser) Read([]byte) (int, error)  { return 0, nil }
+func (*fakeReadWriteCloser) Write([]byte) (int, error) { return 0, nil }
+func (*fakeReadWriteCloser) Close() error              { return nil }
+
 func TestPortForwardNoSuchContainer(t *testing.T) {
 	dm, _ := newTestDockerManager()
 
@@ -1774,7 +1780,8 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 			Containers: nil,
 		},
 		5000,
-		nil,
+		// need a valid io.ReadWriteCloser here
+		&fakeReadWriteCloser{},
 	)
 	if err == nil {
 		t.Fatal("unexpected non-error")
@@ -2071,7 +2078,7 @@ func TestGetPidMode(t *testing.T) {
 func TestGetIPCMode(t *testing.T) {
 	// test false
 	pod := &api.Pod{}
-	ipcMode := getIPCMode(pod, "")
+	ipcMode := getIPCMode(pod)
 
 	if ipcMode != "" {
 		t.Errorf("expected empty ipc mode for pod but got %v", ipcMode)
@@ -2079,7 +2086,7 @@ func TestGetIPCMode(t *testing.T) {
 
 	// test true
 	pod.Spec.HostIPC = true
-	ipcMode = getIPCMode(pod, "")
+	ipcMode = getIPCMode(pod)
 	if ipcMode != "host" {
 		t.Errorf("expected host ipc mode for pod but got %v", ipcMode)
 	}

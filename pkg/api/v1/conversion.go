@@ -29,8 +29,10 @@ func addConversionFuncs() {
 	err := api.Scheme.AddConversionFuncs(
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
+		convert_api_ServiceSpec_To_v1_ServiceSpec,
 		convert_v1_PodSpec_To_api_PodSpec,
 		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
+		convert_v1_ServiceSpec_To_api_ServiceSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -362,6 +364,31 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		}
 	} else {
 		out.ImagePullSecrets = nil
+	}
+	return nil
+}
+
+func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
+	if err := autoconvert_api_ServiceSpec_To_v1_ServiceSpec(in, out, s); err != nil {
+		return err
+	}
+	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
+	for _, ip := range in.ExternalIPs {
+		out.DeprecatedPublicIPs = append(out.DeprecatedPublicIPs, ip)
+	}
+	return nil
+}
+
+func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
+	if err := autoconvert_v1_ServiceSpec_To_api_ServiceSpec(in, out, s); err != nil {
+		return err
+	}
+	// Prefer the legacy deprecatedPublicIPs field, if provided.
+	if len(in.DeprecatedPublicIPs) > 0 {
+		out.ExternalIPs = nil
+		for _, ip := range in.DeprecatedPublicIPs {
+			out.ExternalIPs = append(out.ExternalIPs, ip)
+		}
 	}
 	return nil
 }

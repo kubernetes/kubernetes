@@ -70,7 +70,7 @@ For this exercise, we will create two additional Kubernetes namespaces to hold o
 
 Let's imagine a scenario where an organization is using a shared Kubernetes cluster for development and production use cases.
 
-The development team would like to maintain a space in the cluster where they can get a view on the list of pods, services, and replication-controllers
+The development team would like to maintain a space in the cluster where they can get a view on the list of pods, services, and replication controllers
 they use to build and run their application.  In this space, Kubernetes resources come and go, and the restrictions on who can or cannot modify resources
 are relaxed to enable agile development.
 

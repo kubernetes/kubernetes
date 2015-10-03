@@ -33,7 +33,7 @@ func Download(c *gophercloud.ServiceClient, containerName, objectName string, op
 }
 
 // Create is a function that creates a new object or replaces an existing object.
-func Create(c *gophercloud.ServiceClient, containerName, objectName string, content io.Reader, opts os.CreateOptsBuilder) os.CreateResult {
+func Create(c *gophercloud.ServiceClient, containerName, objectName string, content io.ReadSeeker, opts os.CreateOptsBuilder) os.CreateResult {
 	return os.Create(c, containerName, objectName, content, opts)
 }
 

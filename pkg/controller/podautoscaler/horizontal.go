@@ -34,9 +34,6 @@ import (
 )
 
 const (
-	heapsterNamespace = "kube-system"
-	heapsterService   = "monitoring-heapster"
-
 	// Usage shoud exceed the tolerance before we start downscale or upscale the pods.
 	// TODO: make it a flag or HPA spec element.
 	tolerance = 0.1
@@ -48,8 +45,8 @@ type HorizontalController struct {
 	eventRecorder record.EventRecorder
 }
 
-var downscaleForbiddenWindow, _ = time.ParseDuration("20m")
-var upscaleForbiddenWindow, _ = time.ParseDuration("3m")
+var downscaleForbiddenWindow = 5 * time.Minute
+var upscaleForbiddenWindow = 3 * time.Minute
 
 func NewHorizontalController(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
@@ -112,7 +109,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		// Going down only if the usageRatio dropped significantly below the target
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas && usageRatio < (1-tolerance) &&
-			(hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+			(hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
@@ -120,7 +117,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		// Going up only if the usage ratio increased significantly above the target
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas && usageRatio > (1+tolerance) &&
-			(hpa.Status == nil || hpa.Status.LastScaleTimestamp == nil ||
+			(hpa.Status.LastScaleTimestamp == nil ||
 				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
@@ -138,12 +135,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		desiredReplicas = currentReplicas
 	}
 
-	status := experimental.HorizontalPodAutoscalerStatus{
+	hpa.Status = experimental.HorizontalPodAutoscalerStatus{
 		CurrentReplicas:    currentReplicas,
 		DesiredReplicas:    desiredReplicas,
 		CurrentConsumption: currentConsumption,
 	}
-	hpa.Status = &status
 	if rescale {
 		now := unversioned.NewTime(now)
 		hpa.Status.LastScaleTimestamp = &now

@@ -19,7 +19,6 @@ package nodecontroller
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -326,7 +325,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler,
-			evictionTimeout, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
+			evictionTimeout, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -544,7 +543,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -622,7 +621,7 @@ func TestNodeDeletion(t *testing.T) {
 		Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
 	}
 
-	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
+	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 	nodeController.now = func() unversioned.Time { return fakeNow }
 	if err := nodeController.monitorNodeStatus(); err != nil {
@@ -664,35 +663,6 @@ func newNode(name string) *api.Node {
 
 func newPod(name, host string) *api.Pod {
 	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{NodeName: host}}
-}
-
-func sortedNodeNames(nodes []*api.Node) []string {
-	nodeNames := []string{}
-	for _, node := range nodes {
-		nodeNames = append(nodeNames, node.Name)
-	}
-	sort.Strings(nodeNames)
-	return nodeNames
-}
-
-func sortedNodeAddresses(nodes []*api.Node) []string {
-	nodeAddresses := []string{}
-	for _, node := range nodes {
-		for _, addr := range node.Status.Addresses {
-			nodeAddresses = append(nodeAddresses, addr.Address)
-		}
-	}
-	sort.Strings(nodeAddresses)
-	return nodeAddresses
-}
-
-func sortedNodeExternalIDs(nodes []*api.Node) []string {
-	nodeExternalIDs := []string{}
-	for _, node := range nodes {
-		nodeExternalIDs = append(nodeExternalIDs, node.Spec.ExternalID)
-	}
-	sort.Strings(nodeExternalIDs)
-	return nodeExternalIDs
 }
 
 func contains(node *api.Node, nodes []*api.Node) bool {

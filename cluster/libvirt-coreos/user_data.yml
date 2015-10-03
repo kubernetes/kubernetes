@@ -15,11 +15,12 @@ write_files:
 
 coreos:
   etcd2:
-    discovery: ${discovery}
     advertise-client-urls: http://${public_ip}:2379
     initial-advertise-peer-urls: http://${public_ip}:2380
     listen-client-urls: http://0.0.0.0:2379
     listen-peer-urls: http://${public_ip}:2380
+    initial-cluster-state: new
+    initial-cluster: ${etcd2_initial_cluster}
   units:
     - name: static.network
       command: start
@@ -70,6 +71,11 @@ coreos:
         Type=oneshot
     - name: etcd2.service
       command: start
+      drop-ins:
+        - name: 10-override-name.conf
+          content: |
+            [Service]
+            Environment=ETCD_NAME=%H
     - name: docker.service
       command: start
       drop-ins:

@@ -3,7 +3,7 @@
   "apis": [
    {
     "path": "/api/v1",
-    "description": "API at /api/v1 version v1"
+    "description": "API at /api/v1"
    },
    {
     "path": "/api",

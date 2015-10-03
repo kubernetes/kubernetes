@@ -16,6 +16,8 @@ limitations under the License.
 
 package version
 
+import "github.com/prometheus/client_golang/prometheus"
+
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
@@ -44,4 +46,18 @@ func Get() Info {
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
 	return info.GitVersion
+}
+
+func init() {
+	buildInfo := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "kubernetes_build_info",
+			Help: "A metric with a constant '1' value labeled by major, minor, git version, git commit and git tree state from which Kubernetes was built.",
+		},
+		[]string{"major", "minor", "gitVersion", "gitCommit", "gitTreeState"},
+	)
+	info := Get()
+	buildInfo.WithLabelValues(info.Major, info.Minor, info.GitVersion, info.GitCommit, info.GitTreeState).Set(1)
+
+	prometheus.MustRegister(buildInfo)
 }

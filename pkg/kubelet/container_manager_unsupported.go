@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type unsupportedContainerManager struct {
@@ -38,6 +39,6 @@ func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 
-func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonContainer, systemContainer, kubeletContainer string) (containerManager, error) {
+func newContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface, dockerDaemonContainer, systemContainer, kubeletContainer string) (containerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

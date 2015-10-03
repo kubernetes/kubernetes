@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -178,12 +179,20 @@ const (
 )
 
 // A list of containers for which we want to collect resource usage.
-var targetContainers = []string{
-	"/",
-	"/docker-daemon",
-	"/kubelet",
-	"/kube-proxy",
-	"/system",
+func targetContainers() []string {
+	if providerIs("gce", "gke") {
+		return []string{
+			"/",
+			"/docker-daemon",
+			"/kubelet",
+			"/kube-proxy",
+			"/system",
+		}
+	} else {
+		return []string{
+			"/",
+		}
+	}
 }
 
 type containerResourceUsage struct {
@@ -229,8 +238,9 @@ func getOneTimeResourceUsageOnNode(c *client.Client, nodeName string, cpuInterva
 		return nil, err
 	}
 	// Process container infos that are relevant to us.
-	usageMap := make(map[string]*containerResourceUsage, len(targetContainers))
-	for _, name := range targetContainers {
+	containers := targetContainers()
+	usageMap := make(map[string]*containerResourceUsage, len(containers))
+	for _, name := range containers {
 		info, ok := containerInfos[name]
 		if !ok {
 			return nil, fmt.Errorf("missing info for container %q on node %q", name, nodeName)
@@ -337,6 +347,7 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisor.Con
 // list of containers, computes and cache resource usage up to
 // maxEntriesPerContainer for each container.
 type resourceCollector struct {
+	lock            sync.RWMutex
 	node            string
 	containers      []string
 	client          *client.Client
@@ -381,6 +392,8 @@ func (r *resourceCollector) collectStats(oldStats map[string]*cadvisor.Container
 		Logf("Error getting container info on %q, err: %v", r.node, err)
 		return
 	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	for _, name := range r.containers {
 		info, ok := infos[name]
 		if !ok || len(info.Stats) < 1 {
@@ -396,16 +409,27 @@ func (r *resourceCollector) collectStats(oldStats map[string]*cadvisor.Container
 
 // LogLatest logs the latest resource usage of each container.
 func (r *resourceCollector) LogLatest() {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	stats := make(map[string]*containerResourceUsage)
 	for _, name := range r.containers {
-		s := r.buffers[name][len(r.buffers)-1]
-		if s == nil {
+		contStats, ok := r.buffers[name]
+		if !ok || len(contStats) == 0 {
 			Logf("Resource usage on node %q is not ready yet", r.node)
 			return
 		}
-		stats[name] = s
+		stats[name] = contStats[len(contStats)-1]
 	}
 	Logf("\n%s", formatResourceUsageStats(r.node, stats))
+}
+
+// Reset frees the stats and start over.
+func (r *resourceCollector) Reset() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	for _, name := range r.containers {
+		r.buffers[name] = []*containerResourceUsage{}
+	}
 }
 
 type resourceUsageByCPU []*containerResourceUsage
@@ -414,18 +438,23 @@ func (r resourceUsageByCPU) Len() int           { return len(r) }
 func (r resourceUsageByCPU) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 func (r resourceUsageByCPU) Less(i, j int) bool { return r[i].CPUUsageInCores < r[j].CPUUsageInCores }
 
-var percentiles = [...]float64{0.05, 0.50, 0.90, 0.95}
+// The percentiles to report.
+var percentiles = [...]float64{0.05, 0.20, 0.50, 0.70, 0.90, 0.95, 0.99}
 
-// GetBasicCPUStats returns the 5-th, 50-th, and 95-th, percentiles the cpu
-// usage in cores for containerName. This method examines all data currently in the buffer.
+// GetBasicCPUStats returns the percentiles the cpu usage in cores for
+// containerName. This method examines all data currently in the buffer.
 func (r *resourceCollector) GetBasicCPUStats(containerName string) map[float64]float64 {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	result := make(map[float64]float64, len(percentiles))
 	usages := r.buffers[containerName]
 	sort.Sort(resourceUsageByCPU(usages))
 	for _, q := range percentiles {
 		index := int(float64(len(usages))*q) - 1
 		if index < 0 {
-			index = 0
+			// We don't have enough data.
+			result[q] = 0
+			continue
 		}
 		result[q] = usages[index].CPUUsageInCores
 	}
@@ -467,6 +496,12 @@ func (r *resourceMonitor) Stop() {
 	}
 }
 
+func (r *resourceMonitor) Reset() {
+	for _, collector := range r.collectors {
+		collector.Reset()
+	}
+}
+
 func (r *resourceMonitor) LogLatest() {
 	for _, collector := range r.collectors {
 		collector.LogLatest()
@@ -474,7 +509,7 @@ func (r *resourceMonitor) LogLatest() {
 }
 
 func (r *resourceMonitor) LogCPUSummary() {
-	// Example output for a node:
+	// Example output for a node (the percentiles may differ):
 	// CPU usage of containers on node "e2e-test-yjhong-minion-0vj7":
 	// container        5th%  50th% 90th% 95th%
 	// "/"              0.051 0.159 0.387 0.455
@@ -491,7 +526,7 @@ func (r *resourceMonitor) LogCPUSummary() {
 		buf := &bytes.Buffer{}
 		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 		fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
-		for _, containerName := range targetContainers {
+		for _, containerName := range targetContainers() {
 			data := collector.GetBasicCPUStats(containerName)
 			var s []string
 			s = append(s, fmt.Sprintf("%q", containerName))

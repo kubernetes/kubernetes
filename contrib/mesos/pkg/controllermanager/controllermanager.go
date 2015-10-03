@@ -29,6 +29,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 	kendpoint "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -47,7 +48,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/controller/daemon"
 )
 
 // CMServer is the main context object for the controller manager.
@@ -128,6 +128,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	nodeController := nodecontroller.NewNodeController(cloud, kubeClient,
 		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 

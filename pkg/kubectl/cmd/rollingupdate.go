@@ -296,7 +296,10 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		MaxSurge:       util.NewIntOrStringFromInt(1),
 	}
 	if cmdutil.GetFlagBool(cmd, "rollback") {
-		kubectl.AbortRollingUpdate(config)
+		err = kubectl.AbortRollingUpdate(config)
+		if err != nil {
+			return err
+		}
 		client.ReplicationControllers(config.NewRc.Namespace).Update(config.NewRc)
 	}
 	err = updater.Update(config)

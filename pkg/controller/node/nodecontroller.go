@@ -37,9 +37,7 @@ import (
 )
 
 var (
-	ErrRegistration   = errors.New("unable to register all nodes.")
-	ErrQueryIPAddress = errors.New("unable to query IP address.")
-	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
+	ErrCloudInstance = errors.New("cloud provider doesn't support instances.")
 )
 
 const (
@@ -107,7 +105,8 @@ func NewNodeController(
 	cloud cloudprovider.Interface,
 	kubeClient client.Interface,
 	podEvictionTimeout time.Duration,
-	podEvictionLimiter util.RateLimiter,
+	deletionEvictionLimiter util.RateLimiter,
+	terminationEvictionLimiter util.RateLimiter,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -134,8 +133,8 @@ func NewNodeController(
 		podEvictionTimeout:     podEvictionTimeout,
 		maximumGracePeriod:     5 * time.Minute,
 		evictorLock:            &evictorLock,
-		podEvictor:             NewRateLimitedTimedQueue(podEvictionLimiter),
-		terminationEvictor:     NewRateLimitedTimedQueue(podEvictionLimiter),
+		podEvictor:             NewRateLimitedTimedQueue(deletionEvictionLimiter),
+		terminationEvictor:     NewRateLimitedTimedQueue(terminationEvictionLimiter),
 		nodeStatusMap:          make(map[string]nodeStatusData),
 		nodeMonitorGracePeriod: nodeMonitorGracePeriod,
 		nodeMonitorPeriod:      nodeMonitorPeriod,
@@ -271,9 +270,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 		}
 	}
 
-	if err != nil {
-		return err
-	}
 	if nc.allocateNodeCIDRs {
 		// TODO (cjcullen): Use pkg/controller/framework to watch nodes and
 		// reduce lists/decouple this from monitoring status.
@@ -606,8 +602,8 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 			continue
 		}
 
-		glog.V(2).Infof("Delete pod %v", pod.Name)
-		nc.recorder.Eventf(&pod, "NodeControllerEviction", "Deleting Pod %s from Node %s", pod.Name, nodeName)
+		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
+		nc.recorder.Eventf(&pod, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}

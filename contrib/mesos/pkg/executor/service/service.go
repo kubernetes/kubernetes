@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -30,14 +29,16 @@ import (
 
 	log "github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
-	"k8s.io/kubernetes/contrib/mesos/pkg/redirfd"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -47,8 +48,6 @@ import (
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
-
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -60,8 +59,6 @@ const (
 type KubeletExecutorServer struct {
 	*app.KubeletServer
 	SuicideTimeout time.Duration
-	ShutdownFD     int
-	ShutdownFIFO   string
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -75,7 +72,6 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 		k.RootDirectory = pwd // mesos sandbox dir
 	}
 	k.Address = net.ParseIP(defaultBindingAddress())
-	k.ShutdownFD = -1 // indicates unspecified FD
 
 	return k
 }
@@ -83,28 +79,14 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	s.KubeletServer.AddFlags(fs)
 	fs.DurationVar(&s.SuicideTimeout, "suicide-timeout", s.SuicideTimeout, "Self-terminate after this period of inactivity. Zero disables suicide watch.")
-	fs.IntVar(&s.ShutdownFD, "shutdown-fd", s.ShutdownFD, "File descriptor used to signal shutdown to external watchers, requires shutdown-fifo flag")
-	fs.StringVar(&s.ShutdownFIFO, "shutdown-fifo", s.ShutdownFIFO, "FIFO used to signal shutdown to external watchers, requires shutdown-fd flag")
-}
-
-// returns a Closer that should be closed to signal impending shutdown, but only if ShutdownFD
-// and ShutdownFIFO were specified. if they are specified, then this func blocks until there's
-// a reader on the FIFO stream.
-func (s *KubeletExecutorServer) syncExternalShutdownWatcher() (io.Closer, error) {
-	if s.ShutdownFD == -1 || s.ShutdownFIFO == "" {
-		return nil, nil
-	}
-	// redirfd -w n fifo ...  # (blocks until the fifo is read)
-	log.Infof("blocked, waiting for shutdown reader for FD %d FIFO at %s", s.ShutdownFD, s.ShutdownFIFO)
-	return redirfd.Write.Redirect(true, false, redirfd.FileDescriptor(s.ShutdownFD), s.ShutdownFIFO)
 }
 
 // Run runs the specified KubeletExecutorServer.
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	oomAdjuster := oom.NewOomAdjuster()
-	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOOMAdjuster()
+	if err := oomAdjuster.ApplyOOMScoreAdj(0, s.OOMScoreAdj); err != nil {
 		log.Info(err)
 	}
 
@@ -127,11 +109,6 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	log.Infof("Using root directory: %v", s.RootDirectory)
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
-
-	shutdownCloser, err := s.syncExternalShutdownWatcher()
-	if err != nil {
-		return err
-	}
 
 	cAdvisorInterface, err := cadvisor.New(s.CAdvisorPort)
 	if err != nil {
@@ -233,12 +210,13 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		ResolverConfig:            s.ResolverConfig,
 		CPUCFSQuota:               s.CPUCFSQuota,
 		Writer:                    writer,
+		MaxOpenFiles:              s.MaxOpenFiles,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
 
 	err = app.RunKubelet(&kcfg, app.KubeletBuilder(func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
-		return s.createAndInitKubelet(kc, hks, clientConfig, shutdownCloser)
+		return s.createAndInitKubelet(kc, hks, clientConfig)
 	}))
 	if err != nil {
 		return err
@@ -271,7 +249,6 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	kc *app.KubeletConfig,
 	hks hyperkube.Interface,
 	clientConfig *client.Config,
-	shutdownCloser io.Closer,
 ) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
 
 	// TODO(k8s): block until all sources have delivered at least one update to the channel, or break the sync loop
@@ -343,6 +320,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		&api.NodeDaemonEndpoints{
 			KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
 		},
+		kc.OOMAdjuster,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -360,18 +338,12 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		Docker:          kc.DockerClient,
 		SuicideTimeout:  ks.SuicideTimeout,
 		KubeletFinished: kubeletFinished,
-		ShutdownAlert: func() {
-			if shutdownCloser != nil {
-				if e := shutdownCloser.Close(); e != nil {
-					log.Warningf("failed to signal shutdown to external watcher: %v", e)
-				}
-			}
-		},
-		ExitFunc: os.Exit,
+		ExitFunc:        os.Exit,
 		PodStatusFunc: func(_ executor.KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return klet.GetRuntime().GetPodStatus(pod)
 		},
 		StaticPodsConfigPath: staticPodsConfigPath,
+		PodLW:                cache.NewListWatchFromClient(kc.KubeClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, kc.NodeName)),
 	})
 
 	go exec.InitializeStaticPodsSource(func() {

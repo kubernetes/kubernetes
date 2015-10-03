@@ -44,7 +44,7 @@ type JobController struct {
 	kubeClient client.Interface
 	podControl controller.PodControlInterface
 
-	// To allow injection of updateJob for testing.
+	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *experimental.Job) error
 	syncHandler   func(jobKey string) error
 	// podStoreSynced returns true if the pod store has been synced at least once.
@@ -127,7 +127,7 @@ func NewJobController(kubeClient client.Interface) *JobController {
 		},
 	)
 
-	jm.updateHandler = jm.updateJob
+	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
 	jm.podStoreSynced = jm.podController.HasSynced
 	return jm
@@ -341,7 +341,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Unsuccessful = unsuccessful
 
 		if err := jm.updateHandler(&job); err != nil {
-			glog.Errorf("Failed to update job %v, requeuing", job.Name)
+			glog.Errorf("Failed to update job %v, requeuing.  Error: %v", job.Name, err)
 			jm.enqueueController(&job)
 		}
 	}
@@ -433,8 +433,8 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 	return active
 }
 
-func (jm *JobController) updateJob(job *experimental.Job) error {
-	_, err := jm.kubeClient.Experimental().Jobs(job.Namespace).Update(job)
+func (jm *JobController) updateJobStatus(job *experimental.Job) error {
+	_, err := jm.kubeClient.Experimental().Jobs(job.Namespace).UpdateStatus(job)
 	return err
 }
 

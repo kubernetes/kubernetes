@@ -820,16 +820,26 @@ func (r *runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 // getPodStatus reads the service file and invokes 'rkt status $UUID' to get the
 // pod's status.
 func (r *runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
+	var status api.PodStatus
+
 	// TODO(yifan): Get rkt uuid from the service file name.
 	pod, rktInfo, err := r.readServiceFile(serviceName)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+
+	if os.IsNotExist(err) {
+		// Pod does not exit, means it's not been created yet,
+		// return empty status for now.
+		// TODO(yifan): Maybe inspect the image and return waiting status.
+		return &status, nil
+	}
+
 	podInfo, err := r.getPodInfo(rktInfo.uuid)
 	if err != nil {
 		return nil, err
 	}
-	status := makePodStatus(pod, podInfo, rktInfo)
+	status = makePodStatus(pod, podInfo, rktInfo)
 	return &status, nil
 }
 
@@ -979,10 +989,6 @@ func (r *runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 // SyncPod syncs the running pod to match the specified desired pod.
 func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
 	podFullName := kubeletUtil.FormatPodName(pod)
-	if len(runningPod.Containers) == 0 {
-		glog.V(4).Infof("Pod %q is not running, will start it", podFullName)
-		return r.RunPod(pod, pullSecrets)
-	}
 
 	// Add references to all containers.
 	unidentifiedContainers := make(map[types.UID]*kubecontainer.Container)
@@ -1036,8 +1042,11 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 	}
 
 	if restartPod {
-		if err := r.KillPod(pod, runningPod); err != nil {
-			return err
+		// Kill the pod only if the pod is actually running.
+		if len(runningPod.Containers) > 0 {
+			if err := r.KillPod(pod, runningPod); err != nil {
+				return err
+			}
 		}
 		if err := r.RunPod(pod, pullSecrets); err != nil {
 			return err
@@ -1211,19 +1220,39 @@ func (r *runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 		return err
 	}
 
-	_, lookupErr := exec.LookPath("socat")
+	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
-	args := []string{"-t", fmt.Sprintf("%d", info.pid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 
-	_, lookupErr = exec.LookPath("nsenter")
+	args := []string{"-t", fmt.Sprintf("%d", info.pid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+
+	nsenterPath, lookupErr := exec.LookPath("nsenter")
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
 	}
-	command := exec.Command("nsenter", args...)
-	command.Stdin = stream
+
+	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream
+
+	// If we use Stdin, command.Run() won't return until the goroutine that's copying
+	// from stream finishes. Unfortunately, if you have a client like telnet connected
+	// via port forwarding, as long as the user's telnet client is connected to the user's
+	// local listener that port forwarding sets up, the telnet session never exits. This
+	// means that even if socat has finished running, command.Run() won't ever return
+	// (because the client still has the connection and stream open).
+	//
+	// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
+	// when the command (socat) exits.
+	inPipe, err := command.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
+	}
+	go func() {
+		io.Copy(inPipe, stream)
+		inPipe.Close()
+	}()
+
 	return command.Run()
 }
 

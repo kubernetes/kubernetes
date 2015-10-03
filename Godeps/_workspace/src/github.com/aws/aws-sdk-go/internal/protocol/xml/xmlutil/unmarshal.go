@@ -114,7 +114,7 @@ func parseStruct(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
 			for _, a := range node.Attr {
 				if name == a.Name.Local {
 					// turn this into a text node for de-serializing
-					elems = []*XMLNode{&XMLNode{Text: a.Value}}
+					elems = []*XMLNode{{Text: a.Value}}
 				}
 			}
 		}

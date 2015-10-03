@@ -40,7 +40,7 @@ type ViewOptions struct {
 }
 
 const (
-	view_long = `displays Merged kubeconfig settings or a specified kubeconfig file.
+	view_long = `Displays merged kubeconfig settings or a specified kubeconfig file.
 
 You can use --output=template --template=TEMPLATE to extract specific values.`
 	view_example = `# Show Merged kubeconfig settings.
@@ -55,7 +55,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "displays Merged kubeconfig settings or a specified kubeconfig file.",
+		Short:   "Displays merged kubeconfig settings or a specified kubeconfig file.",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {

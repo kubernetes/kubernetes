@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	expapi "k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -54,6 +55,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
+	ingressetcd "k8s.io/kubernetes/pkg/registry/ingress/etcd"
 	jobetcd "k8s.io/kubernetes/pkg/registry/job/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
@@ -572,9 +574,7 @@ func (m *Master) init(c *Config) {
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
-	defaultVersion := m.defaultAPIGroupVersion()
-	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), apiVersions)
 
 	// allGroups records all supported groups at /apis
 	allGroups := []api.APIGroup{}
@@ -593,8 +593,8 @@ func (m *Master) init(c *Config) {
 		}
 		expAPIVersions := []api.GroupVersion{
 			{
-				GroupVersion: g.Group + "/" + expVersion.Version,
-				Version:      expVersion.Version,
+				GroupVersion: expVersion.Version,
+				Version:      apiutil.GetVersion(expVersion.Version),
 			},
 		}
 		storageVersion, found := c.StorageVersions[g.Group]
@@ -604,12 +604,11 @@ func (m *Master) init(c *Config) {
 		group := api.APIGroup{
 			Name:             g.Group,
 			Versions:         expAPIVersions,
-			PreferredVersion: api.GroupVersion{GroupVersion: g.Group + "/" + storageVersion, Version: storageVersion},
+			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
 		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
 		allGroups = append(allGroups, group)
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), []string{expVersion.Version})
 	}
 
 	// This should be done after all groups are registered
@@ -652,7 +651,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.GroupOrDie("").RESTMapper, "api")
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, m.newAPIRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -778,9 +777,17 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
+func (m *Master) newAPIRequestInfoResolver() *apiserver.APIRequestInfoResolver {
+	return &apiserver.APIRequestInfoResolver{
+		sets.NewString(strings.Trim(m.apiPrefix, "/"), strings.Trim(thirdpartyprefix, "/")), // all possible API prefixes
+		sets.NewString(strings.Trim(m.apiPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+	}
+}
+
 func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
 		Root: m.apiPrefix,
+		APIRequestInfoResolver: m.newAPIRequestInfoResolver(),
 
 		Mapper: latest.GroupOrDie("").RESTMapper,
 
@@ -918,24 +925,25 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 	}
 	apiserver.AddGroupWebService(m.handlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
-	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: sets.NewString(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), []string{thirdparty.Version})
 	return nil
 }
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiRoot := makeThirdPartyPath(group)
+	apiRoot := makeThirdPartyPath("")
 
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root: apiRoot,
+		Root:                   apiRoot,
+		Version:                apiutil.GetGroupVersion(group, version),
+		APIRequestInfoResolver: m.newAPIRequestInfoResolver(),
 
-		Creater:   thirdpartyresourcedata.NewObjectCreator(version, api.Scheme),
+		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
@@ -943,7 +951,6 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
 		Linker:        latest.GroupOrDie("experimental").SelfLinker,
 		Storage:       storage,
-		Version:       version,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Context: m.requestContextMapper,
@@ -955,12 +962,13 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 // experimental returns the resources and codec for the experimental api
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
-	controllerStorage := expcontrolleretcd.NewStorage(c.ExpDatabaseStorage)
+	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
-	daemonSetStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
+	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
 	deploymentStorage := deploymentetcd.NewStorage(c.ExpDatabaseStorage)
-	jobStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
+	jobStorage, jobStatusStorage := jobetcd.NewREST(c.ExpDatabaseStorage)
+	ingressStorage := ingressetcd.NewREST(c.ExpDatabaseStorage)
 
 	thirdPartyControl := ThirdPartyController{
 		master: m,
@@ -979,23 +987,30 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
 		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
 		strings.ToLower("daemonsets"):                   daemonSetStorage,
+		strings.ToLower("daemonsets/status"):            daemonSetStatusStorage,
 		strings.ToLower("deployments"):                  deploymentStorage.Deployment,
 		strings.ToLower("deployments/scale"):            deploymentStorage.Scale,
 		strings.ToLower("jobs"):                         jobStorage,
+		strings.ToLower("jobs/status"):                  jobStatusStorage,
+		strings.ToLower("ingress"):                      ingressStorage,
 	}
 
+	expMeta := latest.GroupOrDie("experimental")
+
 	return &apiserver.APIGroupVersion{
-		Root: m.apiGroupPrefix + "/" + latest.GroupOrDie("experimental").Group,
+		Root: m.apiGroupPrefix,
+		APIRequestInfoResolver: m.newAPIRequestInfoResolver(),
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  latest.GroupOrDie("experimental").RESTMapper,
-		Codec:   latest.GroupOrDie("experimental").Codec,
-		Linker:  latest.GroupOrDie("experimental").SelfLinker,
-		Storage: storage,
-		Version: latest.GroupOrDie("experimental").Version,
+		Mapper:        expMeta.RESTMapper,
+		Codec:         expMeta.Codec,
+		Linker:        expMeta.SelfLinker,
+		Storage:       storage,
+		Version:       expMeta.GroupVersion,
+		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

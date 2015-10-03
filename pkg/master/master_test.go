@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -67,7 +68,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	storageVersions[""] = testapi.Default.Version()
 	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
-	storageVersions["experimental"] = testapi.Experimental.Version()
+	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -289,11 +290,11 @@ func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
 	expAPIGroup := master.experimental(&config)
-	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix+"/"+latest.GroupOrDie("experimental").Group)
+	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").Version)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").GroupVersion)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
@@ -428,6 +429,60 @@ func TestGenerateSSHKey(t *testing.T) {
 	os.Remove(publicKey)
 
 	// TODO: testing error cases where the file can not be removed?
+}
+
+func TestDiscoveryAtAPIS(t *testing.T) {
+	master, config, assert := setUp(t)
+	master.exp = true
+	// ================= preparation for master.init() ======================
+	portRange := util.PortRange{Base: 10, Size: 10}
+	master.serviceNodePortRange = portRange
+
+	_, ipnet, err := net.ParseCIDR("192.168.1.1/24")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	master.serviceClusterIPRange = ipnet
+
+	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
+	master.muxHelper = &mh
+	master.rootWebService = new(restful.WebService)
+
+	master.handlerContainer = restful.NewContainer()
+
+	master.mux = http.NewServeMux()
+	master.requestContextMapper = api.NewRequestContextMapper()
+	// ======================= end of preparation ===========================
+
+	master.init(&config)
+	server := httptest.NewServer(master.handlerContainer.ServeMux)
+	resp, err := http.Get(server.URL + "/apis")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	groupList := api.APIGroupList{}
+	assert.NoError(decodeResponse(resp, &groupList))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectGroupName := "experimental"
+	expectVersions := []api.GroupVersion{
+		{
+			GroupVersion: testapi.Experimental.GroupAndVersion(),
+			Version:      testapi.Experimental.Version(),
+		},
+	}
+	expectPreferredVersion := api.GroupVersion{
+		GroupVersion: config.StorageVersions["experimental"],
+		Version:      apiutil.GetVersion(config.StorageVersions["experimental"]),
+	}
+	assert.Equal(expectGroupName, groupList.Groups[0].Name)
+	assert.Equal(expectVersions, groupList.Groups[0].Versions)
+	assert.Equal(expectPreferredVersion, groupList.Groups[0].PreferredVersion)
 }
 
 var versionsToTest = []string{"v1", "v3"}
@@ -577,7 +632,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return testapi.Default.Codec().Encode(&thirdPartyData)
+	return testapi.Experimental.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {
@@ -681,7 +736,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		},
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
-			APIVersion: version,
+			APIVersion: "company.com/" + version,
 		},
 		SomeField:  "test field",
 		OtherField: 10,

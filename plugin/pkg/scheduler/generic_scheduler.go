@@ -44,7 +44,7 @@ func (f *FitError) Error() string {
 	var reason string
 	// We iterate over all nodes for logging purposes, even though we only return one reason from one node
 	for node, predicateList := range f.FailedPredicates {
-		glog.Infof("failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
+		glog.Infof("Failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
 		if len(reason) == 0 {
 			reason, _ = predicateList.PopAny()
 		}
@@ -195,7 +195,7 @@ func getBestHosts(list algorithm.HostPriorityList) []string {
 func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
-		glog.Errorf("failed to list nodes: %v", err)
+		glog.Errorf("Failed to list nodes: %v", err)
 		return []algorithm.HostPriority{}, err
 	}
 

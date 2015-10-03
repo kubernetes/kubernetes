@@ -19,6 +19,7 @@ package podtask
 import (
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // bogus numbers that we use to make sure that there's some set of minimal offered resources on the slave
@@ -43,7 +44,7 @@ var (
 	}).Procure
 )
 
-func MinimalPodResourcesPredicate(t *T, offer *mesos.Offer) bool {
+func MinimalPodResourcesPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 	var (
 		offeredCpus float64
 		offeredMem  float64

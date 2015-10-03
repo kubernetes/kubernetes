@@ -20,11 +20,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -47,17 +49,17 @@ func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string
 	return t.mapper.GroupForResource(resource)
 }
 
-func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
-	if len(versions) != 1 {
-		return nil, fmt.Errorf("unexpected set of versions: %v", versions)
+func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, groupVersions ...string) (*meta.RESTMapping, error) {
+	if len(groupVersions) != 1 {
+		return nil, fmt.Errorf("unexpected set of groupVersions: %v", groupVersions)
 	}
-	if versions[0] != t.version {
-		return nil, fmt.Errorf("unknown version %s expected %s", versions[0], t.version)
+	if groupVersions[0] != apiutil.GetGroupVersion(t.group, t.version) {
+		return nil, fmt.Errorf("unknown version %s expected %s", groupVersions[0], apiutil.GetGroupVersion(t.group, t.version))
 	}
 	if kind != "ThirdPartyResourceData" {
 		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
 	}
-	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("experimental").Version)
+	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("experimental").GroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -219,65 +221,75 @@ const template = `{
   "items": [ %s ]
 }`
 
-func encodeToJSON(obj *experimental.ThirdPartyResourceData) ([]byte, error) {
+func encodeToJSON(obj *experimental.ThirdPartyResourceData, stream io.Writer) error {
 	var objOut interface{}
 	if err := json.Unmarshal(obj.Data, &objOut); err != nil {
-		return nil, err
+		return err
 	}
 	objMap, ok := objOut.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("unexpected type: %v", objOut)
+		return fmt.Errorf("unexpected type: %v", objOut)
 	}
 	objMap["metadata"] = obj.ObjectMeta
-	return json.Marshal(objMap)
+	encoder := json.NewEncoder(stream)
+	return encoder.Encode(objMap)
 }
 
-func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) (data []byte, err error) {
+func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) ([]byte, error) {
+	buff := &bytes.Buffer{}
+	if err := t.EncodeToStream(obj, buff); err != nil {
+		return nil, err
+	}
+	return buff.Bytes(), nil
+}
+
+func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream io.Writer) (err error) {
 	switch obj := obj.(type) {
 	case *experimental.ThirdPartyResourceData:
-		return encodeToJSON(obj)
+		return encodeToJSON(obj, stream)
 	case *experimental.ThirdPartyResourceDataList:
 		// TODO: There must be a better way to do this...
-		buff := &bytes.Buffer{}
 		dataStrings := make([]string, len(obj.Items))
 		for ix := range obj.Items {
-			data, err := encodeToJSON(&obj.Items[ix])
+			buff := &bytes.Buffer{}
+			err := encodeToJSON(&obj.Items[ix], buff)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			dataStrings[ix] = string(data)
+			dataStrings[ix] = buff.String()
 		}
-		fmt.Fprintf(buff, template, t.kind+"List", strings.Join(dataStrings, ","))
-		return buff.Bytes(), nil
+		fmt.Fprintf(stream, template, t.kind+"List", strings.Join(dataStrings, ","))
+		return nil
 	case *unversioned.Status:
-		return t.delegate.Encode(obj)
+		return t.delegate.EncodeToStream(obj, stream)
 	default:
-		return nil, fmt.Errorf("unexpected object to encode: %#v", obj)
+		return fmt.Errorf("unexpected object to encode: %#v", obj)
 	}
 }
 
-func NewObjectCreator(version string, delegate runtime.ObjectCreater) runtime.ObjectCreater {
-	return &thirdPartyResourceDataCreator{version, delegate}
+func NewObjectCreator(group, version string, delegate runtime.ObjectCreater) runtime.ObjectCreater {
+	return &thirdPartyResourceDataCreator{group, version, delegate}
 }
 
 type thirdPartyResourceDataCreator struct {
+	group    string
 	version  string
 	delegate runtime.ObjectCreater
 }
 
-func (t *thirdPartyResourceDataCreator) New(version, kind string) (out runtime.Object, err error) {
+func (t *thirdPartyResourceDataCreator) New(groupVersion, kind string) (out runtime.Object, err error) {
 	switch kind {
 	case "ThirdPartyResourceData":
-		if t.version != version {
-			return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+		if apiutil.GetGroupVersion(t.group, t.version) != groupVersion {
+			return nil, fmt.Errorf("unknown version %s for kind %s", groupVersion, kind)
 		}
 		return &experimental.ThirdPartyResourceData{}, nil
 	case "ThirdPartyResourceDataList":
-		if t.version != version {
-			return nil, fmt.Errorf("unknown version %s for kind %s", version, kind)
+		if apiutil.GetGroupVersion(t.group, t.version) != groupVersion {
+			return nil, fmt.Errorf("unknown version %s for kind %s", groupVersion, kind)
 		}
 		return &experimental.ThirdPartyResourceDataList{}, nil
 	default:
-		return t.delegate.New(version, kind)
+		return t.delegate.New(groupVersion, kind)
 	}
 }

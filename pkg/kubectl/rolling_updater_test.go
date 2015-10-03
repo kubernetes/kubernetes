@@ -538,7 +538,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 10, newReady: 20, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 10 pods available, don't exceed 40 pods)
+Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 10 pods available, don't exceed 70 pods)
 Scaling foo-v2 up to 20
 Scaling foo-v1 down to 0
 `,
@@ -817,7 +817,7 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(fake.Actions()) != len(test.expected) {
-			t.Fatalf("%s: unexpected actions: %v, expected %v", test.name, fake.Actions, test.expected)
+			t.Fatalf("%s: unexpected actions: %v, expected %v", test.name, fake.Actions(), test.expected)
 		}
 		for j, action := range fake.Actions() {
 			if e, a := test.expected[j], action.GetVerb(); e != a {

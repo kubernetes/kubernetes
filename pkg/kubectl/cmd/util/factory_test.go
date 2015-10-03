@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/user"
 	"path"
 	"sort"
 	"strings"
@@ -300,5 +301,38 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 	if _, err := os.Stat(path.Join(dir, "foo", "blah", schemaFileName)); err == nil || !os.IsNotExist(err) {
 		t.Errorf("unexpected cache file error: %v", err)
+	}
+}
+
+func TestSubstitueUser(t *testing.T) {
+	usr, err := user.Current()
+	if err != nil {
+		t.Logf("SKIPPING TEST: unexpected error: %v", err)
+		return
+	}
+	tests := []struct {
+		input     string
+		expected  string
+		expectErr bool
+	}{
+		{input: "~/foo", expected: path.Join(os.Getenv("HOME"), "foo")},
+		{input: "~" + usr.Username + "/bar", expected: usr.HomeDir + "/bar"},
+		{input: "/foo/bar", expected: "/foo/bar"},
+		{input: "~doesntexit/bar", expectErr: true},
+	}
+	for _, test := range tests {
+		output, err := substituteUserHome(test.input)
+		if test.expectErr {
+			if err == nil {
+				t.Error("unexpected non-error")
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if output != test.expected {
+			t.Errorf("expected: %s, saw: %s", test.expected, output)
+		}
 	}
 }

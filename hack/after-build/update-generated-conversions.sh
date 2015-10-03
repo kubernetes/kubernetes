@@ -43,10 +43,10 @@ EOF
 }
 
 # TODO(lavalamp): get this list by listing the pkg/apis/ directory?
-DEFAULT_GROUP_VERSIONS="api/v1 experimental/v1"
+DEFAULT_GROUP_VERSIONS="v1 experimental/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 for ver in $VERSIONS; do
   # Ensure that the version being processed is registered by setting
   # KUBE_API_VERSIONS.
-  KUBE_API_VERSIONS="${ver##*/}" generate_version "${ver}"
+  KUBE_API_VERSIONS="${ver}" generate_version "${ver}"
 done

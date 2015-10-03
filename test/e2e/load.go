@@ -26,7 +26,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -53,7 +52,7 @@ var _ = Describe("Load capacity", func() {
 	var nodeCount int
 	var ns string
 	var configs []*RCConfig
-	framework := Framework{BaseName: "density"}
+	framework := Framework{BaseName: "load", NamespaceDeletionTimeout: time.Hour}
 
 	BeforeEach(func() {
 		framework.beforeEach()
@@ -77,11 +76,12 @@ var _ = Describe("Load capacity", func() {
 	AfterEach(func() {
 		deleteAllRC(configs)
 
-		framework.afterEach()
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, sets.NewString("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+
+		framework.afterEach()
 	})
 
 	type Load struct {

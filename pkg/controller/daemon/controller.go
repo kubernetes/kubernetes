@@ -400,7 +400,7 @@ func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *experimental.D
 		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
 		ds.Status.CurrentNumberScheduled = currentNumberScheduled
 		ds.Status.NumberMisscheduled = numberMisscheduled
-		_, updateErr = dsClient.Update(ds)
+		_, updateErr = dsClient.UpdateStatus(ds)
 		if updateErr == nil {
 			// successful update
 			return nil
@@ -416,7 +416,7 @@ func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *experimental.D
 }
 
 func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *experimental.DaemonSet) {
-	glog.Infof("Updating daemon set status")
+	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		glog.Errorf("Error getting node to daemon pod mapping for daemon set %+v: %v", ds, err)

@@ -53,15 +53,17 @@ POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup
-#   influxdb - Heapster, InfluxDB, and Grafana
-#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+#   none           - No cluster monitoring setup
+#   influxdb       - Heapster, InfluxDB, and Grafana
+#   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+#   googleinfluxdb - Enable influxdb and google (except GCM)
+#   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=4}"
 
 KUBELET_TEST_ARGS="--max-pods=100 $TEST_CLUSTER_LOG_LEVEL"
-APISERVER_TEST_ARGS="--runtime-config=experimental/v1 ${TEST_CLUSTER_LOG_LEVEL}"
+APISERVER_TEST_ARGS="--runtime-config=experimental/v1alpha1 ${TEST_CLUSTER_LOG_LEVEL}"
 CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 SCHEDULER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
@@ -106,6 +108,12 @@ fi
 # Experimental feature, not ready for production use.
 ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
 if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+
+# Optional: Enable deployment experimental feature, not ready for production use.
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
+if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
 

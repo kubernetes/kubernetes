@@ -2,37 +2,17 @@
 // source: containerizer.proto
 // DO NOT EDIT!
 
-/*
-	Package mesosproto is a generated protocol buffer package.
-
-	It is generated from these files:
-		containerizer.proto
-		internal.proto
-		log.proto
-		mesos.proto
-		messages.proto
-		registry.proto
-		scheduler.proto
-		state.proto
-
-	It has these top-level messages:
-		Launch
-		Update
-		Wait
-		Destroy
-		Usage
-		Termination
-		Containers
-*/
 package mesosproto
 
 import proto "github.com/gogo/protobuf/proto"
+import fmt "fmt"
 import math "math"
 
-// discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto/gogo.pb"
+// discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
 
 // *
@@ -200,6 +180,8 @@ func (m *Usage) GetContainerId() *ContainerID {
 type Termination struct {
 	// A container may be killed if it exceeds its resources; this will
 	// be indicated by killed=true and described by the message string.
+	// TODO(jaybuff): As part of MESOS-2035 we should remove killed and
+	// replace it with a TaskStatus::Reason.
 	Killed  *bool   `protobuf:"varint,1,req,name=killed" json:"killed,omitempty"`
 	Message *string `protobuf:"bytes,2,req,name=message" json:"message,omitempty"`
 	// Exit status of the process.
@@ -249,7 +231,4 @@ func (m *Containers) GetContainers() []*ContainerID {
 		return m.Containers
 	}
 	return nil
-}
-
-func init() {
 }

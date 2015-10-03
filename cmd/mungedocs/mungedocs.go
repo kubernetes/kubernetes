@@ -46,6 +46,9 @@ Examples:
 	// All of the munge operations to perform.
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
 	allMunges = []munge{
+		// Simple "check something" functions must run first.
+		{"preformat-balance", checkPreformatBalance},
+		// Functions which modify state.
 		{"remove-whitespace", updateWhitespace},
 		{"table-of-contents", updateTOC},
 		{"unversioned-warning", updateUnversionedWarning},
