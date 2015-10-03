@@ -172,6 +172,7 @@ func NewDaemonSetsController(kubeClient client.Interface) *DaemonSetsController 
 
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
+	defer util.HandleCrash()
 	go dsc.dsController.Run(stopCh)
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
@@ -217,6 +218,8 @@ func (dsc *DaemonSetsController) enqueueDaemonSet(obj interface{}) {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
+
+	// TODO: Handle overlapping controllers better. See comment in ReplicationManager.
 	dsc.queue.Add(key)
 }
 
@@ -483,7 +486,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(PodStoreSyncedPollPeriod)
 		glog.Infof("Waiting for pods controller to sync, requeuing ds %v", ds.Name)
-		dsc.enqueueDaemonSet(&ds)
+		dsc.enqueueDaemonSet(ds)
 		return nil
 	}
 
