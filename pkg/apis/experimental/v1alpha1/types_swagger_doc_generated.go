@@ -319,7 +319,7 @@ var map_JobStatus = map[string]string{
 	"completionTime": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 	"active":         "Active is the number of actively running pods.",
 	"successful":     "Successful is the number of pods which reached Phase Succeeded.",
-	"unsuccessful":   "Unsuccessful is the number of pods failures, this applies only to jobs created with RestartPolicyNever, otherwise this value will always be 0.",
+	"unsuccessful":   "Unsuccessful is the number of pods which reached Phase Failed.",
 }
 
 func (JobStatus) SwaggerDoc() map[string]string {

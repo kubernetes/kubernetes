@@ -444,8 +444,7 @@ type JobStatus struct {
 	// Successful is the number of pods which reached Phase Succeeded.
 	Successful int `json:"successful,omitempty"`
 
-	// Unsuccessful is the number of pods failures, this applies only to jobs
-	// created with RestartPolicyNever, otherwise this value will always be 0.
+	// Unsuccessful is the number of pods which reached Phase Failed.
 	Unsuccessful int `json:"unsuccessful,omitempty"`
 }
 
