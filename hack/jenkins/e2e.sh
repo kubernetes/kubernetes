@@ -576,6 +576,9 @@ case ${JOB_NAME} in
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="gke-upgrade"}
     : ${E2E_NETWORK:="gke-upgrade"}
+    # TODO(15011): these really shouldn't be (very) version skewed, but because
+    # we have to rebuild, it could get slightly out of whack.
+    : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run ci (new) e2es, not release (old)
     : ${JENKINS_USE_RELEASE_TARS:=n}
