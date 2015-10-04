@@ -186,6 +186,7 @@ resourcequotas	|	quota
 replicationcontrollers	|	rc
 daemonsets	|	ds
 services	|	svc
+ingress		|	ing
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl-overview.md?pixel)]()
