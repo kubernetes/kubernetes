@@ -2025,6 +2025,6 @@ func (dm *DockerManager) GetNetNs(containerID kubecontainer.ContainerID) (string
 }
 
 // Garbage collection of dead containers
-func (dm *DockerManager) GarbageCollect(maxPerPodContainer, maxContainers int, minAge time.Duration) error {
-	return dm.containerGC.GarbageCollect(maxPerPodContainer, maxContainers, minAge)
+func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
+	return dm.containerGC.GarbageCollect(gcPolicy)
 }

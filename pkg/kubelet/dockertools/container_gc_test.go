@@ -25,6 +25,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/stretchr/testify/assert"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
@@ -92,7 +93,7 @@ func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 		makeContainerDetail("1876", false, makeTime(0)),
 	)
 
-	assert.Nil(t, gc.GarbageCollect(1, 0, time.Minute))
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, 1, 0}))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
@@ -113,7 +114,7 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 		makeContainerDetail("5876", false, makeTime(4)),
 	)
 
-	assert.Nil(t, gc.GarbageCollect(-1, 4, time.Minute))
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, -1, 4}))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
@@ -134,7 +135,7 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 		makeContainerDetail("5876", false, makeTime(0)),
 	)
 
-	assert.Nil(t, gc.GarbageCollect(1, -1, time.Minute))
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, 1, -1}))
 	assert.Len(t, fakeDocker.Removed, 0)
 }
 
@@ -306,7 +307,7 @@ func TestGarbageCollect(t *testing.T) {
 		gc, fakeDocker := newTestContainerGC(t)
 		fakeDocker.ContainerList = test.containers
 		fakeDocker.ContainerMap = test.containerDetails
-		assert.Nil(t, gc.GarbageCollect(2, 6, time.Hour))
+		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Hour, 2, 6}))
 		verifyStringArrayEqualsAnyOrder(t, fakeDocker.Removed, test.expectedRemoved)
 	}
 }

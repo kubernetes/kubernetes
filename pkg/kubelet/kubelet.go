@@ -147,7 +147,7 @@ func NewMainKubelet(
 	pullBurst int,
 	eventQPS float32,
 	eventBurst int,
-	containerGCPolicy ContainerGCPolicy,
+	containerGCPolicy kubecontainer.ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	registerNode bool,
 	standaloneMode bool,
@@ -356,7 +356,7 @@ func NewMainKubelet(
 	}
 
 	// setup containerGC
-	containerGC, err := newContainerGC(klet.containerRuntime, containerGCPolicy)
+	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +511,7 @@ type Kubelet struct {
 	recorder record.EventRecorder
 
 	// Policy for handling garbage collection of dead containers.
-	containerGC containerGC
+	containerGC kubecontainer.ContainerGC
 
 	// Manager for images.
 	imageManager imageManager
