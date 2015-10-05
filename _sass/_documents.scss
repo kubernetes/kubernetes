@@ -1,24 +1,18 @@
-.bodywrapper {
-    height: 85vh;
+#docbanner{
+    overflow: hidden;
 }
-
-div #doccontent {
-    position: absolute;
-    top:155px;
-    left:250px;
+.bodywrapper {
+    margin-left: 30px;
+}
+#doccontent {
+    position: relative;
     font-family: "Roboto";
-    padding-left: 30px;
-    padding-right: 30px;
     max-width: 900px;
     overflow: auto;
-	
 	:target:before {
 	  content:"";
 	  display:block;
-	  height:155px; /* fixed header height*/
-	  margin:-155px 0 0; /* negative fixed header height */
 	}
-	
     h1 {
         font-size: 45px;
         font-weight: 700;
@@ -32,7 +26,6 @@ div #doccontent {
         margin-top: 0.83em;
         margin-bottom: 0.83em;
     }
-
     h2 {
         font-size: 35px;
         font-weight: 700;
@@ -46,7 +39,6 @@ div #doccontent {
         margin-top: 0.83em;
         margin-bottom: 0.83em;
     }
-
     h3 {
         font-size: 28px;
         font-weight: 700;
@@ -56,7 +48,6 @@ div #doccontent {
         margin-top: 0.53em;
         margin-bottom: 0.53em;
     }
-
     h4 {
         font-size: 22px;
         font-weight: 500;
@@ -66,21 +57,18 @@ div #doccontent {
         margin-top: 0.43em;
         margin-bottom: 0.43em;
     }
-
     h5 {
         font-size: 20px;
         line-height: 24px;
         margin-top: 0.43em;
         margin-bottom: 0.43em;
     }
-
     li {
         color: $gray;
         font-size: 16px;
         line-height: 25px;
         letter-spacing: 0em;
     }
-
     table {
         color: $gray;
         font-size: 16px;
@@ -90,44 +78,33 @@ div #doccontent {
             color: black;
         }
     }
-
     pre {
         overflow-y: visible;
         padding: 0.8em;
     }
-
     code {
         color: black;
         font-family: Monospace;
         font-size: 14px;
     }
-
     ul {
         list-style-type: disc;
         margin-left: 1.5em;
         padding-left: 1.5em;
     }
-
     ol {
         list-style-type: decimal;
         margin-left: 1.5em;
         padding-left: 1.5em;
     }
-
     p {
         margin-top: 10px;
         margin-bottom: 10px;
     }
-	
 	p > code {
 	  white-space: nowrap;
 	}
-
     img {
         max-width: 100%;
     }
-}
-
-div #docbanner{
-	overflow: hidden;
 }

@@ -5,7 +5,7 @@ show_in_nav: true
 slug: v1.0
 redirect_from: /docs/
 hero:
-    title: Kubernetes Documentation
+    title: Documentation
     text: Version 1.0
     img: /img/desktop/logo.png
 ---

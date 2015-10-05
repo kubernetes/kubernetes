@@ -1,19 +1,31 @@
 {% include dochead.html %}
-<!-- Search box for Google Custom Search Engine -->
-<div class="gcse-wrapper" id="gcse-searchbox">
-	<gcse:searchbox></gcse:searchbox>
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-xs-1 hidden-md hidden-lg navbuttonarrow">
+		<!-- Nav menu button for smaller (mobile) views-->
+			<a href="javascript:;" class="togglenav">
+				<img src="{{site.url}}/img/mobile/chevron-right.png" style="display:inline-block"/>
+				<img src="{{site.url}}/img/mobile/chevron-left.png" style="display:none"/>
+			</a>
+		</div>
+		<div class="gcse-wrapper" id="gcse-searchbox">
+			<!-- Search box for Google Custom Search Engine -->
+			<gcse:searchbox></gcse:searchbox>
+		</div>
+	</div>
+	<div class="row">
+		<!-- Navigation menu -->
+		<div class="col-md-3 hidden-sm hidden-xs" id="wrapper">
+			{% include nav_v1.0.html %}
+		</div>
+		<!-- Content body -->
+		<div class="col-md-8 col-sm-11 col-xs-11 bodywrapper">
+			{% include documentation.html %}
+		</div>
+	</div>
 </div>
 <div class="gcse-wrapper">
-  <gcse:searchresults></gcse:searchresults>
-</div>
-
-<!-- Navigation menu -->
-<div id="wrapper">
-	{% include nav_v1.0.html %}
-</div>
-<!-- Content body -->
-<div class="bodywrapper">
-	{% include documentation.html %}
+    <gcse:searchresults></gcse:searchresults>
 </div>
 <script type="text/javascript">
 	$(function() {
@@ -35,7 +47,6 @@
 						scrolltonavitem();
 					});
 				});
-				curnavitem = curnavitem.parent().parent().parent().children('a.gentoc');
 			}else{//highlight the nav item and open the menu
 				curnavitem.addClass('active');
 				var navmenu = curnavitem;
@@ -60,71 +71,112 @@
 		function loadonstatechange(){
 		    $(window).bind('popstate', function (event) {
 				var returnLocation = history.location || document.location;
-				if (findcurnavitem().hasClass('gentoc')) {//generate the in-page TOC (full page loads)
-					window.location = returnLocation;
-				}
-				$('#doccontent').load(returnLocation + ' #doccontent > *');
+				$('#doccontent').load(returnLocation + ' #doccontent > *', function() {//load the content from the target page
+					var navitem = findcurnavitem();
+					if (navitem.hasClass('gentoc')) {//generate the dynamic TOC
+						var tocid = String(navitem.parent().children('ul').attr('id'));//cast id to string
+						$('#toclist').load( location.pathname + " #" + tocid + " li" );
+					}
+				});
 				syncmenutourl();
 		       return;
 		    });
 		}
 		loadonstatechange();
-		/* Load only the doccontent div on click, push state so back/forward browser buttons work, and then animate nav menu */
+		/* Watch for any click in the content area and close the nav menu if its open (for small res. desiplays) */
+		$('.bodywrapper').on("click", function(e) {
+			if($('#wrapper').hasClass('col-sm-5')) {
+				togglenavmenu();
+			}
+		});
+		/* Handle clicks in nav menu, content body, and header. Also track history by pushing state (so back/forward browser buttons work)*/
 	    $(document).on("click", 'a', function(e) {
 	        e.preventDefault();
 			var clickedon = $(this),
 				href = $(this).attr('href'),
 				isAnchor = false;
-			if (href.indexOf('#') == 0){//if its an anchor
+			if (href.indexOf('#') == 0){//check if its an in-page anchor
 				isAnchor = true;
-			} else if(href != "#") {//get the absolute url
+			} else if(href != "#") {//otherwise get the absolute url
 				href = this.href;
 			}
-			if(this.host != location.host && href != "javascript:;") {//open external links in new tab/window
-				window.open(href, '_blank');
-			} else if(href != "#" && !clickedon.parents('header').is('#nav') && !clickedon.parents('div').is('#mobile-nav-container')) {//skip empty nav menu containers and any clicks in the banner and banner menu
-				history.pushState(null, null, href);
-				if(isAnchor){//if an in-page anchors
-					var offset = 0;
-					if ($(href).length) {//make sure its a valid anchor, otherwise scroll no where (offset = 0)
-						offset = $(href).offset().top - 155;
+			//handle the type of click
+			if(href == "javascript:;") {//clicks on javascript only elements
+				if (clickedon.hasClass('togglenav')) { //toggle display of the nav menu (hidden by default on small res. displays)
+					togglenavmenu();
+					if(!($('#wrapper').hasClass('hidden-sm'))) {
+						syncmenutourl();
 					}
-					$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
-					return false;
-				} else { //load only the new content into the page (do not load full page)
-					$('#doccontent').load(href + ' #doccontent > *');
-					$('html, body').animate({scrollTop: 0}, 0);
-					if (clickedon.hasClass('gentoc')) {//generate the in-page TOC (load the full page load)
-						window.location = href;
+				}
+				return false;
+			} else {//clicks on all other elements
+				//close nav menu on click but exclude container topics so the sub-topics get displayed (for small res. displays)
+				if($('#wrapper').hasClass('col-sm-5') && !(clickedon.parent().hasClass('haschild'))) {
+					togglenavmenu();
+				}
+				if(this.host != location.host) {//open external links in new tab/window
+					window.open(href, '_blank');
+				} else if(href != "#" && !clickedon.parents('header').is('#nav') && !clickedon.parents('div').is('#mobile-nav-container')) {//skip empty nav menu containers and any clicks in the banner and banner menu
+					//track all history but exclude clicks that only toggle open/closed container menus
+					if (!(clickedon.hasClass('active') && clickedon.parent('li').hasClass('haschild'))) {
+						history.pushState(null, null, href);
 					}
-					$.get(href, function(html){//update the page's <title> tags with title from loaded page (so browser shows current title)
-					    var matches = html.match(/<title>([^<]*)/);
-					    if (matches.length>0) {
-					        var title = matches[1];
-					        document.title = title;
-					    }
-					});
+					if(isAnchor){//if an in-page anchors, scroll to it
+						var offset = 0;
+						if ($(href).length) {//make sure its a valid anchor, otherwise scroll no where (offset = 0)
+							offset = $(href).offset().top - 155;
+						}
+						$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
+						return false;
+					} else { //if its a link to another topic, only load content into the page (avoid refreshing whole page)
+						$('#doccontent').load(href + ' #doccontent > *', function() {//load the content from the target page
+							if (clickedon.hasClass('gentoc')) {//generate the dynamic TOC
+								var tocid = String(clickedon.parent().children('ul').attr('id'));//cast id to string
+								$('#toclist').load( location.pathname + " #" + tocid + " li" );
+							}
+							$('html, body').animate({scrollTop: 0}, 0);
+						});
+						$.get(href, function(html){//update the page's <title> tags with title from loaded page (so browser shows current title)
+						    var matches = html.match(/<title>([^<]*)/);
+						    if (matches.length>0) {
+						        var title = matches[1];
+						        document.title = title;
+						    }
+						});
+					}
+					if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
+						animatenav(findcurnavitem());//is an in-page link
+					} else {
+						animatenav(clickedon);//is a nav menu link
+					}
+				} else if (href != "#"){ //if its a link in the main menu, load and refresh the whole page
+					window.location = href;
 				}
-				if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
-					animatenav(findcurnavitem());//is an in-page link
-				} else {
-					animatenav(clickedon);//is a nav menu link
-				}
-			} else if (href != "#"){ //open links in main menu (load the full page load)
-				window.location = href;
 			}
-		    return false; // don't actually follow the link (avoid reloading page)
+		    return false; // don't actually follow the link (avoid reloading page (default browser click behavior))
 	    });
-		/* Animate navigation menu to open/close and highlight item */
+		/* Animate navigation menu to open/close sub menus and then highlight the target/active navigation menu item */
 		function animatenav(anhref){
-			if(anhref.hasClass('hiddenlink')){//if its a hidden getting started topic, highlight and open the container
-				anhref.parent().parent().parent().children('a.gentoc').addClass('active');
-			} else if(!anhref.hasClass('active')) {
-				if(anhref.parents('li.haschild').length === 0 || anhref.parents('li').find('a.active').length === 0){ //close inactive menus
+			var ishidden = false;
+			//if target is a hidden getting started topic, then highlight and open the container
+			if(anhref.hasClass('hiddenlink')){//is an in-page link
+				anhref = anhref.parent().parent().parent().children('a.gentoc');//set focus to container
+				ishidden = true;
+			} else if(anhref.hasClass('gentoc') && anhref.parent().parent().hasClass('hiddenlist')) {//is a nav menu link
+				ishidden = true;
+			}
+			//close inactive menu and open the related menu
+			if(!anhref.hasClass('active')) {
+				//close open menu if its not within the target's menu
+				if(anhref.parents('li.haschild').length === 0 || anhref.parents('li').find('a.active').length === 0){
 					menu_ul.filter(':visible').slideUp('fast');
 				}
-				$('.menu a').removeClass('active');
-				if (anhref.next('ul').length === 0){//is a child nav item, open menu
+				$('.menu a').removeClass('active');//clear active items
+				//set the target active and ensure target's menu is open
+				if(ishidden) {//is a hidden getting started container
+					anhref.addClass('active');
+					scrolltonavitem();
+				} else if (anhref.next('ul').length === 0){//is a child nav item, open menu
 					anhref.addClass('active').closest('ul').slideDown('fast', function() {
 						scrolltonavitem();
 					});
@@ -133,6 +185,9 @@
 						scrolltonavitem();
 					});
 				}
+			//toggle the menu open/close if the target is a container
+			} else if (anhref.hasClass('active') && anhref.parent('li').hasClass('haschild')) {
+				anhref.next().stop(true,true).toggle('fast');
 			}
 		}
 		/* Scroll to navigation item if its offscreen */
@@ -151,6 +206,11 @@
 					}, 50);
 			}
 	        return false;
+		}
+		/* Toggle the navigation menu open or closed (for small resolution screens) */
+		function togglenavmenu() {
+			$('#wrapper').toggleClass('hidden-sm hidden-xs col-sm-5 col-xs-7');
+			$('.togglenav').find('img').toggle();
 		}
 	});
 </script>

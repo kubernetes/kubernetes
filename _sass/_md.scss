@@ -1,4 +1,12 @@
 @media #{$md} {
+	.bodywrapper{
+        top: 57px;
+        left: 255px;
+	}
+	#wrapper {
+		top: $searchboxheight + 67px;
+		max-width: 255px;
+	}
     .headline {
         margin-top: 30px;
         h3 {
