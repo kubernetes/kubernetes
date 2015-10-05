@@ -58,6 +58,8 @@ func TestUnschedulableNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create etcd storage: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -67,7 +69,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
