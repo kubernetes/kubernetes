@@ -174,7 +174,6 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Services.*endpoint"
     "Services.*up\sand\sdown"
     "Networking\sshould\sfunction\sfor\sintra-pod\scommunication"  # possibly causing Ginkgo to get stuck, issue: #13485
-    "Kubectl\sexpose"
     )
 
 # Tests that should not run on soak cluster.
