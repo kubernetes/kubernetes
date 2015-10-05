@@ -109,23 +109,25 @@ start_k8s() {
 
     # Configure docker net settings, then restart it
     case "$lsb_dist" in
-        fedora|centos|amzn)
+        centos)
             DOCKER_CONF="/etc/sysconfig/docker"
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            if ! command_exists ifconfig; then
+                yum -y -q install net-tools
+            fi
+            ifconfig docker0 down
+            yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
         ;;
-        ubuntu|debian|linuxmint)
+        amzn)
+            DOCKER_CONF="/etc/sysconfig/docker"
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            ifconfig docker0 down
+            yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
+        ;;
+        ubuntu|debian)
             DOCKER_CONF="/etc/default/docker"
-        ;;
-    esac
-
-    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-
-    ifconfig docker0 down
-
-    case "$lsb_dist" in
-        fedora|centos)
-            yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
-        ;;
-        ubuntu|debian|linuxmint)
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            ifconfig docker0 down
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
         ;;
     esac
