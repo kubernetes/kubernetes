@@ -124,7 +124,8 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 	if exactMatch {
 		imgPattern = "='" + image + "'"
 	} else {
-		imgPattern = "=~/^" + image + "/"
+		// Escape character "/" in image pattern.
+		imgPattern = "=~/^" + strings.Replace(image, "/", "\\/", -1) + "/"
 	}
 	var namespaceCond string
 	if namespace != "" {
