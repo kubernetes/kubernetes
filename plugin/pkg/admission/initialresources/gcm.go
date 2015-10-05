@@ -122,6 +122,9 @@ func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image,
 	}
 
 	count := len(rawSamples)
+	if count == 0 {
+		return 0, 0, nil
+	}
 	sort.Ints(rawSamples)
 	usageIndex := int64(math.Ceil(float64(count)*9/10)) - 1
 	usage := rawSamples[usageIndex]
