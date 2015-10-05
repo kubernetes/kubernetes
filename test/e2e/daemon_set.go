@@ -39,8 +39,9 @@ import (
 const (
 	// this should not be a multiple of 5, because node status updates
 	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
-	updateRetryPeriod    = 2 * time.Second
-	updateRetryTimeout   = 30 * time.Second
+	dsRetryPeriod  = 2 * time.Second
+	dsRetryTimeout = 1 * time.Minute
+
 	daemonsetLabelPrefix = "daemonset-"
 	daemonsetNameLabel   = daemonsetLabelPrefix + "name"
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
@@ -49,9 +50,17 @@ const (
 var _ = Describe("Daemon set", func() {
 	f := &Framework{BaseName: "daemonsets"}
 
+	image := "gcr.io/google_containers/serve_hostname:1.1"
+	dsName := "daemon-set"
+
+	var ns string
+	var c *client.Client
+
 	BeforeEach(func() {
 		f.beforeEach()
-		err := clearDaemonSetNodeLabels(f.Client)
+		ns = f.Namespace.Name
+		c = f.Client
+		err := clearDaemonSetNodeLabels(c)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -61,8 +70,114 @@ var _ = Describe("Daemon set", func() {
 		f.afterEach()
 	})
 
-	It("should launch a daemon pod on every node of the cluster", func() {
-		testDaemonSets(f)
+	It("should run and stop simple daemon", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+
+		Logf("Creating simple daemon set %s", dsName)
+		_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
+			ObjectMeta: api.ObjectMeta{
+				Name: dsName,
+			},
+			Spec: experimental.DaemonSetSpec{
+				Template: &api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: label,
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  dsName,
+								Image: image,
+								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							},
+						},
+					},
+				},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			Logf("Check that reaper kills all daemon pods for %s", dsName)
+			dsReaper, err := kubectl.ReaperFor("DaemonSet", c)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = dsReaper.Stop(ns, dsName, 0, nil)
+			Expect(err).NotTo(HaveOccurred())
+			err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, label))
+			Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to be reaped")
+		}()
+
+		By("Check that daemon pods launch on every node of the cluster.")
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		By("Stop a daemon pod, check that the daemon pod is revived.")
+		podClient := c.Pods(ns)
+
+		podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(podList.Items)).To(BeNumerically(">", 0))
+		pod := podList.Items[0]
+		err = podClient.Delete(pod.Name, nil)
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
+
+	})
+
+	It("should run and stop complex daemon", func() {
+		complexLabel := map[string]string{daemonsetNameLabel: dsName}
+		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
+		Logf("Creating daemon with a node selector %s", dsName)
+		_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
+			ObjectMeta: api.ObjectMeta{
+				Name: dsName,
+			},
+			Spec: experimental.DaemonSetSpec{
+				Selector: complexLabel,
+				Template: &api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: complexLabel,
+					},
+					Spec: api.PodSpec{
+						NodeSelector: nodeSelector,
+						Containers: []api.Container{
+							{
+								Name:  dsName,
+								Image: image,
+								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							},
+						},
+					},
+				},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Initially, daemon pods should not be running on any nodes.")
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
+
+		By("Change label of node, check that daemon pod is launched.")
+		nodeClient := c.Nodes()
+		nodeList, err := nodeClient.List(labels.Everything(), fields.Everything())
+		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
+		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
+		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
+		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
+		Expect(len(daemonSetLabels)).To(Equal(1))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{newNode.Name}))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+
+		By("remove the node selector and wait for daemons to be unscheduled")
+		_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
+		Expect(err).NotTo(HaveOccurred(), "error removing labels on node")
+		Expect(wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))).
+			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
+
+		By("We should now be able to delete the daemon set.")
+		Expect(c.DaemonSets(ns).Delete(dsName)).NotTo(HaveOccurred())
+
 	})
 })
 
@@ -98,7 +213,7 @@ func setDaemonSetNodeLabels(c *client.Client, nodeName string, labels map[string
 	nodeClient := c.Nodes()
 	var newNode *api.Node
 	var newLabels map[string]string
-	err := wait.Poll(updateRetryPeriod, updateRetryTimeout, func() (bool, error) {
+	err := wait.Poll(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
 		node, err := nodeClient.Get(nodeName)
 		if err != nil {
 			return false, err
@@ -146,6 +261,7 @@ func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames [
 		for _, pod := range pods {
 			nodesToPodCount[pod.Spec.NodeName] += 1
 		}
+		Logf("nodesToPodCount: %#v", nodesToPodCount)
 
 		// Ensure that exactly 1 pod is running on all nodes in nodeNames.
 		for _, nodeName := range nodeNames {
@@ -177,117 +293,4 @@ func checkRunningOnAllNodes(f *Framework, selector map[string]string) func() (bo
 
 func checkRunningOnNoNodes(f *Framework, selector map[string]string) func() (bool, error) {
 	return checkDaemonPodOnNodes(f, selector, make([]string, 0))
-}
-
-func testDaemonSets(f *Framework) {
-	ns := f.Namespace.Name
-	c := f.Client
-	simpleDSName := "simple-daemon-set"
-	image := "gcr.io/google_containers/serve_hostname:1.1"
-	label := map[string]string{daemonsetNameLabel: simpleDSName}
-	retryTimeout := 1 * time.Minute
-	retryInterval := 5 * time.Second
-
-	Logf("Creating simple daemon set %s", simpleDSName)
-	_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
-		ObjectMeta: api.ObjectMeta{
-			Name: simpleDSName,
-		},
-		Spec: experimental.DaemonSetSpec{
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: label,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:  simpleDSName,
-							Image: image,
-							Ports: []api.ContainerPort{{ContainerPort: 9376}},
-						},
-					},
-				},
-			},
-		},
-	})
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		Logf("Check that reaper kills all daemon pods for %s", simpleDSName)
-		dsReaper, err := kubectl.ReaperFor("DaemonSet", c)
-		Expect(err).NotTo(HaveOccurred())
-		_, err = dsReaper.Stop(ns, simpleDSName, 0, nil)
-		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, label))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to be reaped")
-	}()
-
-	By("Check that daemon pods launch on every node of the cluster.")
-	Expect(err).NotTo(HaveOccurred())
-	err = wait.Poll(retryInterval, retryTimeout, checkRunningOnAllNodes(f, label))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
-
-	By("Stop a daemon pod, check that the daemon pod is revived.")
-	podClient := c.Pods(ns)
-
-	podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(podList.Items)).To(BeNumerically(">", 0))
-	pod := podList.Items[0]
-	err = podClient.Delete(pod.Name, nil)
-	Expect(err).NotTo(HaveOccurred())
-	err = wait.Poll(retryInterval, retryTimeout, checkRunningOnAllNodes(f, label))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
-
-	complexDSName := "complex-daemon-set"
-	complexLabel := map[string]string{daemonsetNameLabel: complexDSName}
-	nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
-	Logf("Creating daemon with a node selector %s", complexDSName)
-	_, err = c.DaemonSets(ns).Create(&experimental.DaemonSet{
-		ObjectMeta: api.ObjectMeta{
-			Name: complexDSName,
-		},
-		Spec: experimental.DaemonSetSpec{
-			Selector: complexLabel,
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: complexLabel,
-				},
-				Spec: api.PodSpec{
-					NodeSelector: nodeSelector,
-					Containers: []api.Container{
-						{
-							Name:  complexDSName,
-							Image: image,
-							Ports: []api.ContainerPort{{ContainerPort: 9376}},
-						},
-					},
-				},
-			},
-		},
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	By("Initially, daemon pods should not be running on any nodes.")
-	err = wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, complexLabel))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
-
-	By("Change label of node, check that daemon pod is launched.")
-	nodeClient := c.Nodes()
-	nodeList, err := nodeClient.List(labels.Everything(), fields.Everything())
-	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
-	newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
-	Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
-	daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
-	Expect(len(daemonSetLabels)).To(Equal(1))
-	err = wait.Poll(retryInterval, retryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{newNode.Name}))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
-
-	By("remove the node selector and wait for daemons to be unscheduled")
-	_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
-	Expect(err).NotTo(HaveOccurred(), "error removing labels on node")
-	Expect(wait.Poll(retryInterval, retryTimeout, checkRunningOnNoNodes(f, complexLabel))).
-		NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
-
-	By("We should now be able to delete the daemon set.")
-	Expect(c.DaemonSets(ns).Delete(complexDSName)).NotTo(HaveOccurred())
 }
