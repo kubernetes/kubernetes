@@ -59,7 +59,7 @@ detect_lsb() {
     esac
 
     if command_exists lsb_release; then
-        lsb_dist="$(lsb_release -si)"
+        lsb_dist="$(lsb_release -sir | sed ':a;N;s/\n//g')"
     fi
     if [ -z ${lsb_dist} ] && [ -r /etc/lsb-release ]; then
         lsb_dist="$(. /etc/lsb-release && echo "$DISTRIB_ID")"
@@ -75,6 +75,7 @@ detect_lsb() {
     fi
 
     lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
+    echo "Detected $lsb_dist"
 }
 
 
@@ -86,8 +87,6 @@ bootstrap_daemon() {
 }
 
 # Start k8s components in containers
-DOCKER_CONF=""
-
 start_k8s(){
     # Start etcd 
     docker -H unix:///var/run/docker-bootstrap.sock run --restart=always --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
@@ -105,28 +104,37 @@ start_k8s(){
     docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
     source subnet.env
 
+
     # Configure docker net settings, then restart it
     case "$lsb_dist" in
-        fedora|centos|amzn)
-            DOCKER_CONF="/etc/sysconfig/docker"
+        fedora*|centos*|amzn*)
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a /etc/sysconfig/docker
         ;;
-        ubuntu|debian|linuxmint)
-            DOCKER_CONF="/etc/default/docker"
+        ubuntu15.04)
+            install -Dv /dev/null /etc/systemd/system/docker.service.d/bridge.conf
+            cat <<EOF > /etc/systemd/system/docker.service.d/bridge.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}
+EOF
+            systemctl daemon-reload
+        ;;
+        ubuntu*|debian*|linuxmint*)
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a /etc/default/docker
+        ;;
+        *)
+            echo "Unsupported operations system $lsb_dist"
+            exit 1
         ;;
     esac
 
-    # Append the docker opts
-    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-
-
-    # sleep a little bit
     ifconfig docker0 down
 
     case "$lsb_dist" in
-        fedora|centos|amzn)
+        fedora*|centos*)
             yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
         ;;
-        ubuntu|debian|linuxmint)
+        ubuntu*|debian*|linuxmint*)
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
         ;;
     esac
