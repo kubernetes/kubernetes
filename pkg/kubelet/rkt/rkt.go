@@ -38,6 +38,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -71,6 +72,10 @@ const (
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
 
 	defaultImageTag = "latest"
+
+	// The layout of the time format that satisfies the `--since` option for journalctl.
+	// See man journalctl for more details.
+	journalSinceLayout = "2006-01-02 15:04:05"
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
@@ -1051,7 +1056,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 // stream the log. Set |follow| to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
 //
-// In rkt runtime's implementation, per container log is get via 'journalctl -M [rkt-$UUID] -u [APP_NAME]'.
+// In rkt runtime's implementation, per container log is get via 'journalctl -m _HOSTNAME=[rkt-$UUID] -u [APP_NAME]'.
 // See https://github.com/coreos/rkt/blob/master/Documentation/commands.md#logging for more details.
 //
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
@@ -1061,15 +1066,33 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 		return err
 	}
 
-	cmd := exec.Command("journalctl", "-M", fmt.Sprintf("rkt-%s", id.uuid), "-u", id.appName)
+	cmd := exec.Command("journalctl", "-m", fmt.Sprintf("_HOSTNAME=rkt-%s", id.uuid), "-u", id.appName, "-a")
+
+	// If no timestamps are required, then only returns the pure logs from the app without
+	// any metadata.
+	if !logOptions.Timestamps {
+		cmd.Args = append(cmd.Args, "-o", "cat")
+	}
+
 	if logOptions.Follow {
 		cmd.Args = append(cmd.Args, "-f")
 	}
-	if logOptions.TailLines == nil {
-		cmd.Args = append(cmd.Args, "-a")
-	} else {
+
+	if logOptions.TailLines != nil {
 		cmd.Args = append(cmd.Args, "-n", strconv.FormatInt(*logOptions.TailLines, 10))
 	}
+
+	var since int64
+	if logOptions.SinceSeconds != nil {
+		t := unversioned.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		since = t.Unix()
+	}
+	if logOptions.SinceTime != nil {
+		since = logOptions.SinceTime.Unix()
+	}
+
+	cmd.Args = append(cmd.Args, "--since", time.Unix(since, 0).Format(journalSinceLayout))
+
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	return cmd.Run()
 }
