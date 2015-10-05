@@ -1169,6 +1169,10 @@ const (
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+
+	// ServiceTypeNetworkProvider means a service's external load-balancer will be
+	// created by networkprovider.
+	ServiceTypeNetworkProvider ServiceType = "NetworkProvider"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1522,6 +1526,9 @@ type NodeList struct {
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage
 	Finalizers []FinalizerName
+
+	// Network descibes a network segment
+	Network string `json:"network,omitempty"`
 }
 
 type FinalizerName string
@@ -1543,6 +1550,8 @@ type NamespacePhase string
 const (
 	// NamespaceActive means the namespace is available for use in the system
 	NamespaceActive NamespacePhase = "Active"
+	// NamespaceFailed means the namespace is not available since provider network is not found
+	NamespaceFailed NamespacePhase = "Failed"
 	// NamespaceTerminating means the namespace is undergoing graceful termination
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
@@ -1566,6 +1575,76 @@ type NamespaceList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []Namespace `json:"items"`
+}
+
+// NetworkStatus is information about the current status of a Network.
+type NetworkStatus struct {
+	// Phase is the current lifecycle phase of the network.
+	Phase NetworkPhase `json:"phase,omitempty"`
+}
+
+type NetworkPhase string
+
+// These are the valid phases of a network.
+const (
+	// NetworkInitializing means the network is just accepted by system
+	NetworkInitializing NetworkPhase = "Initializing"
+	// NetworkActive means the network is available for use in the system
+	NetworkActive NetworkPhase = "Active"
+	// NetworkPending means the network is accepted by system, but it is still
+	// processing by network provider
+	NetworkPending NetworkPhase = "Pending"
+	// NetworkFailed means the network is not available
+	NetworkFailed NetworkPhase = "Failed"
+	// NetworkTerminating means the network is undergoing graceful termination
+	NetworkTerminating NetworkPhase = "Terminating"
+)
+
+// Subnet is a description of a subnet
+type Subnet struct {
+	// CIDR of this subnet
+	CIDR string `json:"cidr"`
+	// Gateway of this subnet
+	Gateway string `json:"gateway"`
+}
+
+// NetworkSpec is a description of a network
+type NetworkSpec struct {
+	// There must be at least one subnet in a network
+	// Subnets and ProviderNetworkID must not be provided together
+	Subnets map[string]Subnet `json:"subnets,omitempty"`
+
+	// Network's ID of provider network
+	// ProviderNetworkID and Subnets must not be provided together
+	ProviderNetworkID string `json:"providerNetworkID,omitempty"`
+
+	// TenantID is the tenant ID of network provider
+	TenantID string `json:"tenantID"`
+}
+
+// Network describes a network
+type Network struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of the Network.
+	Spec NetworkSpec `json:"spec,omitempty"`
+
+	// Status describes the current status of a Network
+	Status NetworkStatus `json:"status,omitempty"`
+}
+
+// NetworkList is a list of Networks
+type NetworkList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of Network objects in the list
+	Items []Network `json:"items"`
 }
 
 // Binding ties one object to another - for example, a pod is bound to a node by a scheduler.

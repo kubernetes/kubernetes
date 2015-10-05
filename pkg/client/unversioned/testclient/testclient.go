@@ -267,6 +267,10 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
+func (c *Fake) Networks() client.NetworkInterface {
+	return &FakeNetworks{Fake: c}
+}
+
 func (c *Fake) Experimental() client.ExperimentalInterface {
 	return &FakeExperimental{c}
 }

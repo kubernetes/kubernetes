@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/gc"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/controller/namespace"
+	"k8s.io/kubernetes/pkg/controller/network"
 	"k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/networkprovider"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -65,6 +67,7 @@ type CMServer struct {
 	Address                           net.IP
 	CloudProvider                     string
 	CloudConfigFile                   string
+	NetworkProvider                   string
 	ConcurrentEndpointSyncs           int
 	ConcurrentRCSyncs                 int
 	ConcurrentDSCSyncs                int
@@ -151,6 +154,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.StringVar(&s.NetworkProvider, "network-provider", s.NetworkProvider, "The provider for network services.  Empty string for no provider.")
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
 	fs.DurationVar(&s.ServiceSyncPeriod, "service-sync-period", s.ServiceSyncPeriod, "The period for syncing services with their external load balancers")
@@ -255,6 +259,19 @@ func (s *CMServer) Run(_ []string) error {
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
+
+	ProbeNetworkProviders()
+	networkProvider, err := networkprovider.InitNetworkProvider(s.NetworkProvider)
+	if err != nil {
+		glog.Errorf("Network provider could not be initialized: %v", err)
+	}
+
+	if networkProvider != nil {
+		networkController := networkcontroller.NewNetworkController(kubeClient, networkProvider)
+		go networkController.Run(util.NeverStop)
+	} else {
+		glog.Errorf("NetController should not be run without a networkprovider.")
 	}
 
 	nodeController := nodecontroller.NewNodeController(cloud, kubeClient,

@@ -132,20 +132,20 @@ func (plugin *execNetworkPlugin) validate() error {
 	return nil
 }
 
-func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
-	out, err := utilexec.New().Command(plugin.getExecutable(), setUpCmd, namespace, name, string(id)).CombinedOutput()
+func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID, containerRuntime string) error {
+	out, err := utilexec.New().Command(plugin.getExecutable(), setUpCmd, namespace, name, string(id), containerRuntime).CombinedOutput()
 	glog.V(5).Infof("SetUpPod 'exec' network plugin output: %s, %v", string(out), err)
 	return err
 }
 
-func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
-	out, err := utilexec.New().Command(plugin.getExecutable(), tearDownCmd, namespace, name, string(id)).CombinedOutput()
+func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID, containerRuntime string) error {
+	out, err := utilexec.New().Command(plugin.getExecutable(), tearDownCmd, namespace, name, string(id), containerRuntime).CombinedOutput()
 	glog.V(5).Infof("TearDownPod 'exec' network plugin output: %s, %v", string(out), err)
 	return err
 }
 
-func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID) (*network.PodNetworkStatus, error) {
-	out, err := utilexec.New().Command(plugin.getExecutable(), statusCmd, namespace, name, string(id)).CombinedOutput()
+func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID, containerRuntime string) (*network.PodNetworkStatus, error) {
+	out, err := utilexec.New().Command(plugin.getExecutable(), statusCmd, namespace, name, string(id), containerRuntime).CombinedOutput()
 	glog.V(5).Infof("Status 'exec' network plugin output: %s, %v", string(out), err)
 	if err != nil {
 		return nil, err

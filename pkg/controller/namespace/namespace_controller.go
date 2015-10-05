@@ -255,9 +255,24 @@ func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Names
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
 func syncNamespace(kubeClient client.Interface, experimentalMode bool, namespace *api.Namespace) (err error) {
 	if namespace.DeletionTimestamp == nil {
+		if namespace.Spec.Network != "" {
+
+			net, err := kubeClient.Networks().Get(namespace.Spec.Network)
+			if err != nil || net == nil {
+				glog.Warningf("Network %s cann't be found", namespace.Spec.Network)
+				newNamespace := api.Namespace{}
+				newNamespace.ObjectMeta = namespace.ObjectMeta
+				newNamespace.Spec = namespace.Spec
+				newNamespace.Status = namespace.Status
+				newNamespace.Status.Phase = api.NamespaceFailed
+				_, err := kubeClient.Namespaces().Status(&newNamespace)
+				if err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
-	glog.V(4).Infof("Syncing namespace %s", namespace.Name)
 
 	// ensure that the status is up to date on the namespace
 	// if we get a not found error, we assume the namespace is truly gone

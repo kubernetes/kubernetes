@@ -46,13 +46,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID, containerRuntime string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID, containerRuntime string) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) (*PodNetworkStatus, error)
+	Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID, containerRuntime string) (*PodNetworkStatus, error)
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
@@ -134,14 +134,14 @@ func (plugin *noopNetworkPlugin) Name() string {
 	return DefaultPluginName
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
+func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID, containerRuntime string) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
+func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID, containerRuntime string) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID) (*PodNetworkStatus, error) {
+func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID, containerRuntime string) (*PodNetworkStatus, error) {
 	return nil, nil
 }

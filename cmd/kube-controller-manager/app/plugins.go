@@ -23,6 +23,7 @@ import (
 
 	//Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	networkProviders "k8s.io/kubernetes/pkg/networkprovider/providers"
 
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/util/io"
@@ -67,6 +68,10 @@ func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
 	return allPlugins
+}
+
+func ProbeNetworkProviders() {
+	networkProviders.ProbeNetworkProviders()
 }
 
 // attemptToLoadRecycler tries decoding a pod from a filepath for use as a recycler for a volume.
