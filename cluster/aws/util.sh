@@ -417,6 +417,28 @@ function ensure-master-pd {
   fi
 }
 
+# Creates a new DHCP option set configured correctly for Kubernetes
+# Sets DHCP_OPTION_SET_ID
+function create-dhcp-option-set () {
+  case "${AWS_REGION}" in
+    us-east-1)
+      OPTION_SET_DOMAIN=ec2.internal
+      ;;
+
+    *)
+      OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
+  esac
+
+  DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS | json_val '["DhcpOptions"]["DhcpOptionsId"]')
+
+  add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
+  add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+
+  $AWS_CMD associate-dhcp-options --dhcp-options-id ${DHCP_OPTION_SET_ID} --vpc-id ${VPC_ID}
+
+  echo "Using DHCP option set ${DHCP_OPTION_SET_ID}"
+}
+
 # Verify prereqs
 function verify-prereqs {
   if [[ "$(which aws)" == "" ]]; then
@@ -694,9 +716,12 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
+  create-dhcp-option-set
+
   if [[ -z "${SUBNET_ID:-}" ]]; then
     SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
   fi
+
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
