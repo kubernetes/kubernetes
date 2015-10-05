@@ -29,6 +29,10 @@ func TestSelectorParse(t *testing.T) {
 		"x=a,y=b,z=c",
 		"",
 		"x!=a,y=b",
+		"x=",
+		"x= ",
+		"x=,z= ",
+		"x= ,z= ",
 	}
 	testBadStrings := []string{
 		"x=a||y=b",
@@ -39,7 +43,7 @@ func TestSelectorParse(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v: error %v (%#v)\n", test, err, err)
 		}
-		if test != lq.String() {
+		if strings.Replace(test, " ", "", -1) != lq.String() {
 			t.Errorf("%v restring gave: %v\n", test, lq.String())
 		}
 	}
