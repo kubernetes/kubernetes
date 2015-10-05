@@ -102,6 +102,7 @@ func expandResourceShortcut(resource string) string {
 		"rc":     "replicationcontrollers",
 		"ds":     "daemonsets",
 		"svc":    "services",
+		"ing":    "ingress",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded
