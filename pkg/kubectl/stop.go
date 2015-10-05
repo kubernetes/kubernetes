@@ -183,7 +183,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
-	daemon, err := reaper.Experimental().DaemonSets(namespace).Get(name)
+	ds, err := reaper.Experimental().DaemonSets(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -208,9 +208,13 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return "", fmt.Errorf("Name collision generating an unused node name. Please retry this operation.")
 	}
 
-	daemon.Spec.Template.Spec.NodeName = nodeName
+	ds.Spec.Template.Spec.NodeName = nodeName
+	// force update to avoid version conflict
+	ds.ResourceVersion = ""
 
-	reaper.Experimental().DaemonSets(namespace).Update(daemon)
+	if ds, err = reaper.Experimental().DaemonSets(namespace).Update(ds); err != nil {
+		return "", err
+	}
 
 	// Wait for the daemon set controller to kill all the daemon pods.
 	if err := wait.Poll(reaper.pollInterval, reaper.timeout, func() (bool, error) {
