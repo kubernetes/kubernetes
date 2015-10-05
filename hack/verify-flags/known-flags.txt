@@ -77,6 +77,9 @@ etcd-config
 etcd-prefix
 etcd-server
 etcd-servers
+etcd-ca
+etcd-cert
+etcd-key
 event-burst
 event-qps
 event-ttl
