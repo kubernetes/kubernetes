@@ -91,8 +91,6 @@ type EC2 interface {
 	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
 	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error)
 
-	DescribeVPCs(*ec2.DescribeVpcsInput) ([]*ec2.Vpc, error)
-
 	DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error)
 
 	CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error)
@@ -375,15 +373,6 @@ func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volu
 func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error) {
 	request := ec2.DeleteVolumeInput{VolumeId: &volumeID}
 	return s.ec2.DeleteVolume(&request)
-}
-
-func (s *awsSdkEC2) DescribeVPCs(request *ec2.DescribeVpcsInput) ([]*ec2.Vpc, error) {
-	// VPCs are not paged
-	response, err := s.ec2.DescribeVpcs(request)
-	if err != nil {
-		return nil, fmt.Errorf("error listing AWS VPCs: %v", err)
-	}
-	return response.Vpcs, nil
 }
 
 func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
@@ -1256,35 +1245,6 @@ func (self *AWSCloud) findVPCID() (string, error) {
 	return "", fmt.Errorf("Could not find VPC ID in instance metadata")
 }
 
-// Find the VPC which self is attached to.
-func (self *AWSCloud) findVPC() (*ec2.Vpc, error) {
-	request := &ec2.DescribeVpcsInput{}
-
-	// find by vpcID from metadata
-	vpcID, err := self.findVPCID()
-	if err != nil {
-		return nil, err
-	}
-	filters := []*ec2.Filter{newEc2Filter("vpc-id", vpcID)}
-	// Don't bother adding the filterTags as we know this VPC is valid for this instance from findVPCID above.
-	// This is important as sharing a single regional VPC with multiple per-AZ clusters is a common deployment.
-	request.Filters = filters
-
-	vpcs, err := self.ec2.DescribeVPCs(request)
-	if err != nil {
-		glog.Error("error listing VPCs", err)
-		return nil, err
-	}
-
-	if len(vpcs) == 0 {
-		return nil, nil
-	}
-	if len(vpcs) == 1 {
-		return vpcs[0], nil
-	}
-	return nil, fmt.Errorf("Found multiple matching VPCs for vpcID = %s", vpcID)
-}
-
 // Retrieves the specified security group from the AWS API, or returns nil if not found
 func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup, error) {
 	describeSecurityGroupsRequest := &ec2.DescribeSecurityGroupsInput{
@@ -1572,13 +1532,13 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 	}
 }
 
-func (s *AWSCloud) listSubnetIDsinVPC(vpc *ec2.Vpc) ([]string, error) {
+func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 
 	subnetIds := []string{}
 
 	request := &ec2.DescribeSubnetsInput{}
 	filters := []*ec2.Filter{}
-	filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VpcId)))
+	filters = append(filters, newEc2Filter("vpc-id", vpcId))
 	// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
 	// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
 	// only the public subnet (where the ELB will go) is so tagged.
@@ -1629,17 +1589,13 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		return nil, err
 	}
 
-	vpc, err := s.findVPC()
+	vpcId, err := s.findVPCID()
 	if err != nil {
-		glog.Error("error finding VPC", err)
 		return nil, err
-	}
-	if vpc == nil {
-		return nil, fmt.Errorf("Unable to find VPC")
 	}
 
 	// Construct list of configured subnets
-	subnetIDs, err := s.listSubnetIDsinVPC(vpc)
+	subnetIDs, err := s.listSubnetIDsinVPC(vpcId)
 	if err != nil {
 		glog.Error("error listing subnets in VPC", err)
 		return nil, err
@@ -1650,7 +1606,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 	{
 		sgName := "k8s-elb-" + name
 		sgDescription := "Security group for Kubernetes ELB " + name
-		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, orEmpty(vpc.VpcId))
+		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, vpcId)
 		if err != nil {
 			glog.Error("Error creating load balancer security group: ", err)
 			return nil, err
