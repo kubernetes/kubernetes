@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 )
 
-// NewSourceAPIserver creates config source that watches for changes to the services and endpoints.
+// NewSourceAPI creates config source that watches for changes to the services and endpoints.
 func NewSourceAPI(c *client.Client, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
 	servicesLW := cache.NewListWatchFromClient(c, "services", api.NamespaceAll, fields.Everything())
 	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", api.NamespaceAll, fields.Everything())
