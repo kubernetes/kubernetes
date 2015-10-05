@@ -1,0 +1,17 @@
+<h2 id="codetitle"></h2>
+<div>
+	<form method="get" id="downloadcode">
+		<button type="submit">Download File</button>
+	</form>
+</div>
+<div>&nbsp;</div>
+<div class="highlight" onload="prettyPrint()">
+	<pre class="prettyprint" id="codeblock">
+	</pre>
+</div> 
+<script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js?lang=yaml"></script>
+<script>
+$(document).ready(function(){
+        $('#downloadcode').attr({target:'_blank', 'src':location.href});
+});
+</script>
