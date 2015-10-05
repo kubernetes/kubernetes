@@ -19,6 +19,8 @@ package unversioned
 import (
 	"errors"
 	"net/http"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // KubeletClient is an interface for all kubelet functionality
@@ -49,10 +51,10 @@ func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
 		return nil, err
 	}
 	if config.Dial != nil || tlsConfig != nil {
-		return &http.Transport{
+		return util.SetTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
-		}, nil
+		}), nil
 	} else {
 		return http.DefaultTransport, nil
 	}
