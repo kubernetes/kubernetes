@@ -564,7 +564,7 @@ func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldNa
 	return newRc, nil
 }
 
-func AbortRollingUpdate(c *RollingUpdaterConfig) {
+func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	// Swap the controllers
 	tmp := c.OldRc
 	c.OldRc = c.NewRc
@@ -574,12 +574,18 @@ func AbortRollingUpdate(c *RollingUpdaterConfig) {
 		c.NewRc.Annotations = map[string]string{}
 	}
 	c.NewRc.Annotations[sourceIdAnnotation] = fmt.Sprintf("%s:%s", c.OldRc.Name, c.OldRc.UID)
-	desiredSize, found := c.OldRc.Annotations[desiredReplicasAnnotation]
-	if found {
-		fmt.Printf("Found desired replicas.")
-		c.NewRc.Annotations[desiredReplicasAnnotation] = desiredSize
+
+	// Use the original value since the replica count change from old to new
+	// could be asymmetric. If we don't know the original count, we can't safely
+	// roll back to a known good size.
+	originalSize, foundOriginal := tmp.Annotations[originalReplicasAnnotation]
+	if !foundOriginal {
+		return fmt.Errorf("couldn't find original replica count of %q", tmp.Name)
 	}
+	fmt.Fprintf(c.Out, "Setting %q replicas to %s\n", c.NewRc.Name, originalSize)
+	c.NewRc.Annotations[desiredReplicasAnnotation] = originalSize
 	c.CleanupPolicy = DeleteRollingUpdateCleanupPolicy
+	return nil
 }
 
 func GetNextControllerAnnotation(rc *api.ReplicationController) (string, bool) {
