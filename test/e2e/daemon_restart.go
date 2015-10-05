@@ -241,6 +241,9 @@ var _ = Describe("DaemonRestart", func() {
 
 	It("Scheduler should continue assigning pods to nodes across restart", func() {
 
+		// TODO: Enabale this test in GKE once experimental API there is switched on
+		SkipIfProviderIs("gke")
+
 		restarter := NewRestartConfig(
 			getMasterHost(), "kube-scheduler", ports.SchedulerPort, restartPollInterval, restartTimeout)
 
@@ -256,6 +259,10 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	It("Kubelet should not restart containers across restart", func() {
+
+		// TODO: Enabale this test in GKE once experimental API there is switched on
+		SkipIfProviderIs("gke")
+
 		nodeIPs, err := getNodePublicIps(framework.Client)
 		expectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(framework.Client, ns, labelSelector)
