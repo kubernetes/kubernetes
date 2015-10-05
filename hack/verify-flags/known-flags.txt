@@ -176,6 +176,7 @@ mesos-executor-mem
 mesos-master
 mesos-role
 mesos-user
+mesos-launch-grace-period
 minimum-container-ttl-duration
 minion-max-log-age
 minion-max-log-backups
