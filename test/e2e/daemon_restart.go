@@ -50,6 +50,9 @@ const (
 	restartTimeout      = 10 * time.Minute
 	numPods             = 10
 	sshPort             = 22
+	ADD                 = "ADD"
+	DEL                 = "DEL"
+	UPDATE              = "UPDATE"
 )
 
 // nodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
@@ -126,6 +129,35 @@ func (r *restartDaemonConfig) restart() {
 	r.waitUp()
 }
 
+// podTracker records a serial history of events that might've affects pods.
+type podTracker struct {
+	cache.ThreadSafeStore
+}
+
+func (p *podTracker) remember(pod *api.Pod, eventType string) {
+	if eventType == UPDATE && pod.Status.Phase == api.PodRunning {
+		return
+	}
+	p.Add(fmt.Sprintf("[%v] %v: %v", time.Now(), eventType, pod.Name), pod)
+}
+
+func (p *podTracker) String() (msg string) {
+	for _, k := range p.ListKeys() {
+		obj, exists := p.Get(k)
+		if !exists {
+			continue
+		}
+		pod := obj.(*api.Pod)
+		msg += fmt.Sprintf("%v Phase %v Host %v\n", k, pod.Status.Phase, pod.Spec.NodeName)
+	}
+	return
+}
+
+func newPodTracker() *podTracker {
+	return &podTracker{cache.NewThreadSafeStore(
+		cache.Indexers{}, cache.Indices{})}
+}
+
 // replacePods replaces content of the store with the given pods.
 func replacePods(pods []*api.Pod, store cache.Store) {
 	found := make([]interface{}, 0, len(pods))
@@ -162,6 +194,7 @@ var _ = Describe("DaemonRestart", func() {
 	var controller *controllerFramework.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
+	var tracker *podTracker
 
 	BeforeEach(func() {
 
@@ -188,6 +221,7 @@ var _ = Describe("DaemonRestart", func() {
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})
+		tracker = newPodTracker()
 		newPods, controller = controllerFramework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func() (runtime.Object, error) {
@@ -199,7 +233,17 @@ var _ = Describe("DaemonRestart", func() {
 			},
 			&api.Pod{},
 			0,
-			controllerFramework.ResourceEventHandlerFuncs{},
+			controllerFramework.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					tracker.remember(obj.(*api.Pod), ADD)
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					tracker.remember(newObj.(*api.Pod), UPDATE)
+				},
+				DeleteFunc: func(obj interface{}) {
+					tracker.remember(obj.(*api.Pod), DEL)
+				},
+			},
 		)
 		go controller.Run(stopCh)
 	})
@@ -235,7 +279,7 @@ var _ = Describe("DaemonRestart", func() {
 		}
 		if len(newKeys.List()) != len(existingKeys.List()) ||
 			!newKeys.IsSuperset(existingKeys) {
-			Failf("RcManager created/deleted pods after restart")
+			Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
 		}
 	})
 
@@ -277,7 +321,7 @@ var _ = Describe("DaemonRestart", func() {
 		postRestarts, badNodes := getContainerRestarts(framework.Client, ns, labelSelector)
 		if postRestarts != preRestarts {
 			dumpNodeDebugInfo(framework.Client, badNodes)
-			Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v", preRestarts, postRestarts, badNodes)
+			Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})
 })
