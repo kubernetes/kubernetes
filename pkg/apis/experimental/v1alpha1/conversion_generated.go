@@ -2134,6 +2134,76 @@ func convert_experimental_APIVersion_To_v1alpha1_APIVersion(in *experimental.API
 	return autoconvert_experimental_APIVersion_To_v1alpha1_APIVersion(in, out, s)
 }
 
+func autoconvert_experimental_ClusterAutoscaler_To_v1alpha1_ClusterAutoscaler(in *experimental.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.ClusterAutoscaler))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_experimental_ClusterAutoscalerSpec_To_v1alpha1_ClusterAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_experimental_ClusterAutoscaler_To_v1alpha1_ClusterAutoscaler(in *experimental.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
+	return autoconvert_experimental_ClusterAutoscaler_To_v1alpha1_ClusterAutoscaler(in, out, s)
+}
+
+func autoconvert_experimental_ClusterAutoscalerList_To_v1alpha1_ClusterAutoscalerList(in *experimental.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.ClusterAutoscalerList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ClusterAutoscaler, len(in.Items))
+		for i := range in.Items {
+			if err := convert_experimental_ClusterAutoscaler_To_v1alpha1_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_experimental_ClusterAutoscalerList_To_v1alpha1_ClusterAutoscalerList(in *experimental.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
+	return autoconvert_experimental_ClusterAutoscalerList_To_v1alpha1_ClusterAutoscalerList(in, out, s)
+}
+
+func autoconvert_experimental_ClusterAutoscalerSpec_To_v1alpha1_ClusterAutoscalerSpec(in *experimental.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.ClusterAutoscalerSpec))(in)
+	}
+	out.MinNodes = in.MinNodes
+	out.MaxNodes = in.MaxNodes
+	if in.TargetUtilization != nil {
+		out.TargetUtilization = make([]NodeUtilization, len(in.TargetUtilization))
+		for i := range in.TargetUtilization {
+			if err := convert_experimental_NodeUtilization_To_v1alpha1_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TargetUtilization = nil
+	}
+	return nil
+}
+
+func convert_experimental_ClusterAutoscalerSpec_To_v1alpha1_ClusterAutoscalerSpec(in *experimental.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
+	return autoconvert_experimental_ClusterAutoscalerSpec_To_v1alpha1_ClusterAutoscalerSpec(in, out, s)
+}
+
 func autoconvert_experimental_DaemonSet_To_v1alpha1_DaemonSet(in *experimental.DaemonSet, out *DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.DaemonSet))(in)
@@ -2764,6 +2834,19 @@ func convert_experimental_JobStatus_To_v1alpha1_JobStatus(in *experimental.JobSt
 	return autoconvert_experimental_JobStatus_To_v1alpha1_JobStatus(in, out, s)
 }
 
+func autoconvert_experimental_NodeUtilization_To_v1alpha1_NodeUtilization(in *experimental.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*experimental.NodeUtilization))(in)
+	}
+	out.Resource = NodeResource(in.Resource)
+	out.Value = in.Value
+	return nil
+}
+
+func convert_experimental_NodeUtilization_To_v1alpha1_NodeUtilization(in *experimental.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
+	return autoconvert_experimental_NodeUtilization_To_v1alpha1_NodeUtilization(in, out, s)
+}
+
 func autoconvert_experimental_ReplicationControllerDummy_To_v1alpha1_ReplicationControllerDummy(in *experimental.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*experimental.ReplicationControllerDummy))(in)
@@ -2991,6 +3074,76 @@ func autoconvert_v1alpha1_APIVersion_To_experimental_APIVersion(in *APIVersion, 
 
 func convert_v1alpha1_APIVersion_To_experimental_APIVersion(in *APIVersion, out *experimental.APIVersion, s conversion.Scope) error {
 	return autoconvert_v1alpha1_APIVersion_To_experimental_APIVersion(in, out, s)
+}
+
+func autoconvert_v1alpha1_ClusterAutoscaler_To_experimental_ClusterAutoscaler(in *ClusterAutoscaler, out *experimental.ClusterAutoscaler, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ClusterAutoscaler))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1alpha1_ClusterAutoscalerSpec_To_experimental_ClusterAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1alpha1_ClusterAutoscaler_To_experimental_ClusterAutoscaler(in *ClusterAutoscaler, out *experimental.ClusterAutoscaler, s conversion.Scope) error {
+	return autoconvert_v1alpha1_ClusterAutoscaler_To_experimental_ClusterAutoscaler(in, out, s)
+}
+
+func autoconvert_v1alpha1_ClusterAutoscalerList_To_experimental_ClusterAutoscalerList(in *ClusterAutoscalerList, out *experimental.ClusterAutoscalerList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ClusterAutoscalerList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]experimental.ClusterAutoscaler, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1alpha1_ClusterAutoscaler_To_experimental_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1alpha1_ClusterAutoscalerList_To_experimental_ClusterAutoscalerList(in *ClusterAutoscalerList, out *experimental.ClusterAutoscalerList, s conversion.Scope) error {
+	return autoconvert_v1alpha1_ClusterAutoscalerList_To_experimental_ClusterAutoscalerList(in, out, s)
+}
+
+func autoconvert_v1alpha1_ClusterAutoscalerSpec_To_experimental_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *experimental.ClusterAutoscalerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ClusterAutoscalerSpec))(in)
+	}
+	out.MinNodes = in.MinNodes
+	out.MaxNodes = in.MaxNodes
+	if in.TargetUtilization != nil {
+		out.TargetUtilization = make([]experimental.NodeUtilization, len(in.TargetUtilization))
+		for i := range in.TargetUtilization {
+			if err := convert_v1alpha1_NodeUtilization_To_experimental_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TargetUtilization = nil
+	}
+	return nil
+}
+
+func convert_v1alpha1_ClusterAutoscalerSpec_To_experimental_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *experimental.ClusterAutoscalerSpec, s conversion.Scope) error {
+	return autoconvert_v1alpha1_ClusterAutoscalerSpec_To_experimental_ClusterAutoscalerSpec(in, out, s)
 }
 
 func autoconvert_v1alpha1_DaemonSet_To_experimental_DaemonSet(in *DaemonSet, out *experimental.DaemonSet, s conversion.Scope) error {
@@ -3603,6 +3756,19 @@ func convert_v1alpha1_JobStatus_To_experimental_JobStatus(in *JobStatus, out *ex
 	return autoconvert_v1alpha1_JobStatus_To_experimental_JobStatus(in, out, s)
 }
 
+func autoconvert_v1alpha1_NodeUtilization_To_experimental_NodeUtilization(in *NodeUtilization, out *experimental.NodeUtilization, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*NodeUtilization))(in)
+	}
+	out.Resource = experimental.NodeResource(in.Resource)
+	out.Value = in.Value
+	return nil
+}
+
+func convert_v1alpha1_NodeUtilization_To_experimental_NodeUtilization(in *NodeUtilization, out *experimental.NodeUtilization, s conversion.Scope) error {
+	return autoconvert_v1alpha1_NodeUtilization_To_experimental_NodeUtilization(in, out, s)
+}
+
 func autoconvert_v1alpha1_ReplicationControllerDummy_To_experimental_ReplicationControllerDummy(in *ReplicationControllerDummy, out *experimental.ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerDummy))(in)
@@ -3859,6 +4025,9 @@ func init() {
 		autoconvert_api_VolumeSource_To_v1_VolumeSource,
 		autoconvert_api_Volume_To_v1_Volume,
 		autoconvert_experimental_APIVersion_To_v1alpha1_APIVersion,
+		autoconvert_experimental_ClusterAutoscalerList_To_v1alpha1_ClusterAutoscalerList,
+		autoconvert_experimental_ClusterAutoscalerSpec_To_v1alpha1_ClusterAutoscalerSpec,
+		autoconvert_experimental_ClusterAutoscaler_To_v1alpha1_ClusterAutoscaler,
 		autoconvert_experimental_DaemonSetList_To_v1alpha1_DaemonSetList,
 		autoconvert_experimental_DaemonSetSpec_To_v1alpha1_DaemonSetSpec,
 		autoconvert_experimental_DaemonSetStatus_To_v1alpha1_DaemonSetStatus,
@@ -3886,6 +4055,7 @@ func init() {
 		autoconvert_experimental_JobSpec_To_v1alpha1_JobSpec,
 		autoconvert_experimental_JobStatus_To_v1alpha1_JobStatus,
 		autoconvert_experimental_Job_To_v1alpha1_Job,
+		autoconvert_experimental_NodeUtilization_To_v1alpha1_NodeUtilization,
 		autoconvert_experimental_ReplicationControllerDummy_To_v1alpha1_ReplicationControllerDummy,
 		autoconvert_experimental_ResourceConsumption_To_v1alpha1_ResourceConsumption,
 		autoconvert_experimental_RollingUpdateDeployment_To_v1alpha1_RollingUpdateDeployment,
@@ -3939,6 +4109,9 @@ func init() {
 		autoconvert_v1_VolumeSource_To_api_VolumeSource,
 		autoconvert_v1_Volume_To_api_Volume,
 		autoconvert_v1alpha1_APIVersion_To_experimental_APIVersion,
+		autoconvert_v1alpha1_ClusterAutoscalerList_To_experimental_ClusterAutoscalerList,
+		autoconvert_v1alpha1_ClusterAutoscalerSpec_To_experimental_ClusterAutoscalerSpec,
+		autoconvert_v1alpha1_ClusterAutoscaler_To_experimental_ClusterAutoscaler,
 		autoconvert_v1alpha1_DaemonSetList_To_experimental_DaemonSetList,
 		autoconvert_v1alpha1_DaemonSetSpec_To_experimental_DaemonSetSpec,
 		autoconvert_v1alpha1_DaemonSetStatus_To_experimental_DaemonSetStatus,
@@ -3965,6 +4138,7 @@ func init() {
 		autoconvert_v1alpha1_JobSpec_To_experimental_JobSpec,
 		autoconvert_v1alpha1_JobStatus_To_experimental_JobStatus,
 		autoconvert_v1alpha1_Job_To_experimental_Job,
+		autoconvert_v1alpha1_NodeUtilization_To_experimental_NodeUtilization,
 		autoconvert_v1alpha1_ReplicationControllerDummy_To_experimental_ReplicationControllerDummy,
 		autoconvert_v1alpha1_ResourceConsumption_To_experimental_ResourceConsumption,
 		autoconvert_v1alpha1_RollingUpdateDeployment_To_experimental_RollingUpdateDeployment,
