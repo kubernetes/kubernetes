@@ -238,7 +238,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* SyncFrequency */
 		40 /* MaxPods */)
 
-	kubeletapp.RunKubelet(kcfg, nil)
+	kubeletapp.RunKubelet(kcfg)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
@@ -270,7 +270,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 		40 /* MaxPods */)
 
-	kubeletapp.RunKubelet(kcfg, nil)
+	kubeletapp.RunKubelet(kcfg)
 	return apiServer.URL, configFilePath
 }
 
