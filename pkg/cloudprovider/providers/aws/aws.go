@@ -41,6 +41,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -1573,6 +1574,40 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 	}
 }
 
+func (s *AWSCloud) listSubnetIDsinVPC(vpc *ec2.Vpc) ([]string, error) {
+
+	subnetIds := []string{}
+
+	request := &ec2.DescribeSubnetsInput{}
+	filters := []*ec2.Filter{}
+	filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VpcId)))
+	// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
+	// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
+	// only the public subnet (where the ELB will go) is so tagged.
+	filters = s.addFilters(filters)
+	request.Filters = filters
+
+	subnets, err := s.ec2.DescribeSubnets(request)
+	if err != nil {
+		glog.Error("error describing subnets: ", err)
+		return nil, err
+	}
+
+	availabilityZones := sets.NewString()
+	for _, subnet := range subnets {
+		az := orEmpty(subnet.AvailabilityZone)
+		id := orEmpty(subnet.SubnetId)
+		if availabilityZones.Has(az) {
+			glog.Warning("Found multiple subnets per AZ '", az, "', ignoring subnet '", id, "'")
+			continue
+		}
+		subnetIds = append(subnetIds, id)
+		availabilityZones.Insert(az)
+	}
+
+	return subnetIds, nil
+}
+
 // EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anwyay.
 func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
@@ -1606,32 +1641,10 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 	}
 
 	// Construct list of configured subnets
-	subnetIDs := []string{}
-	{
-		request := &ec2.DescribeSubnetsInput{}
-		filters := []*ec2.Filter{}
-		filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VpcId)))
-		// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
-		// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
-		// only the public subnet (where the ELB will go) is so tagged.
-		filters = s.addFilters(filters)
-		request.Filters = filters
-
-		subnets, err := s.ec2.DescribeSubnets(request)
-		if err != nil {
-			glog.Error("Error describing subnets: ", err)
-			return nil, err
-		}
-
-		//	zones := []string{}
-		for _, subnet := range subnets {
-			subnetIDs = append(subnetIDs, orEmpty(subnet.SubnetId))
-			if !strings.HasPrefix(orEmpty(subnet.AvailabilityZone), region) {
-				glog.Error("Found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
-				return nil, fmt.Errorf("invalid AZ for region")
-			}
-			//		zones = append(zones, subnet.AvailabilityZone)
-		}
+	subnetIDs, err := s.listSubnetIDsinVPC(vpc)
+	if err != nil {
+		glog.Error("error listing subnets in VPC", err)
+		return nil, err
 	}
 
 	// Create a security group for the load balancer
