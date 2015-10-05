@@ -14,17 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ZONE=${KUBE_AWS_ZONE:-us-west-2a}
+# AWS Instance sizes
 MASTER_SIZE=${MASTER_SIZE:-t2.micro}
 MINION_SIZE=${MINION_SIZE:-t2.micro}
-NUM_MINIONS=${NUM_MINIONS:-4}
+
+# Number of minions to run in each AZ
+NUM_MINIONS_PRIMARY_ZONE=${NUM_MINIONS_PRIMARY_ZONE:-2}
+NUM_MINIONS_SECONDARY_ZONE=${NUM_MINIONS_SECONDARY_ZONE:-2}
+NUM_MINIONS=$[$NUM_MINIONS_PRIMARY_ZONE+$NUM_MINIONS_SECONDARY_ZONE]
+
+# Which AWS Region to use (for hosts and S3 Bucket)
+AWS_REGION=${AWS_REGION:-us-west-1}
+AWS_S3_REGION=${AWS_S3_REGION:-us-west-1}
+
+# We'll launch minions across two AWS Availability zones
+# Note that 'us-east-1' does not have a region 'b'. Use 'a' and 'c' instead.
+AWS_ZONE_PRIMARY=${AWS_ZONE_PRIMARY:-a}
+AWS_ZONE_SECONDARY=${AWS_ZONE_SECONDARY:-b}
 
 # Optional: Set AWS_S3_BUCKET to the name of an S3 bucket to use for uploading binaries
 # (otherwise a unique bucket name will be generated for you)
 #  AWS_S3_BUCKET=kubernetes-artifacts
 
-# Because regions are globally named, we want to create in a single region; default to us-east-1
-AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
+# Which CIDR networks ought to be allowed via security groups
+KUBE_AWS_CIDR_WHITELIST="0.0.0.0/0"
 
 # Which docker storage mechanism to use.
 DOCKER_STORAGE=${DOCKER_STORAGE:-aufs}
