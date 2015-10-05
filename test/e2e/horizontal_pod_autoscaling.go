@@ -72,7 +72,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	})
 
 	// Backup tests, currently disabled
-	It("[Skipped][Autoscaling Suite] should scale from 1 pod to 3 pods (scale resource: CPU)", func() {
+	It("[Skipped][Horizontal pod autoscaling Suite] should scale from 1 pod to 3 pods (scale resource: CPU)", func() {
 		rc = NewDynamicResourceConsumer("rc", 1, 700, 0, 800, 100, f)
 		defer rc.CleanUp()
 		createCPUHorizontalPodAutoscaler(rc, "0.3")
