@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -38,6 +38,9 @@ type decReader interface {
 	readb([]byte)
 	readn1() uint8
 	readn1eof() (v uint8, eof bool)
+
+	track()
+	stopTrack() []byte
 }
 
 type decReaderByteScanner interface {
@@ -183,6 +186,9 @@ type ioDecReader struct {
 	// shares buffer with Decoder, so we keep size of struct within 8 words.
 	x  *[scratchByteArrayLen]byte
 	bs ioDecByteScanner
+
+	tr  []byte // tracking bytes read
+	trb bool
 }
 
 func (z *ioDecReader) readx(n int) (bs []byte) {
@@ -197,6 +203,9 @@ func (z *ioDecReader) readx(n int) (bs []byte) {
 	if _, err := io.ReadAtLeast(z.br, bs, n); err != nil {
 		panic(err)
 	}
+	if z.trb {
+		z.tr = append(z.tr, bs...)
+	}
 	return
 }
 
@@ -207,12 +216,18 @@ func (z *ioDecReader) readb(bs []byte) {
 	if _, err := io.ReadAtLeast(z.br, bs, len(bs)); err != nil {
 		panic(err)
 	}
+	if z.trb {
+		z.tr = append(z.tr, bs...)
+	}
 }
 
 func (z *ioDecReader) readn1() (b uint8) {
 	b, err := z.br.ReadByte()
 	if err != nil {
 		panic(err)
+	}
+	if z.trb {
+		z.tr = append(z.tr, b)
 	}
 	return b
 }
@@ -225,6 +240,9 @@ func (z *ioDecReader) readn1eof() (b uint8, eof bool) {
 	} else {
 		panic(err)
 	}
+	if z.trb {
+		z.tr = append(z.tr, b)
+	}
 	return
 }
 
@@ -232,6 +250,23 @@ func (z *ioDecReader) unreadn1() {
 	if err := z.br.UnreadByte(); err != nil {
 		panic(err)
 	}
+	if z.trb {
+		if l := len(z.tr) - 1; l >= 0 {
+			z.tr = z.tr[:l]
+		}
+	}
+}
+
+func (z *ioDecReader) track() {
+	if z.tr != nil {
+		z.tr = z.tr[:0]
+	}
+	z.trb = true
+}
+
+func (z *ioDecReader) stopTrack() (bs []byte) {
+	z.trb = false
+	return z.tr
 }
 
 // ------------------------------------
@@ -243,6 +278,7 @@ type bytesDecReader struct {
 	b []byte // data
 	c int    // cursor
 	a int    // available
+	t int    // track start
 }
 
 func (z *bytesDecReader) unreadn1() {
@@ -296,6 +332,14 @@ func (z *bytesDecReader) readn1eof() (v uint8, eof bool) {
 
 func (z *bytesDecReader) readb(bs []byte) {
 	copy(bs, z.readx(len(bs)))
+}
+
+func (z *bytesDecReader) track() {
+	z.t = z.c
+}
+
+func (z *bytesDecReader) stopTrack() (bs []byte) {
+	return z.b[z.t:z.c]
 }
 
 // ------------------------------------
@@ -386,6 +430,20 @@ func (f decFnInfo) textUnmarshal(rv reflect.Value) {
 	}
 }
 
+func (f decFnInfo) jsonUnmarshal(rv reflect.Value) {
+	tm := f.getValueForUnmarshalInterface(rv, f.ti.junmIndir).(jsonUnmarshaler)
+	// bs := f.dd.DecodeBytes(f.d.b[:], true, true)
+	// grab the bytes to be read
+	f.d.r.track()
+	f.d.swallow()
+	bs := f.d.r.stopTrack()
+	// fmt.Printf(">>>>>> REFLECTION JSON: %s\n", bs)
+	fnerr := tm.UnmarshalJSON(bs)
+	if fnerr != nil {
+		panic(fnerr)
+	}
+}
+
 func (f decFnInfo) kErr(rv reflect.Value) {
 	f.d.errorf("no decoding function defined for kind %v", rv.Kind())
 }
@@ -435,6 +493,10 @@ func (f decFnInfo) kUint64(rv reflect.Value) {
 }
 
 func (f decFnInfo) kUint(rv reflect.Value) {
+	rv.SetUint(f.dd.DecodeUint(uintBitsize))
+}
+
+func (f decFnInfo) kUintptr(rv reflect.Value) {
 	rv.SetUint(f.dd.DecodeUint(uintBitsize))
 }
 
@@ -748,8 +810,10 @@ func (f decFnInfo) kSlice(rv reflect.Value) {
 					rvlen = containerLenS
 				}
 			} else if containerLenS != rvlen {
-				rv.SetLen(containerLenS)
-				rvlen = containerLenS
+				if f.seq == seqTypeSlice {
+					rv.SetLen(containerLenS)
+					rvlen = containerLenS
+				}
 			}
 			j := 0
 			for ; j < numToRead; j++ {
@@ -894,6 +958,7 @@ type Decoder struct {
 	hh    Handle
 	be    bool // is binary encoding
 	bytes bool // is bytes reader
+	js    bool // is json handle
 
 	ri ioDecReader
 	f  map[uintptr]decFn
@@ -917,6 +982,7 @@ func NewDecoder(r io.Reader, h Handle) (d *Decoder) {
 		d.ri.br = &d.ri.bs
 	}
 	d.r = &d.ri
+	_, d.js = h.(*JsonHandle)
 	d.d = h.newDecDriver(d)
 	return
 }
@@ -929,6 +995,7 @@ func NewDecoderBytes(in []byte, h Handle) (d *Decoder) {
 	d.rb.b = in
 	d.rb.a = len(in)
 	d.r = &d.rb
+	_, d.js = h.(*JsonHandle)
 	d.d = h.newDecDriver(d)
 	// d.d = h.newDecDriver(decReaderT{true, &d.rb, &d.ri})
 	return
@@ -1270,6 +1337,10 @@ func (d *Decoder) getDecFn(rt reflect.Type, checkFastpath, checkCodecSelfer bool
 	} else if supportMarshalInterfaces && d.be && ti.bunm {
 		fi.decFnInfoX = &decFnInfoX{d: d, ti: ti}
 		fn.f = (decFnInfo).binaryUnmarshal
+	} else if supportMarshalInterfaces && !d.be && d.js && ti.junm {
+		//If JSON, we should check JSONUnmarshal before textUnmarshal
+		fi.decFnInfoX = &decFnInfoX{d: d, ti: ti}
+		fn.f = (decFnInfo).jsonUnmarshal
 	} else if supportMarshalInterfaces && !d.be && ti.tunm {
 		fi.decFnInfoX = &decFnInfoX{d: d, ti: ti}
 		fn.f = (decFnInfo).textUnmarshal
@@ -1334,6 +1405,8 @@ func (d *Decoder) getDecFn(rt reflect.Type, checkFastpath, checkCodecSelfer bool
 				fn.f = (decFnInfo).kUint16
 				// case reflect.Ptr:
 				// 	fn.f = (decFnInfo).kPtr
+			case reflect.Uintptr:
+				fn.f = (decFnInfo).kUintptr
 			case reflect.Interface:
 				fi.decFnInfoX = &decFnInfoX{d: d, ti: ti}
 				fn.f = (decFnInfo).kInterface

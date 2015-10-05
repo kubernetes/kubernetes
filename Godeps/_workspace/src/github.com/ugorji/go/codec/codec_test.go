@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -860,6 +860,60 @@ func testCodecRpcOne(t *testing.T, rr Rpc, h Handle, doRequest bool, exitSleepMs
 	return
 }
 
+func doTestMapEncodeForCanonical(t *testing.T, name string, h Handle) {
+	v1 := map[string]interface{}{
+		"a": 1,
+		"b": "hello",
+		"c": map[string]interface{}{
+			"c/a": 1,
+			"c/b": "world",
+			"c/c": []int{1, 2, 3, 4},
+			"c/d": map[string]interface{}{
+				"c/d/a": "fdisajfoidsajfopdjsaopfjdsapofda",
+				"c/d/b": "fdsafjdposakfodpsakfopdsakfpodsakfpodksaopfkdsopafkdopsa",
+				"c/d/c": "poir02  ir30qif4p03qir0pogjfpoaerfgjp ofke[padfk[ewapf kdp[afep[aw",
+				"c/d/d": "fdsopafkd[sa f-32qor-=4qeof -afo-erfo r-eafo 4e-  o r4-qwo ag",
+				"c/d/e": "kfep[a sfkr0[paf[a foe-[wq  ewpfao-q ro3-q ro-4qof4-qor 3-e orfkropzjbvoisdb",
+				"c/d/f": "",
+			},
+			"c/e": map[int]string{
+				1:     "1",
+				22:    "22",
+				333:   "333",
+				4444:  "4444",
+				55555: "55555",
+			},
+			"c/f": map[string]int{
+				"1":     1,
+				"22":    22,
+				"333":   333,
+				"4444":  4444,
+				"55555": 55555,
+			},
+		},
+	}
+	var v2 map[string]interface{}
+	var b1, b2 []byte
+
+	// encode v1 into b1, decode b1 into v2, encode v2 into b2, compare b1 and b2
+
+	bh := h.getBasicHandle()
+	canonical0 := bh.Canonical
+	bh.Canonical = true
+	defer func() { bh.Canonical = canonical0 }()
+
+	e1 := NewEncoderBytes(&b1, h)
+	e1.MustEncode(v1)
+	d1 := NewDecoderBytes(b1, h)
+	d1.MustDecode(&v2)
+	e2 := NewEncoderBytes(&b2, h)
+	e2.MustEncode(v2)
+	if !bytes.Equal(b1, b2) {
+		logT(t, "Unequal bytes: %v VS %v", b1, b2)
+		t.FailNow()
+	}
+}
+
 // Comprehensive testing that generates data encoded from python handle (cbor, msgpack),
 // and validates that our code can read and write it out accordingly.
 // We keep this unexported here, and put actual test in ext_dep_test.go.
@@ -1046,6 +1100,10 @@ func TestCborCodecsMisc(t *testing.T) {
 
 func TestCborCodecsEmbeddedPointer(t *testing.T) {
 	testCodecEmbeddedPointer(t, testCborH)
+}
+
+func TestCborMapEncodeForCanonical(t *testing.T) {
+	doTestMapEncodeForCanonical(t, "cbor", testCborH)
 }
 
 func TestJsonCodecsTable(t *testing.T) {
