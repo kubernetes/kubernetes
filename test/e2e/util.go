@@ -242,6 +242,9 @@ func providerIs(providers ...string) bool {
 	return false
 }
 
+// providersWithSSH are those providers where each node is accessible with SSH
+var providersWithSSH = []string{"gce", "gke", "aws"}
+
 type podCondition func(pod *api.Pod) (bool, error)
 
 // podReady returns whether pod has a condition of Ready with a status of true.

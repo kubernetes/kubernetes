@@ -238,7 +238,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to up and down services", func() {
 		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		SkipUnlessProviderIs(providersWithSSH...)
 		ns := namespaces[0]
 		numPods, servicePort := 3, 80
 
@@ -532,14 +532,17 @@ var _ = Describe("Services", func() {
 		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
-		hosts, err := NodeSSHHosts(c)
-		if err != nil {
-			Expect(err).NotTo(HaveOccurred())
-		}
-		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-		if code != 0 {
-			Failf("expected node port (%d) to be in use", nodePort)
+		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		if providerIs(providersWithSSH...) {
+			hosts, err := NodeSSHHosts(c)
+			if err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+			if code != 0 {
+				Failf("expected node port (%d) to be in use", nodePort)
+			}
 		}
 	})
 
@@ -965,14 +968,17 @@ var _ = Describe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := NodeSSHHosts(c)
-		if err != nil {
-			Expect(err).NotTo(HaveOccurred())
-		}
-		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-		if code == 0 {
-			Failf("expected node port (%d) to not be in use", nodePort)
+		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		if providerIs(providersWithSSH...) {
+			hosts, err := NodeSSHHosts(c)
+			if err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+			if code == 0 {
+				Failf("expected node port (%d) to not be in use", nodePort)
+			}
 		}
 
 		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
