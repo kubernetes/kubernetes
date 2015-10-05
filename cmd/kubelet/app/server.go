@@ -490,7 +490,7 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(kcfg, nil); err != nil {
+	if err := RunKubelet(kcfg); err != nil {
 		return err
 	}
 
@@ -697,7 +697,7 @@ func SimpleKubelet(client *client.Client,
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
+func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
@@ -746,8 +746,9 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
+	builder := kcfg.Builder
 	if builder == nil {
-		builder = createAndInitKubelet
+		builder = CreateAndInitKubelet
 	}
 	if kcfg.OSInterface == nil {
 		kcfg.OSInterface = kubecontainer.RealOS{}
@@ -816,6 +817,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
+	Builder                        KubeletBuilder
 	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface
@@ -857,6 +859,7 @@ type KubeletConfig struct {
 	NodeStatusUpdateFrequency      time.Duration
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
+	PodConfig                      *config.PodConfig
 	PodInfraContainerImage         string
 	Port                           uint
 	ReadOnlyPort                   uint
@@ -880,7 +883,7 @@ type KubeletConfig struct {
 	VolumePlugins                  []volume.VolumePlugin
 }
 
-func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
+func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
@@ -901,7 +904,10 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
 	}
 
-	pc = makePodSourceConfig(kc)
+	pc = kc.PodConfig
+	if pc == nil {
+		pc = makePodSourceConfig(kc)
+	}
 	k, err = kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.NodeName,
