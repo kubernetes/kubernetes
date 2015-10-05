@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package container
 
 import (
 	"fmt"
 	"time"
-
-	"k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // Specified a policy for garbage collecting containers.
@@ -39,7 +37,7 @@ type ContainerGCPolicy struct {
 // Manages garbage collection of dead containers.
 //
 // Implementation is thread-compatible.
-type containerGC interface {
+type ContainerGC interface {
 	// Garbage collect containers.
 	GarbageCollect() error
 }
@@ -47,14 +45,14 @@ type containerGC interface {
 // TODO(vmarmol): Preferentially remove pod infra containers.
 type realContainerGC struct {
 	// Container runtime
-	runtime container.Runtime
+	runtime Runtime
 
 	// Policy for garbage collection.
 	policy ContainerGCPolicy
 }
 
-// New containerGC instance with the specified policy.
-func newContainerGC(runtime container.Runtime, policy ContainerGCPolicy) (containerGC, error) {
+// New ContainerGC instance with the specified policy.
+func NewContainerGC(runtime Runtime, policy ContainerGCPolicy) (ContainerGC, error) {
 	if policy.MinAge < 0 {
 		return nil, fmt.Errorf("invalid minimum garbage collection age: %v", policy.MinAge)
 	}
@@ -66,5 +64,5 @@ func newContainerGC(runtime container.Runtime, policy ContainerGCPolicy) (contai
 }
 
 func (cgc *realContainerGC) GarbageCollect() error {
-	return cgc.runtime.GarbageCollect(cgc.policy.MaxPerPodContainer, cgc.policy.MaxContainers, cgc.policy.MinAge)
+	return cgc.runtime.GarbageCollect(cgc.policy)
 }

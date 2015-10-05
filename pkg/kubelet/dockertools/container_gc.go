@@ -26,6 +26,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -172,10 +173,10 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	return evictUnits, unidentifiedContainers, nil
 }
 
-// Garbage collection of dead containers
-func (cgc *containerGC) GarbageCollect(maxPerPodContainer, maxContainers int, minAge time.Duration) error {
+// GarbageCollect removes dead containers using the specified container gc policy
+func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
 	// Separate containers by evict units.
-	evictUnits, unidentifiedContainers, err := cgc.evictableContainers(minAge)
+	evictUnits, unidentifiedContainers, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
 		return err
 	}
@@ -190,14 +191,14 @@ func (cgc *containerGC) GarbageCollect(maxPerPodContainer, maxContainers int, mi
 	}
 
 	// Enforce max containers per evict unit.
-	if maxPerPodContainer >= 0 {
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, maxPerPodContainer)
+	if gcPolicy.MaxPerPodContainer >= 0 {
+		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
 	}
 
 	// Enforce max total number of containers.
-	if maxContainers >= 0 && evictUnits.NumContainers() > maxContainers {
+	if gcPolicy.MaxContainers >= 0 && evictUnits.NumContainers() > gcPolicy.MaxContainers {
 		// Leave an equal number of containers per evict unit (min: 1).
-		numContainersPerEvictUnit := maxContainers / evictUnits.NumEvictUnits()
+		numContainersPerEvictUnit := gcPolicy.MaxContainers / evictUnits.NumEvictUnits()
 		if numContainersPerEvictUnit < 1 {
 			numContainersPerEvictUnit = 1
 		}
@@ -205,14 +206,14 @@ func (cgc *containerGC) GarbageCollect(maxPerPodContainer, maxContainers int, mi
 
 		// If we still need to evict, evict oldest first.
 		numContainers := evictUnits.NumContainers()
-		if numContainers > maxContainers {
+		if numContainers > gcPolicy.MaxContainers {
 			flattened := make([]containerGCInfo, 0, numContainers)
 			for uid := range evictUnits {
 				flattened = append(flattened, evictUnits[uid]...)
 			}
 			sort.Sort(byCreated(flattened))
 
-			cgc.removeOldestN(flattened, numContainers-maxContainers)
+			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
 		}
 	}
 
