@@ -218,9 +218,11 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	kcfg.NodeName = kcfg.Hostname
 
-	err = app.RunKubelet(&kcfg, app.KubeletBuilder(func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
+	kcfg.Builder = app.KubeletBuilder(func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
 		return s.createAndInitKubelet(kc, hks, clientConfig)
-	}))
+	})
+
+	err = app.RunKubelet(&kcfg)
 	if err != nil {
 		return err
 	}
