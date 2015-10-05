@@ -17,6 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -175,6 +176,76 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	return nil
 }
 
+func extractGroupVersions(l *api.APIGroupList) []string {
+	var groupVersions []string
+	for _, g := range l.Groups {
+		for _, gv := range g.Versions {
+			groupVersions = append(groupVersions, gv.GroupVersion)
+		}
+	}
+	return groupVersions
+}
+
+// ServerAPIVersions returns the GroupVersions supported by the API server.
+// It creates a RESTClient based on the passed in config, but it doesn't rely
+// on the Version, Codec, and Prefix of the config, because it uses AbsPath and
+// takes the raw response.
+func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
+	transport, err := TransportFor(c)
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{Transport: transport}
+
+	configCopy := *c
+	configCopy.Version = ""
+	configCopy.Prefix = ""
+	baseURL, err := defaultServerUrlFor(c)
+	if err != nil {
+		return nil, err
+	}
+	// Get the groupVersions exposed at /api
+	req, err := http.NewRequest("GET", baseURL.String()+"/api", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var v api.APIVersions
+	err = json.Unmarshal(body, &v)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	groupVersions = append(groupVersions, v.Versions...)
+	// Get the groupVersions exposed at /apis
+	req, err = http.NewRequest("GET", baseURL.String()+"/apis", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var apiGroupList api.APIGroupList
+	err = json.Unmarshal(body, &apiGroupList)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+
+	return groupVersions, nil
+}
+
 // NegotiateVersion queries the server's supported api versions to find
 // a version that both client and server support.
 // - If no version is provided, try registered client versions in order of
@@ -184,24 +255,24 @@ func MatchesServerVersion(client *Client, c *Config) error {
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(client *Client, c *Config, version string, clientRegisteredVersions []string) (string, error) {
+// TODO: caesarxuchao: We should call NegotiateVersion for each group. This
+// requires one config for each group. Please refer to #14592. The logic of
+// NegotiateVersion is also questionable, e.g., if the passed in version is not
+// supported, arguably an error should be returned, rather than continuing the
+// negotiation.
+func NegotiateVersion(c *Config, version string, clientRegisteredVersions []string) (string, error) {
 	var err error
-	if client == nil {
-		client, err = New(c)
-		if err != nil {
-			return "", err
-		}
-	}
 	clientVersions := sets.String{}
 	for _, v := range clientRegisteredVersions {
 		clientVersions.Insert(v)
 	}
-	apiVersions, err := client.ServerAPIVersions()
+
+	apiVersions, err := ServerAPIVersions(c)
 	if err != nil {
 		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
 	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
+	for _, v := range apiVersions {
 		serverVersions.Insert(v)
 	}
 	// If no version requested, use config version (may also be empty).
@@ -228,11 +299,9 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 		if serverVersions.Has(clientVersion) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
-			// TODO: caesarxuchao: enable the warning message when we have
-			// proper fix. Please refer to issue #14895.
-			// if len(version) != 0 {
-			// 	glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
-			// }
+			if len(version) != 0 {
+				glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
+			}
 			return clientVersion, nil
 		}
 	}
@@ -286,15 +355,23 @@ func NewInCluster() (*Client, error) {
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 func SetKubernetesDefaults(config *Config) error {
-	if config.Prefix == "" {
-		config.Prefix = "/api"
-	}
+	// TODO: caesarxuchao: re-enable the "if" when we have a config for each group.
+	// We need to comment it out now because the config maybe for the experimental
+	// group.
+	//if config.Prefix == "" {
+	config.Prefix = "/api"
+	//}
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if len(config.Version) == 0 {
-		config.Version = defaultVersionFor(config)
-	}
+	// TODO: caesarxuchao: re-enable the "if" when we have a config for each group.
+	// We need to comment it out now because the config maybe for the experimental
+	// group.
+	//if len(config.Version) == 0 {
+	//config.Version = defaultVersionFor(config)
+	//}
+	config.Version = latest.GroupOrDie("").GroupVersion
+
 	version := config.Version
 	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(version)
 	if err != nil {
@@ -466,9 +543,6 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	if version == "" {
-		return nil, fmt.Errorf("version must be set")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
