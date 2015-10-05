@@ -23,7 +23,6 @@ fi
 
 
 function config_etcd {
-
   source ~/kube/config-default.sh
 
   attempt=0
@@ -32,13 +31,14 @@ function config_etcd {
     if [[ "$?" == 0 ]]; then
       break
     else
-    	# enough timeout??
       if (( attempt > 600 )); then
-        echo "timeout for waiting network config" > ~/kube/err.log
+        echo "timeout waiting for /coreos.com/network/config" >> ~/kube/err.log
         exit 2
       fi
 
-      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\"}"
+      /opt/bin/etcdctl mk /coreos.com/network/config \
+          "{\"Network\":\"${FLANNEL_NET}\"}"
+
       attempt=$((attempt+1))
       sleep 3
     fi
@@ -46,15 +46,26 @@ function config_etcd {
 }
 
 function restart_docker {
-  #wait some secs for /run/flannel/subnet.env ready
-  sleep 15
   sudo ip link set dev docker0 down
   sudo brctl delbr docker0
 
+  attempt=0
+  while [ ! -f /run/flannel/subnet.env ]; do
+    if (( attempt > 600 )); then
+      echo "timeout waiting for /run/flannel/subnet.env" >> ~/kube/err.log
+      exit 2
+    fi
+    attempt=$((attempt+1))
+    sleep 3
+  done
+
   source /run/flannel/subnet.env
 
-  echo DOCKER_OPTS=\"${DOCKER_OPTS} -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
-       --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\" > /etc/default/docker
+  echo DOCKER_OPTS=\"${DOCKER_OPTS} \
+      -H tcp://127.0.0.1:4243 \
+      -H unix:///var/run/docker.sock \
+      --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\" > /etc/default/docker
+
   sudo service docker restart
 }
 
