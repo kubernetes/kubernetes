@@ -34,7 +34,7 @@ import (
 
 const (
 	// How long to wait for a job to finish.
-	jobTimeout = 5 * time.Minute
+	jobTimeout = 15 * time.Minute
 
 	// Job selector name
 	jobSelectorKey = "job"
