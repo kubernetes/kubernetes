@@ -149,7 +149,7 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 
 	err = setRLimit(64 * 1000)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set open file handler limit", err)
+		return nil, fmt.Errorf("failed to set open file handler limit: %v", err)
 	}
 
 	proxyPorts := newPortAllocator(pr)
