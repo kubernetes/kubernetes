@@ -58,13 +58,15 @@ const (
 
 type KubeletExecutorServer struct {
 	*app.KubeletServer
-	SuicideTimeout time.Duration
+	SuicideTimeout    time.Duration
+	LaunchGracePeriod time.Duration
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
 	k := &KubeletExecutorServer{
-		KubeletServer:  app.NewKubeletServer(),
-		SuicideTimeout: config.DefaultSuicideTimeout,
+		KubeletServer:     app.NewKubeletServer(),
+		SuicideTimeout:    config.DefaultSuicideTimeout,
+		LaunchGracePeriod: config.DefaultLaunchGracePeriod,
 	}
 	if pwd, err := os.Getwd(); err != nil {
 		log.Warningf("failed to determine current directory: %v", err)
@@ -79,6 +81,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	s.KubeletServer.AddFlags(fs)
 	fs.DurationVar(&s.SuicideTimeout, "suicide-timeout", s.SuicideTimeout, "Self-terminate after this period of inactivity. Zero disables suicide watch.")
+	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
 }
 
 // Run runs the specified KubeletExecutorServer.
@@ -331,14 +334,15 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	kubeletFinished := make(chan struct{})
 	staticPodsConfigPath := filepath.Join(kc.RootDirectory, "static-pods")
 	exec := executor.New(executor.Config{
-		Kubelet:         klet,
-		Updates:         updates,
-		SourceName:      MESOS_CFG_SOURCE,
-		APIClient:       kc.KubeClient,
-		Docker:          kc.DockerClient,
-		SuicideTimeout:  ks.SuicideTimeout,
-		KubeletFinished: kubeletFinished,
-		ExitFunc:        os.Exit,
+		Kubelet:           klet,
+		Updates:           updates,
+		SourceName:        MESOS_CFG_SOURCE,
+		APIClient:         kc.KubeClient,
+		Docker:            kc.DockerClient,
+		SuicideTimeout:    ks.SuicideTimeout,
+		LaunchGracePeriod: ks.LaunchGracePeriod,
+		KubeletFinished:   kubeletFinished,
+		ExitFunc:          os.Exit,
 		PodStatusFunc: func(_ executor.KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return klet.GetRuntime().GetPodStatus(pod)
 		},
