@@ -39,7 +39,7 @@ var (
 
 const (
 	initialResourcesAnnotation = "kubernetes.io/initial-resources"
-	samplesThreshold           = 60
+	samplesThreshold           = 30
 	week                       = 7 * 24 * time.Hour
 	month                      = 30 * 24 * time.Hour
 )
