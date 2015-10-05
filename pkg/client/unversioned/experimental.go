@@ -143,9 +143,7 @@ func setExperimentalDefaults(config *Config) error {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
 			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
 	}
-	if config.Codec == nil {
-		config.Codec = versionInterfaces.Codec
-	}
+	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
