@@ -70,9 +70,11 @@ func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	m := master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
