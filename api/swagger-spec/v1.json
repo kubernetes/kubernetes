@@ -6,7 +6,7 @@
   "apis": [
    {
     "path": "/api/v1/namespaces/{namespace}/bindings",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Binding",
@@ -57,7 +57,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/componentstatuses",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ComponentStatusList",
@@ -132,7 +132,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/componentstatuses/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ComponentStatus",
@@ -183,7 +183,7 @@
    },
    {
     "path": "/api/v1/componentstatuses",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ComponentStatusList",
@@ -250,7 +250,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/endpoints",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.EndpointsList",
@@ -370,7 +370,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/endpoints",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -445,7 +445,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/endpoints/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Endpoints",
@@ -657,7 +657,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/endpoints/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -740,7 +740,7 @@
    },
    {
     "path": "/api/v1/endpoints",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.EndpointsList",
@@ -807,7 +807,7 @@
    },
    {
     "path": "/api/v1/watch/endpoints",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -874,7 +874,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/events",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.EventList",
@@ -994,7 +994,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/events",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -1069,7 +1069,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/events/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Event",
@@ -1281,7 +1281,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/events/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -1364,7 +1364,7 @@
    },
    {
     "path": "/api/v1/events",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.EventList",
@@ -1431,7 +1431,7 @@
    },
    {
     "path": "/api/v1/watch/events",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -1498,7 +1498,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/limitranges",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.LimitRangeList",
@@ -1618,7 +1618,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/limitranges",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -1693,7 +1693,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/limitranges/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.LimitRange",
@@ -1905,7 +1905,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/limitranges/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -1988,7 +1988,7 @@
    },
    {
     "path": "/api/v1/limitranges",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.LimitRangeList",
@@ -2055,7 +2055,7 @@
    },
    {
     "path": "/api/v1/watch/limitranges",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -2122,7 +2122,7 @@
    },
    {
     "path": "/api/v1/namespaces",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.NamespaceList",
@@ -2226,7 +2226,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -2293,7 +2293,7 @@
    },
    {
     "path": "/api/v1/namespaces/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Namespace",
@@ -2473,7 +2473,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -2548,7 +2548,7 @@
    },
    {
     "path": "/api/v1/namespaces/{name}/finalize",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Namespace",
@@ -2599,7 +2599,7 @@
    },
    {
     "path": "/api/v1/namespaces/{name}/status",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Namespace",
@@ -2650,7 +2650,7 @@
    },
    {
     "path": "/api/v1/nodes",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.NodeList",
@@ -2754,7 +2754,7 @@
    },
    {
     "path": "/api/v1/watch/nodes",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -2821,7 +2821,7 @@
    },
    {
     "path": "/api/v1/nodes/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Node",
@@ -3001,7 +3001,7 @@
    },
    {
     "path": "/api/v1/watch/nodes/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -3076,7 +3076,7 @@
    },
    {
     "path": "/api/v1/proxy/nodes/{name}/{path:*}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -3262,7 +3262,7 @@
    },
    {
     "path": "/api/v1/proxy/nodes/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -3400,7 +3400,7 @@
    },
    {
     "path": "/api/v1/nodes/{name}/status",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Node",
@@ -3451,7 +3451,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/persistentvolumeclaims",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolumeClaimList",
@@ -3571,7 +3571,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/persistentvolumeclaims",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -3646,7 +3646,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/persistentvolumeclaims/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolumeClaim",
@@ -3858,7 +3858,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/persistentvolumeclaims/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -3941,7 +3941,7 @@
    },
    {
     "path": "/api/v1/persistentvolumeclaims",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolumeClaimList",
@@ -4008,7 +4008,7 @@
    },
    {
     "path": "/api/v1/watch/persistentvolumeclaims",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -4075,7 +4075,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/persistentvolumeclaims/{name}/status",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolumeClaim",
@@ -4134,7 +4134,7 @@
    },
    {
     "path": "/api/v1/persistentvolumes",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolumeList",
@@ -4238,7 +4238,7 @@
    },
    {
     "path": "/api/v1/watch/persistentvolumes",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -4305,7 +4305,7 @@
    },
    {
     "path": "/api/v1/persistentvolumes/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolume",
@@ -4485,7 +4485,7 @@
    },
    {
     "path": "/api/v1/watch/persistentvolumes/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -4560,7 +4560,7 @@
    },
    {
     "path": "/api/v1/persistentvolumes/{name}/status",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PersistentVolume",
@@ -4611,7 +4611,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PodList",
@@ -4731,7 +4731,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/pods",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -4806,7 +4806,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Pod",
@@ -5018,7 +5018,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/pods/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -5101,7 +5101,7 @@
    },
    {
     "path": "/api/v1/proxy/namespaces/{namespace}/pods/{name}/{path:*}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -5335,7 +5335,7 @@
    },
    {
     "path": "/api/v1/proxy/namespaces/{namespace}/pods/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -5521,7 +5521,7 @@
    },
    {
     "path": "/api/v1/pods",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PodList",
@@ -5588,7 +5588,7 @@
    },
    {
     "path": "/api/v1/watch/pods",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -5655,7 +5655,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/attach",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -5801,7 +5801,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/binding",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Binding",
@@ -5860,7 +5860,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/exec",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -6022,7 +6022,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/log",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Pod",
@@ -6137,7 +6137,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/portforward",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -6203,7 +6203,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/proxy",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -6437,7 +6437,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/proxy/{path:*}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -6719,7 +6719,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/status",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Pod",
@@ -6778,7 +6778,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/podtemplates",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PodTemplateList",
@@ -6898,7 +6898,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/podtemplates",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -6973,7 +6973,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/podtemplates/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PodTemplate",
@@ -7185,7 +7185,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/podtemplates/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -7268,7 +7268,7 @@
    },
    {
     "path": "/api/v1/podtemplates",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.PodTemplateList",
@@ -7335,7 +7335,7 @@
    },
    {
     "path": "/api/v1/watch/podtemplates",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -7402,7 +7402,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/replicationcontrollers",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ReplicationControllerList",
@@ -7522,7 +7522,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/replicationcontrollers",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -7597,7 +7597,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/replicationcontrollers/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ReplicationController",
@@ -7809,7 +7809,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/replicationcontrollers/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -7892,7 +7892,7 @@
    },
    {
     "path": "/api/v1/replicationcontrollers",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ReplicationControllerList",
@@ -7959,7 +7959,7 @@
    },
    {
     "path": "/api/v1/watch/replicationcontrollers",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -8026,7 +8026,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/resourcequotas",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ResourceQuotaList",
@@ -8146,7 +8146,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/resourcequotas",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -8221,7 +8221,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/resourcequotas/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ResourceQuota",
@@ -8433,7 +8433,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/resourcequotas/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -8516,7 +8516,7 @@
    },
    {
     "path": "/api/v1/resourcequotas",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ResourceQuotaList",
@@ -8583,7 +8583,7 @@
    },
    {
     "path": "/api/v1/watch/resourcequotas",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -8650,7 +8650,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/resourcequotas/{name}/status",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ResourceQuota",
@@ -8709,7 +8709,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/secrets",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.SecretList",
@@ -8829,7 +8829,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/secrets",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -8904,7 +8904,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/secrets/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Secret",
@@ -9116,7 +9116,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/secrets/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -9199,7 +9199,7 @@
    },
    {
     "path": "/api/v1/secrets",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.SecretList",
@@ -9266,7 +9266,7 @@
    },
    {
     "path": "/api/v1/watch/secrets",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -9333,7 +9333,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/serviceaccounts",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ServiceAccountList",
@@ -9453,7 +9453,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/serviceaccounts",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -9528,7 +9528,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/serviceaccounts/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ServiceAccount",
@@ -9740,7 +9740,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/serviceaccounts/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -9823,7 +9823,7 @@
    },
    {
     "path": "/api/v1/serviceaccounts",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ServiceAccountList",
@@ -9890,7 +9890,7 @@
    },
    {
     "path": "/api/v1/watch/serviceaccounts",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -9957,7 +9957,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/services",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ServiceList",
@@ -10077,7 +10077,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/services",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -10152,7 +10152,7 @@
    },
    {
     "path": "/api/v1/namespaces/{namespace}/services/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.Service",
@@ -10356,7 +10356,7 @@
    },
    {
     "path": "/api/v1/watch/namespaces/{namespace}/services/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -10439,7 +10439,7 @@
    },
    {
     "path": "/api/v1/proxy/namespaces/{namespace}/services/{name}/{path:*}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -10673,7 +10673,7 @@
    },
    {
     "path": "/api/v1/proxy/namespaces/{namespace}/services/{name}",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "string",
@@ -10859,7 +10859,7 @@
    },
    {
     "path": "/api/v1/services",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "v1.ServiceList",
@@ -10926,7 +10926,7 @@
    },
    {
     "path": "/api/v1/watch/services",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "json.WatchEvent",
@@ -10993,7 +10993,7 @@
    },
    {
     "path": "/api/v1",
-    "description": "API at /api/v1 version v1",
+    "description": "API at /api/v1",
     "operations": [
      {
       "type": "void",
