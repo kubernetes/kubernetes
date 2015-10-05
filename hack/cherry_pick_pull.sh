@@ -136,7 +136,7 @@ gitamcleanup=false
 function make-a-pr() {
   local rel=$(basename ${BRANCH})
   echo "+++ Creating a pull request on github"
-  hub pull-request -F- -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}" <<EOF
+  hub pull-request -F - -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}" <<EOF
 Automated cherry pick of ${PULLSUBJ}
 
 Cherry pick of ${PULLSUBJ} on ${rel}.
