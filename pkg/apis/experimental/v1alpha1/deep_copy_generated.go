@@ -838,6 +838,55 @@ func deepCopy_v1alpha1_APIVersion(in APIVersion, out *APIVersion, c *conversion.
 	return nil
 }
 
+func deepCopy_v1alpha1_ClusterAutoscaler(in ClusterAutoscaler, out *ClusterAutoscaler, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1alpha1_ClusterAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_ClusterAutoscalerList(in ClusterAutoscalerList, out *ClusterAutoscalerList, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ClusterAutoscaler, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1alpha1_ClusterAutoscaler(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_ClusterAutoscalerSpec(in ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, c *conversion.Cloner) error {
+	out.MinNodes = in.MinNodes
+	out.MaxNodes = in.MaxNodes
+	if in.TargetUtilization != nil {
+		out.TargetUtilization = make([]NodeUtilization, len(in.TargetUtilization))
+		for i := range in.TargetUtilization {
+			if err := deepCopy_v1alpha1_NodeUtilization(in.TargetUtilization[i], &out.TargetUtilization[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TargetUtilization = nil
+	}
+	return nil
+}
+
 func deepCopy_v1alpha1_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1296,6 +1345,12 @@ func deepCopy_v1alpha1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clo
 	return nil
 }
 
+func deepCopy_v1alpha1_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
+	out.Resource = in.Resource
+	out.Value = in.Value
+	return nil
+}
+
 func deepCopy_v1alpha1_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1509,6 +1564,9 @@ func init() {
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,
 		deepCopy_v1alpha1_APIVersion,
+		deepCopy_v1alpha1_ClusterAutoscaler,
+		deepCopy_v1alpha1_ClusterAutoscalerList,
+		deepCopy_v1alpha1_ClusterAutoscalerSpec,
 		deepCopy_v1alpha1_DaemonSet,
 		deepCopy_v1alpha1_DaemonSetList,
 		deepCopy_v1alpha1_DaemonSetSpec,
@@ -1536,6 +1594,7 @@ func init() {
 		deepCopy_v1alpha1_JobList,
 		deepCopy_v1alpha1_JobSpec,
 		deepCopy_v1alpha1_JobStatus,
+		deepCopy_v1alpha1_NodeUtilization,
 		deepCopy_v1alpha1_ReplicationControllerDummy,
 		deepCopy_v1alpha1_ResourceConsumption,
 		deepCopy_v1alpha1_RollingUpdateDeployment,

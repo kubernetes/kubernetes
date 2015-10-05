@@ -950,3 +950,117 @@ func TestValidateIngress(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateClusterAutoscaler(t *testing.T) {
+	successCases := []experimental.ClusterAutoscaler{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "ClusterAutoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: experimental.ClusterAutoscalerSpec{
+				MinNodes: 1,
+				MaxNodes: 5,
+				TargetUtilization: []experimental.NodeUtilization{
+					{
+						Resource: experimental.CpuRequest,
+						Value:    0.7,
+					},
+				},
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateClusterAutoscaler(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]experimental.ClusterAutoscaler{
+		"name must be ClusterAutoscaler": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "TestClusterAutoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: experimental.ClusterAutoscalerSpec{
+				MinNodes: 1,
+				MaxNodes: 5,
+				TargetUtilization: []experimental.NodeUtilization{
+					{
+						Resource: experimental.CpuRequest,
+						Value:    0.7,
+					},
+				},
+			},
+		},
+		"namespace must be default": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "ClusterAutoscaler",
+				Namespace: "test",
+			},
+			Spec: experimental.ClusterAutoscalerSpec{
+				MinNodes: 1,
+				MaxNodes: 5,
+				TargetUtilization: []experimental.NodeUtilization{
+					{
+						Resource: experimental.CpuRequest,
+						Value:    0.7,
+					},
+				},
+			},
+		},
+
+		`must be non-negative`: {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "ClusterAutoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: experimental.ClusterAutoscalerSpec{
+				MinNodes: -1,
+				MaxNodes: 5,
+				TargetUtilization: []experimental.NodeUtilization{
+					{
+						Resource: experimental.CpuRequest,
+						Value:    0.7,
+					},
+				},
+			},
+		},
+		`must be bigger or equal to minNodes`: {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "ClusterAutoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: experimental.ClusterAutoscalerSpec{
+				MinNodes: 10,
+				MaxNodes: 5,
+				TargetUtilization: []experimental.NodeUtilization{
+					{
+						Resource: experimental.CpuRequest,
+						Value:    0.7,
+					},
+				},
+			},
+		},
+		"required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "ClusterAutoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: experimental.ClusterAutoscalerSpec{
+				MinNodes:          1,
+				MaxNodes:          5,
+				TargetUtilization: []experimental.NodeUtilization{},
+			},
+		},
+	}
+
+	for k, v := range errorCases {
+		errs := ValidateClusterAutoscaler(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else if !strings.Contains(errs[0].Error(), k) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+		}
+	}
+}
