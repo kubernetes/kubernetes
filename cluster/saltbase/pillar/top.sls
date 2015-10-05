@@ -6,4 +6,3 @@ base:
     - docker-images
     - privilege
     - systemd
-    - network_provider
