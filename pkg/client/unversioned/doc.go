@@ -15,14 +15,14 @@ limitations under the License.
 */
 
 /*
-Package client contains the implementation of the client side communication with the
+Package unversioned contains the implementation of the client side communication with the
 Kubernetes master. The Client class provides methods for reading, creating, updating,
 and deleting pods, replication controllers, daemons, services, and nodes.
 
 Most consumers should use the Config object to create a Client:
 
     import (
-      "k8s.io/kubernetes/pkg/client"
+      client "k8s.io/kubernetes/pkg/client/unversioned"
       "k8s.io/kubernetes/pkg/api"
       "k8s.io/kubernetes/pkg/fields"
       "k8s.io/kubernetes/pkg/labels"
