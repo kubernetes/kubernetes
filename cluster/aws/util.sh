@@ -498,10 +498,12 @@ function upload-server-tars() {
     # and then the bucket is most-simply named (s3.amazonaws.com)
     aws s3 mb "s3://${AWS_S3_BUCKET}" --region ${AWS_S3_REGION}
 
+    echo "Confirming bucket was created..."
+
     local attempt=0
     while true; do
       if ! aws s3 ls --region ${AWS_S3_REGION} "s3://${AWS_S3_BUCKET}" > /dev/null 2>&1; then
-        if (( attempt > 5 )); then
+        if (( attempt > 120 )); then
           echo
           echo -e "${color_red}Unable to confirm bucket creation." >&2
           echo "Please ensure that s3://${AWS_S3_BUCKET} exists" >&2
