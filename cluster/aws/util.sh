@@ -244,7 +244,7 @@ case "${KUBE_OS_DISTRIBUTION}" in
     detect-jessie-image
     ;;
   *)
-    echo "Please specify AWS_IMAGE directly (distro not recognized)"
+    echo "Please specify AWS_IMAGE directly (distro ${KUBE_OS_DISTRIBUTION} not recognized)"
     exit 2
     ;;
 esac
