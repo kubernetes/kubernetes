@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+id: pxc-cluster
+metadata:
+  name: pxc-cluster
+spec:
+  ports:
+    - port: 3306
+      name: mysql
+  selector:
+    unit: pxc-cluster
+labels: 
+  unit: pxc-cluster
