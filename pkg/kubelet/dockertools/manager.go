@@ -87,7 +87,6 @@ var podInfraContainerImagePullPolicy = api.PullIfNotPresent
 type DockerManager struct {
 	client              DockerInterface
 	recorder            record.EventRecorder
-	readinessManager    *kubecontainer.ReadinessManager
 	containerRefManager *kubecontainer.RefManager
 	os                  kubecontainer.OSInterface
 	machineInfo         *cadvisorApi.MachineInfo
@@ -145,7 +144,7 @@ type DockerManager struct {
 func NewDockerManager(
 	client DockerInterface,
 	recorder record.EventRecorder,
-	readinessManager *kubecontainer.ReadinessManager,
+	prober prober.Prober,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorApi.MachineInfo,
 	podInfraContainerImage string,
@@ -195,7 +194,6 @@ func NewDockerManager(
 	dm := &DockerManager{
 		client:                 client,
 		recorder:               recorder,
-		readinessManager:       readinessManager,
 		containerRefManager:    containerRefManager,
 		os:                     osInterface,
 		machineInfo:            machineInfo,
@@ -205,7 +203,7 @@ func NewDockerManager(
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
-		prober:                 nil,
+		prober:                 prober,
 		generator:              generator,
 		execHandler:            execHandler,
 		oomAdjuster:            oomAdjuster,
@@ -213,7 +211,6 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
 	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm)
 
 	return dm
@@ -1386,8 +1383,6 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 		gracePeriod -= int64(unversioned.Now().Sub(start.Time).Seconds())
 	}
 
-	dm.readinessManager.RemoveReadiness(ID)
-
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
 	if gracePeriod < minimumGracePeriodInSeconds {
 		gracePeriod = minimumGracePeriodInSeconds
@@ -1682,7 +1677,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus, dm.readinessManager) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus) {
 				// If we are here it means that the container is dead and should be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
@@ -1717,7 +1712,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 			continue
 		}
 
-		result, err := dm.prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
+		result, err := dm.prober.ProbeLiveness(pod, podStatus, container, string(c.ID), c.Created)
 		if err != nil {
 			// TODO(vmarmol): examine this logic.
 			glog.V(2).Infof("probe no-error: %q", container.Name)

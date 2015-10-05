@@ -51,7 +51,7 @@ func TrimRuntimePrefix(fullString string) string {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus, readinessManager *ReadinessManager) bool {
+func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
 	podFullName := GetPodFullName(pod)
 
 	// Get all dead container status.
@@ -60,11 +60,6 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 		if containerStatus.Name == container.Name && containerStatus.State.Terminated != nil {
 			resultStatus = append(resultStatus, &podStatus.ContainerStatuses[i])
 		}
-	}
-
-	// Set dead containers to notReady state.
-	for _, c := range resultStatus {
-		readinessManager.RemoveReadiness(TrimRuntimePrefix(c.ContainerID))
 	}
 
 	// Check RestartPolicy for dead container.

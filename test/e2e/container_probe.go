@@ -118,6 +118,9 @@ func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 					Image:          "gcr.io/google_containers/test-webserver",
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
+				}, {
+					Name:  "test-noprobe",
+					Image: "gcr.io/google_containers/pause",
 				},
 			},
 		},

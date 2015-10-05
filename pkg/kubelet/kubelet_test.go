@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -105,7 +106,6 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
-	kubelet.readinessManager = kubecontainer.NewReadinessManager()
 	kubelet.recorder = fakeRecorder
 	kubelet.statusManager = status.NewManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
@@ -130,6 +130,10 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		runtimeCache: kubelet.runtimeCache,
 		t:            t,
 	}
+
+	kubelet.prober = prober.FakeProber{}
+	kubelet.probeManager = prober.FakeManager{}
+
 	kubelet.volumeManager = newVolumeManager()
 	kubelet.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), mockCadvisor, "", "", "")
 	kubelet.networkConfigured = true
