@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // ExposeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -133,7 +134,11 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
-	params["default-name"] = info.Name
+	name := info.Name
+	if len(name) > validation.DNS952LabelMaxLength {
+		name = name[:validation.DNS952LabelMaxLength]
+	}
+	params["default-name"] = name
 
 	// For objects that need a pod selector, derive it from the exposed object in case a user
 	// didn't explicitly specify one via --selector
