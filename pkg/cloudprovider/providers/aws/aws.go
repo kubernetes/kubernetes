@@ -1975,22 +1975,6 @@ func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) er
 	return nil
 }
 
-// TODO: Make efficient
-func (a *AWSCloud) getInstancesByIds(ids []string) ([]*ec2.Instance, error) {
-	instances := []*ec2.Instance{}
-	for _, id := range ids {
-		instance, err := a.getInstanceById(id)
-		if err != nil {
-			return nil, err
-		}
-		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance " + id)
-		}
-		instances = append(instances, instance)
-	}
-	return instances, nil
-}
-
 // Returns the instance with the specified ID
 func (a *AWSCloud) getInstanceById(instanceID string) (*ec2.Instance, error) {
 	request := &ec2.DescribeInstancesInput{
