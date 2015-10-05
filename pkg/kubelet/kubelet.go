@@ -52,11 +52,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -244,7 +246,6 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
 	statusManager := status.NewManager(kubeClient)
-	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
 
 	volumeManager := newVolumeManager()
@@ -259,7 +260,6 @@ func NewMainKubelet(
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
 		containerRefManager:            containerRefManager,
-		readinessManager:               readinessManager,
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		registerNode:                   registerNode,
@@ -317,7 +317,7 @@ func NewMainKubelet(
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
 			recorder,
-			readinessManager,
+			klet, // prober
 			containerRefManager,
 			machineInfo,
 			podInfraContainerImage,
@@ -343,7 +343,7 @@ func NewMainKubelet(
 			klet,
 			recorder,
 			containerRefManager,
-			readinessManager,
+			klet, // prober
 			klet.volumeManager)
 		if err != nil {
 			return nil, err
@@ -385,6 +385,12 @@ func NewMainKubelet(
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = newBasicPodManager(klet.kubeClient)
+
+	klet.prober = prober.New(klet.runner, containerRefManager, recorder)
+	klet.probeManager = prober.NewManager(
+		klet.resyncInterval,
+		klet.statusManager,
+		klet.prober)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -486,8 +492,10 @@ type Kubelet struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// Container readiness state manager.
-	readinessManager *kubecontainer.ReadinessManager
+	// Handles container readiness probing
+	probeManager prober.Manager
+	// TODO: Move prober ownership to the probeManager once the runtime no longer depends on it.
+	prober prober.Prober
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them
@@ -1662,6 +1670,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// Stop the workers for no-longer existing pods.
 	// TODO: is here the best place to forget pod workers?
 	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
+	kl.probeManager.CleanupPods(activePods)
 
 	runningPods, err := kl.runtimeCache.GetPods()
 	if err != nil {
@@ -1990,6 +1999,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, SyncPodCreate, mirrorPod, start)
+		kl.probeManager.AddPod(pod)
 	}
 }
 
@@ -2021,6 +2031,7 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 		if err := kl.deletePod(pod.UID); err != nil {
 			glog.V(2).Infof("Failed to delete pod %q, err: %v", kubeletUtil.FormatPodName(pod), err)
 		}
+		kl.probeManager.RemovePod(pod)
 	}
 }
 
@@ -2609,15 +2620,8 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	// Assume info is ready to process
 	podStatus.Phase = GetPhase(spec, podStatus.ContainerStatuses)
-	for _, c := range spec.Containers {
-		for i, st := range podStatus.ContainerStatuses {
-			if st.Name == c.Name {
-				ready := st.State.Running != nil && kl.readinessManager.GetReadiness(kubecontainer.TrimRuntimePrefix(st.ContainerID))
-				podStatus.ContainerStatuses[i].Ready = ready
-				break
-			}
-		}
-	}
+	kl.probeManager.UpdatePodStatus(pod.UID, podStatus)
+
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
 
 	if !kl.standaloneMode {
@@ -2785,6 +2789,16 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 // is exported to simplify integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
+}
+
+// Proxy prober calls through the Kubelet to break the circular dependency between the runtime &
+// prober.
+// TODO: Remove this hack once the runtime no longer depends on the prober.
+func (kl *Kubelet) ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+	return kl.prober.ProbeLiveness(pod, status, container, containerID, createdAt)
+}
+func (kl *Kubelet) ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error) {
+	return kl.prober.ProbeReadiness(pod, status, container, containerID)
 }
 
 var minRsrc = resource.MustParse("1k")

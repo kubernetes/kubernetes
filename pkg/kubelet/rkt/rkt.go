@@ -94,7 +94,6 @@ type runtime struct {
 	generator           kubecontainer.RunContainerOptionsGenerator
 	recorder            record.EventRecorder
 	prober              prober.Prober
-	readinessManager    *kubecontainer.ReadinessManager
 	volumeGetter        volumeGetter
 	imagePuller         kubecontainer.ImagePuller
 }
@@ -113,7 +112,7 @@ func New(config *Config,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
-	readinessManager *kubecontainer.ReadinessManager,
+	prober prober.Prober,
 	volumeGetter volumeGetter) (kubecontainer.Runtime, error) {
 
 	systemdVersion, err := getSystemdVersion()
@@ -151,10 +150,9 @@ func New(config *Config,
 		containerRefManager: containerRefManager,
 		generator:           generator,
 		recorder:            recorder,
-		readinessManager:    readinessManager,
+		prober:              prober,
 		volumeGetter:        volumeGetter,
 	}
-	rkt.prober = prober.New(rkt, readinessManager, containerRefManager, recorder)
 	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt)
 
 	// Test the rkt version.
@@ -1002,7 +1000,7 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus, r.readinessManager) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus) {
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				// TODO(yifan): Containers in one pod are fate-sharing at this moment, see:
 				// https://github.com/appc/spec/issues/276.
@@ -1022,7 +1020,7 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 			break
 		}
 
-		result, err := r.prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
+		result, err := r.prober.ProbeLiveness(pod, podStatus, container, string(c.ID), c.Created)
 		// TODO(vmarmol): examine this logic.
 		if err == nil && result != probe.Success {
 			glog.Infof("Pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)

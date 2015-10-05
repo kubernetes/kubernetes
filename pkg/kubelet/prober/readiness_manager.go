@@ -14,45 +14,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package prober
 
 import "sync"
 
-// ReadinessManager maintains the readiness information(probe results) of
+// readinessManager maintains the readiness information(probe results) of
 // containers over time to allow for implementation of health thresholds.
 // This manager is thread-safe, no locks are necessary for the caller.
-type ReadinessManager struct {
+type readinessManager struct {
 	// guards states
 	sync.RWMutex
 	// TODO(yifan): To use strong type.
 	states map[string]bool
 }
 
-// NewReadinessManager creates ane returns a readiness manager with empty
+// newReadinessManager creates ane returns a readiness manager with empty
 // contents.
-func NewReadinessManager() *ReadinessManager {
-	return &ReadinessManager{states: make(map[string]bool)}
+func newReadinessManager() *readinessManager {
+	return &readinessManager{states: make(map[string]bool)}
 }
 
-// GetReadiness returns the readiness value for the container with the given ID.
+// getReadiness returns the readiness value for the container with the given ID.
 // If the readiness value is found, returns it.
 // If the readiness is not found, returns false.
-func (r *ReadinessManager) GetReadiness(id string) bool {
+func (r *readinessManager) getReadiness(id string) (ready bool, found bool) {
 	r.RLock()
 	defer r.RUnlock()
 	state, found := r.states[id]
-	return state && found
+	return state, found
 }
 
-// SetReadiness sets the readiness value for the container with the given ID.
-func (r *ReadinessManager) SetReadiness(id string, value bool) {
+// setReadiness sets the readiness value for the container with the given ID.
+func (r *readinessManager) setReadiness(id string, value bool) {
 	r.Lock()
 	defer r.Unlock()
 	r.states[id] = value
 }
 
-// RemoveReadiness clears the readiness value for the container with the given ID.
-func (r *ReadinessManager) RemoveReadiness(id string) {
+// removeReadiness clears the readiness value for the container with the given ID.
+func (r *readinessManager) removeReadiness(id string) {
 	r.Lock()
 	defer r.Unlock()
 	delete(r.states, id)
