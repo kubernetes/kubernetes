@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -188,7 +189,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Port: 80}}},
@@ -220,7 +221,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.checkLeftoverEndpoints()
 
 	if e, a := 1, endpoints.queue.Len(); e != a {
@@ -248,7 +249,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
@@ -276,7 +277,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
@@ -301,7 +302,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -338,7 +339,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 0, 1, 1)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -375,7 +376,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 1)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -416,7 +417,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -456,7 +457,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, api.NamespaceDefault, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
@@ -475,7 +476,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 3, 2, 0)
 	addPods(endpoints.podStore.Store, "blah", 5, 2, 0) // make sure these aren't found!
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -517,7 +518,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 3, 2, 0)
 	serviceLabels := map[string]string{"foo": "bar"}
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -577,7 +578,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
-	endpoints := NewEndpointController(client)
+	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	serviceLabels := map[string]string{"baz": "blah"}
 	endpoints.serviceStore.Store.Add(&api.Service{
