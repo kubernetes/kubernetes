@@ -202,13 +202,13 @@ func (config *KubeProxyTestConfig) hitEndpoints() {
 	for _, endpointPod := range config.endpointPods {
 		Expect(len(endpointPod.Status.PodIP)).To(BeNumerically(">", 0), "podIP is empty:%s", endpointPod.Status.PodIP)
 		By("dialing(udp) endpointPodIP:endpointUdpPort from node1")
-		config.dialFromNode("udp", endpointPod.Status.PodIP, endpointUdpPort, 1, 1)
+		config.dialFromNode("udp", endpointPod.Status.PodIP, endpointUdpPort, 5, 1)
 		By("dialing(http) endpointPodIP:endpointHttpPort from node1")
-		config.dialFromNode("http", endpointPod.Status.PodIP, endpointHttpPort, 1, 1)
+		config.dialFromNode("http", endpointPod.Status.PodIP, endpointHttpPort, 5, 1)
 		By("dialing(udp) endpointPodIP:endpointUdpPort from test container")
-		config.dialFromTestContainer("udp", endpointPod.Status.PodIP, endpointUdpPort, 1, 1)
+		config.dialFromTestContainer("udp", endpointPod.Status.PodIP, endpointUdpPort, 5, 1)
 		By("dialing(http) endpointPodIP:endpointHttpPort from test container")
-		config.dialFromTestContainer("http", endpointPod.Status.PodIP, endpointHttpPort, 1, 1)
+		config.dialFromTestContainer("http", endpointPod.Status.PodIP, endpointHttpPort, 5, 1)
 	}
 }
 
