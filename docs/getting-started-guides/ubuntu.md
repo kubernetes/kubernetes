@@ -60,7 +60,7 @@ work, which has been merge into this document.
 Internet to download the necessary files, while worker nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
 Ubuntu 15 which uses systemd instead of upstart.
-4. Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.6, may work with higher versions.
+4. Dependencies of this guide: etcd-2.0.12, flannel-0.5.3, k8s-1.0.6, may work with higher versions.
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
 
@@ -77,13 +77,13 @@ $ git clone https://github.com/kubernetes/kubernetes.git
 #### Configure and start the Kubernetes cluster
 
 The startup process will first download all the required binaries automatically.
-By default etcd version is 2.0.12, flannel version is 0.4.0 and k8s version is 1.0.6.
+By default etcd version is 2.0.12, flannel version is 0.5.3 and k8s version is 1.0.6.
 You can customize your etcd version, flannel version, k8s version by changing corresponding variables
 `ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` like following.
 
 ```console
 $ export KUBE_VERSION=1.0.5
-$ export FLANNEL_VERSION=0.5.3
+$ export FLANNEL_VERSION=0.5.0
 $ export ETCD_VERSION=2.2.0
 ```
 
