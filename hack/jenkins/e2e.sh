@@ -845,6 +845,9 @@ fi
 ### Start Kubemark ###
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   export RUN_FROM_DISTRO=true
+  NUM_MINIONS_BKP=${NUM_MINIONS}
+  # We need to unset NUM_MINIONS to be able to use kubemark default settings.
+  unset NUM_MINIONS
   ./test/kubemark/stop-kubemark.sh
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
@@ -855,6 +858,8 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   fi
   ./test/kubemark/stop-kubemark.sh
   unset RUN_FROM_DISTRO
+  NUM_MINIONS=${NUM_MINIONS_BKP}
+  unset NUM_MINIONS_BKP
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
