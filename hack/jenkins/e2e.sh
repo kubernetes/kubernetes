@@ -74,6 +74,11 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
   KUBERNETES_PROVIDER="gke"
   : ${E2E_ZONE:="us-central1-f"}
+elif [[ ${JOB_NAME} =~ ^kubernetes-.*-aws ]]; then
+  KUBERNETES_PROVIDER="aws"
+  : ${E2E_MIN_STARTUP_PODS:="1"}
+  : ${E2E_ZONE:="us-east-1a"}
+  : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -220,6 +225,22 @@ case ${JOB_NAME} in
     : ${ENABLE_DEPLOYMENTS:=true}
     ;;
 
+  # Runs all non-flaky, non-slow tests on AWS, sequentially.
+  kubernetes-e2e-aws)
+    : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-aws"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
+	  )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
+    : ${PROJECT:="k8s-jkns-e2e-aws"}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    ;;
+
   # Runs only the examples tests on GCE.
   kubernetes-e2e-gce-examples)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
@@ -323,7 +344,7 @@ case ${JOB_NAME} in
           )"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
-    NUM_MINIONS="6"
+    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
 
   # Runs the flaky tests on GCE in parallel.
