@@ -35,6 +35,16 @@ func TestBuildImageMultipleContextsError(t *testing.T) {
 func TestBuildImageContextDirDockerignoreParsing(t *testing.T) {
 	fakeRT := &FakeRoundTripper{message: "", status: http.StatusOK}
 	client := newTestClient(fakeRT)
+
+	if err := os.Symlink("doesnotexist", "testing/data/symlink"); err != nil {
+		t.Errorf("error creating symlink on demand: %s", err)
+	}
+	defer func() {
+		if err := os.Remove("testing/data/symlink"); err != nil {
+			t.Errorf("error removing symlink on demand: %s", err)
+		}
+	}()
+
 	var buf bytes.Buffer
 	opts := BuildImageOptions{
 		Name:                "testImage",

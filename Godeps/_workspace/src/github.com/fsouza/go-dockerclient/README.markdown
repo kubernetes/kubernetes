@@ -5,7 +5,7 @@
 [![GoDoc](https://img.shields.io/badge/api-Godoc-blue.svg?style=flat-square)](https://godoc.org/github.com/fsouza/go-dockerclient)
 
 This package presents a client for the Docker remote API. It also provides
-support for the extensions in the [Swarm API](https://docs.docker.com/swarm/API/).
+support for the extensions in the [Swarm API](https://docs.docker.com/swarm/api/swarm-api/).
 
 This package also provides support for docker's network API, which is a simple
 passthrough to the libnetwork remote API.  Note that docker's network API is

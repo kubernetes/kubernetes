@@ -5,6 +5,7 @@
 package docker
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -161,6 +162,16 @@ func TestNewTLSClient(t *testing.T) {
 	}
 }
 
+func TestEndpoint(t *testing.T) {
+	client, err := NewVersionedClient("http://localhost:4243", "1.12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if endpoint := client.Endpoint(); endpoint != client.endpoint {
+		t.Errorf("Client.Endpoint(): want %q. Got %q", client.endpoint, endpoint)
+	}
+}
+
 func TestGetURL(t *testing.T) {
 	var tests = []struct {
 		endpoint string
@@ -185,8 +196,34 @@ func TestGetURL(t *testing.T) {
 	}
 }
 
+func TestGetFakeUnixURL(t *testing.T) {
+	var tests = []struct {
+		endpoint string
+		path     string
+		expected string
+	}{
+		{"unix://var/run/docker.sock", "/", "http://unix.sock/"},
+		{"unix://var/run/docker.socket", "/", "http://unix.sock/"},
+		{"unix://var/run/docker.sock", "/containers/ps", "http://unix.sock/containers/ps"},
+	}
+	for _, tt := range tests {
+		client, _ := NewClient(tt.endpoint)
+		client.endpoint = tt.endpoint
+		client.SkipServerVersionCheck = true
+		got := client.getFakeUnixURL(tt.path)
+		if got != tt.expected {
+			t.Errorf("getURL(%q): Got %s. Want %s.", tt.path, got, tt.expected)
+		}
+	}
+}
+
 func TestError(t *testing.T) {
-	err := newError(400, []byte("bad parameter"))
+	fakeBody := ioutil.NopCloser(bytes.NewBufferString("bad parameter"))
+	resp := &http.Response{
+		StatusCode: 400,
+		Body:       fakeBody,
+	}
+	err := newError(resp)
 	expected := Error{Status: 400, Message: "bad parameter"}
 	if !reflect.DeepEqual(expected, *err) {
 		t.Errorf("Wrong error type. Want %#v. Got %#v.", expected, *err)
@@ -334,7 +371,7 @@ func TestPingErrorWithUnixSocket(t *testing.T) {
 		}
 		defer li.Close()
 		if err != nil {
-			t.Fatalf("Expected to get listner, but failed: %#v", err)
+			t.Fatalf("Expected to get listener, but failed: %#v", err)
 		}
 
 		fd, err := li.Accept()
@@ -345,7 +382,7 @@ func TestPingErrorWithUnixSocket(t *testing.T) {
 		buf := make([]byte, 512)
 		nr, err := fd.Read(buf)
 
-		// Create invalid response message to occur error
+		// Create invalid response message to trigger error.
 		data := buf[0:nr]
 		for i := 0; i < 10; i++ {
 			data[i] = 63
@@ -366,6 +403,7 @@ func TestPingErrorWithUnixSocket(t *testing.T) {
 	u, _ := parseEndpoint(endpoint, false)
 	client := Client{
 		HTTPClient:             http.DefaultClient,
+		Dialer:                 &net.Dialer{},
 		endpoint:               endpoint,
 		endpointURL:            u,
 		SkipServerVersionCheck: true,

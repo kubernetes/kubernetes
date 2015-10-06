@@ -96,13 +96,13 @@ type ListImagesOptions struct {
 // See https://goo.gl/xBe1u3 for more details.
 func (c *Client) ListImages(opts ListImagesOptions) ([]APIImages, error) {
 	path := "/images/json?" + queryString(opts)
-	body, _, err := c.do("GET", path, doOptions{})
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var images []APIImages
-	err = json.Unmarshal(body, &images)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&images); err != nil {
 		return nil, err
 	}
 	return images, nil
@@ -122,16 +122,16 @@ type ImageHistory struct {
 //
 // See https://goo.gl/8bnTId for more details.
 func (c *Client) ImageHistory(name string) ([]ImageHistory, error) {
-	body, status, err := c.do("GET", "/images/"+name+"/history", doOptions{})
-	if status == http.StatusNotFound {
-		return nil, ErrNoSuchImage
-	}
+	resp, err := c.do("GET", "/images/"+name+"/history", doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return nil, ErrNoSuchImage
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var history []ImageHistory
-	err = json.Unmarshal(body, &history)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&history); err != nil {
 		return nil, err
 	}
 	return history, nil
@@ -141,11 +141,15 @@ func (c *Client) ImageHistory(name string) ([]ImageHistory, error) {
 //
 // See https://goo.gl/V3ZWnK for more details.
 func (c *Client) RemoveImage(name string) error {
-	_, status, err := c.do("DELETE", "/images/"+name, doOptions{})
-	if status == http.StatusNotFound {
-		return ErrNoSuchImage
+	resp, err := c.do("DELETE", "/images/"+name, doOptions{})
+	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return ErrNoSuchImage
+		}
+		return err
 	}
-	return err
+	resp.Body.Close()
+	return nil
 }
 
 // RemoveImageOptions present the set of options available for removing an image
@@ -163,37 +167,40 @@ type RemoveImageOptions struct {
 // See https://goo.gl/V3ZWnK for more details.
 func (c *Client) RemoveImageExtended(name string, opts RemoveImageOptions) error {
 	uri := fmt.Sprintf("/images/%s?%s", name, queryString(&opts))
-	_, status, err := c.do("DELETE", uri, doOptions{})
-	if status == http.StatusNotFound {
-		return ErrNoSuchImage
+	resp, err := c.do("DELETE", uri, doOptions{})
+	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return ErrNoSuchImage
+		}
+		return err
 	}
-	return err
+	resp.Body.Close()
+	return nil
 }
 
 // InspectImage returns an image by its name or ID.
 //
 // See https://goo.gl/jHPcg6 for more details.
 func (c *Client) InspectImage(name string) (*Image, error) {
-	body, status, err := c.do("GET", "/images/"+name+"/json", doOptions{})
-	if status == http.StatusNotFound {
-		return nil, ErrNoSuchImage
-	}
+	resp, err := c.do("GET", "/images/"+name+"/json", doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return nil, ErrNoSuchImage
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	var image Image
 
 	// if the caller elected to skip checking the server's version, assume it's the latest
 	if c.SkipServerVersionCheck || c.expectedAPIVersion.GreaterThanOrEqualTo(apiVersion112) {
-		err = json.Unmarshal(body, &image)
-		if err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(&image); err != nil {
 			return nil, err
 		}
 	} else {
 		var imagePre012 ImagePre012
-		err = json.Unmarshal(body, &imagePre012)
-		if err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(&imagePre012); err != nil {
 			return nil, err
 		}
 
@@ -409,6 +416,7 @@ type BuildImageOptions struct {
 	Auth                AuthConfiguration  `qs:"-"` // for older docker X-Registry-Auth header
 	AuthConfigs         AuthConfigurations `qs:"-"` // for newer docker X-Registry-Config header
 	ContextDir          string             `qs:"-"`
+	Ulimits             []ULimit           `qs:"-"`
 }
 
 // BuildImage builds an image from a tarball's url or a Dockerfile in the input
@@ -442,7 +450,16 @@ func (c *Client) BuildImage(opts BuildImageOptions) error {
 		}
 	}
 
-	return c.stream("POST", fmt.Sprintf("/build?%s", queryString(&opts)), streamOptions{
+	qs := queryString(&opts)
+	if len(opts.Ulimits) > 0 {
+		if b, err := json.Marshal(opts.Ulimits); err == nil {
+			item := url.Values(map[string][]string{})
+			item.Add("ulimits", string(b))
+			qs = fmt.Sprintf("%s&%s", qs, item.Encode())
+		}
+	}
+
+	return c.stream("POST", fmt.Sprintf("/build?%s", qs), streamOptions{
 		setRawTerminal: true,
 		rawJSONStream:  opts.RawJSONStream,
 		headers:        headers,
@@ -477,10 +494,11 @@ func (c *Client) TagImage(name string, opts TagImageOptions) error {
 	if name == "" {
 		return ErrNoSuchImage
 	}
-	_, status, err := c.do("POST", fmt.Sprintf("/images/"+name+"/tag?%s",
+	resp, err := c.do("POST", fmt.Sprintf("/images/"+name+"/tag?%s",
 		queryString(&opts)), doOptions{})
+	defer resp.Body.Close()
 
-	if status == http.StatusNotFound {
+	if resp.StatusCode == http.StatusNotFound {
 		return ErrNoSuchImage
 	}
 
@@ -533,13 +551,13 @@ type APIImageSearch struct {
 //
 // See https://goo.gl/AYjyrF for more details.
 func (c *Client) SearchImages(term string) ([]APIImageSearch, error) {
-	body, _, err := c.do("GET", "/images/search?term="+term, doOptions{})
+	resp, err := c.do("GET", "/images/search?term="+term, doOptions{})
+	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 	var searchResult []APIImageSearch
-	err = json.Unmarshal(body, &searchResult)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&searchResult); err != nil {
 		return nil, err
 	}
 	return searchResult, nil
