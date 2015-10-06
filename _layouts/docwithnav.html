@@ -71,13 +71,23 @@
 		function loadonstatechange(){
 		    $(window).bind('popstate', function (event) {
 				var returnLocation = history.location || document.location;
-				$('#doccontent').load(returnLocation + ' #doccontent > *', function() {//load the content from the target page
-					var navitem = findcurnavitem();
-					if (navitem.hasClass('gentoc')) {//generate the dynamic TOC
-						var tocid = String(navitem.parent().children('ul').attr('id'));//cast id to string
-						$('#toclist').load( location.pathname + " #" + tocid + " li" );
-					}
-				});
+				returnlochref = returnLocation.href;
+				if ((returnlochref.indexOf('.yaml') > -1 && returnlochref.indexOf('.yaml') + 5 == returnlochref.length) || (returnlochref.indexOf('.json') > -1 && returnlochref.indexOf('.json') + 5 ==  returnlochref.length)) {//open code samples (.yaml or .json files) in <code> blocks
+					$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {
+						$('#codeblock').load(returnlochref, function() { //load the code sample file into the 'code' tags
+							$('#codetitle').html(location.pathname); //set the page title
+							$( "code" ).prepend( "<br />" ); //insert line break to correct unwanted 1st line indentation
+						});
+					});
+				} else {
+					$('#doccontent').load(returnLocation + ' #doccontent > *', function() {//load the content from the target page
+						var navitem = findcurnavitem();
+						if (navitem.hasClass('gentoc')) {//generate the dynamic TOC
+							var tocid = String(navitem.parent().children('ul').attr('id'));//cast id to string
+							$('#toclist').load( location.pathname + " #" + tocid + " li" );
+						}
+					});
+				}
 				syncmenutourl();
 		       return;
 		    });
@@ -94,7 +104,8 @@
 	        e.preventDefault();
 			var clickedon = $(this),
 				href = $(this).attr('href'),
-				isAnchor = false;
+				isAnchor = false,
+				isCode = false;
 			if (href.indexOf('#') == 0){//check if its an in-page anchor
 				isAnchor = true;
 			} else if(href != "#") {//otherwise get the absolute url
@@ -128,6 +139,14 @@
 						}
 						$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
 						return false;
+					} else if ((href.indexOf('.yaml') > -1 && href.indexOf('.yaml') + 5 == href.length) || (href.indexOf('.json') > -1 && href.indexOf('.json') + 5 ==  href.length)) {//open code samples (.yaml or .json files) in <code> blocks
+						$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {
+							$('#codeblock').load(href, function() {	//load the code sample file into the 'code' tags
+								$('#codetitle').html(location.pathname); //set the page title
+								$( "code" ).prepend( "<br />" ); //insert line break to correct unwanted 1st line indentation
+							});
+						});
+						isCode = true;
 					} else { //if its a link to another topic, only load content into the page (avoid refreshing whole page)
 						$('#doccontent').load(href + ' #doccontent > *', function() {//load the content from the target page
 							if (clickedon.hasClass('gentoc')) {//generate the dynamic TOC
@@ -144,10 +163,12 @@
 						    }
 						});
 					}
-					if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
-						animatenav(findcurnavitem());//is an in-page link
-					} else {
-						animatenav(clickedon);//is a nav menu link
+					if(!isCode){//dont change/animate nav menu when dispalying a code sample
+						if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
+							animatenav(findcurnavitem());//is an in-page link
+						} else {
+							animatenav(clickedon);//is a nav menu link
+						}
 					}
 				} else if (href != "#"){ //if its a link in the main menu, load and refresh the whole page
 					window.location = href;
