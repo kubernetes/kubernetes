@@ -1225,7 +1225,7 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "gcr.io/google_containers/pause",
+					Image: "beta.gcr.io/google_containers/pause:2.0",
 					Ports: containerPorts,
 				},
 			},
