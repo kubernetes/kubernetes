@@ -1965,13 +1965,13 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		kl.addSource(u.Source)
 		switch u.Op {
 		case kubetypes.ADD:
-			glog.V(2).Infof("SyncLoop (ADD): %q", kubeletUtil.FormatPodNames(u.Pods))
+			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, kubeletUtil.FormatPodNames(u.Pods))
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
-			glog.V(2).Infof("SyncLoop (UPDATE): %q", kubeletUtil.FormatPodNames(u.Pods))
+			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, kubeletUtil.FormatPodNames(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
-			glog.V(2).Infof("SyncLoop (REMOVE): %q", kubeletUtil.FormatPodNames(u.Pods))
+			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, kubeletUtil.FormatPodNames(u.Pods))
 			handler.HandlePodDeletions(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
