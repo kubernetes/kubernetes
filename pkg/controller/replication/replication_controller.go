@@ -211,7 +211,13 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 	// rc1 (older rc): [(k1=v1)], replicas=1 rc2: [(k2=v2)], replicas=2
 	// pod: [(k1:v1), (k2:v2)] will wake both rc1 and rc2, and we will sync rc1.
 	// pod: [(k2:v2)] will wake rc2 which creates a new replica.
-	sort.Sort(overlappingControllers(controllers))
+	if len(controllers) > 1 {
+		// More than two items in this list indicates user error. If two replication-controller
+		// overlap, sort by creation timestamp, subsort by name, then pick
+		// the first.
+		glog.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels)
+		sort.Sort(overlappingControllers(controllers))
+	}
 	return &controllers[0]
 }
 
