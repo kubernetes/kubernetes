@@ -112,6 +112,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Daemon\sset"
     "Deployment"
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "Shell"
     )
 
 # Tests which cannot be run on AWS.
