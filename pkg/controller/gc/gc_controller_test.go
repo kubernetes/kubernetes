@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -98,7 +99,7 @@ func TestGC(t *testing.T) {
 
 	for i, test := range testCases {
 		client := testclient.NewSimpleFake()
-		gcc := New(client, test.threshold)
+		gcc := New(client, controller.NoResyncPeriodFunc, test.threshold)
 		fake := &FakePodControl{}
 		gcc.podControl = fake
 

@@ -63,6 +63,7 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			},
 		},
 		&api.PersistentVolume{},
+		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    binder.addVolume,
@@ -80,6 +81,7 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			},
 		},
 		&api.PersistentVolumeClaim{},
+		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    binder.addClaim,

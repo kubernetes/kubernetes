@@ -54,6 +54,13 @@ var (
 	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
 )
 
+type ResyncPeriodFunc func() time.Duration
+
+// Returns 0 for resyncPeriod in case resyncing is not needed.
+func NoResyncPeriodFunc() time.Duration {
+	return 0
+}
+
 // Expectations are a way for controllers to tell the controller manager what they expect. eg:
 //	ControllerExpectations: {
 //		controller1: expects  2 adds in 2 minutes

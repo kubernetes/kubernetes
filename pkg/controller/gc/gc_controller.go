@@ -37,8 +37,7 @@ import (
 )
 
 const (
-	fullResyncPeriod = 0
-	gcCheckPeriod    = 20 * time.Second
+	gcCheckPeriod = 20 * time.Second
 )
 
 type GCController struct {
@@ -49,7 +48,7 @@ type GCController struct {
 	threshold      int
 }
 
-func New(kubeClient client.Interface, threshold int) *GCController {
+func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -75,7 +74,7 @@ func New(kubeClient client.Interface, threshold int) *GCController {
 			},
 		},
 		&api.Pod{},
-		fullResyncPeriod,
+		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{},
 	)
 	return gcc
