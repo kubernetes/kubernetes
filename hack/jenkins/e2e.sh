@@ -92,7 +92,6 @@ fi
 REBOOT_SKIP_TESTS=(
     "Autoscaling\sSuite"
     "Skipped"
-    "Reboot"
     "Restart\sshould\srestart\sall\snodes"
     "Example"
     )
