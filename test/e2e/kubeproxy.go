@@ -241,7 +241,7 @@ func (config *KubeProxyTestConfig) dialFromContainer(protocol, containerIP, targ
 func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targetPort, tries, expectedCount int) {
 	var cmd string
 	if protocol == "udp" {
-		cmd = fmt.Sprintf("echo 'hostName' | nc -w 1 -u %s %d", targetIP, targetPort)
+		cmd = fmt.Sprintf("echo 'hostName' | nc -w 1 -q 5 -u %s %d", targetIP, targetPort)
 	} else {
 		cmd = fmt.Sprintf("curl -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
 	}
