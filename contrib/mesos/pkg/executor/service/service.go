@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
 	utilio "k8s.io/kubernetes/pkg/util/io"
@@ -139,6 +141,16 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		return err
 	}
 
+	hostPIDSources, err := kubelet.GetValidatedSources(strings.Split(s.HostPIDSources, ","))
+	if err != nil {
+		return err
+	}
+
+	hostIPCSources, err := kubelet.GetValidatedSources(strings.Split(s.HostIPCSources, ","))
+	if err != nil {
+		return err
+	}
+
 	tlsOptions, err := s.InitializeTLS()
 	if err != nil {
 		return err
@@ -162,58 +174,75 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
+	manifestURLHeader := make(http.Header)
+	if s.ManifestURLHeader != "" {
+		pieces := strings.Split(s.ManifestURLHeader, ":")
+		if len(pieces) != 2 {
+			return fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", s.ManifestURLHeader)
+		}
+		manifestURLHeader.Set(pieces[0], pieces[1])
+	}
+
 	kcfg := app.KubeletConfig{
-		Address:            s.Address,
-		AllowPrivileged:    s.AllowPrivileged,
-		HostNetworkSources: hostNetworkSources,
-		HostnameOverride:   s.HostnameOverride,
-		RootDirectory:      s.RootDirectory,
+		Address:           s.Address,
+		AllowPrivileged:   s.AllowPrivileged,
+		CAdvisorInterface: cAdvisorInterface,
+		CgroupRoot:        s.CgroupRoot,
+		Cloud:             nil, // TODO(jdef) Cloud, specifying null here because we don't want all kubelets polling mesos-master; need to account for this in the cloudprovider impl
+		ClusterDNS:        s.ClusterDNS,
+		ClusterDomain:     s.ClusterDomain,
 		// ConfigFile: ""
-		// ManifestURL: ""
-		FileCheckFrequency: s.FileCheckFrequency,
+		ConfigureCBR0:           s.ConfigureCBR0,
+		ContainerRuntime:        s.ContainerRuntime,
+		CPUCFSQuota:             s.CPUCFSQuota,
+		DiskSpacePolicy:         diskSpacePolicy,
+		DockerClient:            dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		DockerDaemonContainer:   s.DockerDaemonContainer,
+		DockerExecHandler:       dockerExecHandler,
+		EnableDebuggingHandlers: s.EnableDebuggingHandlers,
+		EnableServer:            s.EnableServer,
+		EventBurst:              s.EventBurst,
+		EventRecordQPS:          s.EventRecordQPS,
+		FileCheckFrequency:      s.FileCheckFrequency,
+		HostnameOverride:        s.HostnameOverride,
+		HostNetworkSources:      hostNetworkSources,
+		HostPIDSources:          hostPIDSources,
+		HostIPCSources:          hostIPCSources,
 		// HTTPCheckFrequency
-		PodInfraContainerImage:  s.PodInfraContainerImage,
-		SyncFrequency:           s.SyncFrequency,
-		RegistryPullQPS:         s.RegistryPullQPS,
-		RegistryBurst:           s.RegistryBurst,
-		MinimumGCAge:            s.MinimumGCAge,
-		MaxPerPodContainerCount: s.MaxPerPodContainerCount,
-		MaxContainerCount:       s.MaxContainerCount,
-		RegisterNode:            s.RegisterNode,
-		// StandaloneMode: false
-		ClusterDomain:                  s.ClusterDomain,
-		ClusterDNS:                     s.ClusterDNS,
-		Runonce:                        s.RunOnce,
-		Port:                           s.Port,
-		ReadOnlyPort:                   s.ReadOnlyPort,
-		CAdvisorInterface:              cAdvisorInterface,
-		EnableServer:                   s.EnableServer,
-		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
-		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		KubeClient:                     apiclient,
-		MasterServiceNamespace:         s.MasterServiceNamespace,
-		VolumePlugins:                  app.ProbeVolumePlugins(),
-		NetworkPlugins:                 app.ProbeNetworkPlugins(s.NetworkPluginDir),
-		NetworkPluginName:              s.NetworkPluginName,
-		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
-		TLSOptions:                     tlsOptions,
-		ImageGCPolicy:                  imageGCPolicy,
-		DiskSpacePolicy:                diskSpacePolicy,
-		Cloud:                          nil, // TODO(jdef) Cloud, specifying null here because we don't want all kubelets polling mesos-master; need to account for this in the cloudprovider impl
-		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
-		ResourceContainer:         s.ResourceContainer,
-		CgroupRoot:                s.CgroupRoot,
-		ContainerRuntime:          s.ContainerRuntime,
-		Mounter:                   mounter,
-		DockerDaemonContainer:     s.DockerDaemonContainer,
-		SystemContainer:           s.SystemContainer,
-		ConfigureCBR0:             s.ConfigureCBR0,
-		MaxPods:                   s.MaxPods,
-		DockerExecHandler:         dockerExecHandler,
-		ResolverConfig:            s.ResolverConfig,
-		CPUCFSQuota:               s.CPUCFSQuota,
-		Writer:                    writer,
+		ImageGCPolicy: imageGCPolicy,
+		KubeClient:    apiclient,
+		// ManifestURL: ""
+		ManifestURLHeader:         manifestURLHeader,
+		MasterServiceNamespace:    s.MasterServiceNamespace,
+		MaxContainerCount:         s.MaxContainerCount,
 		MaxOpenFiles:              s.MaxOpenFiles,
+		MaxPerPodContainerCount:   s.MaxPerPodContainerCount,
+		MaxPods:                   s.MaxPods,
+		MinimumGCAge:              s.MinimumGCAge,
+		Mounter:                   mounter,
+		NetworkPluginName:         s.NetworkPluginName,
+		NetworkPlugins:            app.ProbeNetworkPlugins(s.NetworkPluginDir),
+		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
+		OOMAdjuster:               oomAdjuster,
+		OSInterface:               kubecontainer.RealOS{},
+		PodCIDR:                   s.PodCIDR,
+		PodInfraContainerImage:    s.PodInfraContainerImage,
+		Port:              s.Port,
+		ReadOnlyPort:      s.ReadOnlyPort,
+		RegisterNode:      s.RegisterNode,
+		RegistryBurst:     s.RegistryBurst,
+		RegistryPullQPS:   s.RegistryPullQPS,
+		ResolverConfig:    s.ResolverConfig,
+		ResourceContainer: s.ResourceContainer,
+		RootDirectory:     s.RootDirectory,
+		Runonce:           s.RunOnce,
+		// StandaloneMode: false
+		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
+		SyncFrequency:                  s.SyncFrequency,
+		SystemContainer:                s.SystemContainer,
+		TLSOptions:                     tlsOptions,
+		VolumePlugins:                  app.ProbeVolumePlugins(),
+		Writer:                         writer,
 	}
 
 	kcfg.NodeName = kcfg.Hostname
