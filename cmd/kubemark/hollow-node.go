@@ -107,6 +107,8 @@ func main() {
 	configFilePath := makeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 	fakeDockerClient.VersionInfo = docker.Env{"ApiVersion=1.18"}
+	fakeDockerClient.ContainerMap = make(map[string]*docker.Container)
+	fakeDockerClient.EnableSleep = true
 	kcfg := kubeletapp.SimpleKubelet(
 		cl,
 		&fakeDockerClient,
