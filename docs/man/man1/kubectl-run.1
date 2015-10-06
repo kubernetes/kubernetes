@@ -51,6 +51,10 @@ Creates a replication controller to manage the created container(s).
     Labels to apply to the pod(s).
 
 .PP
+\fB\-\-leave\-stdin\-open\fP=false
+    If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.
+
+.PP
 \fB\-\-limits\fP=""
     The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
 

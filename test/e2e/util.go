@@ -1061,6 +1061,11 @@ func runKubectl(args ...string) string {
 	return newKubectlCommand(args...).exec()
 }
 
+// runKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+func runKubectlInput(data string, args ...string) string {
+	return newKubectlCommand(args...).withStdinData(data).exec()
+}
+
 func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
 	if err != nil {
