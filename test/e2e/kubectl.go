@@ -193,11 +193,49 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should support inline execution and attach", func() {
-			By("executing a command with run and attach")
-			runOutput := runKubectl(fmt.Sprintf("--namespace=%v", ns), "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "echo", "running", "in", "container")
-			expectedRunOutput := "running in container"
-			Expect(runOutput).To(ContainSubstring(expectedRunOutput))
-			// everything in the ns will be deleted at the end of the test
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("executing a command with run and attach with stdin")
+			runOutput := newKubectlCommand(nsFlag, "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234").
+				exec()
+			Expect(runOutput).To(ContainSubstring("abcd1234"))
+			Expect(runOutput).To(ContainSubstring("stdin closed"))
+			Expect(c.Pods(ns).Delete("run-test", api.NewDeleteOptions(0))).To(BeNil())
+
+			By("executing a command with run and attach without stdin")
+			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234").
+				exec()
+			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
+			Expect(runOutput).To(ContainSubstring("stdin closed"))
+			Expect(c.Pods(ns).Delete("run-test-2", api.NewDeleteOptions(0))).To(BeNil())
+
+			By("executing a command with run and attach with stdin with open stdin should remain running")
+			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234\n").
+				exec()
+			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
+			if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, time.Minute) {
+				Failf("Pod %q should still be running", "run-test-3")
+			}
+
+			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
+			// to loop test.
+			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, 1*time.Second) {
+					Failf("Pod %q should still be running", "run-test-3")
+				}
+				logOutput := runKubectl(nsFlag, "logs", "run-test-3")
+				Expect(logOutput).ToNot(ContainSubstring("stdin closed"))
+				return strings.Contains(logOutput, "abcd1234"), nil
+			})
+			if err != nil {
+				os.Exit(1)
+			}
+			Expect(err).To(BeNil())
+
+			Expect(c.Pods(ns).Delete("run-test-3", api.NewDeleteOptions(0))).To(BeNil())
 		})
 
 		It("should support port-forward", func() {

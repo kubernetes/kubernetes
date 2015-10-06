@@ -59,6 +59,7 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
       --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s).
+      --leave-stdin-open[=false]: If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.
       --limits="": The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/v1.1.0/docs/user-guide/jsonpath.md].

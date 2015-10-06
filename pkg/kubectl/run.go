@@ -267,6 +267,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
+		{"leave-stdin-open", false},
 		{"tty", false},
 		{"restart", false},
 		{"command", false},
@@ -333,6 +334,10 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	if err != nil {
 		return nil, err
 	}
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
 
 	tty, err := GetBool(params, "tty", false)
 	if err != nil {
@@ -360,6 +365,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 					Image:           params["image"],
 					ImagePullPolicy: api.PullIfNotPresent,
 					Stdin:           stdin,
+					StdinOnce:       !leaveStdinOpen && stdin,
 					TTY:             tty,
 					Resources:       resourceRequirements,
 				},

@@ -144,6 +144,7 @@ kubelet-timeout
 kube-master
 label-columns
 last-release-pr
+leave-stdin-open
 limit-bytes
 load-balancer-ip
 log-flush-frequency
