@@ -181,6 +181,7 @@ minion-max-log-size
 minion-path-override
 min-pr-number
 min-request-timeout
+min-resync-period
 namespace-sync-period
 network-plugin
 network-plugin-dir
