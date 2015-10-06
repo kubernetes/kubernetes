@@ -118,6 +118,7 @@ func NewCMServer() *CMServer {
 		RegisterRetryCount:                10,
 		PodEvictionTimeout:                5 * time.Minute,
 		ClusterName:                       "kubernetes",
+		TerminatedPodGCThreshold:          12500,
 		VolumeConfigFlags: VolumeConfigFlags{
 			// default values here
 			PersistentVolumeRecyclerMinimumTimeoutNFS:        300,
