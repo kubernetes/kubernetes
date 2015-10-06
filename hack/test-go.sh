@@ -65,6 +65,9 @@ KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
+# Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
+# set.
+KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -162,7 +165,9 @@ produceJUnitXMLReport() {
     return
   fi
   cat ${test_stdout_filenames} | go-junit-report > "${junit_xml_filename}"
-  rm ${test_stdout_filenames}
+  if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
+    rm ${test_stdout_filenames}
+  fi
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
