@@ -273,6 +273,8 @@ hack/test-integration.sh
 
 ## End-to-End tests
 
+For a complete discussion of end-to-end tests, see the [e2e-tests doc](e2e-tests.md).
+
 You can run an end-to-end test which will bring up a master and two nodes, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `KUBERNETES_PROVIDER` environment variable to something other than "gce".
 
 ```sh
