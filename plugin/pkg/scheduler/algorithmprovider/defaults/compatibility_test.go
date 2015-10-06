@@ -34,6 +34,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		// Do not change this JSON. A failure indicates backwards compatibility with 1.0 was broken.
 		"1.0": {
 			JSON: `{
+  "kind": "Policy",
+  "apiVersion": "v1",
   "predicates": [
     {"name": "MatchNodeSelector"},
     {"name": "PodFitsResources"},
@@ -69,6 +71,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		// Do not change this JSON after 1.1 is tagged. A failure indicates backwards compatibility with 1.1 was broken.
 		"1.1": {
 			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
 		  "predicates": [
 		    {"name": "PodFitsHostPorts"}
 		  ],"priorities": [
