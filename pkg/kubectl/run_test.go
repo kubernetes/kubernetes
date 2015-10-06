@@ -553,6 +553,63 @@ func TestGeneratePod(t *testing.T) {
 				},
 			},
 		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"labels":   "foo=bar,baz=blah",
+				"stdin":    "true",
+			},
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							ImagePullPolicy: api.PullIfNotPresent,
+							Stdin:           true,
+							StdinOnce:       true,
+						},
+					},
+					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+				},
+			},
+		},
+		{
+			params: map[string]interface{}{
+				"name":             "foo",
+				"image":            "someimage",
+				"replicas":         "1",
+				"labels":           "foo=bar,baz=blah",
+				"stdin":            "true",
+				"leave-stdin-open": "true",
+			},
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							ImagePullPolicy: api.PullIfNotPresent,
+							Stdin:           true,
+							StdinOnce:       false,
+						},
+					},
+					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+				},
+			},
+		},
 	}
 	generator := BasicPod{}
 	for _, test := range tests {
