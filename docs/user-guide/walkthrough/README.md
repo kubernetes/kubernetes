@@ -110,8 +110,8 @@ The pod IPs is accessible, On previous created busybox pod, you can get the pod 
 ```sh
 $ kubectl get pod nginx -o go-template={{.status.podIP}}
 ```
-On the busybox pod, you can access pod's http endpoint with curl on port 80:
-pod_ip is previous step result.
+On busybox pod, you can access http endpoint with curl on port 80:
+pod_ip is previous result.
 ```sh
 $ curl http://pod_ip
 ```
