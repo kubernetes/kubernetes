@@ -332,6 +332,11 @@ func TestEtcdCreate(t *testing.T) {
 	}
 }
 
+func podCopy(in *api.Pod) *api.Pod {
+	out := *in
+	return &out
+}
+
 func TestEtcdUpdate(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
@@ -407,18 +412,18 @@ func TestEtcdUpdate(t *testing.T) {
 		"normal": {
 			existing: nodeWithPodA,
 			expect:   nodeWithPodB,
-			toUpdate: podB,
+			toUpdate: podCopy(podB),
 			errOK:    func(err error) bool { return err == nil },
 		},
 		"notExisting": {
 			existing: emptyNode,
 			expect:   emptyNode,
-			toUpdate: podA,
+			toUpdate: podCopy(podA),
 			errOK:    func(err error) bool { return errors.IsNotFound(err) },
 		},
 		"createIfNotFound": {
 			existing:    emptyNode,
-			toUpdate:    podA,
+			toUpdate:    podCopy(podA),
 			allowCreate: true,
 			objOK:       hasCreated(t, podA),
 			errOK:       func(err error) bool { return err == nil },
@@ -426,13 +431,13 @@ func TestEtcdUpdate(t *testing.T) {
 		"outOfDate": {
 			existing: newerNodeWithPodA,
 			expect:   newerNodeWithPodA,
-			toUpdate: podB,
+			toUpdate: podCopy(podB),
 			errOK:    func(err error) bool { return errors.IsConflict(err) },
 		},
 		"unconditionalUpdate": {
 			existing:                 nodeWithPodAWithResourceVersion,
 			allowUnconditionalUpdate: true,
-			toUpdate:                 podA,
+			toUpdate:                 podCopy(podA),
 			objOK:                    func(obj runtime.Object) bool { return true },
 			errOK:                    func(err error) bool { return err == nil },
 		},

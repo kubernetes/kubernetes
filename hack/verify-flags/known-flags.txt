@@ -303,4 +303,5 @@ cpu-cfs-quota
 terminated-pod-gc-threshold
 reconcile-cidr
 register-schedulable
+repair-malformed-updates
 
