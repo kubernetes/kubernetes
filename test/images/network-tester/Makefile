@@ -7,10 +7,10 @@ webserver: webserver.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./webserver.go
 
 container: webserver
-	docker build -t gcr.io/google_containers/nettest:$(TAG) .
+	docker build -t beta.gcr.io/google_containers/nettest:$(TAG) .
 
 push: container
-	gcloud docker push gcr.io/google_containers/nettest:$(TAG)
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/nettest:$(TAG)
 
 clean:
 	rm -f webserver

@@ -1058,7 +1058,7 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "gcr.io/google_containers/pause",
+					Image: "beta.gcr.io/google_containers/pause",
 					Ports: containerPorts,
 				},
 			},
@@ -1236,7 +1236,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	maxContainerFailures := 0
 	config := RCConfig{
 		Client:               c,
-		Image:                "gcr.io/google_containers/serve_hostname:1.1",
+		Image:                "beta.gcr.io/google_containers/serve_hostname:1.1",
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
@@ -1379,7 +1379,7 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 	t.services = make(map[string]bool)
 
 	t.name = "webserver"
-	t.image = "gcr.io/google_containers/test-webserver"
+	t.image = "beta.gcr.io/google_containers/test-webserver"
 
 	return t
 }

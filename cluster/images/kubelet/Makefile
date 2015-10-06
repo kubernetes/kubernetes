@@ -10,12 +10,12 @@ LOCAL_OUTPUT_DIR=../../../_output/local
 
 release: clean
 	curl -O https://storage.googleapis.com/kubernetes-release/release/${VERSION}/${BIN_DIR}/kubelet
-	docker build -t gcr.io/google_containers/kubelet:${VERSION} .
-	gcloud docker push gcr.io/google_containers/kubelet:${VERSION}
+	docker build -t beta.gcr.io/google_containers/kubelet:${VERSION} .
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/kubelet:${VERSION}
 
 local: clean
 	cp ${LOCAL_OUTPUT_DIR}/${BIN_DIR}/kubelet .
-	docker build -t gcr.io/google_containers/kubelet .
+	docker build -t beta.gcr.io/google_containers/kubelet .
 
 clean:
 	rm -f kubelet

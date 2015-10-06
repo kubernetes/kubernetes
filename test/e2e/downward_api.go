@@ -39,7 +39,7 @@ var _ = Describe("Downward API", func() {
 				Containers: []api.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "beta.gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c", "env"},
 						Env: []api.EnvVar{
 							{

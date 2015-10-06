@@ -33,7 +33,7 @@
         "containers": [
             {
                 "name": "etcd-container",
-                "image": "gcr.io/google_containers/etcd:2.0.9",
+                "image": "beta.gcr.io/google_containers/etcd:2.0.9",
                 "command": [
                     "/usr/local/bin/etcd",
                     "--addr",
@@ -93,7 +93,7 @@
                 "lastState": {},
                 "ready": true,
                 "restartCount": 0,
-                "image": "gcr.io/google_containers/etcd:2.0.9",
+                "image": "beta.gcr.io/google_containers/etcd:2.0.9",
                 "imageID": "docker://b6b9a86dc06aa1361357ca1b105feba961f6a4145adca6c54e142c0be0fe87b0",
                 "containerID": "docker://3cbbf818f1addfc252957b4504f56ef2907a313fe6afc47fc75373674255d46d"
             }

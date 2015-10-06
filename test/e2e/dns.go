@@ -62,7 +62,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *api.Pod {
 				// TODO: Consider scraping logs instead of running a webserver.
 				{
 					Name:  "webserver",
-					Image: "gcr.io/google_containers/test-webserver",
+					Image: "beta.gcr.io/google_containers/test-webserver",
 					Ports: []api.ContainerPort{
 						{
 							Name:          "http",
@@ -78,7 +78,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *api.Pod {
 				},
 				{
 					Name:    "querier",
-					Image:   "gcr.io/google_containers/dnsutils",
+					Image:   "beta.gcr.io/google_containers/dnsutils",
 					Command: []string{"sh", "-c", wheezyProbeCmd},
 					VolumeMounts: []api.VolumeMount{
 						{
@@ -89,7 +89,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *api.Pod {
 				},
 				{
 					Name:    "jessie-querier",
-					Image:   "gcr.io/google_containers/jessie-dnsutils",
+					Image:   "beta.gcr.io/google_containers/jessie-dnsutils",
 					Command: []string{"sh", "-c", jessieProbeCmd},
 					VolumeMounts: []api.VolumeMount{
 						{

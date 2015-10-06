@@ -49,7 +49,7 @@ var _ = Describe("Etcd failure", func() {
 			Client:    framework.Client,
 			Name:      "baz",
 			Namespace: framework.Namespace.Name,
-			Image:     "gcr.io/google_containers/nginx",
+			Image:     "beta.gcr.io/google_containers/nginx",
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})
@@ -84,7 +84,7 @@ func etcdFailTest(framework Framework, failCommand, fixCommand string) {
 
 	checkExistingRCRecovers(framework)
 
-	ServeImageOrFail(&framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+	ServeImageOrFail(&framework, "basic", "beta.gcr.io/google_containers/serve_hostname:1.1")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.

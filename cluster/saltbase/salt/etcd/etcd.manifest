@@ -10,7 +10,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:2.0.12",
+    "image": "beta.gcr.io/google_containers/etcd:2.0.12",
     "resources": {
       "limits": {
         "cpu": "200m"

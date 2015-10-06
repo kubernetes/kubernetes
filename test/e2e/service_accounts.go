@@ -67,14 +67,14 @@ var _ = Describe("ServiceAccounts", func() {
 				Containers: []api.Container{
 					{
 						Name:  "token-test",
-						Image: "gcr.io/google_containers/mounttest:0.2",
+						Image: "beta.gcr.io/google_containers/mounttest:0.2",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey),
 						},
 					},
 					{
 						Name:  "root-ca-test",
-						Image: "gcr.io/google_containers/mounttest:0.2",
+						Image: "beta.gcr.io/google_containers/mounttest:0.2",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountRootCAKey),
 						},

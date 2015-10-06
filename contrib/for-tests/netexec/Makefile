@@ -1,7 +1,8 @@
 .PHONY: all netexec image push clean
 
 TAG = 1.1
-PREFIX = gcr.io/google_containers
+REGISTRY = beta.gcr.io
+PREFIX = $(REGISTRY)/google_containers
 
 all: push
 
@@ -12,7 +13,7 @@ image: netexec
 	docker build -t $(PREFIX)/netexec:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/netexec:$(TAG)
+	gcloud docker --server=$(REGISTRY) push $(PREFIX)/netexec:$(TAG)
 
 clean:
 	rm -f netexec

@@ -183,7 +183,7 @@ func testDaemonSets(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
 	simpleDSName := "simple-daemon-set"
-	image := "gcr.io/google_containers/serve_hostname:1.1"
+	image := "beta.gcr.io/google_containers/serve_hostname:1.1"
 	label := map[string]string{daemonsetNameLabel: simpleDSName}
 	retryTimeout := 1 * time.Minute
 	retryInterval := 5 * time.Second

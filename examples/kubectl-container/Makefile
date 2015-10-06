@@ -19,11 +19,11 @@ tag: .tag
 
 container:
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' to see a suggestion))
-	docker build -t gcr.io/google_containers/kubectl:$(TAG) .
+	docker build -t beta.gcr.io/google_containers/kubectl:$(TAG) .
 
 push: container
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' to see a suggestion))
-	gcloud docker push gcr.io/google_containers/kubectl:$(TAG)
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/kubectl:$(TAG)
 
 clean:
 	rm -f kubectl

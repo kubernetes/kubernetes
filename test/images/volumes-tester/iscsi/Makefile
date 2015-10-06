@@ -4,9 +4,9 @@ TAG = 0.1
 
 container:
 	# Build new image and automatically tag it as latest
-	docker build -t gcr.io/google_containers/volume-iscsi .
+	docker build -t beta.gcr.io/google_containers/volume-iscsi .
 	# Add the version tag to the latest image
-	docker tag gcr.io/google_containers/volume-iscsi gcr.io/google_containers/volume-iscsi:$(TAG)
+	docker tag beta.gcr.io/google_containers/volume-iscsi beta.gcr.io/google_containers/volume-iscsi:$(TAG)
 
 block:
 	# Create block.tar.gz with ext2 block device with index.html inside.
@@ -17,6 +17,6 @@ block:
 
 push: container
 	# Push image tagged as latest to repository
-	gcloud docker push gcr.io/google_containers/volume-iscsi
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/volume-iscsi
 	# Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
-	gcloud docker push gcr.io/google_containers/volume-iscsi:$(TAG)
+	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/volume-iscsi:$(TAG)

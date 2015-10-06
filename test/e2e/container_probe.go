@@ -115,7 +115,7 @@ func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:           "test-webserver",
-					Image:          "gcr.io/google_containers/test-webserver",
+					Image:          "beta.gcr.io/google_containers/test-webserver",
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				}, {

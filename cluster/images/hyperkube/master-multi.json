@@ -7,7 +7,7 @@
   "containers":[
     {
       "name": "controller-manager",
-      "image": "gcr.io/google_containers/hyperkube:VERSION",
+      "image": "beta.gcr.io/google_containers/hyperkube:VERSION",
       "command": [
               "/hyperkube",
               "controller-manager",
@@ -17,7 +17,7 @@
     },
     {
       "name": "apiserver",
-      "image": "gcr.io/google_containers/hyperkube:VERSION",
+      "image": "beta.gcr.io/google_containers/hyperkube:VERSION",
       "command": [
               "/hyperkube",
               "apiserver",
@@ -30,7 +30,7 @@
     },
     {
       "name": "scheduler",
-      "image": "gcr.io/google_containers/hyperkube:VERSION",
+      "image": "beta.gcr.io/google_containers/hyperkube:VERSION",
       "command": [
               "/hyperkube",
               "scheduler",

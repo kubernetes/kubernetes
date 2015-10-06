@@ -38,7 +38,7 @@ const (
 	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
-	image                           = "gcr.io/google_containers/resource_consumer:beta"
+	image                           = "beta.gcr.io/google_containers/resource_consumer:beta"
 	rcIsNil                         = "ERROR: replicationController = nil"
 )
 

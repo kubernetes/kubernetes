@@ -7,7 +7,7 @@ consumer:
 	CGO_ENABLED=0 godep go build -a -installsuffix cgo --ldflags '-w' -o consumer .
 
 container:
-	sudo docker build -t gcr.io/google_containers/resource_consumer:$(TAG) .	
+	sudo docker build -t beta.gcr.io/google_containers/resource_consumer:$(TAG) .	
 
 run_container:
 	docker run --publish=8080:8080 gcr.io/google_containers/resource_consumer:$(TAG)
