@@ -54,7 +54,7 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 func validateHorizontalPodAutoscalerSpec(autoscaler experimental.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if autoscaler.MinReplicas < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, `must be non-negative`))
+		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, isNegativeErrorMsg))
 	}
 	if autoscaler.MaxReplicas < autoscaler.MinReplicas {
 		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
@@ -68,7 +68,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler experimental.HorizontalPodAu
 	}
 	quantity := autoscaler.Target.Quantity.Value()
 	if quantity < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("target.quantity", quantity, "must be non-negative"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("target.quantity", quantity, isNegativeErrorMsg))
 	}
 	return allErrs
 }
