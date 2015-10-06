@@ -182,3 +182,11 @@ kubectl create -f ${KUBECONFIG_SECRET} --namespace="kubemark"
 kubectl create -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json --namespace="kubemark"
 
 rm ${KUBECONFIG_SECRET}
+
+echo "Waiting for all HollowNodes to become Running..."
+echo "This can loop forever if something crashed."
+until [[ "$(kubectl --kubeconfig=${KUBE_ROOT}/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_MINIONS}" ]]; do
+  echo -n .
+  sleep 1
+done
+echo ""
