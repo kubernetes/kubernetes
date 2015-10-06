@@ -89,12 +89,11 @@ type CMServer struct {
 	ServiceAccountKeyFile             string
 	RootCAFile                        string
 
-	ClusterName                   string
-	ClusterCIDR                   net.IPNet
-	AllocateNodeCIDRs             bool
-	EnableProfiling               bool
-	EnableHorizontalPodAutoscaler bool
-	EnableDeploymentController    bool
+	ClusterName        string
+	ClusterCIDR        net.IPNet
+	AllocateNodeCIDRs  bool
+	EnableProfiling    bool
+	EnableExperimental bool
 
 	Master     string
 	Kubeconfig string
@@ -119,8 +118,6 @@ func NewCMServer() *CMServer {
 		RegisterRetryCount:                10,
 		PodEvictionTimeout:                5 * time.Minute,
 		ClusterName:                       "kubernetes",
-		EnableHorizontalPodAutoscaler:     false,
-		EnableDeploymentController:        false,
 		VolumeConfigFlags: VolumeConfigFlags{
 			// default values here
 			PersistentVolumeRecyclerMinimumTimeoutNFS:        300,
@@ -191,8 +188,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
-	fs.BoolVar(&s.EnableHorizontalPodAutoscaler, "enable-horizontal-pod-autoscaler", s.EnableHorizontalPodAutoscaler, "Enables horizontal pod autoscaler (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
-	fs.BoolVar(&s.EnableDeploymentController, "enable-deployment-controller", s.EnableDeploymentController, "Enables deployment controller (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
+	fs.BoolVar(&s.EnableExperimental, "enable-experimental", s.EnableExperimental, "Enables experimental controllers (requires enabling experimental API on apiserver).")
 }
 
 // Run runs the CMServer.  This should never exit.
@@ -241,12 +237,6 @@ func (s *CMServer) Run(_ []string) error {
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient, replicationControllerPkg.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
-	go daemon.NewDaemonSetsController(kubeClient).
-		Run(s.ConcurrentDSCSyncs, util.NeverStop)
-
-	go job.NewJobController(kubeClient).
-		Run(s.ConcurrentJobSyncs, util.NeverStop)
-
 	if s.TerminatedPodGCThreshold > 0 {
 		go gc.New(kubeClient, s.TerminatedPodGCThreshold).
 			Run(util.NeverStop)
@@ -282,18 +272,20 @@ func (s *CMServer) Run(_ []string) error {
 	resourceQuotaController := resourcequotacontroller.NewResourceQuotaController(kubeClient)
 	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
-	// An OR of all flags to enable/disable experimental features
-	experimentalMode := s.EnableHorizontalPodAutoscaler || s.EnableDeploymentController
-	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, experimentalMode, s.NamespaceSyncPeriod)
-	namespaceController.Run()
+	namespacecontroller.NewNamespaceController(kubeClient, s.EnableExperimental, s.NamespaceSyncPeriod).Run()
 
-	if s.EnableHorizontalPodAutoscaler {
-		horizontalPodAutoscalerController := podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient))
-		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
-	}
-	if s.EnableDeploymentController {
-		deploymentController := deployment.New(kubeClient)
-		deploymentController.Run(s.DeploymentControllerSyncPeriod)
+	if s.EnableExperimental {
+		go daemon.NewDaemonSetsController(kubeClient).
+			Run(s.ConcurrentDSCSyncs, util.NeverStop)
+
+		go job.NewJobController(kubeClient).
+			Run(s.ConcurrentJobSyncs, util.NeverStop)
+
+		podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient)).
+			Run(s.HorizontalPodAutoscalerSyncPeriod)
+
+		deployment.New(kubeClient).
+			Run(s.DeploymentControllerSyncPeriod)
 	}
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
