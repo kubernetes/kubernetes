@@ -19,6 +19,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -100,7 +101,17 @@ func TestE2E(t *testing.T) {
 	}
 
 	if testContext.Provider == "aws" {
-		awsConfig := "[Global]\n"
+		var awsConfig string
+		config := os.Getenv("AWS_CONFIG_FILE")
+		if len(config) == 0 {
+			awsConfig = "[Global]\n"
+		} else {
+			data, err := ioutil.ReadFile(config)
+			if err != nil {
+				glog.Fatalf("failed to read config: %v", err)
+			}
+			awsConfig = string(data) + "\n"
+		}
 		if cloudConfig.Zone == "" {
 			glog.Fatal("gce-zone must be specified for AWS")
 		}
