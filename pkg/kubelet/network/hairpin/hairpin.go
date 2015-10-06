@@ -64,7 +64,7 @@ func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, c
 	// Get container's interface index
 	output, err := e.Command(nsenterPath, "-t", fmt.Sprintf("%d", containerPid), "-n", "-F", "--", ethtoolPath, "--statistics", containerInterfaceName).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("Unable to query interface %s of container %d: %v", containerInterfaceName, containerPid, err)
+		return "", fmt.Errorf("Unable to query interface %s of container %d: %v: %s", containerInterfaceName, containerPid, err, string(output))
 	}
 	// look for peer_ifindex
 	match := ethtoolOutputRegex.FindSubmatch(output)
