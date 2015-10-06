@@ -17,6 +17,8 @@ limitations under the License.
 package flocker
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	flockerClient "github.com/ClusterHQ/flocker-go"
@@ -28,15 +30,17 @@ import (
 
 const pluginName = "kubernetes.io/flocker"
 
-func newInitializedVolumePlugMgr() volume.VolumePluginMgr {
+func newInitializedVolumePlugMgr(t *testing.T) (volume.VolumePluginMgr, string) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/foo/bar", nil, nil))
-	return plugMgr
+	dir, err := ioutil.TempDir("", "flocker")
+	assert.NoError(t, err)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(dir, nil, nil))
+	return plugMgr, dir
 }
 
 func TestGetByName(t *testing.T) {
 	assert := assert.New(t)
-	plugMgr := newInitializedVolumePlugMgr()
+	plugMgr, _ := newInitializedVolumePlugMgr(t)
 
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NotNil(plug, "Can't find the plugin by name")
@@ -45,7 +49,7 @@ func TestGetByName(t *testing.T) {
 
 func TestCanSupport(t *testing.T) {
 	assert := assert.New(t)
-	plugMgr := newInitializedVolumePlugMgr()
+	plugMgr, _ := newInitializedVolumePlugMgr(t)
 
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NoError(err)
@@ -113,7 +117,7 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 func TestNewBuilder(t *testing.T) {
 	assert := assert.New(t)
 
-	plugMgr := newInitializedVolumePlugMgr()
+	plugMgr, _ := newInitializedVolumePlugMgr(t)
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NoError(err)
 
@@ -196,7 +200,10 @@ func TestSetUpAtInternal(t *testing.T) {
 
 	assert := assert.New(t)
 
-	plugMgr := newInitializedVolumePlugMgr()
+	plugMgr, rootDir := newInitializedVolumePlugMgr(t)
+	if rootDir != "" {
+		defer os.RemoveAll(rootDir)
+	}
 	plug, err := plugMgr.FindPluginByName(flockerPluginName)
 	assert.NoError(err)
 
