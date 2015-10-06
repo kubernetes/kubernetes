@@ -11,7 +11,7 @@ spec:
         - containerPort: 8080
           protocol: TCP
       volumeMounts:
-        - mountPath: /mount/test-volume
+        - mountPath: "/mount/test-volume"
           name: test-volume
   volumes:
     - name: test-volume
