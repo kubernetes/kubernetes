@@ -1785,6 +1785,12 @@ func getSigner(provider string) (ssh.Signer, error) {
 	case "gce", "gke":
 		keyfile = "google_compute_engine"
 	case "aws":
+		// If there is an env. variable override, use that.
+		aws_keyfile := os.Getenv("AWS_SSH_KEY")
+		if len(aws_keyfile) != 0 {
+			return util.MakePrivateKeySignerFromFile(aws_keyfile)
+		}
+		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
 	default:
 		return nil, fmt.Errorf("getSigner(...) not implemented for %s", provider)
