@@ -103,14 +103,18 @@ List all pods:
 $ kubectl get pods
 ```
 
-On most providers, the pod IPs are not externally accessible. The easiest way to test that the pod is working is to create a busybox pod and exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.md) for details.
+On most cloud providers, the pod IPs are not externally accessible. The easiest way to check  the pod's status is to create a busybox pod then exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.md) for details.
 
-Provided the pod IP is accessible, you should be able to access its http endpoint with curl on port 80:
+The pod IP is accessible on previous created busybox pod, you should get the pod's IP first:
 
 ```sh
-$ curl http://$(kubectl get pod nginx -o go-template={{.status.podIP}})
+$ kubectl get pod nginx -o go-template={{.status.podIP}}
 ```
-
+On the busybox pod, you can access its http endpoint with curl on port 80:
+$pod_ip is previous step result.
+```sh
+$ curl http://$pod_ip
+```
 Delete the pod by name:
 
 ```sh
@@ -124,7 +128,7 @@ That's great for a simple static web server, but what about persistent storage?
 
 The container file system only lives as long as the container does. So if your app's state needs to survive relocation, reboots, and crashes, you'll need to configure some persistent storage.
 
-For this example we'll be creating a Redis pod with a named volume and volume mount that defines the path to mount the volume.
+For this example we'll be creating a Redis pod with a named `volumes` and a `volumeMounts` that defines the path to mount the volume within the container.
 
 1. Define a volume:
 
