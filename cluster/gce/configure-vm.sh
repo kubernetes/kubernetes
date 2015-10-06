@@ -316,14 +316,9 @@ cluster_registry_disk_size: $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZ
 cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
 EOF
     fi
-    if [ -n "${ENABLE_HORIZONTAL_POD_AUTOSCALER:-}" ]; then
+    if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-enable_horizontal_pod_autoscaler: '$(echo "$ENABLE_HORIZONTAL_POD_AUTOSCALER" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${ENABLE_DEPLOYMENTS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-enable_deployments: '$(echo "$ENABLE_DEPLOYMENTS" | sed -e "s/'/''/g")'
+enable_experimental_api: '$(echo "$ENABLE_EXPERIMENTAL_API" | sed -e "s/'/''/g")'
 EOF
     fi
 }
