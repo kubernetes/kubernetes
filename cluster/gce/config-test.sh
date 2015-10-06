@@ -128,7 +128,7 @@ KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 # is only supported in trusty nodes.
 TEST_CLUSTER="${TEST_CLUSTER:-true}"
 
-# opencontrail settings
+# OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
@@ -74,14 +75,13 @@ func (*fakeOptionGenerator) GenerateRunContainerOptions(pod *api.Pod, container 
 func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManager, *FakeDockerClient) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}, Errors: make(map[string]error), RemovedImages: sets.String{}}
 	fakeRecorder := &record.FakeRecorder{}
-	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
 	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	optionGenerator := &fakeOptionGenerator{}
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
-		readinessManager,
+		prober.FakeProber{},
 		containerRefManager,
 		&cadvisorApi.MachineInfo{},
 		PodInfraContainerImage,
@@ -398,10 +398,6 @@ func TestKillContainerInPod(t *testing.T) {
 	containerToKill := &containers[0]
 	containerToSpare := &containers[1]
 	fakeDocker.ContainerList = containers
-	// Set all containers to ready.
-	for _, c := range fakeDocker.ContainerList {
-		manager.readinessManager.SetReadiness(c.ID, true)
-	}
 
 	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -410,13 +406,9 @@ func TestKillContainerInPod(t *testing.T) {
 	if err := fakeDocker.AssertStopped([]string{containerToKill.ID}); err != nil {
 		t.Errorf("container was not stopped correctly: %v", err)
 	}
-
-	// Verify that the readiness has been removed for the stopped container.
-	if ready := manager.readinessManager.GetReadiness(containerToKill.ID); ready {
-		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", containerToKill.ID, ready)
-	}
-	if ready := manager.readinessManager.GetReadiness(containerToSpare.ID); !ready {
-		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", containerToSpare.ID, ready)
+	// Assert the container has been spared.
+	if err := fakeDocker.AssertStopped([]string{containerToSpare.ID}); err == nil {
+		t.Errorf("container unexpectedly stopped: %v", containerToSpare.ID)
 	}
 }
 
@@ -471,10 +463,6 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 			},
 		},
 	}
-	// Set all containers to ready.
-	for _, c := range fakeDocker.ContainerList {
-		manager.readinessManager.SetReadiness(c.ID, true)
-	}
 
 	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -510,26 +498,11 @@ func TestKillContainerInPodWithError(t *testing.T) {
 			Names: []string{"/k8s_bar_qux_new_1234_42"},
 		},
 	}
-	containerToKill := &containers[0]
-	containerToSpare := &containers[1]
 	fakeDocker.ContainerList = containers
 	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
 
-	// Set all containers to ready.
-	for _, c := range fakeDocker.ContainerList {
-		manager.readinessManager.SetReadiness(c.ID, true)
-	}
-
 	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err == nil {
 		t.Errorf("expected error, found nil")
-	}
-
-	// Verify that the readiness has been removed even though the stop failed.
-	if ready := manager.readinessManager.GetReadiness(containerToKill.ID); ready {
-		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", containerToKill.ID, ready)
-	}
-	if ready := manager.readinessManager.GetReadiness(containerToSpare.ID); !ready {
-		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", containerToSpare.ID, ready)
 	}
 }
 

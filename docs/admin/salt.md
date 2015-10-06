@@ -82,7 +82,7 @@ An example file is presented below using the Vagrant based environment.
 [root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
   etcd_servers: $MASTER_IP
-  cloud_provider: vagrant
+  cloud: vagrant
   roles:
     - kubernetes-master
 ```

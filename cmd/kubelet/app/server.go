@@ -173,9 +173,9 @@ func NewKubeletServer() *KubeletServer {
 		FileCheckFrequency:          20 * time.Second,
 		HealthzBindAddress:          net.ParseIP("127.0.0.1"),
 		HealthzPort:                 10248,
-		HostNetworkSources:          kubelet.FileSource,
-		HostPIDSources:              kubelet.FileSource,
-		HostIPCSources:              kubelet.FileSource,
+		HostNetworkSources:          kubelet.AllSource,
+		HostPIDSources:              kubelet.AllSource,
+		HostIPCSources:              kubelet.AllSource,
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
@@ -228,9 +228,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
 	fs.StringVar(&s.RootDirectory, "root-dir", s.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
-	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
-	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. For all sources use \"*\" [default=\"file\"]")
-	fs.StringVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. For all sources use \"*\" [default=\"file\"]")
+	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. [default=\"*\"]")
+	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. [default=\"*\"]")
+	fs.StringVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. [default=\"*\"]")
 	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	fs.IntVar(&s.RegistryBurst, "registry-burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0")
 	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited. [default=0.0]")
@@ -455,7 +455,7 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(kcfg, nil); err != nil {
+	if err := RunKubelet(kcfg); err != nil {
 		return err
 	}
 
@@ -663,7 +663,7 @@ func SimpleKubelet(client *client.Client,
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
+func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
@@ -712,8 +712,9 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
+	builder := kcfg.Builder
 	if builder == nil {
-		builder = createAndInitKubelet
+		builder = CreateAndInitKubelet
 	}
 	if kcfg.OSInterface == nil {
 		kcfg.OSInterface = kubecontainer.RealOS{}
@@ -782,6 +783,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
+	Builder                        KubeletBuilder
 	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface
@@ -824,6 +826,7 @@ type KubeletConfig struct {
 	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
+	PodConfig                      *config.PodConfig
 	PodInfraContainerImage         string
 	Port                           uint
 	ReadOnlyPort                   uint
@@ -846,7 +849,7 @@ type KubeletConfig struct {
 	VolumePlugins                  []volume.VolumePlugin
 }
 
-func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
+func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
@@ -867,7 +870,10 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
 	}
 
-	pc = makePodSourceConfig(kc)
+	pc = kc.PodConfig
+	if pc == nil {
+		pc = makePodSourceConfig(kc)
+	}
 	k, err = kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.NodeName,

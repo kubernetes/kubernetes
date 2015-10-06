@@ -131,6 +131,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
 		a.eventRecorder.Eventf(&hpa, "SuccessfulRescale", "New size: %d", desiredReplicas)
+		glog.Infof("Successfull rescale of %s, old size: %d, new size: %d, usage ratio: %f",
+			hpa.Name, currentReplicas, desiredReplicas, usageRatio)
 	} else {
 		desiredReplicas = currentReplicas
 	}

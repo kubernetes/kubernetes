@@ -99,7 +99,7 @@ DOCKER_CONF=""
 # Start k8s components in containers
 start_k8s() {
     # Start flannel
-    flannelCID=$(sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --restart=always --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001 -iface="eth0")
+    flannelCID=$(sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --restart=always --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001 -iface="eth0")
 
     sleep 8
 
@@ -109,23 +109,25 @@ start_k8s() {
 
     # Configure docker net settings, then restart it
     case "$lsb_dist" in
-        fedora|centos|amzn)
+        centos)
             DOCKER_CONF="/etc/sysconfig/docker"
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            if ! command_exists ifconfig; then
+                yum -y -q install net-tools
+            fi
+            ifconfig docker0 down
+            yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
         ;;
-        ubuntu|debian|linuxmint)
+        amzn)
+            DOCKER_CONF="/etc/sysconfig/docker"
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            ifconfig docker0 down
+            yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
+        ;;
+        ubuntu|debian)
             DOCKER_CONF="/etc/default/docker"
-        ;;
-    esac
-
-    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-
-    ifconfig docker0 down
-
-    case "$lsb_dist" in
-        fedora|centos)
-            yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
-        ;;
-        ubuntu|debian|linuxmint)
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            ifconfig docker0 down
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
         ;;
     esac

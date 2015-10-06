@@ -144,10 +144,12 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	}
 	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, testapi.Experimental.GroupAndVersion(), etcdtest.PathPrefix())
 	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
-
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("experimental", expEtcdStorage)
 
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
@@ -166,8 +168,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		ExpDatabaseStorage:    expEtcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         fakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -238,7 +239,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* SyncFrequency */
 		40 /* MaxPods */)
 
-	kubeletapp.RunKubelet(kcfg, nil)
+	kubeletapp.RunKubelet(kcfg)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
@@ -270,7 +271,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 		40 /* MaxPods */)
 
-	kubeletapp.RunKubelet(kcfg, nil)
+	kubeletapp.RunKubelet(kcfg)
 	return apiServer.URL, configFilePath
 }
 

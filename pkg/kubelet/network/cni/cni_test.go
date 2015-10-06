@@ -37,6 +37,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -143,13 +144,12 @@ func (nh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
 func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDockerClient) {
 	fakeDocker := &dockertools.FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}, Errors: make(map[string]error), RemovedImages: sets.String{}}
 	fakeRecorder := &record.FakeRecorder{}
-	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
 	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	dockerManager := dockertools.NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
-		readinessManager,
+		prober.FakeProber{},
 		containerRefManager,
 		&cadvisorApi.MachineInfo{},
 		dockertools.PodInfraContainerImage,

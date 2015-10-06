@@ -107,7 +107,7 @@ octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
 service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
 MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
-# opencontrail settings
+# OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"

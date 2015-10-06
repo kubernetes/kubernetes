@@ -75,7 +75,7 @@ var _ = Describe("Autoscaling", func() {
 	})
 
 	It("[Skipped][Autoscaling Suite] should scale cluster size based on memory utilization", func() {
-		setUpAutoscaler("memory/node_utilization", 0.5, nodeCount, nodeCount+1)
+		setUpAutoscaler("memory/node_utilization", 0.6, nodeCount, nodeCount+1)
 
 		// Consume 60% of total memory capacity
 		megabytesPerReplica := int(memCapacityMb * 6 / 10 / coresPerNode)

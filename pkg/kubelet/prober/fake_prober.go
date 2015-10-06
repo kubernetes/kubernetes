@@ -21,11 +21,24 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 )
 
-var _ Prober = &FakeProber{}
+var _ Prober = FakeProber{}
 
 type FakeProber struct {
+	Readiness probe.Result
+	Liveness  probe.Result
+	Error     error
 }
 
-func (fp *FakeProber) Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
-	return probe.Success, nil
+func (f FakeProber) ProbeLiveness(_ *api.Pod, _ api.PodStatus, c api.Container, _ string, _ int64) (probe.Result, error) {
+	if c.LivenessProbe == nil {
+		return probe.Success, nil
+	}
+	return f.Liveness, f.Error
+}
+
+func (f FakeProber) ProbeReadiness(_ *api.Pod, _ api.PodStatus, c api.Container, _ string) (probe.Result, error) {
+	if c.ReadinessProbe == nil {
+		return probe.Success, nil
+	}
+	return f.Readiness, f.Error
 }

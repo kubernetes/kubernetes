@@ -77,6 +77,7 @@ etcd-config
 etcd-prefix
 etcd-server
 etcd-servers
+etcd-servers-overrides
 event-burst
 event-qps
 event-ttl
@@ -176,6 +177,7 @@ mesos-executor-mem
 mesos-master
 mesos-role
 mesos-user
+mesos-launch-grace-period
 minimum-container-ttl-duration
 minion-max-log-age
 minion-max-log-backups

@@ -109,7 +109,6 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Nodes"
     "Etcd\sFailure"
     "MasterCerts"
-    "Shell"
     "Daemon\sset"
     "Deployment"
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
@@ -156,7 +155,6 @@ GCE_PARALLEL_SKIP_TESTS=(
     "Resource\susage\sof\ssystem\scontainers"
     "SchedulerPredicates"
     "Services.*restarting"
-    "Shell.*services"
     "resource\susage\stracking"
     )
 
@@ -174,7 +172,6 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Services.*endpoint"
     "Services.*up\sand\sdown"
     "Networking\sshould\sfunction\sfor\sintra-pod\scommunication"  # possibly causing Ginkgo to get stuck, issue: #13485
-    "Kubectl\sexpose"
     )
 
 # Tests that should not run on soak cluster.

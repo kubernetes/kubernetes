@@ -100,7 +100,10 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     public List<InetAddress> getSeeds() {
         List<InetAddress> list = new ArrayList<InetAddress>();
-        String host = getEnvOrDefault("KUBERNETES_API_HOST","https://kubernetes.default.svc.cluster.local");
+        //String host = "https://kubernetes.default.svc.cluster.local";
+        String proto = "https://";
+        String host = getEnvOrDefault("KUBERNETES_PORT_443_TCP_ADDR", "kubernetes.default.svc.cluster.local");
+        String port = getEnvOrDefault("KUBERNETES_PORT_443_TCP_PORT", "443");
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
         String podNamespace = getEnvOrDefault("POD_NAMESPACE", "default");
         String path = String.format("/api/v1/namespaces/%s/endpoints/", podNamespace);
@@ -110,7 +113,7 @@ public class KubernetesSeedProvider implements SeedProvider {
             SSLContext ctx = SSLContext.getInstance("SSL");
             ctx.init(null, trustAll, new SecureRandom());
 
-            URL url = new URL(host + path + serviceName);
+            URL url = new URL(proto + host + ":" + port + path + serviceName);
             logger.info("Getting endpoints from " + url);
             HttpsURLConnection conn = (HttpsURLConnection)url.openConnection();
 
