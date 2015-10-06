@@ -47,9 +47,16 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *api.Pod) error {
 	if mc.apiserverClient == nil {
 		return nil
 	}
-	pod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
+	// Make a copy of the pod.
+	copyPod := *pod
+	copyPod.Annotations = make(map[string]string)
 
-	_, err := mc.apiserverClient.Pods(pod.Namespace).Create(pod)
+	for k, v := range pod.Annotations {
+		copyPod.Annotations[k] = v
+	}
+	copyPod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
+
+	_, err := mc.apiserverClient.Pods(copyPod.Namespace).Create(&copyPod)
 	return err
 }
 
