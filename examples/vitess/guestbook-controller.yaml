@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
         - name: guestbook
-          image: vitess/guestbook:v2.0
+          image: vitess/guestbook:v2.0.0-alpha3
           ports:
             - name: http-server
               containerPort: 8080

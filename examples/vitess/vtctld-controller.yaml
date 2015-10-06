@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
         - name: vtctld
-          image: vitess/lite:v2.0
+          image: vitess/lite:v2.0.0-alpha3
           volumeMounts:
             - name: syslog
               mountPath: /dev/log
@@ -35,8 +35,10 @@ spec:
               -log_dir $VTDATAROOT/tmp
               -alsologtostderr
               -port 15000
+              -service_map 'bsonrpc-vt-vtctl'
               -topo_implementation etcd
               -tablet_protocol grpc
+              -tablet_manager_protocol grpc
               -etcd_global_addrs http://$ETCD_GLOBAL_SERVICE_HOST:$ETCD_GLOBAL_SERVICE_PORT" vitess
       volumes:
         - name: syslog
