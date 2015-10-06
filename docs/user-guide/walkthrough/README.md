@@ -103,9 +103,9 @@ List all pods:
 $ kubectl get pods
 ```
 
-On most cloud providers, the pod IPs are not externally accessible. The easiest way to check  the pod's status is to create a busybox pod then exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.md) for details.
+On the most cloud providers, the pod's IP are not externally accessible. The easiest way to check the pod's status is to create a busybox pod and exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.md) for details.
 
-The pod IP is accessible on previous created busybox pod, you should get the pod's IP first:
+The pod's IP is accessible on previous created busybox pod, you should get the pod's IP:
 
 ```sh
 $ kubectl get pod nginx -o go-template={{.status.podIP}}
