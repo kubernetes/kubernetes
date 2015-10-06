@@ -119,7 +119,7 @@ var _ = Describe("Service endpoints latency", func() {
 func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := RCConfig{
 		Client:       f.Client,
-		Image:        "gcr.io/google_containers/pause:1.0",
+		Image:        "beta.gcr.io/google_containers/pause:2.0",
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,

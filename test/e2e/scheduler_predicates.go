@@ -208,7 +208,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -227,7 +227,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -288,7 +288,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -312,7 +312,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -354,7 +354,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 				NodeSelector: map[string]string{
@@ -390,7 +390,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -428,7 +428,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 				NodeSelector: map[string]string{
