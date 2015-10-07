@@ -24,6 +24,7 @@
 
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
+{% set network_plugin = "" -%}
 {% if grains['roles'][0] == 'kubernetes-master' -%}
   {% if grains.cloud in ['aws', 'gce', 'vagrant'] -%}
 
@@ -36,7 +37,6 @@
       {% endif -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
-      {% set network_plugin = "" -%}
     {% endif -%}
 
     # Disable the debugging handlers (/run and /exec) to prevent arbitrary
