@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/experimental"
 	"k8s.io/kubernetes/pkg/labels"
@@ -500,4 +501,51 @@ func validateIngressBackend(backend *experimental.IngressBackend) errs.Validatio
 		allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort, portRangeErrorMsg))
 	}
 	return allErrs
+}
+
+func ValidateDerivedNodeMetricsName(name string, prefix bool) (bool, string) {
+	return apivalidation.ValidateNodeName(name, prefix)
+}
+
+func validateMetricsWindows(mw experimental.MetricsWindows, field string) errs.ValidationErrorList {
+	result := errs.ValidationErrorList{}
+	if mw.EndTime.Equal(unversioned.Time{}) {
+		result = append(result, errs.NewFieldInvalid(field+".endTime", mw.EndTime, `is not set`))
+	}
+	for _, metrics := range mw.Windows {
+		fields := map[string]experimental.ResourceUsage{
+			"mean": metrics.Mean,
+			"max":  metrics.Max,
+			"ninetyFifthPercentile": metrics.NinetyFifthPercentile,
+		}
+		for f, resUsage := range fields {
+			resources := map[string]bool{
+				"cpu":    false,
+				"memory": false,
+			}
+			for n := range resUsage {
+				resources[n] = true
+			}
+			for n, b := range resources {
+				if !b {
+					result = append(result, errs.NewFieldInvalid(field+"."+f, resUsage, fmt.Sprintf(`is missing '%s' resource`, n)))
+				}
+			}
+		}
+	}
+	return result
+}
+
+func ValidateDerivedNodeMetrics(metrics *experimental.DerivedNodeMetrics) errs.ValidationErrorList {
+	result := errs.ValidationErrorList{}
+	result = append(result, apivalidation.ValidateObjectMeta(&metrics.ObjectMeta, false, ValidateDerivedNodeMetricsName).Prefix("metadata")...)
+	result = append(result, validateMetricsWindows(metrics.NodeMetrics, "nodeMetrics")...)
+	for _, cont := range metrics.SystemContainers {
+		result = append(result, validateMetricsWindows(cont.ContainerMetrics, "systemContainers.windows")...)
+	}
+	return result
+}
+
+func ValidateDerivedNodeMetricsUpdate(newMetrics *experimental.DerivedNodeMetrics, oldMetrics *experimental.DerivedNodeMetrics) errs.ValidationErrorList {
+	return nil
 }

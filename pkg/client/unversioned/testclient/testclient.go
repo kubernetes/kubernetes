@@ -316,6 +316,10 @@ func (c *FakeExperimental) HorizontalPodAutoscalers(namespace string) client.Hor
 	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) NodeMetrics() client.NodeMetricsInterface {
+	return nil
+}
+
 func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterface {
 	return &FakeDeployments{Fake: c, Namespace: namespace}
 }

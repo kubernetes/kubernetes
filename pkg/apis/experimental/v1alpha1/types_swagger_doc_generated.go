@@ -133,6 +133,37 @@ func (DeploymentStrategy) SwaggerDoc() map[string]string {
 	return map_DeploymentStrategy
 }
 
+var map_DerivedContainerMetrics = map[string]string{
+	"":                 "DerivedContainerMetrics contains derived metrics for a single container.",
+	"containerName":    "containerName is the name of the cgroups relative to the mountpoint.",
+	"containerMetrics": "containerMetrics contains derived metrics about the container.",
+}
+
+func (DerivedContainerMetrics) SwaggerDoc() map[string]string {
+	return map_DerivedContainerMetrics
+}
+
+var map_DerivedNodeMetrics = map[string]string{
+	"":                 "DerivedNodeMetrics contains derived metrics for a single node. It holds derived metrics in windows about the node itself and all all the cgroups created and managed by kubernetes on the node, which we call system containers.",
+	"metadata":         "Standard list metadata.",
+	"nodeMetrics":      "nodeMetrics contains derived metrics about the node.",
+	"systemContainers": "systemContainers contains derived metrics about all the system containers.",
+}
+
+func (DerivedNodeMetrics) SwaggerDoc() map[string]string {
+	return map_DerivedNodeMetrics
+}
+
+var map_DerivedNodeMetricsList = map[string]string{
+	"":         "DerivedNodeMetricsList contains derived node metrics for all nodes.",
+	"metadata": "Standard list metadata.",
+	"items":    "items holds a list of a DerivedNodeMetrics object for every node.",
+}
+
+func (DerivedNodeMetricsList) SwaggerDoc() map[string]string {
+	return map_DerivedNodeMetricsList
+}
+
 var map_HTTPIngressPath = map[string]string{
 	"":        "IngressPath associates a path regex with an IngressBackend. Incoming urls matching the Path are forwarded to the Backend.",
 	"path":    "Path is a regex matched against the url of an incoming request.",
@@ -324,6 +355,28 @@ var map_JobStatus = map[string]string{
 
 func (JobStatus) SwaggerDoc() map[string]string {
 	return map_JobStatus
+}
+
+var map_MetricsWindow = map[string]string{
+	"":         "MetricsWindow holds derived metrics for multiple resources.",
+	"duration": "duration is the length in time of the window. The start of the window will be the subtraction of this duration to EndTime.",
+	"mean":     "mean holds the averages over the window.",
+	"max":      "max holds the maximum values over the window.",
+	"ninetyFifthPercentile": "ninetyFifthPercentile holds the 95th percentile values over the window.",
+}
+
+func (MetricsWindow) SwaggerDoc() map[string]string {
+	return map_MetricsWindow
+}
+
+var map_MetricsWindows = map[string]string{
+	"":        "MetricsWindows holds multiple derived metrics windows.",
+	"endTime": "endTime is the end time of all the time windows.",
+	"windows": "windows is a list of all the time windows with metrics. All of the windows are rolling.",
+}
+
+func (MetricsWindows) SwaggerDoc() map[string]string {
+	return map_MetricsWindows
 }
 
 var map_ReplicationControllerDummy = map[string]string{
