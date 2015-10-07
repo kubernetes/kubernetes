@@ -16,68 +16,7 @@ limitations under the License.
 
 package gce_cloud
 
-import (
-	"net"
-	"testing"
-
-	compute "google.golang.org/api/compute/v1"
-)
-
-func TestOwnsAddress(t *testing.T) {
-	tests := []struct {
-		ip        net.IP
-		addrs     []*compute.Address
-		expectOwn bool
-	}{
-		{
-			ip:        net.ParseIP("1.2.3.4"),
-			addrs:     []*compute.Address{},
-			expectOwn: false,
-		},
-		{
-			ip: net.ParseIP("1.2.3.4"),
-			addrs: []*compute.Address{
-				{Address: "2.3.4.5"},
-				{Address: "2.3.4.6"},
-				{Address: "2.3.4.7"},
-			},
-			expectOwn: false,
-		},
-		{
-			ip: net.ParseIP("2.3.4.5"),
-			addrs: []*compute.Address{
-				{Address: "2.3.4.5"},
-				{Address: "2.3.4.6"},
-				{Address: "2.3.4.7"},
-			},
-			expectOwn: true,
-		},
-		{
-			ip: net.ParseIP("2.3.4.6"),
-			addrs: []*compute.Address{
-				{Address: "2.3.4.5"},
-				{Address: "2.3.4.6"},
-				{Address: "2.3.4.7"},
-			},
-			expectOwn: true,
-		},
-		{
-			ip: net.ParseIP("2.3.4.7"),
-			addrs: []*compute.Address{
-				{Address: "2.3.4.5"},
-				{Address: "2.3.4.6"},
-				{Address: "2.3.4.7"},
-			},
-			expectOwn: true,
-		},
-	}
-	for _, test := range tests {
-		own := ownsAddress(test.ip, test.addrs)
-		if own != test.expectOwn {
-			t.Errorf("expected: %v, got %v for %v", test.expectOwn, own, test)
-		}
-	}
-}
+import "testing"
 
 func TestGetRegion(t *testing.T) {
 	gce := &GCECloud{
