@@ -39,6 +39,8 @@ KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 # multiple versions of the server are being used in the same project
 # simultaneously (e.g. on Jenkins).
 KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX-""}
+# How long (in seconds) to wait for cluster initialization.
+KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
 
 # VERSION_REGEX matches things like "v0.13.1"
 readonly KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
@@ -721,11 +723,10 @@ function kube-up {
         --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
   fi
 
-  echo "Waiting for cluster initialization."
+  echo "Waiting up to ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds for cluster initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
-  echo "  This might loop forever if there was some uncaught error during start"
-  echo "  up."
+  echo "  This may time out if there was some uncaught error during start up."
   echo
 
   # curl in mavericks is borked.
@@ -736,12 +737,18 @@ function kube-up {
     fi
   fi
 
-
+  local start_time=$(date +%s)
   until curl --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
           --max-time 5 --fail --output /dev/null --silent \
           "https://${KUBE_MASTER_IP}/api/v1/pods"; do
+      local elapsed=$(($(date +%s) - ${start_time}))
+      if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
+          echo -e "${color_red}Cluster failed to initialize within" \
+            "${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}"
+          exit 2
+      fi
       printf "."
       sleep 2
   done
