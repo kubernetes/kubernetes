@@ -37,59 +37,59 @@ var _ = Describe("EmptyDir volumes", func() {
 
 	f := NewFramework("emptydir")
 
-	It("volume on tmpfs should have the correct mode", func() {
+	It("volume on tmpfs should have the correct mode [Conformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support (root,0644,tmpfs)", func() {
+	It("should support (root,0644,tmpfs) [Conformance]", func() {
 		doTest0644(f, testImageRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support (root,0666,tmpfs)", func() {
+	It("should support (root,0666,tmpfs) [Conformance]", func() {
 		doTest0666(f, testImageRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support (root,0777,tmpfs)", func() {
+	It("should support (root,0777,tmpfs) [Conformance]", func() {
 		doTest0777(f, testImageRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0644,tmpfs)", func() {
+	It("should support (non-root,0644,tmpfs) [Conformance]", func() {
 		doTest0644(f, testImageNonRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0666,tmpfs)", func() {
+	It("should support (non-root,0666,tmpfs) [Conformance]", func() {
 		doTest0666(f, testImageNonRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0777,tmpfs)", func() {
+	It("should support (non-root,0777,tmpfs) [Conformance]", func() {
 		doTest0777(f, testImageNonRootUid, api.StorageMediumMemory)
 	})
 
-	It("volume on default medium should have the correct mode", func() {
+	It("volume on default medium should have the correct mode [Conformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, api.StorageMediumDefault)
 	})
 
-	It("should support (root,0644,default)", func() {
+	It("should support (root,0644,default) [Conformance]", func() {
 		doTest0644(f, testImageRootUid, api.StorageMediumDefault)
 	})
 
-	It("should support (root,0666,default)", func() {
+	It("should support (root,0666,default) [Conformance]", func() {
 		doTest0666(f, testImageRootUid, api.StorageMediumDefault)
 	})
 
-	It("should support (root,0777,default)", func() {
+	It("should support (root,0777,default) [Conformance]", func() {
 		doTest0777(f, testImageRootUid, api.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0644,default)", func() {
+	It("should support (non-root,0644,default) [Conformance]", func() {
 		doTest0644(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0666,default)", func() {
+	It("should support (non-root,0666,default) [Conformance]", func() {
 		doTest0666(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0777,default)", func() {
+	It("should support (non-root,0777,default) [Conformance]", func() {
 		doTest0777(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 })

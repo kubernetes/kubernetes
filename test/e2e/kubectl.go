@@ -93,7 +93,7 @@ var _ = Describe("Kubectl client", func() {
 			nautilusPath = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 			kittenPath = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		})
-		It("should create and stop a replication controller", func() {
+		It("should create and stop a replication controller [Conformance]", func() {
 			defer cleanup(nautilusPath, ns, updateDemoSelector)
 
 			By("creating a replication controller")
@@ -101,7 +101,7 @@ var _ = Describe("Kubectl client", func() {
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
-		It("should scale a replication controller", func() {
+		It("should scale a replication controller [Conformance]", func() {
 			defer cleanup(nautilusPath, ns, updateDemoSelector)
 
 			By("creating a replication controller")
@@ -115,7 +115,7 @@ var _ = Describe("Kubectl client", func() {
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
-		It("should do a rolling update of a replication controller", func() {
+		It("should do a rolling update of a replication controller [Conformance]", func() {
 			By("creating the initial replication controller")
 			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
@@ -133,7 +133,7 @@ var _ = Describe("Kubectl client", func() {
 			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
 		})
 
-		It("should create and stop a working application", func() {
+		It("should create and stop a working application [Conformance]", func() {
 			defer cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
 			By("creating all guestbook components")
@@ -238,7 +238,7 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl api-versions", func() {
-		It("should check if v1 is in available api versions", func() {
+		It("should check if v1 is in available api versions [Conformance]", func() {
 			By("validating api verions")
 			output := runKubectl("api-versions")
 			if !strings.Contains(output, "Available Server Api Versions:") {
@@ -251,7 +251,7 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl cluster-info", func() {
-		It("should check if Kubernetes master services is included in cluster-info", func() {
+		It("should check if Kubernetes master services is included in cluster-info [Conformance]", func() {
 			By("validating cluster-info")
 			output := runKubectl("cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
@@ -268,7 +268,7 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl describe", func() {
-		It("should check if kubectl describe prints relevant information for rc and pods", func() {
+		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
@@ -358,7 +358,7 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl expose", func() {
-		It("should create services for rc", func() {
+		It("should create services for rc [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
@@ -441,7 +441,7 @@ var _ = Describe("Kubectl client", func() {
 			cleanup(podPath, ns, simplePodSelector)
 		})
 
-		It("should update the label on a resource", func() {
+		It("should update the label on a resource [Conformance]", func() {
 			labelName := "testing-label"
 			labelValue := "testing-label-value"
 
@@ -480,7 +480,7 @@ var _ = Describe("Kubectl client", func() {
 			cleanup(rcPath, ns, simplePodSelector)
 		})
 
-		It("should be able to retrieve and filter logs", func() {
+		It("should be able to retrieve and filter logs [Conformance]", func() {
 			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
 				By("checking for a matching strings")
 				_, err := lookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", podStartTimeout)
@@ -520,7 +520,7 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl patch", func() {
-		It("should add annotations for pods in rc", func() {
+		It("should add annotations for pods in rc [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
@@ -549,7 +549,7 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl version", func() {
-		It("should check is all data is printed", func() {
+		It("should check is all data is printed [Conformance]", func() {
 			version := runKubectl("version")
 			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
 			for _, item := range requiredItems {
@@ -573,7 +573,7 @@ var _ = Describe("Kubectl client", func() {
 			runKubectl("stop", "rc", rcName, nsFlag)
 		})
 
-		It("should create an rc from an image", func() {
+		It("should create an rc from an image [Conformance]", func() {
 			image := "nginx"
 
 			By("running the image " + image)
@@ -616,7 +616,7 @@ var _ = Describe("Kubectl client", func() {
 			runKubectl("stop", "pods", podName, nsFlag)
 		})
 
-		It("should create a pod from an image when restart is OnFailure", func() {
+		It("should create a pod from an image when restart is OnFailure [Conformance]", func() {
 			image := "nginx"
 
 			By("running the image " + image)
@@ -635,7 +635,7 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 
-		It("should create a pod from an image when restart is Never", func() {
+		It("should create a pod from an image when restart is Never [Conformance]", func() {
 			image := "nginx"
 
 			By("running the image " + image)
@@ -658,7 +658,7 @@ var _ = Describe("Kubectl client", func() {
 
 	Describe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
-		It("should support proxy with --port 0", func() {
+		It("should support proxy with --port 0 [Conformance]", func() {
 			By("starting the proxy server")
 			port, cmd, err := startProxyServer()
 			if cmd != nil {
@@ -675,7 +675,7 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 
-		It("should support --unix-socket=/path", func() {
+		It("should support --unix-socket=/path [Conformance]", func() {
 			By("Starting the proxy")
 			tmpdir, err := ioutil.TempDir("", "kubectl-proxy-unix")
 			if err != nil {

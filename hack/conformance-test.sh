@@ -74,38 +74,14 @@ git show-ref | grep $HEAD_SHA | grep refs/tags
 echo
 echo "Conformance test checking conformance with Kubernetes version 1.0"
 
-# It runs a whitelist of tests.  This whitelist was assembled at commit
-# b70b7084c93d4ce80b7463f48c23d5ac04edb2b1 starting from this list of tests:
-#   grep -h 'It(\|Describe(' -R test
+# It runs a whitelist of tests: all tests which are flagged with [Conformance]
+# somewhere in the description (i.e. either in the Describe part or the It part).
+# The list of tagged conformance tests can be retrieved by:
 #
-# List of test name patterns not included and why not included:
-#  Cadvisor: impl detail how stats gotten from containers.
-#  MasterCerts: GKE/GCE specific
-#  Density: performance
-#  Cluster level logging...: optional feature
-#  Etcd failure: reliability
-#  Load Capacity: performance
-#  Monitoring: optional feature.
-#  Namespaces.*seconds: performance.
-#  Pod disks: uses GCE specific feature.
-#  Reboot: node management
-#  Nodes: node management.
-#  Restart: node management.
-#  Scale: performance
-#  Services.*load balancer: not all cloud providers have a load balancer.
-#  Services.*NodePort: requires you to open the firewall yourself, so not covered.
-#  Services.*nodeport: requires you to open the firewall yourself, so not covered.
-#  Shell: replies on optional ssh access to nodes.
-#  SSH: optional feature.
-#  Addon\supdate: requires SSH
-#  Volumes: contained only skipped tests.
-#  Clean\sup\spods\son\snode: performance
-#  MaxPods\slimit\snumber\sof\spods: not sure why this wasn't working on GCE but it wasn't.
-#  Kubectl\sclient\sSimple\spod: not sure why this wasn't working on GCE but it wasn't
-#  DNS: not sure why this wasn't working on GCE but it wasn't
-export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging|Etcd\sfailure|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Services.*nodeport|Shell|SSH|Addon\supdate|Volumes|Clean\sup\spods\son\snode|Skipped|skipped|MaxPods\slimit\snumber\sof\spods|Kubectl\sclient\sSimple\spod|DNS|Resource\susage\sof\ssystem\scontainers"
+# NUM_MINIONS=4 KUBERNETES_CONFORMANCE_TEST="y" \
+# hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]' -ginkgo.dryRun=true
 
 declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_MINIONS=4
-hack/ginkgo-e2e.sh
+hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]'
 exit $?

@@ -28,7 +28,7 @@ import (
 var _ = Describe("Secrets", func() {
 	f := NewFramework("secrets")
 
-	It("should be consumable from pods", func() {
+	It("should be consumable from pods [Conformance]", func() {
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
