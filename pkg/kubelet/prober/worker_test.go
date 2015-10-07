@@ -22,8 +22,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 const (
@@ -51,12 +54,11 @@ func TestDoProbe(t *testing.T) {
 	failedStatus.Phase = api.PodFailed
 
 	tests := []struct {
-		probe     api.Probe
-		podStatus *api.PodStatus
-
-		expectContinue    bool
-		expectReadySet    bool
-		expectedReadiness bool
+		probe          api.Probe
+		podStatus      *api.PodStatus
+		expectContinue bool
+		expectSet      bool
+		expectedResult results.Result
 	}{
 		{ // No status.
 			expectContinue: true,
@@ -71,135 +73,160 @@ func TestDoProbe(t *testing.T) {
 		{ // Container waiting
 			podStatus:      &pendingStatus,
 			expectContinue: true,
-			expectReadySet: true,
+			expectSet:      true,
 		},
 		{ // Container terminated
-			podStatus:      &terminatedStatus,
-			expectReadySet: true,
+			podStatus: &terminatedStatus,
+			expectSet: true,
 		},
 		{ // Probe successful.
-			podStatus:         &runningStatus,
-			expectContinue:    true,
-			expectReadySet:    true,
-			expectedReadiness: true,
+			podStatus:      &runningStatus,
+			expectContinue: true,
+			expectSet:      true,
+			expectedResult: results.Success,
 		},
 		{ // Initial delay passed
 			podStatus: &runningStatus,
 			probe: api.Probe{
 				InitialDelaySeconds: -100,
 			},
-			expectContinue:    true,
-			expectReadySet:    true,
-			expectedReadiness: true,
+			expectContinue: true,
+			expectSet:      true,
+			expectedResult: results.Success,
 		},
 	}
 
-	for i, test := range tests {
-		w := newTestWorker(test.probe)
-		if test.podStatus != nil {
-			m.statusManager.SetPodStatus(w.pod, *test.podStatus)
-		}
-		if c := doProbe(m, w); c != test.expectContinue {
-			t.Errorf("[%d] Expected continue to be %v but got %v", i, test.expectContinue, c)
-		}
-		ready, ok := m.readinessCache.getReadiness(containerID)
-		if ok != test.expectReadySet {
-			t.Errorf("[%d] Expected to have readiness: %v but got %v", i, test.expectReadySet, ok)
-		}
-		if ready != test.expectedReadiness {
-			t.Errorf("[%d] Expected readiness: %v but got %v", i, test.expectedReadiness, ready)
-		}
+	for _, probeType := range [...]probeType{liveness, readiness} {
+		for i, test := range tests {
+			w := newTestWorker(probeType, test.probe)
+			if test.podStatus != nil {
+				m.statusManager.SetPodStatus(w.pod, *test.podStatus)
+			}
+			if c := doProbe(m, w); c != test.expectContinue {
+				t.Errorf("[%s-%d] Expected continue to be %v but got %v", probeType, i, test.expectContinue, c)
+			}
+			result, ok := m.resultsManager(probeType).Get(containerID)
+			if ok != test.expectSet {
+				t.Errorf("[%s-%d] Expected to have result: %v but got %v", probeType, i, test.expectSet, ok)
+			}
+			if result != test.expectedResult {
+				t.Errorf("[%s-%d] Expected result: %v but got %v", probeType, i, test.expectedResult, result)
+			}
 
-		// Clean up.
-		m.statusManager.DeletePodStatus(podUID)
-		m.readinessCache.removeReadiness(containerID)
+			// Clean up.
+			m.statusManager.DeletePodStatus(podUID)
+			m.resultsManager(probeType).Remove(containerID)
+		}
 	}
 }
 
 func TestInitialDelay(t *testing.T) {
 	m := newTestManager()
-	w := newTestWorker(api.Probe{
-		InitialDelaySeconds: 10,
-	})
-	m.statusManager.SetPodStatus(w.pod, getRunningStatus())
 
-	if !doProbe(m, w) {
-		t.Errorf("Expected to continue, but did not")
-	}
+	for _, probeType := range [...]probeType{liveness, readiness} {
+		w := newTestWorker(probeType, api.Probe{
+			InitialDelaySeconds: 10,
+		})
+		m.statusManager.SetPodStatus(w.pod, getRunningStatus())
 
-	ready, ok := m.readinessCache.getReadiness(containerID)
-	if !ok {
-		t.Errorf("Expected readiness to be false, but was not set")
-	} else if ready {
-		t.Errorf("Expected readiness to be false, but was true")
-	}
+		if !doProbe(m, w) {
+			t.Errorf("[%s] Expected to continue, but did not", probeType)
+		}
 
-	// 100 seconds later...
-	laterStatus := getRunningStatus()
-	laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
-		time.Now().Add(-100 * time.Second)
-	m.statusManager.SetPodStatus(w.pod, laterStatus)
+		result, ok := m.resultsManager(probeType).Get(containerID)
+		if probeType == readiness {
+			if !ok {
+				t.Errorf("Expected readiness to be false during initial delay, but was not set")
+			} else if result {
+				t.Errorf("Expected readiness to be false during initial delay, but was true")
+			}
+		} else { // probeType == liveness
+			if ok {
+				t.Errorf("Expected liveness to be unset during initial delay, but was set")
+			}
+		}
 
-	// Second call should succeed (already waited).
-	if !doProbe(m, w) {
-		t.Errorf("Expected to continue, but did not")
-	}
+		// 100 seconds later...
+		laterStatus := getRunningStatus()
+		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
+			time.Now().Add(-100 * time.Second)
+		m.statusManager.SetPodStatus(w.pod, laterStatus)
 
-	ready, ok = m.readinessCache.getReadiness(containerID)
-	if !ok {
-		t.Errorf("Expected readiness to be true, but was not set")
-	} else if !ready {
-		t.Errorf("Expected readiness to be true, but was false")
+		// Second call should succeed (already waited).
+		if !doProbe(m, w) {
+			t.Errorf("[%s] Expected to continue, but did not", probeType)
+		}
+
+		result, ok = m.resultsManager(probeType).Get(containerID)
+		if !ok {
+			t.Errorf("[%s] Expected result to be true, but was not set", probeType)
+		} else if !result {
+			t.Errorf("[%s] Expected result to be true, but was false", probeType)
+		}
 	}
 }
 
 func TestCleanUp(t *testing.T) {
 	m := newTestManager()
-	pod := getTestPod(api.Probe{})
-	m.statusManager.SetPodStatus(&pod, getRunningStatus())
-	m.readinessCache.setReadiness(containerID, true)
-	w := m.newWorker(&pod, pod.Spec.Containers[0])
-	m.readinessProbes[containerPath{podUID, containerName}] = w
 
-	if ready, _ := m.readinessCache.getReadiness(containerID); !ready {
-		t.Fatal("Expected readiness to be true.")
-	}
+	for _, probeType := range [...]probeType{liveness, readiness} {
+		key := probeKey{podUID, containerName, probeType}
+		pod := getTestPod(api.Probe{})
+		m.statusManager.SetPodStatus(&pod, getRunningStatus())
+		m.resultsManager(probeType).Set(containerID, results.Success)
+		w := m.newWorker(&pod, pod.Spec.Containers[0], probeType)
+		m.workers[key] = w
 
-	close(w.stop)
-	if err := waitForWorkerExit(m, []containerPath{{podUID, containerName}}); err != nil {
-		t.Fatal(err)
-	}
+		if ready, _ := m.resultsManager(probeType).Get(containerID); !ready {
+			t.Fatalf("[%s] Expected result to be true.", probeType)
+		}
 
-	if _, ok := m.readinessCache.getReadiness(containerID); ok {
-		t.Error("Expected readiness to be cleared.")
-	}
-	if _, ok := m.readinessProbes[containerPath{podUID, containerName}]; ok {
-		t.Error("Expected worker to be cleared.")
+		close(w.stop)
+		if err := waitForWorkerExit(m, []probeKey{key}); err != nil {
+			t.Fatalf("[%s] error waiting for worker exit: %v", probeType, err)
+		}
+
+		if _, ok := m.resultsManager(probeType).Get(containerID); ok {
+			t.Errorf("[%s] Expected result to be cleared.")
+		}
+		if _, ok := m.workers[key]; ok {
+			t.Errorf("[%s] Expected worker to be cleared.", probeType)
+		}
 	}
 }
 
 func TestHandleCrash(t *testing.T) {
 	m := newTestManager()
-	m.prober = CrashingProber{}
-	w := newTestWorker(api.Probe{})
+	m.prober = &prober{
+		refManager: kubecontainer.NewRefManager(),
+		recorder:   &record.FakeRecorder{},
+		exec:       crashingExecProber{},
+	}
+
+	w := newTestWorker(readiness, api.Probe{})
 	m.statusManager.SetPodStatus(w.pod, getRunningStatus())
 
 	// doProbe should recover from the crash, and keep going.
 	if !doProbe(m, w) {
 		t.Error("Expected to keep going, but terminated.")
 	}
-	if _, ok := m.readinessCache.getReadiness(containerID); ok {
+	if _, ok := m.readinessManager.Get(containerID); ok {
 		t.Error("Expected readiness to be unchanged from crash.")
 	}
 }
 
-func newTestWorker(probeSpec api.Probe) *worker {
+func newTestWorker(probeType probeType, probeSpec api.Probe) *worker {
+	// All tests rely on the fake exec prober.
+	probeSpec.Handler = api.Handler{
+		Exec: &api.ExecAction{},
+	}
 	pod := getTestPod(probeSpec)
 	return &worker{
 		stop:      make(chan struct{}),
 		pod:       &pod,
 		container: pod.Spec.Containers[0],
 		spec:      &probeSpec,
+		probeType: probeType,
 	}
 }
 
@@ -231,12 +258,20 @@ func getTestPod(probeSpec api.Probe) api.Pod {
 	return pod
 }
 
-type CrashingProber struct{}
+type crashingExecProber struct{}
 
-func (f CrashingProber) ProbeLiveness(_ *api.Pod, _ api.PodStatus, c api.Container, _ kubecontainer.ContainerID, _ int64) (probe.Result, error) {
-	panic("Intentional ProbeLiveness crash.")
+func (p crashingExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
+	panic("Intentional Probe crash.")
 }
 
-func (f CrashingProber) ProbeReadiness(_ *api.Pod, _ api.PodStatus, c api.Container, _ kubecontainer.ContainerID) (probe.Result, error) {
-	panic("Intentional ProbeReadiness crash.")
+// Format probe type.
+func (t probeType) String() string {
+	switch t {
+	case readiness:
+		return "Readiness"
+	case liveness:
+		return "Liveness"
+	default:
+		return "UNKNOWN"
+	}
 }

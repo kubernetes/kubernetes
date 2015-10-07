@@ -37,7 +37,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -149,7 +149,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 	dockerManager := dockertools.NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
-		prober.FakeProber{},
+		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorApi.MachineInfo{},
 		dockertools.PodInfraContainerImage,
