@@ -272,7 +272,7 @@ type PodSecurityContext struct {
     // FSGroup is a supplemental group that all containers in a pod run under.  This group will own
     // volumes that the Kubelet manages ownership for.  If this is not specified, the Kubelet will
     // not set the group ownership of any volumes.
-    FSGroup *int64 `json:"supplementalGroup"`
+    FSGroup *int64 `json:"fsGroup,omitempty"`
 }
 ```
 
@@ -285,7 +285,7 @@ type PodSecurityContext struct {
     // FSGroup is a supplemental group that all containers in a pod run under.  This group will own
     // volumes that the Kubelet manages ownership for.  If this is not specified, the Kubelet will
     // not set the group ownership of any volumes.
-    FSGroup *int64 `json:"supplementalGroup"`
+    FSGroup *int64 `json:"fsGroup,omitempty"`
 }
 ```
 
@@ -455,7 +455,7 @@ metadata:
   name: test-pod
 spec:
   securityContext:
-    supplementalGroup: 1001
+    fsGroup: 1001
   containers:
   - name: a
     securityContext:
@@ -487,7 +487,7 @@ metadata:
   name: test-pod
 spec:
   securityContext:
-    supplementalGroup: 1001
+    fsGroup: 1001
   containers:
   - name: a
     securityContext:
