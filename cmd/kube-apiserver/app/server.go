@@ -68,6 +68,7 @@ type APIServer struct {
 	BindAddress                net.IP
 	AdvertiseAddress           net.IP
 	SecurePort                 int
+	ReadWritePort              int
 	ExternalHost               string
 	TLSCertFile                string
 	TLSPrivateKeyFile          string
@@ -177,6 +178,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
+	fs.IntVar(&s.ReadWritePort, "read-write-port", s.ReadWritePort, "The port for read and write operations; defaults to --secure-port.")
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, "+
@@ -514,6 +516,11 @@ func (s *APIServer) Run(_ []string) error {
 			installSSH = instances.AddSSHKeyToAllInstances
 		}
 	}
+
+	if s.ReadWritePort == 0 {
+		s.ReadWritePort = s.SecurePort
+	}
+
 	config := &master.Config{
 		StorageDestinations:       storageDestinations,
 		StorageVersions:           storageVersions,
@@ -530,7 +537,7 @@ func (s *APIServer) Run(_ []string) error {
 		APIPrefix:                 s.APIPrefix,
 		APIGroupPrefix:            s.APIGroupPrefix,
 		CorsAllowedOriginList:     s.CorsAllowedOriginList,
-		ReadWritePort:             s.SecurePort,
+		ReadWritePort:             s.ReadWritePort,
 		PublicAddress:             s.AdvertiseAddress,
 		Authenticator:             authenticator,
 		SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
