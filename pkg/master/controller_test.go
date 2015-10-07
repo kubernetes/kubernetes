@@ -259,7 +259,7 @@ func TestSetEndpoints(t *testing.T) {
 		}
 		if test.expectUpdate != nil {
 			if len(registry.Updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
+				t.Errorf("case %q: unexpected updates: (%v).  Expected exactly 1 change. ", test.testName, registry.Updates)
 			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
 				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 			}
