@@ -347,6 +347,9 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 				b.resourceTuples = append(b.resourceTuples, tuple)
 			}
 		}
+		if err = b.checkImplicitExpResource(); err != nil {
+			b.errs = append(b.errs, err)
+		}
 		return b
 	}
 	if len(args) > 0 {
@@ -369,7 +372,34 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 	default:
 		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource or resource and name"))
 	}
+	if err := b.checkImplicitExpResource(); err != nil {
+		b.errs = append(b.errs, err)
+	}
 	return b
+}
+
+func (b *Builder) checkImplicitExpResource() error {
+	for _, tuple := range b.resourceTuples {
+		if err := b.errorOnImplicitExpResource(tuple.Resource); err != nil {
+			return err
+		}
+	}
+	for _, resource := range b.resources {
+		if err := b.errorOnImplicitExpResource(resource); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *Builder) errorOnImplicitExpResource(resource string) error {
+	exp := "experimental"
+	if !strings.Contains(resource, "/") {
+		if group, err := b.mapper.GroupForResource(resource); err == nil && group == exp {
+			return fmt.Errorf("%s resource %q should be specified explicitly; use %s/%s instead", exp, resource, exp, resource)
+		}
+	}
+	return nil
 }
 
 // replaceAliases accepts an argument and tries to expand any existing
