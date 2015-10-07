@@ -346,7 +346,6 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		klet.containerGC = rktRuntime
 		klet.imageManager = rkt.NewImageManager(rktRuntime)
 
 		// No Docker daemon to put in a container.
