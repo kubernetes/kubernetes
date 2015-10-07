@@ -17,17 +17,20 @@ limitations under the License.
 package record
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 func init() {
@@ -38,6 +41,7 @@ func init() {
 type testEventSink struct {
 	OnCreate func(e *api.Event) (*api.Event, error)
 	OnUpdate func(e *api.Event) (*api.Event, error)
+	OnPatch  func(e *api.Event, p []byte) (*api.Event, error)
 }
 
 // CreateEvent records the event for testing.
@@ -54,6 +58,50 @@ func (t *testEventSink) Update(e *api.Event) (*api.Event, error) {
 		return t.OnUpdate(e)
 	}
 	return e, nil
+}
+
+// PatchEvent records the event for testing.
+func (t *testEventSink) Patch(e *api.Event, p []byte) (*api.Event, error) {
+	if t.OnPatch != nil {
+		return t.OnPatch(e, p)
+	}
+	return e, nil
+}
+
+type OnCreateFunc func(*api.Event) (*api.Event, error)
+
+func OnCreateFactory(testCache map[string]*api.Event, createEvent chan<- *api.Event) OnCreateFunc {
+	return func(event *api.Event) (*api.Event, error) {
+		testCache[getEventKey(event)] = event
+		createEvent <- event
+		return event, nil
+	}
+}
+
+type OnPatchFunc func(*api.Event, []byte) (*api.Event, error)
+
+func OnPatchFactory(testCache map[string]*api.Event, patchEvent chan<- *api.Event) OnPatchFunc {
+	return func(event *api.Event, patch []byte) (*api.Event, error) {
+		cachedEvent, found := testCache[getEventKey(event)]
+		if !found {
+			return nil, fmt.Errorf("unexpected error: couldn't find Event in testCache. Try to find Event: %v", event)
+		}
+		originalData, err := json.Marshal(cachedEvent)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error: %v", err)
+		}
+		patched, err := strategicpatch.StrategicMergePatch(originalData, patch, event)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error: %v", err)
+		}
+		patchedObj := &api.Event{}
+		err = json.Unmarshal(patched, patchedObj)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error: %v", err)
+		}
+		patchEvent <- patchedObj
+		return patchedObj, nil
+	}
 }
 
 func TestEventf(t *testing.T) {
@@ -270,24 +318,26 @@ func TestEventf(t *testing.T) {
 		},
 	}
 
+	testCache := map[string]*api.Event{}
 	logCalled := make(chan struct{})
 	createEvent := make(chan *api.Event)
 	updateEvent := make(chan *api.Event)
+	patchEvent := make(chan *api.Event)
 	testEvents := testEventSink{
-		OnCreate: func(event *api.Event) (*api.Event, error) {
-			createEvent <- event
-			return event, nil
-		},
+		OnCreate: OnCreateFactory(testCache, createEvent),
 		OnUpdate: func(event *api.Event) (*api.Event, error) {
 			updateEvent <- event
 			return event, nil
 		},
+		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
 	eventBroadcaster := NewBroadcaster()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+	clock := &util.FakeClock{time.Now()}
+	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for _, item := range table {
+		clock.Step(1 * time.Second)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
@@ -301,7 +351,7 @@ func TestEventf(t *testing.T) {
 
 		// validate event
 		if item.expectUpdate {
-			actualEvent := <-updateEvent
+			actualEvent := <-patchEvent
 			validateEvent(actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
@@ -346,6 +396,10 @@ func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.
 	recvEvent.FirstTimestamp = actualFirstTimestamp
 	recvEvent.LastTimestamp = actualLastTimestamp
 	return actualEvent, nil
+}
+
+func recorderWithFakeClock(eventSource api.EventSource, eventBroadcaster EventBroadcaster, clock util.Clock) EventRecorder {
+	return &recorderImpl{eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
 }
 
 func TestWriteEventError(t *testing.T) {
@@ -412,8 +466,10 @@ func TestWriteEventError(t *testing.T) {
 			},
 		},
 	).Stop()
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+	clock := &util.FakeClock{time.Now()}
+	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for caseName := range table {
+		clock.Step(1 * time.Second)
 		recorder.Event(ref, "Reason", caseName)
 	}
 	recorder.Event(ref, "Reason", "finished")
@@ -528,25 +584,27 @@ func TestEventfNoNamespace(t *testing.T) {
 		},
 	}
 
+	testCache := map[string]*api.Event{}
 	logCalled := make(chan struct{})
 	createEvent := make(chan *api.Event)
 	updateEvent := make(chan *api.Event)
+	patchEvent := make(chan *api.Event)
 	testEvents := testEventSink{
-		OnCreate: func(event *api.Event) (*api.Event, error) {
-			createEvent <- event
-			return event, nil
-		},
+		OnCreate: OnCreateFactory(testCache, createEvent),
 		OnUpdate: func(event *api.Event) (*api.Event, error) {
 			updateEvent <- event
 			return event, nil
 		},
+		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
 	eventBroadcaster := NewBroadcaster()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+	clock := &util.FakeClock{time.Now()}
+	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for _, item := range table {
+		clock.Step(1 * time.Second)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
@@ -560,7 +618,7 @@ func TestEventfNoNamespace(t *testing.T) {
 
 		// validate event
 		if item.expectUpdate {
-			actualEvent := <-updateEvent
+			actualEvent := <-patchEvent
 			validateEvent(actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
@@ -787,42 +845,44 @@ func TestMultiSinkCache(t *testing.T) {
 		},
 	}
 
+	testCache := map[string]*api.Event{}
 	createEvent := make(chan *api.Event)
 	updateEvent := make(chan *api.Event)
+	patchEvent := make(chan *api.Event)
 	testEvents := testEventSink{
-		OnCreate: func(event *api.Event) (*api.Event, error) {
-			createEvent <- event
-			return event, nil
-		},
+		OnCreate: OnCreateFactory(testCache, createEvent),
 		OnUpdate: func(event *api.Event) (*api.Event, error) {
 			updateEvent <- event
 			return event, nil
 		},
+		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
 
+	testCache2 := map[string]*api.Event{}
 	createEvent2 := make(chan *api.Event)
 	updateEvent2 := make(chan *api.Event)
+	patchEvent2 := make(chan *api.Event)
 	testEvents2 := testEventSink{
-		OnCreate: func(event *api.Event) (*api.Event, error) {
-			createEvent2 <- event
-			return event, nil
-		},
+		OnCreate: OnCreateFactory(testCache2, createEvent2),
 		OnUpdate: func(event *api.Event) (*api.Event, error) {
 			updateEvent2 <- event
 			return event, nil
 		},
+		OnPatch: OnPatchFactory(testCache2, patchEvent2),
 	}
 
 	eventBroadcaster := NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+	clock := &util.FakeClock{time.Now()}
+	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 	for _, item := range table {
+		clock.Step(1 * time.Second)
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		// validate event
 		if item.expectUpdate {
-			actualEvent := <-updateEvent
+			actualEvent := <-patchEvent
 			validateEvent(actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
@@ -833,11 +893,12 @@ func TestMultiSinkCache(t *testing.T) {
 	// Another StartRecordingToSink call should start to record events with new clean cache.
 	sinkWatcher2 := eventBroadcaster.StartRecordingToSink(&testEvents2)
 	for _, item := range table {
+		clock.Step(1 * time.Second)
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		// validate event
 		if item.expectUpdate {
-			actualEvent := <-updateEvent2
+			actualEvent := <-patchEvent2
 			validateEvent(actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent2
