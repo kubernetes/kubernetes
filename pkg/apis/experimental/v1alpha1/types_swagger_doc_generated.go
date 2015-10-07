@@ -132,7 +132,7 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 var map_DeploymentSpec = map[string]string{
 	"":               "DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":       "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
-	"selector":       "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be scaled down.",
+	"selector":       "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be the ones affected by this deployment.",
 	"template":       "Template describes the pods that will be created.",
 	"strategy":       "The deployment strategy to use to replace existing pods with new ones.",
 	"uniqueLabelKey": "Key of the selector that is added to existing RCs (and label key that is added to its pods) to prevent the existing RCs to select new pods (and old pods being selected by new RC). Users can set this to an empty string to indicate that the system should not add any selector and label. If unspecified, system uses \"deployment.kubernetes.io/podTemplateHash\". Value of this key is hash of DeploymentSpec.PodTemplateSpec. No label is added if this is set to empty string.",
@@ -144,8 +144,8 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 
 var map_DeploymentStatus = map[string]string{
 	"":                "DeploymentStatus is the most recently observed status of the Deployment.",
-	"replicas":        "Total number of ready pods targeted by this deployment (this includes both the old and new pods).",
-	"updatedReplicas": "Total number of new ready pods with the desired template spec.",
+	"replicas":        "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+	"updatedReplicas": "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
 }
 
 func (DeploymentStatus) SwaggerDoc() map[string]string {
