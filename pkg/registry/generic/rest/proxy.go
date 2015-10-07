@@ -41,23 +41,19 @@ import (
 type UpgradeAwareProxyHandler struct {
 	UpgradeRequired bool
 	Location        *url.URL
-	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
-	Transport http.RoundTripper
-	// WrapTransport indicates whether the provided Transport should be wrapped with default proxy transport behavior (URL rewriting, X-Forwarded-* header setting)
-	WrapTransport  bool
-	FlushInterval  time.Duration
-	MaxBytesPerSec int64
-	err            error
+	Transport       http.RoundTripper
+	FlushInterval   time.Duration
+	MaxBytesPerSec  int64
+	err             error
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
 
 // NewUpgradeAwareProxyHandler creates a new proxy handler with a default flush interval
-func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool) *UpgradeAwareProxyHandler {
+func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, upgradeRequired bool) *UpgradeAwareProxyHandler {
 	return &UpgradeAwareProxyHandler{
 		Location:        location,
 		Transport:       transport,
-		WrapTransport:   wrapTransport,
 		UpgradeRequired: upgradeRequired,
 		FlushInterval:   defaultFlushInterval,
 	}
@@ -105,8 +101,8 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	if h.Transport == nil || h.WrapTransport {
-		h.Transport = h.defaultProxyTransport(req.URL, h.Transport)
+	if h.Transport == nil {
+		h.Transport = h.defaultProxyTransport(req.URL)
 	}
 
 	newReq, err := http.NewRequest(req.Method, loc.String(), req.Body)
@@ -262,7 +258,7 @@ func (h *UpgradeAwareProxyHandler) dialURL() (net.Conn, error) {
 	}
 }
 
-func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
+func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.RoundTripper {
 	scheme := url.Scheme
 	host := url.Host
 	suffix := h.Location.Path
@@ -270,14 +266,13 @@ func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalT
 		suffix += "/"
 	}
 	pathPrepend := strings.TrimSuffix(url.Path, suffix)
-	rewritingTransport := &proxy.Transport{
-		Scheme:       scheme,
-		Host:         host,
-		PathPrepend:  pathPrepend,
-		RoundTripper: internalTransport,
+	internalTransport := &proxy.Transport{
+		Scheme:      scheme,
+		Host:        host,
+		PathPrepend: pathPrepend,
 	}
 	return &corsRemovingTransport{
-		RoundTripper: rewritingTransport,
+		RoundTripper: internalTransport,
 	}
 }
 
