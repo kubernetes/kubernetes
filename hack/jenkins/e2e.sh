@@ -599,6 +599,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
+    : ${ENABLE_DEPLOYMENTS:=true}
     NUM_MINIONS=3
     ;;
 
