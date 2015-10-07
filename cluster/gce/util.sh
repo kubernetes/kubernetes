@@ -61,7 +61,7 @@ function verify-prereqs {
     else
       # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1alpha1=false" and appending "experimental/v1alpha1=true" if not.
       if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
-        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!" >&2
         exit 1
       fi
     fi
@@ -81,8 +81,8 @@ function verify-prereqs {
         curl https://sdk.cloud.google.com | bash
       fi
       if ! which "${cmd}" >/dev/null; then
-        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
-        echo "SDK can be downloaded from https://cloud.google.com/sdk/."
+        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
+        echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
         exit 1
       fi
     fi
@@ -125,7 +125,7 @@ function find-release-tars {
     SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
   fi
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
+    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz" >&2
     exit 1
   fi
 
@@ -134,7 +134,7 @@ function find-release-tars {
     SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
   fi
   if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
+    echo "!!! Cannot find kubernetes-salt.tar.gz" >&2
     exit 1
   fi
 }
@@ -348,10 +348,10 @@ function create-firewall-rule {
       --target-tags "$3" \
       --allow tcp,udp,icmp,esp,ah,sctp; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}"
+          echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -433,10 +433,10 @@ function add-instance-metadata {
       --zone "${ZONE}" \
       --metadata "${kvs[@]}"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
+          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -460,10 +460,10 @@ function add-instance-metadata-from-file {
       --zone "${ZONE}" \
       --metadata-from-file "$(join_csv ${kvs[@]})"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
+          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -543,7 +543,7 @@ function create-certs {
     ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
-    echo "=== Failed to generate certificates: Aborting ==="
+    echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
@@ -745,8 +745,7 @@ function kube-up {
           "https://${KUBE_MASTER_IP}/api/v1/pods"; do
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
-          echo -e "${color_red}Cluster failed to initialize within" \
-            "${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}"
+          echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
           exit 2
       fi
       printf "."
