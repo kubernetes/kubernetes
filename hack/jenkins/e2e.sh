@@ -645,6 +645,21 @@ case ${JOB_NAME} in
     : ${USE_KUBEMARK:="true"}
     : ${NUM_MINIONS:="10"}
     ;;
+
+  kubernetes-kubemark-gce-scale)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-scale"}
+    : ${E2E_NETWORK:="kubernetes-kubemark-scale"}
+    : ${PROJECT:="kubernetes-scale"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    : ${NUM_MINIONS:="40"}
+    : ${MASTER_SIZE:="n1-standard-32"}  # Note: not available in all zones
+    : ${MINION_SIZE="n1-standard-16"}   # Note: can fit about 17 hollow nodes per core
+    #                                           so NUM_MINIONS x cores_per_minion should
+    #                                           be set accordingly.
+    ;;
 esac
 
 # AWS variables
