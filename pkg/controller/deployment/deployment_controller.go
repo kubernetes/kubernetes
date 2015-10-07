@@ -102,7 +102,7 @@ func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment exper
 	allRCs := append(oldRCs, newRC)
 
 	// Scale up, if we can.
-	scaledUp, err := d.scaleUp(allRCs, newRC, deployment)
+	scaledUp, err := d.reconcileNewRC(allRCs, newRC, deployment)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment exper
 	}
 
 	// Scale down, if we can.
-	scaledDown, err := d.scaleDown(allRCs, oldRCs, newRC, deployment)
+	scaledDown, err := d.reconcileOldRCs(allRCs, oldRCs, newRC, deployment)
 	if err != nil {
 		return err
 	}
@@ -158,11 +158,17 @@ func (d *DeploymentController) getNewRC(deployment experimental.Deployment) (*ap
 	return createdRC, nil
 }
 
-func (d *DeploymentController) scaleUp(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) (bool, error) {
+func (d *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) (bool, error) {
 	if newRC.Spec.Replicas == deployment.Spec.Replicas {
-		// Scaling up not required.
+		// Scaling not required.
 		return false, nil
 	}
+	if newRC.Spec.Replicas > deployment.Spec.Replicas {
+		// Scale down.
+		_, err := d.scaleRCAndRecordEvent(newRC, deployment.Spec.Replicas, deployment)
+		return true, err
+	}
+	// Check if we can scale up.
 	maxSurge, isPercent, err := util.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxSurge)
 	if err != nil {
 		return false, fmt.Errorf("invalid value for MaxSurge: %v", err)
@@ -172,7 +178,6 @@ func (d *DeploymentController) scaleUp(allRCs []*api.ReplicationController, newR
 	}
 	// Find the total number of pods
 	currentPodCount := deploymentUtil.GetReplicaCountForRCs(allRCs)
-	// Check if we can scale up.
 	maxTotalPods := deployment.Spec.Replicas + maxSurge
 	if currentPodCount >= maxTotalPods {
 		// Cannot scale up.
@@ -180,16 +185,14 @@ func (d *DeploymentController) scaleUp(allRCs []*api.ReplicationController, newR
 	}
 	// Scale up.
 	scaleUpCount := maxTotalPods - currentPodCount
+	// Do not exceed the number of desired replicas.
 	scaleUpCount = int(math.Min(float64(scaleUpCount), float64(deployment.Spec.Replicas-newRC.Spec.Replicas)))
 	newReplicasCount := newRC.Spec.Replicas + scaleUpCount
-	_, err = d.scaleRC(newRC, newReplicasCount)
-	if err == nil {
-		d.eventRecorder.Eventf(&deployment, "ScalingRC", "Scaled up rc %s to %d", newRC.Name, newReplicasCount)
-	}
+	_, err = d.scaleRCAndRecordEvent(newRC, newReplicasCount, deployment)
 	return true, err
 }
 
-func (d *DeploymentController) scaleDown(allRCs []*api.ReplicationController, oldRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) (bool, error) {
+func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationController, oldRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) (bool, error) {
 	oldPodsCount := deploymentUtil.GetReplicaCountForRCs(oldRCs)
 	if oldPodsCount == 0 {
 		// Cant scale down further
@@ -227,11 +230,10 @@ func (d *DeploymentController) scaleDown(allRCs []*api.ReplicationController, ol
 		// Scale down.
 		scaleDownCount := int(math.Min(float64(targetRC.Spec.Replicas), float64(totalScaleDownCount)))
 		newReplicasCount := targetRC.Spec.Replicas - scaleDownCount
-		_, err = d.scaleRC(targetRC, newReplicasCount)
+		_, err = d.scaleRCAndRecordEvent(targetRC, newReplicasCount, deployment)
 		if err != nil {
 			return false, err
 		}
-		d.eventRecorder.Eventf(&deployment, "ScalingRC", "Scaled down rc %s to %d", targetRC.Name, newReplicasCount)
 		totalScaleDownCount -= scaleDownCount
 	}
 	return true, err
@@ -248,6 +250,18 @@ func (d *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationC
 	}
 	_, err := d.updateDeployment(&newDeployment)
 	return err
+}
+
+func (d *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationController, newScale int, deployment experimental.Deployment) (*api.ReplicationController, error) {
+	scalingOperation := "down"
+	if rc.Spec.Replicas < newScale {
+		scalingOperation = "up"
+	}
+	newRC, err := d.scaleRC(rc, newScale)
+	if err == nil {
+		d.eventRecorder.Eventf(&deployment, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
+	}
+	return newRC, err
 }
 
 func (d *DeploymentController) scaleRC(rc *api.ReplicationController, newScale int) (*api.ReplicationController, error) {
