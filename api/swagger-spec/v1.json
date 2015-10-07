@@ -12646,6 +12646,10 @@
       "type": "boolean",
       "description": "Use the host's ipc namespace. Optional: Default to false."
      },
+     "securityContext": {
+      "$ref": "v1.PodSecurityContext",
+      "description": "SecurityContext holds pod-level security attributes and common container settings"
+     },
      "imagePullSecrets": {
       "type": "array",
       "items": {
@@ -13200,6 +13204,11 @@
       "description": "Level is SELinux level label that applies to the container. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
      }
     }
+   },
+   "v1.PodSecurityContext": {
+    "id": "v1.PodSecurityContext",
+    "description": "PodSecurityContext holds pod-level security attributes and common container settings.",
+    "properties": {}
    },
    "v1.PodStatus": {
     "id": "v1.PodStatus",

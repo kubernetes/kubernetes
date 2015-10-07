@@ -2084,9 +2084,13 @@ func autoconvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
-	out.HostPID = in.HostPID
-	out.HostIPC = in.HostIPC
+	if in.SecurityContext != nil {
+		if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -5094,9 +5098,16 @@ func autoconvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.ServiceAccountName = in.ServiceAccountName
 	// in.DeprecatedServiceAccount has no peer in out
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
-	out.HostPID = in.HostPID
-	out.HostIPC = in.HostIPC
+	// in.HostNetwork has no peer in out
+	// in.HostPID has no peer in out
+	// in.HostIPC has no peer in out
+	if in.SecurityContext != nil {
+		if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {

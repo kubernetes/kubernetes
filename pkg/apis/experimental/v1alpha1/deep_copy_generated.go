@@ -497,6 +497,10 @@ func deepCopy_v1_PersistentVolumeClaimVolumeSource(in v1.PersistentVolumeClaimVo
 	return nil
 }
 
+func deepCopy_v1_PodSecurityContext(in v1.PodSecurityContext, out *v1.PodSecurityContext, c *conversion.Cloner) error {
+	return nil
+}
+
 func deepCopy_v1_PodSpec(in v1.PodSpec, out *v1.PodSpec, c *conversion.Cloner) error {
 	if in.Volumes != nil {
 		out.Volumes = make([]v1.Volume, len(in.Volumes))
@@ -546,6 +550,14 @@ func deepCopy_v1_PodSpec(in v1.PodSpec, out *v1.PodSpec, c *conversion.Cloner) e
 	out.HostNetwork = in.HostNetwork
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(v1.PodSecurityContext)
+		if err := deepCopy_v1_PodSecurityContext(*in.SecurityContext, out.SecurityContext, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]v1.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -1551,6 +1563,7 @@ func init() {
 		deepCopy_v1_ObjectFieldSelector,
 		deepCopy_v1_ObjectMeta,
 		deepCopy_v1_PersistentVolumeClaimVolumeSource,
+		deepCopy_v1_PodSecurityContext,
 		deepCopy_v1_PodSpec,
 		deepCopy_v1_PodTemplateSpec,
 		deepCopy_v1_Probe,
