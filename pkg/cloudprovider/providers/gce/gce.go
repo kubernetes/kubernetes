@@ -876,9 +876,41 @@ func (gce *GCECloud) CreateBackendService(bg *compute.BackendService) error {
 	return gce.waitForGlobalOp(op)
 }
 
+// Health Checks
+
 // GetHttpHealthCheck returns the given HttpHealthCheck by name.
 func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, error) {
 	return gce.service.HttpHealthChecks.Get(gce.projectID, name).Do()
+}
+
+// UpdateHttpHealthCheck applies the given HttpHealthCheck as an update.
+func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
+	op, err := gce.service.HttpHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteHttpHealthCheck deletes the given HttpHealthCheck by name.
+func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
+	op, err := gce.service.HttpHealthChecks.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// CreateHttpHealthCheck creates the given HttpHealthCheck.
+func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
+	op, err := gce.service.HttpHealthChecks.Insert(gce.projectID, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
 }
 
 // InstanceGroup Management
