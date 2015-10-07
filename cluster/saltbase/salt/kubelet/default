@@ -31,7 +31,9 @@
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
-      {% set network_plugin = "--network-plugin=opencontrail" %}
+      {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+          {% set network_plugin = "--network-plugin=opencontrail" %}
+      {% endif -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
       {% set network_plugin = "" -%}
