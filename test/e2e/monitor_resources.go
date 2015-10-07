@@ -119,7 +119,16 @@ var _ = Describe("Resource usage of system containers", func() {
 			for container, cUsage := range usage {
 				Logf("%v on %v usage: %#v", container, node, cUsage)
 				if !allowedUsage[container].isStrictlyGreaterThan(cUsage) {
-					violating[node] = usage
+					if allowedUsage[container].CPUUsageInCores < cUsage.CPUUsageInCores {
+						Logf("CPU is too high for %s (%v)", container, cUsage.CPUUsageInCores)
+					}
+					if allowedUsage[container].MemoryUsageInBytes < cUsage.MemoryUsageInBytes {
+						Logf("Memory use is too high for %s (%v)", container, cUsage.MemoryUsageInBytes)
+					}
+					if allowedUsage[container].MemoryWorkingSetInBytes < cUsage.MemoryWorkingSetInBytes {
+						Logf("Working set is too high for %s (%v)", container, cUsage.MemoryWorkingSetInBytes)
+					}
+					violating[node][container] = usage[container]
 				}
 			}
 		}
