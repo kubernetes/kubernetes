@@ -130,6 +130,7 @@ type Client struct {
 	SkipServerVersionCheck bool
 	HTTPClient             *http.Client
 	TLSConfig              *tls.Config
+	Dialer                 *net.Dialer
 
 	endpoint            string
 	endpointURL         *url.URL
@@ -137,6 +138,7 @@ type Client struct {
 	requestedAPIVersion APIVersion
 	serverAPIVersion    APIVersion
 	expectedAPIVersion  APIVersion
+	unixHTTPClient      *http.Client
 }
 
 // NewClient returns a Client instance ready for communication with the given
@@ -191,6 +193,7 @@ func NewVersionedClient(endpoint string, apiVersionString string) (*Client, erro
 	}
 	return &Client{
 		HTTPClient:          http.DefaultClient,
+		Dialer:              &net.Dialer{},
 		endpoint:            endpoint,
 		endpointURL:         u,
 		eventMonitor:        new(eventMonitoringState),
@@ -302,6 +305,7 @@ func NewVersionedTLSClientFromBytes(endpoint string, certPEMBlock, keyPEMBlock, 
 	return &Client{
 		HTTPClient:          &http.Client{Transport: tr},
 		TLSConfig:           tlsConfig,
+		Dialer:              &net.Dialer{},
 		endpoint:            endpoint,
 		endpointURL:         u,
 		eventMonitor:        new(eventMonitoringState),
@@ -326,32 +330,40 @@ func (c *Client) checkAPIVersion() error {
 	return nil
 }
 
+// Endpoint returns the current endpoint. It's useful for getting the endpoint
+// when using functions that get this data from the environment (like
+// NewClientFromEnv.
+func (c *Client) Endpoint() string {
+	return c.endpoint
+}
+
 // Ping pings the docker server
 //
 // See https://goo.gl/kQCfJj for more details.
 func (c *Client) Ping() error {
 	path := "/_ping"
-	body, status, err := c.do("GET", path, doOptions{})
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
 		return err
 	}
-	if status != http.StatusOK {
-		return newError(status, body)
+	if resp.StatusCode != http.StatusOK {
+		return newError(resp)
 	}
+	resp.Body.Close()
 	return nil
 }
 
 func (c *Client) getServerAPIVersionString() (version string, err error) {
-	body, status, err := c.do("GET", "/version", doOptions{})
+	resp, err := c.do("GET", "/version", doOptions{})
 	if err != nil {
 		return "", err
 	}
-	if status != http.StatusOK {
-		return "", fmt.Errorf("Received unexpected status %d while trying to retrieve the server version", status)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Received unexpected status %d while trying to retrieve the server version", resp.StatusCode)
 	}
 	var versionResponse map[string]interface{}
-	err = json.Unmarshal(body, &versionResponse)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&versionResponse); err != nil {
 		return "", err
 	}
 	if version, ok := (versionResponse["ApiVersion"]).(string); ok {
@@ -365,24 +377,35 @@ type doOptions struct {
 	forceJSON bool
 }
 
-func (c *Client) do(method, path string, doOptions doOptions) ([]byte, int, error) {
+func (c *Client) do(method, path string, doOptions doOptions) (*http.Response, error) {
 	var params io.Reader
 	if doOptions.data != nil || doOptions.forceJSON {
 		buf, err := json.Marshal(doOptions.data)
 		if err != nil {
-			return nil, -1, err
+			return nil, err
 		}
 		params = bytes.NewBuffer(buf)
 	}
 	if path != "/version" && !c.SkipServerVersionCheck && c.expectedAPIVersion == nil {
 		err := c.checkAPIVersion()
 		if err != nil {
-			return nil, -1, err
+			return nil, err
 		}
 	}
-	req, err := http.NewRequest(method, c.getURL(path), params)
+
+	httpClient := c.HTTPClient
+	protocol := c.endpointURL.Scheme
+	var u string
+	if protocol == "unix" {
+		httpClient = c.unixClient()
+		u = c.getFakeUnixURL(path)
+	} else {
+		u = c.getURL(path)
+	}
+
+	req, err := http.NewRequest(method, u, params)
 	if err != nil {
-		return nil, -1, err
+		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
 	if doOptions.data != nil {
@@ -390,40 +413,19 @@ func (c *Client) do(method, path string, doOptions doOptions) ([]byte, int, erro
 	} else if method == "POST" {
 		req.Header.Set("Content-Type", "plain/text")
 	}
-	var resp *http.Response
-	protocol := c.endpointURL.Scheme
-	address := c.endpointURL.Path
-	if protocol == "unix" {
-		var dial net.Conn
-		dial, err = net.Dial(protocol, address)
-		if err != nil {
-			return nil, -1, err
-		}
-		defer dial.Close()
-		breader := bufio.NewReader(dial)
-		err = req.Write(dial)
-		if err != nil {
-			return nil, -1, err
-		}
-		resp, err = http.ReadResponse(breader, req)
-	} else {
-		resp, err = c.HTTPClient.Do(req)
-	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
-			return nil, -1, ErrConnectionRefused
+			return nil, ErrConnectionRefused
 		}
-		return nil, -1, err
+		return nil, err
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, -1, err
-	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, resp.StatusCode, newError(resp.StatusCode, body)
+		return nil, newError(resp)
 	}
-	return body, resp.StatusCode, nil
+	return resp, nil
 }
 
 type streamOptions struct {
@@ -464,16 +466,12 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 	address := c.endpointURL.Path
 	if streamOptions.stdout == nil {
 		streamOptions.stdout = ioutil.Discard
-	} else if t, ok := streamOptions.stdout.(io.Closer); ok {
-		defer t.Close()
 	}
 	if streamOptions.stderr == nil {
 		streamOptions.stderr = ioutil.Discard
-	} else if t, ok := streamOptions.stderr.(io.Closer); ok {
-		defer t.Close()
 	}
 	if protocol == "unix" {
-		dial, err := net.Dial(protocol, address)
+		dial, err := c.Dialer.Dial(protocol, address)
 		if err != nil {
 			return err
 		}
@@ -509,11 +507,7 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return newError(resp.StatusCode, body)
+		return newError(resp)
 	}
 	if streamOptions.useJSONDecoder || resp.Header.Get("Content-Type") == "application/json" {
 		// if we want to get raw json stream, just copy it back to output
@@ -599,12 +593,12 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) error 
 	}
 	var dial net.Conn
 	if c.TLSConfig != nil && protocol != "unix" {
-		dial, err = tlsDial(protocol, address, c.TLSConfig)
+		dial, err = tlsDialWithDialer(c.Dialer, protocol, address, c.TLSConfig)
 		if err != nil {
 			return err
 		}
 	} else {
-		dial, err = net.Dial(protocol, address)
+		dial, err = c.Dialer.Dial(protocol, address)
 		if err != nil {
 			return err
 		}
@@ -664,6 +658,41 @@ func (c *Client) getURL(path string) string {
 		return fmt.Sprintf("%s/v%s%s", urlStr, c.requestedAPIVersion, path)
 	}
 	return fmt.Sprintf("%s%s", urlStr, path)
+}
+
+// getFakeUnixURL returns the URL needed to make an HTTP request over a UNIX
+// domain socket to the given path.
+func (c *Client) getFakeUnixURL(path string) string {
+	u := *c.endpointURL // Copy.
+
+	// Override URL so that net/http will not complain.
+	u.Scheme = "http"
+	u.Host = "unix.sock" // Doesn't matter what this is - it's not used.
+	u.Path = ""
+
+	urlStr := strings.TrimRight(u.String(), "/")
+
+	if c.requestedAPIVersion != nil {
+		return fmt.Sprintf("%s/v%s%s", urlStr, c.requestedAPIVersion, path)
+	}
+	return fmt.Sprintf("%s%s", urlStr, path)
+}
+
+func (c *Client) unixClient() *http.Client {
+	if c.unixHTTPClient != nil {
+		return c.unixHTTPClient
+	}
+
+	socketPath := c.endpointURL.Path
+	c.unixHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			Dial: func(network, addr string) (net.Conn, error) {
+				return c.Dialer.Dial("unix", socketPath)
+			},
+		},
+	}
+
+	return c.unixHTTPClient
 }
 
 type jsonMessage struct {
@@ -747,8 +776,13 @@ type Error struct {
 	Message string
 }
 
-func newError(status int, body []byte) *Error {
-	return &Error{Status: status, Message: string(body)}
+func newError(resp *http.Response) *Error {
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return &Error{Status: resp.StatusCode, Message: fmt.Sprintf("cannot read body, err: %v", err)}
+	}
+	return &Error{Status: resp.StatusCode, Message: string(data)}
 }
 
 func (e *Error) Error() string {
