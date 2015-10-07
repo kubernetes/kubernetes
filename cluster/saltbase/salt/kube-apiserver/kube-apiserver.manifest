@@ -112,7 +112,7 @@
     "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
     "resources": {
       "limits": {
-        "cpu": "200m"
+        "cpu": "250m"
       }
     },
     "command": [
