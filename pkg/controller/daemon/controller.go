@@ -446,7 +446,10 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *experimental.DaemonSe
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int
 	for _, node := range nodeList.Items {
 		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-		shouldRun := nodeSelector.Matches(labels.Set(node.Labels))
+		nameMatch := ds.Spec.Template.Name == "" || ds.Spec.Template.Name == node.Name
+		labelMatch := nodeSelector.Matches(labels.Set(node.Labels))
+		shouldRun := nameMatch && labelMatch
+
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 
 		// TODO(mikedanese): this does not count nodes that should be running
