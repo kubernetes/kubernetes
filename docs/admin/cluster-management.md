@@ -118,16 +118,19 @@ In other environments you may need to configure the machine yourself and tell th
 
 ### Horizontal auto-scaling of nodes (GCE)
 
-If you are using GCE, you can configure your cluster so that the number of nodes will be automatically scaled based on their CPU and memory utilization.
+If you are using GCE, you can configure your cluster so that the number of nodes will be automatically scaled based on:
+ * CPU and memory utilization.
+ * Amount of of CPU and memory requested by the pods (called also reservation).
+
 Before setting up the cluster by ```kube-up.sh```, you can set ```KUBE_ENABLE_NODE_AUTOSCALER``` environment variable to ```true``` and export it.
 The script will create an autoscaler for the instance group managing your nodes.
 
-The autoscaler will try to maintain the average CPU and memory utilization of nodes within the cluster close to the target value.
+The autoscaler will try to maintain the average CPU/memory utilization and reservation of nodes within the cluster close to the target value.
 The target value can be configured by ```KUBE_TARGET_NODE_UTILIZATION``` environment variable (default: 0.7) for ``kube-up.sh`` when creating the cluster.
-The node utilization is the total node's CPU/memory usage (OS + k8s + user load) divided by the node's capacity.
-If the desired numbers of nodes in the cluster resulting from CPU utilization and memory utilization are different,
-the autoscaler will choose the bigger number.
-The number of nodes in the cluster set by the autoscaler will be limited from ```KUBE_AUTOSCALER_MIN_NODES``` (default: 1)
+Node utilization is the total node's CPU/memory usage (OS + k8s + user load) divided by the node's capacity.
+Node reservation is the total CPU/memory requested by pods that are running on the node divided by the node's capacity.
+If the desired numbers of nodes in the cluster resulting from CPU/memory utilization/reservation are different,
+the autoscaler will choose the bigger number. The number of nodes in the cluster set by the autoscaler will be limited from ```KUBE_AUTOSCALER_MIN_NODES``` (default: 1)
 to ```KUBE_AUTOSCALER_MAX_NODES``` (default: the initial number of nodes in the cluster).
 
 The autoscaler is implemented as a Compute Engine Autoscaler.
@@ -141,7 +144,8 @@ gcloud preview autoscaler --zone compute-zone <command>
 
 Note that autoscaling will work properly only if node metrics are accessible in Google Cloud Monitoring.
 To make the metrics accessible, you need to create your cluster with ```KUBE_ENABLE_CLUSTER_MONITORING```
-equal to ```google``` or ```googleinfluxdb``` (```googleinfluxdb``` is the default value).
+equal to ```google``` or ```googleinfluxdb``` (```googleinfluxdb``` is the default value). Please also make sure
+that you have Google Cloud Monitoring API enabled in Google Developer Console.
 
 ## Maintenance on a Node
 
