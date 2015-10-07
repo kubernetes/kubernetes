@@ -39,11 +39,8 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/glusterfs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}}}) {
-		t.Errorf("Expected true")
-	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}}}}) {
-		t.Errorf("Expected true")
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{}}}}) {
+		t.Errorf("Expected false")
 	}
 	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
 		t.Errorf("Expected false")
