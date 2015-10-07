@@ -125,6 +125,9 @@ func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (
 	devicePaths := getDiskByIdPaths(b.gcePersistentDisk)
 	var gceCloud *gce_cloud.GCECloud
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
+		// Block execution until any pending detach goroutines for this pd have completed
+		detachCleanupManager.Send(b.pdName, true)
+
 		var err error
 		if gceCloud == nil {
 			gceCloud, err = getCloudProvider()
@@ -141,9 +144,10 @@ func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (
 		}
 
 		if err := gceCloud.AttachDisk(b.pdName, b.readOnly); err != nil {
-			// Retry on error. See issue #11321. Continue and verify if disk is attached, because a
-			// previous attach operation may still succeed.
+			// Retry on error. See issue #11321.
 			glog.Errorf("Error attaching PD %q: %v", b.pdName, err)
+			time.Sleep(errorSleepDuration)
+			continue
 		}
 
 		for numChecks := 0; numChecks < maxChecks; numChecks++ {
