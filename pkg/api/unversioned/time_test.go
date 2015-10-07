@@ -34,7 +34,7 @@ func TestTimeMarshalYAML(t *testing.T) {
 		result string
 	}{
 		{Time{}, "t: null\n"},
-		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: 1998-05-05T05:05:05Z\n"},
+		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: 1998-05-05T05:05:05.00000005Z\n"},
 		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
 	}
 
@@ -49,7 +49,6 @@ func TestTimeMarshalYAML(t *testing.T) {
 		}
 	}
 }
-
 func TestTimeUnmarshalYAML(t *testing.T) {
 	cases := []struct {
 		input  string
@@ -76,7 +75,7 @@ func TestTimeMarshalJSON(t *testing.T) {
 		result string
 	}{
 		{Time{}, "{\"t\":null}"},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05Z\"}"},
+		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05.00000005Z\"}"},
 		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "{\"t\":\"1998-05-05T05:05:05Z\"}"},
 	}
 
@@ -117,8 +116,8 @@ func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
 		input Time
 	}{
 		{Time{}},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.Local).Rfc3339Copy()},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local).Rfc3339Copy()},
+		{Date(1998, time.May, 5, 5, 5, 5, 50, time.Local).Rfc3339NanoCopy()},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local).Rfc3339NanoCopy()},
 	}
 
 	for i, c := range cases {
