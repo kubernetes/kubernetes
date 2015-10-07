@@ -34,7 +34,7 @@ import (
 var _ = Describe("Events", func() {
 	framework := NewFramework("events")
 
-	It("should be sent by kubelets and the scheduler about pods scheduling and running", func() {
+	It("should be sent by kubelets and the scheduler about pods scheduling and running [Conformance]", func() {
 
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 

@@ -65,12 +65,12 @@ var _ = Describe("Services", func() {
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 
-	It("should provide secure master service", func() {
+	It("should provide secure master service [Conformance]", func() {
 		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should serve a basic endpoint from pods", func() {
+	It("should serve a basic endpoint from pods [Conformance]", func() {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		labels := map[string]string{
@@ -129,7 +129,7 @@ var _ = Describe("Services", func() {
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
-	It("should serve multiport endpoints from pods", func() {
+	It("should serve multiport endpoints from pods [Conformance]", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name

@@ -59,7 +59,7 @@ var _ = Describe("hostPath", func() {
 		}
 	})
 
-	It("should give a volume the correct mode", func() {
+	It("should give a volume the correct mode [Conformance]", func() {
 		volumePath := "/test-volume"
 		source := &api.HostPathVolumeSource{
 			Path: "/tmp",
@@ -76,7 +76,7 @@ var _ = Describe("hostPath", func() {
 			namespace.Name)
 	})
 
-	It("should support r/w", func() {
+	It("should support r/w [Conformance]", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180

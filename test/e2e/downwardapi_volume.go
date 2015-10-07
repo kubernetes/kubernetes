@@ -28,7 +28,7 @@ import (
 var _ = Describe("Downward API volume", func() {
 	f := NewFramework("downward-api")
 
-	It("should provide labels and annotations files", func() {
+	It("should provide labels and annotations files [Conformance]", func() {
 		podName := "metadata-volume-" + string(util.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{

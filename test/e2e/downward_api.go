@@ -28,7 +28,7 @@ import (
 var _ = Describe("Downward API", func() {
 	framework := NewFramework("downward-api")
 
-	It("should provide pod name and namespace as env vars", func() {
+	It("should provide pod name and namespace as env vars [Conformance]", func() {
 		podName := "downward-api-" + string(util.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
