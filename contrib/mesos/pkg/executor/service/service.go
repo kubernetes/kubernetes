@@ -220,7 +220,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	// create static pods directory
 	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
-	err := os.Mkdir(staticPodsConfigPath, 0755)
+	err := os.Mkdir(staticPodsConfigPath, 0750)
 	if err != nil {
 		return err
 	}
