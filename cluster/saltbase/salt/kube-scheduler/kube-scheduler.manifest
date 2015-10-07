@@ -24,7 +24,7 @@
     "image": "gcr.io/google_containers/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
     "resources": {
       "limits": {
-        "cpu": "200m"
+        "cpu": "100m"
       }
     },
     "command": [
