@@ -74,7 +74,6 @@ func (s Server) serveWebSocket(w http.ResponseWriter, req *http.Request) {
 	rwc, buf, err := w.(http.Hijacker).Hijack()
 	if err != nil {
 		panic("Hijack failed: " + err.Error())
-		return
 	}
 	// The server should abort the WebSocket connection if it finds
 	// the client did not send a handshake that matches with protocol
@@ -95,8 +94,8 @@ func (s Server) serveWebSocket(w http.ResponseWriter, req *http.Request) {
 // You might want to verify websocket.Conn.Config().Origin in the func.
 // If you use Server instead of Handler, you could call websocket.Origin and
 // check the origin in your Handshake func. So, if you want to accept
-// non-browser client, which doesn't send Origin header, you could use Server
-//. that doesn't check origin in its Handshake.
+// non-browser clients, which do not send an Origin header, set a
+// Server.Handshake that does not check the origin.
 type Handler func(*Conn)
 
 func checkOrigin(config *Config, req *http.Request) (err error) {
