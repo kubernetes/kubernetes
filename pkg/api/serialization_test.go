@@ -108,7 +108,7 @@ func TestSpecificKind(t *testing.T) {
 	api.Scheme.Log(t)
 	defer api.Scheme.Log(nil)
 
-	kind := "PodList"
+	kind := "Pod"
 	doRoundTripTest(kind, t)
 }
 
@@ -169,6 +169,8 @@ func TestEncode_Ptr(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 
 			TerminationGracePeriodSeconds: &grace,
+
+			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
 	obj := runtime.Object(pod)
@@ -181,7 +183,8 @@ func TestEncode_Ptr(t *testing.T) {
 		t.Fatalf("Got wrong type")
 	}
 	if !api.Semantic.DeepEqual(obj2, pod) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", pod, obj2)
+		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, util.ObjectDiff(obj2, pod))
+
 	}
 }
 

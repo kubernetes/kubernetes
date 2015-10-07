@@ -459,6 +459,13 @@ func deepCopy_api_PersistentVolumeClaimVolumeSource(in api.PersistentVolumeClaim
 	return nil
 }
 
+func deepCopy_api_PodSecurityContext(in api.PodSecurityContext, out *api.PodSecurityContext, c *conversion.Cloner) error {
+	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
+	return nil
+}
+
 func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner) error {
 	if in.Volumes != nil {
 		out.Volumes = make([]api.Volume, len(in.Volumes))
@@ -504,9 +511,14 @@ func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
-	out.HostPID = in.HostPID
-	out.HostIPC = in.HostIPC
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(api.PodSecurityContext)
+		if err := deepCopy_api_PodSecurityContext(*in.SecurityContext, out.SecurityContext, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -1525,6 +1537,7 @@ func init() {
 		deepCopy_api_ObjectFieldSelector,
 		deepCopy_api_ObjectMeta,
 		deepCopy_api_PersistentVolumeClaimVolumeSource,
+		deepCopy_api_PodSecurityContext,
 		deepCopy_api_PodSpec,
 		deepCopy_api_PodTemplateSpec,
 		deepCopy_api_Probe,
