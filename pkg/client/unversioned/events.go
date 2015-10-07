@@ -35,6 +35,7 @@ type EventNamespacer interface {
 type EventInterface interface {
 	Create(event *api.Event) (*api.Event, error)
 	Update(event *api.Event) (*api.Event, error)
+	Patch(event *api.Event, data []byte) (*api.Event, error)
 	List(label labels.Selector, field fields.Selector) (*api.EventList, error)
 	Get(name string) (*api.Event, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -93,6 +94,22 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 		Resource("events").
 		Name(event.Name).
 		Body(event).
+		Do().
+		Into(result)
+	return result, err
+}
+
+// Patch modifies an existing event. It returns the copy of the event that the server returns, or an
+// error. The namespace and name of the target event is deduced from the incompleteEvent. The
+// namespace must either match this event client's namespace, or this event client must have been
+// created with the "" namespace.
+func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, error) {
+	result := &api.Event{}
+	err := e.client.Patch(api.StrategicMergePatchType).
+		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
+		Resource("events").
+		Name(incompleteEvent.Name).
+		Body(data).
 		Do().
 		Into(result)
 	return result, err
