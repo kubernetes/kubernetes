@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+// test to ensure hidden commands run as intended
+func TestHiddenCommandExecutes(t *testing.T) {
+
+	// ensure that outs does not already equal what the command will be setting it
+	// to, if it did this test would not actually be testing anything...
+	if outs == "hidden" {
+		t.Errorf("outs should NOT EQUAL hidden")
+	}
+
+	cmdHidden.Execute()
+
+	// upon running the command, the value of outs should now be 'hidden'
+	if outs != "hidden" {
+		t.Errorf("Hidden command failed to run!")
+	}
+}
+
+// test to ensure hidden commands do not show up in usage/help text
+func TestHiddenCommandIsHidden(t *testing.T) {
+	if cmdHidden.IsAvailableCommand() {
+		t.Errorf("Hidden command found!")
+	}
+}
+
 func TestStripFlags(t *testing.T) {
 	tests := []struct {
 		input  []string

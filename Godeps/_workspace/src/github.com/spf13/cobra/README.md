@@ -418,6 +418,42 @@ func main() {
 }
 ```
 
+## Suggestions when "unknown command" happens
+
+Cobra will print automatic suggestions when "unknown command" errors happen. This allows Cobra to behavior similarly to the `git` command when a typo happens. For example:
+
+```
+$ hugo srever
+unknown command "srever" for "hugo"
+
+Did you mean this?
+  server
+
+Run 'hugo --help' for usage.
+```
+
+Suggestions are automatic based on every subcommand registered and use an implementation of Levenshtein distance. Every registered command that matches a minimum distance of 2 (ignoring case) will be displayed as a suggestion.
+
+If you need to disable suggestions or tweak the string distance in your command, use:
+
+    command.DisableSuggestions = true
+
+or 
+
+    command.SuggestionsMinimumDistance = 1
+
+You can also explicitly set names for which a given command will be suggested using the `SuggestFor` attribute. This allows suggestions for strings that are not close in terms of string distance, but makes sense in your set of commands and for some which you don't want aliases. Example:
+
+```
+$ hugo delete
+unknown command "delete" for "hugo"
+
+Did you mean this?
+  remove
+
+Run 'hugo --help' for usage.
+```
+
 ## Generating markdown formatted documentation for your command
 
 Cobra can generate a markdown formatted document based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Markdown Docs](md_docs.md)
