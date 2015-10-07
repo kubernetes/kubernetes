@@ -82,6 +82,12 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 	return defaultVersion, kind, err
 }
 
+// ResourceIsValid takes a string (kind) and checks if it's a valid resource.
+// It expands the resource first, then invokes the wrapped mapper.
+func (e ShortcutExpander) ResourceIsValid(resource string) bool {
+	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
+}
+
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.

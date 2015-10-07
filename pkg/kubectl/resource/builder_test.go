@@ -557,6 +557,112 @@ func TestSingleResourceType(t *testing.T) {
 	}
 }
 
+func TestHasNamesArg(t *testing.T) {
+	testCases := map[string]struct {
+		args     []string
+		expected bool
+	}{
+		"resource/name": {
+			args:     []string{"pods/foo"},
+			expected: true,
+		},
+		"resource name": {
+			args:     []string{"pods", "foo"},
+			expected: true,
+		},
+		"resource1,resource2 name": {
+			args:     []string{"pods,rc", "foo"},
+			expected: true,
+		},
+		"resource1,group2/resource2 name": {
+			args:     []string{"pods,experimental/deployments", "foo"},
+			expected: true,
+		},
+		"group/resource name": {
+			args:     []string{"experimental/deployments", "foo"},
+			expected: true,
+		},
+		"group/resource/name": {
+			args:     []string{"experimental/deployments/foo"},
+			expected: true,
+		},
+		"group1/resource1,group2/resource2": {
+			args:     []string{"experimental/daemonsets,experimental/deployments"},
+			expected: false,
+		},
+		"resource1,group2/resource2": {
+			args:     []string{"pods,experimental/deployments"},
+			expected: false,
+		},
+		"group/resource/name,group2/resource2": {
+			args:     []string{"experimental/deployments/foo,controller/deamonset"},
+			expected: false,
+		},
+	}
+	for k, testCase := range testCases {
+		b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient())
+		if testCase.expected != b.hasNamesArg(testCase.args) {
+			t.Errorf("%s: unexpected argument - expected: %v", k, testCase.expected)
+		}
+	}
+}
+
+func TestSplitGroupResourceTypeName(t *testing.T) {
+	expectNoErr := func(err error) bool { return err == nil }
+	expectErr := func(err error) bool { return err != nil }
+	testCases := map[string]struct {
+		arg           string
+		expectedTuple resourceTuple
+		expectedOK    bool
+		errFn         func(error) bool
+	}{
+		"group/type/name": {
+			arg:           "experimental/deployments/foo",
+			expectedTuple: resourceTuple{Resource: "experimental/deployments", Name: "foo"},
+			expectedOK:    true,
+			errFn:         expectNoErr,
+		},
+		"type/name": {
+			arg:           "pods/foo",
+			expectedTuple: resourceTuple{Resource: "pods", Name: "foo"},
+			expectedOK:    true,
+			errFn:         expectNoErr,
+		},
+		"type": {
+			arg:        "pods",
+			expectedOK: false,
+			errFn:      expectNoErr,
+		},
+		"": {
+			arg:        "",
+			expectedOK: false,
+			errFn:      expectNoErr,
+		},
+		"/": {
+			arg:        "/",
+			expectedOK: false,
+			errFn:      expectErr,
+		},
+		"group/type/name/something": {
+			arg:        "experimental/deployments/foo/something",
+			expectedOK: false,
+			errFn:      expectErr,
+		},
+	}
+	for k, testCase := range testCases {
+		tuple, ok, err := splitGroupResourceTypeName(testCase.arg)
+		if !testCase.errFn(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		}
+		if ok != testCase.expectedOK {
+			t.Errorf("%s: unexpected ok: %v", k, ok)
+		}
+		if testCase.expectedOK && !reflect.DeepEqual(tuple, testCase.expectedTuple) {
+			t.Errorf("%s: unexpected tuple - expected: %v, got: %v", k, testCase.expectedTuple, tuple)
+		}
+	}
+}
+
 func TestResourceTuple(t *testing.T) {
 	expectNoErr := func(err error) bool { return err == nil }
 	expectErr := func(err error) bool { return err != nil }

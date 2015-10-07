@@ -169,16 +169,25 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resource string) (singular stri
 
 // VersionAndKindForResource implements RESTMapper
 func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+	if parts := strings.Split(resource, "/"); len(parts) > 1 {
+		if len(parts) > 2 {
+			return "", "", fmt.Errorf("resource %q has an invalid name", resource)
+		}
+		resource = parts[1]
+		if m.group != parts[0] {
+			return "", "", fmt.Errorf("no resource %q is defined for group %q", resource, m.group)
+		}
+	}
 	meta, ok := m.mapping[strings.ToLower(resource)]
 	if !ok {
-		return "", "", fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
+		return "", "", fmt.Errorf("no resource %q has been defined", resource)
 	}
 	return meta.APIVersion, meta.Kind, nil
 }
 
 func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
 	if _, ok := m.mapping[strings.ToLower(resource)]; !ok {
-		return "", fmt.Errorf("in group for resource, no resource %q has been defined", resource)
+		return "", fmt.Errorf("no resource %q has been defined", resource)
 	}
 	return m.group, nil
 }
@@ -273,6 +282,12 @@ func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
 	return nil, false
 }
 
+// ResourceIsValid takes a string (kind) and checks if it's a valid resource
+func (m *DefaultRESTMapper) ResourceIsValid(resource string) bool {
+	_, _, err := m.VersionAndKindForResource(resource)
+	return err == nil
+}
+
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
 type MultiRESTMapper []RESTMapper
 
@@ -334,4 +349,14 @@ func (m MultiRESTMapper) AliasesForResource(alias string) (aliases []string, ok 
 		}
 	}
 	return nil, false
+}
+
+// ResourceIsValid takes a string (either group/kind or kind) and checks if it's a valid resource
+func (m MultiRESTMapper) ResourceIsValid(resource string) bool {
+	for _, t := range m {
+		if t.ResourceIsValid(resource) {
+			return true
+		}
+	}
+	return false
 }
