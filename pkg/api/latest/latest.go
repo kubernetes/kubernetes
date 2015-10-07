@@ -37,6 +37,8 @@ var (
 	// AllPreferredGroupVersions returns the preferred versions of all
 	// registered groups in the form of "group1/version1,group2/version2,..."
 	AllPreferredGroupVersions = allGroups.AllPreferredGroupVersions
+	// IsRegistered is a shortcut to allGroups.IsRegistered.
+	IsRegistered = allGroups.IsRegistered
 )
 
 // GroupMetaMap is a map between group names and their metadata.
@@ -63,6 +65,12 @@ func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
 		return nil, fmt.Errorf("no version is registered for group %v", group)
 	}
 	return groupMeta, nil
+}
+
+// IsRegistered takes a string and determines if it's one of the registered groups
+func (g GroupMetaMap) IsRegistered(group string) bool {
+	_, found := g[group]
+	return found
 }
 
 // TODO: This is an expedient function, because we don't check if a Group is
