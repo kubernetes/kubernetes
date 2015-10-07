@@ -22,14 +22,16 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
 const (
-	containerID   = "cOnTaInEr_Id"
 	containerName = "cOnTaInEr_NaMe"
 	podUID        = "pOd_UiD"
 )
+
+var containerID = kubecontainer.ContainerID{"test", "cOnTaInEr_Id"}
 
 func TestDoProbe(t *testing.T) {
 	m := newTestManager()
@@ -204,7 +206,7 @@ func newTestWorker(probeSpec api.Probe) *worker {
 func getRunningStatus() api.PodStatus {
 	containerStatus := api.ContainerStatus{
 		Name:        containerName,
-		ContainerID: containerID,
+		ContainerID: containerID.String(),
 	}
 	containerStatus.State.Running = &api.ContainerStateRunning{unversioned.Now()}
 	podStatus := api.PodStatus{
@@ -231,10 +233,10 @@ func getTestPod(probeSpec api.Probe) api.Pod {
 
 type CrashingProber struct{}
 
-func (f CrashingProber) ProbeLiveness(_ *api.Pod, _ api.PodStatus, c api.Container, _ string, _ int64) (probe.Result, error) {
+func (f CrashingProber) ProbeLiveness(_ *api.Pod, _ api.PodStatus, c api.Container, _ kubecontainer.ContainerID, _ int64) (probe.Result, error) {
 	panic("Intentional ProbeLiveness crash.")
 }
 
-func (f CrashingProber) ProbeReadiness(_ *api.Pod, _ api.PodStatus, c api.Container, _ string) (probe.Result, error) {
+func (f CrashingProber) ProbeReadiness(_ *api.Pod, _ api.PodStatus, c api.Container, _ kubecontainer.ContainerID) (probe.Result, error) {
 	panic("Intentional ProbeReadiness crash.")
 }

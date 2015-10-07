@@ -18,7 +18,6 @@ package container
 
 import (
 	"hash/adler32"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
@@ -29,24 +28,13 @@ import (
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error
+	Run(containerID ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error
 }
 
 // RunContainerOptionsGenerator generates the options that necessary for
 // container runtime to run a container.
 type RunContainerOptionsGenerator interface {
 	GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*RunContainerOptions, error)
-}
-
-// Trims runtime prefix from ID or image name (e.g.: docker://busybox -> busybox).
-func TrimRuntimePrefix(fullString string) string {
-	const prefixSeparator = "://"
-
-	idx := strings.Index(fullString, prefixSeparator)
-	if idx < 0 {
-		return fullString
-	}
-	return fullString[idx+len(prefixSeparator):]
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

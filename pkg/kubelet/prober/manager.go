@@ -141,7 +141,8 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *api.PodStatus) {
 		var ready bool
 		if c.State.Running == nil {
 			ready = false
-		} else if result, ok := m.readinessCache.getReadiness(kubecontainer.TrimRuntimePrefix(c.ContainerID)); ok {
+		} else if result, ok := m.readinessCache.getReadiness(
+			kubecontainer.ParseContainerID(c.ContainerID)); ok {
 			ready = result
 		} else {
 			// The check whether there is a probe which hasn't run yet.

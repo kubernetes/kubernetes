@@ -74,16 +74,16 @@ func TestResolvePortStringUnknown(t *testing.T) {
 
 type fakeContainerCommandRunner struct {
 	Cmd []string
-	ID  string
+	ID  kubecontainer.ContainerID
 }
 
-func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]byte, error) {
+func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string) ([]byte, error) {
 	f.Cmd = cmd
 	f.ID = id
 	return []byte{}, nil
 }
 
-func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	return nil
 }
 
@@ -95,7 +95,7 @@ func TestRunHandlerExec(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
 
-	containerID := "abc1234"
+	containerID := kubecontainer.ContainerID{"test", "abc1234"}
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -137,7 +137,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	fakeHttp := fakeHTTP{}
 	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
 
-	containerID := "abc1234"
+	containerID := kubecontainer.ContainerID{"test", "abc1234"}
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -168,7 +168,7 @@ func TestRunHandlerHttp(t *testing.T) {
 
 func TestRunHandlerNil(t *testing.T) {
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil)
-	containerID := "abc1234"
+	containerID := kubecontainer.ContainerID{"test", "abc1234"}
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
