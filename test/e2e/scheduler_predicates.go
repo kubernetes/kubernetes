@@ -33,12 +33,12 @@ import (
 )
 
 // Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduledNumbers(pods *api.PodList) (scheduledPods, notScheduledPods int) {
+func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName != "" {
-			scheduledPods += 1
+			scheduledPods = append(scheduledPods, pod)
 		} else {
-			notScheduledPods += 1
+			notScheduledPods = append(notScheduledPods, pod)
 		}
 	}
 	return
@@ -49,7 +49,7 @@ func getPodsScheduledNumbers(pods *api.PodList) (scheduledPods, notScheduledPods
 func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
-	podsScheduledBefore, _ := getPodsScheduledNumbers(allPods)
+	podsScheduledBefore, _ := getPodsScheduled(allPods)
 
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
@@ -67,7 +67,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 	timeout := 10 * time.Minute
 	startTime := time.Now()
 	currentlyScheduledPods := 0
-	for podsScheduledBefore+replicas != currentlyScheduledPods {
+	for len(podsScheduledBefore)+replicas != currentlyScheduledPods {
 		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		scheduledPods := 0
@@ -84,7 +84,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 		}
 		time.Sleep(5 * time.Second)
 	}
-	Expect(currentlyScheduledPods).To(Equal(podsScheduledBefore + replicas))
+	Expect(currentlyScheduledPods).To(Equal(len(podsScheduledBefore) + replicas))
 }
 
 func getRequestedCPU(pod api.Pod) int64 {
@@ -98,7 +98,7 @@ func getRequestedCPU(pod api.Pod) int64 {
 func verifyResult(c *client.Client, podName string, ns string, oldNotScheduled int) {
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
-	_, notScheduledPods := getPodsScheduledNumbers(allPods)
+	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
 
 	schedEvents, err := c.Events(ns).List(
 		labels.Everything(),
@@ -121,8 +121,8 @@ func verifyResult(c *client.Client, podName string, ns string, oldNotScheduled i
 		}
 	}
 
-	Expect(notScheduledPods).To(Equal(1+oldNotScheduled), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
-	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
+	Expect(len(notScheduledPods)).To(Equal(1+oldNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 func cleanupPods(c *client.Client, ns string) {
@@ -177,8 +177,8 @@ var _ = Describe("SchedulerPredicates", func() {
 
 		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		currentlyScheduledPods, currentlyNotScheduledPods := getPodsScheduledNumbers(allPods)
-		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
+		currentlyScheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
+		podsNeededForSaturation := int(totalPodCapacity) - len(currentlyScheduledPods)
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
@@ -224,7 +224,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, currentlyNotScheduledPods)
+		verifyResult(c, podName, ns, len(currentlyNotScheduledPods))
 		cleanupPods(c, ns)
 	})
 
@@ -326,7 +326,7 @@ var _ = Describe("SchedulerPredicates", func() {
 
 		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		_, currentlyNotScheduledPods := getPodsScheduledNumbers(allPods)
+		_, currentlyNotScheduledPods := getPodsScheduled(allPods)
 
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -354,7 +354,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, currentlyNotScheduledPods)
+		verifyResult(c, podName, ns, len(currentlyNotScheduledPods))
 		cleanupPods(c, ns)
 	})
 
