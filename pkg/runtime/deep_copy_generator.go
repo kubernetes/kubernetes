@@ -265,10 +265,13 @@ func (s byPkgAndName) Swap(i, j int) {
 
 func (g *deepCopyGenerator) nameForType(inType reflect.Type) string {
 	switch inType.Kind() {
-	case reflect.Slice:
-		return fmt.Sprintf("[]%s", g.typeName(inType.Elem()))
 	case reflect.Ptr:
 		return fmt.Sprintf("*%s", g.typeName(inType.Elem()))
+	case reflect.Slice:
+		if len(inType.Name()) == 0 {
+			return fmt.Sprintf("[]%s", g.typeName(inType.Elem()))
+		}
+		fallthrough
 	case reflect.Map:
 		if len(inType.Name()) == 0 {
 			return fmt.Sprintf("map[%s]%s", g.typeName(inType.Key()), g.typeName(inType.Elem()))

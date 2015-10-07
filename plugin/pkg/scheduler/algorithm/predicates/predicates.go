@@ -199,6 +199,30 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	return selector.Matches(labels.Set(node.Labels))
 }
 
+// NoPodAntiAffinitySelectorsMatch evaluates if a pod fits a node by:
+// 1) Comparing the pod's anti affinity selectors against labels of all existing pods.
+// 2) Comparing existing pods anti affinity selectors with labels of this pod.
+func NoPodAntiAffinitySelectorsMatch(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	for podIx := range existingPods {
+		if existingPods[podIx].Labels != nil {
+			for ii := range pod.Spec.AntiAffinitySelectors {
+				if pod.Spec.AntiAffinitySelectors[ii].Matches(labels.Set(existingPods[podIx].Labels)) {
+					return false, nil
+				}
+			}
+		}
+		if pod.Labels != nil {
+			for ii := range existingPods[podIx].Spec.AntiAffinitySelectors {
+				if existingPods[podIx].Spec.AntiAffinitySelectors[ii].Matches(labels.Set(pod.Labels)) {
+					return false, nil
+				}
+			}
+		}
+	}
+
+	return true, nil
+}
+
 type NodeSelector struct {
 	info NodeInfo
 }
