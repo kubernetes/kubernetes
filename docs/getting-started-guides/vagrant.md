@@ -44,6 +44,7 @@ Running Kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 - [Running containers](#running-containers)
 - [Troubleshooting](#troubleshooting)
     - [I keep downloading the same (large) box all the time!](#i-keep-downloading-the-same-large-box-all-the-time)
+    - [I am getting timeouts when trying to curl the master from my host!](#i-am-getting-timeouts-when-trying-to-curl-the-master-from-my-host)
     - [I just created the cluster, but I am getting authorization errors!](#i-just-created-the-cluster-but-i-am-getting-authorization-errors)
     - [I just created the cluster, but I do not see my container running!](#i-just-created-the-cluster-but-i-do-not-see-my-container-running)
     - [I want to make changes to Kubernetes code!](#i-want-to-make-changes-to-kubernetes-code)
@@ -312,6 +313,43 @@ export KUBERNETES_BOX_URL=path_of_your_kuber_box
 export KUBERNETES_PROVIDER=vagrant
 ./cluster/kube-up.sh
 ```
+
+#### I am getting timeouts when trying to curl the master from my host!
+
+During provision of the cluster, you may see the following message:
+
+```sh
+Validating minion-1
+.............
+Waiting for each minion to be registered with cloud provider
+error: couldn't read version from server: Get https://10.245.1.2/api: dial tcp 10.245.1.2:443: i/o timeout
+```
+
+Some users have reported VPNs may prevent traffic from being routed to the host machine into the virtual machine network.
+
+To debug, first verify that the master is binding to the proper IP address:
+
+```
+$ vagrant ssh master
+$ ifconfig | grep eth1 -C 2 
+eth1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 inet 10.245.1.2 netmask 
+   255.255.255.0 broadcast 10.245.1.255 
+```
+
+Then verify that your host machine has a network connection to a bridge that can serve that address:
+
+```sh
+$ ifconfig | grep 10.245.1 -C 2
+
+vboxnet5: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 10.245.1.1  netmask 255.255.255.0  broadcast 10.245.1.255
+        inet6 fe80::800:27ff:fe00:5  prefixlen 64  scopeid 0x20<link>
+        ether 0a:00:27:00:00:05  txqueuelen 1000  (Ethernet)
+```
+
+If you do not see a response on your host machine, you will most likely need to connect your host to the virtual network created by the virtualization provider.
+
+If you do see a network, but are still unable to ping the machine, check if your VPN is blocking the request.
 
 #### I just created the cluster, but I am getting authorization errors!
 
