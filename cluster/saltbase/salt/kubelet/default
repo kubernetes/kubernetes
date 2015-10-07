@@ -50,8 +50,9 @@
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 
 {% set manifest_url = "" -%}
+{% set manifest_url_header = "" -%}
 {% if pillar.get('enable_manifest_url', '').lower() == 'true' %}
-  {% set manifest_url = "--manifest-url=" + pillar['manifest_url'] -%}
+  {% set manifest_url = "--manifest-url=" + pillar['manifest_url'] + " --manifest-url-header=" + pillar['manifest_url_header'] -%}
 {% endif -%}
 
 {% set hostname_override = "" -%}
