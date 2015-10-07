@@ -25,16 +25,44 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"text/template"
 
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// The temp dir where test plugins will be stored.
-const testPluginPath = "/tmp/fake/plugins/net"
+func tmpDirOrDie() string {
+	dir, err := ioutil.TempDir(os.TempDir(), "exec-test")
+	if err != nil {
+		panic(fmt.Sprintf("error creating tmp dir: %v", err))
+	}
+	return path.Join(dir, "fake", "plugins", "net")
+}
 
-func installPluginUnderTest(t *testing.T, vendorName string, plugName string, execTemplateData *map[string]interface{}) {
+var lock sync.Mutex
+var namesInUse = sets.NewString()
+
+func selectName() string {
+	lock.Lock()
+	defer lock.Unlock()
+	for {
+		pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
+		if !namesInUse.Has(pluginName) {
+			namesInUse.Insert(pluginName)
+			return pluginName
+		}
+	}
+}
+
+func releaseName(name string) {
+	lock.Lock()
+	defer lock.Unlock()
+	namesInUse.Delete(name)
+}
+
+func installPluginUnderTest(t *testing.T, vendorName, testPluginPath, plugName string, execTemplateData *map[string]interface{}) {
 	vendoredName := plugName
 	if vendorName != "" {
 		vendoredName = fmt.Sprintf("%s~%s", vendorName, plugName)
@@ -85,7 +113,7 @@ echo -n $@ &> {{.OutputFile}}
 	f.Close()
 }
 
-func tearDownPlugin(plugName string) {
+func tearDownPlugin(testPluginPath string) {
 	err := os.RemoveAll(testPluginPath)
 	if err != nil {
 		fmt.Printf("Error in cleaning up test: %v", err)
@@ -93,10 +121,15 @@ func tearDownPlugin(plugName string) {
 }
 
 func TestSelectPlugin(t *testing.T) {
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
 	// install some random plugin under testPluginPath
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
-	installPluginUnderTest(t, "", pluginName, nil)
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
+	installPluginUnderTest(t, "", testPluginPath, pluginName, nil)
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 	if err != nil {
@@ -108,11 +141,16 @@ func TestSelectPlugin(t *testing.T) {
 }
 
 func TestSelectVendoredPlugin(t *testing.T) {
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
 	// install some random plugin under testPluginPath
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
 	vendor := "mycompany"
-	installPluginUnderTest(t, vendor, pluginName, nil)
+	installPluginUnderTest(t, vendor, testPluginPath, pluginName, nil)
 
 	vendoredPluginName := fmt.Sprintf("%s/%s", vendor, pluginName)
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), vendoredPluginName, network.NewFakeHost(nil))
@@ -125,10 +163,15 @@ func TestSelectVendoredPlugin(t *testing.T) {
 }
 
 func TestSelectWrongPlugin(t *testing.T) {
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
 	// install some random plugin under testPluginPath
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
-	installPluginUnderTest(t, "", pluginName, nil)
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
+	installPluginUnderTest(t, "", testPluginPath, pluginName, nil)
 
 	wrongPlugin := "abcd"
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), wrongPlugin, network.NewFakeHost(nil))
@@ -138,9 +181,15 @@ func TestSelectWrongPlugin(t *testing.T) {
 }
 
 func TestPluginValidation(t *testing.T) {
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
-	installPluginUnderTest(t, "", pluginName, nil)
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
+	// install some random plugin under testPluginPath
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
+	installPluginUnderTest(t, "", testPluginPath, pluginName, nil)
 
 	// modify the perms of the pluginExecutable
 	f, err := os.Open(path.Join(testPluginPath, pluginName, pluginName))
@@ -161,9 +210,15 @@ func TestPluginValidation(t *testing.T) {
 }
 
 func TestPluginSetupHook(t *testing.T) {
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
-	installPluginUnderTest(t, "", pluginName, nil)
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
+	// install some random plugin under testPluginPath
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
+	installPluginUnderTest(t, "", testPluginPath, pluginName, nil)
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 
@@ -183,9 +238,15 @@ func TestPluginSetupHook(t *testing.T) {
 }
 
 func TestPluginTearDownHook(t *testing.T) {
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
-	installPluginUnderTest(t, "", pluginName, nil)
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
+	// install some random plugin under testPluginPath
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
+	installPluginUnderTest(t, "", testPluginPath, pluginName, nil)
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 
@@ -205,9 +266,15 @@ func TestPluginTearDownHook(t *testing.T) {
 }
 
 func TestPluginStatusHook(t *testing.T) {
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
-	installPluginUnderTest(t, "", pluginName, nil)
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
+	// install some random plugin under testPluginPath
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
+	installPluginUnderTest(t, "", testPluginPath, pluginName, nil)
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 
@@ -230,14 +297,20 @@ func TestPluginStatusHook(t *testing.T) {
 }
 
 func TestPluginStatusHookIPv6(t *testing.T) {
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName)
+	// The temp dir where test plugins will be stored.
+	testPluginPath := tmpDirOrDie()
+
+	// install some random plugin under testPluginPath
+	pluginName := selectName()
+	defer tearDownPlugin(testPluginPath)
+	defer releaseName(pluginName)
+
 	pluginDir := path.Join(testPluginPath, pluginName)
 	execTemplate := &map[string]interface{}{
 		"IPAddress":  "fe80::e2cb:4eff:fef9:6710",
 		"OutputFile": path.Join(pluginDir, pluginName+".out"),
 	}
-	installPluginUnderTest(t, "", pluginName, execTemplate)
+	installPluginUnderTest(t, "", testPluginPath, pluginName, execTemplate)
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 
