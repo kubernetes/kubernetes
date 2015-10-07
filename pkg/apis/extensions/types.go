@@ -204,7 +204,7 @@ type DeploymentSpec struct {
 	Replicas int `json:"replicas,omitempty"`
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
-	// selected by this will be scaled down.
+	// selected by this will be the ones affected by this deployment.
 	Selector map[string]string `json:"selector,omitempty"`
 
 	// Template describes the pods that will be created.
@@ -279,11 +279,10 @@ type RollingUpdateDeployment struct {
 }
 
 type DeploymentStatus struct {
-	// Total number of ready pods targeted by this deployment (this
-	// includes both the old and new pods).
+	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
 	Replicas int `json:"replicas,omitempty"`
 
-	// Total number of new ready pods with the desired template spec.
+	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
 	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
 }
 
