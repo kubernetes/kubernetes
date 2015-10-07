@@ -90,16 +90,27 @@ func GetNewRCTemplate(deployment extensions.Deployment) *api.PodTemplateSpec {
 		ObjectMeta: deployment.Spec.Template.ObjectMeta,
 		Spec:       deployment.Spec.Template.Spec,
 	}
-	podTemplateSpecHash := GetPodTemplateSpecHash(newRCTemplate)
-	if deployment.Spec.UniqueLabelKey != "" {
-		newLabels := map[string]string{}
-		for key, value := range deployment.Spec.Template.ObjectMeta.Labels {
-			newLabels[key] = value
-		}
-		newLabels[deployment.Spec.UniqueLabelKey] = fmt.Sprintf("%d", podTemplateSpecHash)
-		newRCTemplate.ObjectMeta.Labels = newLabels
-	}
+	newRCTemplate.ObjectMeta.Labels = CloneAndAddLabel(
+		deployment.Spec.Template.ObjectMeta.Labels,
+		deployment.Spec.UniqueLabelKey,
+		GetPodTemplateSpecHash(newRCTemplate))
 	return newRCTemplate
+}
+
+// Clones the given map and returns a new map with the given key and value added.
+// Returns the given map, if labelKey is empty.
+func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint32) map[string]string {
+	if labelKey == "" {
+		// Dont need to add a label.
+		return labels
+	}
+	// Clone.
+	newLabels := map[string]string{}
+	for key, value := range labels {
+		newLabels[key] = value
+	}
+	newLabels[labelKey] = fmt.Sprintf("%d", labelValue)
+	return newLabels
 }
 
 func GetPodTemplateSpecHash(template *api.PodTemplateSpec) uint32 {
