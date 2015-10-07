@@ -137,7 +137,7 @@ func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
 
 // ResourceLocation returns an URL and transport which one can use to send traffic for the specified node.
 func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	schemeReq, name, portReq, valid := util.SplitSchemeNamePort(id)
+	name, portReq, valid := util.SplitPort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
 	}
@@ -154,7 +154,6 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	host := hostIP.String()
 
 	if portReq == "" || strconv.Itoa(ports.KubeletPort) == portReq {
-		// Ignore requested scheme, use scheme provided by GetConnectionInfo
 		scheme, port, transport, err := connection.GetConnectionInfo(host)
 		if err != nil {
 			return nil, nil, err
@@ -169,5 +168,5 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 			transport,
 			nil
 	}
-	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(host, portReq)}, nil, nil
+	return &url.URL{Host: net.JoinHostPort(host, portReq)}, nil, nil
 }
