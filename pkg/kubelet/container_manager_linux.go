@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
 const (
@@ -141,10 +142,37 @@ func createManager(containerName string) *fs.Manager {
 	}
 }
 
+const sysctlVmOvercommitMemory = "vm/overcommit_memory"
+
+// disableKernelMemoryOvercommitHandling tells the kernel to perform no memory over-commit handling.
+// Under this setting, the potential for memory overload is increased, but so is performance for
+// memory-intensive tasks
+// sets /proc/sys/vm/overcommit_memory to 1
+func disableKernelMemoryOvercommitHandling() error {
+	val, err := utilsysctl.GetSysctl(sysctlVmOvercommitMemory)
+	if err != nil {
+		return err
+	}
+	if val == 1 {
+		return nil
+	}
+	glog.V(2).Infof("Updating kernel memory overcommit flag from %v to %v", val, 1)
+	err = utilsysctl.SetSysctl(sysctlVmOvercommitMemory, 1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cm *containerManagerImpl) setupNode() error {
 	if err := validateSystemRequirements(cm.mountUtil); err != nil {
 		return err
 	}
+
+	if err := disableKernelMemoryOvercommitHandling(); err != nil {
+		return err
+	}
+
 	systemContainers := []*systemContainer{}
 	if cm.dockerDaemonContainerName != "" {
 		cont := newSystemContainer(cm.dockerDaemonContainerName)
