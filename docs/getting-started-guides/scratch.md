@@ -476,7 +476,7 @@ because of how this is used later.
   1. Set appropriate MTU
   - `ip link set dev cbr0 mtu 1460` (NOTE: the actual value of MTU will depend on your network environment)
   1. Add the clusters network to the bridge (docker will go on other side of bridge).
-  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev eth0`
+  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev cbr0`
   1. Turn it on
   - e.g. `ip link set dev cbr0 up`
 
@@ -485,7 +485,7 @@ other, then you may need to do masquerading just for destination IPs outside
 the cluster network.  For example:
 
 ```sh
-iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CLUSTER_SUBNET}
+iptables -t nat -A POSTROUTING ! -d ${CLUSTER_SUBNET} -m addrtype ! --dst-type LOCAL -j MASQUERADE
 ```
 
 This will rewrite the source address from
