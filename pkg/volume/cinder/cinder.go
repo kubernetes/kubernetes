@@ -225,6 +225,10 @@ func (b *cinderVolumeBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *cinderVolumeBuilder) SupportsSELinux() bool {
+	return true
+}
+
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(cinderVolumePluginName), "mounts", devName)
 }

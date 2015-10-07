@@ -146,7 +146,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 				return nil, err
 			}
 		}
-		podVolumes[volSpec.Name] = builder
+		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}
 	}
 	return podVolumes, nil
 }

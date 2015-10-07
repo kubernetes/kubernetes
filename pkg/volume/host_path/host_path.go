@@ -185,6 +185,10 @@ func (b *hostPathBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *hostPathBuilder) SupportsSELinux() bool {
+	return false
+}
+
 func (b *hostPathBuilder) GetPath() string {
 	return b.path
 }

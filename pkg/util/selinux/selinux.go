@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package empty_dir
+package selinux
 
 // chconRunner knows how to chcon a directory.
-type chconRunner interface {
+type ChconRunner interface {
 	SetContext(dir, context string) error
 }
 
 // newChconRunner returns a new chconRunner.
-func newChconRunner() chconRunner {
+func NewChconRunner() ChconRunner {
 	return &realChconRunner{}
 }

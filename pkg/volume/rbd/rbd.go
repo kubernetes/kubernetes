@@ -219,6 +219,10 @@ func (b *rbd) IsReadOnly() bool {
 	return b.ReadOnly
 }
 
+func (b *rbd) SupportsSELinux() bool {
+	return true
+}
+
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
 func (c *rbdCleaner) TearDown() error {

@@ -157,6 +157,10 @@ func (d *downwardAPIVolume) IsReadOnly() bool {
 	return true
 }
 
+func (d *downwardAPIVolume) SupportsSELinux() bool {
+	return true
+}
+
 // collectData collects requested downwardAPI in data map.
 // Map's key is the requested name of file to dump
 // Map's value is the (sorted) content of the field to be dumped in the file.

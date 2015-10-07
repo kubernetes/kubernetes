@@ -191,6 +191,10 @@ func (b *fcDiskBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *fcDiskBuilder) SupportsSELinux() bool {
+	return true
+}
+
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
 func (c *fcDiskCleaner) TearDown() error {

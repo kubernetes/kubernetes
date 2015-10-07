@@ -187,6 +187,10 @@ func (cephfsVolume *cephfsBuilder) IsReadOnly() bool {
 	return cephfsVolume.readonly
 }
 
+func (cephfsVolume *cephfsBuilder) SupportsSELinux() bool {
+	return false
+}
+
 type cephfsCleaner struct {
 	*cephfs
 }

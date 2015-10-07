@@ -172,6 +172,10 @@ func (fv *FakeVolume) IsReadOnly() bool {
 	return false
 }
 
+func (fv *FakeVolume) SupportsSELinux() bool {
+	return false
+}
+
 func (fv *FakeVolume) GetPath() string {
 	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, util.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
 }

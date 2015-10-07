@@ -488,7 +488,7 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
 			Name:   *volName,
 			Kind:   "host",
-			Source: volume.GetPath(),
+			Source: volume.Builder.GetPath(),
 		})
 	}
 

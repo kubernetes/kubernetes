@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -62,6 +63,7 @@ import (
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -73,6 +75,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
@@ -975,6 +978,47 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
+// relabelVolumes relabels SELinux volumes to match the pod's
+// SELinuxOptions specification. This is only needed if the pod uses
+// hostPID or hostIPC. Otherwise relabeling is delegated to docker.
+func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap) error {
+	if pod.Spec.SecurityContext.SELinuxOptions == nil {
+		return nil
+	}
+
+	rootDirContext, err := kl.getRootDirContext()
+	if err != nil {
+		return err
+	}
+
+	chconRunner := selinux.NewChconRunner()
+	// Apply the pod's Level to the rootDirContext
+	rootDirSELinuxOptions, err := securitycontext.ParseSELinuxOptions(rootDirContext)
+	if err != nil {
+		return err
+	}
+
+	rootDirSELinuxOptions.Level = pod.Spec.SecurityContext.SELinuxOptions.Level
+	volumeContext := fmt.Sprintf("%s:%s:%s:%s", rootDirSELinuxOptions.User, rootDirSELinuxOptions.Role, rootDirSELinuxOptions.Type, rootDirSELinuxOptions.Level)
+
+	for _, volume := range volumes {
+		if volume.Builder.SupportsSELinux() && !volume.Builder.IsReadOnly() {
+			// Relabel the volume and its content to match the 'Level' of the pod
+			err := filepath.Walk(volume.Builder.GetPath(), func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				return chconRunner.SetContext(path, volumeContext)
+			})
+			if err != nil {
+				return err
+			}
+			volume.SELinuxLabeled = true
+		}
+	}
+	return nil
+}
+
 func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
 	// Kubernetes only mounts on /etc/hosts if :
 	// - container does not use hostNetwork and
@@ -991,11 +1035,21 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 			glog.Warningf("Mount cannot be satisified for container %q, because the volume is missing: %q", container.Name, mount)
 			continue
 		}
+
+		relabelVolume := false
+		// If the volume supports SELinux and it has not been
+		// relabeled already and it is not a read-only volume,
+		// relabel it and mark it as labeled
+		if vol.Builder.SupportsSELinux() && !vol.SELinuxLabeled && !vol.Builder.IsReadOnly() {
+			vol.SELinuxLabeled = true
+			relabelVolume = true
+		}
 		mounts = append(mounts, kubecontainer.Mount{
-			Name:          mount.Name,
-			ContainerPath: mount.MountPath,
-			HostPath:      vol.GetPath(),
-			ReadOnly:      mount.ReadOnly,
+			Name:           mount.Name,
+			ContainerPath:  mount.MountPath,
+			HostPath:       vol.Builder.GetPath(),
+			ReadOnly:       mount.ReadOnly,
+			SELinuxRelabel: relabelVolume,
 		})
 	}
 	if mountEtcHostsFile {
@@ -1080,6 +1134,16 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	}
 
 	opts.PortMappings = makePortMappings(container)
+	// Docker does not relabel volumes if the container is running
+	// in the host pid or ipc namespaces so the kubelet must
+	// relabel the volumes
+	if pod.Spec.SecurityContext != nil && (pod.Spec.SecurityContext.HostIPC || pod.Spec.SecurityContext.HostPID) {
+		err = kl.relabelVolumes(pod, vol)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, vol)
 	if err != nil {
 		return nil, err
