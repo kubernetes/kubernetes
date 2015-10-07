@@ -1027,7 +1027,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		daemonEndpoints,
 		kc.OOMAdjuster,
 		kc.SerializeImagePulls,
-	)
 
 		// Flannel parameters
 		kc.UseDefaultOverlay,

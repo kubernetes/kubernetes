@@ -223,7 +223,7 @@ func (l *LeaseClient) Watch(rv string) (LeaseEvent, error) {
 	var err error
 	leaseEvent := LeaseEvent{}
 
-	w, err := l.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), rv)
+	w, err := l.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), api.ListOptions{ResourceVersion: rv})
 	if err != nil {
 		return leaseEvent, err
 	}
