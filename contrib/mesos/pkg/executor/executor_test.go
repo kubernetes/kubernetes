@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -66,15 +67,15 @@ func TestExecutorRegister(t *testing.T) {
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
 
-	initialPodUpdate := kubelet.PodUpdate{
+	initialPodUpdate := kubeletTypes.PodUpdate{
 		Pods:   []*api.Pod{},
-		Op:     kubelet.SET,
+		Op:     kubeletTypes.SET,
 		Source: executor.sourcename,
 	}
 	receivedInitialPodUpdate := false
 	select {
 	case m := <-updates:
-		update, ok := m.(kubelet.PodUpdate)
+		update, ok := m.(kubeletTypes.PodUpdate)
 		if ok {
 			if reflect.DeepEqual(initialPodUpdate, update) {
 				receivedInitialPodUpdate = true
@@ -212,7 +213,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	gotPodUpdate := false
 	select {
 	case m := <-updates:
-		update, ok := m.(kubelet.PodUpdate)
+		update, ok := m.(kubeletTypes.PodUpdate)
 		if ok && len(update.Pods) == 1 {
 			gotPodUpdate = true
 		}
@@ -360,7 +361,7 @@ func TestExecutorStaticPods(t *testing.T) {
 			if !ok {
 				return
 			}
-			podUpdate, ok := update.(kubelet.PodUpdate)
+			podUpdate, ok := update.(kubeletTypes.PodUpdate)
 			if !ok {
 				continue
 			}
