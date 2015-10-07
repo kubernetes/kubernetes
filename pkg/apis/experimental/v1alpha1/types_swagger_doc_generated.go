@@ -356,7 +356,8 @@ func (JobStatus) SwaggerDoc() map[string]string {
 }
 
 var map_NodeUtilization = map[string]string{
-	"": "NodeUtilization describes what percentage of a particular resource is used on a node.",
+	"":      "NodeUtilization describes what percentage of a particular resource is used on a node.",
+	"value": "The accepted values are from 0 to 1.",
 }
 
 func (NodeUtilization) SwaggerDoc() map[string]string {
