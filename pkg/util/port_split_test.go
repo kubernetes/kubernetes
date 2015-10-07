@@ -20,11 +20,12 @@ import (
 	"testing"
 )
 
-func TestSplitPort(t *testing.T) {
+func TestSplitSchemeNamePort(t *testing.T) {
 	table := []struct {
-		in         string
-		name, port string
-		valid      bool
+		in                 string
+		name, port, scheme string
+		valid              bool
+		normalized         bool
 	}{
 		{
 			in:    "aoeu:asdf",
@@ -32,26 +33,50 @@ func TestSplitPort(t *testing.T) {
 			port:  "asdf",
 			valid: true,
 		}, {
-			in:    "aoeu:",
-			name:  "aoeu",
-			valid: true,
+			in:     "http:aoeu:asdf",
+			scheme: "http",
+			name:   "aoeu",
+			port:   "asdf",
+			valid:  true,
 		}, {
-			in:   ":asdf",
-			name: "",
-			port: "asdf",
+			in:         "https:aoeu:",
+			scheme:     "https",
+			name:       "aoeu",
+			port:       "",
+			valid:      true,
+			normalized: false,
 		}, {
-			in: "aoeu:asdf:htns",
+			in:     "https:aoeu:asdf",
+			scheme: "https",
+			name:   "aoeu",
+			port:   "asdf",
+			valid:  true,
+		}, {
+			in:         "aoeu:",
+			name:       "aoeu",
+			valid:      true,
+			normalized: false,
+		}, {
+			in:    ":asdf",
+			valid: false,
+		}, {
+			in:    "aoeu:asdf:htns",
+			valid: false,
 		}, {
 			in:    "aoeu",
 			name:  "aoeu",
 			valid: true,
 		}, {
-			in: "",
+			in:    "",
+			valid: false,
 		},
 	}
 
 	for _, item := range table {
-		name, port, valid := SplitPort(item.in)
+		scheme, name, port, valid := SplitSchemeNamePort(item.in)
+		if e, a := item.scheme, scheme; e != a {
+			t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
+		}
 		if e, a := item.name, name; e != a {
 			t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
 		}
@@ -60,6 +85,27 @@ func TestSplitPort(t *testing.T) {
 		}
 		if e, a := item.valid, valid; e != a {
 			t.Errorf("%q: Wanted %t, got %t", item.in, e, a)
+		}
+
+		// Make sure valid items round trip through JoinSchemeNamePort
+		if item.valid {
+			out := JoinSchemeNamePort(scheme, name, port)
+			if item.normalized && out != item.in {
+				t.Errorf("%q: Wanted %s, got %s", item.in, item.in, out)
+			}
+			scheme, name, port, valid := SplitSchemeNamePort(out)
+			if e, a := item.scheme, scheme; e != a {
+				t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
+			}
+			if e, a := item.name, name; e != a {
+				t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
+			}
+			if e, a := item.port, port; e != a {
+				t.Errorf("%q: Wanted %q, got %q", item.in, e, a)
+			}
+			if e, a := item.valid, valid; e != a {
+				t.Errorf("%q: Wanted %t, got %t", item.in, e, a)
+			}
 		}
 	}
 }

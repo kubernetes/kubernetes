@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"net"
@@ -48,6 +49,13 @@ type REST struct {
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
 }
+
+// ServiceProxyTransport is used by the API proxy to connect to services
+// Exported to allow overriding TLS options (like adding a client certificate)
+var ServiceProxyTransport = util.SetTransportDefaults(&http.Transport{
+	// Turn off hostname verification, because connections are to assigned IPs, not deterministic
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+})
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
@@ -277,8 +285,8 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	// Allow ID as "svcname" or "svcname:port".
-	svcName, portStr, valid := util.SplitPort(id)
+	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
+	svcScheme, svcName, portStr, valid := util.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
 	}
@@ -303,11 +311,10 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 				// Pick a random address.
 				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
 				port := ss.Ports[i].Port
-				// We leave off the scheme ('http://') because we have no idea what sort of server
-				// is listening at this endpoint.
 				return &url.URL{
-					Host: net.JoinHostPort(ip, strconv.Itoa(port)),
-				}, nil, nil
+					Scheme: svcScheme,
+					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
+				}, ServiceProxyTransport, nil
 			}
 		}
 	}
