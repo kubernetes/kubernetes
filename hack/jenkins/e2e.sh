@@ -92,7 +92,6 @@ fi
 REBOOT_SKIP_TESTS=(
     "Autoscaling\sSuite"
     "Skipped"
-    "Reboot"
     "Restart\sshould\srestart\sall\snodes"
     "Example"
     )
@@ -112,6 +111,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Daemon\sset"
     "Deployment"
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "Shell"
     )
 
 # Tests which cannot be run on AWS.
@@ -123,7 +123,7 @@ AWS_REQUIRED_SKIP_TESTS=(
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
     "DaemonRestart\sController\sManager"
-    "Daemon\sset\sshould\slaunch\sa\sdaemon\spod\son\severy\snode\sof\sthe\scluster"
+    "Daemon\sset\sshould"
     "Resource\susage\sof\ssystem\scontainers"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
@@ -599,6 +599,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
+    : ${ENABLE_DEPLOYMENTS:=true}
     NUM_MINIONS=3
     ;;
 
@@ -845,6 +846,9 @@ fi
 ### Start Kubemark ###
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   export RUN_FROM_DISTRO=true
+  NUM_MINIONS_BKP=${NUM_MINIONS}
+  # We need to unset NUM_MINIONS to be able to use kubemark default settings.
+  unset NUM_MINIONS
   ./test/kubemark/stop-kubemark.sh
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
@@ -855,6 +859,8 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   fi
   ./test/kubemark/stop-kubemark.sh
   unset RUN_FROM_DISTRO
+  NUM_MINIONS=${NUM_MINIONS_BKP}
+  unset NUM_MINIONS_BKP
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are

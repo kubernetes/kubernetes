@@ -51,6 +51,9 @@ sed -i -e 's|<<\(.*\)\.\(.*\)>>|link:definitions.html#_\L\1_\2\E[\1.\2]|g' ./pat
 sed -i -e 's|<<any>>|link:#_any[any]|g' ./definitions.adoc
 sed -i -e 's|<<any>>|link:definitions.html#_any[any]|g' ./paths.adoc
 
+# change the title of paths.adoc from "paths" to "operations"
+sed -i 's|== Paths|== Operations|g' ./paths.adoc
+
 echo -e "=== any\nRepresents an untyped JSON map - see the description of the field for more info about the structure of this object." >> ./definitions.adoc
 
 asciidoctor definitions.adoc

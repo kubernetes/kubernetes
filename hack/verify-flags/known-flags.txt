@@ -17,6 +17,7 @@ api-servers
 api-server-port
 api-token
 api-version
+kubernetes-service-node-port
 authorization-mode
 authorization-policy-file
 auth-path
@@ -70,8 +71,7 @@ duration-sec
 e2e-verify-service-account
 e2e-output-dir
 enable-debugging-handlers
-enable-horizontal-pod-autoscaler
-enable-deployment-controller
+enable-experimental
 enable-server
 etcd-config
 etcd-prefix

@@ -53,7 +53,7 @@ MASTER_USER=vagrant
 MASTER_PASSWD=vagrant
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 # Optional: Enable experimental API features
 ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-true}"

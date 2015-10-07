@@ -88,7 +88,7 @@ DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 # Optional: Install cluster docker registry.
-ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-true}"
+ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-false}"
 CLUSTER_REGISTRY_DISK="${CLUSTER_REGISTRY_DISK:-${INSTANCE_PREFIX}-kube-system-kube-registry}"
 CLUSTER_REGISTRY_DISK_SIZE="${CLUSTER_REGISTRY_DISK_SIZE:-200GB}"
 CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
@@ -117,7 +117,7 @@ if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
 
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DenyEscalatingExec,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

@@ -20,5 +20,4 @@ if [ "$#" -lt 1 ]; then
 fi
 OUTPUT=${2:-${PWD}}
 
-docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1 https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/$1.json https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/$1/register.go
-
+docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1.1 https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/$1.json https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/$1/register.go
