@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -79,7 +80,7 @@ type Runtime interface {
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
+	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability
@@ -87,20 +88,18 @@ type Runtime interface {
 }
 
 type ContainerAttacher interface {
-	AttachContainer(id string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
+	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
 }
 
 // CommandRunner encapsulates the command runner interfaces for testability.
 type ContainerCommandRunner interface {
 	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
 	// Runs the command in the container of the specified pod using nsinit.
-	// TODO(yifan): Use strong type for containerID.
-	RunInContainer(containerID string, cmd []string) ([]byte, error)
+	RunInContainer(containerID ContainerID, cmd []string) ([]byte, error)
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
-	// TODO(yifan): Use strong type for containerID.
-	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
+	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
@@ -139,6 +138,15 @@ func BuildContainerID(typ, ID string) ContainerID {
 	return ContainerID{Type: typ, ID: ID}
 }
 
+// Convenience method for creating a ContainerID from an ID string.
+func ParseContainerID(containerID string) ContainerID {
+	var id ContainerID
+	if err := id.ParseString(containerID); err != nil {
+		glog.Error(err)
+	}
+	return id
+}
+
 func (c *ContainerID) ParseString(data string) error {
 	// Trim the quotes and split the type and ID.
 	parts := strings.Split(strings.Trim(data, "\""), "://")
@@ -151,6 +159,10 @@ func (c *ContainerID) ParseString(data string) error {
 
 func (c *ContainerID) String() string {
 	return fmt.Sprintf("%s://%s", c.Type, c.ID)
+}
+
+func (c *ContainerID) IsEmpty() bool {
+	return *c == ContainerID{}
 }
 
 func (c *ContainerID) MarshalJSON() ([]byte, error) {
@@ -166,7 +178,7 @@ func (c *ContainerID) UnmarshalJSON(data []byte) error {
 type Container struct {
 	// The ID of the container, used by the container runtime to identify
 	// a container.
-	ID types.UID
+	ID ContainerID
 	// The name of the container, which should be the same as specified by
 	// api.Container.
 	Name string

@@ -16,7 +16,11 @@ limitations under the License.
 
 package prober
 
-import "sync"
+import (
+	"sync"
+
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+)
 
 // readinessManager maintains the readiness information(probe results) of
 // containers over time to allow for implementation of health thresholds.
@@ -24,20 +28,19 @@ import "sync"
 type readinessManager struct {
 	// guards states
 	sync.RWMutex
-	// TODO(yifan): To use strong type.
-	states map[string]bool
+	states map[kubecontainer.ContainerID]bool
 }
 
 // newReadinessManager creates ane returns a readiness manager with empty
 // contents.
 func newReadinessManager() *readinessManager {
-	return &readinessManager{states: make(map[string]bool)}
+	return &readinessManager{states: make(map[kubecontainer.ContainerID]bool)}
 }
 
 // getReadiness returns the readiness value for the container with the given ID.
 // If the readiness value is found, returns it.
 // If the readiness is not found, returns false.
-func (r *readinessManager) getReadiness(id string) (ready bool, found bool) {
+func (r *readinessManager) getReadiness(id kubecontainer.ContainerID) (ready bool, found bool) {
 	r.RLock()
 	defer r.RUnlock()
 	state, found := r.states[id]
@@ -45,14 +48,14 @@ func (r *readinessManager) getReadiness(id string) (ready bool, found bool) {
 }
 
 // setReadiness sets the readiness value for the container with the given ID.
-func (r *readinessManager) setReadiness(id string, value bool) {
+func (r *readinessManager) setReadiness(id kubecontainer.ContainerID, value bool) {
 	r.Lock()
 	defer r.Unlock()
 	r.states[id] = value
 }
 
 // removeReadiness clears the readiness value for the container with the given ID.
-func (r *readinessManager) removeReadiness(id string) {
+func (r *readinessManager) removeReadiness(id kubecontainer.ContainerID) {
 	r.Lock()
 	defer r.Unlock()
 	delete(r.states, id)
