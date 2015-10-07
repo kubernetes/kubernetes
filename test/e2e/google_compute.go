@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 )
@@ -32,15 +33,22 @@ func createGCEStaticIP(name string) (string, error) {
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
-	output, err := exec.Command("gcloud", "compute", "addresses", "create",
-		name, "--project", testContext.CloudConfig.ProjectID,
-		"--region", "us-central1", "-q").CombinedOutput()
-	if err != nil {
+	var output []byte
+	var err error
+	for attempts := 0; attempts < 4; attempts++ {
+		output, err = exec.Command("gcloud", "compute", "addresses", "create",
+			name, "--project", testContext.CloudConfig.ProjectID,
+			"--region", "us-central1", "-q").CombinedOutput()
+		if err == nil {
+			break
+		}
 		glog.Errorf("Creating static IP with name:%s in project: %s", name, testContext.CloudConfig.ProjectID)
 		glog.Errorf("output: %s", output)
+		time.Sleep(time.Duration(5*attempts) * time.Second)
+	}
+	if err != nil {
 		return "", err
 	}
-	glog.Errorf("Creating static IP with name:%s in project: %s", name, testContext.CloudConfig.ProjectID)
 	text := string(output)
 	if strings.Contains(text, "RESERVED") {
 		r, _ := regexp.Compile("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+")
