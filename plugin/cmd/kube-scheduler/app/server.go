@@ -77,8 +77,8 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", 15.0, "Number of bindings per second scheduler is allowed to continuously make")
-	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", 20, "Number of bindings per second scheduler is allowed to make during bursts")
+	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", 50.0, "Number of bindings per second scheduler is allowed to continuously make")
+	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", 100, "Number of bindings per second scheduler is allowed to make during bursts")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -95,8 +95,8 @@ func (s *SchedulerServer) Run(_ []string) error {
 	if err != nil {
 		return err
 	}
-	kubeconfig.QPS = 20.0
-	kubeconfig.Burst = 30
+	kubeconfig.QPS = 50.0
+	kubeconfig.Burst = 100
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
