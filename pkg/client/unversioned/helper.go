@@ -205,41 +205,30 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 		return nil, err
 	}
 	// Get the groupVersions exposed at /api
-	req, err := http.NewRequest("GET", baseURL.String()+"/api", nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
+	baseURL.Path = "/api"
+	resp, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
 	}
 	var v api.APIVersions
-	err = json.Unmarshal(body, &v)
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&v)
 	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
+
 	groupVersions = append(groupVersions, v.Versions...)
 	// Get the groupVersions exposed at /apis
-	req, err = http.NewRequest("GET", baseURL.String()+"/apis", nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err = client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	body, err = ioutil.ReadAll(resp.Body)
+	baseURL.Path = "/apis"
+	resp2, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
 	}
 	var apiGroupList api.APIGroupList
-	err = json.Unmarshal(body, &apiGroupList)
+	defer resp2.Body.Close()
+	err = json.NewDecoder(resp2.Body).Decode(&apiGroupList)
 	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
 	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
 
