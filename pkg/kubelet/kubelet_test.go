@@ -46,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -131,8 +132,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t:            t,
 	}
 
-	kubelet.prober = prober.FakeProber{}
 	kubelet.probeManager = prober.FakeManager{}
+	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.volumeManager = newVolumeManager()
 	kubelet.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), mockCadvisor, "", "", "")

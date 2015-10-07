@@ -22,7 +22,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// Manager provides a probe results cache.
+// Manager provides a probe results cache and channel of updates.
 type Manager interface {
 	// Get returns the cached result for the container with the given ID.
 	Get(id kubecontainer.ContainerID) (Result, bool)
@@ -30,6 +30,10 @@ type Manager interface {
 	Set(id kubecontainer.ContainerID, result Result)
 	// Remove clears the cached result for the container with the given ID.
 	Remove(id kubecontainer.ContainerID)
+	// Updates creates a channel that receives an Update whenever its result changes (but not
+	// removed). If the channel is full, updates will be dropped.
+	// NOTE: The current implementation only supports a single updates channel.
+	Updates() <-chan Update
 }
 
 // Result is the type for probe results.
@@ -51,12 +55,20 @@ func (r Result) String() string {
 	}
 }
 
+// Update is an enum of the types of updates sent over the Updates channel.
+type Update struct {
+	ContainerID kubecontainer.ContainerID
+	Result      Result
+}
+
 // Manager implementation.
 type manager struct {
 	// guards the cache
 	sync.RWMutex
 	// map of container ID -> probe Result
 	cache map[kubecontainer.ContainerID]Result
+	// channel of updates (may be nil)
+	updates chan Update
 }
 
 var _ Manager = &manager{}
@@ -79,6 +91,7 @@ func (m *manager) Set(id kubecontainer.ContainerID, result Result) {
 	prev, exists := m.cache[id]
 	if !exists || prev != result {
 		m.cache[id] = result
+		m.pushUpdate(Update{id, result})
 	}
 }
 
@@ -86,4 +99,22 @@ func (m *manager) Remove(id kubecontainer.ContainerID) {
 	m.Lock()
 	defer m.Unlock()
 	delete(m.cache, id)
+}
+
+func (m *manager) Updates() <-chan Update {
+	if m.updates == nil {
+		m.updates = make(chan Update)
+	}
+	return m.updates
+}
+
+// pushUpdates sends (non-blocking) an update on the updates channel if it is initialized.
+func (m *manager) pushUpdate(update Update) {
+	if m.updates != nil {
+		select {
+		case m.updates <- update:
+		default:
+			// Don't block
+		}
+	}
 }
