@@ -29,7 +29,7 @@ mesosmaster1:
 mesosslave:
   hostname: mesosslave
   privileged: true
-  image: mesosphere/mesos-slave-dind:0.23.0-1.0.ubuntu1404.docker181
+  image: surbaniak/mesos-slave-dind:0.23.0-1.0.ubuntu1404.docker181
   entrypoint:
   - bash
   - -xc
