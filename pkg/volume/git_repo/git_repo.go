@@ -122,6 +122,10 @@ func (b *gitRepoVolumeBuilder) IsReadOnly() bool {
 	return false
 }
 
+func (b *gitRepoVolumeBuilder) SupportsSELinux() bool {
+	return true
+}
+
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
 	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},

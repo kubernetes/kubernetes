@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
@@ -16,19 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package empty_dir
-
-import (
-	"github.com/docker/libcontainer/selinux"
-)
+package selinux
 
 type realChconRunner struct{}
 
 func (_ *realChconRunner) SetContext(dir, context string) error {
-	// If SELinux is not enabled, return an empty string
-	if !selinux.SelinuxEnabled() {
-		return nil
-	}
-
-	return selinux.Setfilecon(dir, context)
+	// NOP
+	return nil
 }

@@ -606,12 +606,28 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // can be understood by docker.
 // Each element in the string is in the form of:
 // '<HostPath>:<ContainerPath>', or
-// '<HostPath>:<ContainerPath>:ro', if the path is read only.
-func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
+// '<HostPath>:<ContainerPath>:ro', if the path is read only, or
+// '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
+// relabeling and the pod provides an SELinux label
+func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		if m.ReadOnly {
 			bind += ":ro"
+		}
+		// Only request relabeling if the pod provides an
+		// SELinux context. If the pod does not provide an
+		// SELinux context relabeling will label the volume
+		// with the container's randomly allocated MCS label.
+		// This would restrict access to the volume to the
+		// container which mounts it first.
+		if m.SELinuxRelabel && podHasSELinuxLabel {
+			if m.ReadOnly {
+				bind += ",Z"
+			} else {
+				bind += ":Z"
+			}
+
 		}
 		result = append(result, bind)
 	}
@@ -766,7 +782,8 @@ func (dm *DockerManager) runContainer(
 		dm.recorder.Eventf(ref, "Created", "Created with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 	}
 
-	binds := makeMountBindings(opts.Mounts)
+	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
+	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
 
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
