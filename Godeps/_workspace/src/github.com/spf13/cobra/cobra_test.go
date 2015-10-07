@@ -19,7 +19,7 @@ var _ = os.Stderr
 var tp, te, tt, t1, tr []string
 var rootPersPre, echoPre, echoPersPre, timesPersPre []string
 var flagb1, flagb2, flagb3, flagbr, flagbp bool
-var flags1, flags2a, flags2b, flags3 string
+var flags1, flags2a, flags2b, flags3, outs string
 var flagi1, flagi2, flagi3, flagir int
 var globalFlag1 bool
 var flagEcho, rootcalled bool
@@ -27,6 +27,16 @@ var versionUsed int
 
 const strtwoParentHelp = "help message for parent flag strtwo"
 const strtwoChildHelp = "help message for child flag strtwo"
+
+var cmdHidden = &Command{
+	Use:   "hide [secret string to print]",
+	Short: "Print anything to screen (if command is known)",
+	Long:  `an absolutely utterly useless command for testing.`,
+	Run: func(cmd *Command, args []string) {
+		outs = "hidden"
+	},
+	Hidden: true,
+}
 
 var cmdPrint = &Command{
 	Use:   "print [string to print]",
@@ -72,9 +82,10 @@ var cmdDeprecated = &Command{
 }
 
 var cmdTimes = &Command{
-	Use:   "times [# times] [string to echo]",
-	Short: "Echo anything to the screen more times",
-	Long:  `a slightly useless command for testing.`,
+	Use:        "times [# times] [string to echo]",
+	SuggestFor: []string{"counts"},
+	Short:      "Echo anything to the screen more times",
+	Long:       `a slightly useless command for testing.`,
 	PersistentPreRun: func(cmd *Command, args []string) {
 		timesPersPre = args
 	},
@@ -255,16 +266,24 @@ func logErr(t *testing.T, found, expected string) {
 	t.Errorf(out.String())
 }
 
+func checkStringContains(t *testing.T, found, expected string) {
+	if !strings.Contains(found, expected) {
+		logErr(t, found, expected)
+	}
+}
+
 func checkResultContains(t *testing.T, x resulter, check string) {
-	if !strings.Contains(x.Output, check) {
-		logErr(t, x.Output, check)
+	checkStringContains(t, x.Output, check)
+}
+
+func checkStringOmits(t *testing.T, found, expected string) {
+	if strings.Contains(found, expected) {
+		logErr(t, found, expected)
 	}
 }
 
 func checkResultOmits(t *testing.T, x resulter, check string) {
-	if strings.Contains(x.Output, check) {
-		logErr(t, x.Output, check)
-	}
+	checkStringOmits(t, x.Output, check)
 }
 
 func checkOutputContains(t *testing.T, c *Command, check string) {
@@ -398,8 +417,11 @@ func TestGrandChildSameName(t *testing.T) {
 }
 
 func TestFlagLong(t *testing.T) {
-	noRRSetupTest("echo --intone=13 something here")
+	noRRSetupTest("echo --intone=13 something -- here")
 
+	if cmdEcho.ArgsLenAtDash() != 1 {
+		t.Errorf("expected argsLenAtDash: %d but got %d", 1, cmdRootNoRun.ArgsLenAtDash())
+	}
 	if strings.Join(te, " ") != "something here" {
 		t.Errorf("flags didn't leave proper args remaining..%s given", te)
 	}
@@ -412,8 +434,11 @@ func TestFlagLong(t *testing.T) {
 }
 
 func TestFlagShort(t *testing.T) {
-	noRRSetupTest("echo -i13 something here")
+	noRRSetupTest("echo -i13 -- something here")
 
+	if cmdEcho.ArgsLenAtDash() != 0 {
+		t.Errorf("expected argsLenAtDash: %d but got %d", 0, cmdRootNoRun.ArgsLenAtDash())
+	}
 	if strings.Join(te, " ") != "something here" {
 		t.Errorf("flags didn't leave proper args remaining..%s given", te)
 	}
@@ -614,10 +639,10 @@ func TestNonRunChildHelp(t *testing.T) {
 }
 
 func TestRunnableRootCommand(t *testing.T) {
-	fullSetupTest("")
+	x := fullSetupTest("")
 
 	if rootcalled != true {
-		t.Errorf("Root Function was not called")
+		t.Errorf("Root Function was not called\n out:%v", x.Error)
 	}
 }
 
@@ -632,7 +657,10 @@ func TestRunnableRootCommandNilInput(t *testing.T) {
 	c.AddCommand(cmdPrint, cmdEcho)
 	c.SetArgs(empty_arg)
 
-	c.Execute()
+	err := c.Execute()
+	if err != nil {
+		t.Errorf("Execute() failed with %v", err)
+	}
 
 	if rootcalled != true {
 		t.Errorf("Root Function was not called")
@@ -778,6 +806,45 @@ func TestRootUnknownCommand(t *testing.T) {
 	r = noRRSetupTest("--strtwo=a bogus")
 	if r.Output != s {
 		t.Errorf("Unexpected response.\nExpecting to be:\n %q\nGot:\n %q\n", s, r.Output)
+	}
+}
+
+func TestRootSuggestions(t *testing.T) {
+	outputWithSuggestions := "Error: unknown command \"%s\" for \"cobra-test\"\n\nDid you mean this?\n\t%s\n\nRun 'cobra-test --help' for usage.\n"
+	outputWithoutSuggestions := "Error: unknown command \"%s\" for \"cobra-test\"\nRun 'cobra-test --help' for usage.\n"
+
+	cmd := initializeWithRootCmd()
+	cmd.AddCommand(cmdTimes)
+
+	tests := map[string]string{
+		"time":     "times",
+		"tiems":    "times",
+		"tims":     "times",
+		"timeS":    "times",
+		"rimes":    "times",
+		"ti":       "times",
+		"t":        "times",
+		"timely":   "times",
+		"ri":       "",
+		"timezone": "",
+		"foo":      "",
+		"counts":   "times",
+	}
+
+	for typo, suggestion := range tests {
+		for _, suggestionsDisabled := range []bool{false, true} {
+			cmd.DisableSuggestions = suggestionsDisabled
+			result := simpleTester(cmd, typo)
+			expected := ""
+			if len(suggestion) == 0 || suggestionsDisabled {
+				expected = fmt.Sprintf(outputWithoutSuggestions, typo)
+			} else {
+				expected = fmt.Sprintf(outputWithSuggestions, typo, suggestion)
+			}
+			if result.Output != expected {
+				t.Errorf("Unexpected response.\nExpecting to be:\n %q\nGot:\n %q\n", expected, result.Output)
+			}
+		}
 	}
 }
 
@@ -976,15 +1043,15 @@ func TestFlagOnPflagCommandLine(t *testing.T) {
 func TestAddTemplateFunctions(t *testing.T) {
 	AddTemplateFunc("t", func() bool { return true })
 	AddTemplateFuncs(template.FuncMap{
-		"f": func() bool { return false }, 
-		"h": func() string { return "Hello," }, 
+		"f": func() bool { return false },
+		"h": func() string { return "Hello," },
 		"w": func() string { return "world." }})
 
 	const usage = "Hello, world."
-	
+
 	c := &Command{}
 	c.SetUsageTemplate(`{{if t}}{{h}}{{end}}{{if f}}{{h}}{{end}} {{w}}`)
-	
+
 	if us := c.UsageString(); us != usage {
 		t.Errorf("c.UsageString() != \"%s\", is \"%s\"", usage, us)
 	}
