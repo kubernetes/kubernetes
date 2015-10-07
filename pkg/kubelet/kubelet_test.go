@@ -586,7 +586,7 @@ func TestGetContainerInfo(t *testing.T) {
 			Containers: []*kubecontainer.Container{
 				{
 					Name: "foo",
-					ID:   types.UID(containerID),
+					ID:   kubecontainer.ContainerID{"test", containerID},
 				},
 			},
 		},
@@ -668,7 +668,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 			Namespace: "ns",
 			Containers: []*kubecontainer.Container{
 				{Name: "foo",
-					ID: types.UID(containerID),
+					ID: kubecontainer.ContainerID{"test", containerID},
 				},
 			},
 		},
@@ -752,7 +752,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 			Namespace: "ns",
 			Containers: []*kubecontainer.Container{
 				{Name: "bar",
-					ID: types.UID("fakeID"),
+					ID: kubecontainer.ContainerID{"test", "fakeID"},
 				},
 			}},
 	}
@@ -772,7 +772,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 
 type fakeContainerCommandRunner struct {
 	Cmd    []string
-	ID     string
+	ID     kubecontainer.ContainerID
 	PodID  types.UID
 	E      error
 	Stdin  io.Reader
@@ -783,13 +783,13 @@ type fakeContainerCommandRunner struct {
 	Stream io.ReadWriteCloser
 }
 
-func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]byte, error) {
+func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string) ([]byte, error) {
 	f.Cmd = cmd
 	f.ID = id
 	return []byte{}, f.E
 }
 
-func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	f.Cmd = cmd
 	f.ID = id
 	f.Stdin = in
@@ -835,7 +835,7 @@ func TestRunInContainer(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
-	containerID := "abc1234"
+	containerID := kubecontainer.ContainerID{"test", "abc1234"}
 	fakeRuntime.PodList = []*kubecontainer.Pod{
 		{
 			ID:        "12345678",
@@ -843,7 +843,7 @@ func TestRunInContainer(t *testing.T) {
 			Namespace: "nsFoo",
 			Containers: []*kubecontainer.Container{
 				{Name: "containerFoo",
-					ID: types.UID(containerID),
+					ID: containerID,
 				},
 			},
 		},
@@ -1865,7 +1865,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 	if err == nil {
 		t.Fatal("unexpected non-error")
 	}
-	if fakeCommandRunner.ID != "" {
+	if !fakeCommandRunner.ID.IsEmpty() {
 		t.Fatal("unexpected invocation of runner.ExecInContainer")
 	}
 }
@@ -1887,7 +1887,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 			Namespace: podNamespace,
 			Containers: []*kubecontainer.Container{
 				{Name: "bar",
-					ID: "barID"},
+					ID: kubecontainer.ContainerID{"test", "barID"}},
 			},
 		},
 	}
@@ -1909,7 +1909,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	if err == nil {
 		t.Fatal("unexpected non-error")
 	}
-	if fakeCommandRunner.ID != "" {
+	if !fakeCommandRunner.ID.IsEmpty() {
 		t.Fatal("unexpected invocation of runner.ExecInContainer")
 	}
 }
@@ -1950,7 +1950,7 @@ func TestExecInContainer(t *testing.T) {
 			Namespace: podNamespace,
 			Containers: []*kubecontainer.Container{
 				{Name: containerID,
-					ID: types.UID(containerID),
+					ID: kubecontainer.ContainerID{"test", containerID},
 				},
 			},
 		},
@@ -1973,7 +1973,7 @@ func TestExecInContainer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	if e, a := containerID, fakeCommandRunner.ID; e != a {
+	if e, a := containerID, fakeCommandRunner.ID.ID; e != a {
 		t.Fatalf("container name: expected %q, got %q", e, a)
 	}
 	if e, a := command, fakeCommandRunner.Cmd; !reflect.DeepEqual(e, a) {
@@ -2014,7 +2014,7 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 	if err == nil {
 		t.Fatal("unexpected non-error")
 	}
-	if fakeCommandRunner.ID != "" {
+	if !fakeCommandRunner.ID.IsEmpty() {
 		t.Fatal("unexpected invocation of runner.PortForward")
 	}
 }
@@ -2035,7 +2035,7 @@ func TestPortForward(t *testing.T) {
 			Containers: []*kubecontainer.Container{
 				{
 					Name: "foo",
-					ID:   "containerFoo",
+					ID:   kubecontainer.ContainerID{"test", "containerFoo"},
 				},
 			},
 		},
@@ -2847,7 +2847,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 			Containers: []*kubecontainer.Container{
 				{
 					Name: "foo",
-					ID:   types.UID(containerID),
+					ID:   kubecontainer.ContainerID{"test", containerID},
 				},
 			},
 		},

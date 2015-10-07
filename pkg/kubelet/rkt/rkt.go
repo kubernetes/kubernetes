@@ -513,7 +513,7 @@ func apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		p.Containers = append(p.Containers, &kubecontainer.Container{
-			ID:      types.UID(buildContainerID(&containerID{uuid, c.Name})),
+			ID:      buildContainerID(&containerID{uuid, c.Name}),
 			Name:    c.Name,
 			Image:   c.Image,
 			Hash:    kubecontainer.HashContainer(c),
@@ -646,7 +646,7 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, failure error) {
 	// Set up container references.
 	for _, c := range runtimePod.Containers {
-		containerID := string(c.ID)
+		containerID := c.ID
 		id, err := parseContainerID(containerID)
 		if err != nil {
 			glog.Warningf("Invalid container ID %q", containerID)
@@ -697,7 +697,7 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 			r.recorder.Eventf(ref, "Failed", "Failed to create rkt container with error: %v", prepareErr)
 			continue
 		}
-		containerID := string(runtimePod.Containers[i].ID)
+		containerID := runtimePod.Containers[i].ID
 		r.containerRefManager.SetRef(containerID, ref)
 	}
 
@@ -802,8 +802,7 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	serviceName := makePodServiceFileName(runningPod.ID)
 	r.generateEvents(&runningPod, "Killing", nil)
 	for _, c := range runningPod.Containers {
-		id := string(c.ID)
-		r.containerRefManager.ClearRef(id)
+		r.containerRefManager.ClearRef(c.ID)
 	}
 
 	// Since all service file have 'KillMode=mixed', the processes in
@@ -989,7 +988,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 	podFullName := kubeletUtil.FormatPodName(pod)
 
 	// Add references to all containers.
-	unidentifiedContainers := make(map[types.UID]*kubecontainer.Container)
+	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.Container)
 	for _, c := range runningPod.Containers {
 		unidentifiedContainers[c.ID] = c
 	}
@@ -1020,7 +1019,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 			break
 		}
 
-		result, err := r.prober.ProbeLiveness(pod, podStatus, container, string(c.ID), c.Created)
+		result, err := r.prober.ProbeLiveness(pod, podStatus, container, c.ID, c.Created)
 		// TODO(vmarmol): examine this logic.
 		if err == nil && result != probe.Success {
 			glog.Infof("Pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
@@ -1062,7 +1061,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 // See https://github.com/coreos/rkt/blob/master/Documentation/commands.md#logging for more details.
 //
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
+func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
 	id, err := parseContainerID(containerID)
 	if err != nil {
 		return err
@@ -1098,7 +1097,7 @@ func (r *Runtime) GarbageCollect() error {
 // Note: In rkt, the container ID is in the form of "UUID:appName", where
 // appName is the container name.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+func (r *Runtime) RunInContainer(containerID kubecontainer.ContainerID, cmd []string) ([]byte, error) {
 	glog.V(4).Infof("Rkt running in container.")
 
 	id, err := parseContainerID(containerID)
@@ -1112,14 +1111,14 @@ func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, erro
 	return []byte(strings.Join(result, "\n")), err
 }
 
-func (r *Runtime) AttachContainer(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	return fmt.Errorf("unimplemented")
 }
 
 // Note: In rkt, the container ID is in the form of "UUID:appName", where UUID is
 // the rkt UUID, and appName is the container name.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	glog.V(4).Infof("Rkt execing in container.")
 
 	id, err := parseContainerID(containerID)

@@ -183,7 +183,7 @@ func TestProbeContainer(t *testing.T) {
 		refManager: kubecontainer.NewRefManager(),
 		recorder:   &record.FakeRecorder{},
 	}
-	containerID := "foobar"
+	containerID := kubecontainer.ContainerID{"test", "foobar"}
 	createdAt := time.Now().Unix()
 
 	tests := []struct {

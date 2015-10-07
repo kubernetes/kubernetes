@@ -24,7 +24,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -47,7 +46,7 @@ type worker struct {
 	spec *api.Probe
 
 	// The last known container ID for this worker.
-	containerID types.UID
+	containerID kubecontainer.ContainerID
 }
 
 // Creates and starts a new probe worker.
@@ -75,8 +74,8 @@ func run(m *manager, w *worker) {
 	defer func() {
 		// Clean up.
 		probeTicker.Stop()
-		if w.containerID != "" {
-			m.readinessCache.removeReadiness(string(w.containerID))
+		if !w.containerID.IsEmpty() {
+			m.readinessCache.removeReadiness(w.containerID)
 		}
 
 		m.removeReadinessProbe(w.pod.UID, w.container.Name)
@@ -121,17 +120,17 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 		return true // Wait for more information.
 	}
 
-	if w.containerID != types.UID(c.ContainerID) {
-		if w.containerID != "" {
-			m.readinessCache.removeReadiness(string(w.containerID))
+	if w.containerID.String() != c.ContainerID {
+		if !w.containerID.IsEmpty() {
+			m.readinessCache.removeReadiness(w.containerID)
 		}
-		w.containerID = types.UID(kubecontainer.TrimRuntimePrefix(c.ContainerID))
+		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 	}
 
 	if c.State.Running == nil {
 		glog.V(3).Infof("Non-running container probed: %v - %v",
 			kubeutil.FormatPodName(w.pod), w.container.Name)
-		m.readinessCache.setReadiness(string(w.containerID), false)
+		m.readinessCache.setReadiness(w.containerID, false)
 		// Abort if the container will not be restarted.
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != api.RestartPolicyNever
@@ -139,14 +138,14 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 
 	if int64(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
 		// Readiness defaults to false during the initial delay.
-		m.readinessCache.setReadiness(string(w.containerID), false)
+		m.readinessCache.setReadiness(w.containerID, false)
 		return true
 	}
 
 	// TODO: Move error handling out of prober.
-	result, _ := m.prober.ProbeReadiness(w.pod, status, w.container, string(w.containerID))
+	result, _ := m.prober.ProbeReadiness(w.pod, status, w.container, w.containerID)
 	if result != probe.Unknown {
-		m.readinessCache.setReadiness(string(w.containerID), result != probe.Failure)
+		m.readinessCache.setReadiness(w.containerID, result != probe.Failure)
 	}
 
 	return true

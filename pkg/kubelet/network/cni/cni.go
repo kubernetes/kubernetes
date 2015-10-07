@@ -18,15 +18,17 @@ package cni
 
 import (
 	"fmt"
-	"github.com/appc/cni/libcni"
-	cniTypes "github.com/appc/cni/pkg/types"
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"net"
 	"sort"
 	"strings"
+
+	"github.com/appc/cni/libcni"
+	cniTypes "github.com/appc/cni/pkg/types"
+	"github.com/golang/glog"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -105,12 +107,12 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubel
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	netns, err := runtime.GetNetNs(string(id))
+	netns, err := runtime.GetNetNs(id.ContainerID())
 	if err != nil {
 		return err
 	}
 
-	_, err = plugin.defaultNetwork.addToNetwork(name, namespace, string(id), netns)
+	_, err = plugin.defaultNetwork.addToNetwork(name, namespace, id.ContainerID(), netns)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
 		return err
@@ -124,12 +126,12 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	netns, err := runtime.GetNetNs(string(id))
+	netns, err := runtime.GetNetNs(id.ContainerID())
 	if err != nil {
 		return err
 	}
 
-	return plugin.defaultNetwork.deleteFromNetwork(name, namespace, string(id), netns)
+	return plugin.defaultNetwork.deleteFromNetwork(name, namespace, id.ContainerID(), netns)
 }
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
@@ -150,7 +152,7 @@ func (plugin *cniNetworkPlugin) Status(namespace string, name string, id kubelet
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
-func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID string, podNetnsPath string) (*cniTypes.Result, error) {
+func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cniTypes.Result, error) {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)
@@ -168,7 +170,7 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 	return res, nil
 }
 
-func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID string, podNetnsPath string) error {
+func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error deleting network: %v", err)
@@ -185,18 +187,18 @@ func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string
 	return nil
 }
 
-func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID string, podNetnsPath string) (*libcni.RuntimeConf, error) {
+func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
 	glog.V(4).Infof("Got netns path %v", podNetnsPath)
 	glog.V(4).Infof("Using netns path %v", podNs)
 
 	rt := &libcni.RuntimeConf{
-		ContainerID: podInfraContainerID,
+		ContainerID: podInfraContainerID.ID,
 		NetNS:       podNetnsPath,
 		IfName:      DefaultInterfaceName,
 		Args: [][2]string{
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
-			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID},
+			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},
 		},
 	}
 

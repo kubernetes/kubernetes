@@ -46,8 +46,7 @@ func NewHandlerRunner(httpGetter kubeletTypes.HttpGetter, commandRunner kubecont
 	}
 }
 
-// TODO(yifan): Use a strong type for containerID.
-func (hr *HandlerRunner) Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error {
+func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error {
 	switch {
 	case handler.Exec != nil:
 		_, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command)

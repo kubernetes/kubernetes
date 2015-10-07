@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -151,35 +152,35 @@ func TestUpdatePodStatus(t *testing.T) {
 	const podUID = "pod_uid"
 	unprobed := api.ContainerStatus{
 		Name:        "unprobed_container",
-		ContainerID: "unprobed_container_id",
+		ContainerID: "test://unprobed_container_id",
 		State: api.ContainerState{
 			Running: &api.ContainerStateRunning{},
 		},
 	}
 	probedReady := api.ContainerStatus{
 		Name:        "probed_container_ready",
-		ContainerID: "probed_container_ready_id",
+		ContainerID: "test://probed_container_ready_id",
 		State: api.ContainerState{
 			Running: &api.ContainerStateRunning{},
 		},
 	}
 	probedPending := api.ContainerStatus{
 		Name:        "probed_container_pending",
-		ContainerID: "probed_container_pending_id",
+		ContainerID: "test://probed_container_pending_id",
 		State: api.ContainerState{
 			Running: &api.ContainerStateRunning{},
 		},
 	}
 	probedUnready := api.ContainerStatus{
 		Name:        "probed_container_unready",
-		ContainerID: "probed_container_unready_id",
+		ContainerID: "test://probed_container_unready_id",
 		State: api.ContainerState{
 			Running: &api.ContainerStateRunning{},
 		},
 	}
 	terminated := api.ContainerStatus{
 		Name:        "terminated_container",
-		ContainerID: "terminated_container_id",
+		ContainerID: "test://terminated_container_id",
 		State: api.ContainerState{
 			Terminated: &api.ContainerStateTerminated{},
 		},
@@ -199,9 +200,10 @@ func TestUpdatePodStatus(t *testing.T) {
 		containerPath{podUID, probedUnready.Name}: {},
 		containerPath{podUID, terminated.Name}:    {},
 	}
-	m.readinessCache.setReadiness(probedReady.ContainerID, true)
-	m.readinessCache.setReadiness(probedUnready.ContainerID, false)
-	m.readinessCache.setReadiness(terminated.ContainerID, true)
+
+	m.readinessCache.setReadiness(kubecontainer.ParseContainerID(probedReady.ContainerID), true)
+	m.readinessCache.setReadiness(kubecontainer.ParseContainerID(probedUnready.ContainerID), false)
+	m.readinessCache.setReadiness(kubecontainer.ParseContainerID(terminated.ContainerID), true)
 
 	m.UpdatePodStatus(podUID, &podStatus)
 

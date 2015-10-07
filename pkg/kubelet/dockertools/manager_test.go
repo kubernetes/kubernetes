@@ -346,7 +346,7 @@ func apiContainerToContainer(c docker.APIContainers) kubecontainer.Container {
 		return kubecontainer.Container{}
 	}
 	return kubecontainer.Container{
-		ID:   types.UID(c.ID),
+		ID:   kubecontainer.ContainerID{"docker", c.ID},
 		Name: dockerName.ContainerName,
 		Hash: hash,
 	}
@@ -360,7 +360,7 @@ func dockerContainersToPod(containers DockerContainers) kubecontainer.Pod {
 			continue
 		}
 		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:    types.UID(c.ID),
+			ID:    kubecontainer.ContainerID{"docker", c.ID},
 			Name:  dockerName.ContainerName,
 			Hash:  hash,
 			Image: c.Image,
@@ -399,7 +399,7 @@ func TestKillContainerInPod(t *testing.T) {
 	containerToSpare := &containers[1]
 	fakeDocker.ContainerList = containers
 
-	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err != nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -464,7 +464,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 		},
 	}
 
-	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err != nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -501,7 +501,7 @@ func TestKillContainerInPodWithError(t *testing.T) {
 	fakeDocker.ContainerList = containers
 	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
 
-	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err == nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod); err == nil {
 		t.Errorf("expected error, found nil")
 	}
 }

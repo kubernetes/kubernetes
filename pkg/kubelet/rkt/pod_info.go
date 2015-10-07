@@ -143,7 +143,7 @@ func makeContainerStatus(container *kubecontainer.Container, podInfo *podInfo) a
 	var status api.ContainerStatus
 	status.Name = container.Name
 	status.Image = container.Image
-	status.ContainerID = string(container.ID)
+	status.ContainerID = container.ID.String()
 	// TODO(yifan): Add image ID info.
 
 	switch podInfo.state {
