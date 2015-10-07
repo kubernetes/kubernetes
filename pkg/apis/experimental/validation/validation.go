@@ -501,3 +501,40 @@ func validateIngressBackend(backend *experimental.IngressBackend) errs.Validatio
 	}
 	return allErrs
 }
+
+func validateClusterAutoscalerSpec(spec experimental.ClusterAutoscalerSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if spec.MinNodes < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minNodes", spec.MinNodes, `must be non-negative`))
+	}
+	if spec.MaxNodes < spec.MinNodes {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maxNodes", spec.MaxNodes, `must be bigger or equal to minNodes`))
+	}
+	if len(spec.TargetUtilization) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("targetUtilization"))
+	}
+	for _, target := range spec.TargetUtilization {
+		if len(target.Resource) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired("targetUtilization.resource"))
+		}
+		if target.Value <= 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("targetUtilization.value", target.Value, "must be greater than 0"))
+		}
+		if target.Value > 1 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("targetUtilization.value", target.Value, "must be less or equal 1"))
+		}
+	}
+	return allErrs
+}
+
+func ValidateClusterAutoscaler(autoscaler *experimental.ClusterAutoscaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if autoscaler.Name != "ClusterAutoscaler" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", autoscaler.Name, `name must be ClusterAutoscaler`))
+	}
+	if autoscaler.Namespace != api.NamespaceDefault {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", autoscaler.Namespace, `namespace must be default`))
+	}
+	allErrs = append(allErrs, validateClusterAutoscalerSpec(autoscaler.Spec)...)
+	return allErrs
+}

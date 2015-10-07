@@ -37,6 +37,35 @@ func (APIVersion) SwaggerDoc() map[string]string {
 	return map_APIVersion
 }
 
+var map_ClusterAutoscaler = map[string]string{
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata For now (experimental api) it is required that the name is set to \"ClusterAutoscaler\" and namespace is \"default\".",
+	"spec":     "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (ClusterAutoscaler) SwaggerDoc() map[string]string {
+	return map_ClusterAutoscaler
+}
+
+var map_ClusterAutoscalerList = map[string]string{
+	"":         "There will be just one (or none) ClusterAutoscaler.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+}
+
+func (ClusterAutoscalerList) SwaggerDoc() map[string]string {
+	return map_ClusterAutoscalerList
+}
+
+var map_ClusterAutoscalerSpec = map[string]string{
+	"":         "Configuration of the Cluster Autoscaler",
+	"minNodes": "Minimum number of nodes that the cluster should have.",
+	"maxNodes": "Maximum number of nodes that the cluster should have.",
+	"target":   "Target average utilization of the cluster nodes. New nodes will be added if one of the targets is exceeded. Cluster size will be decreased if the current utilization is too low for all targets.",
+}
+
+func (ClusterAutoscalerSpec) SwaggerDoc() map[string]string {
+	return map_ClusterAutoscalerSpec
+}
+
 var map_DaemonSet = map[string]string{
 	"":         "DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -324,6 +353,14 @@ var map_JobStatus = map[string]string{
 
 func (JobStatus) SwaggerDoc() map[string]string {
 	return map_JobStatus
+}
+
+var map_NodeUtilization = map[string]string{
+	"": "NodeUtilization describes what percentage of a particular resource is used on a node.",
+}
+
+func (NodeUtilization) SwaggerDoc() map[string]string {
+	return map_NodeUtilization
 }
 
 var map_ReplicationControllerDummy = map[string]string{
