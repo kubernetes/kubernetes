@@ -67,3 +67,13 @@ www/test_out
 # precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
 _tmp/
 doc_tmp/
+
+# Test artifacts produced by Jenkins jobs
+/_artifacts/
+
+# Go dependencies installed on Jenkins
+/_gopath/
+
+# Config directories created by gcloud and gsutil on Jenkins
+/.config/gcloud/
+/.gsutil/
