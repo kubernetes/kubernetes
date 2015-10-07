@@ -114,7 +114,7 @@ var _ = Describe("Port forwarding", func() {
 	framework := NewFramework("port-forwarding")
 
 	Describe("With a server that expects a client request", func() {
-		It("should support a client that connects, sends no data, and disconnects", func() {
+		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "1", "1", "1")
 			framework.Client.Pods(framework.Namespace.Name).Create(pod)
@@ -138,7 +138,7 @@ var _ = Describe("Port forwarding", func() {
 			verifyLogMessage(logOutput, "Expected to read 3 bytes from client, but got 0 instead")
 		})
 
-		It("should support a client that connects, sends data, and disconnects", func() {
+		It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "10", "10", "100")
 			framework.Client.Pods(framework.Namespace.Name).Create(pod)
@@ -185,7 +185,7 @@ var _ = Describe("Port forwarding", func() {
 		})
 	})
 	Describe("With a server that expects no client request", func() {
-		It("should support a client that connects, sends no data, and disconnects", func() {
+		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("", "10", "10", "100")
 			framework.Client.Pods(framework.Namespace.Name).Create(pod)
