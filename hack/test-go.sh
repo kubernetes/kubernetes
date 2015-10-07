@@ -74,7 +74,8 @@ kube::test::usage() {
 usage: $0 [OPTIONS] [TARGETS]
 
 OPTIONS:
-  -i <number>   : number of times to run each test, must be >= 1
+  -p <number>   : number of parallel workers, must be >= 1
+  -i <number>   : number of times to run each test per worker, must be >= 1
 EOF
 }
 
@@ -83,11 +84,20 @@ isnum() {
 }
 
 iterations=1
-while getopts "hi:" opt ; do
+parallel=1
+while getopts "hp:i:" opt ; do
   case $opt in
     h)
       kube::test::usage
       exit 0
+      ;;
+    p)
+      parallel="$OPTARG"
+      if ! isnum "${parallel}" || [[ "${parallel}" -le 0 ]]; then
+        kube::log::usage "'$0': argument to -p must be numeric and greater than 0"
+        kube::test::usage
+        exit 1
+      fi
       ;;
     i)
       iterations="$OPTARG"
@@ -171,39 +181,48 @@ produceJUnitXMLReport() {
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
+runTestIterations() {
+  local worker=$1
+  shift
+  kube::log::status "Worker ${worker}: Running ${iterations} times"
+  for arg; do
+    trap 'exit 1' SIGINT
+    local pkg=${KUBE_GO_PACKAGE}/${arg}
+    kube::log::status "${pkg}"
+    # keep going, even if there are failures
+    local pass=0
+    local count=0
+    for i in $(seq 1 ${iterations}); do
+      if go test "${goflags[@]:+${goflags[@]}}" \
+          ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}" \
+          "${testargs[@]:+${testargs[@]}}"; then
+        pass=$((pass + 1))
+      else
+        ITERATION_FAILURES=$((ITERATION_FAILURES + 1))
+      fi
+      count=$((count + 1))
+    done 2>&1
+    kube::log::status "Worker ${worker}: ${pass} / ${count} passed"
+  done
+  return 0
+}
+
 runTests() {
   # TODO: this should probably be refactored to avoid code duplication with the
   # coverage version.
   if [[ $iterations -gt 1 ]]; then
+    ITERATION_FAILURES=0 # purposely non-local
     if [[ $# -eq 0 ]]; then
       set -- $(kube::test::find_dirs)
     fi
-    kube::log::status "Running ${iterations} times"
-    fails=0
-    for arg; do
-      trap 'exit 1' SIGINT
-      pkg=${KUBE_GO_PACKAGE}/${arg}
-      kube::log::status "${pkg}"
-      # keep going, even if there are failures
-      pass=0
-      count=0
-      for i in $(seq 1 ${iterations}); do
-        if go test "${goflags[@]:+${goflags[@]}}" \
-            ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}" \
-            "${testargs[@]:+${testargs[@]}}"; then
-          pass=$((pass + 1))
-        else
-          fails=$((fails + 1))
-        fi
-        count=$((count + 1))
-      done 2>&1
-      kube::log::status "${pass} / ${count} passed"
+    for p in $(seq 1 ${parallel}); do
+      runTestIterations ${p} "$@" &
     done
-    if [[ ${fails} -gt 0 ]]; then
+    wait
+    if [[ ${ITERATION_FAILURES} -gt 0 ]]; then
       return 1
-    else
-      return 0
     fi
+    return 0
   fi
 
   local junit_filename_prefix
