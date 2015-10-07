@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -148,8 +149,8 @@ type KubeletBootstrap interface {
 	StartGarbageCollection()
 	ListenAndServe(net.IP, uint, *kubelet.TLSOptions, bool)
 	ListenAndServeReadOnly(net.IP, uint)
-	Run(<-chan kubelet.PodUpdate)
-	RunOnce(<-chan kubelet.PodUpdate) ([]kubelet.RunPodResult, error)
+	Run(<-chan kubeletTypes.PodUpdate)
+	RunOnce(<-chan kubeletTypes.PodUpdate) ([]kubelet.RunPodResult, error)
 }
 
 // create and initialize a Kubelet instance
@@ -173,9 +174,9 @@ func NewKubeletServer() *KubeletServer {
 		FileCheckFrequency:          20 * time.Second,
 		HealthzBindAddress:          net.ParseIP("127.0.0.1"),
 		HealthzPort:                 10248,
-		HostNetworkSources:          kubelet.AllSource,
-		HostPIDSources:              kubelet.AllSource,
-		HostIPCSources:              kubelet.AllSource,
+		HostNetworkSources:          kubeletTypes.AllSource,
+		HostPIDSources:              kubeletTypes.AllSource,
+		HostIPCSources:              kubeletTypes.AllSource,
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
@@ -283,17 +284,17 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 // KubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes.
 func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
-	hostNetworkSources, err := kubelet.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
+	hostNetworkSources, err := kubeletTypes.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
 	if err != nil {
 		return nil, err
 	}
 
-	hostPIDSources, err := kubelet.GetValidatedSources(strings.Split(s.HostPIDSources, ","))
+	hostPIDSources, err := kubeletTypes.GetValidatedSources(strings.Split(s.HostPIDSources, ","))
 	if err != nil {
 		return nil, err
 	}
 
-	hostIPCSources, err := kubelet.GetValidatedSources(strings.Split(s.HostIPCSources, ","))
+	hostIPCSources, err := kubeletTypes.GetValidatedSources(strings.Split(s.HostIPCSources, ","))
 	if err != nil {
 		return nil, err
 	}
@@ -763,17 +764,17 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 	// define file config source
 	if kc.ConfigFile != "" {
 		glog.Infof("Adding manifest file: %v", kc.ConfigFile)
-		config.NewSourceFile(kc.ConfigFile, kc.NodeName, kc.FileCheckFrequency, cfg.Channel(kubelet.FileSource))
+		config.NewSourceFile(kc.ConfigFile, kc.NodeName, kc.FileCheckFrequency, cfg.Channel(kubeletTypes.FileSource))
 	}
 
 	// define url config source
 	if kc.ManifestURL != "" {
 		glog.Infof("Adding manifest url %q with HTTP header %v", kc.ManifestURL, kc.ManifestURLHeader)
-		config.NewSourceURL(kc.ManifestURL, kc.ManifestURLHeader, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
+		config.NewSourceURL(kc.ManifestURL, kc.ManifestURLHeader, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubeletTypes.HTTPSource))
 	}
 	if kc.KubeClient != nil {
 		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kc.KubeClient, kc.NodeName, cfg.Channel(kubelet.ApiserverSource))
+		config.NewSourceApiserver(kc.KubeClient, kc.NodeName, cfg.Channel(kubeletTypes.ApiserverSource))
 	}
 	return cfg
 }
