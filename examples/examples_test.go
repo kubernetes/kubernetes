@@ -366,6 +366,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/experimental": {
 			"deployment": &experimental.Deployment{},
 		},
+		"../examples/javaweb-tomcat-sidecar": {
+			"javaweb":   &api.Pod{},
+			"javaweb-2": &api.Pod{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
