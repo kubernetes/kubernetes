@@ -78,16 +78,6 @@ func proxyContext(version string) {
 						Port:       81,
 						TargetPort: util.NewIntOrStringFromInt(162),
 					},
-					{
-						Name:       "tlsportname1",
-						Port:       443,
-						TargetPort: util.NewIntOrStringFromString("tlsdest1"),
-					},
-					{
-						Name:       "tlsportname2",
-						Port:       444,
-						TargetPort: util.NewIntOrStringFromInt(462),
-					},
 				},
 			},
 		})
@@ -103,7 +93,7 @@ func proxyContext(version string) {
 		pods := []*api.Pod{}
 		cfg := RCConfig{
 			Client:       f.Client,
-			Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+			Image:        "gcr.io/google_containers/porter:59ad46ed2c56ba50fa7f1dc176c07c37",
 			Name:         service.Name,
 			Namespace:    f.Namespace.Name,
 			Replicas:     1,
@@ -112,17 +102,10 @@ func proxyContext(version string) {
 				"SERVE_PORT_80":  `<a href="/rewriteme">test</a>`,
 				"SERVE_PORT_160": "foo",
 				"SERVE_PORT_162": "bar",
-
-				"SERVE_TLS_PORT_443": `<a href="/tlsrewriteme">test</a>`,
-				"SERVE_TLS_PORT_460": `tls baz`,
-				"SERVE_TLS_PORT_462": `tls qux`,
 			},
 			Ports: map[string]int{
 				"dest1": 160,
 				"dest2": 162,
-
-				"tlsdest1": 460,
-				"tlsdest2": 462,
 			},
 			Labels:      labels,
 			CreatedPods: &pods,
@@ -133,44 +116,14 @@ func proxyContext(version string) {
 		Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
 
 		// Try proxying through the service and directly to through the pod.
-		svcProxyURL := func(scheme, port string) string {
-			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + util.JoinSchemeNamePort(scheme, service.Name, port)
-		}
-		podProxyURL := func(scheme, port string) string {
-			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + util.JoinSchemeNamePort(scheme, pods[0].Name, port)
-		}
-		subresourcePodProxyURL := func(scheme, port string) string {
-			return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + util.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
-		}
+		svcPrefix := prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + service.Name
+		podPrefix := prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + pods[0].Name
 		expectations := map[string]string{
-			svcProxyURL("", "portname1") + "/": "foo",
-			svcProxyURL("", "portname2") + "/": "bar",
-
-			svcProxyURL("http", "portname1") + "/": "foo",
-			svcProxyURL("http", "portname2") + "/": "bar",
-
-			svcProxyURL("https", "tlsportname1") + "/": "tls baz",
-			svcProxyURL("https", "tlsportname2") + "/": "tls qux",
-
-			podProxyURL("", "80") + "/":  `<a href="` + podProxyURL("", "80") + `/rewriteme">test</a>`,
-			podProxyURL("", "160") + "/": "foo",
-			podProxyURL("", "162") + "/": "bar",
-
-			podProxyURL("http", "80") + "/":  `<a href="` + podProxyURL("http", "80") + `/rewriteme">test</a>`,
-			podProxyURL("http", "160") + "/": "foo",
-			podProxyURL("http", "162") + "/": "bar",
-
-			subresourcePodProxyURL("", "") + "/":        `<a href="` + subresourcePodProxyURL("", "") + `/rewriteme">test</a>`,
-			subresourcePodProxyURL("", "80") + "/":      `<a href="` + subresourcePodProxyURL("", "80") + `/rewriteme">test</a>`,
-			subresourcePodProxyURL("http", "80") + "/":  `<a href="` + subresourcePodProxyURL("http", "80") + `/rewriteme">test</a>`,
-			subresourcePodProxyURL("", "160") + "/":     "foo",
-			subresourcePodProxyURL("http", "160") + "/": "foo",
-			subresourcePodProxyURL("", "162") + "/":     "bar",
-			subresourcePodProxyURL("http", "162") + "/": "bar",
-
-			subresourcePodProxyURL("https", "443") + "/": `<a href="` + subresourcePodProxyURL("https", "443") + `/tlsrewriteme">test</a>`,
-			subresourcePodProxyURL("https", "460") + "/": "tls baz",
-			subresourcePodProxyURL("https", "462") + "/": "tls qux",
+			svcPrefix + ":portname1/": "foo",
+			svcPrefix + ":portname2/": "bar",
+			podPrefix + ":80/":        `<a href="` + podPrefix + `:80/rewriteme">test</a>`,
+			podPrefix + ":160/":       "foo",
+			podPrefix + ":162/":       "bar",
 			// TODO: below entries don't work, but I believe we should make them work.
 			// svcPrefix + ":80": "foo",
 			// svcPrefix + ":81": "bar",
@@ -206,8 +159,7 @@ func proxyContext(version string) {
 						recordError(fmt.Sprintf("%v: path %v took %v > 15s", i, path, d))
 					}
 				}(i, path, val)
-				// default QPS is 5
-				time.Sleep(200 * time.Millisecond)
+				time.Sleep(150 * time.Millisecond)
 			}
 		}
 		wg.Wait()
