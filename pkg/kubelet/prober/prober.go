@@ -41,8 +41,8 @@ const maxProbeRetries = 3
 
 // Prober checks the healthiness of a container.
 type Prober interface {
-	ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
-	ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error)
+	ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, createdAt int64) (probe.Result, error)
+	ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error)
 }
 
 // Prober helps to check the liveness/readiness of a container.
@@ -75,7 +75,7 @@ func New(
 
 // ProbeLiveness probes the liveness of a container.
 // If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, createdAt int64) (probe.Result, error) {
 	var live probe.Result
 	var output string
 	var err error
@@ -114,7 +114,7 @@ func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container ap
 }
 
 // ProbeReadiness probes and sets the readiness of a container.
-func (pb *prober) ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error) {
+func (pb *prober) ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
 	var ready probe.Result
 	var output string
 	var err error
@@ -151,7 +151,7 @@ func (pb *prober) ProbeReadiness(pod *api.Pod, status api.PodStatus, container a
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retries int) (probe.Result, string, error) {
+func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
 	var err error
 	var result probe.Result
 	var output string
@@ -164,7 +164,7 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 	return result, output, err
 }
 
-func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, string, error) {
+func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
@@ -242,7 +242,7 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string, cmd []string) exec.Cmd {
+func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
 		return p.runner.RunInContainer(containerID, cmd)
 	}}

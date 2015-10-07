@@ -18,6 +18,7 @@ package prober
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -29,14 +30,14 @@ type FakeProber struct {
 	Error     error
 }
 
-func (f FakeProber) ProbeLiveness(_ *api.Pod, _ api.PodStatus, c api.Container, _ string, _ int64) (probe.Result, error) {
+func (f FakeProber) ProbeLiveness(_ *api.Pod, _ api.PodStatus, c api.Container, _ kubecontainer.ContainerID, _ int64) (probe.Result, error) {
 	if c.LivenessProbe == nil {
 		return probe.Success, nil
 	}
 	return f.Liveness, f.Error
 }
 
-func (f FakeProber) ProbeReadiness(_ *api.Pod, _ api.PodStatus, c api.Container, _ string) (probe.Result, error) {
+func (f FakeProber) ProbeReadiness(_ *api.Pod, _ api.PodStatus, c api.Container, _ kubecontainer.ContainerID) (probe.Result, error) {
 	if c.ReadinessProbe == nil {
 		return probe.Success, nil
 	}
