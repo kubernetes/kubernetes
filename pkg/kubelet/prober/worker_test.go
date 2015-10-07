@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -56,7 +57,7 @@ func TestDoProbe(t *testing.T) {
 
 		expectContinue    bool
 		expectReadySet    bool
-		expectedReadiness bool
+		expectedReadiness results.Result
 	}{
 		{ // No status.
 			expectContinue: true,
@@ -81,7 +82,7 @@ func TestDoProbe(t *testing.T) {
 			podStatus:         &runningStatus,
 			expectContinue:    true,
 			expectReadySet:    true,
-			expectedReadiness: true,
+			expectedReadiness: results.Success,
 		},
 		{ // Initial delay passed
 			podStatus: &runningStatus,
@@ -90,7 +91,7 @@ func TestDoProbe(t *testing.T) {
 			},
 			expectContinue:    true,
 			expectReadySet:    true,
-			expectedReadiness: true,
+			expectedReadiness: results.Success,
 		},
 	}
 
@@ -102,7 +103,7 @@ func TestDoProbe(t *testing.T) {
 		if c := doProbe(m, w); c != test.expectContinue {
 			t.Errorf("[%d] Expected continue to be %v but got %v", i, test.expectContinue, c)
 		}
-		ready, ok := m.readinessCache.getReadiness(containerID)
+		ready, ok := m.readinessCache.Get(containerID)
 		if ok != test.expectReadySet {
 			t.Errorf("[%d] Expected to have readiness: %v but got %v", i, test.expectReadySet, ok)
 		}
@@ -112,7 +113,7 @@ func TestDoProbe(t *testing.T) {
 
 		// Clean up.
 		m.statusManager.DeletePodStatus(podUID)
-		m.readinessCache.removeReadiness(containerID)
+		m.readinessCache.Remove(containerID)
 	}
 }
 
@@ -127,7 +128,7 @@ func TestInitialDelay(t *testing.T) {
 		t.Errorf("Expected to continue, but did not")
 	}
 
-	ready, ok := m.readinessCache.getReadiness(containerID)
+	ready, ok := m.readinessCache.Get(containerID)
 	if !ok {
 		t.Errorf("Expected readiness to be false, but was not set")
 	} else if ready {
@@ -145,7 +146,7 @@ func TestInitialDelay(t *testing.T) {
 		t.Errorf("Expected to continue, but did not")
 	}
 
-	ready, ok = m.readinessCache.getReadiness(containerID)
+	ready, ok = m.readinessCache.Get(containerID)
 	if !ok {
 		t.Errorf("Expected readiness to be true, but was not set")
 	} else if !ready {
@@ -157,11 +158,11 @@ func TestCleanUp(t *testing.T) {
 	m := newTestManager()
 	pod := getTestPod(api.Probe{})
 	m.statusManager.SetPodStatus(&pod, getRunningStatus())
-	m.readinessCache.setReadiness(containerID, true)
+	m.readinessCache.Set(containerID, results.Success)
 	w := m.newWorker(&pod, pod.Spec.Containers[0])
 	m.readinessProbes[containerPath{podUID, containerName}] = w
 
-	if ready, _ := m.readinessCache.getReadiness(containerID); !ready {
+	if ready, _ := m.readinessCache.Get(containerID); !ready {
 		t.Fatal("Expected readiness to be true.")
 	}
 
@@ -170,7 +171,7 @@ func TestCleanUp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := m.readinessCache.getReadiness(containerID); ok {
+	if _, ok := m.readinessCache.Get(containerID); ok {
 		t.Error("Expected readiness to be cleared.")
 	}
 	if _, ok := m.readinessProbes[containerPath{podUID, containerName}]; ok {
@@ -188,7 +189,7 @@ func TestHandleCrash(t *testing.T) {
 	if !doProbe(m, w) {
 		t.Error("Expected to keep going, but terminated.")
 	}
-	if _, ok := m.readinessCache.getReadiness(containerID); ok {
+	if _, ok := m.readinessCache.Get(containerID); ok {
 		t.Error("Expected readiness to be unchanged from crash.")
 	}
 }

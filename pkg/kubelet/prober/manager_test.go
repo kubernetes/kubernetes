@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -201,9 +202,9 @@ func TestUpdatePodStatus(t *testing.T) {
 		containerPath{podUID, terminated.Name}:    {},
 	}
 
-	m.readinessCache.setReadiness(kubecontainer.ParseContainerID(probedReady.ContainerID), true)
-	m.readinessCache.setReadiness(kubecontainer.ParseContainerID(probedUnready.ContainerID), false)
-	m.readinessCache.setReadiness(kubecontainer.ParseContainerID(terminated.ContainerID), true)
+	m.readinessCache.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success)
+	m.readinessCache.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure)
+	m.readinessCache.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success)
 
 	m.UpdatePodStatus(podUID, &podStatus)
 

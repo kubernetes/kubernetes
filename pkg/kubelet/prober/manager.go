@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -53,7 +54,7 @@ type Manager interface {
 
 type manager struct {
 	// Caches the results of readiness probes.
-	readinessCache *readinessManager
+	readinessCache results.Manager
 
 	// Map of active workers for readiness
 	readinessProbes map[containerPath]*worker
@@ -78,7 +79,7 @@ func NewManager(
 		defaultProbePeriod: defaultProbePeriod,
 		statusManager:      statusManager,
 		prober:             prober,
-		readinessCache:     newReadinessManager(),
+		readinessCache:     results.NewManager(),
 		readinessProbes:    make(map[containerPath]*worker),
 	}
 }
@@ -141,9 +142,9 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *api.PodStatus) {
 		var ready bool
 		if c.State.Running == nil {
 			ready = false
-		} else if result, ok := m.readinessCache.getReadiness(
+		} else if result, ok := m.readinessCache.Get(
 			kubecontainer.ParseContainerID(c.ContainerID)); ok {
-			ready = result
+			ready = result == results.Success
 		} else {
 			// The check whether there is a probe which hasn't run yet.
 			_, exists := m.getReadinessProbe(podUID, c.Name)
