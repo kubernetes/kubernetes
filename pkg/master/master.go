@@ -551,7 +551,7 @@ func (m *Master) init(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage := controlleretcd.NewREST(dbClient("replicationControllers"))
+	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"))
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
@@ -567,12 +567,13 @@ func (m *Master) init(c *Config) {
 
 		"podTemplates": podTemplateStorage,
 
-		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator),
-		"endpoints":              endpointsStorage,
-		"nodes":                  nodeStorage,
-		"nodes/status":           nodeStatusStorage,
-		"events":                 eventStorage,
+		"replicationControllers":        controllerStorage,
+		"replicationControllers/status": controllerStatusStorage,
+		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator),
+		"endpoints":                     endpointsStorage,
+		"nodes":                         nodeStorage,
+		"nodes/status":                  nodeStatusStorage,
+		"events":                        eventStorage,
 
 		"limitRanges":                   limitRangeStorage,
 		"resourceQuotas":                resourceQuotaStorage,
