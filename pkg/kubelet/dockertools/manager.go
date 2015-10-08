@@ -158,7 +158,9 @@ func NewDockerManager(
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFsInterface,
-	cpuCFSQuota bool) *DockerManager {
+	cpuCFSQuota bool,
+	imageBackOff *util.Backoff) *DockerManager {
+
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
@@ -211,7 +213,7 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm)
+	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm, imageBackOff)
 
 	return dm
 }
@@ -509,9 +511,12 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 					}
 				}
 				containerStatus.LastTerminationState = containerStatus.State
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{Reason: reasonInfo.reason,
-					Message: reasonInfo.message}
-				containerStatus.State.Running = nil
+				containerStatus.State = api.ContainerState{
+					Waiting: &api.ContainerStateWaiting{
+						Reason:  reasonInfo.reason,
+						Message: reasonInfo.message,
+					},
+				}
 			}
 			continue
 		}
@@ -524,20 +529,27 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			containerStatus.RestartCount = oldStatus.RestartCount
 			containerStatus.LastTerminationState = oldStatus.LastTerminationState
 		}
-		//Check image is ready on the node or not.
-		image := container.Image
 		// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
-		_, err := dm.client.InspectImage(image)
-		if err == nil {
-			containerStatus.State.Waiting = &api.ContainerStateWaiting{
-				Message: fmt.Sprintf("Image: %s is ready, container is creating", image),
-				Reason:  "ContainerCreating",
+		reasonInfo, ok := dm.reasonCache.Get(uid, container.Name)
+		if !ok {
+			// default position for a container
+			// At this point there are no active or dead containers, the reasonCache is empty (no entry or the entry has expired)
+			// its reasonable to say the container is being created till a more accurate reason is logged
+			containerStatus.State = api.ContainerState{
+				Waiting: &api.ContainerStateWaiting{
+					Reason:  fmt.Sprintf("ContainerCreating"),
+					Message: fmt.Sprintf("Image: %s is ready, container is creating", container.Image),
+				},
 			}
-		} else if err == docker.ErrNoSuchImage {
-			containerStatus.State.Waiting = &api.ContainerStateWaiting{
-				Message: fmt.Sprintf("Image: %s is not ready on the node", image),
-				Reason:  "ImageNotReady",
-			}
+		} else if reasonInfo.reason == kubecontainer.ErrImagePullBackOff.Error() ||
+			reasonInfo.reason == kubecontainer.ErrImageInspect.Error() ||
+			reasonInfo.reason == kubecontainer.ErrImagePull.Error() ||
+			reasonInfo.reason == kubecontainer.ErrImageNeverPull.Error() {
+			// mark it as waiting, reason will be filled bellow
+			containerStatus.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
+		} else if reasonInfo.reason == kubecontainer.ErrRunContainer.Error() {
+			// mark it as waiting, reason will be filled bellow
+			containerStatus.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
 		}
 		statuses[container.Name] = &containerStatus
 	}
@@ -545,6 +557,7 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	podStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
 	for containerName, status := range statuses {
 		if status.State.Waiting != nil {
+			status.State.Running = nil
 			// For containers in the waiting state, fill in a specific reason if it is recorded.
 			if reasonInfo, ok := dm.reasonCache.Get(uid, containerName); ok {
 				status.State.Waiting.Reason = reasonInfo.reason
@@ -1599,7 +1612,8 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	}
 
 	// No pod secrets for the infra container.
-	if err := dm.imagePuller.PullImage(pod, container, nil); err != nil {
+	// The message isnt needed for the Infra container
+	if err, _ := dm.imagePuller.PullImage(pod, container, nil); err != nil {
 		return "", err
 	}
 
@@ -1841,10 +1855,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			continue
 		}
 		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
-		err := dm.imagePuller.PullImage(pod, container, pullSecrets)
-		dm.updateReasonCache(pod, container, "PullImageError", err)
+		err, msg := dm.imagePuller.PullImage(pod, container, pullSecrets)
 		if err != nil {
-			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", container.Image, kubecontainer.GetPodFullName(pod), container.Name, err)
+			dm.updateReasonCache(pod, container, err.Error(), errors.New(msg))
 			continue
 		}
 
@@ -1864,7 +1877,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		// See createPodInfraContainer for infra container setup.
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
 		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod))
-		dm.updateReasonCache(pod, container, "RunContainerError", err)
+		dm.updateReasonCache(pod, container, kubecontainer.ErrRunContainer.Error(), err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
 			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)

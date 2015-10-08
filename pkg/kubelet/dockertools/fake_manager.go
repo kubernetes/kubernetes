@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 )
@@ -40,13 +41,13 @@ func NewFakeDockerManager(
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
 	generator kubecontainer.RunContainerOptionsGenerator,
-	httpClient kubeletTypes.HttpGetter) *DockerManager {
+	httpClient kubeletTypes.HttpGetter, imageBackOff *util.Backoff) *DockerManager {
 
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFs()
 	dm := NewDockerManager(client, recorder, prober, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
-		fakeOOMAdjuster, fakeProcFs, false)
+		fakeOOMAdjuster, fakeProcFs, false, imageBackOff)
 	dm.dockerPuller = &FakeDockerPuller{}
 	return dm
 }

@@ -84,6 +84,20 @@ func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
 	return p.Clock.Now().Sub(eventTime) < entry.backoff
 }
 
+// Returns True if time since lastupdate is less than the current backoff window.
+func (p *Backoff) IsInBackOffSinceUpdate(id string, eventTime time.Time) bool {
+	p.Lock()
+	defer p.Unlock()
+	entry, ok := p.perItemBackoff[id]
+	if !ok {
+		return false
+	}
+	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+		return false
+	}
+	return eventTime.Sub(entry.lastUpdate) < entry.backoff
+}
+
 // Garbage collect records that have aged past maxDuration. Backoff users are expected
 // to invoke this periodically.
 func (p *Backoff) GC() {
