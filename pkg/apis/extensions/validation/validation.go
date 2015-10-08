@@ -99,8 +99,8 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *extensi
 func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *extensions.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
 	status := controller.Status
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
 	return allErrs
 }
 
@@ -151,9 +151,9 @@ func ValidateDaemonSetUpdate(controller, oldController *extensions.DaemonSet) fi
 // validateDaemonSetStatus validates a DaemonSetStatus
 func validateDaemonSetStatus(status *extensions.DaemonSetStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentNumberScheduled), fldPath.Child("currentNumberScheduled"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.NumberMisscheduled), fldPath.Child("numberMisscheduled"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredNumberScheduled), fldPath.Child("desiredNumberScheduled"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentNumberScheduled), fldPath.Child("currentNumberScheduled"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberMisscheduled), fldPath.Child("numberMisscheduled"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredNumberScheduled), fldPath.Child("desiredNumberScheduled"))...)
 	return allErrs
 }
 
@@ -225,7 +225,7 @@ func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *fiel
 			allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, "must be an integer or percentage (e.g '5%')"))
 		}
 	} else if intOrPercent.Type == intstr.Int {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(intOrPercent.IntValue()), fldPath)...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(intOrPercent.IntValue()), fldPath)...)
 	}
 	return allErrs
 }
@@ -266,7 +266,7 @@ func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDepl
 	}
 	// Validate that MaxUnavailable is not more than 100%.
 	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(rollingUpdate.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rollingUpdate.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	return allErrs
 }
 
@@ -288,7 +288,7 @@ func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fldPath
 func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecForRC(&spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
 	// empty string is a valid UniqueLabelKey
@@ -333,13 +333,13 @@ func ValidateJobSpec(spec *extensions.JobSpec, fldPath *field.Path) field.ErrorL
 	allErrs := field.ErrorList{}
 
 	if spec.Parallelism != nil {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
 	}
 	if spec.Completions != nil {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Completions), fldPath.Child("completions"))...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Completions), fldPath.Child("completions"))...)
 	}
 	if spec.ActiveDeadlineSeconds != nil {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
 	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -365,9 +365,9 @@ func ValidateJobSpec(spec *extensions.JobSpec, fldPath *field.Path) field.ErrorL
 
 func ValidateJobStatus(status *extensions.JobStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), fldPath.Child("active"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Succeeded), fldPath.Child("succeeded"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Failed), fldPath.Child("failed"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Active), fldPath.Child("active"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Succeeded), fldPath.Child("succeeded"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Failed), fldPath.Child("failed"))...)
 	return allErrs
 }
 
