@@ -27,10 +27,10 @@ import (
 )
 
 const (
-	cpuSeriesName      = "autoscaling.cpu.usage.1m"
-	memSeriesName      = "autoscaling.memory.usage.1m"
-	cpuContinuousQuery = "select derivative(value) as value from \"cpu/usage_ns_cumulative\" where pod_id <> '' group by pod_id, pod_namespace, container_name, container_base_image, time(1m) into " + cpuSeriesName
-	memContinuousQuery = "select mean(value) as value from \"memory/usage_bytes_gauge\" where pod_id <> '' group by pod_id, pod_namespace, container_name, container_base_image, time(1m) into " + memSeriesName
+	cpuSeriesName      = "autoscaling.cpu.usage.2m"
+	memSeriesName      = "autoscaling.memory.usage.2m"
+	cpuContinuousQuery = "select derivative(value) as value from \"cpu/usage_ns_cumulative\" where pod_id <> '' group by pod_id, pod_namespace, container_name, container_base_image, time(2m) into " + cpuSeriesName
+	memContinuousQuery = "select mean(value) as value from \"memory/usage_bytes_gauge\" where pod_id <> '' group by pod_id, pod_namespace, container_name, container_base_image, time(2m) into " + memSeriesName
 	timeFormat         = "2006-01-02 15:04:05"
 )
 
@@ -124,7 +124,8 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 	if exactMatch {
 		imgPattern = "='" + image + "'"
 	} else {
-		imgPattern = "=~/^" + image + "/"
+		// Escape character "/" in image pattern.
+		imgPattern = "=~/^" + strings.Replace(image, "/", "\\/", -1) + "/"
 	}
 	var namespaceCond string
 	if namespace != "" {
@@ -140,7 +141,7 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 
 	// TODO(pszczesniak): fix issue with dropped data base
 	if len(res) == 0 {
-		return 0, 0, fmt.Errorf("Missing series %v in InfluxDB", series)
+		return 0, 0, fmt.Errorf("Missing data in series %v in InfluxDB", series)
 	}
 	points := res[0].GetPoints()
 	if len(points) == 0 {
