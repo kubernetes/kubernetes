@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -92,6 +93,8 @@ type Proxier struct {
 	iptables      iptables.Interface
 	hostIP        net.IP
 	proxyPorts    PortAllocator
+	recorder      record.EventRecorder
+	nodeRef       *api.ObjectReference
 }
 
 // assert Proxier is a ProxyProvider
@@ -121,7 +124,7 @@ var (
 	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
 	// the loopback address. May be checked for by callers of NewProxier to know whether
 	// the caller provided invalid input.
-	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
+	ErrProxyOnLocalhost = fmt.Errorf("Cannot proxy on localhost")
 )
 
 // IsProxyLocked returns true if the proxy could not acquire the lock on iptables.
@@ -136,40 +139,50 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr util.PortRange, syncPeriod time.Duration) (*Proxier, error) {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr util.PortRange, recorder record.EventRecorder, syncPeriod time.Duration, nodeRef *api.ObjectReference) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
+		recorder.Eventf(nodeRef, "ErrProxyOnLocalhost", "Cannot proxy on localhost")
+		time.Sleep(100 * time.Millisecond)
 		return nil, ErrProxyOnLocalhost
 	}
 
 	hostIP, err := util.ChooseHostInterface()
 	if err != nil {
-		return nil, fmt.Errorf("failed to select a host interface: %v", err)
+		recorder.Eventf(nodeRef, "FailedHostInterfaceSelection", "Failed to select a host interface")
+		time.Sleep(100 * time.Millisecond)
+		return nil, fmt.Errorf("Failed to select a host interface: %v", err)
 	}
 
 	err = setRLimit(64 * 1000)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set open file handler limit: %v", err)
+		recorder.Eventf(nodeRef, "FailedOpenFileHandlerLimitSet", "Failed to set open file handler limit")
+		time.Sleep(100 * time.Millisecond)
+		return nil, fmt.Errorf("Failed to set open file handler limit: %v", err)
 	}
 
 	proxyPorts := newPortAllocator(pr)
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, recorder, syncPeriod, nodeRef)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod time.Duration) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, recorder record.EventRecorder, syncPeriod time.Duration, nodeRef *api.ObjectReference) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(util.PortRange{})
 	}
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
-		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
+		recorder.Eventf(nodeRef, "FailedIptablesInit", "Failed to initialize iptables")
+		time.Sleep(100 * time.Millisecond)
+		return nil, fmt.Errorf("Failed to initialize iptables: %v", err)
 	}
 	// Flush old iptables rules (since the bound ports will be invalid after a restart).
 	// When OnUpdate() is first called, the rules will be recreated.
 	if err := iptablesFlush(iptables); err != nil {
-		return nil, fmt.Errorf("failed to flush iptables: %v", err)
+		recorder.Eventf(nodeRef, "FailedIptablesFlush", "Failed to flush iptables")
+		time.Sleep(100 * time.Millisecond)
+		return nil, fmt.Errorf("Failed to flush iptables: %v", err)
 	}
 	return &Proxier{
 		loadBalancer: loadBalancer,
@@ -180,6 +193,8 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		iptables:     iptables,
 		hostIP:       hostIP,
 		proxyPorts:   proxyPorts,
+		recorder:     recorder,
+		nodeRef:      nodeRef,
 	}, nil
 }
 
@@ -230,7 +245,8 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
 	if err := iptablesInit(proxier.iptables); err != nil {
-		glog.Errorf("Failed to ensure iptables: %v", err)
+		proxier.recorder.Eventf(proxier.nodeRef, "FailedIptablesInit", "Failed to initialize iptables")
+		glog.Errorf("Failed to initialize iptables: %v", err)
 	}
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -255,7 +271,8 @@ func (proxier *Proxier) ensurePortals() {
 	for name, info := range proxier.serviceMap {
 		err := proxier.openPortal(name, info)
 		if err != nil {
-			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
+			proxier.recorder.Eventf(proxier.nodeRef, "FailedToOpenPortal", "Failed to open portal for service %q", name)
+			glog.Errorf("Failed to open portal for %q: %v", name, err)
 		}
 	}
 }
@@ -373,23 +390,27 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 				glog.V(4).Infof("Something changed for service %q: stopping it", serviceName)
 				err := proxier.closePortal(serviceName, info)
 				if err != nil {
+					proxier.recorder.Eventf(proxier.nodeRef, "FailedaToClosePortal", "Failed to close portal for %q", serviceName)
 					glog.Errorf("Failed to close portal for %q: %v", serviceName, err)
 				}
 				err = proxier.stopProxy(serviceName, info)
 				if err != nil {
+					proxier.recorder.Eventf(proxier.nodeRef, "FailedToStopService", "Failed to stop service %q", serviceName)
 					glog.Errorf("Failed to stop service %q: %v", serviceName, err)
 				}
 			}
 
 			proxyPort, err := proxier.proxyPorts.AllocateNext()
 			if err != nil {
-				glog.Errorf("failed to allocate proxy port for service %q: %v", serviceName, err)
+				proxier.recorder.Eventf(proxier.nodeRef, "FailedToAllocateProxyPort", "Failed to allocate proxy port for service %q", serviceName)
+				glog.Errorf("Failed to allocate proxy port for service %q: %v", serviceName, err)
 				continue
 			}
 
 			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
 			info, err = proxier.addServiceOnPort(serviceName, servicePort.Protocol, proxyPort, udpIdleTimeout)
 			if err != nil {
+				proxier.recorder.Eventf(proxier.nodeRef, "FailedProxying", "Proxying failed for service %q", serviceName)
 				glog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
 				continue
 			}
@@ -404,6 +425,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 
 			err = proxier.openPortal(serviceName, info)
 			if err != nil {
+				proxier.recorder.Eventf(proxier.nodeRef, "FailedToOpenPortal", "Failed to open portal for service %q", serviceName)
 				glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
 			}
 			proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
@@ -416,10 +438,12 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			glog.V(1).Infof("Stopping service %q", name)
 			err := proxier.closePortal(name, info)
 			if err != nil {
+				proxier.recorder.Eventf(proxier.nodeRef, "FailedToClosePortal", "Failed to close portal for %q", name)
 				glog.Errorf("Failed to close portal for %q: %v", name, err)
 			}
 			err = proxier.stopProxyInternal(name, info)
 			if err != nil {
+				proxier.recorder.Eventf(proxier.nodeRef, "FailedToStopService", "Failed to stop service %q", name)
 				glog.Errorf("Failed to stop service %q: %v", name, err)
 			}
 		}
