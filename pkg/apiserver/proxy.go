@@ -94,6 +94,12 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// servers (like etcd) require it.
 			remainder = remainder + "/"
 		}
+		proxyPrefix := strings.TrimSuffix(req.URL.Path, remainder)
+		remainder = strings.TrimPrefix(req.RequestURI, proxyPrefix)
+		// Remove the query string because it will be added later
+		if strings.Contains(remainder, "?") {
+			remainder = remainder[:strings.Index(remainder, "?")]
+		}
 	}
 	storage, ok := r.storage[resource]
 	if !ok {
@@ -137,9 +143,11 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if location.Scheme == "" {
 		location.Scheme = "http"
 	}
+	newURL := *location
+	newURL.Scheme = ""
 	// Add the subpath
 	if len(remainder) > 0 {
-		location.Path = singleJoiningSlash(location.Path, remainder)
+		newURL.Opaque = util.SingleJoiningSlash(location.Path, remainder)
 	}
 	// Start with anything returned from the storage, and add the original request's parameters
 	values := location.Query()
@@ -148,18 +156,12 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			values.Add(k, v)
 		}
 	}
-	location.RawQuery = values.Encode()
+	newURL.RawQuery = values.Encode()
 
-	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
-	if err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
-		notFound(w, req)
-		httpCode = status.Code
-		return
-	}
+	newReq := new(http.Request)
+	*newReq = *req
+	newReq.URL = &newURL
 	httpCode = http.StatusOK
-	newReq.Header = req.Header
 
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
@@ -302,17 +304,4 @@ func dialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	default:
 		return nil, fmt.Errorf("Unknown scheme: %s", url.Scheme)
 	}
-}
-
-// borrowed from net/http/httputil/reverseproxy.go
-func singleJoiningSlash(a, b string) string {
-	aslash := strings.HasSuffix(a, "/")
-	bslash := strings.HasPrefix(b, "/")
-	switch {
-	case aslash && bslash:
-		return a + b[1:]
-	case !aslash && !bslash:
-		return a + "/" + b
-	}
-	return a + b
 }

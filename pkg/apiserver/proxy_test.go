@@ -43,6 +43,7 @@ func TestProxy(t *testing.T) {
 		reqNamespace    string
 	}{
 		{"GET", "/some/dir", "", "answer", "text/css", "default"},
+		{"GET", "/some/dir/encoded%2fchar", "", "answer", "text/css", "default"},
 		{"GET", "/some/dir", "", "<html><head></head><body>answer</body></html>", "text/html", "default"},
 		{"POST", "/some/other/dir", "question", "answer", "text/css", "default"},
 		{"PUT", "/some/dir/id", "different question", "answer", "text/css", "default"},
@@ -61,7 +62,7 @@ func TestProxy(t *testing.T) {
 			if e, a := item.reqBody, string(gotBody); e != a {
 				t.Errorf("%v - expected %v, got %v", item.method, e, a)
 			}
-			if e, a := item.path, req.URL.Path; e != a {
+			if e, a := item.path, req.RequestURI; e != a {
 				t.Errorf("%v - expected %v, got %v", item.method, e, a)
 			}
 			w.Header().Set("Content-Type", item.respContentType)
@@ -109,6 +110,12 @@ func TestProxy(t *testing.T) {
 				t.Errorf("%v - unexpected error %v", item.method, err)
 				continue
 			}
+
+			// Override the request URL to set Opaque
+			reqURL, _ := url.Parse(server.URL)
+			reqURL.Opaque = reqURL.Path + proxyTestPattern
+			req.URL = reqURL
+
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Errorf("%v - unexpected error %v", item.method, err)
