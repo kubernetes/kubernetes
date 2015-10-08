@@ -2750,8 +2750,8 @@ func autoconvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobSta
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 
@@ -3584,8 +3584,8 @@ func autoconvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *e
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 

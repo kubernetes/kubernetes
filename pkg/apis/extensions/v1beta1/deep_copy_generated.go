@@ -1286,8 +1286,8 @@ func deepCopy_v1beta1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clon
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 

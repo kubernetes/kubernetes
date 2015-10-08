@@ -1274,8 +1274,8 @@ func deepCopy_extensions_JobStatus(in JobStatus, out *JobStatus, c *conversion.C
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 
