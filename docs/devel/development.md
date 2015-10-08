@@ -264,7 +264,7 @@ Coverage results for the project can also be viewed on [Coveralls](https://cover
 
 ## Integration tests
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.12) in your path, please make sure it is installed and in your ``$PATH``.
 
 ```sh
 cd kubernetes
