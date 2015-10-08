@@ -214,10 +214,17 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if cmdutil.GetFlagBool(cmd, "dry-run") {
 		fmt.Fprintln(out, "running in dry-run mode...")
 	} else {
-		data, err := info.Mapping.Codec.Encode(object)
+		// Serialize the configuration into an annotation.
+		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+			return err
+		}
+
+		// Serialize the object with the annotation applied.
+		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
 			return err
 		}
+
 		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, data)
 		if err != nil {
 			return err
