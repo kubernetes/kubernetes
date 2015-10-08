@@ -84,7 +84,7 @@ var _ = Describe("Pod Disks", func() {
 			podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
 			detachPD(host1Name, diskName)
-			deletePD(diskName)
+			deletePDWithRetry(diskName)
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -144,7 +144,7 @@ var _ = Describe("Pod Disks", func() {
 
 			detachPD(host0Name, diskName)
 			detachPD(host1Name, diskName)
-			deletePD(diskName)
+			deletePDWithRetry(diskName)
 		}()
 
 		By("submitting rwPod to ensure PD is formatted")
@@ -194,7 +194,7 @@ var _ = Describe("Pod Disks", func() {
 			// Teardown should do nothing unless test failed.
 			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
-			deletePD(diskName)
+			deletePDWithRetry(diskName)
 		}()
 
 		fileAndContentToVerify := make(map[string]string)
@@ -251,8 +251,8 @@ var _ = Describe("Pod Disks", func() {
 			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, disk1Name)
 			detachPD(host0Name, disk2Name)
-			deletePD(disk1Name)
-			deletePD(disk2Name)
+			deletePDWithRetry(disk1Name)
+			deletePDWithRetry(disk2Name)
 		}()
 
 		containerName := "mycontainer"
@@ -327,7 +327,7 @@ func createPD() (string, error) {
 
 		zone := testContext.CloudConfig.Zone
 		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
-		err := exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "disks", "create", "--zone="+zone, "--size=10GB", pdName).Run()
+		err := exec.Command("gcloud", "compute", "--quiet", "--project="+testContext.CloudConfig.ProjectID, "disks", "create", "--zone="+zone, "--size=10GB", pdName).Run()
 		if err != nil {
 			return "", err
 		}
@@ -348,10 +348,16 @@ func deletePD(pdName string) error {
 		zone := testContext.CloudConfig.Zone
 
 		// TODO: make this hit the compute API directly.
-		cmd := exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "disks", "delete", "--zone="+zone, pdName)
+		cmd := exec.Command("gcloud", "compute", "--quiet", "--project="+testContext.CloudConfig.ProjectID, "disks", "delete", "--zone="+zone, pdName)
 		data, err := cmd.CombinedOutput()
 		if err != nil {
-			Logf("Error deleting PD: %s (%v)", string(data), err)
+			dataStr := string(data)
+			if strings.Contains(dataStr, "was not found") {
+				Logf("PD deletion implicitly succeeded because PD %q does not exist.", pdName)
+				return nil
+			}
+
+			Logf("Error deleting PD: %s (%v)", dataStr, err)
 		}
 		return err
 	} else {
@@ -370,7 +376,7 @@ func detachPD(hostName, pdName string) error {
 		zone := testContext.CloudConfig.Zone
 
 		// TODO: make this hit the compute API directly.
-		return exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
+		return exec.Command("gcloud", "compute", "--quiet", "--project="+testContext.CloudConfig.ProjectID, "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
 	} else {
 		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
