@@ -2836,8 +2836,8 @@ func autoconvert_experimental_JobStatus_To_v1alpha1_JobStatus(in *experimental.J
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 
@@ -3758,8 +3758,8 @@ func autoconvert_v1alpha1_JobStatus_To_experimental_JobStatus(in *JobStatus, out
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 

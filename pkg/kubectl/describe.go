@@ -893,7 +893,7 @@ func describeJob(job *experimental.Job, events *api.EventList) (string, error) {
 		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(job.Labels))
-		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Successful, job.Status.Unsuccessful)
+		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		if job.Spec.Template != nil {
 			describeVolumes(job.Spec.Template.Spec.Volumes, out)
 		}

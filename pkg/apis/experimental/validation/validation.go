@@ -345,8 +345,8 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 func ValidateJobStatus(status *experimental.JobStatus) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), "active")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Successful), "successful")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Unsuccessful), "unsuccessful")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Succeeded), "succeeded")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Failed), "failed")...)
 	return allErrs
 }
 
