@@ -244,7 +244,6 @@ script
 	set -o errexit
 	set -o nounset
 
-	# TODO(andyzheng0831): Add health check functionality.
 	. /etc/kube-env
 	ARGS="--v=2"
 	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
@@ -259,7 +258,7 @@ script
 		--enable-debugging-handlers=true \
 		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
-		--allow-privileged=false \
+		--allow-privileged=true \
 		--cluster-dns=${DNS_SERVER_IP} \
 		--cluster-domain=${DNS_DOMAIN} \
 		--configure-cbr0=true \
