@@ -26,10 +26,8 @@ function clear_old_bootstrap {
     if [[ ! -z "$PID" ]]; then
         clear_bootstrap_containers
         kill -9 $PID
+        
         echo "... Clearing bootstrap dir"
-        if [[ -d "/var/lib/docker-bootstrap" ]]; then
-          umount $(mount | grep /var/lib/docker-bootstrap | awk '{print $1}')
-        fi
         # Have to warn user some dirs may be left
         rm -rf /var/lib/docker-bootstrap || true; \
         echo "Warning: Some directories can not be deleted, you need to clear them mannually"
@@ -66,7 +64,7 @@ function clear_old_components() {
       echo "... ... And stopped some users' redundant kubelet"
       stubborn=`docker ps | grep -E "/hyperkube kubelet|/hyperkube proxy" | awk '{print $1}'`
       if [[ "" !=  "$stubborn" ]]; then
-          echo "... ... Warning: Found some extra kubelet|proxy running, they may fail the deployment"
+          echo "... ... [WARN]: Found some extra kubelet|proxy running, they may fail the deployment"
       fi
   fi
 }

@@ -22,7 +22,7 @@
 
 set -e
 
-source ~/docker-cluster/kube-config/node.env
+source ~/docker/kube-config/node.env
 
 if [ "$(id -u)" != "0" ]; then
   echo >&2 "config-network.sh must be called as root!"
@@ -39,7 +39,7 @@ if [[ ! -z $1 ]]; then
 fi
 
 # Wait for flanneld ready
-sleep 2
+sleep 3
 
 # We use eth0 for default, may make it configurable in future
 flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
@@ -56,33 +56,42 @@ DOCKER_CONF=""
 
 # Configure docker net settings, then restart it
 # $lsb_dist is detected in kube-deploy/common.sh
+# TODO: deal with ubuntu 15.04
 case "$lsb_dist" in
-    fedora|centos|amzn)
+    amzn)
         DOCKER_CONF="/etc/sysconfig/docker"
+        echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+        ifconfig docker0 down
+        yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
     ;;
-    ubuntu|debian|linuxmint)
+    centos)
+        DOCKER_CONF="/etc/sysconfig/docker"
+        echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+        if ! command_exists ifconfig; then
+            yum -y -q install net-tools
+        fi
+        ifconfig docker0 down
+        yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
+    ;;
+    ubuntu|debian)
         DOCKER_CONF="/etc/default/docker"
-    ;;
-esac
-
-# Append the docker opts
-echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-
-ifconfig docker0 down
-
-case "$lsb_dist" in
-    fedora|centos|amzn)
-        yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
-    ;;
-    ubuntu|debian|linuxmint)
+        echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+        ifconfig docker0 down
         apt-get install bridge-utils && brctl delbr docker0 && service docker restart
     ;;
+    *)
+        echo "Unsupported operations system $lsb_dist"
+        exit 1
+    ;;
 esac
+
+# Wait for docker daemon ready
+sleep 3
 
 # Verify network 
 function verify-network() {
   pgrep -f "/opt/bin/flanneld" >/dev/null 2>&1 || {
-    printf "Warning: $daemon is not running! \n"        
+    printf "[WARN]: $daemon is not running! \n"        
   }
   printf "\n"
 }

@@ -37,7 +37,7 @@ function verify() {
 		PID=`pgrep -f "${daemon}"`
 		if [[ -z $PID ]]; then
 			ok=1
-	  		printf "Warning: $daemon is not running! \n"        
+	  		printf "[WARN]: $daemon is not running! \n"        
 		fi
 	done
 

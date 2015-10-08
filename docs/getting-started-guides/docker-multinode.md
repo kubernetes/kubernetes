@@ -46,6 +46,7 @@ interested in just starting to explore Kubernetes, we recommend that you start t
   - [Bootstrap Docker](#bootstrap-docker)
 - [Starting a Cluster](#starting-a-cluster)
     - [Add another Node into cluster](#add-another-node-into-cluster)
+    - [Support different infrastructures](#support-different-infrastructures)
 - [Test it out](#test-it-out)
 - [Customize](#customize)
 - [Tear Down](#tear-down)
@@ -57,7 +58,7 @@ interested in just starting to explore Kubernetes, we recommend that you start t
 2. All machines can communicate with each other, no need to connect Internet (but should configure to use
 private docker registry in this case).
 3. All the remote servers are ssh accessible.
-4. If your machines were onced provisoned before, [Tear Down](#tear-down) first is highly recommended.
+4. If your machines were once deployed before, [Tear Down](#tear-down) first is highly recommended.
 
 ## Overview
 
@@ -97,12 +98,13 @@ In `cluster/` directory:
 ```sh
 export NODES="vcap@10.10.102.152"
 export MASTER="vcap@10.10.102.150"
-export KUBERNETES_PROVIDER=docker-cluster ./kube-up.sh
+export KUBERNETES_PROVIDER=docker
+./kube-up.sh
 ```
 
-> Please check `cluster/docker-cluster/config-default.sh` for more supported ENVs
+> Please check `cluster/docker/config-default.sh` for more supported ENVs
 
-> If your MASTER is also in one of NODES, that machine will be deployed as **both master & node**
+> If your MASTER appears in NODES, that MASTER will be deployed as **both master & node**. But we do not recommend this as e2e test may complain.
 
 If all things goes right, you will see the below message from console indicating the k8s is up.
 
@@ -122,9 +124,28 @@ $ cd kubernetes/docs/getting-started-guides/docker-multinode/
 $ ./master.sh
 ```
 
+### Support different infrastructures
+
+We use `baremetal` as default infrastructure provider, which means we only require a batch of machines (VMs or physical servers) with Docker installed, and then deploy k8s on them remotely by using `scp` & `ssh`.
+
+But we also planned to supported any other infrastructure like GCE, AWS etc. So there will be more provider specific versions based on the existing [docker-baremetal](../../cluster/docker-baremetal/) implementation, e.g. `docker-gce` or `docker-aws`, to support `gcloud ssh` or AWS identity.
+
+And then tell scripts you want to deploy on other infrastructure like this:
+
+```sh
+export NODES="vcap@10.10.102.152"
+export MASTER="vcap@10.10.102.150"
+export KUBERNETES_PROVIDER=docker
+export INFRA=gce
+./kube-up.sh
+```
+
+
+Only a few functions need to be rewrite, so welcome to contribute!
+
 ## Test it out
 
-On every node, you can see there're two containers running by `docker ps`:
+On every node, you can see there are two containers running by `docker ps`:
 
 ```console
 kube_in_docker_proxy_xxx
@@ -137,7 +158,7 @@ And on Master node, you can see extra master containers running:
 k8s_scheduler.xxx
 k8s_apiserver.xxx
 k8s_controller-manager.xxx
-``` 
+```
 
 As we use `hyperkube` image to run k8s, we **do not** need to compile binaries, please download and extract `kubectl` binary from [releases page](https://github.com/kubernetes/kubernetes/releases).
 
@@ -154,7 +175,7 @@ NAME            LABELS                                 STATUS
 
 See [here](docker-multinode/deployDNS.md) for instructions.
 
-Then you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
+Then you can run Kubernetes [guest-example](../../examples/guestbook/) to build a Redis backend cluster on the k8s．
 
 ## Customize
 
@@ -162,7 +183,7 @@ One of the biggest benefits of using Docker to run Kubernetes is users can custo
 
 ### master
 
-You need to enable **comstomized master mode** before deploy:
+You need to enable **customized master mode** before deploy:
 
 ```console
 $ export MASTER_IP=<your_master_ip (e.g. 1.2.3.4)>
@@ -170,18 +191,18 @@ $ cd kubernetes/docs/getting-started-guides/docker-multinode/
 $ ./worker.sh
 ```
 
-The configuration file of Master locates in `docker-cluster/kube-config/master-multi.json`, which will be mounted as volume for Master Pod to comsume, you can modify it freely **before deploying**.
+The configuration file of Master locates in `docker/kube-config/master-multi.json`, which will be mounted as volume for Master Pod to consume, you can modify it freely **before deploying**.
 
 In this mode, you can even change the configuration of Master after the deployment has done, see:
 
 1. Login the Master node
-2. Change the content in `~/docker-cluster/kube-config/master-multi.json`
+2. Change the content in `~/docker/kube-config/master-multi.json`
 
 kubelet will auto-restart the affected master pod.
 
 ### kubelet
 
-Except a few basic options defined in `kube-deploy/master.sh|node.sh`, you can customize the `docker-cluster/kube-config/kubelet.env` freely to add or update `kubelet` options **before deploying**.
+Except a few basic options defined in `kube-deploy/master.sh|node.sh`, you can customize the `docker/kube-config/kubelet.env` freely to add or update `kubelet` options **before deploying**.
 
 ## Tear Down
 
@@ -189,7 +210,7 @@ In `cluster/` directory:
 
 ```sh
 export NODES="vcap@10.10.102.150 vcap@10.10.102.152"
-export KUBERNETES_PROVIDER=docker-cluster ./kube-down.sh
+export KUBERNETES_PROVIDER=docker ./kube-down.sh
 ```
 
 ## Trouble shooting
@@ -201,15 +222,15 @@ Although using docker to deploy k8s is much simpler than ordinary way, here're s
 1. Start a bootstrap daemon
 2. Start `flannel` on every node's bootstrap daemon, `etcd` on Master's bootstrap daemon
 3. Start `kubelet` & `proxy` containers by using `hyperkube` image on every node
-4. `kubelet` on the Master node will start master Pod (contains `api-server`, `controller-manager` & `scheduler`)from a json file, that file is bind mounted in a host dir.
+4. `kubelet` on the Master node will start master Pod (contains `api-server`, `controller-manager` & `scheduler`)from a built in `json` file in hyperkube image.
 
 See [docker-multinode/master.md](docker-multinode/master.md) and [docker-multinode/worker.md](docker-multinode/worker.md) for detailed instructions explanation.
 
 ### Useful tips
 
-1. Make sure you have access to the images stored in `gcr.io`, otherwise, you need to mannually load `hyperkube` image into your docker daemon and `etcd` into docker bootstrap daemon.
+1. Make sure you have access to the images stored in `gcr.io`, otherwise, you need to manually load `hyperkube` image into your docker daemon and `etcd` into docker bootstrap daemon.
 
-2. As we said, there're two kinds of daemon running on a node. The bootstrap daemon works on `-H unix:///var/run/docker-bootstrap.sock` with work_dir `/var/lib/docker-bootstrap`. Thus re-configuring and restarting docker daemon will never influence etcd and flanneld.
+2. As we said, there are two kinds of daemon running on a node. The bootstrap daemon works on `-H unix:///var/run/docker-bootstrap.sock` with work_dir `/var/lib/docker-bootstrap`. Thus re-configuring and restarting docker daemon will never influence Etcd and Flanneld.
 
 3. For k8s admins, you should learn to manage process by using docker container, `docker ps`, `docker logs` & `docker exec` solve most problems.
 

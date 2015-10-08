@@ -15,10 +15,10 @@
 # limitations under the License.
 
 # A common lib for master.sh & node.sh to use
-source ~/docker-cluster/kube-config/node.env
-source ~/docker-cluster/kube-config/kubelet.env
+source ~/docker/kube-config/node.env
+source ~/docker/kube-config/kubelet.env
 
-DESTROY_SH=~/docker-cluster/kube-deploy/destroy.sh
+DESTROY_SH=~/docker/kube-deploy/destroy.sh
 
 : ${K8S_VERSION?"K8S_VERSION is not exported on Node"}
 
@@ -45,7 +45,7 @@ function detect_lsb() {
     *64)
         ;;
     *)
-        echo "Error: We currently only support 64-bit platforms."       
+        echo "[ERROR]: We currently only support 64-bit platforms."       
         exit 1
         ;;
     esac
@@ -67,15 +67,15 @@ function detect_lsb() {
     fi
 
     export lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
+    echo "... ... OS distro Detected: $lsb_dist"
 }
 
 
 # Start the bootstrap daemon
 function bootstrap_daemon() {
-    echo "... Start Bootstrap daemon"
-    PID=`ps -eaf | grep 'unix:///var/run/docker-bootstrap.sock' | grep -v grep | awk '{print $2}'`
+    local pid=`ps -eaf | grep 'unix:///var/run/docker-bootstrap.sock' | grep -v grep | awk '{print $2}'`
 
-    if [[ -z "$PID" ]]; then
+    if [[ -z "$pid" ]]; then
         sudo -b docker -d -H unix:///var/run/docker-bootstrap.sock \
             -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false \
             --bridge=none --graph=/var/lib/docker-bootstrap \
@@ -87,12 +87,14 @@ function bootstrap_daemon() {
         echo "... Bootstrap daemon already existed, try to clear its containers"
         $DESTROY_SH clear_bootstrap_containers >/dev/null 2>&1
     fi
+
+    echo "... Bootstrap daemon started"
 }
 
-# kubelet & kubeproxy use host network, so we can deal with container network seperately
+# Deploy network implementation for k8s
 function start-network() {
   echo "... Configuring network"
-  # $1 is used for config-network to know if it will deploy a master
-  ~/docker-cluster/config-network.sh $1
+  # $1 is a flag for config-network to know if it is deploying a master
+  ~/docker/config-network.sh $1
 }
 
