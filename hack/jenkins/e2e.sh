@@ -650,6 +650,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
     : ${NUM_MINIONS:="40"}
+    : ${E2E_ZONE:="asia-east1-a"}
     : ${MASTER_SIZE:="n1-standard-32"}  # Note: not available in all zones
     : ${MINION_SIZE="n1-standard-16"}   # Note: can fit about 17 hollow nodes per core
     #                                           so NUM_MINIONS x cores_per_minion should
