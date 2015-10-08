@@ -939,13 +939,13 @@ __EOF__
   kubectl delete experimental/deployment nginx-deployment
   ### Get experimental resource via shortname
   kubectl get experimental/hpa
-  ### Get experimental resource via shortname implicitly
+  ### Get experimental resource via shortname implicitly should fail
   ERROR_FILE="/tmp/should-error"
   kubectl get hpa 1>&2 2> "${ERROR_FILE}" || true
   if grep -q "error" "${ERROR_FILE}" && grep -q "should be specified explicitly" "${ERROR_FILE}"; then
     echo "\"kubectl get hpa\" returns error as expected: $(cat ${ERROR_FILE})"
   else
-    echo "\"kubectl get hpa\" returns unexpected non-error: $(cat ${ERROR_FILE})"
+    echo "\"kubectl get hpa\" returns unexpected error or non-error: $(cat ${ERROR_FILE})"
     exit 1
   fi
   rm "${ERROR_FILE}"

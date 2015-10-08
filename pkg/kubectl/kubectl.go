@@ -82,18 +82,19 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 	parts := strings.Split(resource, "/")
 	// group/kind or group/kind-shortcut
 	if len(parts) > 1 {
-		resource = fmt.Sprintf("%s/%s", parts[0], expandResourceShortcut(parts[1]))
+		return e.RESTMapper.VersionAndKindForResource(fmt.Sprintf("%s/%s", parts[0], expandResourceShortcut(parts[1])))
 	}
 	// kind or kind-shortcut
 	if len(parts) == 1 {
-		resource = expandResourceShortcut(resource)
+		if defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(expandResourceShortcut(resource)); err != nil {
+			return
+		}
+		// kind that should be experimental/kind
+		if group, err2 := e.GroupForResource(resource); err2 == nil && group == exp {
+			err = fmt.Errorf("%s resource %q should be specified explicitly; use %s/%s instead", exp, resource, exp, resource)
+		}
 	}
-	defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(resource)
-	// kind that should be experimental/kind
-	if group, err := e.GroupForResource(resource); len(parts) == 1 && err == nil && group == exp {
-		return defaultVersion, kind, fmt.Errorf("%s resource %q should be specified explicitly; use %s/%s instead", exp, resource, exp, resource)
-	}
-	return defaultVersion, kind, err
+	return
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource.
@@ -103,7 +104,7 @@ func (e ShortcutExpander) ResourceIsValid(resource string) bool {
 }
 
 func (e ShortcutExpander) GroupForResource(resource string) (group string, err error) {
-	return e.RESTMapper.GroupForResource(resource)
+	return e.RESTMapper.GroupForResource(expandResourceShortcut(resource))
 }
 
 // expandResourceShortcut will return the expanded version of resource
