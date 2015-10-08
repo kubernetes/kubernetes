@@ -440,7 +440,7 @@ case ${JOB_NAME} in
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
     : ${E2E_NETWORK:="e2e-gke-test"}
-    : ${JENKINS_USE_RELEASE_TARS:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
@@ -491,7 +491,7 @@ case ${JOB_NAME} in
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="gke-upgrade"}
     : ${E2E_NETWORK:="gke-upgrade"}
-    : ${JENKINS_USE_RELEASE_TARS:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
@@ -505,7 +505,6 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="gke-upgrade"}
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_USE_RELEASE_TARS:=n}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -521,7 +520,7 @@ case ${JOB_NAME} in
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run release (old) e2es, not ci (new)
-    : ${JENKINS_USE_RELEASE_TARS:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -540,7 +539,6 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="gke-upgrade"}
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_USE_RELEASE_TARS:=n}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -556,7 +554,7 @@ case ${JOB_NAME} in
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run release (old) e2es, not ci (new)
-    : ${JENKINS_USE_RELEASE_TARS:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -577,8 +575,6 @@ case ${JOB_NAME} in
     # we have to rebuild, it could get slightly out of whack.
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
-    # Run ci (new) e2es, not release (old)
-    : ${JENKINS_USE_RELEASE_TARS:=n}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -594,7 +590,7 @@ case ${JOB_NAME} in
   kubernetes-upgrade-gce-step1-deploy)
     : ${E2E_CLUSTER_NAME:="gce-upgrade"}
     : ${E2E_NETWORK:="gce-upgrade"}
-    : ${JENKINS_USE_RELEASE_TARS:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
@@ -608,7 +604,6 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="gce-upgrade"}
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_USE_RELEASE_TARS:=n}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -694,6 +689,7 @@ export MASTER_SIZE=${MASTER_SIZE:-}
 export MINION_SIZE=${MINION_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
 export PROJECT=${PROJECT:-}
+export JENKINS_PUBLISHED_VERSION=${JENKINS_PUBLISHED_VERSION:-'ci/latest'}
 
 export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}
 export PATH=${PATH}:/usr/local/go/bin
@@ -746,7 +742,7 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             IFS='/' read -a varr <<< "${JENKINS_EXPLICIT_VERSION}"
             bucket="${varr[0]}"
             githash="${varr[1]}"
-            echo "$bucket / $githash"
+            echo "Using explicit version $bucket/$githash"
         elif [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
             # for GKE we can use server default version.
             bucket="release"
@@ -754,25 +750,24 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             # msg will look like "defaultClusterVersion: 1.0.1". Strip
             # everything up to, including ": "
             githash="v${msg##*: }"
-        else
-            # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
-            bucket="ci"
-            # The "latest" version picks the most recent "ci" or "release" build.
-            version_file="latest"
-            if [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
-                # The "release" bucket is for builds like "v0.15.0"
-                bucket="release"
-                if [[ ${JENKINS_USE_STABLE:-} =~ ^[yY]$ ]]; then
-                    # The "stable" version picks the most recent "release" build.
-                    version_file="stable"
-                fi
-            fi
-            githash=$(gsutil cat gs://kubernetes-release/${bucket}/${version_file}.txt)
+            echo "Using server version $bucket/$githash"
+        else  # use JENKINS_PUBLISHED_VERSION
+            # Use a published version like "ci/latest" (default),
+            # "release/latest", "release/latest-1", or "release/stable"
+            IFS='/' read -a varr <<< "${JENKINS_PUBLISHED_VERSION}"
+            bucket="${varr[0]}"
+            githash=$(gsutil cat gs://kubernetes-release/${JENKINS_PUBLISHED_VERSION}.txt)
+            echo "Using published version $bucket/$githash (from ${JENKINS_PUBLISHED_VERSION})"
         fi
         # At this point, we want to have the following vars set:
         # - bucket
         # - githash
         gsutil -m cp gs://kubernetes-release/${bucket}/${githash}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${githash}/kubernetes-test.tar.gz .
+
+        # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
+        if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
+            export CLUSTER_API_VERSION=$(echo ${githash} | cut -c 2-)
+        fi
     fi
 
     if [[ ! "${CIRCLECI:-}" == "true" ]]; then
@@ -807,14 +802,6 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
     md5sum kubernetes*.tar.gz
     tar -xzf kubernetes.tar.gz
     tar -xzf kubernetes-test.tar.gz
-
-    # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
-    if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
-        export CLUSTER_API_VERSION=$(echo ${githash} | cut -c 2-)
-    elif [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
-        release=$(gsutil cat gs://kubernetes-release/release/${version_file}.txt | cut -c 2-)
-        export CLUSTER_API_VERSION=${release}
-    fi
 fi
 
 cd kubernetes
