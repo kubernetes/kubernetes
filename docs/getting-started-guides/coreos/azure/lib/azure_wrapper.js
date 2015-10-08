@@ -107,8 +107,11 @@ var create_ssh_key = function (prefix) {
   };
   openssl.exec('req', opts, function (err, buffer) {
     if (err) console.log(clr.red(err));
-    fs.chmod(opts.keyout, '0600', function (err) {
+    openssl.exec('rsa', { in: opts.keyout, out: opts.keyout }, function (err, buffer) {
       if (err) console.log(clr.red(err));
+      fs.chmod(opts.keyout, '0600', function (err) {
+        if (err) console.log(clr.red(err));
+      });
     });
   });
   return {
