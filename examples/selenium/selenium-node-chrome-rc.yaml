@@ -3,15 +3,15 @@ kind: ReplicationController
 metadata:
   name: selenium-node-chrome 
   labels:
-    name: selenium-node-chrome
+    app: selenium-node-chrome
 spec:
   replicas: 2
   selector:
-    name: selenium-node-chrome
+    app: selenium-node-chrome
   template:
     metadata:
       labels:
-        name: selenium-node-chrome
+        app: selenium-node-chrome
     spec:
       containers:
       - name: selenium-node-chrome

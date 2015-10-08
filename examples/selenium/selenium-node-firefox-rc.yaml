@@ -3,15 +3,15 @@ kind: ReplicationController
 metadata:
   name: selenium-node-firefox 
   labels:
-    name: selenium-node-firefox
+    app: selenium-node-firefox
 spec:
   replicas: 2
   selector:
-    name: selenium-node-firefox
+    app: selenium-node-firefox
   template:
     metadata:
       labels:
-        name: selenium-node-firefox
+        app: selenium-node-firefox
     spec:
       containers:
       - name: selenium-node-firefox
