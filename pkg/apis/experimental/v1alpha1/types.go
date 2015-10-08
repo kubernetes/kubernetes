@@ -312,7 +312,7 @@ type DaemonSetSpec struct {
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
-	// CurrentNumberScheduled is the number of nodes that are running exactly 1
+	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
 	CurrentNumberScheduled int `json:"currentNumberScheduled"`

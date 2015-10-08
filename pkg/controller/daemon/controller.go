@@ -448,13 +448,15 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *experimental.DaemonSe
 		shouldRun := nodeSelector.Matches(labels.Set(node.Labels))
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 
-		if numDaemonPods > 0 {
+		if shouldRun && numDaemonPods > 0 {
 			currentNumberScheduled++
 		}
 
 		if shouldRun {
 			desiredNumberScheduled++
-		} else if numDaemonPods >= 0 {
+		}
+
+		if !shouldRun && numDaemonPods > 0 {
 			numberMisscheduled++
 		}
 	}
