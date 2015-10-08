@@ -630,6 +630,8 @@ case ${JOB_NAME} in
     NUM_MINIONS=3
     ;;
 
+  # Run Kubemark test on a fake 100 node cluster to have a comparison
+  # to the real results from scalability suite
   kubernetes-kubemark-gce)
     : ${E2E_CLUSTER_NAME:="kubernetes-kubemark"}
     : ${E2E_NETWORK:="kubernetes-kubemark"}
@@ -638,9 +640,15 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
-    : ${NUM_MINIONS:="10"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    NUM_MINIONS="10"
+    MASTER_SIZE="n1-standard-2"
+    MINION_SIZE="n1-standard-1"
+    KUBEMARK_MASTER_SIZE="n1-standard-4"
+    KUBEMARK_NUM_MINIONS="100"
     ;;
 
+  # Run big Kubemark test, this currently means a 1000 node cluster and 16 core master
   kubernetes-kubemark-gce-scale)
     : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-scale"}
     : ${E2E_NETWORK:="kubernetes-kubemark-scale"}
@@ -649,12 +657,15 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
-    : ${NUM_MINIONS:="40"}
-    : ${E2E_ZONE:="asia-east1-a"}
-    : ${MASTER_SIZE:="n1-standard-32"}  # Note: not available in all zones
-    : ${MINION_SIZE="n1-standard-16"}   # Note: can fit about 17 hollow nodes per core
-    #                                           so NUM_MINIONS x cores_per_minion should
-    #                                           be set accordingly.
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    NUM_MINIONS="8"
+    MASTER_SIZE="n1-standard-4"
+    MINION_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
+    #                                     so NUM_MINIONS x cores_per_minion should
+    #                                     be set accordingly.
+    E2E_ZONE="asia-east1-a"
+    KUBEMARK_MASTER_SIZE="n1-standard-16"
+    KUBEMARK_NUM_MINIONS="1000"
     ;;
 esac
 
@@ -850,9 +861,10 @@ fi
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   export RUN_FROM_DISTRO=true
   NUM_MINIONS_BKP=${NUM_MINIONS}
-  # We need to unset NUM_MINIONS to be able to use kubemark default settings.
-  unset NUM_MINIONS
+  MASTER_SIZE_BKP=${MASTER_SIZE}
   ./test/kubemark/stop-kubemark.sh
+  NUM_MINIONS=${KUBEMARK_NUM_MINIONS:-$NUM_MINIONS}
+  MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
   if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
@@ -861,9 +873,11 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
         gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
   fi
   ./test/kubemark/stop-kubemark.sh
-  unset RUN_FROM_DISTRO
   NUM_MINIONS=${NUM_MINIONS_BKP}
+  MASTER_SIZE=${MASTER_SIZE_BKP}
+  unset RUN_FROM_DISTRO
   unset NUM_MINIONS_BKP
+  unset MASTER_SIZE_BKP
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
