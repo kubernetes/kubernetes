@@ -1642,7 +1642,6 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 
 	containersToStart := make(map[int]empty)
 	containersToKeep := make(map[kubeletTypes.DockerID]int)
-	createPodInfraContainer := false
 
 	var err error
 	var podInfraContainerID kubeletTypes.DockerID
@@ -1656,7 +1655,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 		}
 	}
 
-	createPodInfraContainer = true
+	createPodInfraContainer := true
 	if podInfraContainer == nil {
 		glog.V(2).Infof("Need to restart pod infra container for %q because it is not found", podFullName)
 	} else if changed {
