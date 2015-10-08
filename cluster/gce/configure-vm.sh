@@ -284,7 +284,6 @@ opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW")'
 kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
 dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
-allow_privileged: '$(echo "$ALLOW_PRIVILEGED")'
 EOF
 
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
@@ -575,6 +574,7 @@ EOF
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   kubelet_api_servers: '${KUBELET_APISERVER}'
   cbr-cidr: 10.123.45.0/30
+  network_provider: '${NETWORK_PROVIDER}'
 EOF
   else
     # If the kubelet is running disconnected from a master, give it a fixed
@@ -598,6 +598,7 @@ grains:
   cbr-cidr: 10.123.45.0/30
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
+  network_provider: '${NETWORK_PROVIDER}'
 EOF
 }
 

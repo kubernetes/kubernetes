@@ -24,7 +24,6 @@
 
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
-{% set network_plugin = "" -%}
 {% if grains['roles'][0] == 'kubernetes-master' -%}
   {% if grains.cloud in ['aws', 'gce', 'vagrant'] -%}
 
@@ -32,9 +31,6 @@
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
-      {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
-          {% set network_plugin = "--network-plugin=opencontrail" %}
-      {% endif -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}
@@ -110,6 +106,11 @@
 {% if pillar['kubelet_test_args'] is defined -%}
   {% set test_args=pillar['kubelet_test_args'] %}
 {% endif -%}
+
+{% set network_plugin = "" %}
+{% if grains['roles'][0] != 'kubernetes-master' and grains.get('network_provider') and grains['network_provider'] == 'opencontrail' %}
+      {% set network_plugin = "--network_plugin=" + grains['network_provider'] %}
+{% endif %}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{cpu_cfs_quota}} {{network_plugin}} {{test_args}}"
