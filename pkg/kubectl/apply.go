@@ -58,8 +58,8 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 		return nil
 	}
 
-	// Get the current annotations from the object.
-	annotations, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
+	accessor := info.Mapping.MetadataAccessor
+	annotations, err := accessor.Annotations(info.Object)
 	if err != nil {
 		return err
 	}
@@ -161,4 +161,19 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 	}
 
 	return modified, nil
+}
+
+// UpdateApplyAnnotation gets the modified configuration of the object,
+// without embedding it again, and then sets it on the object as the annotation.
+func UpdateApplyAnnotation(info *resource.Info) error {
+	modified, err := GetModifiedConfiguration(info, false)
+	if err != nil {
+		return err
+	}
+
+	if err := SetOriginalConfiguration(info, modified); err != nil {
+		return err
+	}
+
+	return nil
 }

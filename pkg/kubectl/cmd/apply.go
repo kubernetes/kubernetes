@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
-// ApplyOptions stores cmd.Flag values for apply.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
+// ApplyOptions stores cmd.Flag values for apply.  As new fields are added,
+// add them here instead of referencing the cmd.Flags()
 type ApplyOptions struct {
 	Filenames []string
 }
