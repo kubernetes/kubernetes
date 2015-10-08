@@ -18,9 +18,9 @@
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-1}
-MINION_SIZE=${MINION_SIZE:-n1-standard-1}
-NUM_MINIONS=${NUM_MINIONS:-4}
+MASTER_SIZE=${MASTER_SIZE:-n1-standard-2}
+MINION_SIZE=${MINION_SIZE:-n1-standard-2}
+NUM_MINIONS=${NUM_MINIONS:-3}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 MINION_DISK_TYPE=pd-standard
