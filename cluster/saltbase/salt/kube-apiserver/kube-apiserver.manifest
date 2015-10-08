@@ -44,6 +44,7 @@
 {% endif -%}
 
 {% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
+{% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
 
 {% set service_cluster_ip_range = "" -%}
 {% if pillar['service_cluster_ip_range'] is defined -%}
@@ -88,7 +89,7 @@
  {% set runtime_config = "--runtime-config=" + grains.runtime_config -%}
 {% endif -%}
 
-{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
+{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 {% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
@@ -111,7 +112,7 @@
     "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
     "resources": {
       "limits": {
-        "cpu": "200m"
+        "cpu": "250m"
       }
     },
     "command": [
