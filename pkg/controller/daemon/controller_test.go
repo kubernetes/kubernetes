@@ -130,7 +130,7 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
-	manager := NewDaemonSetsController(client)
+	manager := NewDaemonSetsController(client, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}
 	manager.podControl = podControl
