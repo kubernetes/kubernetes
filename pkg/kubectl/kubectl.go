@@ -18,6 +18,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -77,8 +78,21 @@ type ShortcutExpander struct {
 // VersionAndKindForResource implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
 // mapper.
 func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
-	resource = expandResourceShortcut(resource)
+	exp := "experimental"
+	parts := strings.Split(resource, "/")
+	// group/kind or group/kind-shortcut
+	if len(parts) > 1 {
+		resource = fmt.Sprintf("%s/%s", parts[0], expandResourceShortcut(parts[1]))
+	}
+	// kind or kind-shortcut
+	if len(parts) == 1 {
+		resource = expandResourceShortcut(resource)
+	}
 	defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(resource)
+	// kind that should be experimental/kind
+	if group, err := e.GroupForResource(resource); len(parts) == 1 && err == nil && group == exp {
+		return defaultVersion, kind, fmt.Errorf("%s resource %q should be specified explicitly; use %s/%s instead", exp, resource, exp, resource)
+	}
 	return defaultVersion, kind, err
 }
 
@@ -86,6 +100,10 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 // It expands the resource first, then invokes the wrapped mapper.
 func (e ShortcutExpander) ResourceIsValid(resource string) bool {
 	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
+}
+
+func (e ShortcutExpander) GroupForResource(resource string) (group string, err error) {
+	return e.RESTMapper.GroupForResource(resource)
 }
 
 // expandResourceShortcut will return the expanded version of resource

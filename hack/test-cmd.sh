@@ -136,6 +136,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
+  --runtime_config="experimental/v1alpha1=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -921,6 +922,33 @@ __EOF__
   kubectl patch "${kube_flags[@]}" nodes "127.0.0.1" -p='{"spec":{"unschedulable":null}}'
   # Post-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+
+
+  #########################
+  # Experimental resource #
+  #########################
+
+  ### Create and delete an experimental deployment example
+  # Pre-condition: no persistent experimental deployment currently exist
+  kube::test::get_object_assert experimental/deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/experimental/deployment.yaml
+  # Post-condition: deployment "nginx-deployment" is created
+  kube::test::get_object_assert experimental/deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  # Clean up
+  kubectl delete experimental/deployment nginx-deployment
+  ### Get experimental resource via shortname
+  kubectl get experimental/hpa
+  ### Get experimental resource via shortname implicitly
+  ERROR_FILE="/tmp/should-error"
+  kubectl get hpa 1>&2 2> "${ERROR_FILE}" || true
+  if grep -q "error" "${ERROR_FILE}" && grep -q "should be specified explicitly" "${ERROR_FILE}"; then
+    echo "\"kubectl get hpa\" returns error as expected: $(cat ${ERROR_FILE})"
+  else
+    echo "\"kubectl get hpa\" returns unexpected non-error: $(cat ${ERROR_FILE})"
+    exit 1
+  fi
+  rm "${ERROR_FILE}"
 
 
   #####################
