@@ -85,7 +85,7 @@ func NewEndpointController(client *client.Client) *endpointController {
 			},
 		},
 		&api.Pod{},
-		kservice.PodRelistPeriod,
+		5*time.Minute,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    e.addPod,
 			UpdateFunc: e.updatePod,

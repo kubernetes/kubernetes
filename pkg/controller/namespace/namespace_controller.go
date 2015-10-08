@@ -55,6 +55,7 @@ func NewNamespaceController(kubeClient client.Interface, experimentalMode bool, 
 			},
 		},
 		&api.Namespace{},
+		// TODO: Can we have much longer period here?
 		resyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {

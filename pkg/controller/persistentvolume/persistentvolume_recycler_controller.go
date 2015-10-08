@@ -71,6 +71,7 @@ func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Du
 			},
 		},
 		&api.PersistentVolume{},
+		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
