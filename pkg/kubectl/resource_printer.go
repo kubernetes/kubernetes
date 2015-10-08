@@ -741,7 +741,7 @@ func printJob(job *experimental.Job, w io.Writer, withNamespace bool, wide bool,
 		firstContainer.Name,
 		firstContainer.Image,
 		labels.FormatLabels(job.Spec.Selector),
-		job.Status.Successful)
+		job.Status.Succeeded)
 	if err != nil {
 		return err
 	}
