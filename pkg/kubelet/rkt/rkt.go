@@ -212,10 +212,10 @@ func rawValue(value string) *json.RawMessage {
 // rawValue converts the request, limit to *json.RawMessage
 func rawRequestLimit(request, limit string) *json.RawMessage {
 	if request == "" {
-		return rawValue(fmt.Sprintf(`{"limit":%q}`, limit))
+		request = limit
 	}
 	if limit == "" {
-		return rawValue(fmt.Sprintf(`{"request":%q}`, request))
+		limit = request
 	}
 	return rawValue(fmt.Sprintf(`{"request":%q,"limit":%q}`, request, limit))
 }
