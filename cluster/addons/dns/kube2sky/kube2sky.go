@@ -130,7 +130,7 @@ func (ks *kube2sky) newHeadlessService(subdomain string, service *kapi.Service) 
 		return fmt.Errorf("failed to get endpoints object from endpoints store - %v", err)
 	}
 	if !exists {
-		glog.V(1).Infof("could not find endpoints for service %q in namespace %q. DNS records will be created once endpoints show up.", service.Name, service.Namespace)
+		glog.V(1).Infof("Could not find endpoints for service %q in namespace %q. DNS records will be created once endpoints show up.", service.Name, service.Namespace)
 		return nil
 	}
 	if e, ok := e.(*kapi.Endpoints); ok {
