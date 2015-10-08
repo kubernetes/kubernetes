@@ -19,6 +19,14 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+ETCD_VERSION=${ETCD_VERSION:-v2.0.12}
+
+full_name=etcd-${ETCD_VERSION}-linux-amd64
+archive_url=https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/${full_name}.tar.gz
+
+download_dir=/tmp/etcd-${ETCD_VERSION}
+
+mkdir ${download_dir}
 
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
 : ${KUBECTL:=${KUBE_VERSION_ROOT}/cluster/kubectl.sh}
