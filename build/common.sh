@@ -1177,7 +1177,9 @@ function kube::release::gcs::publish() {
 
   local contents
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
+    kube::log::status "Making uploaded version file public and non-cacheable."
     gsutil acl ch -R -g all:R "${publish_file_dst}" >/dev/null 2>&1 || return 1
+    gsutil setmeta -h "Cache-Control:private, max-age=0" "${publish_file_dst}" >/dev/null 2>&1 || return 1
     # If public, validate public link
     local -r public_link="https://storage.googleapis.com/${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
     kube::log::status "Validating uploaded version file at ${public_link}"
