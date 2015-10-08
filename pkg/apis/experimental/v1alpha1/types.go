@@ -440,11 +440,11 @@ type JobStatus struct {
 	// Active is the number of actively running pods.
 	Active int `json:"active,omitempty"`
 
-	// Successful is the number of pods which reached Phase Succeeded.
-	Successful int `json:"successful,omitempty"`
+	// Succeeded is the number of pods which reached Phase Succeeded.
+	Succeeded int `json:"succeeded,omitempty"`
 
-	// Unsuccessful is the number of pods which reached Phase Failed.
-	Unsuccessful int `json:"unsuccessful,omitempty"`
+	// Failed is the number of pods which reached Phase Failed.
+	Failed int `json:"failed,omitempty"`
 }
 
 type JobConditionType string

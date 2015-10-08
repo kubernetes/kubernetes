@@ -101,7 +101,7 @@ var _ = Describe("Job", func() {
 			if err != nil {
 				return false, err
 			}
-			return curr.Status.Unsuccessful > lotsOfFailures, nil
+			return curr.Status.Failed > lotsOfFailures, nil
 		})
 	})
 
@@ -256,6 +256,6 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int) err
 		if err != nil {
 			return false, err
 		}
-		return curr.Status.Successful == completions, nil
+		return curr.Status.Succeeded == completions, nil
 	})
 }
