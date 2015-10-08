@@ -447,10 +447,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *experimental.DaemonSe
 
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 
-		// TODO(mikedanese): this does not count nodes that should be running
-		// exactly one daemon pod but are running more than one daemon pods.
-
-		if shouldRun && numDaemonPods == 1 {
+		if shouldRun && numDaemonPods > 0 {
 			currentNumberScheduled++
 		}
 
