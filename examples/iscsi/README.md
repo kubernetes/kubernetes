@@ -31,26 +31,54 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## Step 1. Setting up iSCSI target and iSCSI initiator
+## Step 1. Setting up iSCSI target
 
-**Setup A.** On Fedora 21 nodes
+* IET (iSCSI Enterprise Target), also known as iscsitarget is the simplest to setup, commands are as follows :
 
-If you use Fedora 21 on Kubernetes node, then first install iSCSI initiator on the node:
+```console
+ietadm --op new --tid=[id] --params Name=iqn.2001-04.com.example:storage.kube.sys1.xyz
+ietadm --op new --tid=[id] --lun=[lun_id] --params Path=[path to backing device],Type=fileio
+```
 
-    # yum -y install iscsi-initiator-utils
+See this [quickstart guide for Debian](https://wiki.debian.org/SAN/iSCSI/iscsitarget)
 
+* Linux SCSI target framework (tgt or stgt) is a more up to date implementation with the following workflow:
 
-then edit */etc/iscsi/initiatorname.iscsi* and */etc/iscsi/iscsid.conf* to match your iSCSI target configuration.
+```console
+tgtadm --lld iscsi --op new --mode target --tid [id] -T iqn.2001-04.com.example:storage.kube.sys1.xyz
+tgtadm --lld iscsi --op new --mode logicalunit --tid [id] --lun [lun_id] -b [path to backing device]
+tgtadm --lld iscsi --op bind --mode target --tid [id] -I ALL
+```
 
-I mostly followed these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi) to setup iSCSI target. and these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi&f=2) to setup iSCSI initiator.
+See this [quickstart guide for fedora](https://fedoraproject.org/wiki/Scsi-target-utils_Quickstart_Guide).
+Keep in mind that LUN 0 is reserved in tgt and cannot be used as a lun id.
 
-**Setup B.** On Unbuntu 12.04 and Debian 7 nodes on Google Compute Engine (GCE)
+* Linux-IO(LIO) is the current implementation in the kernel deprecating both of the above but is significantly
+more complicated to setup. LIO also reserves LUN 0. A setup guide can be found [here](https://en.wikipedia.org/wiki/LIO_(SCSI_target)
 
-GCE does not provide preconfigured Fedora 21 image, so I set up the iSCSI target on a preconfigured Ubuntu 12.04 image, mostly following these [instructions](http://www.server-world.info/en/note?os=Ubuntu_12.04&p=iscsi). My Kubernetes cluster on GCE was running Debian 7 images, so I followed these [instructions](http://www.server-world.info/en/note?os=Debian_7.0&p=iscsi&f=2) to set up the iSCSI initiator.
+## Step 2. Setting up the iSCSI initiator
 
-## Step 2. Creating the pod with iSCSI persistent storage
+The linux initiator project is known as open-iscsi. No configuration is needed for open-iscsi for most target setups.
+Commands are as follows :
+```console
+iscsiadm -m discovery -t st -p [ip:port of target portal]
+iscsiadm -m node -T iqn.2001-04.com.example:storage.kube.sys1.xyz -p [ip:port of target portal] -l
+```
+Kubernetes will automatically run these commands using information from the provided json file, these are provided for testing purposes only. See the [README](http://www.open-iscsi.org/docs/README) for more details.
 
-Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on my example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean.
+## Step 3. Creating the pod with iSCSI persistent storage
+
+Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on the example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean. No initiator information is required.
+
+The following is the configuration for the sample json and the output provided here :
+
+Target IQN       : iqn.2001-04.com.example:storage.kube.sys1.xyz
+Target/Portal IP : 10.0.2.15
+Target LUN 0     : Read-only access
+Target LUN 1     : Read-write access
+
+Initiator IQN    : iqn.2005-03.org.open-iscsi:691284415481
+Initiator IP     : 10.0.2.20
 
 **Note:** If you have followed the instructions in the links above you
 may have partitioned the device, the iSCSI volume plugin does not
@@ -77,30 +105,33 @@ NAME      READY     STATUS    RESTARTS   AGE
 iscsipd   2/2       RUNNING   0           2m
 ```
 
-On the Kubernetes node, I got these in mount output
+On the Kubernetes node, verify the mount output
 
 ```console
 # mount |grep kub
-/dev/sdb on /var/lib/kubelet/plugins/kubernetes.io/iscsi/iscsi/10.240.205.13:3260-iqn-iqn.2014-12.world.server:storage.target1-lun-0 type ext4 (ro,relatime,data=ordered)
-/dev/sdb on /var/lib/kubelet/pods/e36158ce-f8d8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-ro type ext4 (ro,relatime,data=ordered)
-/dev/sdc on /var/lib/kubelet/plugins/kubernetes.io/iscsi/iscsi/10.240.205.13:3260-iqn-iqn.2014-12.world.server:storage.target1-lun-1 type xfs (rw,relatime,attr2,inode64,noquota)
-/dev/sdc on /var/lib/kubelet/pods/e36158ce-f8d8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw type xfs (rw,relatime,attr2,inode64,noquota)
+/dev/sdb on /var/lib/kubelet/plugins/kubernetes.io/iscsi/10.0.2.15:3260-iqn.2001-04.com.example:storage.kube.sys1.xyz-lun-0 type ext4 (ro,relatime,data=ordered)
+/dev/sdb on /var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-ro type ext4 (ro,relatime,data=ordered)
+/dev/sdc on /var/lib/kubelet/plugins/kubernetes.io/iscsi/10.0.2.15:3260-iqn.2001-04.com.example:storage.kube.sys1.xyz-lun-1 type ext4 (rw,relatime,data=ordered)
+/dev/sdc on /var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-rw type ext4 (rw,relatime,data=ordered)
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod.
 
 ```console
 # docker ps
-CONTAINER ID        IMAGE                                                COMMAND                CREATED             STATUS              PORTS               NAMES
-cc051196e7af        kubernetes/pause:latest                              "/pause"               About an hour ago   Up About an hour                        k8s_iscsipd-rw.ff2d2e9f_iscsipd_default_e36158ce-f8d8-11e4-9ae7-42010af01964_26f3a457                                               
-8aa981443cf4        kubernetes/pause:latest                              "/pause"               About an hour ago   Up About an hour                        k8s_iscsipd-ro.d7752e8f_iscsipd_default_e36158ce-f8d8-11e4-9ae7-42010af01964_4939633d    
+CONTAINER ID        IMAGE                                  COMMAND             CREATED             STATUS              PORTS               NAMES
+f855336407f4        kubernetes/pause                       "/pause"            6 minutes ago       Up 6 minutes                            k8s_iscsipd-ro.d130ec3e_iscsipd_default_f527ca5b-6d87-11e5-aa7e-080027ff6387_5409a4cb
+3b8a772515d2        kubernetes/pause                       "/pause"            6 minutes ago       Up 6 minutes                            k8s_iscsipd-rw.ed58ec4e_iscsipd_default_f527ca5b-6d87-11e5-aa7e-080027ff6387_d25592c5
 ```
 
-Run *docker inspect* and I found the Containers mounted the host directory into the their */mnt/iscsipd* directory.
+Run *docker inspect* and verify the container mounted the host directory into the their */mnt/iscsipd* directory.
 
 ```console 
-# docker inspect --format '{{index .Volumes "/mnt/iscsipd"}}' cc051196e7af
-/var/lib/kubelet/pods/75e0af2b-f8e8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw
+# docker inspect --format '{{ range .Mounts }}{{ if eq .Destination "/mnt/iscsipd" }}{{ .Source }}{{ end }}{{ end }}' f855336407f4
+/var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-ro
+
+# docker inspect --format '{{ range .Mounts }}{{ if eq .Destination "/mnt/iscsipd" }}{{ .Source }}{{ end }}{{ end }}' 3b8a772515d2
+/var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-rw
 ```
 
 
