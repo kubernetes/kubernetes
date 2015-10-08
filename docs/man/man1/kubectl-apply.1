@@ -3,24 +3,41 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl apply \- Apply a configuration to a resource by filename or stdin
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl apply\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
+Apply a configuration to a resource by filename or stdin.
 
 .PP
-Find more information at 
-\[la]https://github.com/kubernetes/kubernetes\[ra].
+JSON and YAML formats are accepted.
 
 
 .SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to file that contains the configuration to apply
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output mode. Use "\-o name" for shorter output (resource/name).
+
+.PP
+\fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
+
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -114,9 +131,24 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Apply the configuration in pod.json to a pod.
+$ kubectl apply \-f ./pod.json
+
+# Apply the JSON passed into stdin to a pod.
+$ cat pod.json | kubectl apply \-f \-
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-edit(1)\fP, \fBkubectl\-apply(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-attach(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-annotate(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP, \fBkubectl\-explain(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY
