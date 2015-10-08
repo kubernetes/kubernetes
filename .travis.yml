@@ -8,7 +8,7 @@ matrix:
 
 install:
   - go get github.com/tools/godep
-  - ./hack/travis/install-etcd.sh
+  - ./hack/install-etcd.sh
   - ./hack/build-go.sh
   - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
 
