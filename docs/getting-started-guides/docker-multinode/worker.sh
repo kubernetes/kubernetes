@@ -130,6 +130,10 @@ start_k8s() {
             ifconfig docker0 down
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
         ;;
+        *)
+            echo "Unsupported operations system $lsb_dist"
+            exit 1
+        ;;
     esac
 
     # sleep a little bit
