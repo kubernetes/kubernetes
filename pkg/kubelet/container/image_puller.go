@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // imagePuller pulls the image using Runtime.PullImage().
@@ -30,14 +31,16 @@ import (
 type imagePuller struct {
 	recorder record.EventRecorder
 	runtime  Runtime
+	backOff  *util.Backoff
 }
 
 // NewImagePuller takes an event recorder and container runtime to create a
 // image puller that wraps the container runtime's PullImage interface.
-func NewImagePuller(recorder record.EventRecorder, runtime Runtime) ImagePuller {
+func NewImagePuller(recorder record.EventRecorder, runtime Runtime, imageBackOff *util.Backoff) ImagePuller {
 	return &imagePuller{
 		recorder: recorder,
 		runtime:  runtime,
+		backOff:  imageBackOff,
 	}
 }
 
@@ -56,24 +59,18 @@ func shouldPullImage(container *api.Container, imagePresent bool) bool {
 	return false
 }
 
-// reportImagePull reports 'image pulling', 'image pulled' or 'image pulling failed' events.
-func (puller *imagePuller) reportImagePull(ref *api.ObjectReference, event string, image string, pullError error) {
-	if ref == nil {
-		return
-	}
-
-	switch event {
-	case "pulling":
-		puller.recorder.Eventf(ref, "Pulling", "Pulling image %q", image)
-	case "pulled":
-		puller.recorder.Eventf(ref, "Pulled", "Successfully pulled image %q", image)
-	case "failed":
-		puller.recorder.Eventf(ref, "Failed", "Failed to pull image %q: %v", image, pullError)
+// records an event using ref, event msg.  log to glog using prefix, msg, logFn
+func (puller *imagePuller) logIt(ref *api.ObjectReference, event, prefix, msg string, logFn func(args ...interface{})) {
+	if ref != nil {
+		puller.recorder.Eventf(ref, event, msg)
+	} else {
+		logFn(fmt.Sprint(prefix, " ", msg))
 	}
 }
 
 // PullImage pulls the image for the specified pod and container.
-func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
+func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
 	ref, err := GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -81,24 +78,36 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	spec := ImageSpec{container.Image}
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
-		if ref != nil {
-			puller.recorder.Eventf(ref, "Failed", "Failed to inspect image %q: %v", container.Image, err)
-		}
-		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
+		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
+		puller.logIt(ref, "Failed", logPrefix, msg, glog.Warning)
+		return ErrImageInspect, msg
 	}
 
 	if !shouldPullImage(container, present) {
-		if present && ref != nil {
-			puller.recorder.Eventf(ref, "Pulled", "Container image %q already present on machine", container.Image)
+		if present {
+			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
+			puller.logIt(ref, "Pulled", logPrefix, msg, glog.Info)
+			return nil, ""
+		} else {
+			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
+			puller.logIt(ref, "ErrImageNeverPull", logPrefix, msg, glog.Warning)
+			return ErrImageNeverPull, msg
 		}
-		return nil
 	}
 
-	puller.reportImagePull(ref, "pulling", container.Image, nil)
-	if err = puller.runtime.PullImage(spec, pullSecrets); err != nil {
-		puller.reportImagePull(ref, "failed", container.Image, err)
-		return err
+	backOffKey := fmt.Sprintf("%s_%s", pod.Name, container.Image)
+	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
+		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
+		puller.logIt(ref, "Back-off", logPrefix, msg, glog.Info)
+		return ErrImagePullBackOff, msg
 	}
-	puller.reportImagePull(ref, "pulled", container.Image, nil)
-	return nil
+	puller.logIt(ref, "Pulling", logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
+	if err = puller.runtime.PullImage(spec, pullSecrets); err != nil {
+		puller.logIt(ref, "Failed", logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
+		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
+		return ErrImagePull, err.Error()
+	}
+	puller.logIt(ref, "Pulled", logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
+	puller.backOff.GC()
+	return nil, ""
 }

@@ -309,7 +309,7 @@ func NewMainKubelet(
 	}
 
 	procFs := procfs.NewProcFs()
-
+	imageBackOff := util.NewBackOff(resyncInterval, maxContainerBackOff)
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -331,7 +331,9 @@ func NewMainKubelet(
 			dockerExecHandler,
 			oomAdjuster,
 			procFs,
-			klet.cpuCFSQuota)
+			klet.cpuCFSQuota,
+			imageBackOff)
+
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -344,7 +346,8 @@ func NewMainKubelet(
 			recorder,
 			containerRefManager,
 			klet, // prober
-			klet.volumeManager)
+			klet.volumeManager,
+			imageBackOff)
 		if err != nil {
 			return nil, err
 		}

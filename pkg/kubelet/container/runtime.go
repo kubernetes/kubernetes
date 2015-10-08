@@ -33,6 +33,22 @@ import (
 // Container Terminated and Kubelet is backing off the restart
 var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
+var (
+	// Container image pull failed, kubelet is backing off image pull
+	ErrImagePullBackOff = errors.New("ImagePullBackOff")
+
+	// Unable to inspect image
+	ErrImageInspect = errors.New("ImageInspectError")
+
+	// General image pull error
+	ErrImagePull = errors.New("ErrImagePull")
+
+	// Required Image is absent on host and PullPolicy is NeverPullImage
+	ErrImageNeverPull = errors.New("ErrImageNeverPull")
+)
+
+var ErrRunContainer = errors.New("RunContainerError")
+
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
 	// if the version is less than the other, 1 if it is greater than the other,
@@ -108,7 +124,7 @@ type ContainerCommandRunner interface {
 // It will check the presence of the image, and report the 'image pulling',
 // 'image pulled' events correspondingly.
 type ImagePuller interface {
-	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error
+	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 }
 
 // Pod is a group of containers, with the status of the pod.

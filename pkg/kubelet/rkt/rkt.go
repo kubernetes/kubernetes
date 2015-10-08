@@ -113,7 +113,7 @@ func New(config *Config,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
 	prober prober.Prober,
-	volumeGetter volumeGetter) (*Runtime, error) {
+	volumeGetter volumeGetter, imageBackOff *util.Backoff) (*Runtime, error) {
 
 	systemdVersion, err := getSystemdVersion()
 	if err != nil {
@@ -153,7 +153,7 @@ func New(config *Config,
 		prober:              prober,
 		volumeGetter:        volumeGetter,
 	}
-	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt)
+	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
 
 	// Test the rkt version.
 	version, err := rkt.Version()
@@ -418,7 +418,7 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 	manifest := appcschema.BlankPodManifest()
 
 	for _, c := range pod.Spec.Containers {
-		if err := r.imagePuller.PullImage(pod, &c, pullSecrets); err != nil {
+		if err, _ := r.imagePuller.PullImage(pod, &c, pullSecrets); err != nil {
 			return nil, err
 		}
 		imgManifest, err := r.getImageManifest(c.Image)
