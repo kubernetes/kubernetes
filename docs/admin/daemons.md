@@ -181,9 +181,13 @@ all or certain hosts, and when it needs to start before other pods.
 
 ## Caveats
 
-DaemonSet is part of the experimental API group, so it is not subject to the same compatibility
-guarantees as objects in the main API.  It may not be enabled.  Enable by setting
-`--runtime-config=experimental/v1alpha1` on the apiserver.
+DaemonSet objects are in the [`extensions` API Group](../api.md#api-groups).  This API group may or
+may not be enabled on your cluster.
+
+DaemonSet objects effectively have [API version `v1alpha1`](../api.md#api-versioning).
+ Alpha objects may change or even be discontinued in future software releases.
+However, due to to a known issue, they may appear as API version `v1beta1` if enabled.
+
 
 
 

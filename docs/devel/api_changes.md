@@ -507,6 +507,69 @@ The API spec changes should be in a commit separate from your other changes.
 
 TODO(smarterclayton): write this.
 
+## Alpha, Beta, and Stable Versions
+
+New feature development proceeds through a series of stages of increasing maturity:
+
+- Development level
+  - Object Versioning: no convention
+  - Availability: not commited to main kubernetes repo, and thus not available in offical releases
+  - Audience: other developers closely collaborating on a feature or proof-of-concept
+  - Upgradeability, Reliability, Completeness, and Support: no requirements or guarantees
+- Alpha level
+  - Object Versioning: API version name contains `alpha` (e.g. `v1alpha1`)
+  - Availability: committed to main kubernetes repo;  appears in an official release; feature is
+    disabled by default, but may be enabled by flag
+  - Audience: developers and expert users interested in giving early feedback on features
+  - Completeness: some API operations, CLI commands, or UI support may not be implemented;  the API
+    need not have had an *API review* (an intensive and targeted review of the API, on top of a normal
+    code review)
+  - Upgradeability: the object schema and semantics may change in a later software release, without
+    any provision for preserving objects in an existing cluster;
+    removing the upgradability concern allows developers to make rapid progress; in particular,
+    API versions can increment faster than the minor release cadence and the developer need not
+    maintain multiple versions; developers should still increment the API version when object schema
+    or semantics change in an [incompatible way](#on-compatibility)
+  - Cluster Reliability: because the feature is relatively new, and may lack complete end-to-end
+    tests, enabling the feature via a flag might expose bugs with destabilize the cluster (e.g. a
+    bug in a control loop might rapidly create excessive numbers of object, exhausting API storage).
+  - Support: there is *no commitment* from the project to complete the feature; the feature may be
+    dropped entirely in a later software release
+  - Recommended Use Cases: only in short-lived testing clusters, due to complexity of upgradeability
+    and lack of long-term support and lack of upgradability.
+- Beta level:
+  - Object Versioning: API version name contains `beta` (e.g. `v2beta3`)
+  - Availability: in official Kubernetes releases, and enabled by default
+  - Audience: users interested in providing feedback on features
+  - Completeness: all API operations, CLI commands, and UI support should be implemented; end-to-end
+    tests complete; the API has had a thorough API review and is thought to be complete, though use
+    during beta may frequently turn up API issues not thought of during review
+  - Upgradeability: the object schema and semantics may change in a later software release; when
+    this happens, an upgrade path will be documentedr; in some cases, objects will be automatically
+    converted to the new version; in other cases, a manual upgrade may be necessary;  a manual
+    upgrade may require downtime for anything relying on the new feature, and may require
+    manual conversion of objects to the new version; when manual conversion is necessary, the
+    project will provide documentation on the process (for an example, see [v1 conversion
+    tips](../api.md))
+  - Cluster Reliability: since the feature has e2e tests, enabling the feature via a flag should not
+    create new bugs in unrelated features;  because the feature is new, it may have minor bugs
+  - Support: the project commits to complete the feature, in some form, in a subsequent Stable
+    version;  typically this will happen within 3 months, but sometimes longer;  releases should
+    simultaneously support two consecutive versions (e.g. `v1beta1` and `v1beta2`; or `v1beta2` and
+    `v1`) for at least one minor release cycle (typically 3 months) so that users have enough time
+    to upgrade and migrate objects
+  - Recommended Use Cases: in short-lived testing clusters; in production clusters as part of a
+    short-lived evaluation of the feature in order to provide feedback
+- Stable level:
+  - Object Versioning: API version `vX` where `X` is an integer (e.g. `v1`)
+  - Availability: in official Kubernetes releases, and enabled by default
+  - Audience: all users
+  - Completeness: same as beta
+  - Upgradeability: only [strictly compatible](#on-compatibility) changes allowed in subsequent
+    software releases
+  - Cluster Reliability: high
+  - Support: API version will continue to be present for many subsequent software releases;
+  - Recommended Use Cases: any
 
 
 
