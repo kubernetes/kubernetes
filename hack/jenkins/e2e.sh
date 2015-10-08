@@ -728,6 +728,38 @@ case ${JOB_NAME} in
     MINION_SIZE="n1-standard-2"
     ;;
 
+  # Sets up the GKE soak cluster weekly using the latest CI release.
+  kubernetes-soak-weekly-deploy-gke)
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gke-soak-weekly"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest"}
+    : ${E2E_TEST:="false"}
+    : ${E2E_UP:="true"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    # Need at least n1-standard-2 nodes to run kubelet_perf tests
+    MINION_SIZE="n1-standard-2"
+    ;;
+
+  # Runs tests on GKE soak cluster.
+  kubernetes-soak-continuous-e2e-gke)
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
+    : ${E2E_NETWORK:="gke-soak-weekly"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_UP:="false"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
+          )"}
+    ;;
+
   # kubernetes-upgrade-gke
   #
   # This suite:
