@@ -15,7 +15,17 @@
 # limitations under the License.
 
 # TODO: figure out how to get etcd tag from some real configuration and put it here.
-sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
+	--listen-peer-urls http://127.0.0.1:2380 \
+	--addr=127.0.0.1:4001 \
+	--bind-addr=0.0.0.0:4001 \
+	--data-dir=/var/etcd/data
+
+sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
+	--listen-peer-urls http://127.0.0.1:2381 \
+	--addr=127.0.0.1:4002 \
+	--bind-addr=0.0.0.0:4002 \
+	--data-dir=/var/etcd/data_events
 
 # Increase the allowed number of open file descriptors
 ulimit -n 65536
@@ -30,6 +40,7 @@ kubernetes/server/bin/kube-apiserver \
 	--portal-net=10.0.0.1/24 \
 	--address=0.0.0.0 \
 	--etcd-servers=http://127.0.0.1:4001 \
+	--etcd-servers-overrides=/events#http://127.0.0.1:4002 \
 	--cluster-name=hollow-kubernetes \
 	--v=4 \
 	--tls-cert-file=/srv/kubernetes/server.cert \
