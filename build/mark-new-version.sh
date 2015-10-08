@@ -20,6 +20,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [ "$#" -ne 1 ]; then
+  echo "Usage: ${0} <version>"
+  exit 1
+fi
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
