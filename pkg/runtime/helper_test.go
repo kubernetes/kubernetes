@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -84,6 +85,28 @@ func TestExtractListGeneric(t *testing.T) {
 	}
 	if obj, ok := list[1].(*api.Service); !ok {
 		t.Fatalf("Expected list[1] to be *api.Service, it is %#v", obj)
+	}
+}
+
+func TestExtractListGenericV1(t *testing.T) {
+	pl := &v1.List{
+		Items: []runtime.RawExtension{
+			{RawJSON: []byte("foo")},
+			{RawJSON: []byte("bar")},
+		},
+	}
+	list, err := runtime.ExtractList(pl)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := len(list), len(pl.Items); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+	if obj, ok := list[0].(*runtime.Unknown); !ok {
+		t.Fatalf("Expected list[0] to be *runtime.Unknown, it is %#v", obj)
+	}
+	if obj, ok := list[1].(*runtime.Unknown); !ok {
+		t.Fatalf("Expected list[1] to be *runtime.Unknown, it is %#v", obj)
 	}
 }
 
