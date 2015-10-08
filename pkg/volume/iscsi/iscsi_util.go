@@ -67,9 +67,9 @@ func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (
 	return refCount, nil
 }
 
-// make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/iscsi/portal-iqn-some_iqn-lun-0
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/portal-some_iqn-lun-lun_id
 func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string) string {
-	return path.Join(host.GetPluginDir(iscsiPluginName), "iscsi", portal+"-iqn-"+iqn+"-lun-"+lun)
+	return path.Join(host.GetPluginDir(iscsiPluginName), portal+"-"+iqn+"-lun-"+lun)
 }
 
 type ISCSIUtil struct{}
