@@ -21,12 +21,11 @@ import (
 	"strings"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -188,27 +187,13 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return "", err
 	}
 
-	// Update the daemon set to select for a non-existent NodeName.
-	// The daemon set controller will then kill all the daemon pods corresponding to daemon set.
-	nodes, err := reaper.Nodes().List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return "", err
+	// We set the nodeSelector to a random label. This label is nearly guaranteed
+	// to not be set on any node so the DameonSetController will start deleting
+	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
+	// the DaemonSet.
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{
+		string(util.NewUUID()): string(util.NewUUID()),
 	}
-	var fuzzer = fuzz.New()
-	var nameExists bool
-
-	var nodeName string
-	fuzzer.Fuzz(&nodeName)
-	nameExists = false
-	for _, node := range nodes.Items {
-		nameExists = nameExists || node.Name == nodeName
-	}
-	if nameExists {
-		// Probability of reaching here is extremely low, most likely indicates a programming bug/library error.
-		return "", fmt.Errorf("Name collision generating an unused node name. Please retry this operation.")
-	}
-
-	ds.Spec.Template.Spec.NodeName = nodeName
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
 
