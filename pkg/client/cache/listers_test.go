@@ -171,7 +171,8 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
-				return lister.List()
+				list, err := lister.List()
+				return list.Items, err
 			},
 			outDaemonSetNames: sets.NewString("basic"),
 		},
@@ -183,7 +184,8 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
-				return lister.List()
+				list, err := lister.List()
+				return list.Items, err
 			},
 			outDaemonSetNames: sets.NewString("basic", "complex", "complex2"),
 		},

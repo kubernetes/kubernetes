@@ -202,8 +202,8 @@ func (dsc *DaemonSetsController) enqueueAllDaemonSets() {
 		glog.Errorf("Error enqueueing daemon sets: %v", err)
 		return
 	}
-	for i := range ds {
-		dsc.enqueueDaemonSet(&ds[i])
+	for i := range ds.Items {
+		dsc.enqueueDaemonSet(&ds.Items[i])
 	}
 }
 
