@@ -9,7 +9,7 @@ set -e
 # Should-Stop:        
 # Default-Start:      
 # Default-Stop:       
-# Short-Description:  Start kube-controller-managerservice
+# Short-Description:  Start kube-controller-manager service
 # Description:
 #  http://www.github.com/GoogleCloudPlatform/Kubernetes
 ### END INIT INFO
@@ -59,7 +59,7 @@ KUBE_CONTROLLER_MANAGER_START="start-stop-daemon
 --make-pidfile \
 --pidfile $KUBE_CONTROLLER_MANAGER_PIDFILE \
 -- $KUBE_CONTROLLER_MANAGER_OPTS \
->> "$KUBE_CONTROLLER_MANAGER_LOGFILE" 2>&1
+>> $KUBE_CONTROLLER_MANAGER_LOGFILE 2>&1"
 
 KUBE_CONTROLLER_MANAGER_STOP="start-stop-daemon \
 --stop \
