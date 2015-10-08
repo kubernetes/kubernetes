@@ -220,7 +220,7 @@ func NameIsDNS952Label(name string, prefix bool) (bool, string) {
 }
 
 // Validates that given value is not negative.
-func ValidatePositiveField(value int64, fldPath *field.Path) field.ErrorList {
+func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, isNegativeErrorMsg))
@@ -229,7 +229,7 @@ func ValidatePositiveField(value int64, fldPath *field.Path) field.ErrorList {
 }
 
 // Validates that a Quantity is not negative
-func ValidatePositiveQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
+func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNegativeErrorMsg))
@@ -278,7 +278,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 			allErrs = append(allErrs, field.Forbidden(fldPath, "not allowed on this type"))
 		}
 	}
-	allErrs = append(allErrs, ValidatePositiveField(meta.Generation, fldPath.Child("generation"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 
@@ -1039,11 +1039,11 @@ func validateProbe(probe *api.Probe, fldPath *field.Path) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler, fldPath)...)
 
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
 	return allErrs
 }
 
@@ -1598,8 +1598,8 @@ func ValidateReplicationControllerUpdate(controller, oldController *api.Replicat
 func ValidateReplicationControllerStatusUpdate(controller, oldController *api.ReplicationController) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
 	statusPath := field.NewPath("status")
-	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
 	return allErrs
 }
 
@@ -1643,7 +1643,7 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
 	return allErrs
 }
@@ -2012,7 +2012,7 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) field.ErrorList {
 // validateResourceQuantityValue enforces that specified quantity is valid for specified resource
 func validateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidatePositiveQuantity(value, fldPath)...)
+	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if api.IsIntegerResourceName(resource) {
 		if value.MilliValue()%int64(1000) != int64(0) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
