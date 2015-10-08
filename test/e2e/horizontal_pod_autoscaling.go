@@ -63,7 +63,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	})
 
 	It("[Skipped][Autoscaling Suite] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: Memory)", func() {
-		rc = NewDynamicResourceConsumer("rc", 5, 0, 2200, 100, 1000, f)
+		rc = NewDynamicResourceConsumer("rc", 5, 0, 2200, 100, 2500, f)
 		defer rc.CleanUp()
 		createMemoryHorizontalPodAutoscaler(rc, "1000")
 		rc.WaitForReplicas(3)
