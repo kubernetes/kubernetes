@@ -144,6 +144,7 @@ A key design question for a Rescheduler is how much knowledge it needs about the
 ## Appendix: Integrating rescheduler with cluster auto-scaler (scale up)
 
 For scaling up the cluster, a reasonable workflow might be:
+
 1. pod horizontal auto-scaler decides to add one or more Pods to a service, based on the metrics it is observing
 1. the Pod goes PENDING due to lack of a suitable node with sufficient resources
 1. rescheduler notices the PENDING Pod and determines that the Pod cannot schedule just by rearranging existing Pods (while respecting SLOs)
