@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
@@ -46,8 +46,8 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
-		update := got.(kubeletTypes.PodUpdate)
-		expected := CreatePodUpdate(kubeletTypes.SET, kubeletTypes.FileSource)
+		update := got.(kubetypes.PodUpdate)
+		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -75,7 +75,7 @@ func TestReadPodsFromFile(t *testing.T) {
 	var testCases = []struct {
 		desc     string
 		pod      runtime.Object
-		expected kubeletTypes.PodUpdate
+		expected kubetypes.PodUpdate
 	}{
 		{
 			desc: "Simple pod",
@@ -94,7 +94,7 @@ func TestReadPodsFromFile(t *testing.T) {
 					SecurityContext: &api.PodSecurityContext{},
 				},
 			},
-			expected: CreatePodUpdate(kubeletTypes.SET, kubeletTypes.FileSource, &api.Pod{
+			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test-" + hostname,
 					UID:       "12345",
@@ -137,7 +137,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
 			select {
 			case got := <-ch:
-				update := got.(kubeletTypes.PodUpdate)
+				update := got.(kubetypes.PodUpdate)
 				for _, pod := range update.Pods {
 					if errs := validation.ValidatePod(pod); len(errs) > 0 {
 						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
@@ -180,8 +180,8 @@ func TestExtractFromEmptyDir(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	update := (<-ch).(kubeletTypes.PodUpdate)
-	expected := CreatePodUpdate(kubeletTypes.SET, kubeletTypes.FileSource)
+	update := (<-ch).(kubetypes.PodUpdate)
+	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}

@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -212,7 +212,7 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 }
 
 // DockerContainers is a map of containers
-type DockerContainers map[kubeletTypes.DockerID]*docker.APIContainers
+type DockerContainers map[kubetypes.DockerID]*docker.APIContainers
 
 func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
@@ -368,7 +368,7 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
 			continue
 		}
-		result[kubeletTypes.DockerID(container.ID)] = container
+		result[kubetypes.DockerID(container.ID)] = container
 	}
 	return result, nil
 }

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -172,7 +172,7 @@ func TestExecSupportNotExists(t *testing.T) {
 
 func TestDockerContainerCommand(t *testing.T) {
 	runner := &DockerManager{}
-	containerID := kubeletTypes.DockerID("1234").ContainerID()
+	containerID := kubetypes.DockerID("1234").ContainerID()
 	command := []string{"ls"}
 	cmd, _ := runner.getRunInContainerCommand(containerID, command)
 	if cmd.Dir != "/var/lib/docker/execdriver/native/"+containerID.ID {
@@ -561,12 +561,12 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   kubeletTypes.DockerID("foobar").ContainerID(),
+							ID:   kubetypes.DockerID("foobar").ContainerID(),
 							Name: "foobar",
 							Hash: 0x1234,
 						},
 						{
-							ID:   kubeletTypes.DockerID("baz").ContainerID(),
+							ID:   kubetypes.DockerID("baz").ContainerID(),
 							Name: "baz",
 							Hash: 0x1234,
 						},
@@ -578,7 +578,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   kubeletTypes.DockerID("barbar").ContainerID(),
+							ID:   kubetypes.DockerID("barbar").ContainerID(),
 							Name: "barbar",
 							Hash: 0x1234,
 						},
@@ -619,17 +619,17 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   kubeletTypes.DockerID("foobar").ContainerID(),
+							ID:   kubetypes.DockerID("foobar").ContainerID(),
 							Name: "foobar",
 							Hash: 0x1234,
 						},
 						{
-							ID:   kubeletTypes.DockerID("barfoo").ContainerID(),
+							ID:   kubetypes.DockerID("barfoo").ContainerID(),
 							Name: "barfoo",
 							Hash: 0x1234,
 						},
 						{
-							ID:   kubeletTypes.DockerID("baz").ContainerID(),
+							ID:   kubetypes.DockerID("baz").ContainerID(),
 							Name: "baz",
 							Hash: 0x1234,
 						},
@@ -641,7 +641,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   kubeletTypes.DockerID("barbar").ContainerID(),
+							ID:   kubetypes.DockerID("barbar").ContainerID(),
 							Name: "barbar",
 							Hash: 0x1234,
 						},
@@ -653,7 +653,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   kubeletTypes.DockerID("bazbaz").ContainerID(),
+							ID:   kubetypes.DockerID("bazbaz").ContainerID(),
 							Name: "bazbaz",
 							Hash: 0x1234,
 						},

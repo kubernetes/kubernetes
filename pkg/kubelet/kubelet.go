@@ -55,7 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/probe"
@@ -462,7 +462,7 @@ type Kubelet struct {
 	// Optional, defaults to simple Docker implementation
 	runner kubecontainer.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
-	httpClient kubeletTypes.HttpGetter
+	httpClient kubetypes.HttpGetter
 
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface
@@ -777,7 +777,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 }
 
 // Run starts the kubelet reacting to config updates
-func (kl *Kubelet) Run(updates <-chan kubeletTypes.PodUpdate) {
+func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.logServer == nil {
 		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
 	}
@@ -1248,15 +1248,15 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubeletTypes.SyncPodType) error {
+func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	start := time.Now()
 	var firstSeenTime time.Time
-	if firstSeenTimeStr, ok := pod.Annotations[kubeletTypes.ConfigFirstSeenAnnotationKey]; !ok {
+	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; !ok {
 		glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
 	} else {
-		firstSeenTime = kubeletTypes.ConvertToTimestamp(firstSeenTimeStr).Get()
+		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
 	}
 
 	// Before returning, regenerate status and store it in the cache.
@@ -1332,7 +1332,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// it's OK to pretend like the kubelet started them after it restarted.
 
 	var podStatus api.PodStatus
-	if updateType == kubeletTypes.SyncPodCreate {
+	if updateType == kubetypes.SyncPodCreate {
 		// This is the first time we are syncing the pod. Record the latency
 		// since kubelet first saw the pod if firstSeenTime is set.
 		if !firstSeenTime.IsZero() {
@@ -1902,7 +1902,7 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync-frequency seconds. Never returns.
-func (kl *Kubelet) syncLoop(updates <-chan kubeletTypes.PodUpdate, handler SyncHandler) {
+func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
 	var housekeepingTimestamp time.Time
 	for {
@@ -1944,7 +1944,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubeletTypes.PodUpdate, handler SyncH
 	}
 }
 
-func (kl *Kubelet) syncLoopIteration(updates <-chan kubeletTypes.PodUpdate, handler SyncHandler) bool {
+func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler SyncHandler) bool {
 	kl.syncLoopMonitor.Store(time.Now())
 	select {
 	case u, open := <-updates:
@@ -1954,16 +1954,16 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubeletTypes.PodUpdate, hand
 		}
 		kl.addSource(u.Source)
 		switch u.Op {
-		case kubeletTypes.ADD:
+		case kubetypes.ADD:
 			glog.V(2).Infof("SyncLoop (ADD): %q", kubeletUtil.FormatPodNames(u.Pods))
 			handler.HandlePodAdditions(u.Pods)
-		case kubeletTypes.UPDATE:
+		case kubetypes.UPDATE:
 			glog.V(2).Infof("SyncLoop (UPDATE): %q", kubeletUtil.FormatPodNames(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
-		case kubeletTypes.REMOVE:
+		case kubetypes.REMOVE:
 			glog.V(2).Infof("SyncLoop (REMOVE): %q", kubeletUtil.FormatPodNames(u.Pods))
 			handler.HandlePodDeletions(u.Pods)
-		case kubeletTypes.SET:
+		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
@@ -1976,7 +1976,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubeletTypes.PodUpdate, hand
 	return true
 }
 
-func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType kubeletTypes.SyncPodType, mirrorPod *api.Pod, start time.Time) {
+func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType kubetypes.SyncPodType, mirrorPod *api.Pod, start time.Time) {
 	if kl.podIsTerminated(pod) {
 		return
 	}
@@ -1985,7 +1985,7 @@ func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType kubeletTypes.SyncPodType,
 		metrics.PodWorkerLatency.WithLabelValues(syncType.String()).Observe(metrics.SinceInMicroseconds(start))
 	})
 	// Note the number of containers for new pods.
-	if syncType == kubeletTypes.SyncPodCreate {
+	if syncType == kubetypes.SyncPodCreate {
 		metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
 	}
 }
@@ -1996,7 +1996,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *api.Pod, start time.Time) {
 	// corresponding static pod. Send update to the pod worker if the static
 	// pod exists.
 	if pod, ok := kl.podManager.GetPodByMirrorPod(mirrorPod); ok {
-		kl.dispatchWork(pod, kubeletTypes.SyncPodUpdate, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
 	}
 }
 
@@ -2021,7 +2021,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 			continue
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubeletTypes.SyncPodCreate, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 		kl.probeManager.AddPod(pod)
 	}
 }
@@ -2037,7 +2037,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
 		// TODO: Evaluate if we need to validate and reject updates.
 
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubeletTypes.SyncPodUpdate, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
 	}
 }
 
@@ -2062,7 +2062,7 @@ func (kl *Kubelet) HandlePodSyncs(pods []*api.Pod) {
 	start := time.Now()
 	for _, pod := range pods {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubeletTypes.SyncPodSync, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
 	}
 }
 
