@@ -119,6 +119,12 @@ git commit -m "Kubernetes version $NEW_VERSION"
 
 echo "+++ Tagging version"
 git tag -a -m "Kubernetes version $NEW_VERSION" "${NEW_VERSION}"
+# We have to sleep for a bit so that the timestamp of the beta tag is after the
+# timestamp of the release version, so that future commits are described as
+# beta, and not release versions.
+sleep 5
+declare -r beta_ver="v${VERSION_MAJOR}.${VERSION_MINOR}.$((${VERSION_PATCH}+1))-beta"
+git tag -a -m "Kubernetes version $beta_ver" "${beta_ver}"
 newtag=$(git rev-parse --short HEAD)
 
 if [[ "${VERSION_PATCH}" == "0" ]]; then
