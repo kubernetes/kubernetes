@@ -97,7 +97,7 @@ func TestMasterProcessMetrics(t *testing.T) {
 	checkForExpectedMetrics(t, metrics, []string{
 		"process_start_time_seconds",
 		"process_cpu_seconds_total",
-		"process_goroutines",
+		"go_goroutines",
 		"process_open_fds",
 		"process_resident_memory_bytes",
 	})

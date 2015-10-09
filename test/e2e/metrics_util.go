@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -31,8 +32,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	"github.com/prometheus/client_golang/extraction"
-	"github.com/prometheus/client_golang/model"
+	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 // Dashboard metrics
@@ -60,34 +61,6 @@ func (a APIResponsiveness) Len() int      { return len(a.APICalls) }
 func (a APIResponsiveness) Swap(i, j int) { a.APICalls[i], a.APICalls[j] = a.APICalls[j], a.APICalls[i] }
 func (a APIResponsiveness) Less(i, j int) bool {
 	return a.APICalls[i].Latency.Perc99 < a.APICalls[j].Latency.Perc99
-}
-
-// Ingest method implements extraction.Ingester (necessary for Prometheus library
-// to parse the metrics).
-func (a *APIResponsiveness) Ingest(samples model.Samples) error {
-	ignoredResources := sets.NewString("events")
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
-
-	for _, sample := range samples {
-		// Example line:
-		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
-			continue
-		}
-
-		resource := string(sample.Metric["resource"])
-		verb := string(sample.Metric["verb"])
-		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
-			continue
-		}
-		latency := sample.Value
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return err
-		}
-		a.addMetric(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
-	}
-	return nil
 }
 
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
@@ -118,14 +91,42 @@ func setQuantile(apicall APICall, quantile float64, latency time.Duration) APICa
 }
 
 func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
+	var a APIResponsiveness
+
 	body, err := getMetrics(c)
 	if err != nil {
-		return APIResponsiveness{}, err
+		return a, err
 	}
 
-	var ingester APIResponsiveness
-	err = extraction.Processor004.ProcessSingle(strings.NewReader(body), &ingester, &extraction.ProcessOptions{})
-	return ingester, err
+	samples, err := extractMetricSamples(body)
+	if err != nil {
+		return a, err
+	}
+
+	ignoredResources := sets.NewString("events")
+	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
+
+	for _, sample := range samples {
+		// Example line:
+		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
+			continue
+		}
+
+		resource := string(sample.Metric["resource"])
+		verb := string(sample.Metric["verb"])
+		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
+			continue
+		}
+		latency := sample.Value
+		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+		if err != nil {
+			return a, err
+		}
+		a.addMetric(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
+	}
+
+	return a, err
 }
 
 // Prints summary metrics for request types with latency above threshold
@@ -274,4 +275,29 @@ func writePerfData(c *client.Client, dirName string, postfix string) error {
 		}
 	}
 	return nil
+}
+
+// extractMetricSamples parses the prometheus metric samples from the input string.
+func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
+	dec, err := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
+	if err != nil {
+		return nil, err
+	}
+	decoder := expfmt.SampleDecoder{
+		Dec:  dec,
+		Opts: &expfmt.DecodeOptions{},
+	}
+
+	var samples []*model.Sample
+	for {
+		var v model.Vector
+		if err = decoder.Decode(&v); err != nil {
+			if err == io.EOF {
+				// Expected loop termination condition.
+				return samples, nil
+			}
+			return nil, err
+		}
+		samples = append(samples, v...)
+	}
 }
