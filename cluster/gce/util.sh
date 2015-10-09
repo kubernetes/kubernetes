@@ -57,10 +57,10 @@ function join_csv {
 function verify-prereqs {
   if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
     if [[ -z "${RUNTIME_CONFIG}" ]]; then
-      RUNTIME_CONFIG="experimental/v1alpha1=true"
+      RUNTIME_CONFIG="extensions/v1beta1=true"
     else
-      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1alpha1=false" and appending "experimental/v1alpha1=true" if not.
-      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
+      # TODO: add checking if RUNTIME_CONFIG contains "extensions/v1beta1=false" and appending "extensions/v1beta1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1=true"; then
         echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!" >&2
         exit 1
       fi

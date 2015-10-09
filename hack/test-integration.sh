@@ -28,8 +28,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # separated by comma, lists are separated by semicolon. e.g.,
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # TODO: It's going to be:
-# KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,experimental/v1alpha1"}
+# KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1"}
 
 # Give integration tests longer to run
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
@@ -52,18 +52,18 @@ runTests() {
     KUBE_RACE="" \
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
-    KUBE_API_VERSIONS="v1,experimental/v1alpha1" \
+    KUBE_API_VERSIONS="v1,extensions/v1beta1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
   kube::log::status "Running integration test scenario"
 
-  KUBE_API_VERSIONS="v1,experimental/v1alpha1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+  KUBE_API_VERSIONS="v1,extensions/v1beta1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
     --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
 }
 
-KUBE_API_VERSIONS="v1,experimental/v1alpha1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
+KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
