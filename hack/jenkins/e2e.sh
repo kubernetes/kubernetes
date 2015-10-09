@@ -786,7 +786,8 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
-    NUM_MINIONS="8"
+    # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
+    NUM_MINIONS="11"
     MASTER_SIZE="n1-standard-4"
     MINION_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
     #                                     so NUM_MINIONS x cores_per_minion should
