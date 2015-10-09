@@ -182,9 +182,9 @@ func convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	return nil
 }
 
-func convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *experimental.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
+func convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DeploymentSpec))(in)
+		defaulting.(func(*extensions.DeploymentSpec))(in)
 	}
 	out.Replicas = new(int)
 	*out.Replicas = in.Replicas
@@ -212,7 +212,7 @@ func convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *experimenta
 	return nil
 }
 
-func convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentSpec, out *experimental.DeploymentSpec, s conversion.Scope) error {
+func convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentSpec))(in)
 	}
@@ -244,9 +244,9 @@ func convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	return nil
 }
 
-func convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *experimental.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
+func convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *extensions.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DeploymentStrategy))(in)
+		defaulting.(func(*extensions.DeploymentStrategy))(in)
 	}
 	out.Type = DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
@@ -260,13 +260,13 @@ func convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *exp
 	return nil
 }
 
-func convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(in *DeploymentStrategy, out *experimental.DeploymentStrategy, s conversion.Scope) error {
+func convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(in *DeploymentStrategy, out *extensions.DeploymentStrategy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStrategy))(in)
 	}
-	out.Type = experimental.DeploymentStrategyType(in.Type)
+	out.Type = extensions.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(experimental.RollingUpdateDeployment)
+		out.RollingUpdate = new(extensions.RollingUpdateDeployment)
 		if err := convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
@@ -276,9 +276,9 @@ func convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(in *Dep
 	return nil
 }
 
-func convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *experimental.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
+func convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.RollingUpdateDeployment))(in)
+		defaulting.(func(*extensions.RollingUpdateDeployment))(in)
 	}
 	if out.MaxUnavailable == nil {
 		out.MaxUnavailable = &util.IntOrString{}
@@ -296,7 +296,7 @@ func convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployme
 	return nil
 }
 
-func convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *experimental.RollingUpdateDeployment, s conversion.Scope) error {
+func convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RollingUpdateDeployment))(in)
 	}
