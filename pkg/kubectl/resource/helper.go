@@ -130,7 +130,7 @@ func (m *Helper) Create(namespace string, modify bool, data []byte) (runtime.Obj
 func (m *Helper) createResource(c RESTClient, resource, namespace string, data []byte) (runtime.Object, error) {
 	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(data).Do().Get()
 }
-func (m *Helper) Patch(namespace, name string, pt unversioned.PatchType, data []byte) (runtime.Object, error) {
+func (m *Helper) Patch(namespace, name string, pt api.PatchType, data []byte) (runtime.Object, error) {
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
