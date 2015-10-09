@@ -144,7 +144,7 @@ func proxyContext(version string) {
 				wg.Add(1)
 				go func(i int, path, val string) {
 					defer wg.Done()
-					body, status, d, err := doProxy(f, path)
+					body, status, _, err := doProxy(f, path)
 					if err != nil {
 						recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
 						return
@@ -154,9 +154,6 @@ func proxyContext(version string) {
 					}
 					if e, a := val, string(body); e != a {
 						recordError(fmt.Sprintf("%v: path %v: wanted %v, got %v", i, path, e, a))
-					}
-					if d > 15*time.Second {
-						recordError(fmt.Sprintf("%v: path %v took %v > 15s", i, path, d))
 					}
 				}(i, path, val)
 				time.Sleep(150 * time.Millisecond)
@@ -214,7 +211,7 @@ func nodeProxyTest(f *Framework, version, nodeDest string) {
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+"/proxy/nodes/"+node+nodeDest)
+		_, status, _, err := doProxy(f, prefix+"/proxy/nodes/"+node+nodeDest)
 		if status == http.StatusServiceUnavailable {
 			Logf("Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
@@ -222,7 +219,6 @@ func nodeProxyTest(f *Framework, version, nodeDest string) {
 		} else {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(d).To(BeNumerically("<", 15*time.Second))
 		}
 	}
 	if serviceUnavailableErrors > 0 {
