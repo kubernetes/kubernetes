@@ -67,10 +67,10 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	storageVersions := make(map[string]string)
 	storageDestinations := NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix()))
-	storageDestinations.AddAPIGroup("extensions", etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix()))
+	storageDestinations.AddAPIGroup("extensions", etcdstorage.NewEtcdStorage(fakeClient, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
 	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Experimental.GroupAndVersion()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -474,8 +474,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	expectGroupName := "extensions"
 	expectVersions := []api.GroupVersion{
 		{
-			GroupVersion: testapi.Experimental.GroupAndVersion(),
-			Version:      testapi.Experimental.Version(),
+			GroupVersion: testapi.Extensions.GroupAndVersion(),
+			Version:      testapi.Extensions.Version(),
 		},
 	}
 	expectPreferredVersion := api.GroupVersion{
@@ -522,7 +522,7 @@ func initThirdParty(t *testing.T, version string) (*Master, *tools.FakeEtcdClien
 
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
+	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Extensions.Codec(), etcdtest.PathPrefix())
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
 		t.FailNow()
@@ -634,7 +634,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return testapi.Experimental.Codec().Encode(&thirdPartyData)
+	return testapi.Extensions.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {
@@ -774,7 +774,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		t.FailNow()
 	}
 
-	obj, err := testapi.Experimental.Codec().Decode([]byte(etcdResp.Node.Value))
+	obj, err := testapi.Extensions.Codec().Decode([]byte(etcdResp.Node.Value))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
