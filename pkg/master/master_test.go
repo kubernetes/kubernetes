@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/emicklei/go-restful"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -472,13 +471,13 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 
 	expectGroupName := "extensions"
-	expectVersions := []api.GroupVersion{
+	expectVersions := []unversioned.GroupVersion{
 		{
 			GroupVersion: testapi.Extensions.GroupAndVersion(),
 			Version:      testapi.Extensions.Version(),
 		},
 	}
-	expectPreferredVersion := api.GroupVersion{
+	expectPreferredVersion := unversioned.GroupVersion{
 		GroupVersion: config.StorageVersions["extensions"],
 		Version:      apiutil.GetVersion(config.StorageVersions["extensions"]),
 	}

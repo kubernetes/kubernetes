@@ -664,7 +664,7 @@ func (m *Master) init(c *Config) {
 		if err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		expAPIVersions := []api.GroupVersion{
+		expAPIVersions := []unversioned.GroupVersion{
 			{
 				GroupVersion: expVersion.Version,
 				Version:      apiutil.GetVersion(expVersion.Version),
@@ -677,7 +677,7 @@ func (m *Master) init(c *Config) {
 		group := unversioned.APIGroup{
 			Name:             g.Group,
 			Versions:         expAPIVersions,
-			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
+			PreferredVersion: unversioned.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
 		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group+"/", group)
 		allGroups = append(allGroups, group)
@@ -982,13 +982,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
 	path := makeThirdPartyPath(group)
-	groupVersion := api.GroupVersion{
+	groupVersion := unversioned.GroupVersion{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
 	}
 	apiGroup := unversioned.APIGroup{
 		Name:     group,
-		Versions: []api.GroupVersion{groupVersion},
+		Versions: []unversioned.GroupVersion{groupVersion},
 	}
 	apiserver.AddGroupWebService(m.handlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
