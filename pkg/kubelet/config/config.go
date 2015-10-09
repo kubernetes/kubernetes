@@ -89,14 +89,14 @@ func (c *PodConfig) Channel(source string) chan<- interface{} {
 	return c.mux.Channel(source)
 }
 
-// SeenAllSources returns true if this config has received a SET
-// message from all configured sources, false otherwise.
-func (c *PodConfig) SeenAllSources() bool {
+// SeenAllSources returns true if seenSources contains all sources in the
+// config, and also this config has received a SET message from each source.
+func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	if c.pods == nil {
 		return false
 	}
-	glog.V(6).Infof("Looking for %v, have seen %v", c.sources.List(), c.pods.sourcesSeen)
-	return c.pods.seenSources(c.sources.List()...)
+	glog.V(6).Infof("Looking for %v, have seen %v", c.sources.List(), seenSources)
+	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
