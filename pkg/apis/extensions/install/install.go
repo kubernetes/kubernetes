@@ -81,7 +81,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case "extensions/v1beta1":
 		return &meta.VersionInterfaces{
-			Codec:            v1alpha1.Codec,
+			Codec:            v1beta1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
