@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -85,8 +85,8 @@ func NewManager(kubeClient client.Interface) Manager {
 // isStatusEqual returns true if the given pod statuses are equal, false otherwise.
 // This method sorts container statuses so order does not affect equality.
 func isStatusEqual(oldStatus, status *api.PodStatus) bool {
-	sort.Sort(kubeletTypes.SortedContainerStatuses(status.ContainerStatuses))
-	sort.Sort(kubeletTypes.SortedContainerStatuses(oldStatus.ContainerStatuses))
+	sort.Sort(kubetypes.SortedContainerStatuses(status.ContainerStatuses))
+	sort.Sort(kubetypes.SortedContainerStatuses(oldStatus.ContainerStatuses))
 
 	// TODO: More sophisticated equality checking.
 	return reflect.DeepEqual(status, oldStatus)

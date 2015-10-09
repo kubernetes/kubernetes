@@ -21,7 +21,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -38,7 +38,7 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 		return nil, err
 	}
 	return &kubecontainer.Container{
-		ID:      kubeletTypes.DockerID(c.ID).ContainerID(),
+		ID:      kubetypes.DockerID(c.ID).ContainerID(),
 		Name:    dockerName.ContainerName,
 		Image:   c.Image,
 		Hash:    hash,
