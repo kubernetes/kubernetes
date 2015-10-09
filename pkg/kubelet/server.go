@@ -35,12 +35,15 @@ import (
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -54,8 +57,9 @@ import (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
+	auth        AuthInterface
 	host        HostInterface
-	restfulCont *restful.Container
+	restfulCont containerInterface
 }
 
 type TLSOptions struct {
@@ -64,10 +68,38 @@ type TLSOptions struct {
 	KeyFile  string
 }
 
+// containerInterface defines the restful.Container functions used on the root container
+type containerInterface interface {
+	Add(service *restful.WebService) *restful.Container
+	Handle(path string, handler http.Handler)
+	Filter(filter restful.FilterFunction)
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	RegisteredWebServices() []*restful.WebService
+
+	// RegisteredHandlePaths returns the paths of handlers registered directly with the container (non-web-services)
+	// Used to test filters are being applied on non-web-service handlers
+	RegisteredHandlePaths() []string
+}
+
+// filteringContainer delegates all Handle(...) calls to Container.HandleWithFilter(...),
+// so we can ensure restful.FilterFunctions are used for all handlers
+type filteringContainer struct {
+	*restful.Container
+	registeredHandlePaths []string
+}
+
+func (a *filteringContainer) Handle(path string, handler http.Handler) {
+	a.HandleWithFilter(path, handler)
+	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
+}
+func (a *filteringContainer) RegisteredHandlePaths() []string {
+	return a.registeredHandlePaths
+}
+
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool) {
+func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, enableDebuggingHandlers)
+	handler := NewServer(host, auth, enableDebuggingHandlers)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -84,8 +116,7 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, port uint) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, false)
-	s.restfulCont.Handle("/metrics", prometheus.Handler())
+	s := NewServer(host, nil, false)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -93,6 +124,13 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, por
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Fatal(server.ListenAndServe())
+}
+
+// AuthInterface contains all methods required by the auth filters
+type AuthInterface interface {
+	authenticator.Request
+	authorizer.RequestAttributesGetter
+	authorizer.Authorizer
 }
 
 // HostInterface contains all the kubelet methods required by the server.
@@ -118,16 +156,51 @@ type HostInterface interface {
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, enableDebuggingHandlers bool) Server {
+func NewServer(host HostInterface, auth AuthInterface, enableDebuggingHandlers bool) Server {
 	server := Server{
 		host:        host,
-		restfulCont: restful.NewContainer(),
+		auth:        auth,
+		restfulCont: &filteringContainer{Container: restful.NewContainer()},
+	}
+	if auth != nil {
+		server.InstallAuthFilter()
 	}
 	server.InstallDefaultHandlers()
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 	}
 	return server
+}
+
+// InstallAuthFilter installs authentication filters with the restful Container.
+func (s *Server) InstallAuthFilter() {
+	s.restfulCont.Filter(func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+		// Authenticate
+		u, ok, err := s.auth.AuthenticateRequest(req.Request)
+		if err != nil {
+			glog.Errorf("Unable to authenticate the request due to an error: %v", err)
+			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		if !ok {
+			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		// Get authorization attributes
+		attrs := s.auth.GetRequestAttributes(u, req.Request)
+
+		// Authorize
+		if err := s.auth.Authorize(attrs); err != nil {
+			msg := fmt.Sprintf("Forbidden (user=%s, verb=%s, namespace=%s, resource=%s)", u.GetName(), attrs.GetVerb(), attrs.GetNamespace(), attrs.GetResource())
+			glog.V(2).Info(msg)
+			resp.WriteErrorString(http.StatusForbidden, msg)
+			return
+		}
+
+		// Continue
+		chain.ProcessFilter(req, resp)
+	})
 }
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
@@ -149,6 +222,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Add(ws)
 
 	s.restfulCont.Handle("/stats/", &httpHandler{f: s.handleStats})
+	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	ws = new(restful.WebService)
 	ws.
@@ -226,8 +300,6 @@ func (s *Server) InstallDebuggingHandlers() {
 		To(s.getContainerLogs).
 		Operation("getContainerLogs"))
 	s.restfulCont.Add(ws)
-
-	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
 		name := strings.TrimPrefix(req.Request.URL.Path, pprofBasePath)
