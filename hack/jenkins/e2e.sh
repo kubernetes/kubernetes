@@ -374,20 +374,21 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
-  # Runs non-flaky tests on GCE on the release-latest branch,
+  # Runs non-flaky tests on GCE on the release-1.0 branch,
   # sequentially. As a reminder, if you need to change the skip list
   # or flaky test list on the release branch, you'll need to propose a
   # pull request directly to the release branch itself.
-  kubernetes-e2e-gce-release)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release"}
+  kubernetes-e2e-gce-release-1.0)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release-1.0"}
     : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="e2e-gce-release"}
+    : ${E2E_NETWORK:="e2e-gce-release-1-0"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-1-0"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.0"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
 
