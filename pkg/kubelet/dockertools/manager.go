@@ -1737,8 +1737,10 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 			containersToKeep[containerID] = index
 			continue
 		}
-		glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
-		containersToStart[index] = empty{}
+		if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+			glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+			containersToStart[index] = empty{}
+		}
 	}
 
 	// After the loop one of the following should be true:
