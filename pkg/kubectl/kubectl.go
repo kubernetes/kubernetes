@@ -103,6 +103,8 @@ func (e ShortcutExpander) ResourceIsValid(resource string) bool {
 	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
 }
 
+// GroupForResource takes a string (resource) and returns its group.
+// Note that the input string should not include group information; "group/resource" will result in an error.
 func (e ShortcutExpander) GroupForResource(resource string) (group string, err error) {
 	return e.RESTMapper.GroupForResource(expandResourceShortcut(resource))
 }

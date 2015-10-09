@@ -940,7 +940,7 @@ __EOF__
   ### Get experimental resource via shortname
   kubectl get experimental/hpa
   ### Get experimental resource via shortname implicitly should fail
-  ERROR_FILE="/tmp/should-error"
+  ERROR_FILE="${KUBE_TEMP}/should-error"
   kubectl get hpa 1>&2 2> "${ERROR_FILE}" || true
   if grep -q "error" "${ERROR_FILE}" && grep -q "should be specified explicitly" "${ERROR_FILE}"; then
     echo "\"kubectl get hpa\" returns error as expected: $(cat ${ERROR_FILE})"

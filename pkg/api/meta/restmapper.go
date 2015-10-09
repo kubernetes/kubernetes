@@ -185,6 +185,8 @@ func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultV
 	return meta.APIVersion, meta.Kind, nil
 }
 
+// GroupForResource takes a string (resource) and returns its group.
+// Note that the input string should not include group information; "group/resource" will result in an error.
 func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
 	if _, ok := m.mapping[strings.ToLower(resource)]; !ok {
 		return "", fmt.Errorf("no resource %q has been defined", resource)
@@ -321,6 +323,7 @@ func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVers
 
 // GroupForResource provides the Group mappings for the REST resources. This
 // implementation supports multiple REST schemas and returns the first match.
+// Note that the input string should not include group information; "group/resource" will result in an error.
 func (m MultiRESTMapper) GroupForResource(resource string) (group string, err error) {
 	for _, t := range m {
 		group, err = t.GroupForResource(resource)
