@@ -169,7 +169,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		return
 	}
 
-	for _, patchType := range []api.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {
+	for _, patchType := range []unversioned.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {
 		// TODO SUPPORT THIS!
 		if patchType == api.JSONPatchType {
 			continue

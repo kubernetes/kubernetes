@@ -407,7 +407,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		if idx := strings.Index(contentType, ";"); idx > 0 {
 			contentType = contentType[:idx]
 		}
-		patchType := api.PatchType(contentType)
+		patchType := unversioned.PatchType(contentType)
 
 		patchJS, err := readBody(req.Request)
 		if err != nil {
@@ -432,7 +432,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 }
 
 // patchResource divides PatchResource for easier unit testing
-func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.Object, patcher rest.Patcher, name string, patchType api.PatchType, patchJS []byte, namer ScopeNamer, codec runtime.Codec) (runtime.Object, error) {
+func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.Object, patcher rest.Patcher, name string, patchType unversioned.PatchType, patchJS []byte, namer ScopeNamer, codec runtime.Codec) (runtime.Object, error) {
 	namespace := api.NamespaceValue(ctx)
 
 	original, err := patcher.Get(ctx, name)
@@ -806,7 +806,7 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 
 }
 
-func getPatchedJS(patchType api.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
+func getPatchedJS(patchType unversioned.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
 	switch patchType {
 	case api.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(patchJS)
