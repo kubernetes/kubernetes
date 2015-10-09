@@ -425,7 +425,7 @@ func (s *APIServer) Run(_ []string) error {
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	if enableExp {
-		expGroup, err := latest.Group("experimental")
+		expGroup, err := latest.Group("extensions")
 		if err != nil {
 			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
@@ -436,7 +436,7 @@ func (s *APIServer) Run(_ []string) error {
 		if err != nil {
 			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 		}
-		storageDestinations.AddAPIGroup("experimental", expEtcdStorage)
+		storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 	}
 
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, &storageDestinations, newEtcd)

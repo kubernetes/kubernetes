@@ -138,14 +138,14 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, testapi.Experimental.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Experimental.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions["extensions"] = testapi.Experimental.GroupAndVersion()
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("experimental", expEtcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))

@@ -67,10 +67,10 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	storageVersions := make(map[string]string)
 	storageDestinations := NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix()))
-	storageDestinations.AddAPIGroup("experimental", etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix()))
+	storageDestinations.AddAPIGroup("extensions", etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
 	storageVersions[""] = testapi.Default.Version()
-	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
+	storageVersions["extensions"] = testapi.Experimental.GroupAndVersion()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -293,10 +293,10 @@ func TestExpapi(t *testing.T) {
 
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
-	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
-	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
-	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").GroupVersion)
+	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("extensions").RESTMapper)
+	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("extensions").Codec)
+	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("extensions").SelfLinker)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("extensions").GroupVersion)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
@@ -471,7 +471,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectGroupName := "experimental"
+	expectGroupName := "extensions"
 	expectVersions := []api.GroupVersion{
 		{
 			GroupVersion: testapi.Experimental.GroupAndVersion(),
@@ -479,8 +479,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 	}
 	expectPreferredVersion := api.GroupVersion{
-		GroupVersion: config.StorageVersions["experimental"],
-		Version:      apiutil.GetVersion(config.StorageVersions["experimental"]),
+		GroupVersion: config.StorageVersions["extensions"],
+		Version:      apiutil.GetVersion(config.StorageVersions["extensions"]),
 	}
 	assert.Equal(expectGroupName, groupList.Groups[0].Name)
 	assert.Equal(expectVersions, groupList.Groups[0].Versions)

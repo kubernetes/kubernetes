@@ -141,7 +141,7 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 
-	if _, err := latest.Group("experimental"); err != nil {
+	if _, err := latest.Group("extensions"); err != nil {
 		return &Client{RESTClient: client, ExperimentalClient: nil}, nil
 	}
 	experimentalConfig := *c

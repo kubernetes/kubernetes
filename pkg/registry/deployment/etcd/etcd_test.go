@@ -32,7 +32,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*DeploymentStorage, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "experimental")
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "extensions")
 	deploymentStorage := NewStorage(etcdStorage)
 	return &deploymentStorage, fakeClient
 }
