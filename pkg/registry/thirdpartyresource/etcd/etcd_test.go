@@ -35,13 +35,13 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewThirdPartyResource(name string) *experimental.ThirdPartyResource {
-	return &experimental.ThirdPartyResource{
+func validNewThirdPartyResource(name string) *extensions.ThirdPartyResource {
+	return &extensions.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Versions: []experimental.APIVersion{
+		Versions: []extensions.APIVersion{
 			{
 				Name: "stable/v1",
 			},
@@ -58,7 +58,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		rsrc,
 		// invalid
-		&experimental.ThirdPartyResource{},
+		&extensions.ThirdPartyResource{},
 	)
 }
 
@@ -70,7 +70,7 @@ func TestUpdate(t *testing.T) {
 		validNewThirdPartyResource("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.ThirdPartyResource)
+			object := obj.(*extensions.ThirdPartyResource)
 			object.Description = "new description"
 			return object
 		},

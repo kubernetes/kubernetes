@@ -68,7 +68,7 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPodAutoscaler) error {
+func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
 
 	scale, err := a.client.Experimental().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
@@ -135,7 +135,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa experimental.HorizontalPo
 		desiredReplicas = currentReplicas
 	}
 
-	hpa.Status = experimental.HorizontalPodAutoscalerStatus{
+	hpa.Status = extensions.HorizontalPodAutoscalerStatus{
 		CurrentReplicas:    currentReplicas,
 		DesiredReplicas:    desiredReplicas,
 		CurrentConsumption: currentConsumption,

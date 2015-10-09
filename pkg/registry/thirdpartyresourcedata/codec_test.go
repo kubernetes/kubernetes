@@ -103,7 +103,7 @@ func TestCodec(t *testing.T) {
 			}
 			continue
 		}
-		rsrcObj, ok := obj.(*experimental.ThirdPartyResourceData)
+		rsrcObj, ok := obj.(*extensions.ThirdPartyResourceData)
 		if !ok {
 			t.Errorf("[%s] unexpected object: %v", test.name, obj)
 			continue
@@ -149,7 +149,7 @@ func TestCreater(t *testing.T) {
 			name:        "valid ThirdPartyResourceData creation",
 			version:     "creater group/creater version",
 			kind:        "ThirdPartyResourceData",
-			expectedObj: &experimental.ThirdPartyResourceData{},
+			expectedObj: &extensions.ThirdPartyResourceData{},
 			expectErr:   false,
 		},
 		{

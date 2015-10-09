@@ -880,7 +880,7 @@ func (d *JobDescriber) Describe(namespace, name string) (string, error) {
 	return describeJob(job, events)
 }
 
-func describeJob(job *experimental.Job, events *api.EventList) (string, error) {
+func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)
@@ -928,7 +928,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *experimental.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
 		if daemon.Spec.Template != nil {
@@ -1448,7 +1448,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 // of getting all DS's and searching through them manually).
 // TODO: write an interface for controllers and fuse getReplicationControllersForLabels
 // and getDaemonSetsForLabels.
-func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]experimental.DaemonSet, error) {
+func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
 	dss, err := c.List(labels.Everything())
@@ -1457,7 +1457,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 	}
 
 	// Find the ones that match labelsToMatch.
-	var matchingDaemonSets []experimental.DaemonSet
+	var matchingDaemonSets []extensions.DaemonSet
 	for _, ds := range dss.Items {
 		selector := labels.SelectorFromSet(ds.Spec.Selector)
 		if selector.Matches(labelsToMatch) {

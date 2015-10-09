@@ -66,12 +66,12 @@ var validController = api.ReplicationController{
 	Spec:       validControllerSpec,
 }
 
-var validScale = experimental.Scale{
+var validScale = extensions.Scale{
 	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-	Spec: experimental.ScaleSpec{
+	Spec: extensions.ScaleSpec{
 		Replicas: validReplicas,
 	},
-	Status: experimental.ScaleStatus{
+	Status: extensions.ScaleStatus{
 		Replicas: 0,
 		Selector: validPodTemplate.Template.Labels,
 	},
@@ -88,7 +88,7 @@ func TestGet(t *testing.T) {
 
 	expect := &validScale
 	obj, err := storage.Get(ctx, "foo")
-	scale := obj.(*experimental.Scale)
+	scale := obj.(*extensions.Scale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -106,9 +106,9 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
-	update := experimental.Scale{
+	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-		Spec: experimental.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},
 	}

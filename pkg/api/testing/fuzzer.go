@@ -122,15 +122,15 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
-		func(j *experimental.DeploymentStrategy, c fuzz.Continue) {
+		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
-			strategyTypes := []experimental.DeploymentStrategyType{experimental.RecreateDeploymentStrategyType, experimental.RollingUpdateDeploymentStrategyType}
+			strategyTypes := []extensions.DeploymentStrategyType{extensions.RecreateDeploymentStrategyType, extensions.RollingUpdateDeploymentStrategyType}
 			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
-			if j.Type != experimental.RollingUpdateDeploymentStrategyType {
+			if j.Type != extensions.RollingUpdateDeploymentStrategyType {
 				j.RollingUpdate = nil
 			} else {
-				rollingUpdate := experimental.RollingUpdateDeployment{}
+				rollingUpdate := extensions.RollingUpdateDeployment{}
 				if c.RandBool() {
 					rollingUpdate.MaxUnavailable = util.NewIntOrStringFromInt(int(c.RandUint64()))
 					rollingUpdate.MaxSurge = util.NewIntOrStringFromInt(int(c.RandUint64()))
@@ -140,7 +140,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				j.RollingUpdate = &rollingUpdate
 			}
 		},
-		func(j *experimental.JobSpec, c fuzz.Continue) {
+		func(j *extensions.JobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			completions := c.Rand.Int()
 			parallelism := c.Rand.Int()
@@ -359,7 +359,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(n)
 			n.Spec.ExternalID = "external"
 		},
-		func(s *experimental.APIVersion, c fuzz.Continue) {
+		func(s *extensions.APIVersion, c fuzz.Continue) {
 			// We can't use c.RandString() here because it may generate empty
 			// string, which will cause tests failure.
 			s.APIGroup = "something"

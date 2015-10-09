@@ -33,7 +33,7 @@ func getDeploymentsResoureName() string {
 
 func TestDeploymentCreate(t *testing.T) {
 	ns := api.NamespaceDefault
-	deployment := experimental.Deployment{
+	deployment := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -58,7 +58,7 @@ func TestDeploymentCreate(t *testing.T) {
 
 func TestDeploymentGet(t *testing.T) {
 	ns := api.NamespaceDefault
-	deployment := &experimental.Deployment{
+	deployment := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -80,8 +80,8 @@ func TestDeploymentGet(t *testing.T) {
 
 func TestDeploymentList(t *testing.T) {
 	ns := api.NamespaceDefault
-	deploymentList := &experimental.DeploymentList{
-		Items: []experimental.Deployment{
+	deploymentList := &extensions.DeploymentList{
+		Items: []extensions.Deployment{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
@@ -105,7 +105,7 @@ func TestDeploymentList(t *testing.T) {
 
 func TestDeploymentUpdate(t *testing.T) {
 	ns := api.NamespaceDefault
-	deployment := &experimental.Deployment{
+	deployment := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,

@@ -507,11 +507,11 @@ type FooList struct {
 func initThirdParty(t *testing.T, version string) (*Master, *tools.FakeEtcdClient, *httptest.Server, *assert.Assertions) {
 	master, _, assert := setUp(t)
 	master.thirdPartyResources = map[string]*thirdpartyresourcedatastorage.REST{}
-	api := &experimental.ThirdPartyResource{
+	api := &extensions.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo.company.com",
 		},
-		Versions: []experimental.APIVersion{
+		Versions: []extensions.APIVersion{
 			{
 				APIGroup: "group",
 				Name:     version,
@@ -630,7 +630,7 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	thirdPartyData := experimental.ThirdPartyResourceData{
+	thirdPartyData := extensions.ThirdPartyResourceData{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
@@ -778,7 +778,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	thirdPartyObj, ok := obj.(*experimental.ThirdPartyResourceData)
+	thirdPartyObj, ok := obj.(*extensions.ThirdPartyResourceData)
 	if !ok {
 		t.Errorf("unexpected object: %v", obj)
 	}

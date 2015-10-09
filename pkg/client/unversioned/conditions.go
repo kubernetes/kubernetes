@@ -45,7 +45,7 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(c Interface, job *experimental.Job) wait.ConditionFunc {
+func JobHasDesiredParallelism(c Interface, job *extensions.Job) wait.ConditionFunc {
 
 	return func() (bool, error) {
 		job, err := c.Experimental().Jobs(job.Namespace).Get(job.Name)

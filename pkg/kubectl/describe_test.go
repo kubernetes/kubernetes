@@ -481,12 +481,12 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 }
 
 func TestDescribeDeployment(t *testing.T) {
-	fake := testclient.NewSimpleFake(&experimental.Deployment{
+	fake := testclient.NewSimpleFake(&extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Template: &api.PodTemplateSpec{},
 		},
 	})

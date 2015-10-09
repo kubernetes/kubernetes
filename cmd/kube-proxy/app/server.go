@@ -98,7 +98,7 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 const (
 	proxyModeUserspace              = "userspace"
 	proxyModeIptables               = "iptables"
-	experimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
+	experimentalProxyModeAnnotation = "net.extensions.kubernetes.io/proxy-mode"
 )
 
 func checkKnownProxyMode(proxyMode string) bool {

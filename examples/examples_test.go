@@ -101,17 +101,17 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
-	case *experimental.Deployment:
+	case *extensions.Deployment:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expValidation.ValidateDeployment(t)
-	case *experimental.Job:
+	case *extensions.Job:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expValidation.ValidateJob(t)
-	case *experimental.DaemonSet:
+	case *extensions.DaemonSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
@@ -221,10 +221,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"multi-pod":   nil,
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
-			"job":         &experimental.Job{},
+			"job":         &extensions.Job{},
 		},
 		"../docs/admin": {
-			"daemon": &experimental.DaemonSet{},
+			"daemon": &extensions.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
@@ -365,7 +365,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"fc": &api.Pod{},
 		},
 		"../examples/experimental": {
-			"deployment": &experimental.Deployment{},
+			"deployment": &extensions.Deployment{},
 		},
 	}
 

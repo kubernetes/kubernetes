@@ -37,8 +37,8 @@ func TestListDaemonSets(t *testing.T) {
 			Path:   testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
-			Body: &experimental.DaemonSetList{
-				Items: []experimental.DaemonSet{
+			Body: &extensions.DaemonSetList{
+				Items: []extensions.DaemonSet{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -47,7 +47,7 @@ func TestListDaemonSets(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Spec: experimental.DaemonSetSpec{
+						Spec: extensions.DaemonSetSpec{
 							Template: &api.PodTemplateSpec{},
 						},
 					},
@@ -66,7 +66,7 @@ func TestGetDaemonSet(t *testing.T) {
 		Request: testRequest{Method: "GET", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.DaemonSet{
+			Body: &extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -74,7 +74,7 @@ func TestGetDaemonSet(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.DaemonSetSpec{
+				Spec: extensions.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -97,14 +97,14 @@ func TestGetDaemonSetWithNoName(t *testing.T) {
 
 func TestUpdateDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestDaemonSet := &experimental.DaemonSet{
+	requestDaemonSet := &extensions.DaemonSet{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.DaemonSet{
+			Body: &extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -112,7 +112,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.DaemonSetSpec{
+				Spec: extensions.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -124,14 +124,14 @@ func TestUpdateDaemonSet(t *testing.T) {
 
 func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestDaemonSet := &experimental.DaemonSet{
+	requestDaemonSet := &extensions.DaemonSet{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo") + "/status", Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.DaemonSet{
+			Body: &extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -139,10 +139,10 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.DaemonSetSpec{
+				Spec: extensions.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
-				Status: experimental.DaemonSetStatus{},
+				Status: extensions.DaemonSetStatus{},
 			},
 		},
 	}
@@ -162,14 +162,14 @@ func TestDeleteDaemon(t *testing.T) {
 
 func TestCreateDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestDaemonSet := &experimental.DaemonSet{
+	requestDaemonSet := &extensions.DaemonSet{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.DaemonSet{
+			Body: &extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -177,7 +177,7 @@ func TestCreateDaemonSet(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.DaemonSetSpec{
+				Spec: extensions.DaemonSetSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},

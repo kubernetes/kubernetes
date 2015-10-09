@@ -151,13 +151,13 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 })
 
 func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
-	hpa := &experimental.HorizontalPodAutoscaler{
+	hpa := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.framework.Namespace.Name,
 		},
-		Spec: experimental.HorizontalPodAutoscalerSpec{
-			ScaleRef: &experimental.SubresourceReference{
+		Spec: extensions.HorizontalPodAutoscalerSpec{
+			ScaleRef: &extensions.SubresourceReference{
 				Kind:        kind,
 				Name:        rc.name,
 				Namespace:   rc.framework.Namespace.Name,
@@ -165,7 +165,7 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
 			},
 			MinReplicas: 1,
 			MaxReplicas: 5,
-			Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
+			Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
 		},
 	}
 	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
@@ -174,13 +174,13 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
 
 // argument memory is in megabytes
 func createMemoryHorizontalPodAutoscaler(rc *ResourceConsumer, memory string) {
-	hpa := &experimental.HorizontalPodAutoscaler{
+	hpa := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.framework.Namespace.Name,
 		},
-		Spec: experimental.HorizontalPodAutoscalerSpec{
-			ScaleRef: &experimental.SubresourceReference{
+		Spec: extensions.HorizontalPodAutoscalerSpec{
+			ScaleRef: &extensions.SubresourceReference{
 				Kind:        kind,
 				Name:        rc.name,
 				Namespace:   rc.framework.Namespace.Name,
@@ -188,7 +188,7 @@ func createMemoryHorizontalPodAutoscaler(rc *ResourceConsumer, memory string) {
 			},
 			MinReplicas: 1,
 			MaxReplicas: 5,
-			Target:      experimental.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
+			Target:      extensions.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
 		},
 	}
 	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
