@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -264,9 +265,9 @@ func (k *KubernetesExecutor) onInitialRegistration() {
 	defer close(k.initialRegComplete)
 
 	// emit an empty update to allow the mesos "source" to be marked as seen
-	k.updateChan <- kubelet.PodUpdate{
+	k.updateChan <- kubeletTypes.PodUpdate{
 		Pods:   []*api.Pod{},
-		Op:     kubelet.SET,
+		Op:     kubeletTypes.SET,
 		Source: k.sourcename,
 	}
 }
@@ -392,8 +393,8 @@ func (k *KubernetesExecutor) handleChangedApiserverPod(pod *api.Pod) {
 			oldPod.DeletionTimestamp = pod.DeletionTimestamp
 			oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
 
-			update := kubelet.PodUpdate{
-				Op:   kubelet.UPDATE,
+			update := kubeletTypes.PodUpdate{
+				Op:   kubeletTypes.UPDATE,
 				Pods: []*api.Pod{oldPod},
 			}
 			k.updateChan <- update
@@ -565,8 +566,8 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 	k.pods[podFullName] = pod
 
 	// send the new pod to the kubelet which will spin it up
-	update := kubelet.PodUpdate{
-		Op:   kubelet.ADD,
+	update := kubeletTypes.PodUpdate{
+		Op:   kubeletTypes.ADD,
 		Pods: []*api.Pod{pod},
 	}
 	k.updateChan <- update
@@ -770,8 +771,8 @@ func (k *KubernetesExecutor) removePodTask(driver bindings.ExecutorDriver, tid, 
 		delete(k.pods, pid)
 
 		// tell the kubelet to remove the pod
-		update := kubelet.PodUpdate{
-			Op:   kubelet.REMOVE,
+		update := kubeletTypes.PodUpdate{
+			Op:   kubeletTypes.REMOVE,
 			Pods: []*api.Pod{pod},
 		}
 		k.updateChan <- update

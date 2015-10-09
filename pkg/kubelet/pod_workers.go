@@ -24,18 +24,19 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
-	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType SyncPodType, updateComplete func())
+	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubeletTypes.SyncPodType, updateComplete func())
 	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
 	ForgetWorker(uid types.UID)
 }
 
-type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, SyncPodType) error
+type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, kubeletTypes.SyncPodType) error
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -74,7 +75,7 @@ type workUpdate struct {
 	updateCompleteFn func()
 
 	// A string describing the type of this update, eg: create
-	updateType SyncPodType
+	updateType kubeletTypes.SyncPodType
 }
 
 func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnType,
@@ -121,7 +122,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 }
 
 // Apply the new setting to the specified pod. updateComplete is called when the update is completed.
-func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType SyncPodType, updateComplete func()) {
+func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubeletTypes.SyncPodType, updateComplete func()) {
 	uid := pod.UID
 	var podUpdates chan workUpdate
 	var exists bool

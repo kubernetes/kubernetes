@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -56,7 +56,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
-		pod.Namespace = kubelet.NamespaceDefault
+		pod.Namespace = kubeletTypes.NamespaceDefault
 	}
 	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 

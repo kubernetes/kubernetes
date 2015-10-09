@@ -37,6 +37,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
@@ -172,7 +173,7 @@ func readResp(resp *http.Response) (string, error) {
 // A helper function to return the correct pod name.
 func getPodName(name, namespace string) string {
 	if namespace == "" {
-		namespace = NamespaceDefault
+		namespace = kubeletTypes.NamespaceDefault
 	}
 	return name + "_" + namespace
 }
