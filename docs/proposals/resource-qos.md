@@ -33,11 +33,13 @@ Documentation for other releases can be found at
 
 # Resource Quality of Service in Kubernetes
 
-**Author**: Ananya Kumar (@AnanyaKumar)
+**Author**: Ananya Kumar (@AnanyaKumar) Vishnu Kannan (@vishh)
 
-**Status**: Draft proposal; prototype in progress.
+**Status**: Design & Implementation in progress.
 
 *This document presents the design of resource quality of service for containers in Kubernetes, and describes use cases and implementation details.*
+
+**Quality of Service is still under development. Look [here](resource-qos.md#under-development) for more details**
 
 ## Motivation
 
@@ -92,66 +94,20 @@ An alternative is to have user-specified numerical priorities that guide Kubelet
 1. Achieved behavior would be emergent based on how users assigned priorities to their containers. No particular SLO could be delivered by the system, and usage would be subject to gaming if not restricted administratively
 2. Changes to desired priority bands would require changes to all user container configurations.
 
-## Implementation
+## Under Development
 
-### To implement requests (PR #12035):
+This feature is still under development.
+Following are some of the primary issues.
 
-API changes for request
-- Default request to limit, if limit is specified but request is not (api/v1/defaults.go)
-- Add validation code that checks request <= limit, and validation test cases (api/validation/validation.go)
+* Our current design supports QoS per-resource.
+  Given that unified hierarchy is in the horizon, a per-resource QoS cannot be supported.
+  [#14943](https://github.com/kubernetes/kubernetes/pull/14943) has more information.
 
-Scheduler Changes
-- Predicates: Use requests instead of limits in CheckPodsExceedingCapacity and PodFitsResources (scheduler/algorithm/predicates/predicates.go)
-- Priorities: Use requests instead of limits in LeastRequestedPriority and BalancedResourceAllocation(scheduler/algorithm/priorities/priorities.go)(PR #12718)
+* Scheduler does not take usage into account.
+  The scheduler can pile up BestEffort tasks on a node and cause resource pressure.
+  [#14081](https://github.com/kubernetes/kubernetes/issues/14081) needs to be resolved for the scheduler to start utilizing node's usage.
 
-Container Manager Changes
-- Use requests to assign CPU shares for Docker (kubelet/dockertools/container_manager.go)
-- RKT changes will be implemented in a later iteration
-
-### QoS Classes (PR #12182):
-
-For now, we will be implementing QoS classes using OOM scores. However, system OOM kills are expensive, and without kernel modifications we cannot rely on system OOM kills to enforce burstable class guarantees. Eventually, we will need to layer control loops on top of OOM score assignment.
-
-Add kubelet/qos/policy.go
-- Decides which memory QoS class a container is in (based on the policy described above)
-- Decides what OOM score all processes in a container should get
-
-Change memory overcommit mode
-- Right now overcommit mode is off on the machines we set up, so if there isn’t enough memory malloc will return null. This prevents QoS, because best-effort containers won’t be killed. Instead, when there isn’t enough memory, and guaranteed containers call malloc, they may not get the memory they want. We want memory guaranteed containers to get the memory they request, and force out memory best-effort containers.
-- Change the memory overcommit mode to 1, so that using excess memory starts the OOM killer. The implication is that malloc won't return null, a process will be killed instead.
-
-Container OOM score configuration
-- We’re focusing on Docker in this implementation (not RKT)
-- OOM scores
-  - Note that the OOM score of a process is 10 times the % of memory the process consumes, adjusted by OOM_SCORE_ADJ, barring exceptions (e.g. process is launched by root). Processes with higher OOM scores are killed.
-  - The base OOM score is between 0 and 1000, so if process A’s OOM_SCORE_ADJ - process B’s OOM_SCORE_ADJ is over a 1000, then process A will always be OOM killed before B.
-  - The final OOM score of a process is also between 0 and 1000
-- Memory best-effort
-  - Set OOM_SCORE_ADJ: 1000
-  - So processes in best-effort containers will have an OOM_SCORE of 1000
-- Memory guaranteed
-  - Set OOM_SCORE_ADJ: -999
-  - So processes in guaranteed containers will have an OOM_SCORE of 0 or 1
-- Memory burstable
-  - If total memory request > 99.8% of available memory, OOM_SCORE_ADJ: 2
-  - Otherwise, set OOM_SCORE_ADJ to 1000 - 10 * (% of memory requested)
-    - This ensures that the OOM_SCORE of burstable containers is > 1
-    - So burstable containers will be killed if they conflict with guaranteed containers
-    - If a burstable container uses less memory than requested, its OOM_SCORE < 1000
-    - So best-effort containers will be killed if they conflict with burstable containers using less than requested memory
-    - If a process in a burstable container uses more memory than the container requested, its OOM_SCORE will be 1000, if not its OOM_SCORE will be < 1000
-    - Assuming that a container typically has a single big process, if a burstable container that uses more memory than requested conflicts with a burstable container using less memory than requested, the former will be killed
-    - If burstable containers with multiple processes conflict, then the formula for OOM scores is a heuristic, it will not ensure "Request and Limit" guarantees. This is one reason why control loops will be added in subsequent iterations.
-- Pod infrastructure container
-  - OOM_SCORE_ADJ: -999
-- Kubelet, Docker, Kube-Proxy
-  - OOM_SCORE_ADJ: -999 (won’t be OOM killed)
-  - Hack, because these critical tasks might die if they conflict with guaranteed containers. in the future, we should place all user-pods into a separate cgroup, and set a limit on the memory they can consume.
-
-Setting OOM_SCORE_ADJ for a container
-- Refactor existing ApplyOOMScoreAdj to util/oom.go
-- To set OOM_SCORE_ADJ of a container, we loop through all processes in the container, and set OOM_SCORE_ADJ
-- We keep looping until the list of processes in the container stabilizes. This is sufficient because child processes inherit OOM_SCORE_ADJ.
+The semantics of this feature can change in subsequent releases.
 
 ## Implementation Issues and Extensions
 
@@ -177,16 +133,7 @@ Maintaining CPU performance:
 - **CPU limits**: Enabling CPU limits can be problematic, because processes might be hard capped and might stall for a while. TODO: Enable CPU limits intelligently using CPU quota and core allocation.
 
 Documentation:
-- **QoS Class Status**: TODO: Add code to ContainerStatus in the API, so that it shows which memory and CPU classes a container is in.
 - **Documentation**: TODO: add user docs for resource QoS
-
-## Demo and Tests
-
-Possible demos/E2E tests:
-- Launch a couple of memory guaranteed containers on a node. Barrage the node with memory best-effort containers. The memory guaranteed containers should survive the onslaught of memory best-effort containers.
-- Fill up a node with memory best-effort containers. Barrage the node with memory guaranteed containers. All memory best-effort containers should be evicted. This is a hard test, because the Kubelet, Kube-proxy, etc need to be well protected.
-- Launch a container with 0 CPU request. The container, when run in isolation, should get to use the entire CPU. Then add a container with non-zero request that tries to use up CPU. The 0-requst containers should be throttled, and given a small number of CPU shares.
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/resource-qos.md?pixel)]()
