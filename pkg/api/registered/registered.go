@@ -32,7 +32,7 @@ var RegisteredVersions []string
 func init() {
 	// TODO: caesarxuchao: rename this variable to validGroupVersions
 	validAPIVersions := map[string]bool{
-		"v1": true,
+		"v1":                 true,
 		"extensions/v1beta1": true,
 	}
 

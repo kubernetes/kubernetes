@@ -78,7 +78,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]string{
-				"":             "v1",
+				"":           "v1",
 				"extensions": "extensions/v1beta1",
 			},
 		},
@@ -86,7 +86,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]string{
-				"":             "v1",
+				"":           "v1",
 				"extensions": "extensions/v1beta1",
 			},
 		},
