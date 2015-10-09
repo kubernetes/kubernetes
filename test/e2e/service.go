@@ -1240,7 +1240,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
-		Timeout:              30 * time.Second,
+		Timeout:              podReadyBeforeTimeout,
 		Replicas:             replicas,
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,
