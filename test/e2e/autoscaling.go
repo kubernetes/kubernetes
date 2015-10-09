@@ -69,7 +69,7 @@ var _ = Describe("Autoscaling", func() {
 		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
-	It("[Skipped] should scale cluster size based on cpu reservation", func() {
+	It("[Skipped][Autoscaling Suite] should scale cluster size based on cpu reservation", func() {
 		setUpAutoscaler("cpu/node_reservation", 0.5, nodeCount, nodeCount+1)
 
 		ReserveCpu(f, "cpu-reservation", 600*nodeCount*coresPerNode)
@@ -91,7 +91,7 @@ var _ = Describe("Autoscaling", func() {
 		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
-	It("[Skipped] should scale cluster size based on memory reservation", func() {
+	It("[Skipped][Autoscaling Suite] should scale cluster size based on memory reservation", func() {
 		setUpAutoscaler("memory/node_reservation", 0.5, nodeCount, nodeCount+1)
 
 		ReserveMemory(f, "memory-reservation", nodeCount*memCapacityMb*6/10)
