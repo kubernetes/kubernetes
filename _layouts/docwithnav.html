@@ -105,17 +105,21 @@
 			var clickedon = $(this),
 				href = $(this).attr('href'),
 				isAnchor = false,
+				hasAnchor = false,
 				isCode = false;
 			if (href.indexOf('#') == 0){//check if its an in-page anchor
 				isAnchor = true;
 			} else if(href != "#") {//otherwise get the absolute url
 				href = this.href;
+				if (href.indexOf('#') > 0) {//check for an anchor in the URL
+					hasAnchor = true;
+				}
 			}
 			//handle the type of click
 			if(href == "javascript:;") {//clicks on javascript only elements
 				if (clickedon.hasClass('togglenav')) { //toggle display of the nav menu (hidden by default on small res. displays)
 					togglenavmenu();
-					if(!($('#wrapper').hasClass('hidden-sm'))) {
+					if (!($('#wrapper').hasClass('hidden-sm'))) {
 						syncmenutourl();
 					}
 				}
@@ -134,11 +138,10 @@
 					}
 					if(isAnchor){//if an in-page anchors, scroll to it
 						var offset = 0;
-						if ($(href).length) {//make sure its a valid anchor, otherwise scroll no where (offset = 0)
+						if ($(href).length) {//make sure its not an empty anchor, otherwise start at the top (offset = 0)
 							offset = $(href).offset().top - 155;
 						}
 						$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
-						return false;
 					} else if ((href.indexOf('.yaml') > -1 && href.indexOf('.yaml') + 5 == href.length) || (href.indexOf('.json') > -1 && href.indexOf('.json') + 5 ==  href.length)) {//open code samples (.yaml or .json files) in <code> blocks
 						$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {
 							$('#codeblock').load(href, function() {	//load the code sample file into the 'code' tags
@@ -153,7 +156,14 @@
 								var tocid = String(clickedon.parent().children('ul').attr('id'));//cast id to string
 								$('#toclist').load( location.pathname + " #" + tocid + " li" );
 							}
-							$('html, body').animate({scrollTop: 0}, 0);
+							var offset = 0;//set offset to the top of the page
+							if (hasAnchor) {//if URL has an anchor, find and set its offset
+								var hash = "#" + href.substring(href.indexOf("#")+1);//retrieve only the anchor from the URL
+								if ($(hash).length) {//make sure its not an empty anchor
+									offset = $(hash).offset().top - 155;
+								}
+							}
+							$('html, body').animate({scrollTop: offset}, 0);
 						});
 						$.get(href, function(html){//update the page's <title> tags with title from loaded page (so browser shows current title)
 						    var matches = html.match(/<title>([^<]*)/);
