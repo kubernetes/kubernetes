@@ -68,14 +68,6 @@ const (
 	authDir            = "auth.d"
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
 
-	// TODO(yifan): Merge with ContainerGCPolicy, i.e., derive
-	// the grace period from MinAge in ContainerGCPolicy.
-	//
-	// Duration to wait before discarding inactive pods from garbage
-	defaultGracePeriod = "1m"
-	// Duration to wait before expiring prepared pods.
-	defaultExpirePrepared = "1m"
-
 	defaultImageTag = "latest"
 )
 
@@ -1083,11 +1075,11 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 // GarbageCollect collects the pods/containers.
 // TODO(yifan): Enforce the gc policy, also, it would be better if we can
 // just GC kubernetes pods.
-func (r *Runtime) GarbageCollect() error {
+func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
 	if err := exec.Command("systemctl", "reset-failed").Run(); err != nil {
 		glog.Errorf("rkt: Failed to reset failed systemd services: %v", err)
 	}
-	if _, err := r.runCommand("gc", "--grace-period="+defaultGracePeriod, "--expire-prepared="+defaultExpirePrepared); err != nil {
+	if _, err := r.runCommand("gc", "--grace-period="+gcPolicy.MinAge.String(), "--expire-prepared="+gcPolicy.MinAge.String()); err != nil {
 		glog.Errorf("rkt: Failed to gc: %v", err)
 		return err
 	}

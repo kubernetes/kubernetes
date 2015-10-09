@@ -147,7 +147,7 @@ func NewMainKubelet(
 	pullBurst int,
 	eventQPS float32,
 	eventBurst int,
-	containerGCPolicy ContainerGCPolicy,
+	containerGCPolicy kubecontainer.ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	registerNode bool,
 	standaloneMode bool,
@@ -236,11 +236,6 @@ func NewMainKubelet(
 		Namespace: "",
 	}
 
-	containerGC, err := newContainerGC(dockerClient, containerGCPolicy)
-	if err != nil {
-		return nil, err
-	}
-
 	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
@@ -275,7 +270,6 @@ func NewMainKubelet(
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
-		containerGC:                    containerGC,
 		diskSpaceManager:               diskSpaceManager,
 		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
@@ -352,7 +346,6 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		klet.containerGC = rktRuntime
 		klet.imageManager = rkt.NewImageManager(rktRuntime)
 
 		// No Docker daemon to put in a container.
@@ -360,6 +353,13 @@ func NewMainKubelet(
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
+
+	// setup containerGC
+	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
+	if err != nil {
+		return nil, err
+	}
+	klet.containerGC = containerGC
 
 	// setup imageManager
 	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
@@ -510,7 +510,7 @@ type Kubelet struct {
 	recorder record.EventRecorder
 
 	// Policy for handling garbage collection of dead containers.
-	containerGC containerGC
+	containerGC kubecontainer.ContainerGC
 
 	// Manager for images.
 	imageManager imageManager
