@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -311,7 +312,7 @@ func TestKubeletDirsCompat(t *testing.T) {
 	}
 }
 
-var emptyPodUIDs map[types.UID]SyncPodType
+var emptyPodUIDs map[types.UID]kubeletTypes.SyncPodType
 
 func TestSyncLoopTimeUpdate(t *testing.T) {
 	testKubelet := newTestKubelet(t)
@@ -323,12 +324,12 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 		t.Errorf("Unexpected sync loop time: %s, expected 0", loopTime1)
 	}
 
-	kubelet.syncLoopIteration(make(chan PodUpdate), kubelet)
+	kubelet.syncLoopIteration(make(chan kubeletTypes.PodUpdate), kubelet)
 	loopTime2 := kubelet.LatestLoopEntryTime()
 	if loopTime2.IsZero() {
 		t.Errorf("Unexpected sync loop time: 0, expected non-zero value.")
 	}
-	kubelet.syncLoopIteration(make(chan PodUpdate), kubelet)
+	kubelet.syncLoopIteration(make(chan kubeletTypes.PodUpdate), kubelet)
 	loopTime3 := kubelet.LatestLoopEntryTime()
 	if !loopTime3.After(loopTime1) {
 		t.Errorf("Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
@@ -345,7 +346,7 @@ func TestSyncLoopAbort(t *testing.T) {
 	// the channel close
 	kubelet.resyncInterval = time.Second * 30
 
-	ch := make(chan PodUpdate)
+	ch := make(chan kubeletTypes.PodUpdate)
 	close(ch)
 
 	// sanity check (also prevent this test from hanging in the next step)
@@ -2657,7 +2658,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 }
 
 func TestCreateMirrorPod(t *testing.T) {
-	for _, updateType := range []SyncPodType{SyncPodCreate, SyncPodUpdate} {
+	for _, updateType := range []kubeletTypes.SyncPodType{kubeletTypes.SyncPodCreate, kubeletTypes.SyncPodUpdate} {
 		testKubelet := newTestKubelet(t)
 		kl := testKubelet.kubelet
 		manager := testKubelet.fakeMirrorClient
@@ -2667,7 +2668,7 @@ func TestCreateMirrorPod(t *testing.T) {
 				Name:      "bar",
 				Namespace: "foo",
 				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "file",
+					kubeletTypes.ConfigSourceAnnotationKey: "file",
 				},
 			},
 		}
@@ -2700,7 +2701,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 			Name:      "foo",
 			Namespace: "ns",
 			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: "file",
+				kubeletTypes.ConfigSourceAnnotationKey: "file",
 			},
 		},
 		Spec: api.PodSpec{
@@ -2716,8 +2717,8 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 			Name:      "foo",
 			Namespace: "ns",
 			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: "api",
-				ConfigMirrorAnnotationKey: "mirror",
+				kubeletTypes.ConfigSourceAnnotationKey: "api",
+				kubeletTypes.ConfigMirrorAnnotationKey: "mirror",
 			},
 		},
 		Spec: api.PodSpec{
@@ -2729,7 +2730,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{}, SyncPodUpdate)
+	err := kl.syncPod(pod, mirrorPod, container.Pod{}, kubeletTypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2754,8 +2755,8 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 				Name:      "pod1",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "api",
-					ConfigMirrorAnnotationKey: "mirror",
+					kubeletTypes.ConfigSourceAnnotationKey: "api",
+					kubeletTypes.ConfigMirrorAnnotationKey: "mirror",
 				},
 			},
 		},
@@ -2765,8 +2766,8 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 				Name:      "pod2",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "api",
-					ConfigMirrorAnnotationKey: "mirror",
+					kubeletTypes.ConfigSourceAnnotationKey: "api",
+					kubeletTypes.ConfigMirrorAnnotationKey: "mirror",
 				},
 			},
 		},
@@ -2797,7 +2798,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 				Name:      "qux",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "file",
+					kubeletTypes.ConfigSourceAnnotationKey: "file",
 				},
 			},
 			Spec: api.PodSpec{
@@ -2812,8 +2813,8 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 				Name:      "qux",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "api",
-					ConfigMirrorAnnotationKey: "mirror",
+					kubeletTypes.ConfigSourceAnnotationKey: "api",
+					kubeletTypes.ConfigMirrorAnnotationKey: "mirror",
 				},
 			},
 			Spec: api.PodSpec{
@@ -2879,7 +2880,7 @@ func TestDoNotCacheStatusForStaticPods(t *testing.T) {
 				Name:      "staticFoo",
 				Namespace: "new",
 				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "file",
+					kubeletTypes.ConfigSourceAnnotationKey: "file",
 				},
 			},
 			Spec: api.PodSpec{
@@ -2904,7 +2905,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 
 	capabilities.SetForTests(capabilities.Capabilities{
 		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{ApiserverSource, FileSource},
+			HostNetworkSources: []string{kubeletTypes.ApiserverSource, kubeletTypes.FileSource},
 		},
 	})
 	pod := &api.Pod{
@@ -2913,7 +2914,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 			Name:      "foo",
 			Namespace: "new",
 			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: FileSource,
+				kubeletTypes.ConfigSourceAnnotationKey: kubeletTypes.FileSource,
 			},
 		},
 		Spec: api.PodSpec{
@@ -2926,7 +2927,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, container.Pod{}, kubeletTypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -2947,7 +2948,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			Name:      "foo",
 			Namespace: "new",
 			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: FileSource,
+				kubeletTypes.ConfigSourceAnnotationKey: kubeletTypes.FileSource,
 			},
 		},
 		Spec: api.PodSpec{
@@ -2959,7 +2960,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, container.Pod{}, kubeletTypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -2986,7 +2987,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, container.Pod{}, kubeletTypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3012,7 +3013,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, container.Pod{}, kubeletTypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
