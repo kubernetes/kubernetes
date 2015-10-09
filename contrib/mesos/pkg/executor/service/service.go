@@ -46,7 +46,7 @@ import (
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -56,7 +56,7 @@ import (
 const (
 	// if we don't use this source then the kubelet will do funny, mirror things.
 	// @see ConfigSourceAnnotationKey
-	MESOS_CFG_SOURCE = kubeletTypes.ApiserverSource
+	MESOS_CFG_SOURCE = kubetypes.ApiserverSource
 )
 
 type KubeletExecutorServer struct {
@@ -137,17 +137,17 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	//cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	//log.Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 
-	hostNetworkSources, err := kubeletTypes.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
+	hostNetworkSources, err := kubetypes.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
 	if err != nil {
 		return err
 	}
 
-	hostPIDSources, err := kubeletTypes.GetValidatedSources(strings.Split(s.HostPIDSources, ","))
+	hostPIDSources, err := kubetypes.GetValidatedSources(strings.Split(s.HostPIDSources, ","))
 	if err != nil {
 		return err
 	}
 
-	hostIPCSources, err := kubeletTypes.GetValidatedSources(strings.Split(s.HostIPCSources, ","))
+	hostIPCSources, err := kubetypes.GetValidatedSources(strings.Split(s.HostIPCSources, ","))
 	if err != nil {
 		return err
 	}
@@ -384,7 +384,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 
 	go exec.InitializeStaticPodsSource(func() {
 		// Create file source only when we are called back. Otherwise, it is never marked unseen.
-		fileSourceUpdates := pc.Channel(kubeletTypes.FileSource)
+		fileSourceUpdates := pc.Channel(kubetypes.FileSource)
 
 		kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
 	})
@@ -450,7 +450,7 @@ func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions 
 
 // runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
 // never returns.
-func (kl *kubeletExecutor) Run(updates <-chan kubeletTypes.PodUpdate) {
+func (kl *kubeletExecutor) Run(updates <-chan kubetypes.PodUpdate) {
 	defer func() {
 		close(kl.kubeletFinished)
 		util.HandleCrash()
@@ -461,7 +461,7 @@ func (kl *kubeletExecutor) Run(updates <-chan kubeletTypes.PodUpdate) {
 
 	// push updates through a closable pipe. when the executor indicates shutdown
 	// via Done() we want to stop the Kubelet from processing updates.
-	pipe := make(chan kubeletTypes.PodUpdate)
+	pipe := make(chan kubetypes.PodUpdate)
 	go func() {
 		// closing pipe will cause our patched kubelet's syncLoop() to exit
 		defer close(pipe)

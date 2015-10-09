@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
@@ -415,7 +415,7 @@ containers:
 
 			// Wait for the mirror pod to be created.
 			podName := fmt.Sprintf("%s-localhost", desc)
-			namespace := kubeletTypes.NamespaceDefault
+			namespace := kubetypes.NamespaceDefault
 			if err := wait.Poll(time.Second, longTestTimeout,
 				podRunning(c, namespace, podName)); err != nil {
 				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything()); err == nil {

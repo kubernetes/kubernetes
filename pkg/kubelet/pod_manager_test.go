@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // Stub out mirror client for testing purpose.
@@ -41,8 +41,8 @@ func TestGetSetPods(t *testing.T) {
 			Name:      "bar",
 			Namespace: "default",
 			Annotations: map[string]string{
-				kubeletTypes.ConfigSourceAnnotationKey: "api",
-				kubeletTypes.ConfigMirrorAnnotationKey: "mirror",
+				kubetypes.ConfigSourceAnnotationKey: "api",
+				kubetypes.ConfigMirrorAnnotationKey: "mirror",
 			},
 		},
 	}
@@ -51,7 +51,7 @@ func TestGetSetPods(t *testing.T) {
 			UID:         "123456789",
 			Name:        "bar",
 			Namespace:   "default",
-			Annotations: map[string]string{kubeletTypes.ConfigSourceAnnotationKey: "file"},
+			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
 		},
 	}
 
@@ -61,7 +61,7 @@ func TestGetSetPods(t *testing.T) {
 				UID:         "999999999",
 				Name:        "taco",
 				Namespace:   "default",
-				Annotations: map[string]string{kubeletTypes.ConfigSourceAnnotationKey: "api"},
+				Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "api"},
 			},
 		},
 		staticPod,

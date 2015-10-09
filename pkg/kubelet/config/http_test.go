@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -128,7 +128,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
-		expected kubeletTypes.PodUpdate
+		expected kubetypes.PodUpdate
 	}{
 		{
 			desc: "Single pod",
@@ -148,8 +148,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					SecurityContext: &api.PodSecurityContext{},
 				},
 			},
-			expected: CreatePodUpdate(kubeletTypes.SET,
-				kubeletTypes.HTTPSource,
+			expected: CreatePodUpdate(kubetypes.SET,
+				kubetypes.HTTPSource,
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
@@ -206,15 +206,15 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					},
 				},
 			},
-			expected: CreatePodUpdate(kubeletTypes.SET,
-				kubeletTypes.HTTPSource,
+			expected: CreatePodUpdate(kubetypes.SET,
+				kubetypes.HTTPSource,
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "default",
 
-						SelfLink: getSelfLink("foo-"+hostname, kubeletTypes.NamespaceDefault),
+						SelfLink: getSelfLink("foo-"+hostname, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						NodeName:                      hostname,
@@ -237,7 +237,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Name:      "bar" + "-" + hostname,
 						Namespace: "default",
 
-						SelfLink: getSelfLink("bar-"+hostname, kubeletTypes.NamespaceDefault),
+						SelfLink: getSelfLink("bar-"+hostname, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						NodeName:                      hostname,
@@ -279,7 +279,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
 		}
-		update := (<-ch).(kubeletTypes.PodUpdate)
+		update := (<-ch).(kubetypes.PodUpdate)
 
 		if !api.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
@@ -325,7 +325,7 @@ func TestURLWithHeader(t *testing.T) {
 	if err := c.extractFromURL(); err != nil {
 		t.Fatalf("Unexpected error extracting from URL: %v", err)
 	}
-	update := (<-ch).(kubeletTypes.PodUpdate)
+	update := (<-ch).(kubetypes.PodUpdate)
 
 	headerVal := fakeHandler.RequestReceived.Header["Metadata-Flavor"]
 	if len(headerVal) != 1 || headerVal[0] != "Google" {
