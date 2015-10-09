@@ -744,10 +744,6 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 
 // GetZone implements Zones.GetZone
 func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
-	if self.availabilityZone == "" {
-		// Should be unreachable
-		panic("availabilityZone not set")
-	}
 	return cloudprovider.Zone{
 		FailureDomain: self.availabilityZone,
 		Region:        self.region,
