@@ -125,7 +125,6 @@ AWS_REQUIRED_SKIP_TESTS=(
 GCE_FLAKY_TESTS=(
     "DaemonRestart\sController\sManager"
     "Daemon\sset\sshould"
-    "Resource\susage\sof\ssystem\scontainers"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
     "should\srelease\sthe\sload\sbalancer\swhen\sType\sgoes\sfrom\sLoadBalancer" # timeouts in 20 minutes in last builds. #14424
